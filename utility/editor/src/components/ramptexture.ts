@@ -36,11 +36,11 @@ export class RampTextureCreator {
       [
         {
           x: 0,
-          value: 1
+          value: [1]
         },
         {
           x: 1,
-          value: 1
+          value: [1]
         }
       ],
       {

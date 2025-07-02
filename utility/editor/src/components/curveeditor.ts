@@ -658,13 +658,14 @@ export class CurveEditor {
   }
 
   private updateInterpolator(): void {
+    const stride = this._interpolator?.stride ?? 1;
     const inputs = new Float32Array(this._points.length);
-    const outputs = new Float32Array(this._points.length * this._interpolator.stride);
+    const outputs = new Float32Array(this._points.length * stride);
     for (let i = 0; i < this._points.length; i++) {
       inputs[i] = this._points[i].x;
-      if (this._interpolator.stride > 1) {
-        for (let j = 0; j < this._interpolator.stride; j++) {
-          outputs[i * this._interpolator.stride + j] = this._points[i].value[j];
+      if (stride > 1) {
+        for (let j = 0; j < stride; j++) {
+          outputs[i * stride + j] = this._points[i].value[j];
         }
       } else {
         outputs[i] = this._points[i].value[0];
@@ -678,7 +679,7 @@ export class CurveEditor {
       this._interpolator.mode = this._settings.interpolationType;
     }
     if (!this._resultBuffer) {
-      this._resultBuffer = new Float32Array(this._interpolator.stride);
+      this._resultBuffer = new Float32Array(stride);
     }
     this._curveDirty = true;
   }
