@@ -11,7 +11,7 @@ import { DlgSelectAnimation } from './selectanimationdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
-    new DlgMessage(`${title}##Dialog`, message, true, width, height);
+    new DlgMessage(`${title}##Dialog`, message, width, height).showModal();
   }
   public static async batchExportScene(
     title: string,
@@ -20,7 +20,7 @@ export class Dialog {
     height?: number
   ): Promise<DBSceneInfo[]> {
     return new Promise<DBSceneInfo[]>((resolve) => {
-      new DlgExportScene(title, true, scene, width, height, resolve);
+      new DlgExportScene(title, scene, width, height, resolve).showModal();
     });
   }
   public static async openScene(
@@ -30,17 +30,17 @@ export class Dialog {
     height?: number
   ): Promise<string> {
     return new Promise<string>((resolve) => {
-      new DlgOpenScene(title, true, scene, width, height, resolve);
+      new DlgOpenScene(title, scene, width, height, resolve).showModal();
     });
   }
   public static async promptName(title: string, width?: number, height?: number): Promise<string> {
     return new Promise((resolve) => {
-      new DlgPromptName(title, true, width, height, resolve);
+      new DlgPromptName(title, width, height, resolve).showModal();
     });
   }
   public static async rename(title: string, name: string, width?: number): Promise<string> {
     return new Promise((resolve) => {
-      new DlgRename(title, true, width, name, resolve);
+      new DlgRename(title, width, name, resolve).showModal();
     });
   }
   public static async editCurve(
@@ -50,7 +50,7 @@ export class Dialog {
     height?: number
   ): Promise<Interpolator> {
     return new Promise((resolve) => {
-      new DlgCurveEditor(title, true, width, height, interpolator, resolve);
+      new DlgCurveEditor(title, width, height, interpolator, resolve).show();
     });
   }
   public static async createRampTexture(
@@ -59,7 +59,7 @@ export class Dialog {
     height?: number
   ): Promise<{ data: Uint8ClampedArray; name: string }> {
     return new Promise((resolve) => {
-      new DlgRampTextureCreator(title, true, width, height, resolve);
+      new DlgRampTextureCreator(title, width, height, resolve).showModal();
     });
   }
   public static async selectAnimationAndTrack(
@@ -68,7 +68,7 @@ export class Dialog {
     width?: number
   ): Promise<{ animationName: string; trackName: string }> {
     return new Promise((resolve) => {
-      new DlgSelectAnimation(title, true, animationNames, width, resolve);
+      new DlgSelectAnimation(title, animationNames, width, resolve).showModal();
     });
   }
 }

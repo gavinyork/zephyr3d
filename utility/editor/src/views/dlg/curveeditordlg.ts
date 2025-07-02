@@ -1,22 +1,21 @@
 import type { Interpolator } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 import { CurveEditor } from '../../components/curveeditor';
 
-export class DlgCurveEditor extends ModalDialog {
+export class DlgCurveEditor extends DialogRenderer {
   private labels: string[];
   private channel: [number];
   private resolve: (val: Interpolator) => void;
   private editor: CurveEditor;
   constructor(
     id: string,
-    open: boolean,
     width: number,
     height: number,
     interpolator: Interpolator,
     resolve: (val: Interpolator) => void
   ) {
-    super(id, open, width, height);
+    super(id, width, height);
     this.resolve = resolve;
     this.editor = new CurveEditor(interpolator);
     if (interpolator && interpolator.target !== 'number') {

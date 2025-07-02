@@ -188,7 +188,7 @@ class PropertyGroup {
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
-  request_edit_interpolator: [interpolator: Interpolator];
+  request_edit_interpolator: [interpolator: Interpolator, prop: PropertyAccessor];
   end_edit_interpolator: [interpolator: Interpolator];
   object_property_changed: [object: unknown, prop: string];
 }>() {
@@ -448,7 +448,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             if (group.prop.edit === 'aabb') {
               this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
             } else if (group.prop.edit === 'interpolator') {
-              this.dispatchEvent('request_edit_interpolator', group.value.object[0] as Interpolator);
+              this.dispatchEvent(
+                'request_edit_interpolator',
+                group.value.object[0] as Interpolator,
+                group.prop
+              );
             }
           }
         }

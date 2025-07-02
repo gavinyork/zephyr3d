@@ -1,10 +1,10 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 
-export class DlgProgress extends ModalDialog {
+export class DlgProgress extends DialogRenderer {
   private _progress: string;
-  constructor(id: string, open: boolean) {
-    super(id, open, 300);
+  constructor(id: string) {
+    super(id, 300);
     this._progress = '';
   }
   get progress() {

@@ -1,21 +1,20 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 import type { DBSceneInfo } from '../../storage/db';
 
-export class DlgOpenScene extends ModalDialog {
+export class DlgOpenScene extends DialogRenderer {
   private _sceneNames: string[];
   private _sceneIds: string[];
   private _selected: [number];
   private _resolve: (s: string) => void;
   constructor(
     id: string,
-    open: boolean,
     scenes: DBSceneInfo[],
     width: number,
     height: number,
     resolve: (s: string) => void
   ) {
-    super(id, open, width, height);
+    super(id, width, height);
     this._sceneNames = scenes.map((scene) => scene.name);
     this._sceneIds = scenes.map((scene) => scene.uuid);
     this._selected = [0];

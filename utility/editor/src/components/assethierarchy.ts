@@ -100,7 +100,8 @@ export class AssetHierarchy {
       },
       (current, total) => {
         if (!this._zipProgress) {
-          this._zipProgress = new DlgProgress('Uploading files', true);
+          this._zipProgress = new DlgProgress('Uploading files');
+          this._zipProgress.showModal();
         }
         this._zipProgress.progress = `${current}/${total}`;
       }

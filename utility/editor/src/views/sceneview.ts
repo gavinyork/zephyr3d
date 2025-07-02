@@ -7,6 +7,7 @@ import type {
   Camera,
   Compositor,
   NodeCloneMethod,
+  PropertyAccessor,
   Scene,
   SerializationManager,
   ShapeOptionType,
@@ -899,7 +900,14 @@ export class SceneView extends BaseView<SceneModel> {
       this._currentEditTool.get().update(dt);
     }
   }
-  private editInterpolator(interpolator: Interpolator) {}
+  private editInterpolator(interpolator: Interpolator, prop: PropertyAccessor) {
+    Dialog.editCurve(
+      `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
+      interpolator,
+      600,
+      500
+    );
+  }
   private endEditInterpolator(interpolator: Interpolator) {}
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;

@@ -1,22 +1,20 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 import { renderEditableCombo } from '../../components/editablecombo';
 
-export class DlgSelectAnimation extends ModalDialog {
+export class DlgSelectAnimation extends DialogRenderer {
   private _animationNames: string[];
   private _selected: [string];
   private _trackName: [string];
   private _resolve: (result: { animationName: string; trackName: string }) => void;
   constructor(
     id: string,
-    open: boolean,
     animations: string[],
     width: number,
     resolve: (result: { animationName: string; trackName: string }) => void
   ) {
     super(
       id,
-      open,
       width,
       4 * ImGui.GetStyle().WindowPadding.y + 2 * ImGui.GetStyle().ItemSpacing.y + 4 * ImGui.GetFrameHeight(),
       true,

@@ -1,11 +1,11 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 
-export class DlgPromptName extends ModalDialog {
+export class DlgPromptName extends DialogRenderer {
   private _sceneName: string;
   private _resolve: (s: string) => void;
-  constructor(id: string, open: boolean, width: number, height: number, resolve: (s: string) => void) {
-    super(id, open, width, height);
+  constructor(id: string, width: number, height: number, resolve: (s: string) => void) {
+    super(id, width, height);
     this._sceneName = '';
     this._resolve = resolve;
   }

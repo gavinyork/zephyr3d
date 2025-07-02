@@ -1,4 +1,4 @@
-import { InterpolationMode, Interpolator } from '@zephyr3d/base';
+import { InterpolationMode, Interpolator, makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 interface Point {
@@ -21,7 +21,9 @@ interface CurveSettings {
 
 const keyFramePointShape = [new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2()];
 
-export class CurveEditor {
+export class CurveEditor extends makeEventTarget(Object)<{
+  curve_changed: [];
+}>() {
   private _points: Point[] = [];
   private _interpolator: Interpolator = null;
 
@@ -45,6 +47,7 @@ export class CurveEditor {
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
   constructor(pointsOrInterpolator?: Point[] | Interpolator, settings?: Partial<CurveSettings>) {
+    super();
     let points: Point[];
     let timeRangeMin = Number.MAX_VALUE;
     let timeRangeMax = -Number.MAX_VALUE;
@@ -682,6 +685,7 @@ export class CurveEditor {
       this._resultBuffer = new Float32Array(stride);
     }
     this._curveDirty = true;
+    this.dispatchEvent('curve_changed');
   }
   getValue(time: number): number {
     if (!this._interpolator || this._points.length < 2) {

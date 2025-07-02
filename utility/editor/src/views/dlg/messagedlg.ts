@@ -1,10 +1,10 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 
-export class DlgMessage extends ModalDialog {
+export class DlgMessage extends DialogRenderer {
   private _text: string;
-  constructor(id?: string, message?: string, open?: boolean, width?: number, height?: number) {
-    super(id ?? 'MessageBox', open ?? true, width ?? 300, height ?? 0);
+  constructor(id?: string, message?: string, width?: number, height?: number) {
+    super(id ?? 'MessageBox', width ?? 300, height ?? 0);
     this._text = message ?? '';
   }
   get text() {

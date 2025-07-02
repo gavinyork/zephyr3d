@@ -1,19 +1,18 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 
-export class DlgRampTextureCreator extends ModalDialog {
+export class DlgRampTextureCreator extends DialogRenderer {
   private _resolve: (tex: { data: Uint8ClampedArray; name: string }) => void;
   private _name: string;
   private _creator: RampTextureCreator;
   constructor(
     id: string,
-    open: boolean,
     width: number,
     height: number,
     resolve: (tex: { data: Uint8ClampedArray; name: string }) => void
   ) {
-    super(id, open, width, height);
+    super(id, width, height);
     this._resolve = resolve;
     this._name = 'ramp texture';
     this._creator = new RampTextureCreator();
