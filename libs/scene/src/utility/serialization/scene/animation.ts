@@ -91,6 +91,7 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         {
           name: 'TrackData',
           type: 'object',
+          edit: 'interpolator',
           objectTypes: [Interpolator],
           get(this: PropertyTrack, value) {
             value.object[0] = this.interpolator;

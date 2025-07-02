@@ -25,7 +25,7 @@ export type PropertyValue = {
   object?: unknown[];
 };
 
-export type PropEdit = 'aabb' | 'quaternion';
+export type PropEdit = 'aabb' | 'quaternion' | 'interpolator';
 
 export type PropertyAccessor<T = unknown> = {
   type: PropertyType;

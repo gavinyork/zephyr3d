@@ -784,6 +784,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
+    this._propGrid.on('request_edit_interpolator', this.editInterpolator, this);
+    this._propGrid.on('end_edit_interpolator', this.endEditInterpolator, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     this.sceneSetup();
   }
@@ -802,6 +804,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
+    this._propGrid.off('request_edit_interpolator', this.editInterpolator, this);
+    this._propGrid.off('end_edit_interpolator', this.endEditInterpolator, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     this.sceneFinialize();
   }
@@ -895,6 +899,8 @@ export class SceneView extends BaseView<SceneModel> {
       this._currentEditTool.get().update(dt);
     }
   }
+  private editInterpolator(interpolator: Interpolator) {}
+  private endEditInterpolator(interpolator: Interpolator) {}
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
     this._postGizmoRenderer.editAABB(this._aabbForEdit);

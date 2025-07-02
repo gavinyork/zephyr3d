@@ -19,6 +19,8 @@ interface CurveSettings {
   interpolationType: InterpolationMode;
 }
 
+const keyFramePointShape = [new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2()];
+
 export class CurveEditor {
   private _points: Point[] = [];
   private _interpolator: Interpolator = null;
@@ -498,11 +500,19 @@ export class CurveEditor {
       const color =
         index === this._selectedPointIndex ? this._settings.selectedPointColor : this._settings.pointColor;
 
+      keyFramePointShape[0].Set(cursorPos.x + screenPos.x - 5, cursorPos.y + screenPos.y);
+      keyFramePointShape[1].Set(cursorPos.x + screenPos.x, cursorPos.y + screenPos.y + 5);
+      keyFramePointShape[2].Set(cursorPos.x + screenPos.x + 5, cursorPos.y + screenPos.y);
+      keyFramePointShape[3].Set(cursorPos.x + screenPos.x, cursorPos.y + screenPos.y - 5);
+
+      drawList.AddConvexPolyFilled(keyFramePointShape, 4, color);
+      /*
       drawList.AddCircleFilled(
         new ImGui.ImVec2(cursorPos.x + screenPos.x, cursorPos.y + screenPos.y),
         5,
         color
       );
+      */
     });
   }
   private handleInteraction(cursorPos: ImGui.ImVec2): void {

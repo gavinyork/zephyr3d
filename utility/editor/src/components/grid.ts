@@ -12,7 +12,14 @@ import {
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
+import {
+  AABB,
+  degree2radian,
+  Interpolator,
+  makeEventTarget,
+  Quaternion,
+  radian2degree
+} from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 
@@ -181,6 +188,8 @@ class PropertyGroup {
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
+  request_edit_interpolator: [interpolator: Interpolator];
+  end_edit_interpolator: [interpolator: Interpolator];
   object_property_changed: [object: unknown, prop: string];
 }>() {
   private _rootGroup: PropertyGroup;
@@ -364,7 +373,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       group.objectTypes.length > 0
     ) {
       const readonly = !!group.prop.readonly;
-      const editable = group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb';
+      const editable =
+        (group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb') ||
+        (group.value.object?.[0] instanceof Interpolator && group.prop.edit === 'interpolator');
       const settable = !!group.prop.set && (group.prop.type === 'object' || group.index < group.count);
       const addable = group.prop.type === 'object_array' && !!group.prop.add;
       const deletable = group.prop.type === 'object_array' && group.prop.delete;
@@ -423,14 +434,22 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             this.dispatchEvent('object_property_changed', group.object, group.prop.name);
             this.refresh();
             if (editable) {
-              this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+              if (group.prop.edit === 'aabb') {
+                this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+              } else if (group.prop.edit === 'interpolator') {
+                this.dispatchEvent('end_edit_interpolator', group.value.object[0] as Interpolator);
+              }
             }
           }
         }
         if (editable) {
           ImGui.SameLine(0, 0);
           if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-            this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
+            if (group.prop.edit === 'aabb') {
+              this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
+            } else if (group.prop.edit === 'interpolator') {
+              this.dispatchEvent('request_edit_interpolator', group.value.object[0] as Interpolator);
+            }
           }
         }
         ImGui.EndChild();
