@@ -9,7 +9,6 @@ import type { DRef } from '../app';
 import type { Scene } from '../scene';
 import { SceneNode } from '../scene/scene_node';
 import {
-  AnimationClip,
   AnimationSet,
   NodeRotationTrack,
   NodeScaleTrack,
@@ -619,7 +618,7 @@ export class SharedModel {
             }
           }
         }
-        const animation = new AnimationClip(name, true);
+        const animation = animationSet.createAnimation(name, true);
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
             animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));
@@ -642,10 +641,6 @@ export class SharedModel {
             console.error(`Invalid animation track type: ${track.type}`);
           }
         }
-        if (animation.tracks.size === 0) {
-          continue;
-        }
-        animationSet.add(animation);
         for (const sk of animationData.skeletons) {
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {

@@ -1,6 +1,6 @@
 import { weightedAverage } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
-import type { AnimationClip } from './animation';
+import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 import type { Disposable } from '../app/gc/ref';
@@ -129,13 +129,16 @@ export class AnimationSet implements Disposable {
     return this._animations[name] ?? null;
   }
   /**
-   * Adds an animation
+   * Creates an animation
    */
-  add(animation: AnimationClip) {
-    if (!animation.name || this._animations[animation.name]) {
+  createAnimation(name: string, embedded = false): AnimationClip {
+    if (!name || this._animations[name]) {
       console.error('Animation must have unique name');
+      return null;
     } else {
-      this._animations[animation.name] = animation;
+      const animation = new AnimationClip(name, this, embedded);
+      this._animations[name] = animation;
+      return animation;
     }
   }
   /**

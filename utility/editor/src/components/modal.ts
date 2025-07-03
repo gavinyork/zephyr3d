@@ -52,7 +52,7 @@ export class DialogRenderer extends makeEventTarget(Object)<{
       console.error('Dialog was already opened as modal dialog');
       return;
     }
-    let index = DialogRenderer._modeless.indexOf(this);
+    const index = DialogRenderer._modeless.indexOf(this);
     if (index < 0) {
       DialogRenderer._modeless.push(this);
     }

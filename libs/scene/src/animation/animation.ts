@@ -1,3 +1,4 @@
+import type { AnimationSet } from './animationset';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 
@@ -8,6 +9,8 @@ import type { Skeleton } from './skeleton';
 export class AnimationClip {
   /** @internal */
   protected _name: string;
+  /** @internal */
+  protected _animationSet: AnimationSet;
   /** @internal */
   protected _embedded: boolean;
   /** @internal */
@@ -23,8 +26,9 @@ export class AnimationClip {
    * @param name - Name of the animation
    * @param model - Parent node if this is a skeleton animation
    */
-  constructor(name: string, embedded = false) {
+  constructor(name: string, animationSet: AnimationSet, embedded = false) {
     this._name = name;
+    this._animationSet = animationSet;
     this._embedded = embedded;
     this._tracks = new Map();
     this._duration = 0;
@@ -33,6 +37,10 @@ export class AnimationClip {
   /** Whether this is an embedded animation */
   get embedded(): boolean {
     return this._embedded;
+  }
+  /** AnimationSet this animation belongs to */
+  get animationSet() {
+    return this._animationSet;
   }
   /** Disposes self */
   dispose() {

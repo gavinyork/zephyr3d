@@ -1,4 +1,5 @@
-import { InterpolationMode, Interpolator, makeEventTarget } from '@zephyr3d/base';
+import type { InterpolationMode } from '@zephyr3d/base';
+import { Interpolator, makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 interface Point {

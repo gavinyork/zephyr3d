@@ -148,7 +148,7 @@ const colorNames = {
  */
 export type GenericConstructor<T = object> = {
   new (...args: any[]): T;
-  isPrototypeOf(v: Object): boolean;
+  isPrototypeOf(v: object): boolean;
 };
 
 /**

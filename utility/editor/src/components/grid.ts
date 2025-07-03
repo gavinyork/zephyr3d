@@ -1,7 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SerializationManager } from '@zephyr3d/scene';
 import {
-  AnimationClip,
   AnimationSet,
   PropertyTrack,
   SceneNode,
@@ -507,8 +506,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             }
             let animation = animationSet.getAnimationClip(val.animationName);
             if (!animation) {
-              animation = new AnimationClip(val.animationName);
-              animationSet.add(animation);
+              animation = animationSet.createAnimation(val.animationName, false);
             }
             const propValue = { num: [0, 0, 0, 0] };
             value.get.call(object, propValue);

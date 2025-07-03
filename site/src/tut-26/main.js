@@ -5,7 +5,6 @@ import {
   Application,
   PerspectiveCamera,
   AnimationSet,
-  AnimationClip,
   AssetManager,
   AnimationTrack
 } from '@zephyr3d/scene';
@@ -53,7 +52,7 @@ myApp.ready().then(async () => {
   const assetManager = new AssetManager();
   const model = await assetManager.fetchModel(scene, 'assets/models/BoxTextured.glb');
   const animationSet = new AnimationSet(model.group);
-  const animation = new AnimationClip('UserTrackTest');
+  const animation = animationSet.createAnimation('UserTrackTest');
   const interpolator = new Interpolator(
     'linear',
     null,
@@ -62,7 +61,6 @@ myApp.ready().then(async () => {
   );
   const track = new MyAnimationTrack(interpolator);
   animation.addTrack(model.group, track);
-  animationSet.add(animation);
   animationSet.playAnimation('UserTrackTest');
 
   // Create camera

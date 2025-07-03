@@ -1,10 +1,13 @@
-import { InterpolationMode, InterpolationTarget, Interpolator } from '@zephyr3d/base';
-import { AnimationClip, AnimationSet, AnimationTrack, PropertyTrack } from '../../../animation';
+import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import { Interpolator } from '@zephyr3d/base';
+import type { AnimationTrack } from '../../../animation';
+import { AnimationClip, AnimationSet, PropertyTrack } from '../../../animation';
 import type { SerializationManager } from '../manager';
 import type { SerializableClass } from '../types';
-import { ClipmapTerrain, Mesh, ParticleSystem, SceneNode, Terrain, Water } from '../../../scene';
+import type { SceneNode } from '../../../scene';
+import { ClipmapTerrain, Mesh, ParticleSystem, Terrain, Water } from '../../../scene';
 
-function findAnimationTargetByName(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
+export function findAnimationTarget(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
   const prop = track?.getProp();
   if (!prop) {
     return null;
@@ -145,6 +148,12 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
 export function getAnimationClass(): SerializableClass {
   return {
     ctor: AnimationClip,
+    createFunc(ctx: AnimationSet, init: string) {
+      return { obj: ctx.createAnimation(init, false) };
+    },
+    getInitParams(obj: AnimationClip) {
+      return obj.name;
+    },
     getProps() {
       return [
         {
@@ -203,17 +212,12 @@ export function getAnimationSetClass(): SerializableClass {
           set(this: AnimationSet, value) {
             for (const ani of value.object) {
               const animation = ani as AnimationClip;
-              const existAnimation = this.getAnimationClip(animation.name);
-              if (existAnimation) {
-                for (const tracks of animation.tracks) {
-                  for (const track of tracks[1]) {
-                    if (!track.embedded) {
-                      existAnimation.addTrack(tracks[0], track);
-                    }
+              for (const tracks of animation.tracks) {
+                for (const track of tracks[1]) {
+                  if (!track.embedded) {
+                    animation.addTrack(tracks[0], track);
                   }
                 }
-              } else {
-                this.add(animation);
               }
             }
           }
