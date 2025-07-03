@@ -33,6 +33,7 @@ class PropertyGroup {
   grid: PropertyEditor;
   name: string;
   index: number;
+  selected: [number];
   count: number;
   value: PropertyValue;
   parent: PropertyGroup;
@@ -48,6 +49,7 @@ class PropertyGroup {
     this.grid = grid;
     this.name = name;
     this.index = 0;
+    this.selected = [-1];
     this.count = 1;
     this.path = '';
     this.parent = null;
@@ -98,7 +100,7 @@ class PropertyGroup {
       }
     } else {
       const property: Property<any> = {
-        path: `${group.path}/${value.name}`,
+        path: group.path,
         name: value.name,
         object: obj,
         value
@@ -167,6 +169,13 @@ class PropertyGroup {
       if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj)) {
         this.objectTypes.unshift(null);
       }
+      this.selected[0] = this.objectTypes.findIndex((val) => {
+        if (!val) {
+          return !obj;
+        }
+        return val.ctor === (obj?.constructor ?? null);
+      });
+
       this.properties = [];
       this.subgroups = [];
       if (this.value.object[0]) {
@@ -395,19 +404,16 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       if (!readonly) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
-        const index = [
-          group.objectTypes.findIndex((val) => val.ctor === (group.value.object?.[0]?.constructor ?? null))
-        ] as [number];
         ImGui.Combo(
           '',
-          index,
+          group.selected,
           group.objectTypes.map((val) => val?.ctor.name ?? 'NULL'),
           group.objectTypes.length
         );
         if (settable) {
           ImGui.SameLine(0, 0);
           if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
-            const ctor = group.objectTypes[index[0]]?.ctor;
+            const ctor = group.objectTypes[group.selected[0]]?.ctor;
             const newObj = ctor
               ? group.prop.create
                 ? group.prop.create.call(group.object, ctor, group.index)
@@ -421,7 +427,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         if (addable) {
           ImGui.SameLine(0, 0);
           if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0))) {
-            const ctor = group.objectTypes[index[0]]?.ctor;
+            const ctor = group.objectTypes[group.selected[0]]?.ctor;
             const newObj = ctor
               ? group.prop.create
                 ? group.prop.create.call(group.object, ctor, group.index)
@@ -511,6 +517,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             const propValue = { num: [0, 0, 0, 0] };
             value.get.call(object, propValue);
             const track = new PropertyTrack(value, propValue.num);
+            track.target = property.path;
             track.name = val.trackName;
             animation.addTrack(object, track);
             this.refresh();

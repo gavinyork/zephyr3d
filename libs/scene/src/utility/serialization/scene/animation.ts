@@ -122,6 +122,17 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
           }
         },
         {
+          name: 'TrackTarget',
+          label: 'Target',
+          type: 'string',
+          get(this: PropertyTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: PropertyTrack, value) {
+            this.target = value.str[0];
+          }
+        },
+        {
           name: 'TrackProp',
           type: 'string',
           get(this: PropertyTrack, value) {

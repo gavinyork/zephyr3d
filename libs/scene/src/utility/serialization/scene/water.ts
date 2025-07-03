@@ -197,7 +197,7 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
           name: 'WaveGenerator',
           type: 'object',
           default: null,
-          objectTypes: [GerstnerWaveGenerator, FFTWaveGenerator, FBMWaveGenerator],
+          objectTypes: [FFTWaveGenerator, FBMWaveGenerator],
           isNullable() {
             return true;
           },

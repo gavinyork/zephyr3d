@@ -8,6 +8,7 @@ import { Interpolator } from '@zephyr3d/base';
  */
 export class PropertyTrack extends AnimationTrack<PropertyValue> {
   private _state: PropertyValue;
+  private _target: string;
   private _prop: PropertyAccessor;
   private _count: number;
   /**
@@ -17,6 +18,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   constructor(prop: PropertyAccessor, value?: number[], embedded?: boolean) {
     super(undefined, embedded);
     this._prop = prop;
+    this._target = '';
     this._state = { num: [0, 0, 0, 0] };
     if (value) {
       this._state.num = value.slice();
@@ -63,6 +65,12 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
       default:
         throw new Error(`Property '${this._prop.name}' cannot be animated`);
     }
+  }
+  get target() {
+    return this._target;
+  }
+  set target(val: string) {
+    this._target = val;
   }
   calculateState(target: unknown, currentTime: number): PropertyValue {
     if (this._interpolator) {
