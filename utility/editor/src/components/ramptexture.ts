@@ -36,11 +36,11 @@ export class RampTextureCreator {
       [
         {
           x: 0,
-          value: 1
+          value: [1]
         },
         {
           x: 1,
-          value: 1
+          value: [1]
         }
       ],
       {
@@ -51,6 +51,7 @@ export class RampTextureCreator {
         drawHints: false
       }
     );
+    this._alphaEditor.on('curve_changed', this.updateTexture, this);
     this.updateInterpolator();
     this._alphaInterpolator = this._alphaEditor.interpolator;
   }

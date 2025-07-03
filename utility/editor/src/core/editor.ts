@@ -1,6 +1,6 @@
 import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
-import { ModalDialog } from '../components/modal';
+import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
@@ -94,7 +94,7 @@ export class Editor {
     if (module?.view) {
       imGuiNewFrame();
       module.view.render();
-      ModalDialog.render();
+      DialogRenderer.render();
       imGuiEndFrame();
     }
   }

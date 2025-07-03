@@ -1,4 +1,4 @@
-import { InterpolationMode, Interpolator } from '@zephyr3d/base';
+import { InterpolationMode, Interpolator, makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 interface Point {
@@ -21,7 +21,9 @@ interface CurveSettings {
 
 const keyFramePointShape = [new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2()];
 
-export class CurveEditor {
+export class CurveEditor extends makeEventTarget(Object)<{
+  curve_changed: [];
+}>() {
   private _points: Point[] = [];
   private _interpolator: Interpolator = null;
 
@@ -45,6 +47,7 @@ export class CurveEditor {
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
   constructor(pointsOrInterpolator?: Point[] | Interpolator, settings?: Partial<CurveSettings>) {
+    super();
     let points: Point[];
     let timeRangeMin = Number.MAX_VALUE;
     let timeRangeMax = -Number.MAX_VALUE;
@@ -658,13 +661,14 @@ export class CurveEditor {
   }
 
   private updateInterpolator(): void {
+    const stride = this._interpolator?.stride ?? 1;
     const inputs = new Float32Array(this._points.length);
-    const outputs = new Float32Array(this._points.length * this._interpolator.stride);
+    const outputs = new Float32Array(this._points.length * stride);
     for (let i = 0; i < this._points.length; i++) {
       inputs[i] = this._points[i].x;
-      if (this._interpolator.stride > 1) {
-        for (let j = 0; j < this._interpolator.stride; j++) {
-          outputs[i * this._interpolator.stride + j] = this._points[i].value[j];
+      if (stride > 1) {
+        for (let j = 0; j < stride; j++) {
+          outputs[i * stride + j] = this._points[i].value[j];
         }
       } else {
         outputs[i] = this._points[i].value[0];
@@ -678,9 +682,10 @@ export class CurveEditor {
       this._interpolator.mode = this._settings.interpolationType;
     }
     if (!this._resultBuffer) {
-      this._resultBuffer = new Float32Array(this._interpolator.stride);
+      this._resultBuffer = new Float32Array(stride);
     }
     this._curveDirty = true;
+    this.dispatchEvent('curve_changed');
   }
   getValue(time: number): number {
     if (!this._interpolator || this._points.length < 2) {

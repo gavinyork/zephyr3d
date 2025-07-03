@@ -1,12 +1,12 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { ModalDialog } from '../../components/modal';
+import { DialogRenderer } from '../../components/modal';
 
-export class DlgRename extends ModalDialog {
+export class DlgRename extends DialogRenderer {
   private _name: string;
   private _firstOpen: boolean;
   private _resolve: (s: string) => void;
-  constructor(id: string, open: boolean, width: number, name: string, resolve: (s: string) => void) {
-    super(id, open, width, 0);
+  constructor(id: string, width: number, name: string, resolve: (s: string) => void) {
+    super(id, width, 0);
     this._name = name;
     this._resolve = resolve;
     this._firstOpen = true;
