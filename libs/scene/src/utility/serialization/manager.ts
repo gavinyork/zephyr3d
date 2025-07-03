@@ -45,10 +45,12 @@ export class SerializationManager {
   private _classMap: Map<GenericConstructor, SerializableClass>;
   private _assetRegistry: AssetRegistry;
   private _propMap: Record<string, PropertyAccessor>;
+  private _propNameMap: Map<PropertyAccessor, string>;
   private _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
   constructor(assetRegistry: AssetRegistry) {
     this._assetRegistry = assetRegistry;
     this._propMap = {};
+    this._propNameMap = new Map();
     this._clsPropMap = new Map();
     this._classMap = new Map<GenericConstructor, SerializableClass>(
       [
@@ -115,6 +117,14 @@ export class SerializationManager {
     }
     return null;
   }
+  getClassByProperty(prop: PropertyAccessor): SerializableClass {
+    for (const k of this._clsPropMap) {
+      if (k[1].indexOf(prop) >= 0) {
+        return k[0];
+      }
+    }
+    return null;
+  }
   getPropertiesByClass(cls: SerializableClass) {
     return this._clsPropMap.get(cls);
   }
@@ -122,12 +132,7 @@ export class SerializationManager {
     return this._propMap[name] ?? null;
   }
   getPropertyName(prop: PropertyAccessor) {
-    for (const k of this._clsPropMap) {
-      if (k[1].indexOf(prop) >= 0) {
-        return `/${k[0].ctor.name}/${prop.name}`;
-      }
-    }
-    return null;
+    return this._propNameMap.get(prop) ?? null;
   }
   registerClass(cls: SerializableClass) {
     if (!this._classMap.has(cls.ctor)) {
@@ -146,6 +151,7 @@ export class SerializationManager {
           throw new Error(`Cannot register property ${path}: property name already exists`);
         }
         this._propMap[path] = prop;
+        this._propNameMap.set(prop, path);
       }
     }
   }

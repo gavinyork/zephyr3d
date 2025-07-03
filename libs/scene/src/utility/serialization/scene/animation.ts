@@ -2,6 +2,43 @@ import { InterpolationMode, InterpolationTarget, Interpolator } from '@zephyr3d/
 import { AnimationClip, AnimationSet, AnimationTrack, PropertyTrack } from '../../../animation';
 import type { SerializationManager } from '../manager';
 import type { SerializableClass } from '../types';
+import { ClipmapTerrain, Mesh, ParticleSystem, SceneNode, Terrain, Water } from '../../../scene';
+
+function findAnimationTargetByName(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
+  const prop = track?.getProp();
+  if (!prop) {
+    return null;
+  }
+  const cls = manager.getClassByProperty(prop);
+  if (!cls) {
+    return null;
+  }
+  if (cls.ctor.isPrototypeOf(node.constructor)) {
+    return node;
+  }
+  if (
+    node instanceof Mesh ||
+    node instanceof ParticleSystem ||
+    node instanceof Terrain ||
+    node instanceof ClipmapTerrain ||
+    node instanceof Water
+  ) {
+    if (node.material && cls.ctor.isPrototypeOf(node.material.constructor)) {
+      return node.material;
+    }
+  }
+  if (node instanceof Mesh) {
+    if (node.primitive && cls.ctor.isPrototypeOf(node.primitive.constructor)) {
+      return node.primitive;
+    }
+  }
+  if (node instanceof Water) {
+    if (node.waveGenerator && cls.ctor.isPrototypeOf(node.waveGenerator.constructor)) {
+      return node.waveGenerator;
+    }
+  }
+  return null;
+}
 
 export function getInterpolatorClass(): SerializableClass {
   return {

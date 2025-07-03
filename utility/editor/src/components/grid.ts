@@ -37,6 +37,7 @@ class PropertyGroup {
   count: number;
   value: PropertyValue;
   parent: PropertyGroup;
+  path: string;
   property: Property<any>;
   currentType: number;
   objectTypes: SerializableClass[];
@@ -49,6 +50,7 @@ class PropertyGroup {
     this.name = name;
     this.index = 0;
     this.count = 1;
+    this.path = '';
     this.parent = null;
     this.value = { num: [], str: [], bool: [], object: [null] };
     this.property = null;
@@ -86,7 +88,7 @@ class PropertyGroup {
     if (value.type === 'object' && value.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       const propGroup = group.addGroup(value.name);
-      propGroup.setObject(tmpProperty.object[0], value, obj, 0, 1);
+      propGroup.setObject(tmpProperty.object[0], value, obj, null, 1);
     } else if (value.type === 'object_array' && value.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
@@ -97,7 +99,7 @@ class PropertyGroup {
       }
     } else {
       const property: Property<any> = {
-        path: `${group.name}/${value.name}`,
+        path: `${group.path}/${value.name}`,
         name: value.name,
         object: obj,
         value
@@ -111,6 +113,7 @@ class PropertyGroup {
   addGroup(name: string) {
     const group = new PropertyGroup(name, this.grid);
     group.parent = this;
+    group.path = this.path;
     this.subgroups.push(group);
     return group;
   }
@@ -155,6 +158,9 @@ class PropertyGroup {
       this.index = index ?? 0;
       this.count = count ?? 1;
       this.prop = prop ?? null;
+      if (this.prop) {
+        this.path = `${this.path}/${this.prop.name}${typeof index === 'number' ? `[${index}]` : ''}`;
+      }
       this.objectTypes =
         prop?.objectTypes?.length > 0
           ? prop.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
