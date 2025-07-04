@@ -41,6 +41,29 @@ export class SceneController extends BaseController<SceneModel> {
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
   }
+  private async promptSceneName(title?: string): Promise<DBSceneInfo> {
+    const defaultName = this._scene?.name ?? '';
+    const name = await Dialog.promptName(title ?? 'Input name:', defaultName);
+    if (name) {
+      const scenes = await Database.listScenes();
+      let scene = scenes.find((val) => val.name === name);
+      if (!scene) {
+        scene = { name, content: null };
+      } else if (scene !== this._scene) {
+        if (
+          (await Dialog.messageBoxEx(
+            'zephyr3d',
+            `'${name}' already exists, do you want to overwrite it?`,
+            ['Yes', 'No'],
+            300
+          )) !== 'Yes'
+        ) {
+          return null;
+        }
+      }
+      return scene;
+    }
+  }
   private sceneAction(action: string) {
     switch (action) {
       case 'NEW_DOC':
@@ -48,26 +71,33 @@ export class SceneController extends BaseController<SceneModel> {
         break;
       case 'SAVE_DOC':
         if (!this._scene) {
-          Dialog.promptName('Input scene name:').then((name) => {
-            if (name) {
-              this.saveScene(name);
+          this.promptSceneName().then((info) => {
+            if (info) {
+              this.saveScene(info);
             }
           });
         } else {
-          this.saveScene(this._scene.name);
+          this.saveScene(this._scene);
         }
+        break;
+      case 'SAVE_DOC_AS':
+        this.promptSceneName().then((info) => {
+          if (info) {
+            this.saveScene(info);
+          }
+        });
         break;
       case 'EXPORT_DOC':
         if (!this._scene) {
-          Dialog.promptName('Input scene name:').then((name) => {
-            if (name) {
-              this.saveScene(name, false);
-              this.exportScene(this.model.scene, name);
+          this.promptSceneName().then((info) => {
+            if (info) {
+              this.saveScene(info, false);
+              this.exportScene(this.model.scene);
             }
           });
         } else {
-          this.saveScene(this._scene.name, false).then(() => {
-            this.exportScene(this.model.scene, this._scene.name);
+          this.saveScene(this._scene, false).then(() => {
+            this.exportScene(this.model.scene);
           });
         }
         break;
@@ -103,11 +133,11 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
     this._view.update(dt);
   }
-  private async saveScene(name: string, showMessage = true) {
+  private async saveScene(scene: DBSceneInfo, showMessage = true) {
     const assetList = new Set<string>();
     const embeddedAssetList: Promise<EmbeddedAssetInfo>[] = [];
-    this._scene = Object.assign({}, this._scene ?? {}, {
-      name,
+    this.model.scene.name = scene.name;
+    this._scene = Object.assign({}, scene, {
       content: await serializeObject(
         this.model.scene,
         this._serializationManager,
@@ -154,13 +184,13 @@ export class SceneController extends BaseController<SceneModel> {
     }
     await zipDownloader.finish();
   }
-  private async exportScene(scene: Scene, name: string) {
+  private async exportScene(scene: Scene) {
     const assetList = new Set<string>();
     const content = await serializeObject(scene, this._serializationManager, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.persistentId ?? ''
     };
-    const zipDownloader = new ZipDownloader(`${name}.zip`);
+    const zipDownloader = new ZipDownloader(`${scene.name}.zip`);
     if (assetList.size > 0) {
       await Database.exportAssets(zipDownloader, [...assetList], 'assets');
     }

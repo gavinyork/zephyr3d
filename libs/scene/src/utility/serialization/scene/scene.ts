@@ -18,6 +18,18 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
     getProps() {
       return [
         {
+          name: 'Name',
+          type: 'string',
+          hidden: true,
+          default: '',
+          get(this: Scene, value) {
+            value.str[0] = this.name;
+          },
+          set(this: Scene, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
           name: 'EnvLightType',
           phase: 0,
           type: 'string',

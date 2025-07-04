@@ -148,6 +148,11 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => eventBus.dispatchEvent('action', 'SAVE_DOC')
             },
             {
+              label: 'Save As...',
+              shortCut: 'Ctrl+Alt+S',
+              action: () => eventBus.dispatchEvent('action', 'SAVE_DOC_AS')
+            },
+            {
               label: 'Export',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_DOC')
             },

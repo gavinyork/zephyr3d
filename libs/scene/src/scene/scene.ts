@@ -24,6 +24,8 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   private static _nextId = 0;
   /** @internal */
+  protected _name: string;
+  /** @internal */
   protected _rootNode: DRef<SceneNode>;
   /** @internal */
   protected _octree: Octree;
@@ -42,9 +44,10 @@ export class Scene extends makeEventTarget(Object)<{
   /**
    * Creates an instance of scene
    */
-  constructor() {
+  constructor(name?: string) {
     super();
     this._id = ++Scene._nextId;
+    this._name = name ?? '';
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
     this._nodeUpdateQueue = [];
@@ -59,6 +62,15 @@ export class Scene extends makeEventTarget(Object)<{
    */
   get id(): number {
     return this._id;
+  }
+  /**
+   * Name of the scene
+   */
+  get name() {
+    return this._name;
+  }
+  set name(val: string) {
+    this._name = val ?? '';
   }
   /**
    * Gets the root scene node of the scene

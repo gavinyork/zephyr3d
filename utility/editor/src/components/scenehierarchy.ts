@@ -52,7 +52,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private getNodeName(node: unknown): string {
     if (node instanceof SceneNode) {
       if (node === node.scene.rootNode) {
-        return 'Scene';
+        return node.scene.name || '*Untitled';
       }
       if (node.name) {
         return node.name;

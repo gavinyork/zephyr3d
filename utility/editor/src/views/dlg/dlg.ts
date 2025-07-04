@@ -8,10 +8,22 @@ import { DlgRampTextureCreator } from './ramptexturedlg';
 import { DlgRename } from './renamedlg';
 import { DlgExportScene } from './exportscenedlg';
 import { DlgSelectAnimation } from './selectanimationdlg';
+import { DlgMessageBoxEx } from './messageexdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
     new DlgMessage(`${title}##Dialog`, message, width, height).showModal();
+  }
+  public static async messageBoxEx(
+    title: string,
+    message: string,
+    buttons?: string[],
+    width?: number,
+    height?: number
+  ) {
+    return new Promise<string>((resolve) => {
+      new DlgMessageBoxEx(title, message, buttons, width, height, resolve).showModal();
+    });
   }
   public static async batchExportScene(
     title: string,
@@ -33,9 +45,14 @@ export class Dialog {
       new DlgOpenScene(title, scene, width, height, resolve).showModal();
     });
   }
-  public static async promptName(title: string, width?: number, height?: number): Promise<string> {
+  public static async promptName(
+    title: string,
+    defaultName?: string,
+    width?: number,
+    height?: number
+  ): Promise<string> {
     return new Promise((resolve) => {
-      new DlgPromptName(title, width, height, resolve).showModal();
+      new DlgPromptName(title, defaultName, width, height, resolve).showModal();
     });
   }
   public static async rename(title: string, name: string, width?: number): Promise<string> {
