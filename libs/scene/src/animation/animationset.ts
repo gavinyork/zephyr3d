@@ -142,6 +142,17 @@ export class AnimationSet implements Disposable {
     }
   }
   /**
+   * Deletes an animation
+   */
+  deleteAnimation(name: string) {
+    const animation = this._animations[name];
+    if (animation) {
+      this.stopAnimation(name);
+      delete this._animations[name];
+      animation.dispose();
+    }
+  }
+  /**
    * Gets names of all the animations of the model
    * @returns An array of string that contains the animation names
    */

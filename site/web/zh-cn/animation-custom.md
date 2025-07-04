@@ -67,8 +67,8 @@ class MyAnimationTrack extends AnimationTrack {
 
 // 假定model是一个加载好的模型
 const model = await assetManager.fetchModel(scene, MODEL_URL);
-// 对此model创建一个动画集
-const animationSet = new AnimationSet(scene, model.group);
+// 获取model的动画集
+const animationSet = model.group.animationSet;
 // 创建一个动画
 const animation = new AnimationClip('UserTrackTest');
 // 创建一个interpolator存储自定义动画的关键帧

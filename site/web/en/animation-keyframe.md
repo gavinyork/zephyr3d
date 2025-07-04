@@ -39,8 +39,8 @@ animation.addTrack(box, new EulerRotationTrack('linear', [{
   value: new Vector3(0, 8 * Math.PI, 0, 'ZYX')
 }]));
 
-// Add the animation to an animation set
-const animationSet = new AnimationSet(scene, box);
+// Add the animation to box's animation set
+const animationSet = box.animationSet;
 animationSet.add(animation);
 
 // Start playing 

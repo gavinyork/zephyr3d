@@ -5,7 +5,6 @@ import {
   Application,
   PerspectiveCamera,
   LambertMaterial,
-  AnimationSet,
   NodeTranslationTrack,
   BoxShape,
   Mesh,
@@ -22,8 +21,7 @@ myApp.ready().then(async () => {
   const scene = new Scene();
 
   const box = new Mesh(scene, new BoxShape(), new LambertMaterial());
-  const animationSet = new AnimationSet(box);
-  const animationClip = animationSet.createAnimation('move');
+  const animationClip = box.animationSet.createAnimation('move');
   animationClip
     .addTrack(
       box,
@@ -55,7 +53,7 @@ myApp.ready().then(async () => {
         }
       ])
     );
-  animationSet.playAnimation('move');
+  box.animationSet.playAnimation('move');
 
   // Create camera
   const camera = new PerspectiveCamera(

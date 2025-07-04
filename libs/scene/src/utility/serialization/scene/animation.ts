@@ -1,46 +1,63 @@
-import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import type { GenericConstructor, InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
 import { Interpolator } from '@zephyr3d/base';
 import type { AnimationTrack } from '../../../animation';
-import { AnimationClip, AnimationSet, PropertyTrack } from '../../../animation';
+import { AnimationClip, PropertyTrack } from '../../../animation';
 import type { SerializationManager } from '../manager';
-import type { SerializableClass } from '../types';
+import type { PropertyValue, SerializableClass } from '../types';
 import type { SceneNode } from '../../../scene';
-import { ClipmapTerrain, Mesh, ParticleSystem, Terrain, Water } from '../../../scene';
 
-export function findAnimationTarget(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
-  const prop = track?.getProp();
-  if (!prop) {
-    return null;
-  }
-  const cls = manager.getClassByProperty(prop);
-  if (!cls) {
-    return null;
-  }
-  if (cls.ctor.isPrototypeOf(node.constructor)) {
-    return node;
-  }
-  if (
-    node instanceof Mesh ||
-    node instanceof ParticleSystem ||
-    node instanceof Terrain ||
-    node instanceof ClipmapTerrain ||
-    node instanceof Water
-  ) {
-    if (node.material && cls.ctor.isPrototypeOf(node.material.constructor)) {
-      return node.material;
-    }
-  }
-  if (node instanceof Mesh) {
-    if (node.primitive && cls.ctor.isPrototypeOf(node.primitive.constructor)) {
-      return node.primitive;
-    }
-  }
-  if (node instanceof Water) {
-    if (node.waveGenerator && cls.ctor.isPrototypeOf(node.waveGenerator.constructor)) {
-      return node.waveGenerator;
-    }
+const pattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
+function parsePropertyPath(str: string) {
+  const match = str.match(pattern);
+  if (match) {
+    return {
+      original: match[0],
+      prefix: match[1],
+      index: match[2] || null,
+      indexValue: match[2] ? parseInt(match[2], 10) : null,
+      hasIndex: !!match[2]
+    };
   }
   return null;
+}
+
+function findAnimationTarget(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
+  const target = track.target ?? '';
+  const value: PropertyValue = { object: [] };
+  const parts = target.split('/').filter((val) => !!val);
+  let targetObj: unknown = node;
+  while (parts.length > 0) {
+    const propName = parts.shift();
+    const info = parsePropertyPath(propName);
+    if (!info) {
+      return null;
+    }
+    const cls = manager.getClassByConstructor(targetObj.constructor as GenericConstructor);
+    if (!cls) {
+      return null;
+    }
+    const prop = manager.getPropertyByClass(cls, info.prefix);
+    if (!prop) {
+      return null;
+    }
+    if (info.hasIndex) {
+      if (prop.type !== 'object_array') {
+        return null;
+      }
+      prop.get.call(targetObj, value);
+      targetObj = value.object?.[info.indexValue] ?? null;
+    } else {
+      if (prop.type !== 'object') {
+        return null;
+      }
+      prop.get.call(targetObj, value);
+      targetObj = value.object?.[0] ?? null;
+    }
+    if (!targetObj) {
+      return null;
+    }
+  }
+  return targetObj;
 }
 
 export function getInterpolatorClass(): SerializableClass {
@@ -108,6 +125,12 @@ export function getInterpolatorClass(): SerializableClass {
 export function getPropTrackClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PropertyTrack,
+    createFunc(ctx, init) {
+      return { obj: new PropertyTrack(manager.getPropertyByName(init)) };
+    },
+    getInitParams(obj: PropertyTrack) {
+      return manager.getPropertyName(obj.getProp());
+    },
     getProps() {
       return [
         {
@@ -156,11 +179,11 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
   };
 }
 
-export function getAnimationClass(): SerializableClass {
+export function getAnimationClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: AnimationClip,
-    createFunc(ctx: AnimationSet, init: string) {
-      return { obj: ctx.createAnimation(init, false) };
+    createFunc(ctx: SceneNode, init: string) {
+      return { obj: ctx.animationSet.createAnimation(init, false) };
     },
     getInitParams(obj: AnimationClip) {
       return obj.name;
@@ -185,10 +208,21 @@ export function getAnimationClass(): SerializableClass {
           name: 'Tracks',
           type: 'object_array',
           objectTypes: [PropertyTrack],
+          readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];
             for (const tracks of this.tracks) {
               value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+            }
+          },
+          set(this: AnimationClip, value) {
+            for (const track of value.object) {
+              if (track instanceof PropertyTrack) {
+                const targetObj = findAnimationTarget(manager, this._animationSet.model, track);
+                if (targetObj) {
+                  this.addTrack(targetObj, track);
+                }
+              }
             }
           },
           delete(this: AnimationClip, index) {
@@ -199,37 +233,6 @@ export function getAnimationClass(): SerializableClass {
             const trackToRemove = trackList[index];
             if (trackToRemove) {
               this.deleteTrack(trackToRemove);
-            }
-          }
-        }
-      ];
-    }
-  };
-}
-
-export function getAnimationSetClass(): SerializableClass {
-  return {
-    ctor: AnimationSet,
-    getProps() {
-      return [
-        {
-          name: 'Animations',
-          type: 'object_array',
-          objectTypes: [AnimationClip],
-          readonly: true,
-          get(this: AnimationSet, value) {
-            value.object = this.getAnimationNames().map((name) => this.getAnimationClip(name));
-          },
-          set(this: AnimationSet, value) {
-            for (const ani of value.object) {
-              const animation = ani as AnimationClip;
-              for (const tracks of animation.tracks) {
-                for (const track of tracks[1]) {
-                  if (!track.embedded) {
-                    animation.addTrack(tracks[0], track);
-                  }
-                }
-              }
             }
           }
         }

@@ -8,13 +8,7 @@ import type { BoundingBox } from '../utility';
 import type { DRef } from '../app';
 import type { Scene } from '../scene';
 import { SceneNode } from '../scene/scene_node';
-import {
-  AnimationSet,
-  NodeRotationTrack,
-  NodeScaleTrack,
-  Skeleton,
-  NodeTranslationTrack
-} from '../animation';
+import { NodeRotationTrack, NodeScaleTrack, Skeleton, NodeTranslationTrack } from '../animation';
 import { processMorphData } from '../animation/morphtarget';
 import { MAX_MORPH_TARGETS } from '../values';
 import { MorphTargetTrack } from '../animation/morphtrack';
@@ -589,7 +583,7 @@ export class SharedModel {
   createSceneNode(scene: Scene, instancing: boolean): SceneNode {
     const group = new SceneNode(scene);
     group.name = this.name;
-    const animationSet = new AnimationSet(group);
+    const animationSet = group.animationSet;
     for (let i = 0; i < this.scenes.length; i++) {
       const assetScene = this.scenes[i];
       const skeletonMeshMap: Map<
@@ -663,7 +657,6 @@ export class SharedModel {
         child.sealed = true;
       }
     });
-    group.animationSet = animationSet;
     group.sharedModel = this;
     return group;
   }

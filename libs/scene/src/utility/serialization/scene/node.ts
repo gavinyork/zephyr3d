@@ -8,7 +8,7 @@ import { GraphNode } from '../../../scene';
 import type { Material } from '../../../material';
 import type { Primitive } from '../../../render';
 import type { SerializationManager } from '../manager';
-import { AnimationSet } from '../../../animation';
+import { AnimationClip } from '../../../animation';
 
 export class GatherVisitor implements Visitor<SceneNode> {
   /** @internal */
@@ -300,14 +300,31 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         },
         {
           name: 'Animations',
-          type: 'object',
-          objectTypes: [AnimationSet],
+          type: 'object_array',
           readonly: true,
-          isNullable() {
-            return true;
-          },
+          objectTypes: [AnimationClip],
           get(this: SceneNode, value) {
-            value.object[0] = this.animationSet;
+            const animationSet = this.animationSet;
+            value.object = animationSet
+              .getAnimationNames()
+              .map((name) => animationSet.getAnimationClip(name));
+          },
+          set(this: SceneNode, value, index: number) {
+            for (const ani of value.object) {
+              const animation = ani as AnimationClip;
+              for (const tracks of animation.tracks) {
+                for (const track of tracks[1]) {
+                  if (!track.embedded) {
+                    animation.addTrack(tracks[0], track);
+                  }
+                }
+              }
+            }
+          },
+          delete(this: SceneNode, index) {
+            const animationSet = this.animationSet;
+            const name = animationSet.getAnimationNames()[index];
+            animationSet.deleteAnimation(name);
           }
         }
       ];

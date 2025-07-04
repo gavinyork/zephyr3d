@@ -34,12 +34,7 @@ import {
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
-import {
-  getAnimationClass,
-  getAnimationSetClass,
-  getInterpolatorClass,
-  getPropTrackClass
-} from './scene/animation';
+import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './scene/animation';
 
 export class SerializationManager {
   private _classMap: Map<GenericConstructor, SerializableClass>;
@@ -57,8 +52,7 @@ export class SerializationManager {
         getAABBClass(),
         getInterpolatorClass(),
         getNodeHierarchyClass(),
-        getAnimationSetClass(),
-        getAnimationClass(),
+        getAnimationClass(this),
         getPropTrackClass(this),
         getSceneNodeClass(this),
         getGraphNodeClass(),
@@ -126,7 +120,10 @@ export class SerializationManager {
     return null;
   }
   getPropertiesByClass(cls: SerializableClass) {
-    return this._clsPropMap.get(cls);
+    return this._clsPropMap.get(cls) ?? null;
+  }
+  getPropertyByClass(cls: SerializableClass, name: string) {
+    return this.getPropertiesByClass(cls)?.find((value) => value.name === name) ?? null;
   }
   getPropertyByName(name: string) {
     return this._propMap[name] ?? null;

@@ -4,7 +4,6 @@ import {
   OrbitCameraController,
   Application,
   PerspectiveCamera,
-  AnimationSet,
   AssetManager,
   AnimationTrack
 } from '@zephyr3d/scene';
@@ -51,8 +50,7 @@ myApp.ready().then(async () => {
   const scene = new Scene();
   const assetManager = new AssetManager();
   const model = await assetManager.fetchModel(scene, 'assets/models/BoxTextured.glb');
-  const animationSet = new AnimationSet(model.group);
-  const animation = animationSet.createAnimation('UserTrackTest');
+  const animation = model.group.animationSet.createAnimation('UserTrackTest');
   const interpolator = new Interpolator(
     'linear',
     null,
@@ -61,7 +59,7 @@ myApp.ready().then(async () => {
   );
   const track = new MyAnimationTrack(interpolator);
   animation.addTrack(model.group, track);
-  animationSet.playAnimation('UserTrackTest');
+  model.group.animationSet.playAnimation('UserTrackTest');
 
   // Create camera
   const camera = new PerspectiveCamera(

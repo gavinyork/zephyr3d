@@ -37,7 +37,7 @@ animation.addTrack(box, new EulerRotationTrack('linear', [{
 }]));
 
 // 将动画添加到动画组
-const animationSet = new AnimationSet(scene, box);
+const animationSet = box.animationSet;
 animationSet.add(animation);
 
 // 开始播放

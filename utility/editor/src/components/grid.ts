@@ -1,7 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SerializationManager } from '@zephyr3d/scene';
 import {
-  AnimationSet,
   PropertyTrack,
   SceneNode,
   type PropertyAccessor,
@@ -23,6 +22,7 @@ import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 
 interface Property<T extends {}> {
+  objectPath: string;
   path: string;
   name: string;
   object: any;
@@ -66,6 +66,7 @@ class PropertyGroup {
       name: label,
       property: {
         name: label,
+        objectPath: '',
         path: '',
         object: null,
         value: null
@@ -100,7 +101,8 @@ class PropertyGroup {
       }
     } else {
       const property: Property<any> = {
-        path: group.path,
+        objectPath: group.path,
+        path: `${group.path}/${value.name}`,
         name: value.name,
         object: obj,
         value
@@ -386,11 +388,13 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       (group.prop.type === 'object' || group.prop.type === 'object_array') &&
       group.objectTypes.length > 0
     ) {
-      const readonly = !!group.prop.readonly;
       const editable =
         (group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb') ||
         (group.value.object?.[0] instanceof Interpolator && group.prop.edit === 'interpolator');
-      const settable = !!group.prop.set && (group.prop.type === 'object' || group.index < group.count);
+      const settable =
+        !group.prop.readonly &&
+        !!group.prop.set &&
+        (group.prop.type === 'object' || group.index < group.count);
       const addable = group.prop.type === 'object_array' && !!group.prop.add;
       const deletable = group.prop.type === 'object_array' && group.prop.delete;
 
@@ -401,7 +405,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         (addable ? buttonSize : 0) +
         (deletable ? buttonSize : 0);
       ImGui.TableNextColumn();
-      if (!readonly) {
+      if (settable || addable || deletable || editable) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
         ImGui.Combo(
@@ -499,17 +503,13 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     const animatable = value && !!value.animatable;
     if (animatable && this.object instanceof SceneNode) {
       if (ImGui.Button('A')) {
-        let animationSet = this.object.animationSet;
+        const animationSet = this.object.animationSet;
         Dialog.selectAnimationAndTrack(
           'Create animation track',
           animationSet ? animationSet.getAnimationNames() : [],
           300
         ).then((val) => {
           if (val) {
-            if (!animationSet) {
-              animationSet = new AnimationSet(this.object);
-              this.object.animationSet = animationSet;
-            }
             let animation = animationSet.getAnimationClip(val.animationName);
             if (!animation) {
               animation = animationSet.createAnimation(val.animationName, false);
@@ -517,7 +517,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             const propValue = { num: [0, 0, 0, 0] };
             value.get.call(object, propValue);
             const track = new PropertyTrack(value, propValue.num);
-            track.target = property.path;
+            track.target = property.objectPath;
             track.name = val.trackName;
             animation.addTrack(object, track);
             this.refresh();

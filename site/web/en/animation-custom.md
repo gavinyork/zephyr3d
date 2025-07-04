@@ -66,8 +66,8 @@ class MyAnimationTrack extends AnimationTrack {
 
 // Assume model is a loaded model
 const model = await assetManager.fetchModel(scene, MODEL_URL);
-// Create an animation set for this model
-const animationSet = new AnimationSet(scene, model.group);
+// Get the animation set object of this model
+const animationSet = model.group.animationSet;
 // Create an animation
 const animation = new AnimationClip('UserTrackTest');
 // Create an interpolator to store keyframes for the custom animation

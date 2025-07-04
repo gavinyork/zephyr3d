@@ -4,7 +4,7 @@ import { Water } from '../../../scene/water';
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import type { WaveGenerator } from '../../../render';
-import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
+import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SerializationManager } from '../manager';
 

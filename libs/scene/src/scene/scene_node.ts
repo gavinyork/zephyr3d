@@ -18,7 +18,7 @@ import {
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { DRef } from '../app/gc/ref';
-import type { AnimationSet } from '../animation';
+import { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
@@ -226,13 +226,11 @@ export class SceneNode
     this._sealed = val;
   }
   get animationSet() {
-    return this._animationSet.get();
-  }
-  set animationSet(animationSet: AnimationSet) {
-    this._animationSet.set(animationSet);
-    if (animationSet) {
+    if (!this._animationSet.get()) {
+      this._animationSet.set(new AnimationSet(this));
       this.scene.queueUpdateNode(this);
     }
+    return this._animationSet.get();
   }
   get sharedModel() {
     return this._sharedModel.get();
