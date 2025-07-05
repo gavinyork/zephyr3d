@@ -1,14 +1,12 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 
-export class DlgRename extends DialogRenderer {
+export class DlgRename extends DialogRenderer<string> {
   private _name: string;
   private _firstOpen: boolean;
-  private _resolve: (s: string) => void;
-  constructor(id: string, width: number, name: string, resolve: (s: string) => void) {
+  constructor(id: string, width: number, name: string) {
     super(id, width, 0);
     this._name = name;
-    this._resolve = resolve;
     this._firstOpen = true;
   }
   doRender(): void {
@@ -24,14 +22,12 @@ export class DlgRename extends DialogRenderer {
     ImGui.PopItemWidth();
     if (ImGui.Button('Ok')) {
       if (this._name) {
-        this._resolve(this._name);
-        this.close();
+        this.close(this._name);
       }
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this._resolve('');
-      this.close();
+      this.close('');
     }
   }
 }

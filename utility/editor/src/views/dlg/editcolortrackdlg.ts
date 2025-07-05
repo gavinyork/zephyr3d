@@ -3,7 +3,7 @@ import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 import { InterpolateData, Interpolator } from '@zephyr3d/base';
 
-export class DlgEditColorTrack extends DialogRenderer {
+export class DlgEditColorTrack extends DialogRenderer<boolean> {
   private _creator: RampTextureCreator;
   private _rgbInterpolator: Interpolator;
   private _alphaInterpolator: Interpolator;
@@ -35,7 +35,7 @@ export class DlgEditColorTrack extends DialogRenderer {
     }
     ImGui.EndChild();
     if (ImGui.Button('Ok')) {
-      this.close();
+      this.close(true);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
@@ -46,7 +46,7 @@ export class DlgEditColorTrack extends DialogRenderer {
         this._alphaInterpolator.inputs = this._savedAlphaInputs;
         this._alphaInterpolator.outputs = this._savedAlphaOutputs;
       }
-      this.close();
+      this.close(false);
     }
   }
 }

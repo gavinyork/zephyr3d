@@ -3,8 +3,7 @@ import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 import { Interpolator } from '@zephyr3d/base';
 
-export class DlgRampTextureCreator extends DialogRenderer {
-  private _resolve: (tex: { data: Uint8ClampedArray; name: string }) => void;
+export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedArray; name: string }> {
   private _name: string;
   private _creator: RampTextureCreator;
   constructor(
@@ -13,11 +12,9 @@ export class DlgRampTextureCreator extends DialogRenderer {
     rgbInterpolator: Interpolator,
     alphaInterpolator: Interpolator,
     width: number,
-    height: number,
-    resolve: (tex: { data: Uint8ClampedArray; name: string }) => void
+    height: number
   ) {
     super(id, width, height);
-    this._resolve = resolve;
     this._name = 'ramp texture';
     this._creator = new RampTextureCreator(useAlpha, rgbInterpolator, alphaInterpolator);
   }
@@ -35,14 +32,12 @@ export class DlgRampTextureCreator extends DialogRenderer {
       const data = new Uint8ClampedArray(256 * 4);
       this._creator.fillTextureData(true, data);
       this._creator.dispose();
-      this._resolve({ data, name: this._name });
-      this.close();
+      this.close({ data, name: this._name });
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
       this._creator.dispose();
-      this._resolve(null);
-      this.close();
+      this.close(null);
     }
   }
 }

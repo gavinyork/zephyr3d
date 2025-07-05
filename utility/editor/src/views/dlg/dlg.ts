@@ -10,10 +10,12 @@ import { DlgExportScene } from './exportscenedlg';
 import { DlgSelectAnimation } from './selectanimationdlg';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgEditColorTrack } from './editcolortrackdlg';
+import { DialogRenderer } from '../../components/modal';
+import { ImGui } from '@zephyr3d/imgui';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
-    new DlgMessage(`${title}##Dialog`, message, width, height).showModal();
+    return new DlgMessage(`${title}##Dialog`, message, width, height).showModal();
   }
   public static async messageBoxEx(
     title: string,
@@ -22,9 +24,7 @@ export class Dialog {
     width?: number,
     height?: number
   ) {
-    return new Promise<string>((resolve) => {
-      new DlgMessageBoxEx(title, message, buttons, width, height, resolve).showModal();
-    });
+    return new DlgMessageBoxEx(title, message, buttons, width, height).showModal();
   }
   public static async batchExportScene(
     title: string,
@@ -32,9 +32,7 @@ export class Dialog {
     width?: number,
     height?: number
   ): Promise<DBSceneInfo[]> {
-    return new Promise<DBSceneInfo[]>((resolve) => {
-      new DlgExportScene(title, scene, width, height, resolve).showModal();
-    });
+    return new DlgExportScene(title, scene, width, height).showModal();
   }
   public static async openScene(
     title: string,
@@ -42,9 +40,7 @@ export class Dialog {
     width?: number,
     height?: number
   ): Promise<string> {
-    return new Promise<string>((resolve) => {
-      new DlgOpenScene(title, scene, width, height, resolve).showModal();
-    });
+    return new DlgOpenScene(title, scene, width, height).showModal();
   }
   public static async promptName(
     title: string,
@@ -52,14 +48,10 @@ export class Dialog {
     width?: number,
     height?: number
   ): Promise<string> {
-    return new Promise((resolve) => {
-      new DlgPromptName(title, defaultName, width, height, resolve).showModal();
-    });
+    return new DlgPromptName(title, defaultName, width, height).showModal();
   }
   public static async rename(title: string, name: string, width?: number): Promise<string> {
-    return new Promise((resolve) => {
-      new DlgRename(title, width, name, resolve).showModal();
-    });
+    return new DlgRename(title, width, name).showModal();
   }
   public static async editCurve(
     title: string,
@@ -67,9 +59,13 @@ export class Dialog {
     width?: number,
     height?: number
   ): Promise<Interpolator> {
-    return new Promise((resolve) => {
-      new DlgCurveEditor(title, width, height, interpolator, resolve).show();
-    });
+    const existing = DialogRenderer.findModeless(title);
+    if (existing >= 0) {
+      ImGui.SetWindowFocus(title);
+      return DialogRenderer.getModeless(existing).promise;
+    } else {
+      return new DlgCurveEditor(title, width, height, interpolator).show();
+    }
   }
   public static editColorTrack(
     title: string,
@@ -79,7 +75,14 @@ export class Dialog {
     width?: number,
     height?: number
   ) {
-    new DlgEditColorTrack(title, useAlpha, rgbInterpolator, alphaInterpolator, width, height).showModal();
+    return new DlgEditColorTrack(
+      title,
+      useAlpha,
+      rgbInterpolator,
+      alphaInterpolator,
+      width,
+      height
+    ).showModal();
   }
   public static async createRampTexture(
     title: string,
@@ -89,25 +92,20 @@ export class Dialog {
     width?: number,
     height?: number
   ): Promise<{ data: Uint8ClampedArray; name: string }> {
-    return new Promise((resolve) => {
-      new DlgRampTextureCreator(
-        title,
-        useAlpha,
-        rgbInterpolator,
-        alphaInterpolator,
-        width,
-        height,
-        resolve
-      ).showModal();
-    });
+    return new DlgRampTextureCreator(
+      title,
+      useAlpha,
+      rgbInterpolator,
+      alphaInterpolator,
+      width,
+      height
+    ).showModal();
   }
   public static async selectAnimationAndTrack(
     title: string,
     animationNames: string[],
     width?: number
   ): Promise<{ animationName: string; trackName: string }> {
-    return new Promise((resolve) => {
-      new DlgSelectAnimation(title, animationNames, width, resolve).showModal();
-    });
+    return new DlgSelectAnimation(title, animationNames, width).showModal();
   }
 }

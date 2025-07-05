@@ -1,7 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 
-export class DlgProgress extends DialogRenderer {
+export class DlgProgress extends DialogRenderer<void> {
   private _progress: string;
   constructor(id: string) {
     super(id, 300);

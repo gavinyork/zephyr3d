@@ -2,23 +2,15 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import type { DBSceneInfo } from '../../storage/db';
 
-export class DlgOpenScene extends DialogRenderer {
+export class DlgOpenScene extends DialogRenderer<string> {
   private _sceneNames: string[];
   private _sceneIds: string[];
   private _selected: [number];
-  private _resolve: (s: string) => void;
-  constructor(
-    id: string,
-    scenes: DBSceneInfo[],
-    width: number,
-    height: number,
-    resolve: (s: string) => void
-  ) {
+  constructor(id: string, scenes: DBSceneInfo[], width: number, height: number) {
     super(id, width, height);
     this._sceneNames = scenes.map((scene) => scene.name);
     this._sceneIds = scenes.map((scene) => scene.uuid);
     this._selected = [0];
-    this._resolve = resolve;
   }
   doRender(): void {
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing()), true)) {
@@ -34,14 +26,12 @@ export class DlgOpenScene extends DialogRenderer {
     ImGui.EndChild();
     if (ImGui.Button('Open')) {
       if (this._selected[0] >= 0 && this._selected[0] < this._sceneIds.length) {
-        this._resolve(this._sceneIds[this._selected[0]]);
-        this.close();
+        this.close(this._sceneIds[this._selected[0]]);
       }
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this._resolve('');
-      this.close();
+      this.close('');
     }
   }
 }

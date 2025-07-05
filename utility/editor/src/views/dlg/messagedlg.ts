@@ -1,7 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 
-export class DlgMessage extends DialogRenderer {
+export class DlgMessage extends DialogRenderer<void> {
   private _text: string;
   constructor(id?: string, message?: string, width?: number, height?: number) {
     super(id ?? 'MessageBox', width ?? 300, height ?? 0);

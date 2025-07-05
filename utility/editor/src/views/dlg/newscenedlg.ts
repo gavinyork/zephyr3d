@@ -1,13 +1,11 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 
-export class DlgPromptName extends DialogRenderer {
+export class DlgPromptName extends DialogRenderer<string> {
   private _sceneName: string;
-  private _resolve: (s: string) => void;
-  constructor(id: string, defaultName: string, width: number, height: number, resolve: (s: string) => void) {
+  constructor(id: string, defaultName: string, width: number, height: number) {
     super(id, width, height);
     this._sceneName = defaultName ?? '';
-    this._resolve = resolve;
   }
   doRender(): void {
     const name = [this._sceneName] as [string];
@@ -17,14 +15,12 @@ export class DlgPromptName extends DialogRenderer {
     }
     ImGui.Button('Save');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
-      this._resolve(this._sceneName);
-      this.close();
+      this.close(this._sceneName);
     }
     ImGui.SameLine();
     ImGui.Button('Cancel');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
-      this._resolve('');
-      this.close();
+      this.close('');
     }
   }
 }
