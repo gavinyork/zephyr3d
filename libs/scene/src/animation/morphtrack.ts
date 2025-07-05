@@ -4,7 +4,7 @@ import type { AssetAnimationTrack, AssetSubMeshData } from '../asset';
 import { BoundingBox } from '../utility/bounding_volume';
 import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Interpolator } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 
 /** Morph animation state */
@@ -23,11 +23,13 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   private _originBox: AABB;
   private _boundingBox: BoundingBox[];
   private _defaultWeights: number[];
+  private _interpolator: Interpolator;
   /**
    * Create an instance of MorphTargetTrack
    */
   constructor(assetTrack: AssetAnimationTrack, subMesh: AssetSubMeshData, embedded?: boolean) {
-    super(assetTrack.interpolator, embedded);
+    super(embedded);
+    this._interpolator = assetTrack.interpolator;
     this._state = {
       numTargets: assetTrack.interpolator.stride,
       boundingBox: new BoundingBox(),
@@ -69,6 +71,9 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   }
   getBlendId(): unknown {
     return 'node-morph';
+  }
+  getDuration(): number {
+    return this._interpolator.maxTime;
   }
   reset(node: SceneNode) {
     // apply default weights

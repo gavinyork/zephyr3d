@@ -8,6 +8,7 @@ import type {
   Compositor,
   NodeCloneMethod,
   PropertyAccessor,
+  PropertyTrack,
   Scene,
   SerializationManager,
   ShapeOptionType,
@@ -790,8 +791,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
-    this._propGrid.on('request_edit_interpolator', this.editInterpolator, this);
-    this._propGrid.on('end_edit_interpolator', this.endEditInterpolator, this);
+    this._propGrid.on('request_edit_track', this.editTrack, this);
+    this._propGrid.on('end_edit_track', this.endEditTrack, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     this.sceneSetup();
   }
@@ -810,8 +811,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
-    this._propGrid.off('request_edit_interpolator', this.editInterpolator, this);
-    this._propGrid.off('end_edit_interpolator', this.endEditInterpolator, this);
+    this._propGrid.off('request_edit_track', this.editTrack, this);
+    this._propGrid.off('end_edit_track', this.endEditTrack, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     this.sceneFinialize();
   }
@@ -905,15 +906,27 @@ export class SceneView extends BaseView<SceneModel> {
       this._currentEditTool.get().update(dt);
     }
   }
-  private editInterpolator(interpolator: Interpolator, prop: PropertyAccessor) {
-    Dialog.editCurve(
-      `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
-      interpolator,
-      600,
-      500
-    );
+  private editTrack(track: PropertyTrack) {
+    const prop = track.getProp();
+    if (prop.type === 'rgb' || prop.type === 'rgba') {
+      Dialog.editColorTrack(
+        `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
+        prop.type === 'rgba',
+        track.interpolator,
+        track.interpolatorAlpha,
+        600,
+        500
+      );
+    } else {
+      Dialog.editCurve(
+        `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
+        track.interpolator,
+        600,
+        500
+      );
+    }
   }
-  private endEditInterpolator(interpolator: Interpolator) {}
+  private endEditTrack() {}
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
     this._postGizmoRenderer.editAABB(this._aabbForEdit);

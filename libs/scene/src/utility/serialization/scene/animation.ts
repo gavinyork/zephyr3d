@@ -164,14 +164,23 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         },
         {
           name: 'TrackData',
-          type: 'object',
+          type: 'object_array',
           edit: 'interpolator',
           objectTypes: [Interpolator],
+          isNullable(this: PropertyTrack) {
+            return true;
+          },
+          isHidden(this: PropertyTrack, index: number) {
+            return index >= 0;
+          },
           get(this: PropertyTrack, value) {
-            value.object[0] = this.interpolator;
+            value.object = this.interpolatorAlpha
+              ? [this.interpolator, this.interpolatorAlpha]
+              : [this.interpolator];
           },
           set(this: PropertyTrack, value) {
             this.interpolator = value.object[0] as Interpolator;
+            this.interpolatorAlpha = value.object[1] as Interpolator;
           }
         }
       ];
@@ -208,6 +217,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
           name: 'Tracks',
           type: 'object_array',
           objectTypes: [PropertyTrack],
+          edit: 'interpolator',
           readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];

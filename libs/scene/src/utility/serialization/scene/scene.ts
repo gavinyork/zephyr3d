@@ -20,8 +20,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'Name',
           type: 'string',
-          hidden: true,
           default: '',
+          isHidden() {
+            return true;
+          },
           get(this: Scene, value) {
             value.str[0] = this.name;
           },
@@ -453,7 +455,9 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'NodeHierarchy',
           type: 'object',
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: Scene, value) {
             value.object = [new NodeHierarchy(this, this.rootNode)];
           },

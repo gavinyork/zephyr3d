@@ -33,7 +33,6 @@ export type PropertyAccessor<T = unknown> = {
   label?: string;
   group?: string;
   phase?: number;
-  hidden?: boolean;
   options?: { minValue: number; maxValue: number; speed?: number };
   enum?: { labels: string[]; values: (number | string)[] };
   instance?: boolean;
@@ -49,7 +48,8 @@ export type PropertyAccessor<T = unknown> = {
   delete?: (this: T, index: number) => void;
   add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   isValid?: (this: T) => boolean;
-  isNullable?: (this: T) => boolean;
+  isNullable?: (this: T, index: number) => boolean;
+  isHidden?: (this: T, index: number) => boolean;
   command?: (this: T, index: number) => boolean;
   getDefaultValue?: (this: T) => any;
 };

@@ -9,6 +9,7 @@ import { DlgRename } from './renamedlg';
 import { DlgExportScene } from './exportscenedlg';
 import { DlgSelectAnimation } from './selectanimationdlg';
 import { DlgMessageBoxEx } from './messageexdlg';
+import { DlgEditColorTrack } from './editcolortrackdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -70,13 +71,34 @@ export class Dialog {
       new DlgCurveEditor(title, width, height, interpolator, resolve).show();
     });
   }
+  public static editColorTrack(
+    title: string,
+    useAlpha: boolean,
+    rgbInterpolator: Interpolator,
+    alphaInterpolator: Interpolator,
+    width?: number,
+    height?: number
+  ) {
+    new DlgEditColorTrack(title, useAlpha, rgbInterpolator, alphaInterpolator, width, height).showModal();
+  }
   public static async createRampTexture(
     title: string,
+    useAlpha: boolean,
+    rgbInterpolator: Interpolator,
+    alphaInterpolator: Interpolator,
     width?: number,
     height?: number
   ): Promise<{ data: Uint8ClampedArray; name: string }> {
     return new Promise((resolve) => {
-      new DlgRampTextureCreator(title, width, height, resolve).showModal();
+      new DlgRampTextureCreator(
+        title,
+        useAlpha,
+        rgbInterpolator,
+        alphaInterpolator,
+        width,
+        height,
+        resolve
+      ).showModal();
     });
   }
   public static async selectAnimationAndTrack(

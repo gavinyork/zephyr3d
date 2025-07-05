@@ -153,7 +153,9 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
     const accessorDetailAlbedo: PropertyAccessor<ClipmapTerrain> = {
       name: `DetailAlbedoMap${i}`,
       type: 'object',
-      hidden: true,
+      isHidden() {
+        return true;
+      },
       default: null,
       isValid(this: ClipmapTerrain) {
         return this.numDetailMaps > i;
@@ -193,9 +195,11 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
     const accessorDetailNormal: PropertyAccessor<ClipmapTerrain> = {
       name: `DetailNormalMap${i}`,
       type: 'object',
-      hidden: true,
       default: null,
       isNullable() {
+        return true;
+      },
+      isHidden() {
         return true;
       },
       isValid() {
@@ -236,8 +240,10 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
     const accessorDetailUVScale: PropertyAccessor<ClipmapTerrain> = {
       name: `DetailUVScale${i}`,
       type: 'float',
-      hidden: true,
       default: 80,
+      isHidden() {
+        return true;
+      },
       isValid() {
         return this.numDetailMaps > i;
       },
@@ -251,8 +257,10 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
     const accessorDetailRoughness: PropertyAccessor<ClipmapTerrain> = {
       name: `DetailRoughness${i}`,
       type: 'float',
-      hidden: true,
       default: 80,
+      isHidden() {
+        return true;
+      },
       isValid() {
         return this.numDetailMaps > i;
       },
@@ -357,7 +365,9 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           name: 'SplatMap',
           type: 'object',
           default: null,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: ClipmapTerrain, value) {
             value.str[0] = this.splatMapAssetId;
           },
@@ -399,7 +409,9 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           name: 'Grass',
           type: 'object',
           default: null,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: ClipmapTerrain, value) {
             value.str[0] = this.grassAssetId;
           },
@@ -483,7 +495,9 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           name: 'HeightMap',
           type: 'object',
           default: null,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: ClipmapTerrain, value) {
             value.str[0] = this.heightMapAssetId;
           },

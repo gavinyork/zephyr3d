@@ -9,6 +9,7 @@ import type { SceneNode } from '../scene';
  */
 export class NodeTranslationTrack extends AnimationTrack<Vector3> {
   private _state: Vector3;
+  private _interpolator: Interpolator;
   /**
    * Create an instance of TranslationTrack from keyframe values
    * @param interpolator - Interpolator object that contains the keyframe values
@@ -31,7 +32,8 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`TranslationTrack(): interpolator target must be 'vec3'`);
       }
-      super(modeOrInterpolator, (keyFramesOrEmbedded as boolean) ?? false);
+      super((keyFramesOrEmbedded as boolean) ?? false);
+      this._interpolator = modeOrInterpolator;
     } else {
       const keyFrames = keyFramesOrEmbedded as { time: number; value: Vector3 }[];
       const inputs = new Float32Array(keyFrames.map((val) => val.time));
@@ -41,8 +43,8 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
         outputs[i * 3 + 1] = keyFrames[i].value.y;
         outputs[i * 3 + 2] = keyFrames[i].value.z;
       }
-      const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
-      super(interpolator, embedded ?? false);
+      super(embedded ?? false);
+      this._interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
     }
     this._state = new Vector3();
   }
@@ -58,5 +60,8 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
   }
   getBlendId(): unknown {
     return 'node-translation';
+  }
+  getDuration(): number {
+    return this._interpolator.maxTime;
   }
 }

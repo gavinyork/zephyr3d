@@ -11,6 +11,7 @@ const tmpVec3 = new Vector3();
  */
 export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   private _state: Quaternion;
+  private _interpolator: Interpolator;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains the keyframe values
@@ -33,7 +34,8 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`TranslationTrack(): interpolator target must be 'vec3'`);
       }
-      super(modeOrInterpolator, (keyFramesOrEmbedded as boolean) ?? false);
+      super((keyFramesOrEmbedded as boolean) ?? false);
+      this._interpolator = modeOrInterpolator;
     } else {
       const keyFrames = keyFramesOrEmbedded as { time: number; value: Vector3 }[];
       const inputs = new Float32Array(keyFrames.map((val) => val.time));
@@ -43,8 +45,8 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
         outputs[i * 3 + 1] = keyFrames[i].value.y;
         outputs[i * 3 + 2] = keyFrames[i].value.z;
       }
-      const interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
-      super(interpolator, embedded ?? false);
+      super(embedded ?? false);
+      this._interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
     }
     this._state = new Quaternion();
   }
@@ -61,5 +63,8 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   }
   getBlendId(): unknown {
     return 'node-rotation';
+  }
+  getDuration(): number {
+    return this._interpolator.maxTime;
   }
 }

@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
+import { Interpolator } from '@zephyr3d/base';
 
 export class DlgRampTextureCreator extends DialogRenderer {
   private _resolve: (tex: { data: Uint8ClampedArray; name: string }) => void;
@@ -8,6 +9,9 @@ export class DlgRampTextureCreator extends DialogRenderer {
   private _creator: RampTextureCreator;
   constructor(
     id: string,
+    useAlpha: boolean,
+    rgbInterpolator: Interpolator,
+    alphaInterpolator: Interpolator,
     width: number,
     height: number,
     resolve: (tex: { data: Uint8ClampedArray; name: string }) => void
@@ -15,7 +19,7 @@ export class DlgRampTextureCreator extends DialogRenderer {
     super(id, width, height);
     this._resolve = resolve;
     this._name = 'ramp texture';
-    this._creator = new RampTextureCreator();
+    this._creator = new RampTextureCreator(useAlpha, rgbInterpolator, alphaInterpolator);
   }
   doRender(): void {
     const name = [this._name] as [string];

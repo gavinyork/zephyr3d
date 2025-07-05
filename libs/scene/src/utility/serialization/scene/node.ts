@@ -125,7 +125,9 @@ export function getNodeHierarchyClass(): SerializableClass {
           name: 'MaterialList',
           type: 'object_array',
           phase: 0,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: NodeHierarchy, value) {
             value.object = [...this.materialList].sort(
               (a, b) => Number(!!a.$isInstance) - Number(!!b.$isInstance)
@@ -137,7 +139,9 @@ export function getNodeHierarchyClass(): SerializableClass {
           name: 'PrimitiveList',
           type: 'object_array',
           phase: 0,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: NodeHierarchy, value) {
             value.object = [...this.primitiveList];
           },
@@ -147,7 +151,9 @@ export function getNodeHierarchyClass(): SerializableClass {
           name: 'NodeHierarchy',
           type: 'object',
           phase: 1,
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: NodeHierarchy, value) {
             value.object = [this.rootNode];
           },
@@ -182,7 +188,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Id',
           type: 'string',
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: SceneNode, value) {
             value.str[0] = this.persistentId;
           },
@@ -273,7 +281,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Children',
           type: 'object_array',
-          hidden: true,
+          isHidden() {
+            return true;
+          },
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {

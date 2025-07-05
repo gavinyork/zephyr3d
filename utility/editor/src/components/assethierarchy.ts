@@ -51,7 +51,7 @@ export class AssetHierarchy {
     });
   }
   async uploadRampTexture() {
-    const tex = await Dialog.createRampTexture('Create ramp texture', 400, 200);
+    const tex = await Dialog.createRampTexture('Create ramp texture', false, null, null, 400, 200);
     if (tex) {
       const file = await this.rgbaToPng(`${crypto.randomUUID()}.png`, tex.data.byteLength >> 2, 1, tex.data);
       await this.doUploadAssetFile('texture', [file], tex.name);

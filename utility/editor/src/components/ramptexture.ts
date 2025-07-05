@@ -8,7 +8,6 @@ export class RampTextureCreator {
   private _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
-  private _alphaInterpolator: Interpolator;
   private _textureData: Uint8ClampedArray;
   private _keyframes: Array<{ time: number; color: Float32Array }>;
   private _selectedKeyframe: number;
@@ -18,42 +17,55 @@ export class RampTextureCreator {
   private _alphaEditor: CurveEditor;
   private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
-  constructor() {
+  private _hasAlpha: boolean;
+  constructor(hasAlpha: boolean, rgbInterpolator?: Interpolator, alphaInterpolator?: Interpolator) {
+    this._hasAlpha = !!hasAlpha;
     this._textureWidth = 256;
     this._textureData = new Uint8ClampedArray(this._textureWidth * 4);
     this._texture = null;
-    this._keyframes = [
-      { time: 0, color: new Float32Array([0, 0, 0]) },
-      { time: 1, color: new Float32Array([1, 1, 1]) }
-    ];
+    this._keyframes = rgbInterpolator
+      ? [...rgbInterpolator.inputs].map((t) => ({
+          time: t,
+          color: rgbInterpolator.interpolate(t, new Float32Array(3))
+        }))
+      : [
+          { time: 0, color: new Float32Array([0, 0, 0]) },
+          { time: 1, color: new Float32Array([1, 1, 1]) }
+        ];
+    this._interpolator = rgbInterpolator ?? null;
     this._selectedKeyframe = 0;
     this._isDragging = false;
     this._hoverKeyframe = -1;
     this._markerWidth = 4;
-    this._showAlpha = true;
+    this._showAlpha = this._hasAlpha;
     this._dragStartPos = null;
-    this._alphaEditor = new CurveEditor(
-      [
-        {
-          x: 0,
-          value: [1]
-        },
-        {
-          x: 1,
-          value: [1]
-        }
-      ],
-      {
-        timeRange: [0, 1],
-        valueRange: [0, 1],
-        interpolationType: 'linear',
-        drawLabels: false,
-        drawHints: false
-      }
-    );
-    this._alphaEditor.on('curve_changed', this.updateTexture, this);
+    this._alphaEditor = this._hasAlpha
+      ? alphaInterpolator
+        ? new CurveEditor(alphaInterpolator)
+        : new CurveEditor(
+            [
+              {
+                x: 0,
+                value: [1]
+              },
+              {
+                x: 1,
+                value: [1]
+              }
+            ],
+            {
+              timeRange: [0, 1],
+              valueRange: [0, 1],
+              interpolationType: 'linear',
+              drawLabels: false,
+              drawHints: false
+            }
+          )
+      : null;
+    if (this._alphaEditor) {
+      this._alphaEditor.on('curve_changed', this.updateTexture, this);
+    }
     this.updateInterpolator();
-    this._alphaInterpolator = this._alphaEditor.interpolator;
   }
   private updateInterpolator() {
     this._keyframes.sort((a, b) => a.time - b.time);
@@ -66,7 +78,12 @@ export class RampTextureCreator {
       colors[index * 3 + 1] = kf.color[1];
       colors[index * 3 + 2] = kf.color[2];
     });
-    this._interpolator = new Interpolator('linear', 'vec3', times, colors);
+    if (!this._interpolator) {
+      this._interpolator = new Interpolator('linear', 'vec3', times, colors);
+    } else {
+      this._interpolator.inputs = times;
+      this._interpolator.outputs = colors;
+    }
     this.updateTexture();
   }
   private handleEditorInteraction() {
@@ -220,13 +237,13 @@ export class RampTextureCreator {
     });
   }
   render(): void {
-    if (!this._texture || this._alphaEditor.interpolator !== this._alphaInterpolator) {
-      this._alphaInterpolator = this._alphaEditor.interpolator;
-      if (this._showAlpha) {
-        this.updateTexture();
-      }
+    if (!this._texture) {
+      this.updateTexture();
     }
-    const height = (ImGui.GetContentRegionAvail().y - ImGui.GetStyle().ItemSpacing.y) >> 1;
+    let height = ImGui.GetContentRegionAvail().y - ImGui.GetStyle().ItemSpacing.y;
+    if (this._alphaEditor) {
+      height >>= 1;
+    }
     if (ImGui.BeginChild('RGBEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
       ImGui.SetNextWindowBgAlpha(1);
       if (
@@ -253,25 +270,27 @@ export class RampTextureCreator {
       }
     }
     ImGui.EndChild();
-    if (ImGui.BeginChild('AlphaEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
-      if (
-        (ImGui.BeginChild('CurveEditor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing() * 2)),
-        true,
-        ImGui.WindowFlags.NoScrollbar)
-      ) {
-        ImGui.PushID('CurveEditor');
-        this._alphaEditor.renderCurveView(ImGui.GetContentRegionAvail());
-        ImGui.PopID();
+    if (this._alphaEditor) {
+      if (ImGui.BeginChild('AlphaEditor', new ImGui.ImVec2(0, height), true, ImGui.WindowFlags.NoScrollbar)) {
+        if (
+          (ImGui.BeginChild('CurveEditor', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing() * 2)),
+          true,
+          ImGui.WindowFlags.NoScrollbar)
+        ) {
+          ImGui.PushID('CurveEditor');
+          this._alphaEditor.renderCurveView(ImGui.GetContentRegionAvail());
+          ImGui.PopID();
+        }
+        ImGui.EndChild();
+        ImGui.Text('Alpha');
+        const showAlpha = [this._showAlpha] as [boolean];
+        if (ImGui.Checkbox('Show Alpha', showAlpha)) {
+          this._showAlpha = showAlpha[0];
+          this.updateTexture();
+        }
       }
       ImGui.EndChild();
-      ImGui.Text('Alpha');
-      const showAlpha = [this._showAlpha] as [boolean];
-      if (ImGui.Checkbox('Show Alpha', showAlpha)) {
-        this._showAlpha = showAlpha[0];
-        this.updateTexture();
-      }
     }
-    ImGui.EndChild();
   }
   private drawCheckerboard(
     drawList: ImGui.DrawList,

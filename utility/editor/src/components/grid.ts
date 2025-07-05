@@ -10,14 +10,7 @@ import {
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
-import {
-  AABB,
-  degree2radian,
-  Interpolator,
-  makeEventTarget,
-  Quaternion,
-  radian2degree
-} from '@zephyr3d/base';
+import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 
@@ -95,8 +88,10 @@ class PropertyGroup {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
         for (let i = 0; i < tmpProperty.object.length; i++) {
-          const propGroup = group.addGroup(`${value.name}[${i}]`);
-          propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
+          if (!value.isHidden || !value.isHidden.call(obj, i)) {
+            const propGroup = group.addGroup(`${value.name}[${i}]`);
+            propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
+          }
         }
       }
     } else {
@@ -168,7 +163,7 @@ class PropertyGroup {
         prop?.objectTypes?.length > 0
           ? prop.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
           : [];
-      if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj)) {
+      if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
         this.objectTypes.unshift(null);
       }
       this.selected[0] = this.objectTypes.findIndex((val) => {
@@ -186,7 +181,9 @@ class PropertyGroup {
         while (ctor) {
           cls = serializationManager.getClassByConstructor(ctor);
           if (cls) {
-            const props = serializationManager.getPropertiesByClass(cls).filter((p) => !p.hidden);
+            const props = serializationManager
+              .getPropertiesByClass(cls)
+              .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0], -1));
             if (props.length > 0) {
               this.addSeparator(cls.ctor.name);
               for (const prop of props) {
@@ -204,8 +201,8 @@ class PropertyGroup {
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
-  request_edit_interpolator: [interpolator: Interpolator, prop: PropertyAccessor];
-  end_edit_interpolator: [interpolator: Interpolator];
+  request_edit_track: [track: PropertyTrack];
+  end_edit_track: [track: PropertyTrack];
   object_property_changed: [object: unknown, prop: string];
 }>() {
   private _rootGroup: PropertyGroup;
@@ -390,7 +387,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ) {
       const editable =
         (group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb') ||
-        (group.value.object?.[0] instanceof Interpolator && group.prop.edit === 'interpolator');
+        (group.value.object?.[0] instanceof PropertyTrack && group.prop.edit === 'interpolator');
       const settable =
         !group.prop.readonly &&
         !!group.prop.set &&
@@ -452,7 +449,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               if (group.prop.edit === 'aabb') {
                 this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
               } else if (group.prop.edit === 'interpolator') {
-                this.dispatchEvent('end_edit_interpolator', group.value.object[0] as Interpolator);
+                this.dispatchEvent('end_edit_track', group.value.object[0] as PropertyTrack);
               }
             }
           }
@@ -463,11 +460,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             if (group.prop.edit === 'aabb') {
               this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
             } else if (group.prop.edit === 'interpolator') {
-              this.dispatchEvent(
-                'request_edit_interpolator',
-                group.value.object[0] as Interpolator,
-                group.prop
-              );
+              this.dispatchEvent('request_edit_track', group.value.object[0] as PropertyTrack);
             }
           }
         }
@@ -721,7 +714,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           if (assetInfo) {
             val[0] = assetInfo.name;
           }
-          if (value.isNullable?.()) {
+          if (value.isNullable?.call(object, 0)) {
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
@@ -734,7 +727,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             }
             ImGui.EndDragDropTarget();
           }
-          if (value.isNullable?.()) {
+          if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
               value.set.call(object, null);

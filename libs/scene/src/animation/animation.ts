@@ -122,7 +122,7 @@ export class AnimationClip {
       this._tracks.set(target, trackInfo);
     }
     trackInfo.push(track);
-    this._duration = Math.max(this._duration, track.interpolator?.maxTime ?? 0);
+    this._duration = Math.max(this._duration, track.getDuration() ?? 0);
     track.reset(target);
     return this;
   }

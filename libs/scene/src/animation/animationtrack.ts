@@ -1,4 +1,3 @@
-import type { Interpolator } from '@zephyr3d/base';
 import type { AnimationClip } from './animation';
 
 /**
@@ -11,17 +10,14 @@ export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
   protected _embedded: boolean;
   /** @internal */
-  protected _interpolator: Interpolator;
-  /** @internal */
   protected _animation: AnimationClip;
   /**
    * Creates a new animation track
-   * @param interpolator - Interpolator for the track
+   * @param embedded - Whether this track is an embedded track
    */
-  constructor(interpolator?: Interpolator, embedded?: boolean) {
+  constructor(embedded?: boolean) {
     this._name = 'noname';
     this._embedded = !!embedded;
-    this._interpolator = interpolator;
   }
   /** Name of the track */
   get name() {
@@ -33,13 +29,6 @@ export abstract class AnimationTrack<StateType = unknown> {
   /** Wether this is an embedded track */
   get embedded(): boolean {
     return this._embedded;
-  }
-  /** Interpolator of the track */
-  get interpolator(): Interpolator {
-    return this._interpolator;
-  }
-  set interpolator(val: Interpolator) {
-    this._interpolator = val;
   }
   /** Animation this track belongs to */
   get animation(): AnimationClip {
@@ -79,4 +68,9 @@ export abstract class AnimationTrack<StateType = unknown> {
    * Two tracks which have same blend ID can be blended together
    */
   abstract getBlendId(): unknown;
+  /**
+   * Get the duration of the track
+   * @returns Duration of the track
+   */
+  abstract getDuration(): number;
 }

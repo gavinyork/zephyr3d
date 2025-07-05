@@ -13,9 +13,9 @@ import {
 
 export class Renderer {
   /** @internal */
-  private static readonly VERTEX_BUFFER_SIZE = 32768;
+  private static readonly VERTEX_BUFFER_SIZE = 65536;
   /** @internal */
-  private static readonly INDEX_BUFFER_SIZE = 16384;
+  private static readonly INDEX_BUFFER_SIZE = 65536 * 3;
   /** @internal */
   private _device: AbstractDevice;
   /** @internal */

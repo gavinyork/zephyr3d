@@ -9,6 +9,7 @@ import type { SceneNode } from '../scene';
  */
 export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   private _state: Quaternion;
+  private _interpolator: Interpolator;
   /**
    * Create an instance of RotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -31,7 +32,8 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
       if (modeOrInterpolator.target !== 'quat') {
         throw new Error(`RotationTrack(): interpolator target must be 'quat'`);
       }
-      super(modeOrInterpolator, (keyFramesOrEmbedded as boolean) ?? false);
+      super((keyFramesOrEmbedded as boolean) ?? false);
+      this._interpolator = modeOrInterpolator;
     } else {
       const keyFrames = keyFramesOrEmbedded as { time: number; value: Quaternion }[];
       const inputs = new Float32Array(keyFrames.map((val) => val.time));
@@ -42,8 +44,8 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
         outputs[i * 4 + 2] = keyFrames[i].value.z;
         outputs[i * 4 + 3] = keyFrames[i].value.w;
       }
-      const interpolator = new Interpolator(modeOrInterpolator, 'quat', inputs, outputs);
-      super(interpolator, embedded ?? false);
+      super(embedded ?? false);
+      this._interpolator = new Interpolator(modeOrInterpolator, 'quat', inputs, outputs);
     }
     this._state = new Quaternion();
   }
@@ -59,5 +61,8 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   }
   getBlendId(): unknown {
     return 'node-rotation';
+  }
+  getDuration(): number {
+    return this._interpolator.maxTime;
   }
 }
