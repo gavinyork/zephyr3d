@@ -40,7 +40,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     this._defaultWeights =
       assetTrack.defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
   }
-  calculateState(target: unknown, currentTime: number): MorphState {
+  calculateState(target: object, currentTime: number): MorphState {
     this._interpolator.interpolate(currentTime, this._state.weights);
     calculateMorphBoundingBox(
       this._state.boundingBox,

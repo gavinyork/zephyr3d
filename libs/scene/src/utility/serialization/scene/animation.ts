@@ -1,64 +1,10 @@
-import type { GenericConstructor, InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
 import { Interpolator } from '@zephyr3d/base';
 import type { AnimationTrack } from '../../../animation';
 import { AnimationClip, PropertyTrack } from '../../../animation';
 import type { SerializationManager } from '../manager';
-import type { PropertyValue, SerializableClass } from '../types';
+import type { SerializableClass } from '../types';
 import type { SceneNode } from '../../../scene';
-
-const pattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
-function parsePropertyPath(str: string) {
-  const match = str.match(pattern);
-  if (match) {
-    return {
-      original: match[0],
-      prefix: match[1],
-      index: match[2] || null,
-      indexValue: match[2] ? parseInt(match[2], 10) : null,
-      hasIndex: !!match[2]
-    };
-  }
-  return null;
-}
-
-function findAnimationTarget(manager: SerializationManager, node: SceneNode, track: PropertyTrack) {
-  const target = track.target ?? '';
-  const value: PropertyValue = { object: [] };
-  const parts = target.split('/').filter((val) => !!val);
-  let targetObj: unknown = node;
-  while (parts.length > 0) {
-    const propName = parts.shift();
-    const info = parsePropertyPath(propName);
-    if (!info) {
-      return null;
-    }
-    const cls = manager.getClassByConstructor(targetObj.constructor as GenericConstructor);
-    if (!cls) {
-      return null;
-    }
-    const prop = manager.getPropertyByClass(cls, info.prefix);
-    if (!prop) {
-      return null;
-    }
-    if (info.hasIndex) {
-      if (prop.type !== 'object_array') {
-        return null;
-      }
-      prop.get.call(targetObj, value);
-      targetObj = value.object?.[info.indexValue] ?? null;
-    } else {
-      if (prop.type !== 'object') {
-        return null;
-      }
-      prop.get.call(targetObj, value);
-      targetObj = value.object?.[0] ?? null;
-    }
-    if (!targetObj) {
-      return null;
-    }
-  }
-  return targetObj;
-}
 
 export function getInterpolatorClass(): SerializableClass {
   return {
@@ -165,11 +111,7 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         {
           name: 'TrackData',
           type: 'object_array',
-          edit: 'interpolator',
           objectTypes: [Interpolator],
-          isNullable(this: PropertyTrack) {
-            return true;
-          },
           isHidden(this: PropertyTrack, index: number) {
             return index >= 0;
           },
@@ -217,7 +159,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
           name: 'Tracks',
           type: 'object_array',
           objectTypes: [PropertyTrack],
-          edit: 'interpolator',
+          edit: 'proptrack',
           readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];
@@ -228,7 +170,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
           set(this: AnimationClip, value) {
             for (const track of value.object) {
               if (track instanceof PropertyTrack) {
-                const targetObj = findAnimationTarget(manager, this._animationSet.model, track);
+                const targetObj = manager.findAnimationTarget(this._animationSet.model, track);
                 if (targetObj) {
                   this.addTrack(targetObj, track);
                 }
@@ -243,7 +185,9 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
             const trackToRemove = trackList[index];
             if (trackToRemove) {
               this.deleteTrack(trackToRemove);
+              return trackToRemove;
             }
+            return null;
           }
         }
       ];

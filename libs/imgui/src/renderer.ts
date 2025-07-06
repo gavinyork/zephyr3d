@@ -1,5 +1,5 @@
 import type { ColorRGBA } from '@zephyr3d/base';
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
   type RenderStateSet,
@@ -153,7 +153,7 @@ export class Renderer {
   /** @internal */
   updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number): void {
     const originValues = new Uint8Array(bitmap.data.buffer);
-    console.assert(texture.format === 'rgba8unorm');
+    ASSERT(texture.format === 'rgba8unorm');
     texture.update(originValues, x, y, bitmap.width, bitmap.height);
   }
   /** @internal */

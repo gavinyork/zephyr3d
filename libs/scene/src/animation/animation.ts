@@ -18,7 +18,7 @@ export class AnimationClip {
   /** @internal */
   protected _autoPlay: boolean;
   /** @internal */
-  protected _tracks: Map<unknown, AnimationTrack[]>;
+  protected _tracks: Map<object, AnimationTrack[]>;
   /** @internal */
   protected _skeletons: Set<Skeleton>;
   /**
@@ -97,7 +97,7 @@ export class AnimationClip {
    * @param track - The track to be added
    * @returns self
    */
-  addTrack(target: unknown, track: AnimationTrack): this {
+  addTrack(target: object, track: AnimationTrack): this {
     if (!track) {
       return;
     }

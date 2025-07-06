@@ -450,6 +450,7 @@ export function NewFrame(time: number): void {
   }
 
   const viewport = renderer.device.getViewport();
+  const canvas = renderer.device.canvas;
   const w: number = viewport.width;
   const h: number = viewport.height;
   const display_w: number = w * renderer.device.getScale();
@@ -473,35 +474,37 @@ export function NewFrame(time: number): void {
     } else {
       switch (ImGui.GetMouseCursor()) {
         case ImGui.MouseCursor.None:
-          document.body.style.cursor = 'none';
+          canvas.style.cursor = 'none';
           break;
-        default:
         case ImGui.MouseCursor.Arrow:
-          document.body.style.cursor = 'default';
+          canvas.style.cursor = 'default';
           break;
         case ImGui.MouseCursor.TextInput:
-          document.body.style.cursor = 'text';
+          canvas.style.cursor = 'text';
           break; // When hovering over InputText, etc.
         case ImGui.MouseCursor.ResizeAll:
-          document.body.style.cursor = 'all-scroll';
+          canvas.style.cursor = 'all-scroll';
           break; // Unused
         case ImGui.MouseCursor.ResizeNS:
-          document.body.style.cursor = 'ns-resize';
+          canvas.style.cursor = 'ns-resize';
           break; // When hovering over an horizontal border
         case ImGui.MouseCursor.ResizeEW:
-          document.body.style.cursor = 'ew-resize';
+          canvas.style.cursor = 'ew-resize';
           break; // When hovering over a vertical border or a column
         case ImGui.MouseCursor.ResizeNESW:
-          document.body.style.cursor = 'nesw-resize';
+          canvas.style.cursor = 'nesw-resize';
           break; // When hovering over the bottom-left corner of a window
         case ImGui.MouseCursor.ResizeNWSE:
-          document.body.style.cursor = 'nwse-resize';
+          canvas.style.cursor = 'nwse-resize';
           break; // When hovering over the bottom-right corner of a window
         case ImGui.MouseCursor.Hand:
-          document.body.style.cursor = 'move';
+          canvas.style.cursor = 'move';
           break;
         case ImGui.MouseCursor.NotAllowed:
-          document.body.style.cursor = 'not-allowed';
+          canvas.style.cursor = 'not-allowed';
+          break;
+        default:
+          canvas.style.cursor = 'default';
           break;
       }
     }

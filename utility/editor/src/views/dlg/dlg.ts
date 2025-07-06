@@ -56,15 +56,16 @@ export class Dialog {
   public static async editCurve(
     title: string,
     interpolator: Interpolator,
+    onPreview: (value: number[]) => void,
     width?: number,
     height?: number
-  ): Promise<Interpolator> {
+  ): Promise<boolean> {
     const existing = DialogRenderer.findModeless(title);
     if (existing >= 0) {
       ImGui.SetWindowFocus(title);
       return DialogRenderer.getModeless(existing).promise;
     } else {
-      return new DlgCurveEditor(title, width, height, interpolator).show();
+      return new DlgCurveEditor(title, onPreview, width, height, interpolator).show();
     }
   }
   public static editColorTrack(

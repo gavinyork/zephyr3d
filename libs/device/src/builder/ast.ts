@@ -23,6 +23,7 @@ import * as errors from './errors';
 import type { PBGlobalScope } from './programbuilder';
 import type { PBShaderExp } from './base';
 import { getCurrentProgramBuilder } from './misc';
+import { ASSERT } from '@zephyr3d/base';
 
 const BuiltinInputStructNameVS = 'zVSInput';
 const BuiltinOutputStructNameVS = 'zVSOutput';
@@ -1182,7 +1183,7 @@ export class ASTAddressOf extends ASTExpression {
   type: PBTypeInfo;
   constructor(value: ASTExpression) {
     super();
-    console.assert(value.isReference(), 'no pointer type for non-reference values', true);
+    ASSERT(value.isReference(), 'no pointer type for non-reference values');
     this.value = value;
     this.type = new PBPointerTypeInfo(value.getType(), value.getAddressSpace());
   }

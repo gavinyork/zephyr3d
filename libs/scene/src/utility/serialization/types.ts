@@ -22,12 +22,12 @@ export type PropertyValue = {
   num?: number[];
   str?: string[];
   bool?: boolean[];
-  object?: unknown[];
+  object?: object[];
 };
 
-export type PropEdit = 'aabb' | 'quaternion' | 'interpolator';
+export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
-export type PropertyAccessor<T = unknown> = {
+export type PropertyAccessor<T = object> = {
   type: PropertyType;
   name: string;
   label?: string;
@@ -44,8 +44,8 @@ export type PropertyAccessor<T = unknown> = {
   edit?: PropEdit;
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
-  create?: (this: T, ctor: GenericConstructor, index: number) => void;
-  delete?: (this: T, index: number) => void;
+  create?: (this: T, ctor: GenericConstructor, index: number) => object;
+  delete?: (this: T, index: number) => object;
   add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   isValid?: (this: T) => boolean;
   isNullable?: (this: T, index: number) => boolean;

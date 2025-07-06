@@ -77,7 +77,7 @@ export class AnimationSet implements Disposable {
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
-  private _activeTracks: Map<unknown, Map<unknown, AnimationTrack[]>>;
+  private _activeTracks: Map<object, Map<unknown, AnimationTrack[]>>;
   /** @internal */
   private _activeSkeletons: Map<Skeleton, number>;
   /** @internal */

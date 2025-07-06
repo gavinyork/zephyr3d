@@ -334,7 +334,12 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           delete(this: SceneNode, index) {
             const animationSet = this.animationSet;
             const name = animationSet.getAnimationNames()[index];
-            animationSet.deleteAnimation(name);
+            const animation = animationSet.getAnimationClip(name);
+            if (animation) {
+              animationSet.deleteAnimation(name);
+              return animation;
+            }
+            return null;
           }
         }
       ];

@@ -1,7 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
-import { InterpolateData, Interpolator } from '@zephyr3d/base';
+import type { InterpolateData, Interpolator } from '@zephyr3d/base';
 
 export class DlgEditColorTrack extends DialogRenderer<boolean> {
   private _creator: RampTextureCreator;

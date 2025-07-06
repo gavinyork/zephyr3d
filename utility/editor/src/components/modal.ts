@@ -21,6 +21,18 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
       this._currentModal[0].renderModal();
     }
   }
+  static close<T>(id: string, result: T) {
+    let index = DialogRenderer.findModeless(id);
+    if (index >= 0) {
+      DialogRenderer._modeless[index].close(result);
+    } else {
+      index = DialogRenderer.findModal(id);
+      if (index >= 0) {
+        DialogRenderer._currentModal.splice(0, index);
+        DialogRenderer._currentModal[0].close(result);
+      }
+    }
+  }
   constructor(id: string, width = 0, height = 0, mask = true, noResize = false) {
     super();
     this._id = id;

@@ -337,6 +337,31 @@ export interface ColorRGBA {
   a: number;
 }
 
+export type Truthy<T> = T extends false | 0 | '' | null | undefined | 0n ? never : T;
+
+/**
+ * Simple assertion which throws an error if the !!condition is false.
+ * @param condition - The condition to check.
+ */
+export function ASSERT(condition: boolean, message?: string): asserts condition {
+  if (!condition) {
+    throw new Error(message || 'Assertion failed');
+  }
+}
+
+/**
+ * Check if a value is an instance of a specific constructor.
+ * @param value - The value to check.
+ * @param constructor - The constructor to check against.
+ * @returns True if the value is an instance of the constructor, false otherwise.
+ */
+export function IS_INSTANCE_OF<T extends GenericConstructor>(
+  value: unknown,
+  constructor: T
+): value is InstanceType<T> {
+  return value instanceof constructor;
+}
+
 /**
  * parse a css color value to RGBA color type.
  * @param input - The css color value.

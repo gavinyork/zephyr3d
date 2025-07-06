@@ -40,7 +40,7 @@ function getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
   return v;
 }
 
-export async function deserializeObjectProps<T>(
+export async function deserializeObjectProps<T extends object>(
   obj: T,
   cls: SerializableClass,
   json: object,
@@ -136,7 +136,7 @@ export async function deserializeObjectProps<T>(
   }
 }
 
-export function serializeObjectProps<T>(
+export function serializeObjectProps<T extends object>(
   obj: T,
   cls: SerializableClass,
   json: object,

@@ -18,6 +18,13 @@ export class RampTextureCreator {
   private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
   private _hasAlpha: boolean;
+
+  // 新增：位置指示器相关属性
+  private _positionIndicator: number; // 指示器位置 (0-1)
+  private _isDraggingIndicator: boolean; // 是否正在拖拽指示器
+  private _indicatorWidth: number; // 指示器宽度
+  private _lastIndicatorColor: Float32Array; // 上次指示器位置的颜色
+
   constructor(hasAlpha: boolean, rgbInterpolator?: Interpolator, alphaInterpolator?: Interpolator) {
     this._hasAlpha = !!hasAlpha;
     this._textureWidth = 256;
@@ -39,6 +46,13 @@ export class RampTextureCreator {
     this._markerWidth = 4;
     this._showAlpha = this._hasAlpha;
     this._dragStartPos = null;
+
+    // 初始化位置指示器
+    this._positionIndicator = 0.5; // 默认在中间位置
+    this._isDraggingIndicator = false;
+    this._indicatorWidth = 2;
+    this._lastIndicatorColor = new Float32Array(3);
+
     this._alphaEditor = this._hasAlpha
       ? alphaInterpolator
         ? new CurveEditor(alphaInterpolator)
@@ -67,6 +81,7 @@ export class RampTextureCreator {
     }
     this.updateInterpolator();
   }
+
   private updateInterpolator() {
     this._keyframes.sort((a, b) => a.time - b.time);
     const times = new Float32Array(this._keyframes.length);
@@ -85,7 +100,97 @@ export class RampTextureCreator {
       this._interpolator.outputs = colors;
     }
     this.updateTexture();
+    // 更新指示器颜色并检查是否需要打印
+    this.updateIndicatorColor();
   }
+
+  // 新增：更新指示器位置的颜色并检查变化
+  private updateIndicatorColor() {
+    if (!this._interpolator) return;
+
+    const currentColor = new Float32Array(3);
+    this._interpolator.interpolate(this._positionIndicator, currentColor);
+
+    // 检查颜色是否发生变化
+    const colorChanged =
+      Math.abs(currentColor[0] - this._lastIndicatorColor[0]) > 0.001 ||
+      Math.abs(currentColor[1] - this._lastIndicatorColor[1]) > 0.001 ||
+      Math.abs(currentColor[2] - this._lastIndicatorColor[2]) > 0.001;
+
+    if (colorChanged) {
+      console.log(
+        `Position Indicator - Position: ${this._positionIndicator.toFixed(3)}, ` +
+          `Color: RGB(${(currentColor[0] * 255).toFixed(0)}, ${(currentColor[1] * 255).toFixed(0)}, ${(
+            currentColor[2] * 255
+          ).toFixed(0)}) ` +
+          `/ RGB(${currentColor[0].toFixed(3)}, ${currentColor[1].toFixed(3)}, ${currentColor[2].toFixed(3)})`
+      );
+
+      // 更新上次的颜色
+      this._lastIndicatorColor[0] = currentColor[0];
+      this._lastIndicatorColor[1] = currentColor[1];
+      this._lastIndicatorColor[2] = currentColor[2];
+    }
+  }
+
+  // 新增：检查鼠标是否在指示器上
+  private isMouseOnIndicator(
+    mousePos: ImGui.ImVec2,
+    canvasPos: ImGui.ImVec2,
+    canvasSize: ImGui.ImVec2
+  ): boolean {
+    const indicatorX = canvasPos.x + this._positionIndicator * canvasSize.x;
+    const indicatorHitWidth = Math.max(this._indicatorWidth * 2, 6); // 最小6像素的点击区域
+
+    return (
+      Math.abs(mousePos.x - indicatorX) <= indicatorHitWidth / 2 &&
+      mousePos.y >= canvasPos.y &&
+      mousePos.y <= canvasPos.y + canvasSize.y
+    );
+  }
+
+  // 新增：绘制位置指示器
+  private drawPositionIndicator(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
+    const triangleSize = 10;
+    const indicatorX = canvasPos.x + this._positionIndicator * canvasSize.x;
+    const indicatorTop = canvasPos.y;
+    const indicatorBottom = canvasPos.y + canvasSize.y;
+
+    // 绘制指示器线条
+    drawList.AddLine(
+      new ImGui.ImVec2(indicatorX, indicatorTop),
+      new ImGui.ImVec2(indicatorX, indicatorBottom),
+      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 0.9)), // 白色半透明
+      this._indicatorWidth
+    );
+
+    // 绘制指示器顶部三角形
+    drawList.AddTriangleFilled(
+      new ImGui.ImVec2(indicatorX + triangleSize * 0.5, canvasPos.y),
+      new ImGui.ImVec2(indicatorX - triangleSize * 0.5, canvasPos.y),
+      new ImGui.ImVec2(indicatorX + 1, canvasPos.y + triangleSize),
+      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 0.9))
+    );
+
+    // 绘制指示器底部三角形
+    drawList.AddTriangleFilled(
+      new ImGui.ImVec2(indicatorX + triangleSize * 0.5, canvasPos.y + canvasSize.y),
+      new ImGui.ImVec2(indicatorX - triangleSize * 0.5, canvasPos.y + canvasSize.y),
+      new ImGui.ImVec2(indicatorX + 1, canvasPos.y + canvasSize.y - triangleSize),
+      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 0.9))
+    );
+
+    // 如果正在拖拽，绘制高亮边框
+    if (this._isDraggingIndicator) {
+      drawList.AddLine(
+        new ImGui.ImVec2(indicatorX, indicatorTop),
+        new ImGui.ImVec2(indicatorX, indicatorBottom),
+        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 0, 1)), // 黄色高亮
+        this._indicatorWidth + 2
+      );
+    }
+  }
+
   private handleEditorInteraction() {
     const mousePos = ImGui.GetMousePos();
     const canvasPos = ImGui.GetCursorScreenPos();
@@ -98,6 +203,14 @@ export class RampTextureCreator {
 
     const relX = (mousePos.x - canvasPos.x) / canvasSize.x;
     const currentTime = timeStart + relX * timeDelta;
+
+    // 检查鼠标是否在位置指示器上
+    const isOnIndicator = this.isMouseOnIndicator(mousePos, canvasPos, canvasSize);
+
+    // 设置鼠标光标
+    if (isOnIndicator || this._isDraggingIndicator) {
+      ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
+    }
 
     this._hoverKeyframe = -1;
     this._keyframes.forEach((kf, index) => {
@@ -112,7 +225,10 @@ export class RampTextureCreator {
     });
 
     if (ImGui.IsMouseClicked(0)) {
-      if (this._hoverKeyframe !== -1) {
+      if (isOnIndicator) {
+        // 开始拖拽位置指示器
+        this._isDraggingIndicator = true;
+      } else if (this._hoverKeyframe !== -1) {
         this._selectedKeyframe = this._hoverKeyframe;
         const kf = this._keyframes[this._selectedKeyframe];
         this._dragStartPos = {
@@ -164,7 +280,25 @@ export class RampTextureCreator {
         this.updateInterpolator();
       }
     }
-    if (this._selectedKeyframe !== -1 && this._dragStartPos) {
+
+    // 处理位置指示器拖拽
+    if (this._isDraggingIndicator) {
+      if (ImGui.IsMouseDown(0)) {
+        // 更新指示器位置
+        const newPosition = Math.max(0, Math.min(1, relX));
+        if (Math.abs(newPosition - this._positionIndicator) > 0.001) {
+          this._positionIndicator = newPosition;
+          console.log(`Position Indicator - Position: ${this._positionIndicator.toFixed(3)}`);
+          this.updateIndicatorColor();
+        }
+      } else {
+        // 停止拖拽
+        this._isDraggingIndicator = false;
+      }
+    }
+
+    // 处理关键帧拖拽
+    if (this._selectedKeyframe !== -1 && this._dragStartPos && !this._isDraggingIndicator) {
       if (ImGui.IsMouseDown(0)) {
         const dragDelta = mousePos.x - this._dragStartPos.x;
         if (Math.abs(dragDelta) > 2 || this._isDragging) {
@@ -185,6 +319,8 @@ export class RampTextureCreator {
         this._dragStartPos = null;
       }
     }
+
+    // 绘制画布
     const drawList = ImGui.GetWindowDrawList();
     drawList.AddRectFilled(
       canvasPos,
@@ -197,6 +333,8 @@ export class RampTextureCreator {
       canvasPos,
       new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y)
     );
+
+    // 绘制关键帧标记
     this._keyframes.forEach((kf, index) => {
       const markerX = canvasPos.x + ((kf.time - timeStart) / timeDelta) * canvasSize.x;
       const isSelected = index === this._selectedKeyframe;
@@ -223,6 +361,11 @@ export class RampTextureCreator {
         1
       );
     });
+
+    // 绘制位置指示器
+    this.drawPositionIndicator(drawList, canvasPos, canvasSize);
+
+    // 更新hover状态
     this._hoverKeyframe = -1;
     this._keyframes.forEach((kf, index) => {
       const markerX = canvasPos.x + kf.time * canvasSize.x;
@@ -236,6 +379,7 @@ export class RampTextureCreator {
       }
     });
   }
+
   render(): void {
     if (!this._texture) {
       this.updateTexture();
@@ -292,6 +436,7 @@ export class RampTextureCreator {
       ImGui.EndChild();
     }
   }
+
   private drawCheckerboard(
     drawList: ImGui.DrawList,
     pos: ImGui.ImVec2,
@@ -315,6 +460,7 @@ export class RampTextureCreator {
       }
     }
   }
+
   fillTextureData(showAlpha: boolean, data: Uint8ClampedArray) {
     const p = new Float32Array(3);
     for (let i = 0; i < this._textureWidth; i++) {
@@ -331,6 +477,7 @@ export class RampTextureCreator {
       }
     }
   }
+
   private updateTexture(changTexture = true) {
     this.fillTextureData(this._showAlpha, this._textureData);
     if (!this._texture) {
@@ -345,6 +492,7 @@ export class RampTextureCreator {
       this._texture.update(this._textureData, 0, 0, this._textureWidth, 1);
     }
   }
+
   dispose() {
     this._texture?.dispose();
     this._texture = null;

@@ -9,6 +9,7 @@ import type {
   NodeCloneMethod,
   PropertyAccessor,
   PropertyTrack,
+  PropertyValue,
   Scene,
   SerializationManager,
   ShapeOptionType,
@@ -37,7 +38,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
-import { Interpolator, Quaternion, Vector3 } from '@zephyr3d/base';
+import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -61,6 +62,7 @@ import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
 import type { Editor } from '../core/editor';
+import { DialogRenderer } from '../components/modal';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -97,6 +99,8 @@ export class SceneView extends BaseView<SceneModel> {
   private _cameraAnimationTime: number;
   private _cameraAnimationDuration: number;
   private _animatedCamera: Camera;
+  private _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
+  private _trackId: number;
   constructor(editor: Editor, model: SceneModel, serializationManager: SerializationManager) {
     super(model);
     this._editor = editor;
@@ -126,6 +130,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._cameraAnimationTime = 0;
     this._cameraAnimationDuration = 100;
     this._animatedCamera = null;
+    this._editingProps = new Map();
+    this._trackId = 0;
     this._serializationManager = serializationManager;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
@@ -274,25 +280,6 @@ export class SceneView extends BaseView<SceneModel> {
               id: 'SHOW_TEXTURE_VIEWER',
               action: () => (this._showTextureViewer = !this._showTextureViewer),
               checked: () => this._showTextureViewer
-            },
-            {
-              label: 'Curve editor',
-              id: 'SHOW_CURVE_EDITOR',
-              action: () => {
-                Dialog.editCurve(
-                  'Edit curve',
-                  new Interpolator(
-                    'cubicspline-natural',
-                    'vec3',
-                    new Float32Array([0, 1]),
-                    new Float32Array([0, 0, 0, 0, 0, 0])
-                  ),
-                  600,
-                  500
-                ).then((interpolator) => {
-                  console.dir(interpolator);
-                });
-              }
             },
             {
               label: 'Device Information',
@@ -791,8 +778,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
-    this._propGrid.on('request_edit_track', this.editTrack, this);
-    this._propGrid.on('end_edit_track', this.endEditTrack, this);
+    this._propGrid.on('request_edit_track', this.editPropAnimation, this);
+    this._propGrid.on('end_edit_track', this.endEditPropAnimation, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     this.sceneSetup();
   }
@@ -811,8 +798,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
-    this._propGrid.off('request_edit_track', this.editTrack, this);
-    this._propGrid.off('end_edit_track', this.endEditTrack, this);
+    this._propGrid.off('request_edit_track', this.editPropAnimation, this);
+    this._propGrid.off('end_edit_track', this.endEditPropAnimation, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     this.sceneFinialize();
   }
@@ -884,7 +871,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
     ImGui.End();
   }
-  private handleObjectPropertyChanged(object: unknown) {
+  private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
     if (object instanceof SceneNode) {
       this._proxy.updateProxy(object);
     }
@@ -906,27 +893,63 @@ export class SceneView extends BaseView<SceneModel> {
       this._currentEditTool.get().update(dt);
     }
   }
-  private editTrack(track: PropertyTrack) {
+  private editPropAnimation(track: PropertyTrack, target: object) {
+    let map = this._editingProps.get(target);
+    if (!map) {
+      map = new Map();
+      this._editingProps.set(target, map);
+    }
     const prop = track.getProp();
+    let id = map.get(prop);
+    if (!id) {
+      const label =
+        prop.type === 'rgb' || prop.type === 'rgba'
+          ? `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`
+          : `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`;
+      const value: PropertyValue = { num: [0, 0, 0, 0] };
+      prop.get.call(target, value);
+      id = { id: `${label}##EditTrack${this._trackId++}`, value: value.num };
+      map.set(prop, id);
+    }
     if (prop.type === 'rgb' || prop.type === 'rgba') {
       Dialog.editColorTrack(
-        `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
+        id.id,
         prop.type === 'rgba',
         track.interpolator,
         track.interpolatorAlpha,
         600,
         500
-      );
+      ).then((result) => {
+        this.endEditPropAnimation(track, target, result);
+      });
     } else {
       Dialog.editCurve(
-        `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`,
+        id.id,
         track.interpolator,
+        (value) => {
+          prop.set.call(target, { num: value });
+        },
         600,
         500
-      );
+      ).then((result) => {
+        this.endEditPropAnimation(track, target, result);
+      });
     }
   }
-  private endEditTrack() {}
+  private endEditPropAnimation(track: PropertyTrack, target: object, edited: boolean) {
+    const prop = track.getProp();
+    const map = this._editingProps.get(target);
+    ASSERT(!!map, 'No editing track map found for target');
+    const id = map.get(prop);
+    if (id) {
+      DialogRenderer.close(id.id, edited);
+      prop.set.call(target, { num: id.value });
+      map.delete(prop);
+      if (map.size === 0) {
+        this._editingProps.delete(target);
+      }
+    }
+  }
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
     this._postGizmoRenderer.editAABB(this._aabbForEdit);

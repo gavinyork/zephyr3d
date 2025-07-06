@@ -48,7 +48,7 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
     }
     this._state = new Vector3();
   }
-  calculateState(target: unknown, currentTime: number): Vector3 {
+  calculateState(target: object, currentTime: number): Vector3 {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

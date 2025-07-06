@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SerializationManager } from '@zephyr3d/scene';
 import {
+  AnimationClip,
   PropertyTrack,
   SceneNode,
   type PropertyAccessor,
@@ -10,7 +11,7 @@ import {
 import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { AABB, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
+import { AABB, ASSERT, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 
@@ -201,9 +202,9 @@ class PropertyGroup {
 export class PropertyEditor extends makeEventTarget(Object)<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
-  request_edit_track: [track: PropertyTrack];
-  end_edit_track: [track: PropertyTrack];
-  object_property_changed: [object: unknown, prop: string];
+  request_edit_track: [track: PropertyTrack, target: object];
+  end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
+  object_property_changed: [object: object, prop: PropertyAccessor];
 }>() {
   private _rootGroup: PropertyGroup;
   private _top: number;
@@ -387,7 +388,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ) {
       const editable =
         (group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb') ||
-        (group.value.object?.[0] instanceof PropertyTrack && group.prop.edit === 'interpolator');
+        (group.value.object?.[0] instanceof PropertyTrack && group.prop.edit === 'proptrack');
       const settable =
         !group.prop.readonly &&
         !!group.prop.set &&
@@ -421,7 +422,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 : new ctor()
               : null;
             group.prop.set.call(group.object, { object: [newObj] }, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.dispatchEvent('object_property_changed', group.object, group.prop);
             this.refresh();
           }
         }
@@ -435,7 +436,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 : new ctor()
               : null;
             group.prop.add.call(group.object, { object: [newObj] }, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.dispatchEvent('object_property_changed', group.object, group.prop);
             this.refresh();
           }
         }
@@ -443,13 +444,25 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           ImGui.SameLine(0, 0);
           if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
             group.prop.delete.call(group.object, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop.name);
+            this.dispatchEvent('object_property_changed', group.object, group.prop);
             this.refresh();
             if (editable) {
               if (group.prop.edit === 'aabb') {
                 this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
-              } else if (group.prop.edit === 'interpolator') {
-                this.dispatchEvent('end_edit_track', group.value.object[0] as PropertyTrack);
+              } else if (group.prop.edit === 'proptrack') {
+                const animation: unknown = group.object;
+                ASSERT(
+                  animation instanceof AnimationClip,
+                  'PropertyTrack can only be edited in AnimationClip'
+                );
+                ASSERT(group.value.object[0] instanceof PropertyTrack);
+                const node = animation.animationSet.model;
+                this.dispatchEvent(
+                  'end_edit_track',
+                  group.value.object[0],
+                  this.serailizationManager.findAnimationTarget(node, group.value.object[0]),
+                  false
+                );
               }
             }
           }
@@ -459,8 +472,16 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
             if (group.prop.edit === 'aabb') {
               this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
-            } else if (group.prop.edit === 'interpolator') {
-              this.dispatchEvent('request_edit_track', group.value.object[0] as PropertyTrack);
+            } else if (group.prop.edit === 'proptrack') {
+              const animation: unknown = group.object;
+              ASSERT(animation instanceof AnimationClip, 'PropertyTrack can only be edited in AnimationClip');
+              ASSERT(group.value.object[0] instanceof PropertyTrack);
+              const node = animation.animationSet.model;
+              this.dispatchEvent(
+                'request_edit_track',
+                group.value.object[0],
+                this.serailizationManager.findAnimationTarget(node, group.value.object[0])
+              );
             }
           }
         }
@@ -723,7 +744,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             if (payload) {
               tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
               value.set.call(object, tmpProperty);
-              this.dispatchEvent('object_property_changed', object, value.name);
+              this.dispatchEvent('object_property_changed', object, value);
             }
             ImGui.EndDragDropTarget();
           }
@@ -731,7 +752,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
               value.set.call(object, null);
-              this.dispatchEvent('object_property_changed', object, value.name);
+              this.dispatchEvent('object_property_changed', object, value);
               if (property.value.objectTypes?.length > 0) {
                 ImGui.OpenPopup('X##list');
                 if (ImGui.BeginPopup('X##list')) {
@@ -750,7 +771,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       }
       if (changed && value.set) {
         value.set.call(object, tmpProperty);
-        this.dispatchEvent('object_property_changed', object, value.name);
+        this.dispatchEvent('object_property_changed', object, value);
       }
     }
     ImGui.PopID();

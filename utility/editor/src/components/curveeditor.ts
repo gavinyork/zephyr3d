@@ -18,12 +18,16 @@ interface CurveSettings {
   drawLabels: boolean;
   drawHints: boolean;
   interpolationType: InterpolationMode;
+  positionIndicatorColor: number;
+  positionIndicatorWidth: number;
+  showPositionIndicator: boolean;
 }
 
 const keyFramePointShape = [new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2()];
 
 export class CurveEditor extends makeEventTarget(Object)<{
   curve_changed: [];
+  preview_position: [{ key: number; value: number[] }];
 }>() {
   private _points: Point[] = [];
   private _interpolator: Interpolator = null;
@@ -44,7 +48,9 @@ export class CurveEditor extends makeEventTarget(Object)<{
   private _curveDirty: boolean;
   private _currentChannel: number;
   private _resultBuffer: Float32Array;
-
+  private _positionIndicatorTime: number;
+  private _isDraggingIndicator: boolean;
+  private _showPositionIndicator: boolean;
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
   constructor(pointsOrInterpolator?: Point[] | Interpolator, settings?: Partial<CurveSettings>) {
@@ -117,6 +123,9 @@ export class CurveEditor extends makeEventTarget(Object)<{
       drawLabels: true,
       drawHints: true,
       interpolationType: interpolationMode,
+      positionIndicatorColor: ImGui.GetColorU32(new ImGui.ImVec4(1, 0, 0, 0.8)),
+      positionIndicatorWidth: 2.0,
+      showPositionIndicator: true,
       ...settings
     };
     this._timeRangeStartInput = [this._settings.timeRange[0]];
@@ -129,8 +138,14 @@ export class CurveEditor extends makeEventTarget(Object)<{
     this._currentChannel = 0;
     this._selectedPointIndex = -1;
     this._cachedCurvePoints = [];
+
+    this._positionIndicatorTime = timeRangeMin;
+    this._isDraggingIndicator = false;
+    this._showPositionIndicator = this._settings.showPositionIndicator;
+
     this.updateInterpolator();
   }
+
   get interpolator() {
     return this._interpolator;
   }
@@ -164,12 +179,39 @@ export class CurveEditor extends makeEventTarget(Object)<{
       this.interpolationChanged();
     }
   }
+  get positionIndicatorTime(): number {
+    return this._positionIndicatorTime;
+  }
+  set positionIndicatorTime(time: number) {
+    const clampedTime = Math.max(this._settings.timeRange[0], Math.min(this._settings.timeRange[1], time));
+    if (this._positionIndicatorTime !== clampedTime) {
+      this._positionIndicatorTime = clampedTime;
+      this.emitPreviewPosition();
+    }
+  }
+  get showPositionIndicator(): boolean {
+    return this._showPositionIndicator;
+  }
+  set showPositionIndicator(show: boolean) {
+    this._showPositionIndicator = show;
+  }
+  private emitPreviewPosition(): void {
+    if (!this._interpolator || this._points.length < 2) {
+      return;
+    }
+    this._interpolator.interpolate(this._positionIndicatorTime, this._resultBuffer);
+    this.dispatchEvent('preview_position', {
+      key: this._positionIndicatorTime,
+      value: [...this._resultBuffer]
+    });
+  }
   setTimeRange(min: number, max: number): void {
     if (min >= max) {
       throw new Error('Invalid time range');
     }
     this._settings.timeRange[0] = min;
     this._settings.timeRange[1] = max;
+    this._positionIndicatorTime = Math.max(min, Math.min(max, this._positionIndicatorTime));
     this.settingsChanged();
   }
   setValueRange(min: number, max: number): void {
@@ -280,6 +322,10 @@ export class CurveEditor extends makeEventTarget(Object)<{
     }
     this.drawPoints(drawList, cursorPos);
 
+    if (this._showPositionIndicator) {
+      this.drawPositionIndicator(drawList, cursorPos);
+    }
+
     if (this._settings.drawLabels) {
       this.drawRangeLabels(drawList, cursorPos);
     }
@@ -289,6 +335,39 @@ export class CurveEditor extends makeEventTarget(Object)<{
     }
     ImGui.PopID();
   }
+
+  private drawPositionIndicator(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
+    const screenX = this.timeToScreen(this._positionIndicatorTime);
+    const lineColor = this._settings.positionIndicatorColor;
+    const lineWidth = this._settings.positionIndicatorWidth;
+
+    drawList.AddLine(
+      new ImGui.ImVec2(cursorPos.x + screenX, cursorPos.y),
+      new ImGui.ImVec2(cursorPos.x + screenX, cursorPos.y + this._canvasSize.y),
+      lineColor,
+      lineWidth
+    );
+
+    const triangleSize = 10;
+    const handleColor = this._isDraggingIndicator
+      ? ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 1))
+      : ImGui.GetColorU32(new ImGui.ImVec4(0.8, 0.8, 0.8, 1));
+
+    const topTriangle = [
+      new ImGui.ImVec2(cursorPos.x + screenX + triangleSize * 0.5, cursorPos.y),
+      new ImGui.ImVec2(cursorPos.x + screenX - triangleSize * 0.5, cursorPos.y),
+      new ImGui.ImVec2(cursorPos.x + screenX + 1, cursorPos.y + triangleSize)
+    ];
+    drawList.AddTriangleFilled(topTriangle[0], topTriangle[1], topTriangle[2], handleColor);
+
+    const bottomTriangle = [
+      new ImGui.ImVec2(cursorPos.x + screenX + 1, cursorPos.y + this._canvasSize.y - triangleSize),
+      new ImGui.ImVec2(cursorPos.x + screenX + triangleSize * 0.5, cursorPos.y + this._canvasSize.y),
+      new ImGui.ImVec2(cursorPos.x + screenX - triangleSize * 0.5, cursorPos.y + this._canvasSize.y)
+    ];
+    drawList.AddTriangleFilled(bottomTriangle[0], bottomTriangle[1], bottomTriangle[2], handleColor);
+  }
+
   private drawRangeLabels(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     const textColor = ImGui.GetColorU32(new ImGui.ImVec4(1, 1, 1, 0.8));
     const padding = 5;
@@ -373,9 +452,9 @@ export class CurveEditor extends makeEventTarget(Object)<{
   private drawHint(
     time: number,
     value: number,
-    cursorPos: ImGui.Vec2,
-    mousePos: ImGui.Vec2,
-    drawList: ImGui.DrawList
+    cursorPos: ImGui.ImVec2,
+    mousePos: ImGui.ImVec2,
+    drawList: ImGui.ImDrawList
   ) {
     if (!this._settings.drawHints) {
       return;
@@ -510,33 +589,58 @@ export class CurveEditor extends makeEventTarget(Object)<{
       keyFramePointShape[3].Set(cursorPos.x + screenPos.x, cursorPos.y + screenPos.y - 5);
 
       drawList.AddConvexPolyFilled(keyFramePointShape, 4, color);
-      /*
-      drawList.AddCircleFilled(
-        new ImGui.ImVec2(cursorPos.x + screenPos.x, cursorPos.y + screenPos.y),
-        5,
-        color
-      );
-      */
     });
   }
+
+  private isPositionIndicatorNear(screenPos: ImGui.ImVec2, threshold: number = 2): boolean {
+    if (!this._showPositionIndicator) {
+      return false;
+    }
+    const indicatorScreenX = this.timeToScreen(this._positionIndicatorTime);
+    return Math.abs(screenPos.x - indicatorScreenX) <= threshold;
+  }
+
   private handleInteraction(cursorPos: ImGui.ImVec2): void {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - cursorPos.x, mousePos.y - cursorPos.y);
+
+    const isHoveringIndicator = this.isPositionIndicatorNear(relativeMousePos);
     if (ImGui.IsMouseClicked(0)) {
-      const clickedPoint = this.findPointNear(relativeMousePos);
-      if (clickedPoint !== -1) {
-        this._selectedPointIndex = clickedPoint;
-        this._isDragging = true;
+      if (isHoveringIndicator) {
+        this._isDraggingIndicator = true;
+        this._selectedPointIndex = -1;
       } else {
-        const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
-        this.addPoint(worldPos.x);
+        const clickedPoint = this.findPointNear(relativeMousePos);
+        if (clickedPoint !== -1) {
+          this._selectedPointIndex = clickedPoint;
+          this._isDragging = true;
+        } else {
+          const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
+          this.addPoint(worldPos.x);
+        }
       }
     }
+
     if (ImGui.IsMouseClicked(1)) {
       const clickedPoint = this.findPointNear(relativeMousePos);
       if (clickedPoint !== -1 && clickedPoint !== 0 && clickedPoint !== this._points.length - 1) {
         this.removePoint(clickedPoint);
       }
+    }
+
+    if (this._isDraggingIndicator) {
+      if (ImGui.IsMouseDown(0)) {
+        const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
+        this.positionIndicatorTime = worldPos.x;
+      } else {
+        this._isDraggingIndicator = false;
+      }
+    }
+
+    if (isHoveringIndicator || this._isDraggingIndicator) {
+      ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
+    } else {
+      ImGui.SetMouseCursor(ImGui.MouseCursor.Arrow);
     }
     if (this._isDragging && this._selectedPointIndex !== -1) {
       if (ImGui.IsMouseDown(0)) {
@@ -687,6 +791,10 @@ export class CurveEditor extends makeEventTarget(Object)<{
     }
     this._curveDirty = true;
     this.dispatchEvent('curve_changed');
+
+    if (this._showPositionIndicator) {
+      this.emitPreviewPosition();
+    }
   }
   getValue(time: number): number {
     if (!this._interpolator || this._points.length < 2) {

@@ -1,6 +1,6 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import type { AssetRegistry } from './asset/asset';
-import type { PropertyAccessor, SerializableClass } from './types';
+import type { PropertyAccessor, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass } from './scene/node';
 import { getBatchGroupClass } from './scene/batch';
@@ -35,6 +35,8 @@ import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './scene/animation';
+import type { SceneNode } from '../../scene';
+import type { PropertyTrack } from '../../animation';
 
 export class SerializationManager {
   private _classMap: Map<GenericConstructor, SerializableClass>;
@@ -136,6 +138,59 @@ export class SerializationManager {
       this._classMap.set(cls.ctor, cls);
       this.registerProps(cls);
     }
+  }
+  private static _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
+  private static parsePropertyPath(str: string) {
+    const match = str.match(this._pathPattern);
+    if (match) {
+      return {
+        original: match[0],
+        prefix: match[1],
+        index: match[2] || null,
+        indexValue: match[2] ? parseInt(match[2], 10) : null,
+        hasIndex: !!match[2]
+      };
+    }
+    return null;
+  }
+
+  findAnimationTarget(node: SceneNode, track: PropertyTrack) {
+    const target = track.target ?? '';
+    const value: PropertyValue = { object: [] };
+    const parts = target.split('/').filter((val) => !!val);
+    let targetObj: object = node;
+    while (parts.length > 0) {
+      const propName = parts.shift();
+      const info = SerializationManager.parsePropertyPath(propName);
+      if (!info) {
+        return null;
+      }
+      const cls = this.getClassByConstructor(targetObj.constructor as GenericConstructor);
+      if (!cls) {
+        return null;
+      }
+      const prop = this.getPropertyByClass(cls, info.prefix);
+      if (!prop) {
+        return null;
+      }
+      if (info.hasIndex) {
+        if (prop.type !== 'object_array') {
+          return null;
+        }
+        prop.get.call(targetObj, value);
+        targetObj = value.object?.[info.indexValue] ?? null;
+      } else {
+        if (prop.type !== 'object') {
+          return null;
+        }
+        prop.get.call(targetObj, value);
+        targetObj = value.object?.[0] ?? null;
+      }
+      if (!targetObj) {
+        return null;
+      }
+    }
+    return targetObj;
   }
   /** @internal */
   private registerProps(cls: SerializableClass) {

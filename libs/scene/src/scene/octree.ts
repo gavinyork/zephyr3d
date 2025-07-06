@@ -1,4 +1,4 @@
-import { Vector3, AABB, nextPowerOf2 } from '@zephyr3d/base';
+import { Vector3, AABB, nextPowerOf2, ASSERT } from '@zephyr3d/base';
 import type { GraphNode } from './graph_node';
 import type { Scene } from './scene';
 import type { Visitor } from './visitor';
@@ -91,7 +91,7 @@ export class OctreeNode {
    * @param chunk - The octree chunk to be set
    */
   setChunk(chunk: OctreeNodeChunk): void {
-    console.assert(!!chunk, 'Invalid chunk');
+    ASSERT(!!chunk, 'Invalid chunk');
     this._chunk = chunk;
   }
   /**
@@ -145,7 +145,7 @@ export class OctreeNode {
    */
   getBoxLoosed(): AABB {
     if (this._boxLoosed === null) {
-      console.assert(!!this._chunk, 'Invalid chunk');
+      ASSERT(!!this._chunk, 'Invalid chunk');
       const d = this._chunk.getDimension();
       const nodeSize = this._chunk.getNodeSize();
       const halfWorldSize = this._chunk.getWorldSize() * 0.5;
@@ -169,7 +169,7 @@ export class OctreeNode {
    * @returns Min point of the node
    */
   getMinPoint(): Vector3 {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const d = this._chunk.getDimension();
     const nodeSize = this._chunk.getNodeSize();
     const halfWorldSize = this._chunk.getWorldSize() * 0.5;
@@ -185,7 +185,7 @@ export class OctreeNode {
    * @returns Max point of the node
    */
   getMaxPoint(): Vector3 {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const d = this._chunk.getDimension();
     const nodeSize = this._chunk.getNodeSize();
     const halfWorldSize = this._chunk.getWorldSize() * 0.5;
@@ -218,7 +218,7 @@ export class OctreeNode {
    * @returns Child node at the given placement
    */
   getChild(placement: OctreePlacement): OctreeNode {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const next = this._chunk.getNext();
     return next ? next.getNode(this._chunk.getChildIndex(this._position, placement)) : null;
   }
@@ -228,7 +228,7 @@ export class OctreeNode {
    * @returns The child node fetched
    */
   getOrCreateChild(placement: OctreePlacement): OctreeNode {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const next = this._chunk.getNext();
     return next ? next.getOrCreateNode(this._chunk.getChildIndex(this._position, placement)) : null;
   }
@@ -237,7 +237,7 @@ export class OctreeNode {
    * @returns Parent of the node
    */
   getParent(): OctreeNode {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const prev = this._chunk.getPrev();
     return prev ? prev.getNode(this._chunk.getParentIndex(this._position)) : null;
   }
@@ -246,7 +246,7 @@ export class OctreeNode {
    * @returns The parent node
    */
   getOrCreateParent(): OctreeNode {
-    console.assert(!!this._chunk, 'Invalid chunk');
+    ASSERT(!!this._chunk, 'Invalid chunk');
     const prev = this._chunk.getPrev();
     return prev ? prev.getOrCreateNode(this._chunk.getParentIndex(this._position)) : null;
   }
@@ -400,7 +400,7 @@ export class OctreeNodeChunk {
       case OctreePlacement.NNN:
         break;
       default:
-        console.assert(false, 'getChildIndex: Got invalid index');
+        ASSERT(false, 'getChildIndex: Got invalid index');
         return 0;
     }
     const dimension2 = 2 * dim;

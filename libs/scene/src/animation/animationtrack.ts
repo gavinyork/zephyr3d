@@ -38,20 +38,20 @@ export abstract class AnimationTrack<StateType = unknown> {
     this._animation = ani;
   }
   /** Stops playing the track and rewind to the first frame */
-  reset(target: unknown) {}
+  reset(target: object) {}
   /**
    * Calculates current animation state
    * @param target - The animated object
    * @param currentTime - At which time the animation state should be calculated.
    * @returns State object
    */
-  abstract calculateState(target: unknown, currentTime: number): StateType;
+  abstract calculateState(target: object, currentTime: number): StateType;
   /**
    * Applys animation state to node
    * @param target - The animated object to which the state will be applied
    * @param state - The animation state
    */
-  abstract applyState(target: unknown, state: StateType);
+  abstract applyState(target: object, state: StateType);
   /**
    * Mixes two animation state according to specific weight value
    * @param a - The first state object

@@ -116,7 +116,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
     }
     return this._state;
   }
-  applyState(target: unknown, state: PropertyValue) {
+  applyState(target: object, state: PropertyValue) {
     this._prop.set.call(target, state);
   }
   mixState(a: PropertyValue, b: PropertyValue, t: number): PropertyValue {

@@ -3,19 +3,32 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { CurveEditor } from '../../components/curveeditor';
 
-export class DlgCurveEditor extends DialogRenderer<Interpolator> {
+export class DlgCurveEditor extends DialogRenderer<boolean> {
   private labels: string[];
   private channel: [number];
   private editor: CurveEditor;
-  constructor(id: string, width: number, height: number, interpolator: Interpolator) {
+  private onPreview: (value: number[]) => void;
+  constructor(
+    id: string,
+    onPreview: (value: number[]) => void,
+    width: number,
+    height: number,
+    interpolator: Interpolator
+  ) {
     super(id, width, height);
+    this.onPreview = onPreview;
     this.editor = new CurveEditor(interpolator);
+    this.editor.on('preview_position', this.preview, this);
     if (interpolator && interpolator.target !== 'number') {
       this.labels = ['x', 'y', 'z'];
       this.channel = [0];
     }
   }
-
+  preview(value: { key: number; value: number[] }) {
+    if (this.onPreview) {
+      this.onPreview(value.value);
+    }
+  }
   public doRender(): void {
     this.editor.renderSettings();
     if (
@@ -32,11 +45,13 @@ export class DlgCurveEditor extends DialogRenderer<Interpolator> {
     ImGui.EndChild();
     ImGui.Columns(2, 'ButtonLayout', false);
     if (ImGui.Button('Ok')) {
-      this.close(this.editor.interpolator);
+      this.editor.off('preview_position', this.preview, this);
+      this.close(true);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this.close(null);
+      this.editor.off('preview_position', this.preview, this);
+      this.close(false);
     }
     if (this.labels) {
       ImGui.SameLine();

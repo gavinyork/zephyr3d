@@ -1,3 +1,4 @@
+import { ASSERT } from '@zephyr3d/base';
 import type { TextureFormat } from '../base_types';
 import type { UniformBufferLayout } from '../gpuobject';
 
@@ -1281,8 +1282,8 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       const typename = `array<${elementTypeName}${this.dimension ? ', ' + this.dimension : ''}>`;
       return varName ? `${varName}: ${typename}` : typename;
     } else {
-      console.assert(!!this.dimension, 'runtime-sized array not supported for webgl');
-      console.assert(!this.elementType.isArrayType(), 'multi-dimensional arrays not supported for webgl');
+      ASSERT(!!this.dimension, 'runtime-sized array not supported for webgl');
+      ASSERT(!this.elementType.isArrayType(), 'multi-dimensional arrays not supported for webgl');
       const elementTypeName = this.elementType.toTypeName(deviceType, varName);
       return `${elementTypeName}[${this.dimension}]`;
     }
@@ -1337,7 +1338,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
       pointerType,
       addressSpace
     });
-    console.assert(pointerType.isStorable(), 'the pointee type must be storable');
+    ASSERT(pointerType.isStorable(), 'the pointee type must be storable');
     this.writable = false;
   }
   /** Get type of the pointer */
@@ -1561,8 +1562,8 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       writable,
       storageTexelFormat: texelFormat || null
     });
-    console.assert(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
-    console.assert(
+    ASSERT(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
+    ASSERT(
       !(textureType & BITFLAG_STORAGE) || !!storageTexelFormatMap[texelFormat],
       'invalid texel format for storage texture'
     );
@@ -1656,7 +1657,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       const typename = (deviceType === 'webgl' ? textureTypeMapWebGL : textureTypeMapWebGL2)[
         this.textureType
       ];
-      console.assert(!!typename, 'unsupported texture type');
+      ASSERT(!!typename, 'unsupported texture type');
       return varName ? `${typename} ${varName}` : typename;
     }
   }

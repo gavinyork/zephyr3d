@@ -1,7 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
-import { Interpolator } from '@zephyr3d/base';
+import type { Interpolator } from '@zephyr3d/base';
 
 export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedArray; name: string }> {
   private _name: string;

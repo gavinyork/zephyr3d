@@ -49,7 +49,7 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
     }
     this._state = new Quaternion();
   }
-  calculateState(target: unknown, currentTime: number): Quaternion {
+  calculateState(target: object, currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }

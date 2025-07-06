@@ -11,8 +11,10 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 class MyAnimationTrack extends AnimationTrack {
   _state;
+  _interpolator;
   constructor(interpolator) {
-    super(interpolator);
+    super();
+    this._interpolator = interpolator;
     this._state = new Float32Array(2);
   }
   calculateState(target, currentTime) {
@@ -38,6 +40,9 @@ class MyAnimationTrack extends AnimationTrack {
   }
   getBlendId() {
     return 'uv_and_opacity';
+  }
+  getDuration() {
+    return this._interpolator.maxTime;
   }
 }
 
