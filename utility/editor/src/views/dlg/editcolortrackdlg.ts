@@ -11,11 +11,13 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
   private _savedRGBOutputs: InterpolateData;
   private _savedAlphaInputs: InterpolateData;
   private _savedAlphaOutputs: InterpolateData;
+  private _onPreview: (value: number[]) => void;
   constructor(
     id: string,
     useAlpha: boolean,
     rgbInterpolator: Interpolator,
     alphaInterpolator: Interpolator,
+    onPreview: (value: number[]) => void,
     width: number,
     height: number
   ) {
@@ -27,6 +29,16 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     this._savedRGBOutputs = rgbInterpolator.outputs.slice();
     this._savedAlphaInputs = alphaInterpolator ? alphaInterpolator.inputs.slice() : null;
     this._savedAlphaOutputs = alphaInterpolator ? alphaInterpolator.outputs.slice() : null;
+    this._onPreview = onPreview;
+    this._creator.on('preview_position', this.preview, this);
+  }
+  get rampTextureCreator() {
+    return this._creator;
+  }
+  preview(value: { key: number; value: number[] }) {
+    if (this._onPreview) {
+      this._onPreview(value.value);
+    }
   }
   doRender(): void {
     const height = ImGui.GetContentRegionAvail().y - ImGui.GetFrameHeightWithSpacing();
@@ -35,6 +47,7 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     }
     ImGui.EndChild();
     if (ImGui.Button('Ok')) {
+      this._creator.dispose();
       this.close(true);
     }
     ImGui.SameLine();

@@ -1,5 +1,5 @@
 import type { InterpolationMode } from '@zephyr3d/base';
-import { Interpolator, makeEventTarget } from '@zephyr3d/base';
+import { ASSERT, Interpolator, makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 interface Point {
@@ -53,6 +53,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
   private _showPositionIndicator: boolean;
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
+  constructor(interpolator?: Interpolator, settings?: Partial<CurveSettings>);
   constructor(pointsOrInterpolator?: Point[] | Interpolator, settings?: Partial<CurveSettings>) {
     super();
     let points: Point[];
@@ -136,7 +137,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     this._isDragging = false;
     this._curveActive = false;
     this._currentChannel = 0;
-    this._selectedPointIndex = -1;
+    this._selectedPointIndex = 0;
     this._cachedCurvePoints = [];
 
     this._positionIndicatorTime = timeRangeMin;
@@ -184,10 +185,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
   }
   set positionIndicatorTime(time: number) {
     const clampedTime = Math.max(this._settings.timeRange[0], Math.min(this._settings.timeRange[1], time));
-    if (this._positionIndicatorTime !== clampedTime) {
-      this._positionIndicatorTime = clampedTime;
-      this.emitPreviewPosition();
-    }
+    this._positionIndicatorTime = clampedTime;
   }
   get showPositionIndicator(): boolean {
     return this._showPositionIndicator;
@@ -608,7 +606,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     if (ImGui.IsMouseClicked(0)) {
       if (isHoveringIndicator) {
         this._isDraggingIndicator = true;
-        this._selectedPointIndex = -1;
+        //this._selectedPointIndex = -1;
       } else {
         const clickedPoint = this.findPointNear(relativeMousePos);
         if (clickedPoint !== -1) {
@@ -632,6 +630,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
       if (ImGui.IsMouseDown(0)) {
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
         this.positionIndicatorTime = worldPos.x;
+        this.emitPreviewPosition();
       } else {
         this._isDraggingIndicator = false;
       }
@@ -642,7 +641,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     } else {
       ImGui.SetMouseCursor(ImGui.MouseCursor.Arrow);
     }
-    if (this._isDragging && this._selectedPointIndex !== -1) {
+    if (this._isDragging && !this._isDraggingIndicator && this._selectedPointIndex !== -1) {
       if (ImGui.IsMouseDown(0)) {
         const worldPos = this.screenToWorld(relativeMousePos.x, relativeMousePos.y);
         if (this._selectedPointIndex === 0 || this._selectedPointIndex === this._points.length - 1) {
@@ -722,7 +721,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     this._points.push(newPoint);
     this.sortPoints();
     this.updateInterpolator();
-    this._selectedPointIndex = this._points.findIndex((p) => p === newPoint);
+    this._selectedPointIndex = this._points.indexOf(newPoint);
   }
   private removePoint(index: number): void {
     if (index < 0 || index >= this._points.length) {
@@ -734,7 +733,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     }
     this._points.splice(index, 1);
     if (this._selectedPointIndex === index) {
-      this._selectedPointIndex = -1;
+      this._selectedPointIndex = Math.min(this._selectedPointIndex, this._points.length - 1);
     } else if (this._selectedPointIndex > index) {
       this._selectedPointIndex--;
     }
@@ -791,16 +790,18 @@ export class CurveEditor extends makeEventTarget(Object)<{
     }
     this._curveDirty = true;
     this.dispatchEvent('curve_changed');
-
-    if (this._showPositionIndicator) {
-      this.emitPreviewPosition();
+  }
+  setKeyframeValue(value: number[]) {
+    if (this._selectedPointIndex >= 0) {
+      for (let i = 0; i < value.length; i++) {
+        this._points[this._selectedPointIndex].value[i] = value[i];
+      }
+      this.updateInterpolator();
     }
   }
-  getValue(time: number): number {
-    if (!this._interpolator || this._points.length < 2) {
-      return 0;
-    }
+  getValue(time: number): number[] {
+    ASSERT(this._interpolator && this._points.length >= 2);
     this._interpolator.interpolate(time, this._resultBuffer);
-    return this._resultBuffer[this._currentChannel];
+    return [...this._resultBuffer];
   }
 }

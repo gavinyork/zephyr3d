@@ -1,10 +1,12 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { Texture2D } from '@zephyr3d/device';
 import { Application } from '@zephyr3d/scene';
-import { Interpolator } from '@zephyr3d/base';
+import { Interpolator, makeEventTarget } from '@zephyr3d/base';
 import { CurveEditor } from './curveeditor';
 
-export class RampTextureCreator {
+export class RampTextureCreator extends makeEventTarget(Object)<{
+  preview_position: [{ key: number; value: number[] }];
+}>() {
   private _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
@@ -23,9 +25,9 @@ export class RampTextureCreator {
   private _positionIndicator: number; // 指示器位置 (0-1)
   private _isDraggingIndicator: boolean; // 是否正在拖拽指示器
   private _indicatorWidth: number; // 指示器宽度
-  private _lastIndicatorColor: Float32Array; // 上次指示器位置的颜色
 
   constructor(hasAlpha: boolean, rgbInterpolator?: Interpolator, alphaInterpolator?: Interpolator) {
+    super();
     this._hasAlpha = !!hasAlpha;
     this._textureWidth = 256;
     this._textureData = new Uint8ClampedArray(this._textureWidth * 4);
@@ -48,14 +50,19 @@ export class RampTextureCreator {
     this._dragStartPos = null;
 
     // 初始化位置指示器
-    this._positionIndicator = 0.5; // 默认在中间位置
+    this._positionIndicator = 0;
     this._isDraggingIndicator = false;
     this._indicatorWidth = 2;
-    this._lastIndicatorColor = new Float32Array(3);
 
     this._alphaEditor = this._hasAlpha
       ? alphaInterpolator
-        ? new CurveEditor(alphaInterpolator)
+        ? new CurveEditor(alphaInterpolator, {
+            timeRange: [0, 1],
+            valueRange: [0, 1],
+            interpolationType: 'linear',
+            drawLabels: false,
+            drawHints: false
+          })
         : new CurveEditor(
             [
               {
@@ -77,11 +84,25 @@ export class RampTextureCreator {
           )
       : null;
     if (this._alphaEditor) {
-      this._alphaEditor.on('curve_changed', this.updateTexture, this);
+      this._alphaEditor.on('curve_changed', this.onAlphaChanged, this);
+      this._alphaEditor.on('preview_position', this.preview, this);
     }
     this.updateInterpolator();
   }
-
+  private onAlphaChanged() {
+    this.updateTexture();
+  }
+  private preview(data?: { key: number; value: number[] }) {
+    if (data && !this._isDraggingIndicator) {
+      this._positionIndicator = data.key;
+    }
+    const currentColor = [0, 0, 0];
+    this._interpolator.interpolate(this._positionIndicator, currentColor);
+    if (this._alphaEditor) {
+      currentColor.push(this._alphaEditor.getValue(this._positionIndicator)[0]);
+    }
+    this.dispatchEvent('preview_position', { key: this._positionIndicator, value: currentColor });
+  }
   private updateInterpolator() {
     this._keyframes.sort((a, b) => a.time - b.time);
     const times = new Float32Array(this._keyframes.length);
@@ -100,37 +121,6 @@ export class RampTextureCreator {
       this._interpolator.outputs = colors;
     }
     this.updateTexture();
-    // 更新指示器颜色并检查是否需要打印
-    this.updateIndicatorColor();
-  }
-
-  // 新增：更新指示器位置的颜色并检查变化
-  private updateIndicatorColor() {
-    if (!this._interpolator) return;
-
-    const currentColor = new Float32Array(3);
-    this._interpolator.interpolate(this._positionIndicator, currentColor);
-
-    // 检查颜色是否发生变化
-    const colorChanged =
-      Math.abs(currentColor[0] - this._lastIndicatorColor[0]) > 0.001 ||
-      Math.abs(currentColor[1] - this._lastIndicatorColor[1]) > 0.001 ||
-      Math.abs(currentColor[2] - this._lastIndicatorColor[2]) > 0.001;
-
-    if (colorChanged) {
-      console.log(
-        `Position Indicator - Position: ${this._positionIndicator.toFixed(3)}, ` +
-          `Color: RGB(${(currentColor[0] * 255).toFixed(0)}, ${(currentColor[1] * 255).toFixed(0)}, ${(
-            currentColor[2] * 255
-          ).toFixed(0)}) ` +
-          `/ RGB(${currentColor[0].toFixed(3)}, ${currentColor[1].toFixed(3)}, ${currentColor[2].toFixed(3)})`
-      );
-
-      // 更新上次的颜色
-      this._lastIndicatorColor[0] = currentColor[0];
-      this._lastIndicatorColor[1] = currentColor[1];
-      this._lastIndicatorColor[2] = currentColor[2];
-    }
   }
 
   // 新增：检查鼠标是否在指示器上
@@ -272,7 +262,7 @@ export class RampTextureCreator {
       ) {
         this._keyframes.splice(this._hoverKeyframe, 1);
         if (this._selectedKeyframe === this._hoverKeyframe) {
-          this._selectedKeyframe = -1;
+          this._selectedKeyframe = Math.min(this._selectedKeyframe, this._keyframes.length - 1);
           this._dragStartPos = null;
         } else if (this._selectedKeyframe > this._hoverKeyframe) {
           this._selectedKeyframe--;
@@ -288,9 +278,11 @@ export class RampTextureCreator {
         const newPosition = Math.max(0, Math.min(1, relX));
         if (Math.abs(newPosition - this._positionIndicator) > 0.001) {
           this._positionIndicator = newPosition;
-          console.log(`Position Indicator - Position: ${this._positionIndicator.toFixed(3)}`);
-          this.updateIndicatorColor();
+          if (this._alphaEditor) {
+            this._alphaEditor.positionIndicatorTime = newPosition;
+          }
         }
+        this.preview();
       } else {
         // 停止拖拽
         this._isDraggingIndicator = false;
@@ -461,6 +453,17 @@ export class RampTextureCreator {
     }
   }
 
+  setKeyframeValue(value: number[]) {
+    if (this._selectedKeyframe >= 0) {
+      this._keyframes[this._selectedKeyframe].color[0] = value[0];
+      this._keyframes[this._selectedKeyframe].color[1] = value[1];
+      this._keyframes[this._selectedKeyframe].color[2] = value[2];
+      this.updateInterpolator();
+    }
+    if (value.length > 3 && this._alphaEditor) {
+      this._alphaEditor.setKeyframeValue([value[3]]);
+    }
+  }
   fillTextureData(showAlpha: boolean, data: Uint8ClampedArray) {
     const p = new Float32Array(3);
     for (let i = 0; i < this._textureWidth; i++) {

@@ -56,7 +56,7 @@ export class Dialog {
   public static async editCurve(
     title: string,
     interpolator: Interpolator,
-    onPreview: (value: number[]) => void,
+    onPreview?: (value: number[]) => void,
     width?: number,
     height?: number
   ): Promise<boolean> {
@@ -73,17 +73,25 @@ export class Dialog {
     useAlpha: boolean,
     rgbInterpolator: Interpolator,
     alphaInterpolator: Interpolator,
+    onPreview: (value: number[]) => void,
     width?: number,
     height?: number
   ) {
-    return new DlgEditColorTrack(
-      title,
-      useAlpha,
-      rgbInterpolator,
-      alphaInterpolator,
-      width,
-      height
-    ).showModal();
+    const existing = DialogRenderer.findModeless(title);
+    if (existing >= 0) {
+      ImGui.SetWindowFocus(title);
+      return DialogRenderer.getModeless(existing).promise;
+    } else {
+      return new DlgEditColorTrack(
+        title,
+        useAlpha,
+        rgbInterpolator,
+        alphaInterpolator,
+        onPreview,
+        width,
+        height
+      ).show();
+    }
   }
   public static async createRampTexture(
     title: string,

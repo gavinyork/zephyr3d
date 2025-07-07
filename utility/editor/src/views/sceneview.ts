@@ -63,6 +63,8 @@ import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
 import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
+import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
+import { DlgCurveEditor } from './dlg/curveeditordlg';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -830,6 +832,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
     this._proxy?.dispose();
     this._proxy = null;
+    this.closeAllTrackEditors();
   }
   private renderDeviceInfo() {
     const device = Application.instance.device;
@@ -871,9 +874,36 @@ export class SceneView extends BaseView<SceneModel> {
     }
     ImGui.End();
   }
+  private closeAllTrackEditors() {
+    for (const a of this._editingProps) {
+      for (const b of a[1]) {
+        const dlgIndex = DialogRenderer.findModeless(b[1].id);
+        if (dlgIndex >= 0) {
+          const dlg = DialogRenderer.getModeless(dlgIndex);
+          if (dlg) {
+            dlg.close(false);
+          }
+        }
+      }
+    }
+  }
   private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
     if (object instanceof SceneNode) {
       this._proxy.updateProxy(object);
+    }
+    const info = this._editingProps.get(object)?.get(prop);
+    if (info) {
+      const value = { num: [0, 0, 0, 0] };
+      prop.get.call(object, value);
+      const dlgIndex = DialogRenderer.findModeless(info.id);
+      if (dlgIndex >= 0) {
+        const dlg = DialogRenderer.getModeless(dlgIndex);
+        if (dlg instanceof DlgEditColorTrack) {
+          dlg.rampTextureCreator.setKeyframeValue(value.num);
+        } else if (dlg instanceof DlgCurveEditor) {
+          dlg.curveEditor.setKeyframeValue(value.num);
+        }
+      }
     }
   }
   update(dt: number) {
@@ -917,6 +947,9 @@ export class SceneView extends BaseView<SceneModel> {
         prop.type === 'rgba',
         track.interpolator,
         track.interpolatorAlpha,
+        (value) => {
+          prop.set.call(target, { num: value });
+        },
         600,
         500
       ).then((result) => {
@@ -1123,12 +1156,27 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleEndTranslateNode(node: SceneNode) {
     this.handleEndTransformNode(node, 'moving object');
+    this._propGrid.dispatchEvent(
+      'object_property_changed',
+      node,
+      this._serializationManager.getPropertyByName('/SceneNode/Position')
+    );
   }
   private handleEndRotateNode(node: SceneNode) {
     this.handleEndTransformNode(node, 'rotating object');
+    this._propGrid.dispatchEvent(
+      'object_property_changed',
+      node,
+      this._serializationManager.getPropertyByName('/SceneNode/Rotation')
+    );
   }
   private handleEndScaleNode(node: SceneNode) {
     this.handleEndTransformNode(node, 'scaling object');
+    this._propGrid.dispatchEvent(
+      'object_property_changed',
+      node,
+      this._serializationManager.getPropertyByName('/SceneNode/Scale')
+    );
   }
   private handleEditAABB(aabb: AABB) {
     if (this._aabbForEdit) {

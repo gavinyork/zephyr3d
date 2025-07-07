@@ -28,15 +28,6 @@ export type PlayAnimationOptions = {
    */
   speedRatio?: number;
   /**
-   * Blending weight
-   *
-   * @remarks
-   * When multiple animations are playing at the same time,
-   * all animations are weighted and averaged using this weight.
-   * Default value is 1
-   */
-  weight?: number;
-  /**
    * Fade-in time
    *
    * @remarks
@@ -209,7 +200,11 @@ export class AnimationSet implements Disposable {
             return weight * fadeIn * fadeOut;
           });
           const states = tracks.map((track) =>
-            track.calculateState(k, this._activeAnimations.get(track.animation).currentTime)
+            track.calculateState(
+              k,
+              (this._activeAnimations.get(track.animation).currentTime / track.animation.timeDuration) *
+                track.getDuration()
+            )
           );
           const state = weightedAverage(weights, states, (a, b, t) => {
             return tracks[0].mixState(a, b, t);
@@ -238,16 +233,6 @@ export class AnimationSet implements Disposable {
    */
   getAnimationClip(name: string): AnimationClip | null {
     return this._animations[name] ?? null;
-  }
-  /**
-   * Gets the weight of specific animation which is currently playing
-   * @param name - Name of the animation
-   * @returns Weight of the animation or 0 if this animation is not playing
-   */
-  getAnimationWeight(name: string): number {
-    const ani = this._animations[name];
-    const info = this._activeAnimations.get(ani);
-    return info?.weight ?? 0;
   }
   /**
    * Sets the weight of specific animation which is currently playing
@@ -280,7 +265,7 @@ export class AnimationSet implements Disposable {
     } else {
       const repeat = options?.repeat ?? 0;
       const speedRatio = options?.speedRatio ?? 1;
-      const weight = options?.weight ?? 1;
+      const weight = ani.weight;
       this._activeAnimations.set(ani, {
         repeat,
         weight,

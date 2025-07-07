@@ -24,6 +24,9 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
       this.channel = [0];
     }
   }
+  get curveEditor() {
+    return this.editor;
+  }
   preview(value: { key: number; value: number[] }) {
     if (this.onPreview) {
       this.onPreview(value.value);

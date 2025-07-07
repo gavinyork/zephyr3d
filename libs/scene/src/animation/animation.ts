@@ -19,6 +19,7 @@ export class AnimationClip {
   protected _autoPlay: boolean;
   /** @internal */
   protected _tracks: Map<object, AnimationTrack[]>;
+  protected _weight: number;
   /** @internal */
   protected _skeletons: Set<Skeleton>;
   /**
@@ -32,6 +33,7 @@ export class AnimationClip {
     this._embedded = embedded;
     this._tracks = new Map();
     this._duration = 0;
+    this._weight = 1;
     this._skeletons = new Set();
   }
   /** Whether this is an embedded animation */
@@ -41,6 +43,13 @@ export class AnimationClip {
   /** AnimationSet this animation belongs to */
   get animationSet() {
     return this._animationSet;
+  }
+  /** Animatoin weight */
+  get weight() {
+    return this._weight;
+  }
+  set weight(val: number) {
+    this._weight = val;
   }
   /** Disposes self */
   dispose() {

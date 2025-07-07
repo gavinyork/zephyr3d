@@ -18,6 +18,10 @@ export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedAr
     this._name = 'ramp texture';
     this._creator = new RampTextureCreator(useAlpha, rgbInterpolator, alphaInterpolator);
   }
+  close(result: { data: Uint8ClampedArray; name: string }) {
+    this._creator.dispose();
+    super.close(result);
+  }
   doRender(): void {
     const name = [this._name] as [string];
     if (ImGui.InputText('Asset Name', name)) {
@@ -31,12 +35,10 @@ export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedAr
     if (ImGui.Button('Ok')) {
       const data = new Uint8ClampedArray(256 * 4);
       this._creator.fillTextureData(true, data);
-      this._creator.dispose();
       this.close({ data, name: this._name });
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this._creator.dispose();
       this.close(null);
     }
   }
