@@ -151,8 +151,34 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
         {
           name: 'Duration',
           type: 'float',
+          default: 1,
           get(this: AnimationClip, value) {
             value.num[0] = this.timeDuration;
+          },
+          set(this: AnimationClip, value) {
+            this.timeDuration = value.num[0];
+          }
+        },
+        {
+          name: 'Weight',
+          type: 'float',
+          default: 1,
+          get(this: AnimationClip, value) {
+            value.num[0] = this.weight;
+          },
+          set(this: AnimationClip, value) {
+            this.weight = value.num[0];
+          }
+        },
+        {
+          name: 'AutoPlay',
+          type: 'bool',
+          default: false,
+          get(this: AnimationClip, value) {
+            value.bool[0] = this.autoPlay;
+          },
+          set(this: AnimationClip, value) {
+            this.autoPlay = value.bool[0];
           }
         },
         {

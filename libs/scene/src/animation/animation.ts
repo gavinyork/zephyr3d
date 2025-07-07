@@ -34,6 +34,7 @@ export class AnimationClip {
     this._tracks = new Map();
     this._duration = 0;
     this._weight = 1;
+    this._autoPlay = false;
     this._skeletons = new Set();
   }
   /** Whether this is an embedded animation */
@@ -50,6 +51,13 @@ export class AnimationClip {
   }
   set weight(val: number) {
     this._weight = val;
+  }
+  /** Whether animation should play automatically when loaded */
+  get autoPlay() {
+    return this._autoPlay;
+  }
+  set autoPlay(val: boolean) {
+    this._autoPlay = val;
   }
   /** Disposes self */
   dispose() {
@@ -72,6 +80,9 @@ export class AnimationClip {
   /** The duration of the animation */
   get timeDuration(): number {
     return this._duration;
+  }
+  set timeDuration(val: number) {
+    this._duration = val;
   }
   /**
    * Adds a skeleton to the animation
