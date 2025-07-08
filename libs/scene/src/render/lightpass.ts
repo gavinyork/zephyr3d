@@ -126,7 +126,7 @@ export class LightPass extends RenderPass {
     const lists = this._transmission
       ? [items?.transmission, items?.transmission_trans, items?.transparent]
       : [items?.opaque, items?.transparent];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < lists.length; i++) {
       if (lists[i]) {
         ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
