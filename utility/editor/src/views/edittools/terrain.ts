@@ -1,4 +1,5 @@
 import type { AssetRegistry, ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
+import UPNG from 'upng-js';
 import {
   Application,
   AssetManager,
@@ -8,13 +9,13 @@ import {
   fetchSampler
 } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { ASSERT, degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
 import { ImageList } from '../../components/imagelist';
 import type { Editor } from '../../core/editor';
-import type { Texture2D, Texture2DArray } from '@zephyr3d/device';
+import { type Texture2D, type Texture2DArray } from '@zephyr3d/device';
 import { TerrainTextureBrush } from './brushes/splat';
 import { TerrainRaiseBrush } from './brushes/raise';
 import type { TerrainHeightBrush } from './brushes/height';
@@ -508,11 +509,74 @@ export class TerrainEditTool implements EditTool {
     }
     ImGui.EndChild();
   }
+  async createHeightMapFromPNG(httpRequest: HttpRequest, url: string, heightMap: Texture2D) {
+    const buffer = await httpRequest.requestArrayBuffer(url);
+    const png = UPNG.decode(buffer);
+    const { width, height, depth } = png;
+    const data = new Uint8Array(png.data);
+    const dataLen = data.length;
+    const pixelDataLen = dataLen - height;
+    if (depth !== 8 && depth !== 16) {
+      return null;
+    }
+    const stride = pixelDataLen / ((width * height * depth) / 8);
+    if (stride !== 1 && stride !== 2 && stride !== 3 && stride !== 4) {
+      return null;
+    }
+    const tmpTexture = Application.instance.device.createTexture2D('r32f', width, height, {
+      samplerOptions: { mipFilter: 'none' }
+    });
+    const texels = new Float32Array(width * height);
+    let srcOffset = 0;
+    let dstOffset = 0;
+    if (depth === 16) {
+      for (let row = 0; row < height; row++) {
+        srcOffset++;
+        for (let col = 0; col < width; col++) {
+          const hi = data[srcOffset];
+          const lo = data[srcOffset + 1];
+          texels[dstOffset++] = ((hi << 8) | lo) / 65535;
+          srcOffset += stride * 2;
+        }
+      }
+    } else {
+      for (let row = 0; row < height; row++) {
+        srcOffset++;
+        for (let col = 0; col < width; col++) {
+          const value = data[srcOffset];
+          texels[dstOffset++] = value / 255;
+          srcOffset += stride;
+        }
+      }
+    }
+    tmpTexture.update(texels, 0, 0, width, height);
+    new CopyBlitter().blit(
+      tmpTexture,
+      heightMap,
+      fetchSampler(
+        heightMap.width === tmpTexture.width && heightMap.height === tmpTexture.height
+          ? 'clamp_nearest_nomip'
+          : 'clamp_linear_nomip'
+      )
+    );
+    tmpTexture.dispose();
+  }
   importHeightMap() {
-    FilePicker.chooseFiles(false, '.jpg,.png,.dds').then((files) => {
+    FilePicker.chooseFiles(false, '.jpg,.tga,.png,.dds').then((files) => {
       if (files.length > 0) {
         const url = URL.createObjectURL(files[0]);
         const httpRequest = new HttpRequest((path) => url);
+        if (files[0].name.toLowerCase().endsWith('.png')) {
+          this.createHeightMapFromPNG(httpRequest, url, this._terrain.get().heightMap)
+            .then(() => {
+              URL.revokeObjectURL(url);
+              this._terrain.get().updateBoundingBox();
+            })
+            .catch((err) => {
+              Dialog.messageBox('Error', String(err));
+              URL.revokeObjectURL(url);
+            });
+        }
         const assetManager = new AssetManager();
         assetManager
           .fetchTexture<Texture2D>(

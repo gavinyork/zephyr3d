@@ -56,10 +56,12 @@
   },
   "dependencies": {
     "@types/node": "^18.13.0",
+    "@types/upng-js": "^2.1.5",
     "@types/streamsaver": "^2.0.5",
     "@webgpu/types": "^0.1.62",
     "idb": "^8.0.1",
     "@zip.js/zip.js": "^2.7.54",
+    "upng-js": "^2.1.0",
     "streamsaver": "^2.0.6",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@zephyr3d/base": "workspace:*",
