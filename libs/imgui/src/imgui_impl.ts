@@ -653,7 +653,32 @@ export function addCustomGlyph(charCode: number, font: DeviceFont) {
   glyphFontMap[charCode] = font;
 }
 
-async function font_update(io: ImGui.IO) {
+/** @internal */
+export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
+  const font = ImGui.GetFont();
+  const fontName = font.FontSize + 'px ' + font.FontName;
+  let deviceFont = fonts[fontName];
+  if (!deviceFont) {
+    deviceFont = new DeviceFont(fontName, renderer.device.getScale());
+    fonts[fontName] = deviceFont;
+  }
+  let x = 0;
+  let y = 0;
+  if (text) {
+    for (const ch of text) {
+      const glyphInfo = glyphManager.getGlyphInfo(ch, deviceFont);
+      x += glyphInfo.width;
+      y = Math.max(glyphInfo.height);
+    }
+  }
+  out = out ?? new ImGui.ImVec2();
+  out.x = x;
+  out.y = y;
+  return out;
+}
+
+/** @internal */
+export function font_update(io: ImGui.IO) {
   io.Fonts.Fonts.forEach((font) => {
     const fontName = font.FontSize + 'px ' + font.FontName;
     let deviceFont = fonts[fontName];
@@ -665,10 +690,11 @@ async function font_update(io: ImGui.IO) {
     while (glyph) {
       const f = glyphFontMap[glyph.Char];
       let glyphInfo: AtlasInfo;
+      const char = String.fromCharCode(glyph.Char);
       if (f) {
-        glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), f);
+        glyphInfo = glyphManager.getGlyphInfo(char, f);
       } else {
-        glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), deviceFont);
+        glyphInfo = glyphManager.getGlyphInfo(char, deviceFont);
       }
       glyph.X0 = 0;
       glyph.X1 = glyphInfo.width;

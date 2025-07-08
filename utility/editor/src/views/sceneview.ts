@@ -65,6 +65,7 @@ import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
+import { GraphEditor } from '../components/grapheditor';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -568,10 +569,12 @@ export class SceneView extends BaseView<SceneModel> {
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
     }
+    /*
     if (ImGui.Begin('FontTest')) {
       ImGui.Text(FontGlyph.allGlyphs);
     }
     ImGui.End();
+    */
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);

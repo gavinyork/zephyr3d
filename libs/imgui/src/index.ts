@@ -100,3 +100,36 @@ export function imGuiInjectEvent(ev: Event, type?: string) {
 export function imGuiSetFontGlyph(charCode: number, font: Font) {
   ImGui_Impl.addCustomGlyph(charCode, font);
 }
+
+/**
+ * Force create font glyphs
+ */
+export function imGuiUpdateFontGlyphs() {
+  ImGui_Impl.font_update(ImGui.GetIO());
+}
+
+/**
+ * Load glyphs immediately
+ * @param glyphs - glyphs to be loaded
+ */
+export function imGuiEnsureGlyphsLoaded(glyphs: string) {
+  const needFrame = !inFrame;
+  if (needFrame) {
+    imGuiNewFrame();
+  }
+  ImGui.CalcTextSize(glyphs);
+  ImGui_Impl.font_update(ImGui.GetIO());
+  if (needFrame) {
+    imGuiEndFrame();
+  }
+}
+
+/**
+ * Calculate text size
+ * @param text - text to calculated
+ * @remarks
+ * The function ensures all glyphs in text been created
+ */
+export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
+  return ImGui_Impl.calcTextSize(text, out);
+}
