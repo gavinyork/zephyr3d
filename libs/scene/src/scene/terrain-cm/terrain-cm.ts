@@ -328,7 +328,7 @@ export class ClipmapTerrain
       });
   }
   createHeightMapTexture(width: number, height: number) {
-    return Application.instance.device.createTexture2D('r16f', width, height);
+    return Application.instance.device.createTexture2D('r32f', width, height);
   }
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
@@ -420,7 +420,7 @@ export class ClipmapTerrain
     sizeX = Math.min(Math.max(sizeX, 1), maxTextureSize) >> 0;
     sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
     if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
-      const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ);
+      const newHeightMap = device.createTexture2D('r32f', sizeX, sizeZ);
       const fb = device.createFrameBuffer([newHeightMap], null);
       ClipmapTerrain._copyBlitter.blit(oldHeightMap, fb, fetchSampler('clamp_linear_nomip'));
       fb.dispose();

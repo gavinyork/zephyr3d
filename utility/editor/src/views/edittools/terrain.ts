@@ -9,7 +9,7 @@ import {
   fetchSampler
 } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { ASSERT, degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -150,7 +150,12 @@ export class TerrainEditTool implements EditTool {
     const heightMapCopy = Application.instance.device.createTexture2D(
       heightMap.format,
       heightMap.width,
-      heightMap.height
+      heightMap.height,
+      {
+        samplerOptions: {
+          mipFilter: 'none'
+        }
+      }
     );
     heightMapCopy.name = 'heightMapCopy';
     blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
@@ -176,6 +181,23 @@ export class TerrainEditTool implements EditTool {
       this._heightDirty = false;
       this._terrain.get().updateBoundingBox();
       this._terrain.get().updateRegion();
+    }
+    if (
+      !this._heightMapCopy.get() ||
+      this._heightMapCopy.get().width !== this._terrain.get().heightMap.width ||
+      this._heightMapCopy.get().height !== this._terrain.get().heightMap.height
+    ) {
+      this._heightMapCopy.dispose();
+      this._heightMapCopy.set(
+        Application.instance.device.createTexture2D(
+          this._terrain.get().heightMap.format,
+          this._terrain.get().heightMap.width,
+          this._terrain.get().heightMap.height,
+          {
+            samplerOptions: { mipFilter: 'none' }
+          }
+        )
+      );
     }
     if (this._brushing && this._hitPos && this._brushImageList.selected >= 0) {
       const texture = this._brushImageList.getImage(this._brushImageList.selected);
@@ -527,29 +549,29 @@ export class TerrainEditTool implements EditTool {
       samplerOptions: { mipFilter: 'none' }
     });
     const texels = new Float32Array(width * height);
-    let srcOffset = 0;
     let dstOffset = 0;
     if (depth === 16) {
+      let i = 0;
       for (let row = 0; row < height; row++) {
-        srcOffset++;
         for (let col = 0; col < width; col++) {
-          const hi = data[srcOffset];
-          const lo = data[srcOffset + 1];
+          const hi = data[i];
+          const lo = data[i + 1];
           texels[dstOffset++] = ((hi << 8) | lo) / 65535;
-          srcOffset += stride * 2;
+          i += stride * 2;
         }
       }
     } else {
+      let i = 0;
       for (let row = 0; row < height; row++) {
-        srcOffset++;
         for (let col = 0; col < width; col++) {
-          const value = data[srcOffset];
+          const value = data[i];
           texels[dstOffset++] = value / 255;
-          srcOffset += stride;
+          i += stride;
         }
       }
     }
     tmpTexture.update(texels, 0, 0, width, height);
+    tmpTexture.name = 'TmpHeight';
     new CopyBlitter().blit(
       tmpTexture,
       heightMap,
@@ -559,7 +581,7 @@ export class TerrainEditTool implements EditTool {
           : 'clamp_linear_nomip'
       )
     );
-    tmpTexture.dispose();
+    //tmpTexture.dispose();
   }
   importHeightMap() {
     FilePicker.chooseFiles(false, '.jpg,.tga,.png,.dds').then((files) => {
@@ -576,39 +598,40 @@ export class TerrainEditTool implements EditTool {
               Dialog.messageBox('Error', String(err));
               URL.revokeObjectURL(url);
             });
-        }
-        const assetManager = new AssetManager();
-        assetManager
-          .fetchTexture<Texture2D>(
-            files[0].name,
-            {
-              linearColorSpace: true,
-              samplerOptions: { mipFilter: 'none' }
-            },
-            httpRequest
-          )
-          .then((tex) => {
-            if (!tex || !tex.isTexture2D()) {
-              Dialog.messageBox('Error', 'Invalid texture');
-            }
-            const heightMap = this._terrain.get().heightMap;
-            new CopyBlitter().blit(
-              tex,
-              heightMap,
-              fetchSampler(
-                heightMap.width === tex.width && heightMap.height === tex.height
-                  ? 'clamp_nearest_nomip'
-                  : 'clamp_linear_nomip'
-              )
-            );
-            this._terrain.get().updateBoundingBox();
+        } else {
+          const assetManager = new AssetManager();
+          assetManager
+            .fetchTexture<Texture2D>(
+              files[0].name,
+              {
+                linearColorSpace: true,
+                samplerOptions: { mipFilter: 'none' }
+              },
+              httpRequest
+            )
+            .then((tex) => {
+              if (!tex || !tex.isTexture2D()) {
+                Dialog.messageBox('Error', 'Invalid texture');
+              }
+              const heightMap = this._terrain.get().heightMap;
+              new CopyBlitter().blit(
+                tex,
+                heightMap,
+                fetchSampler(
+                  heightMap.width === tex.width && heightMap.height === tex.height
+                    ? 'clamp_nearest_nomip'
+                    : 'clamp_linear_nomip'
+                )
+              );
+              this._terrain.get().updateBoundingBox();
 
-            URL.revokeObjectURL(url);
-          })
-          .catch((err) => {
-            Dialog.messageBox('Error', String(err));
-            URL.revokeObjectURL(url);
-          });
+              URL.revokeObjectURL(url);
+            })
+            .catch((err) => {
+              Dialog.messageBox('Error', String(err));
+              URL.revokeObjectURL(url);
+            });
+        }
       }
     });
   }
@@ -632,7 +655,7 @@ export class TerrainEditTool implements EditTool {
     if (!this._terrain.get().heightMap) {
       const device = Application.instance.device;
       const heightMap = device.createTexture2D(
-        'r16f',
+        'r32f',
         Math.max(1, this._terrain.get().sizeX),
         Math.max(1, this._terrain.get().sizeZ)
       );
