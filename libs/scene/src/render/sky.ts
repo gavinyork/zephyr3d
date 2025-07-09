@@ -140,7 +140,7 @@ export class SkyRenderer {
     this._fogParams = new Vector4(1, 100, 50, 0.002);
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
-    this._wind = new Vector2(200, 0);
+    this._wind = new Vector2(0, 0);
     this._drawGround = false;
     this._skyWorldMatrix = defaultSkyWorldMatrix;
     this._lastSunDir = SkyRenderer._getSunDir(null);
@@ -427,6 +427,9 @@ export class SkyRenderer {
   update(ctx: DrawContext) {
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
+    if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
+      this._bakedSkyboxDirty = true;
+    }
     if (!sunDir.equalsTo(this._lastSunDir) || !sunColor.equalsTo(this._lastSunColor)) {
       this._lastSunDir.set(sunDir);
       this._lastSunColor.set(sunColor);
@@ -484,22 +487,12 @@ export class SkyRenderer {
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         camera.lookAtCubeFace(face);
         this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
-        this._renderSky(camera, false, true, false);
+        this._renderSky(camera, false, true, true);
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
       this._bakedSkyboxTexture.set(tex);
     }
-  }
-  /**
-   * Regenerate the radiance map and irradiance map
-   *
-   * @param sunColor - The sun light
-   */
-  updateIBLMaps(sunDir: Vector3, sunColor: Vector4) {
-    this.updateBakedSkyMap(sunDir, sunColor);
-    prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceFramebuffer);
-    prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceFramebuffer);
   }
   /** @internal */
   renderAtmosphericFog(ctx: DrawContext) {

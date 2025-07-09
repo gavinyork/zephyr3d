@@ -18,7 +18,6 @@ import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
-  private static FEATURE_SSR = this.defineFeature();
   private static _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
@@ -52,7 +51,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._clipmapGridInfo = new Vector4();
     this._waveGenerator = new DRef();
     this._waveVersion = -1;
-    this._ssrParams = new Vector4(100, 80, 0.5, 8);
+    this._ssrParams = new Vector4(1000, 160, 0.5, 2);
     this._scatterRampTexture = new DRef();
     this._absorptionRampTexture = new DRef();
     this._displace = 16;
@@ -66,12 +65,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._waveGenerator.dispose();
     this._scatterRampTexture.dispose();
     this._absorptionRampTexture.dispose();
-  }
-  get SSR() {
-    return this.featureUsed<boolean>(WaterMaterial.FEATURE_SSR);
-  }
-  set SSR(val: boolean) {
-    this.useFeature(WaterMaterial.FEATURE_SSR, !!val);
   }
   /** @internal */
   get region() {
@@ -335,7 +328,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
         this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
-        this.$l.normalScale = pb.pow(pb.clamp(pb.div(100, this.dist), 0, 1), 2);
+        this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
@@ -465,7 +458,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    //bindGroup.setValue('clipmapInfo', this._clipmapInfo);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {

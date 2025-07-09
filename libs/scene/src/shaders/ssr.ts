@@ -311,7 +311,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.hitUV = pb.vec2();
       this.$l.hitZ = pb.float();
       this.numIterations = 0;
-      this.skippedIterations = pb.min(this.maxIterations, 2);
+      this.skippedIterations = pb.min(this.maxIterations, 1);
       this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 1000 : this.maxIterations, function () {
         if (pb.getDevice().type === 'webgl') {
           this.$if(pb.greaterThanEqual(this.i, this.maxIterations), function () {
@@ -552,13 +552,6 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.currentMipResolution = this.getMipResolution(this.currentMip);
       this.$l.invCurrentMipResolution = pb.div(pb.vec2(1), this.currentMipResolution);
       this.$l.uvOffset = pb.div(pb.mul(0.005, pb.exp2(pb.float(this.mostDetailMip))), this.screenSize);
-      /*
-      this.$l.uvOffset = pb.div(
-        pb.vec2(0.001),
-        //pb.mul(pb.exp2(pb.float(this.mostDetailMip)), 0.005),
-        pb.vec2(pb.textureDimensions(HiZTexture, this.mostDetailMip))
-      );
-      */
       this.uvOffset = pb.vec2(
         this.$choice(pb.lessThan(this.screenSpaceDirection.x, 0), pb.neg(this.uvOffset.x), this.uvOffset.x),
         this.$choice(pb.lessThan(this.screenSpaceDirection.y, 0), pb.neg(this.uvOffset.y), this.uvOffset.y)
