@@ -1,7 +1,7 @@
 import type { AABB } from '@zephyr3d/base';
 import { ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
-import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import { RENDER_PASS_TYPE_OBJECT_COLOR, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 import type { GraphNode } from '../scene/graph_node';
 import type { RenderQueue } from './render_queue';
 import type { RenderPass, Drawable } from '.';
@@ -31,6 +31,10 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   private _renderQueue: RenderQueue;
   /** @internal */
   private _renderPass: RenderPass;
+  /** @internal */
+  private _isGPUPicking: boolean;
+  /** @internal */
+  private _isShadowMapping: boolean;
   /**
    * Creates an instance of CullVisitor
    * @param renderPass - Render pass for the culling task
@@ -44,6 +48,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     this._renderQueue = renderQueue;
     this._skipClipTest = false;
     this._renderPass = renderPass;
+    this._isGPUPicking = this._renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
+    this._isShadowMapping = this._renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
   }
   /** The camera that will be used for culling */
   get camera() {
@@ -122,7 +128,11 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitTerrain(node: Terrain) {
-    if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
+    if (
+      !node.hidden &&
+      (node.castShadow || !this._isShadowMapping) &&
+      (node.gpuPickable || !this._isGPUPicking)
+    ) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         return node.cull(this) > 0;
@@ -132,7 +142,11 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitClipmapTerrain(node: ClipmapTerrain) {
-    if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
+    if (
+      !node.hidden &&
+      (node.castShadow || !this._isShadowMapping) &&
+      (node.gpuPickable || !this._isGPUPicking)
+    ) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);
@@ -154,7 +168,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitParticleSystem(node: ParticleSystem) {
-    if (!node.hidden && this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP) {
+    if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);
@@ -165,7 +179,11 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitMesh(node: Mesh) {
-    if (!node.hidden && (node.castShadow || this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP)) {
+    if (
+      !node.hidden &&
+      (node.castShadow || !this._isShadowMapping) &&
+      (node.gpuPickable || !this._isGPUPicking)
+    ) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);
@@ -176,7 +194,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitWater(node: Water) {
-    if (!node.hidden && this._renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP) {
+    if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);

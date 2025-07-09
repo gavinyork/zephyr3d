@@ -91,7 +91,9 @@ export class SceneNode
   /** @internal */
   protected _visible: SceneNodeVisible;
   /** @internal */
-  protected _pickMode: boolean;
+  protected _pickable: boolean;
+  /** @internal */
+  protected _gpuPickable: boolean;
   /** @internal */
   protected _name: string;
   /** @internal */
@@ -152,7 +154,8 @@ export class SceneNode
     this._clipMode = true;
     this._boxDrawMode = SceneNode.BBOXDRAW_DISABLED;
     this._visible = 'inherit';
-    this._pickMode = false;
+    this._pickable = false;
+    this._gpuPickable = true;
     this._placeToOctree = true;
     this._parent = null;
     this._sealed = false;
@@ -517,12 +520,19 @@ export class SceneNode
       }
     }
   }
-  /** Computed value of pick mode */
+  /** Whether this node is enabled for CPU picking */
   get pickable(): boolean {
-    return this._pickMode;
+    return this._pickable;
   }
   set pickable(val: boolean) {
-    this._pickMode = !!val;
+    this._pickable = !!val;
+  }
+  /** Whether this node is enabled for GPU picking */
+  get gpuPickable(): boolean {
+    return this._gpuPickable;
+  }
+  set gpuPickable(val: boolean) {
+    this._gpuPickable = !!val;
   }
   /** Computed value for bounding box draw mode */
   get computedBoundingBoxDrawMode(): number {

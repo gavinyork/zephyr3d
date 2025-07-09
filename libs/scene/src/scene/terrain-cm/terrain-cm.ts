@@ -425,6 +425,7 @@ export class ClipmapTerrain
       ClipmapTerrain._copyBlitter.blit(oldHeightMap, fb, fetchSampler('clamp_linear_nomip'));
       fb.dispose();
       this.heightMap = newHeightMap;
+      this.updateBoundingBox();
     }
   }
   /*

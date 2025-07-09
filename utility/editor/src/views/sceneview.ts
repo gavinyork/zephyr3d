@@ -7,6 +7,7 @@ import type {
   Camera,
   Compositor,
   NodeCloneMethod,
+  PickResult,
   PropertyAccessor,
   PropertyTrack,
   PropertyValue,
@@ -65,7 +66,6 @@ import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
-import { GraphEditor } from '../components/grapheditor';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -87,6 +87,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
   private _mousePosX: number;
   private _mousePosY: number;
+  private _pickResult: PickResult;
   private _serializationManager: SerializationManager;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
@@ -120,6 +121,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._clipBoardData = new DRef();
     this._mousePosX = -1;
     this._mousePosY = -1;
+    this._pickResult = null;
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
@@ -529,24 +531,6 @@ export class SceneView extends BaseView<SceneModel> {
         );
       }
     }
-    const placeNode = this._nodeToBePlaced.get();
-    if (placeNode) {
-      if (this._mousePosX >= 0 && this._mousePosY >= 0) {
-        placeNode.parent = this.model.scene.rootNode;
-        const ray = this.model.camera.constructRay(this._mousePosX, this._mousePosY);
-        let hitDistance = -ray.origin.y / ray.direction.y;
-        if (Number.isNaN(hitDistance) || hitDistance < 0) {
-          hitDistance = 10;
-        }
-        placeNode.position.setXYZ(
-          ray.origin.x + ray.direction.x * hitDistance,
-          ray.origin.y + ray.direction.y * hitDistance,
-          ray.origin.z + ray.direction.z * hitDistance
-        );
-      } else {
-        placeNode.parent = null;
-      }
-    }
     this.model.camera.viewport = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
     this.model.camera.scissor = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
     if (this.model.camera instanceof PerspectiveCamera) {
@@ -709,30 +693,49 @@ export class SceneView extends BaseView<SceneModel> {
       if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button)) {
         return true;
       }
-      if (this._currentEditTool.get() || (ev.button === 0 && ev.type === 'pointerdown')) {
-        this.model.camera.pickAsync(p[0], p[1]).then((pickResult) => {
-          const node = pickResult?.target?.node ?? null;
-          const hitPos = pickResult?.intersectedPoint ?? null;
-          if (
-            !placeNode &&
-            !this._currentEditTool.get()?.handlePointerEvent(ev, node, hitPos) &&
-            ev.button === 0 &&
-            ev.type === 'pointerdown'
-          ) {
-            let node = pickResult?.target?.node ?? null;
-            if (node) {
-              let assetNode = node;
-              while (assetNode && !this._serializationManager.assetRegistry.getAssetId(assetNode)) {
-                assetNode = assetNode.parent;
-              }
-              if (assetNode) {
-                node = assetNode;
-              }
+      if (
+        this._currentEditTool.get() ||
+        !!placeNode?.parent ||
+        (ev.button === 0 && ev.type === 'pointerdown')
+      ) {
+        const pickResult = this._pickResult;
+        let node = pickResult?.target?.node ?? null;
+        const hitPos = pickResult?.intersectedPoint ?? null;
+        if (placeNode?.parent) {
+          if (hitPos) {
+            //console.log(`Fit to scene: ${hitPos.toString()}`);
+            placeNode.position.set(hitPos);
+          } else {
+            const ray = this.model.camera.constructRay(this._mousePosX, this._mousePosY);
+            let hitDistance = -ray.origin.y / ray.direction.y;
+            if (Number.isNaN(hitDistance) || hitDistance < 0) {
+              hitDistance = 10;
             }
-            node = this._proxy.getProto(node);
-            this._tab.sceneHierarchy.selectNode(node);
+            const x = ray.origin.x + ray.direction.x * hitDistance;
+            const y = ray.origin.y + ray.direction.y * hitDistance;
+            const z = ray.origin.z + ray.direction.z * hitDistance;
+            //console.log(`No fit: ${x}, ${y}, ${z}`);
+            placeNode.position.setXYZ(x, y, z);
           }
-        });
+        }
+        if (
+          !placeNode &&
+          !this._currentEditTool.get()?.handlePointerEvent(ev, node, hitPos) &&
+          ev.button === 0 &&
+          ev.type === 'pointerdown'
+        ) {
+          if (node) {
+            let assetNode = node;
+            while (assetNode && !this._serializationManager.assetRegistry.getAssetId(assetNode)) {
+              assetNode = assetNode.parent;
+            }
+            if (assetNode) {
+              node = assetNode;
+            }
+          }
+          node = this._proxy.getProto(node);
+          this._tab.sceneHierarchy.selectNode(node);
+        }
       }
     }
     return true;
@@ -910,6 +913,17 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   update(dt: number) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (this._mousePosX >= 0 && this._mousePosY >= 0) {
+      if (placeNode) {
+        placeNode.parent = this.model.scene.rootNode;
+      }
+      this.model.camera.pickAsync(this._mousePosX, this._mousePosY).then((pickResult) => {
+        this._pickResult = pickResult;
+      });
+    } else if (placeNode) {
+      placeNode.parent = null;
+    }
     if (this._animatedCamera) {
       this._cameraAnimationTime += dt;
       const t = Math.min(this._cameraAnimationTime / this._cameraAnimationDuration, 1);
@@ -1074,6 +1088,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
     const shape = new shapeCls(options);
     const mesh = new Mesh(this.model.scene, shape, new PBRMetallicRoughnessMaterial());
+    mesh.gpuPickable = false;
     this._nodeToBePlaced.set(mesh);
     this._shapeToBeAdded = {
       cls: shapeCls,
@@ -1090,6 +1105,8 @@ export class SceneView extends BaseView<SceneModel> {
       this._typeToBePlaced = 'none';
     }
     const node = new ctor(this.model.scene);
+    node.parent = null;
+    node.gpuPickable = false;
     this._proxy.createProxy(node);
     this._nodeToBePlaced.set(node);
     this._typeToBePlaced = 'node';
@@ -1106,6 +1123,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._serializationManager.assetRegistry
       .fetchModel(asset.uuid, this.model.scene)
       .then((node) => {
+        node.group.parent = null;
+        node.group.iterate((node) => {
+          node.gpuPickable = false;
+        });
         this._nodeToBePlaced.set(node.group);
         this._assetToBeAdded = asset;
         this._typeToBePlaced = 'asset';
