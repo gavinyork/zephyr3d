@@ -82,7 +82,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     isRendering: boolean;
     isWindingOrderReversed(): boolean;
     nextFrame(callback: () => void): number;
-    // Warning: (ae-forgotten-export) The symbol "Pool" needs to be exported by the entry point index.d.ts
     pool: Pool;
     poolExists(key: string | symbol): boolean;
     popDeviceStates(): any;
@@ -272,7 +271,9 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     protected _endFrameTime: number;
     // (undocumented)
-    abstract executeRenderBundle(renderBundle: RenderBundle): any;
+    executeRenderBundle(renderBundle: RenderBundle): void;
+    // (undocumented)
+    protected abstract _executeRenderBundle(renderBundle: RenderBundle): number;
     // (undocumented)
     exitLoop(): void;
     // (undocumented)
@@ -371,13 +372,13 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     abstract readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
     // (undocumented)
-    protected reloadAll(): Promise<void>;
+    protected reloadAll(): void;
     // (undocumented)
     removeGPUObject(obj: GPUObject): void;
     // (undocumented)
     abstract restoreContext(): void;
     // (undocumented)
-    restoreObject(obj: GPUObject): Promise<void>;
+    restoreObject(obj: GPUObject): void;
     // (undocumented)
     abstract reverseVertexWindingOrder(reverse: boolean): void;
     // (undocumented)
@@ -825,6 +826,12 @@ export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, 
 export function getVertexAttribName(attrib: number): VertexSemantic;
 
 // @public
+export function getVertexAttributeFormat(fmt: VertexAttribFormat): "f32" | "i32" | "u32" | "u8norm" | "i8norm" | "u16" | "i16" | "u16norm" | "i16norm" | "f16";
+
+// @public
+export function getVertexAttributeIndex(fmt: VertexAttribFormat): number;
+
+// @public
 export function getVertexBufferAttribType(vertexBufferType: PBStructTypeInfo, attrib: number): PBPrimitiveTypeInfo;
 
 // @public
@@ -904,11 +911,11 @@ export interface GPUObject<T = unknown> extends IEventTarget<{
     name: string;
     readonly object: T;
     // (undocumented)
-    reload(): Promise<void>;
+    reload(): void;
     // (undocumented)
-    restore(): Promise<void>;
+    restore(): void;
     // (undocumented)
-    restoreHandler: (tex: GPUObject) => Promise<void>;
+    restoreHandler: (tex: GPUObject) => void;
     readonly uid: number;
 }
 
@@ -1034,6 +1041,18 @@ export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat;
 
 // @public
 export function makeVertexBufferType(length: number, ...attributes: VertexAttribFormat[]): PBStructTypeInfo;
+
+// @public
+export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic): boolean;
+
+// @public (undocumented)
+export const MAX_BINDING_GROUPS = 4;
+
+// @public (undocumented)
+export const MAX_TEXCOORD_INDEX_COUNT = 8;
+
+// @public (undocumented)
+export const MAX_VERTEX_ATTRIBUTES = 16;
 
 // @public
 export interface MiscCaps {
@@ -1490,7 +1509,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     get layout(): PBStructLayout;
     get structMembers(): {
         name: string;
-        type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+        type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo;
         alignment: number;
         size: number;
         defaultAlignment: number;
@@ -1625,6 +1644,26 @@ export interface PointerTypeDetail {
 }
 
 // @public
+export class Pool {
+    constructor(device: AbstractDevice, id: string | symbol, memCostThreshold?: number);
+    // (undocumented)
+    autoRelease(): void;
+    createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer<unknown>;
+    disposeFrameBuffer(fb: FrameBuffer): void;
+    disposeTexture(texture: BaseTexture): void;
+    fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: MaybeArray<TextureFormat | T>, depthTexOrFormat?: TextureFormat | T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer;
+    fetchTemporalTexture2D(autoRelease: boolean, format: TextureFormat, width: number, height: number, mipmapping?: boolean): Texture2D;
+    fetchTemporalTexture2DArray(autoRelease: boolean, format: TextureFormat, width: number, height: number, numLayers: number, mipmapping?: boolean): Texture2DArray;
+    fetchTemporalTextureCube(autoRelease: boolean, format: TextureFormat, size: number, mipmapping?: boolean): TextureCube;
+    get id(): string | symbol;
+    purge(): void;
+    releaseFrameBuffer(fb: FrameBuffer): void;
+    releaseTexture(texture: BaseTexture): void;
+    retainFrameBuffer(fb: FrameBuffer): void;
+    retainTexture(texture: BaseTexture): void;
+}
+
+// @public
 export type PrimitiveType = 'triangle-list' | 'triangle-strip' | 'triangle-fan' | 'line-list' | 'line-strip' | 'point-list';
 
 // @public
@@ -1639,7 +1678,7 @@ export interface ProgramBuilder {
     abs(val: number | PBShaderExp): PBShaderExp;
     acos(val: number | PBShaderExp): PBShaderExp;
     acosh(val: number | PBShaderExp): PBShaderExp;
-    add(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
+    add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
     add_2(x: number | PBShaderExp, y: number | PBShaderExp): any;
     addressOf(ref: PBShaderExp): PBShaderExp;
     all(x: PBShaderExp): PBShaderExp;
@@ -1901,7 +1940,7 @@ export interface ProgramBuilder {
     min(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     mix(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
     mod(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
-    mul(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
+    mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
     mul_2(x: number | PBShaderExp, y: number | PBShaderExp): any;
     neg(x: number | PBShaderExp): PBShaderExp;
     normalize(x: PBShaderExp): PBShaderExp;
@@ -2308,8 +2347,8 @@ export type TextureAddressMode = 'repeat' | 'mirrored-repeat' | 'clamp';
 // @public
 export class TextureAtlasManager {
     constructor(device: AbstractDevice, binWidth: number, binHeight: number, rectBorderWidth: number, linearSpace?: boolean);
-    get atlasTextureRestoreHandler(): (tex: BaseTexture) => Promise<void>;
-    set atlasTextureRestoreHandler(f: (tex: BaseTexture) => Promise<void>);
+    get atlasTextureRestoreHandler(): (tex: BaseTexture) => void;
+    set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void);
     clear(): void;
     getAtlasInfo(key: string): AtlasInfo;
     getAtlasTexture(index: number): Texture2D;
@@ -2383,9 +2422,12 @@ export type TextureFormat = 'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' 
 
 // @public
 export interface TextureFormatInfo {
+    blockHeight: number;
+    blockWidth: number;
     compressed: boolean;
     filterable: boolean;
     renderable: boolean;
+    size: number;
 }
 
 // @public
@@ -2474,6 +2516,48 @@ export interface UniformLayout {
     subLayout: UniformBufferLayout;
     type: PBPrimitiveType;
 }
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_BLEND_INDICES = 13;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_BLEND_WEIGHT = 12;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_DIFFUSE = 2;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_NORMAL = 1;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_POSITION = 0;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TANGENT = 3;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD0 = 4;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD1 = 5;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD2 = 6;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD3 = 7;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD4 = 8;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD5 = 9;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD6 = 10;
+
+// @public (undocumented)
+export const VERTEX_ATTRIB_TEXCOORD7 = 11;
 
 // @public
 export type VertexAttribFormat = 'position_u8normx2' | 'position_u8normx4' | 'position_i8normx2' | 'position_i8normx4' | 'position_u16x2' | 'position_u16x4' | 'position_i16x2' | 'position_i16x4' | 'position_u16normx2' | 'position_u16normx4' | 'position_i16normx2' | 'position_i16normx4' | 'position_f16x2' | 'position_f16x4' | 'position_f32' | 'position_f32x2' | 'position_f32x3' | 'position_f32x4' | 'position_i32' | 'position_i32x2' | 'position_i32x3' | 'position_i32x4' | 'position_u32' | 'position_u32x2' | 'position_u32x3' | 'position_u32x4' | 'normal_f16x4' | 'normal_f32x3' | 'normal_f32x4' | 'diffuse_u8normx4' | 'diffuse_u16x4' | 'diffuse_u16normx4' | 'diffuse_f16x4' | 'diffuse_f32x3' | 'diffuse_f32x4' | 'diffuse_u32x3' | 'diffuse_u32x4' | 'tangent_f16x4' | 'tangent_f32x3' | 'tangent_f32x4' | 'tex0_u8normx2' | 'tex0_u8normx4' | 'tex0_i8normx2' | 'tex0_i8normx4' | 'tex0_u16x2' | 'tex0_u16x4' | 'tex0_i16x2' | 'tex0_i16x4' | 'tex0_u16normx2' | 'tex0_u16normx4' | 'tex0_i16normx2' | 'tex0_i16normx4' | 'tex0_f16x2' | 'tex0_f16x4' | 'tex0_f32' | 'tex0_f32x2' | 'tex0_f32x3' | 'tex0_f32x4' | 'tex0_i32' | 'tex0_i32x2' | 'tex0_i32x3' | 'tex0_i32x4' | 'tex0_u32' | 'tex0_u32x2' | 'tex0_u32x3' | 'tex0_u32x4' | 'tex1_u8normx2' | 'tex1_u8normx4' | 'tex1_i8normx2' | 'tex1_i8normx4' | 'tex1_u16x2' | 'tex1_u16x4' | 'tex1_i16x2' | 'tex1_i16x4' | 'tex1_u16normx2' | 'tex1_u16normx4' | 'tex1_i16normx2' | 'tex1_i16normx4' | 'tex1_f16x2' | 'tex1_f16x4' | 'tex1_f32' | 'tex1_f32x2' | 'tex1_f32x3' | 'tex1_f32x4' | 'tex1_i32' | 'tex1_i32x2' | 'tex1_i32x3' | 'tex1_i32x4' | 'tex1_u32' | 'tex1_u32x2' | 'tex1_u32x3' | 'tex1_u32x4' | 'tex2_u8normx2' | 'tex2_u8normx4' | 'tex2_i8normx2' | 'tex2_i8normx4' | 'tex2_u16x2' | 'tex2_u16x4' | 'tex2_i16x2' | 'tex2_i16x4' | 'tex2_u16normx2' | 'tex2_u16normx4' | 'tex2_i16normx2' | 'tex2_i16normx4' | 'tex2_f16x2' | 'tex2_f16x4' | 'tex2_f32' | 'tex2_f32x2' | 'tex2_f32x3' | 'tex2_f32x4' | 'tex2_i32' | 'tex2_i32x2' | 'tex2_i32x3' | 'tex2_i32x4' | 'tex2_u32' | 'tex2_u32x2' | 'tex2_u32x3' | 'tex2_u32x4' | 'tex3_u8normx2' | 'tex3_u8normx4' | 'tex3_i8normx2' | 'tex3_i8normx4' | 'tex3_u16x2' | 'tex3_u16x4' | 'tex3_i16x2' | 'tex3_i16x4' | 'tex3_u16normx2' | 'tex3_u16normx4' | 'tex3_i16normx2' | 'tex3_i16normx4' | 'tex3_f16x2' | 'tex3_f16x4' | 'tex3_f32' | 'tex3_f32x2' | 'tex3_f32x3' | 'tex3_f32x4' | 'tex3_i32' | 'tex3_i32x2' | 'tex3_i32x3' | 'tex3_i32x4' | 'tex3_u32' | 'tex3_u32x2' | 'tex3_u32x3' | 'tex3_u32x4' | 'tex4_u8normx2' | 'tex4_u8normx4' | 'tex4_i8normx2' | 'tex4_i8normx4' | 'tex4_u16x2' | 'tex4_u16x4' | 'tex4_i16x2' | 'tex4_i16x4' | 'tex4_u16normx2' | 'tex4_u16normx4' | 'tex4_i16normx2' | 'tex4_i16normx4' | 'tex4_f16x2' | 'tex4_f16x4' | 'tex4_f32' | 'tex4_f32x2' | 'tex4_f32x3' | 'tex4_f32x4' | 'tex4_i32' | 'tex4_i32x2' | 'tex4_i32x3' | 'tex4_i32x4' | 'tex4_u32' | 'tex4_u32x2' | 'tex4_u32x3' | 'tex4_u32x4' | 'tex5_u8normx2' | 'tex5_u8normx4' | 'tex5_i8normx2' | 'tex5_i8normx4' | 'tex5_u16x2' | 'tex5_u16x4' | 'tex5_i16x2' | 'tex5_i16x4' | 'tex5_u16normx2' | 'tex5_u16normx4' | 'tex5_i16normx2' | 'tex5_i16normx4' | 'tex5_f16x2' | 'tex5_f16x4' | 'tex5_f32' | 'tex5_f32x2' | 'tex5_f32x3' | 'tex5_f32x4' | 'tex5_i32' | 'tex5_i32x2' | 'tex5_i32x3' | 'tex5_i32x4' | 'tex5_u32' | 'tex5_u32x2' | 'tex5_u32x3' | 'tex5_u32x4' | 'tex6_u8normx2' | 'tex6_u8normx4' | 'tex6_i8normx2' | 'tex6_i8normx4' | 'tex6_u16x2' | 'tex6_u16x4' | 'tex6_i16x2' | 'tex6_i16x4' | 'tex6_u16normx2' | 'tex6_u16normx4' | 'tex6_i16normx2' | 'tex6_i16normx4' | 'tex6_f16x2' | 'tex6_f16x4' | 'tex6_f32' | 'tex6_f32x2' | 'tex6_f32x3' | 'tex6_f32x4' | 'tex6_i32' | 'tex6_i32x2' | 'tex6_i32x3' | 'tex6_i32x4' | 'tex6_u32' | 'tex6_u32x2' | 'tex6_u32x3' | 'tex6_u32x4' | 'tex7_u8normx2' | 'tex7_u8normx4' | 'tex7_i8normx2' | 'tex7_i8normx4' | 'tex7_u16x2' | 'tex7_u16x4' | 'tex7_i16x2' | 'tex7_i16x4' | 'tex7_u16normx2' | 'tex7_u16normx4' | 'tex7_i16normx2' | 'tex7_i16normx4' | 'tex7_f16x2' | 'tex7_f16x4' | 'tex7_f32' | 'tex7_f32x2' | 'tex7_f32x3' | 'tex7_f32x4' | 'tex7_i32' | 'tex7_i32x2' | 'tex7_i32x3' | 'tex7_i32x4' | 'tex7_u32' | 'tex7_u32x2' | 'tex7_u32x3' | 'tex7_u32x4' | 'blendweights_f16x1' | 'blendweights_f32x1' | 'blendweights_f16x2' | 'blendweights_f32x2' | 'blendweights_f16x3' | 'blendweights_f32x3' | 'blendweights_f16x4' | 'blendweights_f32x4' | 'blendindices_f16x1' | 'blendindices_u16x1' | 'blendindices_f32x1' | 'blendindices_u32x1' | 'blendindices_f16x2' | 'blendindices_u16x2' | 'blendindices_f32x2' | 'blendindices_u32x2' | 'blendindices_f16x3' | 'blendindices_u16x3' | 'blendindices_f32x3' | 'blendindices_u32x3' | 'blendindices_f16x4' | 'blendindices_u16x4' | 'blendindices_f32x4' | 'blendindices_u32x4';

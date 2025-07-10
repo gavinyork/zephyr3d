@@ -9,6 +9,10 @@ import type { Plane } from './plane';
 const IDENT_MATRIX3x3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 const IDENT_MATRIX4x4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
+/**
+ * Euler angle order type
+ * @public
+ */
 export type EulerAngleOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';
 
 /**

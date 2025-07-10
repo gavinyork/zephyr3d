@@ -41,6 +41,10 @@ export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
  */
 export type NodeCloneMethod = 'deep' | 'instance';
 
+/**
+ * NodeClonable interface
+ * @public
+ */
 export interface NodeClonable<T extends SceneNode> {
   clone(method: NodeCloneMethod, recursive: boolean): T;
 }
@@ -241,6 +245,12 @@ export class SceneNode
   set sharedModel(model: SharedModel) {
     this._sharedModel.set(model);
   }
+  /**
+   * Creates a new node by cloning this node
+   * @param method - clone method
+   * @param recursive - true if children should also be cloned, otherwise false
+   * @returns New cloned node
+   */
   clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
     const other = this._sharedModel.get()
       ? this._sharedModel.get().createSceneNode(this.scene, method === 'instance')
@@ -249,6 +259,12 @@ export class SceneNode
     other.parent = this.parent;
     return other;
   }
+  /**
+   * Copy properties from other node
+   * @param other - Other node to copy properties from
+   * @param method - Clone method
+   * @param recursive - true if children of the node to copy from should be cloned and copied to this node, otherwise, children of the node to copy from will not be copied.
+   */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
     if (other.disposed || this.disposed) {
       console.error('SceneNode.copyFrom(): Cannot copy from/to disposed node');
@@ -857,6 +873,9 @@ export class SceneNode
   }
   /**
    * Update node state once per-frame
+   * @param frameId - Current frame id
+   * @param elapsedInSeconds - Elapsed time from game start in seconds
+   * @param deltaInSeconds - Elapsed time since previous frame in seconds
    */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     const animationSet = this.animationSet;
@@ -867,6 +886,9 @@ export class SceneNode
   }
   /**
    * Update node state once per-camera
+   * @param frameId - Current frame id
+   * @param elapsedInSeconds - Elapsed time from game start in seconds
+   * @param deltaInSeconds - Elapsed time since previous frame in seconds
    */
   updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number) {}
   /**

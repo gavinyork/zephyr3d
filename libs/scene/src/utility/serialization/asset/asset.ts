@@ -3,23 +3,50 @@ import { AssetManager, type ModelFetchOptions, type TextureFetchOptions } from '
 import type { Scene } from '../../../scene';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
+/**
+ * Asset types
+ * @public
+ */
 export type AssetType = 'model' | 'texture' | 'binary';
+
+/**
+ * Asset information
+ * @public
+ */
 export interface AssetInfo {
+  /** Asset id */
   id: string;
+  /** Asset name */
   name: string;
+  /** Asset type */
   type: AssetType;
+  /** Asset path */
   path: string;
+  /** Texture options if the asset is texture type */
   textureOptions?: TextureFetchOptions<any>;
 }
 
+/**
+ * Embedded asset information
+ * @public
+ */
 export type EmbeddedAssetInfo = {
+  /** Asset type */
   assetType: AssetType;
+  /** Asset id */
   assetId: string;
+  /** Asset package id */
   pkgId: string;
+  /** Asset path */
   path: string;
+  /** Asset data */
   data: Blob;
 };
 
+/**
+ * Asset registry
+ * @public
+ */
 export class AssetRegistry {
   private _assetMap: Map<string, AssetInfo>;
   private _allocated: WeakMap<any, string>;

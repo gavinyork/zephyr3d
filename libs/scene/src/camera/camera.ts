@@ -30,6 +30,10 @@ export type PickResult = {
   target: PickTarget;
 };
 
+/**
+ * History data of the camera
+ * @public
+ */
 export type CameraHistoryData = {
   prevColorTex: BaseTexture;
   prevMotionVectorTex: BaseTexture;

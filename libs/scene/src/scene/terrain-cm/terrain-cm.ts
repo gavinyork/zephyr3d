@@ -255,7 +255,7 @@ export class ClipmapTerrain
     return null;
   }
   /**
-   * {@inheritDoc GraphNode.isWater}
+   * {@inheritDoc GraphNode.isClipmapTerrain}
    */
   isClipmapTerrain(): this is ClipmapTerrain {
     return true;

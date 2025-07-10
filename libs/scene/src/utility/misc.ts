@@ -89,6 +89,7 @@ let defaultCopyRenderState: RenderStateSet = null;
  * Fetch a sampler by type
  * @param type - The sampler type to fetch
  * @returns The sampler for the given type
+ * @public
  */
 export function fetchSampler(type: SamplerType): TextureSampler {
   let sampler = samplers[type];
@@ -102,6 +103,16 @@ export function fetchSampler(type: SamplerType): TextureSampler {
   return sampler;
 }
 
+/**
+ * Utility function to copy a texture
+ * @param src - Source texture to copy from
+ * @param dest - Destination texture to copy to
+ * @param sampler - Sampler object use to sample the source texture
+ * @param renderState - RenderStateSet object used to copy texture
+ * @param layer - Texture layer to copy
+ * @param srgbOut - true if output color in sRGB color space
+ * @internal
+ */
 export function copyTexture(
   src: BaseTexture,
   dest: BaseTexture | FrameBuffer,

@@ -2,6 +2,7 @@
  * Convert float16 to float32
  * @param f16 - float16 value
  * @returns float32 value
+ * @public
  */
 export function half2float(f16: number) {
   const s = (f16 & 0x8000) >> 15; // sign
@@ -20,6 +21,7 @@ export function half2float(f16: number) {
  * Convert float32 to float16
  * @param f32 - float32 value
  * @returns float16 value
+ * @public
  */
 export function float2half(f32: number) {
   const buf = new ArrayBuffer(4);

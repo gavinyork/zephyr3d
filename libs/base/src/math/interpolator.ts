@@ -6,6 +6,10 @@ import { Quaternion } from './vector';
  */
 export type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
 
+/**
+ * Type of input/output values
+ * @public
+ */
 export type InterpolateData = Float32Array | number[];
 
 /**

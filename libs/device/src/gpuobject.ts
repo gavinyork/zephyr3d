@@ -790,7 +790,8 @@ export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic
  * Get vertex attribute type of specified vertex format
  * @param fmt - The vertex format
  * @returns Vertex attribute type, possible values are 'f32', 'f16', 'i32', 'u32', 'i16', 'u16', 'i8norm', 'u8norm', 'i16norm', 'u16norm'
- * @
+ *
+ * @public
  */
 export function getVertexAttributeFormat(fmt: VertexAttribFormat) {
   return vertexAttribFormatMap[fmt][3];
@@ -800,7 +801,8 @@ export function getVertexAttributeFormat(fmt: VertexAttribFormat) {
  * Get vertex attribute index of specified vertex format
  * @param fmt - The vertex format
  * @returns Vertex attribute index
- * @
+ *
+ * @public
  */
 export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
   return vertexAttribFormatMap[fmt][0];
@@ -808,6 +810,7 @@ export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
 
 /**
  * Get byte size of specified vertex format
+ *
  * @public
  */
 export function getVertexFormatSize(fmt: VertexAttribFormat): number {
@@ -816,6 +819,7 @@ export function getVertexFormatSize(fmt: VertexAttribFormat): number {
 
 /**
  * Get number of components of specified vertex format
+ *
  * @public
  */
 export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
@@ -828,6 +832,7 @@ export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
  * @param type - Data type of vertex component
  * @param count - The count of vertex components
  * @returns Vertex format
+ *
  * @public
  */
 export function getVertexAttribFormat(
@@ -849,6 +854,7 @@ export function getVertexAttribFormat(
  * Get the length of a vertex buffer by specified structure type of the vertex buffer
  * @param vertexBufferType - The structure type of the vertex buffer
  * @returns The length of the vertex buffer
+ *
  * @public
  */
 export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
@@ -859,6 +865,7 @@ export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
  * Get byte stride of a vertex buffer by specified structure type of the vertex buffer
  * @param vertexBufferType - The structure type of the vertex buffer
  * @returns The byte stride of the vertex buffer
+ *
  * @public
  */
 export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
@@ -879,6 +886,7 @@ export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
  * @param vertexBufferType - The structure type of the vertex buffer
  * @param semantic - The vertex semantic
  * @returns - The primitive type of the vertex attribute
+ *
  * @public
  */
 export function getVertexBufferAttribTypeBySemantic(
@@ -904,6 +912,7 @@ export function getVertexBufferAttribTypeBySemantic(
  * @param vertexBufferType - The structure type of the vertex buffer
  * @param semantic - The vertex attribute index
  * @returns - The primitive type of the vertex attribute
+ *
  * @public
  */
 export function getVertexBufferAttribType(
@@ -922,6 +931,7 @@ export function getVertexBufferAttribType(
  * @param length - The length of the vertex buffer
  * @param attributes - The vertex attributes
  * @returns The structure type of the vertex buffer
+ *
  * @public
  */
 export function makeVertexBufferType(length: number, ...attributes: VertexAttribFormat[]): PBStructTypeInfo {
@@ -956,12 +966,14 @@ export function makeVertexBufferType(length: number, ...attributes: VertexAttrib
 
 /**
  * Vertex step mode.
+ *
  * @public
  */
 export type VertexStepMode = 'vertex' | 'instance';
 
 /**
  * Vertex semantic list
+ *
  * @public
  */
 export const semanticList: string[] = (function () {

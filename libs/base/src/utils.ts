@@ -153,6 +153,7 @@ export type GenericConstructor<T = object> = {
 
 /**
  * Clonable interface
+ * @public
  */
 export interface Clonable<T> {
   clone(): T;
@@ -337,11 +338,16 @@ export interface ColorRGBA {
   a: number;
 }
 
+/**
+ * Generic Truthy type
+ * @public
+ */
 export type Truthy<T> = T extends false | 0 | '' | null | undefined | 0n ? never : T;
 
 /**
  * Simple assertion which throws an error if the !!condition is false.
  * @param condition - The condition to check.
+ * @public
  */
 export function ASSERT(condition: boolean, message?: string): asserts condition {
   if (!condition) {
@@ -354,6 +360,7 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
  * @param value - The value to check.
  * @param constructor - The constructor to check against.
  * @returns True if the value is an instance of the constructor, false otherwise.
+ * @public
  */
 export function IS_INSTANCE_OF<T extends GenericConstructor>(
   value: unknown,

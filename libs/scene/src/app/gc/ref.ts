@@ -40,6 +40,14 @@ export function flushPendingDisposals() {
   disposalQueue.clear();
 }
 
+/**
+ * Retains a disposable object
+ * @param obj - Object to retain
+ * @public
+ *
+ * @remarks
+ * Retains an object will increase the reference counter for this object
+ */
 export function retainObject(obj: Disposable) {
   if (obj) {
     const ref = objectReferenceMap.get(obj) ?? 0;
@@ -50,6 +58,15 @@ export function retainObject(obj: Disposable) {
   }
 }
 
+/**
+ * Releases a disposable object
+ * @param obj - Object to release
+ * @public
+ *
+ * @remarks
+ * Releases an object will decrease the reference counter for this object.
+ * If reference counter become zero, the object will be disposed at next frame.
+ */
 export function releaseObject(obj: Disposable) {
   if (obj) {
     let refcount = objectReferenceMap.get(obj) ?? 0;
@@ -68,7 +85,6 @@ export function releaseObject(obj: Disposable) {
  * A reference-counting wrapper for disposable objects.
  *
  * @public
- * @template T - Type of the wrapped disposable object
  */
 export class DRef<T extends Disposable> {
   /** @internal */
@@ -108,6 +124,11 @@ export class DRef<T extends Disposable> {
   }
 }
 
+/**
+ * A weak-reference-counting wrapper for disposable objects.
+ *
+ * @public
+ */
 export class DWeakRef<T extends Disposable> {
   /** @internal */
   private _object: T;

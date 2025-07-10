@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { applyMixins, nextPowerOf2, Vector4 } from '@zephyr3d/base';
+import { applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
@@ -38,9 +38,21 @@ type ParticleNode = {
 
 const PS_WORLDSPACE = 1 << 8;
 
+/**
+ * Particle emitter shape
+ * @public
+ */
 export type EmitterShape = 'point' | 'sphere' | 'box' | 'cylinder' | 'cone';
+/**
+ * Particle emitter behavior
+ * @public
+ */
 export type EmitterBehavior = 'surface' | 'volume';
 
+/**
+ * Particle system class
+ * @public
+ */
 export class ParticleSystem
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ParticleSystem>
@@ -56,9 +68,6 @@ export class ParticleSystem
   private _numEmitCount: number;
   private _delay: number;
   private _airResistence: boolean;
-  private _transparency: number;
-  private _blendMode: number;
-  private _colorMultiplier: number;
   private _flags: number;
   private _gravity: Vector3;
   private _wind: Vector3;
@@ -82,12 +91,15 @@ export class ParticleSystem
   private _particleAccelMax: number;
   private _emitterShapeSizeMin: Vector3;
   private _emitterShapeSizeMax: Vector3;
-  private _colorValue: Vector4;
   private _primitive: DRef<Primitive>;
   private _material: DRef<ParticleMaterial>;
   private _wsBoundingBox: BoundingBox;
   private _pickTarget: PickTarget;
   private _instanceData: Float32Array;
+  /**
+   * Creates a new ParticleSystem node
+   * @param scene - Which scene the node belongs to
+   */
   constructor(scene: Scene) {
     super(scene);
     this._activeParticleList = [];
@@ -103,7 +115,6 @@ export class ParticleSystem
     this._airResistence = false;
     this._startTick = 0;
     this._delay = 0;
-    this._blendMode = 0;
     this._particleRotationMin = 0;
     this._particleRotationMax = 0;
     this._jitterSpeed = 1;
@@ -113,7 +124,6 @@ export class ParticleSystem
     this._emitterConeRadiusMax = 0.1;
     this._emitterShapeSizeMin = Vector3.one();
     this._emitterShapeSizeMax = Vector3.one();
-    this._colorValue = Vector4.one();
     this._particleVelocityMin = 2;
     this._particleVelocityMax = 3;
     this._particleLifeMin = 1;
@@ -124,8 +134,6 @@ export class ParticleSystem
     this._particleSize2Max = 0.1;
     this._particleAccelMin = -0.01;
     this._particleAccelMax = -0.02;
-    this._transparency = 1;
-    this._colorMultiplier = 1;
     this._pickTarget = { node: this };
     this._flags = PS_WORLDSPACE;
     this._primitive = new DRef();
@@ -133,19 +141,21 @@ export class ParticleSystem
     this._instanceData = null;
     this._material = new DRef(new ParticleMaterial());
   }
+  /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ParticleSystem(this.scene);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
+  /** {@inheritDoc SceneNode.copyFrom} */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.maxParticleCount = other.maxParticleCount;
     this.emitInterval = other.emitInterval;
     this.emitCount = other.emitCount;
-    this.gravity = other.gravity;
-    this.wind = other.wind;
+    this.gravity = other.gravity.clone();
+    this.wind = other.wind.clone();
     this.scalar = other.scalar;
     this.aspect = other.aspect;
     this.airResistence = other.airResistence;
@@ -167,21 +177,22 @@ export class ParticleSystem
     this.particleSize2Max = other.particleSize2Max;
     this.particleAccelMin = other.particleAccelMin;
     this.particleAccelMax = other.particleAccelMax;
-    this.emitterShapeSizeMin = other.emitterShapeSizeMin;
-    this.emitterShapeSizeMax = other.emitterShapeSizeMax;
-    this.colorValue = other.colorValue;
+    this.emitterShapeSizeMin = other.emitterShapeSizeMin.clone();
+    this.emitterShapeSizeMax = other.emitterShapeSizeMax.clone();
     this.directional = other.directional;
     this.worldSpace = other.worldSpace;
     this.flags = other.flags;
-    this.transparency = other.transparency;
-    this.blendMode = other.blendMode;
-    this.colorMultiplier = other.colorMultiplier;
   }
+  /** Material of the particle system node */
   get material(): ParticleMaterial {
     return this._material.get();
   }
   set material(material: ParticleMaterial) {
     this._material.set(material);
+  }
+  /** Maximum particle count */
+  get maxParticleCount(): number {
+    return this._maxParticleCount;
   }
   set maxParticleCount(value: number) {
     if (value !== this._maxParticleCount) {
@@ -189,8 +200,9 @@ export class ParticleSystem
       this.invalidateBoundingVolume();
     }
   }
-  get maxParticleCount(): number {
-    return this._maxParticleCount;
+  /** Particle emit interval in ms */
+  get emitInterval(): number {
+    return this._emitInterval;
   }
   set emitInterval(value: number) {
     if (value !== this._emitInterval) {
@@ -198,14 +210,16 @@ export class ParticleSystem
       this._startEmitTime = 0;
     }
   }
-  get emitInterval(): number {
-    return this._emitInterval;
+  /** How many particles should be emitted one time */
+  get emitCount(): number {
+    return this._emitCount;
   }
   set emitCount(value: number) {
     this._emitCount = value;
   }
-  get emitCount(): number {
-    return this._emitCount;
+  /** Gravity force */
+  get gravity(): Vector3 {
+    return this._gravity;
   }
   set gravity(value: Vector3) {
     if (!value.equalsTo(this._gravity)) {
@@ -213,8 +227,9 @@ export class ParticleSystem
       this.invalidateBoundingVolume();
     }
   }
-  get gravity(): Vector3 {
-    return this._gravity;
+  /** Wind force */
+  get wind(): Vector3 {
+    return this._wind;
   }
   set wind(value: Vector3) {
     if (!value.equalsTo(this._wind)) {
@@ -222,8 +237,9 @@ export class ParticleSystem
       this.invalidateBoundingVolume();
     }
   }
-  get wind(): Vector3 {
-    return this._wind;
+  /** Particle scalar */
+  get scalar(): number {
+    return this._scalar;
   }
   set scalar(value: number) {
     if (value !== this._scalar) {
@@ -231,152 +247,170 @@ export class ParticleSystem
       this.invalidateBoundingVolume();
     }
   }
-  get scalar(): number {
-    return this._scalar;
+  /** Particle aspect ratio */
+  get aspect(): number {
+    return this._material.get().aspect;
   }
   set aspect(value: number) {
     this._material.get().aspect = value;
   }
-  get aspect(): number {
-    return this._material.get().aspect;
+  /** true if particle effected by wind */
+  get airResistence(): boolean {
+    return this._airResistence;
   }
   set airResistence(value: boolean) {
     this._airResistence = value;
   }
-  get airResistence(): boolean {
-    return this._airResistence;
+  /** Minimum particle rotation angle in radians */
+  get particleRotationMin(): number {
+    return this._particleRotationMin;
   }
   set particleRotationMin(value: number) {
     this._particleRotationMin = value;
   }
-  get particleRotationMin(): number {
-    return this._particleRotationMin;
+  /** Maximum particle rotation angle in radians */
+  get particleRotationMax(): number {
+    return this._particleRotationMax;
   }
   set particleRotationMax(value: number) {
     this._particleRotationMax = value;
   }
-  get particleRotationMax(): number {
-    return this._particleRotationMax;
+  /** Particle jitter speed */
+  get jitterSpeed(): number {
+    return this._jitterSpeed;
   }
   set jitterSpeed(value: number) {
     this._jitterSpeed = value;
   }
-  get jitterSpeed(): number {
-    return this._jitterSpeed;
+  /** Particle jitter power */
+  get jitterPower(): number {
+    return this._material.get().jitterPower;
   }
   set jitterPower(value: number) {
     this._material.get().jitterPower = value;
   }
-  get jitterPower(): number {
-    return this._material.get().jitterPower;
+  /** Particle emitter shape */
+  get emitterShape(): EmitterShape {
+    return this._emitterShape;
   }
   set emitterShape(value: EmitterShape) {
     this._emitterShape = value;
   }
-  get emitterShape(): EmitterShape {
-    return this._emitterShape;
+  /** Particle emitter behavior */
+  get emitterBehavior(): EmitterBehavior {
+    return this._emitterBehavior;
   }
   set emitterBehavior(value: EmitterBehavior) {
     this._emitterBehavior = value;
   }
-  get emitterBehavior(): EmitterBehavior {
-    return this._emitterBehavior;
+  /** Minimum cone radius of emitter */
+  get emitterConeRadiusMin(): number {
+    return this._emitterConeRadiusMin;
   }
   set emitterConeRadiusMin(value: number) {
     this._emitterConeRadiusMin = value;
   }
-  get emitterConeRadiusMin(): number {
-    return this._emitterConeRadiusMin;
+  /** Maximum cone radius of emitter */
+  get emitterConeRadiusMax(): number {
+    return this._emitterConeRadiusMax;
   }
   set emitterConeRadiusMax(value: number) {
     this._emitterConeRadiusMax = value;
   }
-  get emitterConeRadiusMax(): number {
-    return this._emitterConeRadiusMax;
+  /** Minimum particle velocity */
+  get particleVelocityMin(): number {
+    return this._particleVelocityMin;
   }
   set particleVelocityMin(value: number) {
     this._particleVelocityMin = value;
   }
-  get particleVelocityMin(): number {
-    return this._particleVelocityMin;
+  /** Maximum particle velocity */
+  get particleVelocityMax(): number {
+    return this._particleVelocityMax;
   }
   set particleVelocityMax(value: number) {
     this._particleVelocityMax = value;
   }
-  get particleVelocityMax(): number {
-    return this._particleVelocityMax;
+  /** Minimum particle life */
+  get particleLifeMin(): number {
+    return this._particleLifeMin;
   }
   set particleLifeMin(value: number) {
     this._particleLifeMin = value;
   }
-  get particleLifeMin(): number {
-    return this._particleLifeMin;
+  /** Maximum particle life */
+  get particleLifeMax(): number {
+    return this._particleLifeMax;
   }
   set particleLifeMax(value: number) {
     this._particleLifeMax = value;
   }
-  get particleLifeMax(): number {
-    return this._particleLifeMax;
+  /** Minimum particle start size */
+  get particleSize1Min(): number {
+    return this._particleSize1Min;
   }
   set particleSize1Min(value: number) {
     this._particleSize1Min = value;
   }
-  get particleSize1Min(): number {
-    return this._particleSize1Min;
+  /** Maximum particle start size */
+  get particleSize1Max(): number {
+    return this._particleSize1Max;
   }
   set particleSize1Max(value: number) {
     this._particleSize1Max = value;
   }
-  get particleSize1Max(): number {
-    return this._particleSize1Max;
+  /** Minimum particle end size */
+  get particleSize2Min(): number {
+    return this._particleSize2Min;
   }
   set particleSize2Min(value: number) {
     this._particleSize2Min = value;
   }
-  get particleSize2Min(): number {
-    return this._particleSize2Min;
+  /** Maximum particle end size */
+  get particleSize2Max(): number {
+    return this._particleSize2Max;
   }
   set particleSize2Max(value: number) {
     this._particleSize2Max = value;
   }
-  get particleSize2Max(): number {
-    return this._particleSize2Max;
+  /** Minimum particle acceleration */
+  get particleAccelMin(): number {
+    return this._particleAccelMin;
   }
   set particleAccelMin(value: number) {
     this._particleAccelMin = value;
   }
-  get particleAccelMin(): number {
-    return this._particleAccelMin;
+  /** Maximum particle acceleration */
+  get particleAccelMax(): number {
+    return this._particleAccelMax;
   }
   set particleAccelMax(value: number) {
     this._particleAccelMax = value;
   }
-  get particleAccelMax(): number {
-    return this._particleAccelMax;
+  /** Minimum emitter shape size */
+  get emitterShapeSizeMin(): Vector3 {
+    return this._emitterShapeSizeMin;
   }
   set emitterShapeSizeMin(value: Vector3) {
     this._emitterShapeSizeMin.set(value);
   }
-  get emitterShapeSizeMin(): Vector3 {
-    return this._emitterShapeSizeMin;
+  /** Maximum emitter shape size */
+  get emitterShapeSizeMax(): Vector3 {
+    return this._emitterShapeSizeMax;
   }
   set emitterShapeSizeMax(value: Vector3) {
     this._emitterShapeSizeMax.set(value);
   }
-  get emitterShapeSizeMax(): Vector3 {
-    return this._emitterShapeSizeMax;
-  }
-  set colorValue(value: Vector4) {
-    this._colorValue.set(value);
-  }
-  get colorValue(): Vector4 {
-    return this._colorValue;
+  /** Whether particles are directional */
+  get directional(): boolean {
+    return this._material.get().directional;
   }
   set directional(val: boolean) {
     this._material.get().directional = val;
   }
-  get directional(): boolean {
-    return this._material.get().directional;
+  /** Whether particles are in world space */
+  get worldSpace(): boolean {
+    return !!(this.flags & PS_WORLDSPACE);
   }
   set worldSpace(value: boolean) {
     if (value) {
@@ -385,32 +419,12 @@ export class ParticleSystem
       this.flags &= ~PS_WORLDSPACE;
     }
   }
-  get worldSpace(): boolean {
-    return !!(this.flags & PS_WORLDSPACE);
-  }
-  set flags(value: number) {
-    this._flags = value;
-  }
+  /** @internal */
   get flags(): number {
     return this._flags;
   }
-  set transparency(value: number) {
-    this._transparency = value;
-  }
-  get transparency(): number {
-    return this._transparency;
-  }
-  set blendMode(value: number) {
-    this._blendMode = value;
-  }
-  get blendMode(): number {
-    return this._blendMode;
-  }
-  set colorMultiplier(value: number) {
-    this._colorMultiplier = value;
-  }
-  get colorMultiplier(): number {
-    return this._colorMultiplier;
+  set flags(value: number) {
+    this._flags = value;
   }
   /** @internal */
   computeBoundingVolume(): BoundingVolume {

@@ -82,12 +82,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._materialChangeTag = null;
     this._primitiveChangeTag = null;
   }
+  /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean): Mesh {
     const other = new Mesh(this.scene);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
+  /** {@inheritDoc SceneNode.copyFrom} */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.castShadow = other.castShadow;
@@ -132,7 +134,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   get skinAnimation() {
     return this._skinAnimation;
   }
-  /** @internal */
   set skinAnimation(val: boolean) {
     this._skinAnimation = val;
   }

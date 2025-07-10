@@ -23,6 +23,10 @@ import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 
+/**
+ * Water scene node
+ * @public
+ */
 export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable, NodeClonable<Water> {
   private _pickTarget: PickTarget;
   private _clipmap: Clipmap;
@@ -31,6 +35,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _animationSpeed: number;
   private _timeStart: number;
   private _material: DRef<WaterMaterial>;
+  /**
+   * Creates an instance of Water node
+   * @param scene - Scene object
+   */
   constructor(scene: Scene) {
     super(scene);
     this._pickTarget = { node: this };
@@ -45,6 +53,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.waveGenerator = new FBMWaveGenerator();
     scene.queuePerCameraUpdateNode(this);
   }
+  /** Disposes the water node */
   dispose(): void {
     super.dispose();
     this._clipmap.dispose();
@@ -52,35 +61,34 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._renderData = null;
     this._material.dispose();
   }
+  /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new Water(this.scene);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
+  /** {@inheritDoc SceneNode.copyFrom} */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.waveGenerator = other.waveGenerator?.clone() ?? null;
     this.gridScale = other.gridScale;
     this.wireframe = other.wireframe;
   }
+  /** Whether water should be drawn with lines */
   get wireframe() {
     return this._clipmap.wireframe;
   }
   set wireframe(val: boolean) {
     this._clipmap.wireframe = !!val;
   }
+  /** Material of the water */
   get material(): WaterMaterial {
     return this._material.get();
   }
+  /** Wave generator object of the water */
   get waveGenerator(): WaveGenerator {
     return this.material.waveGenerator;
-  }
-  get animationSpeed() {
-    return this._animationSpeed;
-  }
-  set animationSpeed(val: number) {
-    this._animationSpeed = val;
   }
   set waveGenerator(waveGenerator: WaveGenerator) {
     this.material.waveGenerator = waveGenerator;
@@ -88,12 +96,21 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this.scene.queueUpdateNode(this);
     }
   }
+  /** Animation speed of the water */
+  get animationSpeed() {
+    return this._animationSpeed;
+  }
+  set animationSpeed(val: number) {
+    this._animationSpeed = val;
+  }
+  /** TAA strength of the water */
   get TAAStrength() {
     return this.material.TAAStrength;
   }
   set TAAStrength(val: number) {
     this.material.TAAStrength = val;
   }
+  /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {
       this.scene.queueUpdateNode(this);
@@ -104,6 +121,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this.invalidateWorldBoundingVolume(false);
     }
   }
+  /** {@inheritDoc SceneNode.updatePerCamera} */
   updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
     const mat = this._material.get();
     const that = this;

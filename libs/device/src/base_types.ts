@@ -2792,14 +2792,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Begins a frame for rendering
    *
    * @remarks
-   * All rendering call must occur between the {@see AbstractDevice.beginFrame} and {@see AbstractDevice.endFrame} methods
+   * All rendering call must occur between the @see AbstractDevice.beginFrame and @see AbstractDevice.endFrame methods
    */
   beginFrame(): boolean;
   /**
    * Ends a frame for rendering
    *
    * @remarks
-   * All rendering call must occur between the {@see AbstractDevice.beginFrame} and {@see AbstractDevice.endFrame} methods
+   * All rendering call must occur between the @see AbstractDevice.beginFrame and @see AbstractDevice.endFrame methods
    */
   endFrame(): void;
   /**

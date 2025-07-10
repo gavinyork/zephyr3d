@@ -50,7 +50,7 @@ export class InputManager {
   private _lastEventDatas: PointerEventData[];
   /**
    * Creates an instance of InputManager
-   * @param app
+   * @param app - Application object
    */
   constructor(app: Application) {
     this._app = app;
@@ -130,7 +130,7 @@ export class InputManager {
    * If either handler returns true, the event that the Application
    * listens to will not be triggered
    *
-   * @param handler The event handler to be added
+   * @param handler - The event handler to be added
    * @returns self
    */
   use(handler: InputEventHandler): this {

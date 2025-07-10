@@ -141,6 +141,7 @@ export function perlinNoise3D(
  * Generates an array of jitters using the Halton sequence.
  * @param length - The length of the array to generate.
  * @returns An array of jitters, range [-0.5, 0.5].
+ * @public
  */
 export function halton23(length: number): [number, number][] {
   function halton(base: number, index: number) {

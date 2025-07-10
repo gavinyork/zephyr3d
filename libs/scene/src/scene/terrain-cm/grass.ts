@@ -10,16 +10,27 @@ import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import type { Camera } from '../../camera';
 
-export const MAX_INSTANCES_PER_NODE = 2048;
+const MAX_INSTANCES_PER_NODE = 2048;
 
+/**
+ * Grass blade instance information
+ * @public
+ */
 export type GrassInstanceInfo = {
+  /** x position of the blade */
   x: number;
+  /** y position of the blade */
   y: number;
+  /** Rotation angle of the blade */
   angle: number;
 };
 // Two floats
 const INSTANCE_BYTES = 4 * 4;
 
+/**
+ * Grass glade instance manager class
+ * @internal
+ */
 export class GrassInstances implements Disposable {
   private _instances: GrassInstanceInfo[];
   private _baseVertexBuffer: DRef<StructuredBuffer>;
@@ -126,6 +137,10 @@ export class GrassInstances implements Disposable {
   }
 }
 
+/**
+ * Grass layer class
+ * @public
+ */
 export class GrassLayer implements Disposable {
   private static _indexBuffer: DRef<IndexBuffer> = new DRef();
   private _material: DRef<ClipmapGrassMaterial>;
@@ -134,6 +149,13 @@ export class GrassLayer implements Disposable {
   private _bladeHeight: number;
   private _baseVertexBuffer: DRef<StructuredBuffer>;
   private _disposed: boolean;
+  /**
+   * Creates an instance of GrassLayer
+   * @param terrain - Clipmap terrain object
+   * @param bladeWidth - Grass blade width
+   * @param bladeHeight - Grass blade height
+   * @param albedoMap - Albedo texture for the blade
+   */
   constructor(terrain: ClipmapTerrain, bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D) {
     this._material = new DRef(new ClipmapGrassMaterial(terrain));
     this._material.get().albedoTexture = albedoMap;
@@ -148,39 +170,68 @@ export class GrassLayer implements Disposable {
       new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
     );
   }
+  /** @internal */
   get quadtree() {
     return this._quadtree.get();
   }
+  /** @internal */
   updateMaterial() {
     this._material.get().uniformChanged();
   }
+  /**
+   * Sets the albedo texture of grass blades in this layer
+   * @param albedoMap - Albedo texture to set
+   */
   setAlbedoMap(albedoMap: Texture2D) {
     this._material.get().albedoTexture = albedoMap;
     if (albedoMap) {
       this._material.get().setTextureSize(albedoMap.width, albedoMap.height);
     }
   }
+  /**
+   * Gets the albedo texture of grass blades in this layer
+   * @returns - Albedo texture of grass blades in this layer
+   */
   getAlbedoMap() {
     return this._material.get().albedoTexture;
   }
+  /**
+   * Add grass blades to this layer in a region
+   * @param instances - Grass blade instances to add
+   */
   addInstances(instances: GrassInstanceInfo[]) {
     this._quadtree.get().addInstances(instances);
   }
+  /**
+   * Remove grass blades to this layer in a region
+   * @param minX - Minimum x position of the region
+   * @param minZ - Minimum z position of the region
+   * @param maxX - Maximum x position of the region
+   * @param maxZ - Maximum z position of the region
+   * @param numInstances - How many grass blades to add
+   */
   removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, numInstances: number) {
     this._quadtree.get().removeInstances(minX, minZ, maxX, maxZ, numInstances);
   }
+  /** Grass blade width in this layer */
   get bladeWidth() {
     return this._bladeWidth;
-  }
-  get bladeHeight() {
-    return this._bladeHeight;
   }
   set bladeWidth(val: number) {
     this.setBladeSize(val, this._bladeHeight);
   }
+  /** Grass blade height in this layer */
+  get bladeHeight() {
+    return this._bladeHeight;
+  }
   set bladeHeight(val: number) {
     this.setBladeSize(this._bladeWidth, val);
   }
+  /**
+   * Sets the size of grass blades in this layer
+   * @param width - Grass blade width
+   * @param height - Grass blade height
+   */
   setBladeSize(width: number, height: number) {
     if (width !== this._bladeWidth || height !== this._bladeHeight) {
       this._bladeWidth = width;
@@ -189,6 +240,7 @@ export class GrassLayer implements Disposable {
       this._quadtree.get().setBaseVertexBuffer(this._baseVertexBuffer.get());
     }
   }
+  /** @internal */
   private static _getIndexBuffer() {
     if (!this._indexBuffer.get()) {
       this._indexBuffer.set(
@@ -199,6 +251,7 @@ export class GrassLayer implements Disposable {
     }
     return this._indexBuffer.get();
   }
+  /** @internal */
   private createBaseVertexBuffer(bladeWidth: number, bladeHeight: number) {
     const device = Application.instance.device;
     const r = bladeWidth * 0.5;
@@ -271,6 +324,7 @@ export class GrassLayer implements Disposable {
     ]);
     return device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
   }
+  /** @internal */
   draw(ctx: DrawContext, region: Vector4, minY: number, maxY: number) {
     this._material.get().apply(ctx);
     for (let pass = 0; pass < this._material.get().numPasses; pass++) {
@@ -278,9 +332,13 @@ export class GrassLayer implements Disposable {
       this._quadtree.get().draw(ctx.camera, region, minY, maxY, false);
     }
   }
+  /**
+   * Whether this layer was disposed
+   */
   get disposed() {
     return this._disposed;
   }
+  /** @internal */
   dispose(): void {
     this._disposed = true;
     this._material.dispose();
@@ -288,34 +346,66 @@ export class GrassLayer implements Disposable {
     this._baseVertexBuffer.dispose();
   }
 }
+/**
+ * Grass renderer for clipmap terrain
+ * @public
+ */
 export class GrassRenderer implements Disposable {
   private _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
   private _disposed: boolean;
+  /**
+   * Creates an instance of GrassRenderer
+   * @param terrain - Clipmap terrain object
+   */
   constructor(terrain: ClipmapTerrain) {
     this._terrain = new DWeakRef(terrain);
     this._layers = [];
     this._disposed = false;
   }
+  /** @internal */
   updateMaterial() {
     for (const layer of this._layers) {
       layer.updateMaterial();
     }
   }
+  /** How many grass layers */
   get numLayers() {
     return this._layers.length;
   }
+  /**
+   * Gets the grass layer at given index
+   * @param index - Index of the grass layer
+   * @returns The grass layer at the index
+   */
   getLayer(index: number) {
     return this._layers[index];
   }
+  /**
+   * Adds a grass layer
+   * @param bladeWidth - Width of grass blades in this layer
+   * @param bladeHeight - Height of grass blades in this layer
+   * @param albedoMap - Albedo texture of grass blades in this layer
+   * @returns Index of the added grass layer
+   */
   addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D): number {
     const layer = new GrassLayer(this._terrain.get(), bladeWidth, bladeHeight, albedoMap);
     this._layers.push(layer);
     return this._layers.length - 1;
   }
+  /**
+   * Gets the albedo texture of grass blades in the grass layer at given index
+   * @param layer - Index of the grass layer to get
+   * @returns Albedo texture of grass blades in the grass layer
+   */
   getGrassTexture(layer: number) {
     return this._layers[layer]?.getAlbedoMap() ?? null;
   }
+  /**
+   * Sets the albedo texture of grass blades in the grass layer at given index
+   * @param layer - Index of the grass layer to set
+   * @param texture - Albedo texture to set
+   */
   setGrassTexture(layer: number, texture: Texture2D) {
     const grassLayer = this._layers[layer];
     if (grassLayer) {
@@ -324,12 +414,28 @@ export class GrassRenderer implements Disposable {
       console.error(`Invalid grass layer: ${layer}`);
     }
   }
+  /**
+   * Gets width of the grass blades in the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @returns Width of the grass blades in the layer
+   */
   getBladeWidth(layer: number) {
     return this._layers[layer]?.bladeWidth ?? 0;
   }
+  /**
+   * Gets height of the grass blades in the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @returns Height of the grass blades in the layer
+   */
   getBladeHeight(layer: number) {
     return this._layers[layer]?.bladeHeight ?? 0;
   }
+  /**
+   * Sets size of the grass blades in the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @param width - Width to set
+   * @param height - Height to set
+   */
   setBladeSize(layer: number, width: number, height: number) {
     const grassLayer = this._layers[layer];
     if (grassLayer) {
@@ -338,6 +444,11 @@ export class GrassRenderer implements Disposable {
       console.error(`Invalid grass layer: ${layer}`);
     }
   }
+  /**
+   * Add grass instances to the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @param instances - Grass blade instances to add
+   */
   addInstances(layer: number, instances: GrassInstanceInfo[]) {
     const grassLayer = this._layers[layer];
     if (!grassLayer) {
@@ -346,6 +457,15 @@ export class GrassRenderer implements Disposable {
       grassLayer.addInstances(instances);
     }
   }
+  /**
+   * Remove grass instances from the grass layer at given index within a region
+   * @param layer - Index of the grass layer
+   * @param minX - Minimum x of the region
+   * @param minZ - Minimum z of the region
+   * @param maxX - Maximum x of the region
+   * @param maxZ - Maximum z of the region
+   * @param num - How many grass blades to remove
+   */
   removeInstances(layer: number, minX: number, minZ: number, maxX: number, maxZ: number, num: number) {
     const grassLayer = this._layers[layer];
     if (!grassLayer) {
@@ -354,9 +474,11 @@ export class GrassRenderer implements Disposable {
       grassLayer.removeInstances(minX, minZ, maxX, maxZ, num);
     }
   }
+  /** Whether this was disposed */
   get disposed() {
     return this._disposed;
   }
+  /** @internal */
   dispose(): void {
     if (!this._disposed) {
       this._disposed = true;
@@ -367,6 +489,7 @@ export class GrassRenderer implements Disposable {
       this._layers = null;
     }
   }
+  /** @internal */
   draw(ctx: DrawContext) {
     const bv = this._terrain.get().getWorldBoundingVolume().toAABB();
     const minY = bv.minPoint.y;
@@ -376,6 +499,7 @@ export class GrassRenderer implements Disposable {
     }
   }
 }
+/** @internal */
 export class GrassQuadtreeNode implements Disposable {
   private static _cullAABB = new AABB();
   private _grassInstances: DRef<GrassInstances>;

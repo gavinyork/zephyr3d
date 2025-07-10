@@ -46,6 +46,9 @@ export class AABB {
 export function applyMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): T & ExtractMixinType<M>;
 
 // @public
+export function ASSERT(condition: boolean, message?: string): asserts condition;
+
+// @public
 export enum BoxSide {
     BACK = 5,
     BOTTOM = 2,
@@ -61,6 +64,12 @@ export enum ClipState {
     B_INSIDE_A = 2,
     CLIPPED = 3,
     NOT_CLIPPED = 0
+}
+
+// @public
+export interface Clonable<T> {
+    // (undocumented)
+    clone(): T;
 }
 
 // @public
@@ -95,6 +104,9 @@ export enum CubeFace {
 export function degree2radian(degree: number): number;
 
 // @public
+export type EulerAngleOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';
+
+// @public
 type EventListener_2<T extends EventMap, K extends keyof T> = (...args: T[K]) => void | Promise<void>;
 export { EventListener_2 as EventListener }
 
@@ -106,6 +118,9 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 
 // @public
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
+
+// @public
+export function float2half(f32: number): number;
 
 // @public
 export function floatToHalf(val: number): number;
@@ -140,7 +155,11 @@ export class Frustum {
 // @public
 export type GenericConstructor<T = object> = {
     new (...args: any[]): T;
+    isPrototypeOf(v: object): boolean;
 };
+
+// @public
+export function half2float(f16: number): number;
 
 // @public
 export function halfToFloat(val: number): number;
@@ -158,6 +177,7 @@ export class HttpRequest {
     request(url: string): Promise<Response>;
     requestArrayBuffer(url: string): Promise<ArrayBuffer>;
     requestBlob(url: string): Promise<Blob>;
+    requestJson(url: string): Promise<string>;
     requestText(url: string): Promise<string>;
     resolveURL(url: string): string;
     get urlResolver(): (url: string) => string;
@@ -173,22 +193,34 @@ export interface IEventTarget<T extends EventMap = any> {
 }
 
 // @public
-export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline';
+export type InterpolateData = Float32Array | number[];
+
+// @public
+export type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
 
 // @public
 export type InterpolationTarget = 'number' | 'vec2' | 'vec3' | 'vec4' | 'quat';
 
 // @public
 export class Interpolator {
-    constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: TypedArray, outputs: TypedArray);
+    constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: InterpolateData, outputs: InterpolateData);
     static getTargetStride(target: InterpolationTarget): number;
-    interpolate(t: number, result: Float32Array): Float32Array;
+    get inputs(): InterpolateData;
+    set inputs(val: InterpolateData);
+    interpolate<T extends InterpolateData>(t: number, result: T): T;
     // (undocumented)
     get maxTime(): number;
     get mode(): InterpolationMode;
+    set mode(val: InterpolationMode);
+    get outputs(): InterpolateData;
+    set outputs(val: InterpolateData);
     get stride(): number;
     get target(): InterpolationTarget;
+    set target(val: InterpolationTarget);
 }
+
+// @public
+export function IS_INSTANCE_OF<T extends GenericConstructor>(value: unknown, constructor: T): value is InstanceType<T>;
 
 // @public
 export function isPowerOf2(value: number): boolean;
@@ -230,13 +262,14 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
     new (...args: any[]): {
         _listeners: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
         on<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
-        once<K_1 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_1, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_1>, context?: unknown): void;
-        off<K_2 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_2, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_2>, context?: unknown): void;
-        dispatchEvent<K_3 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K_3, ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K_3]): void;
-        _internalAddEventListener<K_4 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K_4, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_4>, options: REventHandlerOptions): EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
-        _internalRemoveEventListener<K_5 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K_5, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K_5>, context: unknown): void;
-        _invokeLocalListeners<K_6 extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X), ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K_6]): void;
+        once<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
+        off<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
+        dispatchEvent<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K]): void;
+        _internalAddEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, options: REventHandlerOptions): EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
+        _internalRemoveEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context: unknown): void;
+        _invokeLocalListeners<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X), ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K]): void;
     };
+    isPrototypeOf: ((v: object) => boolean) | ((v: Object) => boolean);
 } & C;
 
 // @public
@@ -313,6 +346,8 @@ export class Matrix4x4 extends VectorBase {
     static add(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4;
     addBy(other: Matrix4x4): Matrix4x4;
     clone(): Matrix4x4;
+    static compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3, result?: Matrix4x4): Matrix4x4;
+    compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3): Matrix4x4;
     decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, translation?: Vector3): this;
     decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3): this;
     det(): number;
@@ -582,8 +617,8 @@ export class Quaternion extends VectorBase {
     static dot(a: Quaternion, b: Quaternion): number;
     fromAxisAngle(axis: Vector3, angle: number): Quaternion;
     static fromAxisAngle(axis: Vector3, angle: number, result?: Quaternion): Quaternion;
-    fromEulerAngle(x: number, y: number, z: number, order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY'): Quaternion;
-    static fromEulerAngle(a: number, b: number, c: number, order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY', result?: Quaternion): Quaternion;
+    fromEulerAngle(x: number, y: number, z: number, order?: EulerAngleOrder): Quaternion;
+    static fromEulerAngle(a: number, b: number, c: number, order?: EulerAngleOrder, result?: Quaternion): Quaternion;
     fromRotationMatrix(matrix: Matrix3x3 | Matrix4x4): Quaternion;
     static fromRotationMatrix(matrix: Matrix3x3 | Matrix4x4, result?: Quaternion): Quaternion;
     getAxisAngle(result?: Vector4): Vector4;
@@ -661,6 +696,9 @@ export class SH {
 
 // @public
 export function toFloat(val: number): number;
+
+// @public
+export type Truthy<T> = T extends false | 0 | '' | null | undefined | 0n ? never : T;
 
 // @public
 export interface Tuple2 {
@@ -884,7 +922,7 @@ export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:212:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:245:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

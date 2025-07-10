@@ -291,30 +291,6 @@ export function getParticleNodeClass(): SerializableClass {
           }
         },
         {
-          name: 'Transparency',
-          animatable: true,
-          type: 'float',
-          default: 1,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.transparency;
-          },
-          set(this: ParticleSystem, value) {
-            this.transparency = value.num[0];
-          }
-        },
-        {
-          name: 'ColorMultiplier',
-          animatable: true,
-          type: 'float',
-          default: 1,
-          get(this: ParticleSystem, value) {
-            value.num[0] = this.colorMultiplier;
-          },
-          set(this: ParticleSystem, value) {
-            this.colorMultiplier = value.num[0];
-          }
-        },
-        {
           name: 'Material',
           type: 'object',
           default: null,

@@ -18,7 +18,7 @@ import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { CopyBlitter } from '../blitter';
 
-export type ClipmapTerrainDetailMapInfo = {
+type ClipmapTerrainDetailMapInfo = {
   detailMap: DRef<Texture2DArray>;
   detailNormalMap?: DRef<Texture2DArray>;
   detailMapList: DRef<Texture2D>[];
@@ -30,6 +30,10 @@ export type ClipmapTerrainDetailMapInfo = {
 
 const MAX_DETAIL_MAPS = 8;
 
+/**
+ * Terrain debug rendering mode
+ * @public
+ */
 export type TerrainDebugMode =
   | 'none'
   | 'vertex_normal'
@@ -39,6 +43,10 @@ export type TerrainDebugMode =
   | 'bitangent'
   | 'albedo';
 
+/**
+ * Default material type of clipmap terrain
+ * @public
+ */
 export class ClipmapTerrainMaterial extends applyMaterialMixins(
   MeshMaterial,
   mixinLight,
@@ -99,7 +107,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   get region() {
     return this._region;
   }
-  /** @internal */
   set region(val: Vector4) {
     if (!val.equalsTo(this._region)) {
       this._region.set(val);
@@ -120,7 +127,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   get terrainScale() {
     return this._terrainScale;
   }
-  /** @internal */
   set terrainScale(val: Vector3) {
     if (!this._terrainScale.equalsTo(val)) {
       this._terrainScale.set(val);
@@ -308,7 +314,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   supportLighting(): boolean {
     return true;
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.uv;
   }
@@ -339,11 +345,11 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     });
     return pb.getGlobalScope()[funcName](TBN);
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.uv;
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.uv;
   }
@@ -687,7 +693,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
     }
   }
-  createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
+  private createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
     const device = Application.instance.device;
     const detailMap = device.createTexture2DArray(
       'rgba8unorm',

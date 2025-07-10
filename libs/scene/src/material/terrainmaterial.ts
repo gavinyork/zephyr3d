@@ -238,15 +238,15 @@ export class TerrainMaterial
       }
     }
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.mapUV;
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.mapUV;
   }
-  /** @ts-ignore */
+  // @ts-ignore
   getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$inputs.mapUV;
   }

@@ -7,6 +7,7 @@ import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
 import { Vector2 } from '@zephyr3d/base';
 
+/** @internal */
 export class TAA extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram[] = [];
   private static _skyMotionVectorProgram: GPUProgram = null;
