@@ -36,8 +36,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           phase: 0,
           type: 'string',
           enum: {
-            labels: ['None', 'Constant', 'Hemispheric', 'IBL'],
-            values: ['none', 'constant', 'hemisphere', 'ibl']
+            labels: ['None', 'Constant', 'Hemispheric', 'IBL', 'IBL-SH'],
+            values: ['none', 'constant', 'hemisphere', 'ibl', 'ibl-sh']
           },
           default: 'ibl',
           get(this: Scene, value) {

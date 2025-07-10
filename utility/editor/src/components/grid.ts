@@ -771,6 +771,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       }
       if (changed && value.set) {
         value.set.call(object, tmpProperty);
+        this.refresh();
         this.dispatchEvent('object_property_changed', object, value);
       }
     }
