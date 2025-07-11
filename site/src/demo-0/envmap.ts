@@ -1,12 +1,6 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
-import type { Scene } from '@zephyr3d/scene';
-import {
-  Application,
-  AssetManager,
-  panoramaToCubemap,
-  prefilterCubemap,
-  projectCubemapCPU
-} from '@zephyr3d/scene';
+import { CubemapSHProjector, projectCubemapCPU, Scene } from '@zephyr3d/scene';
+import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 
 type EnvMapInfo = {
   path: string;
@@ -19,11 +13,13 @@ export class EnvMaps {
   private _assetManager: AssetManager;
   private _assetManagerEx: AssetManager;
   private _currentId: string;
+  private _shProjector: CubemapSHProjector;
   constructor() {
     this._envMaps = {
       tower: {
         path: 'assets/images/environments/tower.hdr'
-      },
+      }
+      /*
       doge2: {
         path: 'assets/images/environments/doge2.hdr'
       },
@@ -33,9 +29,11 @@ export class EnvMaps {
       forest: {
         path: 'assets/images/environments/forest.hdr'
       }
+      */
     };
     this._assetManager = new AssetManager();
     this._assetManagerEx = new AssetManager();
+    this._shProjector = new CubemapSHProjector(10000, true);
     this._currentId = '';
     for (const k in this._envMaps) {
       this._envMaps[k].maps = this.loadEnvMap(this._envMaps[k].path, this._assetManager);
@@ -58,11 +56,13 @@ export class EnvMaps {
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
       prefilterCubemap(maps[0], 'lambertian', maps[2]);
-      const coeff = await projectCubemapCPU(maps[2]);
+      await this._shProjector.shProject(maps[2], sh);
+      const test = await projectCubemapCPU(maps[2]);
+      console.log(test);
       for (let i = 0; i < 9; i++) {
-        sh[i * 4 + 0] = coeff[i].x;
-        sh[i * 4 + 1] = coeff[i].y;
-        sh[i * 4 + 2] = coeff[i].z;
+        sh[i * 4 + 0] = test[i].x;
+        sh[i * 4 + 1] = test[i].y;
+        sh[i * 4 + 2] = test[i].z;
       }
     } catch (err) {
       console.error(err);

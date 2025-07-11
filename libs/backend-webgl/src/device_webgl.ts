@@ -1072,11 +1072,16 @@ export class WebGLDevice extends BaseDevice {
         if (!this._currentProgram.use()) {
           return;
         }
-        for (let i = 0; i < this._currentBindGroups.length; i++) {
+        for (let i = 0; i < this._currentProgram.bindGroupLayouts.length; i++) {
           const bindGroup = this._currentBindGroups[i];
           if (bindGroup) {
             const offsets = this._currentBindGroupOffsets[i];
             bindGroup.apply(this._currentProgram, offsets);
+          } else {
+            console.error(
+              `Missing bind group (${i}) when drawing with program '${this._currentProgram.name}'`
+            );
+            return;
           }
         }
       }

@@ -34,6 +34,7 @@ import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
 import { fetchSampler } from '../utility/misc';
 import { DRef } from '../app';
+import { CubemapSHProjector } from '../utility/shprojector';
 
 /**
  * Type of sky
@@ -97,6 +98,7 @@ export class SkyRenderer {
   private _radianceMap: DRef<TextureCube>;
   private _radianceFrameBuffer: DRef<FrameBuffer>;
   private _irradianceMap: DRef<TextureCube>;
+  private _irradianceSH: Float32Array;
   private _irradianceFrameBuffer: DRef<FrameBuffer>;
   private _radianceMapWidth: number;
   private _irradianceMapWidth: number;
@@ -114,6 +116,7 @@ export class SkyRenderer {
   private _lastSunDir: Vector3;
   private _lastSunColor: Vector4;
   private _panoramaAsset: string;
+  protected _shProjector: CubemapSHProjector;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -130,6 +133,7 @@ export class SkyRenderer {
     this._radianceFrameBuffer = new DRef();
     this._radianceMapWidth = 128;
     this._irradianceMap = new DRef();
+    this._irradianceSH = new Float32Array(36);
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
     this._atmosphereParams = { ...defaultAtmosphereParams };
@@ -146,6 +150,7 @@ export class SkyRenderer {
     this._lastSunDir = SkyRenderer._getSunDir(null);
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
+    this._shProjector = new CubemapSHProjector(10000, true);
   }
   /** @internal */
   dispose() {
@@ -438,7 +443,7 @@ export class SkyRenderer {
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
       this.updateBakedSkyMap(sunDir, sunColor);
-      if (ctx.scene.env.light.type === 'ibl') {
+      if (true || ctx.scene.env.light.type === 'ibl' || ctx.scene.env.light.type === 'ibl-sh') {
         if (
           ctx.scene.env.light.radianceMap &&
           (ctx.scene.env.light.radianceMap === this.radianceMap ||
@@ -446,6 +451,11 @@ export class SkyRenderer {
         ) {
           prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceFramebuffer);
           prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceFramebuffer);
+          this._shProjector.shProject(
+            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
+            this._irradianceSH
+          );
+          ctx.scene.env.light.irradianceSH = this._irradianceSH;
         }
       }
     }

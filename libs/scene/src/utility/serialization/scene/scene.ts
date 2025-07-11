@@ -166,6 +166,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           },
           set(this: Scene, value) {
             this.env.sky.skyColor = new Vector4(value.num[0], value.num[1], value.num[2], 1);
+            this.env.sky.invalidate();
           }
         },
         {
@@ -441,6 +442,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
                   this.env.light.radianceMap = radianceMap;
                   this.env.light.irradianceMap = irradianceMap;
                   this.env.sky.panoramaTextureAsset = assetId;
+                  this.env.sky.invalidate();
                   tex.dispose();
                 } else {
                   console.error('Invalid skybox texture');
