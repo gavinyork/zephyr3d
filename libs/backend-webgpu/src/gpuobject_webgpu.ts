@@ -38,7 +38,7 @@ export abstract class WebGPUObject<T>
     this._object = null;
     this._uid = ++_uniqueId;
     this._cid = 1;
-    this._name = `${genDefaultName(this)}#${this._uid}`;
+    this._name = genDefaultName(this);
     this._queueState = 0;
     this._disposed = false;
     this._restoreHandler = null;

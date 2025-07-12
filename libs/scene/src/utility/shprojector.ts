@@ -17,6 +17,7 @@ export class CubemapSHProjector {
   private static _bindGroup: BindGroup[] = [];
   private static _bindGroupInst: BindGroup = null;
   private static _renderStats: RenderStateSet = null;
+  private static _windowWeights = [1, 2 / Math.PI, 0];
   private _primitive: DRef<Primitive>;
   private _renderTarget: DRef<FrameBuffer>[];
   private _numSamples: number;
@@ -27,7 +28,19 @@ export class CubemapSHProjector {
     this._renderTarget = [];
     this._useInstancing = useInstancing;
   }
-  async shProject(cubemap: TextureCube, outCoeff?: Float32Array): Promise<Float32Array> {
+  applyWindow(coeff: Float32Array, windowWeights: ArrayLike<number>) {
+    for (let i = 0; i < 9; i++) {
+      const weight = i < 1 ? windowWeights[0] : i < 4 ? windowWeights[1] : windowWeights[2];
+      coeff[i * 4 + 0] *= weight;
+      coeff[i * 4 + 1] *= weight;
+      coeff[i * 4 + 2] *= weight;
+    }
+  }
+  async shProject(
+    cubemap: TextureCube,
+    windowWeights?: ArrayLike<number>,
+    outCoeff?: Float32Array
+  ): Promise<Float32Array> {
     outCoeff = outCoeff ?? new Float32Array(9 * 4);
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
@@ -64,6 +77,7 @@ export class CubemapSHProjector {
     } else {
       await this._renderTarget[0].get().getColorAttachments()[0].readPixels(0, 0, 3, 3, 0, 0, outCoeff);
     }
+    this.applyWindow(outCoeff, windowWeights ?? CubemapSHProjector._windowWeights);
     return outCoeff;
   }
   private init(device: AbstractDevice, useInstancing: boolean) {

@@ -30,7 +30,7 @@ const textureEncodeNames = ['Normal', 'RGBA encoded float'];
 let textureDrawEncode = 0;
 
 function textureToListName(tex: BaseTexture) {
-  return `${tex.name}(${tex.format} ${tex.width}x${tex.height}x${tex.depth})##${tex.uid}`;
+  return `${tex.name}#${tex.uid}(${tex.format} ${tex.width}x${tex.height}x${tex.depth})##${tex.uid}`;
 }
 
 export function renderTextureViewer() {

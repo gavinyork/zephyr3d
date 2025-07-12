@@ -37,7 +37,7 @@ export abstract class WebGLGPUObject<T>
     this._object = null;
     this._uid = ++_uniqueId;
     this._cid = 1;
-    this._name = `${genDefaultName(this)}#${this._uid}`;
+    this._name = genDefaultName(this);
     this._restoreHandler = null;
     this._disposed = false;
     this._device.addGPUObject(this);

@@ -116,7 +116,10 @@ export class SkyRenderer {
   private _lastSunDir: Vector3;
   private _lastSunColor: Vector4;
   private _panoramaAsset: string;
-  protected _shProjector: CubemapSHProjector;
+  private _shProjector: CubemapSHProjector;
+  private _shWindowWeights: Vector3;
+  private _radianceConvSamples: number;
+  private _irradianceConvSamples: number;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -151,6 +154,9 @@ export class SkyRenderer {
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
     this._shProjector = new CubemapSHProjector(10000, true);
+    this._shWindowWeights = new Vector3(1, 0.8, 0.6);
+    this._radianceConvSamples = 64;
+    this._irradianceConvSamples = 256;
   }
   /** @internal */
   dispose() {
@@ -222,6 +228,40 @@ export class SkyRenderer {
   set skyColor(val: Vector4) {
     if (!val.equalsTo(this._skyColor)) {
       this._skyColor.set(val);
+      this.invalidate();
+    }
+  }
+  /**
+   * Window weights for SH projection
+   */
+  get shWindowWeights(): Vector3 {
+    return this._shWindowWeights;
+  }
+  set shWindowWeights(weights: Vector3) {
+    this._shWindowWeights.set(weights);
+    this.invalidate();
+  }
+  /**
+   * Sample count for radiance convolution
+   */
+  get radianceConvSamples() {
+    return this._radianceConvSamples;
+  }
+  set radianceConvSamples(val: number) {
+    if (val !== this._radianceConvSamples) {
+      this._radianceConvSamples = val;
+      this.invalidate();
+    }
+  }
+  /**
+   * Sample count for irradiance convolution
+   */
+  get irradianceConvSamples() {
+    return this._irradianceConvSamples;
+  }
+  set irradianceConvSamples(val: number) {
+    if (val !== this._irradianceConvSamples) {
+      this._irradianceConvSamples = val;
       this.invalidate();
     }
   }
@@ -447,12 +487,24 @@ export class SkyRenderer {
         if (
           ctx.scene.env.light.radianceMap &&
           (ctx.scene.env.light.radianceMap === this.radianceMap ||
-            ctx.scene.env.light.irradianceMap === this.irradianceMap)
+            ctx.scene.env.light.irradianceMap === this.irradianceMap ||
+            ctx.scene.env.light.irradianceSH === this._irradianceSH)
         ) {
-          prefilterCubemap(this._bakedSkyboxTexture.get(), 'ggx', this.radianceFramebuffer);
-          prefilterCubemap(this._bakedSkyboxTexture.get(), 'lambertian', this.irradianceFramebuffer);
+          prefilterCubemap(
+            this._bakedSkyboxTexture.get(),
+            'ggx',
+            this.radianceFramebuffer,
+            this._radianceConvSamples
+          );
+          prefilterCubemap(
+            this._bakedSkyboxTexture.get(),
+            'lambertian',
+            this.irradianceFramebuffer,
+            this._irradianceConvSamples
+          );
           this._shProjector.shProject(
             this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
+            this._shWindowWeights,
             this._irradianceSH
           );
           ctx.scene.env.light.irradianceSH = this._irradianceSH;

@@ -6,7 +6,7 @@ import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 
 export function getSceneClass(manager: SerializationManager): SerializableClass {
@@ -116,6 +116,45 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           },
           set(this: Scene, value) {
             this.env.light.strength = value.num[0];
+          }
+        },
+        {
+          name: 'SHWindowWeights',
+          type: 'vec3',
+          options: { minValue: 0, maxValue: 1 },
+          default: [1, 1, 1],
+          get(this: Scene, value) {
+            const weights = this.env.sky.shWindowWeights;
+            value.num[0] = weights.x;
+            value.num[1] = weights.y;
+            value.num[2] = weights.z;
+          },
+          set(this: Scene, value) {
+            this.env.sky.shWindowWeights = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'RadianceConvSamples',
+          type: 'int',
+          options: { minValue: 1, maxValue: 2048 },
+          default: 64,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.radianceConvSamples;
+          },
+          set(this: Scene, value) {
+            this.env.sky.radianceConvSamples = value.num[0];
+          }
+        },
+        {
+          name: 'IrradianceConvSamples',
+          type: 'int',
+          options: { minValue: 1, maxValue: 2048 },
+          default: 256,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.irradianceConvSamples;
+          },
+          set(this: Scene, value) {
+            this.env.sky.irradianceConvSamples = value.num[0];
           }
         },
         {
