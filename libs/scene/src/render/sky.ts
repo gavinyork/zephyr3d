@@ -90,7 +90,6 @@ export class SkyRenderer {
   private _skyType: SkyType;
   private _skyColor: Vector4;
   private _bakedSkyboxDirty: boolean;
-  private _updateRadianceMaps: boolean;
   private _scatterSkyboxTextureWidth: number;
   private _skyboxTexture: DRef<TextureCube>;
   private _bakedSkyboxTexture: DRef<TextureCube>;
@@ -125,7 +124,6 @@ export class SkyRenderer {
    */
   constructor() {
     this._skyType = 'scatter';
-    this._updateRadianceMaps = true;
     this._skyColor = Vector4.zero();
     this._skyboxTexture = new DRef();
     this._bakedSkyboxTexture = new DRef();
@@ -200,24 +198,6 @@ export class SkyRenderer {
   get bakedSkyTexture(): TextureCube {
     this.updateBakedSkyMap(this._lastSunDir, this._lastSunColor);
     return this._bakedSkyboxTexture.get();
-  }
-  /**
-   * Wether the IBL maps should be updated automatically.
-   *
-   * @remarks
-   * If use use the sky for image-based lighting, the value shoud be set to true. default is false
-   *
-   */
-  get autoUpdateIBLMaps(): boolean {
-    return this._updateRadianceMaps;
-  }
-  set autoUpdateIBLMaps(val: boolean) {
-    if (this._updateRadianceMaps !== !!val) {
-      this._updateRadianceMaps = !!val;
-      if (this._updateRadianceMaps) {
-        this.invalidate();
-      }
-    }
   }
   /**
    * The solid sky color

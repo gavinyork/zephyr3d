@@ -174,21 +174,6 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          name: 'AutoUpdateIBLMaps',
-          type: 'bool',
-          phase: 1,
-          default: true,
-          get(this: Scene, value) {
-            value.bool[0] = this.env.sky.autoUpdateIBLMaps;
-          },
-          set(this: Scene, value) {
-            this.env.sky.autoUpdateIBLMaps = value.bool[0];
-          },
-          isValid() {
-            return this.env.sky.skyType !== 'none';
-          }
-        },
-        {
           name: 'SkyColor',
           type: 'rgb',
           animatable: true,
