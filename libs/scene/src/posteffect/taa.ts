@@ -18,7 +18,7 @@ export class TAA extends AbstractPostEffect {
   constructor() {
     super();
     this._bindGroup = null;
-    this._layer = PostEffectLayer.transparent;
+    this._layer = PostEffectLayer.end;
     this._skyMotionVectorBindGroup = null;
   }
   renderSkyMotionVectors(ctx: DrawContext) {

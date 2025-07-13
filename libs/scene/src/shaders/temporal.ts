@@ -7,6 +7,7 @@ export const TAA_DEBUG_VELOCITY = 3;
 export const TAA_DEBUG_EDGE = 4;
 export const TAA_DEBUG_ALAPH = 5;
 export const TAA_DEBUG_MOTION_VECTOR = 6;
+export const TAA_DEBUG_STRENGTH = 7;
 
 const FLT_MIN = 0.00000001;
 const FLT_MAX = 32767;
@@ -264,6 +265,8 @@ export function temporalResolve(
       this.resolvedColor = pb.abs(pb.sub(this.sampleColor, this.historyColor));
     } else if (debug === TAA_DEBUG_MOTION_VECTOR) {
       this.resolvedColor = pb.abs(pb.mul(this.velocityClosest, 20));
+    } else if (debug === TAA_DEBUG_STRENGTH) {
+      this.resolvedColor = pb.vec3(this.blendFactor);
     } else {
       this.resolvedColor = pb.mix(this.prevColor.rgb, this.currentColor.rgb, this.alpha);
       this.resolvedColor = this.reinhardInv(this.resolvedColor);

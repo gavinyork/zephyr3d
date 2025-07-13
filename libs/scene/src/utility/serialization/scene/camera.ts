@@ -9,6 +9,7 @@ import {
   TAA_DEBUG_HISTORY_COLOR,
   TAA_DEBUG_MOTION_VECTOR,
   TAA_DEBUG_NONE,
+  TAA_DEBUG_STRENGTH,
   TAA_DEBUG_VELOCITY
 } from '../../../shaders';
 
@@ -192,7 +193,16 @@ export function getCameraClass(): SerializableClass {
           type: 'int',
           phase: 1,
           enum: {
-            labels: ['None', 'Current Color', 'History Color', 'Velocity', 'Edge', 'Alpha', 'Motion Vector'],
+            labels: [
+              'None',
+              'Current Color',
+              'History Color',
+              'Velocity',
+              'Edge',
+              'Alpha',
+              'Motion Vector',
+              'Strength'
+            ],
             values: [
               TAA_DEBUG_NONE,
               TAA_DEBUG_CURRENT_COLOR,
@@ -200,7 +210,8 @@ export function getCameraClass(): SerializableClass {
               TAA_DEBUG_VELOCITY,
               TAA_DEBUG_EDGE,
               TAA_DEBUG_ALAPH,
-              TAA_DEBUG_MOTION_VECTOR
+              TAA_DEBUG_MOTION_VECTOR,
+              TAA_DEBUG_STRENGTH
             ]
           },
           default: TAA_DEBUG_NONE,

@@ -259,6 +259,8 @@ export abstract class RenderPass {
   }
   /** @internal */
   private clearFramebuffer() {
-    Application.instance.device.clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+    if (this._clearColor || this._clearDepth || this._clearStencil) {
+      Application.instance.device.clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+    }
   }
 }

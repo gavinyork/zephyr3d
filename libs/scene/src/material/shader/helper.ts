@@ -880,7 +880,7 @@ export class ShaderHelper {
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
-    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.bakedSkyTexture);
+    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
       ctx.env.light.envLight.updateBindGroup(bindGroup);
     }
@@ -907,7 +907,7 @@ export class ShaderHelper {
       shadowMapParams.shadowMap,
       shadowMapParams.shadowMapSampler
     );
-    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.bakedSkyTexture);
+    bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
       ctx.env.light.envLight.updateBindGroup(bindGroup);
     }

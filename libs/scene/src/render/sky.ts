@@ -195,8 +195,10 @@ export class SkyRenderer {
     this._drawGround = !!val;
   }
   /** Baked sky texture */
-  get bakedSkyTexture(): TextureCube {
-    this.updateBakedSkyMap(this._lastSunDir, this._lastSunColor);
+  getBakedSkyTexture(ctx: DrawContext): TextureCube {
+    if (this._bakedSkyboxDirty) {
+      this.update(ctx);
+    }
     return this._bakedSkyboxTexture.get();
   }
   /**

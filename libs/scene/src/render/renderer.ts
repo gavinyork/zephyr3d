@@ -231,6 +231,7 @@ export class SceneRenderer {
       ? new Vector4(0, 0, 0, 1)
       : new Vector4(1, 1, 1, 1);
     this._depthPass.clearDepth = transmission ? null : 1;
+    this._depthPass.clearStencil = null;
     this._depthPass.transmission = transmission;
     if (ctx.SSRCalcThickness && !transmission) {
       if (!this._backDepthColorState) {

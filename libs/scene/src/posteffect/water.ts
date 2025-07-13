@@ -259,7 +259,7 @@ export class PostWater extends AbstractPostEffect {
     waterBindGroup.setTexture('tex', inputColorTexture);
     waterBindGroup.setTexture('depthTex', ctx.linearDepthTexture);
     waterBindGroup.setTexture('rampTex', rampTex);
-    waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.bakedSkyTexture);
+    waterBindGroup.setTexture('envMap', this._envMap ?? ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ssr) {
       waterBindGroup.setValue('ssrParams', this._ssrParams);
       if (ctx.HiZTexture) {
