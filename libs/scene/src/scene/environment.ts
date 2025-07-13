@@ -97,10 +97,8 @@ export class EnvLightWrapper {
   }
   set radianceMap(tex: TextureCube) {
     this._radianceMap.set(tex);
-    if (this.type === 'ibl') {
-      (this._envLight as EnvIBL).radianceMap = this.radianceMap;
-    } else if (this.type === 'ibl-sh') {
-      (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
+    if (this.type === 'ibl' || this.type === 'ibl-sh') {
+      (this._envLight as EnvIBL | EnvShIBL).radianceMap = this.radianceMap;
     }
   }
   /** Irradiance map for environment light type ibl */

@@ -314,10 +314,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   supportLighting(): boolean {
     return true;
   }
-  // @ts-ignore
-  getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+  getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
-  }
+  };
   sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const sample = pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
@@ -345,14 +344,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     });
     return pb.getGlobalScope()[funcName](TBN);
   }
-  // @ts-ignore
-  getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+  getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
-  }
-  // @ts-ignore
-  getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$inputs.uv;
-  }
+  };
   calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
     const that = this;
     const pb = scope.$builder;

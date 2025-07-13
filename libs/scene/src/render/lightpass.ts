@@ -22,6 +22,7 @@ export class LightPass extends RenderPass {
   constructor() {
     super(RENDER_PASS_TYPE_LIGHT);
     this._shadowMapHash = null;
+    this._clearColor = Vector4.zero();
   }
   /** @internal */
   get transmission(): boolean {
@@ -126,6 +127,7 @@ export class LightPass extends RenderPass {
     const lists = this._transmission
       ? [items?.transmission, items?.transmission_trans, items?.transparent]
       : [items?.opaque, items?.transparent];
+    const transparentPass = lists.length - 1;
     for (let i = 0; i < lists.length; i++) {
       if (lists[i]) {
         ctx.applyFog = i === 1 && ctx.env.sky.fogType !== 'none' ? ctx.env.sky.fogType : null;
@@ -193,11 +195,13 @@ export class LightPass extends RenderPass {
             ctx.device.popDeviceStates();
           }
         }
-        ctx.compositor?.drawPostEffects(
-          ctx,
-          i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
-          ctx.linearDepthTexture
-        );
+        if (i === 0 || i === transparentPass) {
+          ctx.compositor?.drawPostEffects(
+            ctx,
+            i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
+            ctx.linearDepthTexture
+          );
+        }
       }
     }
     if (tmpFramebuffer) {

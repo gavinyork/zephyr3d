@@ -1,5 +1,6 @@
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
-import { CubemapSHProjector, projectCubemapCPU, Scene } from '@zephyr3d/scene';
+import type { Scene } from '@zephyr3d/scene';
+import { CubemapSHProjector, projectCubemapCPU } from '@zephyr3d/scene';
 import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 
 type EnvMapInfo = {

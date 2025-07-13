@@ -199,7 +199,7 @@ export class Scene extends makeEventTarget(Object)<{
   }
   /** @internal */
   private updateEnvLight() {
-    if (this.env.light.type === 'ibl') {
+    if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
       if (!this.env.light.radianceMap) {
         if (this.env.sky.skyType !== 'none') {
           this.env.light.radianceMap = this.env.sky.radianceMap;
@@ -216,6 +216,15 @@ export class Scene extends makeEventTarget(Object)<{
       } else if (this.env.light.irradianceMap === this.env.sky.irradianceMap) {
         if (this.env.sky.skyType === 'none') {
           this.env.light.irradianceMap = null;
+        }
+      }
+      if (!this.env.light.irradianceSH) {
+        if (this.env.sky.skyType !== 'none') {
+          this.env.light.irradianceSH = this.env.sky.irradianceSH;
+        } else if (this.env.light.irradianceSH === this.env.sky.irradianceSH) {
+          if (this.env.sky.skyType === 'none') {
+            this.env.light.irradianceSH = null;
+          }
         }
       }
     }

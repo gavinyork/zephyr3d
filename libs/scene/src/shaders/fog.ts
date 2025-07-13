@@ -1,5 +1,5 @@
 import { Vector3 } from '@zephyr3d/base';
-import { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
 
 export type HeightFogParams = {
   globalDensity: number;
@@ -40,6 +40,24 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
     pb.vec3('directionalInscatteringColor'),
     pb.vec3('lightDir')
   ]);
+}
+
+export function combineAerialPerspectiveFog(
+  scope: PBInsideFunctionScope,
+  fogging: PBShaderExp,
+  aerialPerspectiveFog: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_combineAerialPerspectiveFog';
+  pb.func(funcName, [pb.vec4('fogging'), pb.vec4('aerialPerspectiveFog')], function () {
+    this.$l.rgb = pb.add(
+      this.fogging.rgb,
+      pb.mul(this.aerialPerspectiveFog.rgb, pb.sub(1, this.fogging.rgb.a))
+    );
+    this.$l.a = pb.mul(pb.sub(1, this.fogging.a), pb.sub(1, this.aerialPerspectiveFog.a));
+    this.$return(pb.vec4(this.rgb, pb.sub(1, this.a)));
+  });
+  return scope[funcName](fogging, aerialPerspectiveFog);
 }
 
 export function calculateHeightFog(

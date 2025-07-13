@@ -66,10 +66,6 @@ export class SceneRenderer {
     return this._shadowMapPass;
   }
   /** @internal */
-  static setClearColor(color: Vector4): void {
-    this._scenePass.clearColor = color;
-  }
-  /** @internal */
   static getClusteredLight(): ClusteredLight {
     if (this._clusters.length > 0) {
       return this._clusters.pop();

@@ -6,7 +6,7 @@ import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
 import { Application, DRef } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
-import type { AbstractDevice, BaseTexture } from '@zephyr3d/device';
+import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type { BaseCameraController } from './base';
@@ -74,8 +74,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _viewport: number[];
   /** @internal */
   protected _scissor: number[];
-  /** @internal */
-  protected _clearColor: Vector4;
   /** @internal */
   protected _clipMask: number;
   /** @internal */
@@ -204,7 +202,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._controller = null;
     this._viewport = null;
     this._scissor = null;
-    this._clearColor = new Vector4(0, 0, 0, 1);
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
@@ -262,6 +259,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._pickPosX = 0;
     this._pickPosY = 0;
     this._compositor = new Compositor();
+    this.updatePostProcessing();
   }
   clone(method: NodeCloneMethod, recursive: boolean): Camera {
     const other = new Camera(this.scene);
@@ -295,9 +293,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this.commandBufferReuse = other.commandBufferReuse;
     this.oit = other.oit;
     this.clipMask = other.clipMask;
-    this.viewport = other.viewport;
-    this.scissor = other.scissor;
-    this.clearColor = other.clearColor;
+    this.viewport = other.viewport?.slice() ?? null;
+    this.scissor = other.scissor?.slice() ?? null;
     this.setProjectionMatrix(other.getProjectionMatrix());
   }
   /** Compositor */
@@ -326,19 +323,19 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether Tonemap is enabled.
    */
   get toneMap(): boolean {
-    return this._toneMap;
+    return this._postEffectTonemap.get().enabled;
   }
   set toneMap(val: boolean) {
-    this._toneMap = !!val;
+    this._postEffectTonemap.get().enabled = !!val;
   }
   /**
    * Gets whether motion blur is enabled
    */
   get motionBlur(): boolean {
-    return this._motionBlur;
+    return this._postEffectMotionBlur.get().enabled;
   }
   set motionBlur(val: boolean) {
-    this._motionBlur = !!val;
+    this._postEffectMotionBlur.get().enabled = !!val;
   }
   /** Motion blur strength */
   get motionBlurStrength(): number {
@@ -354,10 +351,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether Bloom is enabled.
    */
   get bloom(): boolean {
-    return this._bloom;
+    return this._postEffectBloom.get().enabled;
   }
   set bloom(val: boolean) {
-    this._bloom = !!val;
+    this._postEffectBloom.get().enabled = !!val;
   }
   /**
    * Maximum bloom downsample levels
@@ -423,10 +420,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether FXAA is enabled.
    */
   get FXAA(): boolean {
-    return this._FXAA;
+    return this._postEffectFXAA.get().enabled;
   }
   set FXAA(val: boolean) {
-    this._FXAA = !!val;
+    this._postEffectFXAA.get().enabled = !!val;
   }
   /**
    * Tonemap exposure
@@ -444,10 +441,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether TAA is enabled.
    */
   get TAA(): boolean {
-    return this._TAA;
+    return this._postEffectTAA.get().enabled;
   }
   set TAA(val: boolean) {
-    this._TAA = !!val;
+    this._postEffectTAA.get().enabled = !!val;
   }
   /**
    * Gets the debug flag for TAA
@@ -471,10 +468,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether Screen Space Reflections (SSR) is enabled.
    */
   get SSR(): boolean {
-    return this._SSR;
+    return this._postEffectSSR.get().enabled;
   }
   set SSR(val: boolean) {
-    this._SSR = !!val;
+    this._postEffectSSR.get().enabled = !!val;
   }
   /**
    * Gets the maximum roughness value for screen space reflections.
@@ -594,10 +591,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * Gets whether SSAO is enabled.
    */
   get SSAO(): boolean {
-    return this._SSAO;
+    return this._postEffectSSAO.get().enabled;
   }
   set SSAO(val: boolean) {
-    this._SSAO = !!val;
+    this._postEffectSSAO.get().enabled = !!val;
   }
   /** SSAO scale */
   get SSAOScale() {
@@ -690,17 +687,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   set scissor(rect: number[]) {
     this._scissor = rect?.slice() ?? null;
-  }
-  /** Color value used to clear color buffer before rendering, if null, color buffer will not be cleared */
-  get clearColor(): Vector4 {
-    return this._clearColor;
-  }
-  set clearColor(val: Vector4) {
-    if (!val) {
-      this._clearColor = null;
-    } else {
-      this._clearColor.set(val);
-    }
   }
   /**
    * Handle input events
@@ -973,77 +959,61 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._prevJitterValue = null;
   }
   /** @internal */
-  private updatePostProcessing(device: AbstractDevice) {
+  private updatePostProcessing() {
     this._compositor.clear();
-    if (this.SSR) {
-      if (!this._postEffectSSR.get()) {
-        this._postEffectSSR.set(new SSR());
-      }
-      this._compositor.appendPostEffect(this._postEffectSSR.get());
-    } else {
-      this._postEffectSSR.dispose();
+    if (!this._postEffectSSR.get()) {
+      const ssr = new SSR();
+      ssr.enabled = false;
+      this._postEffectSSR.set(ssr);
+      this._compositor.appendPostEffect(ssr);
     }
-    if (this.SSAO) {
-      if (!this._postEffectSSAO.get()) {
-        const ssao = new SAO();
-        ssao.scale = this._SSAOScale;
-        ssao.bias = this._SSAOBias;
-        ssao.radius = this._SSAORadius;
-        ssao.intensity = this._SSAOIntensity;
-        ssao.blurDepthCutoff = this._SSAOBlurDepthCutoff;
-        this._postEffectSSAO.set(ssao);
-      }
-      this._compositor.appendPostEffect(this._postEffectSSAO.get());
-    } else {
-      this._postEffectSSAO.dispose();
+    if (!this._postEffectSSAO.get()) {
+      const ssao = new SAO();
+      ssao.enabled = false;
+      ssao.scale = this._SSAOScale;
+      ssao.bias = this._SSAOBias;
+      ssao.radius = this._SSAORadius;
+      ssao.intensity = this._SSAOIntensity;
+      ssao.blurDepthCutoff = this._SSAOBlurDepthCutoff;
+      this._postEffectSSAO.set(ssao);
+      this._compositor.appendPostEffect(ssao);
     }
-    if (this.TAA && device.type !== 'webgl') {
-      if (!this._postEffectTAA.get()) {
-        this._postEffectTAA.set(new TAA());
-      }
-      this._compositor.appendPostEffect(this._postEffectTAA.get());
-    } else {
-      this._postEffectTAA.dispose();
+    if (!this._postEffectTAA.get()) {
+      const taa = new TAA();
+      taa.enabled = false;
+      this._postEffectTAA.set(taa);
+      this._compositor.appendPostEffect(taa);
     }
-    if (this.motionBlur && device.type !== 'webgl') {
-      if (!this._postEffectMotionBlur.get()) {
-        this._postEffectMotionBlur.set(new MotionBlur());
-        this._postEffectMotionBlur.get().strength = this._motionBlurStrength;
-      }
-      this._compositor.appendPostEffect(this._postEffectMotionBlur.get());
-    } else {
-      this._postEffectMotionBlur.dispose();
+    if (!this._postEffectMotionBlur.get()) {
+      const motionBlur = new MotionBlur();
+      motionBlur.enabled = false;
+      motionBlur.strength = this._motionBlurStrength;
+      this._postEffectMotionBlur.set(motionBlur);
+      this._compositor.appendPostEffect(motionBlur);
     }
-    if (this.toneMap) {
-      if (!this._postEffectTonemap.get()) {
-        this._postEffectTonemap.set(new Tonemap());
-        this._postEffectTonemap.get().exposure = this._tonemapExposure;
-      }
-      this._compositor.appendPostEffect(this._postEffectTonemap.get());
-    } else {
-      this._postEffectTonemap.dispose();
+    if (!this._postEffectTonemap.get()) {
+      const tonemap = new Tonemap();
+      tonemap.enabled = true;
+      tonemap.exposure = this._tonemapExposure;
+      this._postEffectTonemap.set(tonemap);
+      this._compositor.appendPostEffect(tonemap);
     }
-    if (this.FXAA) {
-      if (!this._postEffectFXAA.get()) {
-        this._postEffectFXAA.set(new FXAA());
-      }
-      this._compositor.appendPostEffect(this._postEffectFXAA.get());
-    } else {
-      this._postEffectFXAA.dispose();
+    if (!this._postEffectFXAA.get()) {
+      const fxaa = new FXAA();
+      fxaa.enabled = false;
+      this._postEffectFXAA.set(fxaa);
+      this._compositor.appendPostEffect(fxaa);
     }
-    if (this.bloom) {
-      if (!this._postEffectBloom.get()) {
-        const bloom = new Bloom();
-        bloom.maxDownsampleLevel = this._bloomMaxDownsampleLevels;
-        bloom.downsampleLimit = this._bloomDownsampleLimit;
-        bloom.threshold = this._bloomThreshold;
-        bloom.thresholdKnee = this._bloomThresholdKnee;
-        bloom.intensity = this._bloomIntensity;
-        this._postEffectBloom.set(bloom);
-      }
-      this._compositor.appendPostEffect(this._postEffectBloom.get());
-    } else {
-      this._postEffectBloom.dispose();
+    if (!this._postEffectBloom.get()) {
+      const bloom = new Bloom();
+      bloom.enabled = false;
+      bloom.maxDownsampleLevel = this._bloomMaxDownsampleLevels;
+      bloom.downsampleLimit = this._bloomDownsampleLimit;
+      bloom.threshold = this._bloomThreshold;
+      bloom.thresholdKnee = this._bloomThresholdKnee;
+      bloom.intensity = this._bloomIntensity;
+      this._postEffectBloom.set(bloom);
+      this._compositor.appendPostEffect(bloom);
     }
   }
   /**
@@ -1053,7 +1023,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    */
   render(scene: Scene) {
     const device = Application.instance.device;
-    this.updatePostProcessing(device);
+    //this.updatePostProcessing(device);
     const useMotionVector = (this.TAA || this.motionBlur) && device.type !== 'webgl';
     const useTAA = useMotionVector && this.TAA;
     scene.dispatchEvent('startrender', scene, this, this._compositor);
@@ -1091,7 +1061,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
-    scene.getRenderer().setClearColor(this._clearColor);
     scene.getRenderer().renderScene(scene, this);
     device.popDeviceStates();
     if (useMotionVector) {

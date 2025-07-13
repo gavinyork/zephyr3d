@@ -337,6 +337,12 @@ export class SkyRenderer {
     }
     return this._irradianceMap.get();
   }
+  /**
+   * Irradiance SH coeffecients
+   */
+  get irradianceSH(): Float32Array {
+    return this._irradianceSH;
+  }
   /** @internal */
   get irradianceFramebuffer() {
     if (!this._irradianceFrameBuffer.get()) {
@@ -463,32 +469,30 @@ export class SkyRenderer {
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
       this.updateBakedSkyMap(sunDir, sunColor);
-      if (true || ctx.scene.env.light.type === 'ibl' || ctx.scene.env.light.type === 'ibl-sh') {
-        if (
-          ctx.scene.env.light.radianceMap &&
-          (ctx.scene.env.light.radianceMap === this.radianceMap ||
-            ctx.scene.env.light.irradianceMap === this.irradianceMap ||
-            ctx.scene.env.light.irradianceSH === this._irradianceSH)
-        ) {
-          prefilterCubemap(
-            this._bakedSkyboxTexture.get(),
-            'ggx',
-            this.radianceFramebuffer,
-            this._radianceConvSamples
-          );
-          prefilterCubemap(
-            this._bakedSkyboxTexture.get(),
-            'lambertian',
-            this.irradianceFramebuffer,
-            this._irradianceConvSamples
-          );
-          this._shProjector.shProject(
-            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
-            this._shWindowWeights,
-            this._irradianceSH
-          );
-          ctx.scene.env.light.irradianceSH = this._irradianceSH;
-        }
+      if (
+        ctx.scene.env.light.radianceMap &&
+        (ctx.scene.env.light.radianceMap === this.radianceMap ||
+          ctx.scene.env.light.irradianceMap === this.irradianceMap ||
+          ctx.scene.env.light.irradianceSH === this._irradianceSH)
+      ) {
+        prefilterCubemap(
+          this._bakedSkyboxTexture.get(),
+          'ggx',
+          this.radianceFramebuffer,
+          this._radianceConvSamples
+        );
+        prefilterCubemap(
+          this._bakedSkyboxTexture.get(),
+          'lambertian',
+          this.irradianceFramebuffer,
+          this._irradianceConvSamples
+        );
+        this._shProjector.shProject(
+          this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
+          this._shWindowWeights,
+          this._irradianceSH
+        );
+        ctx.scene.env.light.irradianceSH = this._irradianceSH;
       }
     }
   }

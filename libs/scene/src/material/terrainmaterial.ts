@@ -238,18 +238,15 @@ export class TerrainMaterial
       }
     }
   }
-  // @ts-ignore
-  getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+  getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.mapUV;
-  }
-  // @ts-ignore
-  getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+  };
+  getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.mapUV;
-  }
-  // @ts-ignore
-  getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp {
+  };
+  getAlbedoTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.mapUV;
-  }
+  };
   calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
     if (!this._options) {
       return super.calculateAlbedoColor(scope);
