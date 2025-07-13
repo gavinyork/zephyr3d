@@ -19,14 +19,12 @@ export class CubemapSHProjector {
   private static _renderStats: RenderStateSet = null;
   private static _windowWeights = [1, 2 / Math.PI, 0];
   private _primitive: DRef<Primitive>;
-  private _renderTarget: DRef<FrameBuffer>[];
+  private _renderTarget: DRef<FrameBuffer>;
   private _numSamples: number;
-  private _useInstancing: boolean;
   constructor(numSamples = 10000, useInstancing = false) {
     this._numSamples = numSamples;
     this._primitive = new DRef();
-    this._renderTarget = [];
-    this._useInstancing = useInstancing;
+    this._renderTarget = new DRef();
   }
   applyWindow(coeff: Float32Array, windowWeights: ArrayLike<number>) {
     for (let i = 0; i < 9; i++) {
@@ -34,6 +32,13 @@ export class CubemapSHProjector {
       coeff[i * 4 + 0] *= weight;
       coeff[i * 4 + 1] *= weight;
       coeff[i * 4 + 2] *= weight;
+    }
+  }
+  dispose() {
+    this._primitive.dispose();
+    if (this._renderTarget.get()) {
+      this._renderTarget.get().getColorAttachments()[0].dispose();
+      this._renderTarget.dispose();
     }
   }
   async shProject(
@@ -44,43 +49,22 @@ export class CubemapSHProjector {
     outCoeff = outCoeff ?? new Float32Array(9 * 4);
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
-    this.init(device, this._useInstancing);
+    this.init(device);
     device.pushDeviceStates();
     device.setRenderStates(CubemapSHProjector._renderStats);
-    if (!this._useInstancing) {
-      device.setProgram(CubemapSHProjector._program);
-      for (let i = 0; i < 9; i++) {
-        device.setFramebuffer(this._renderTarget[i].get());
-        device.clearFrameBuffer(clearColor, null, null);
-        const bindGroup = CubemapSHProjector._bindGroup[i];
-        bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
-        bindGroup.setValue('shIndex', i);
-        device.setBindGroup(0, bindGroup);
-        this._primitive.get().draw();
-      }
-    } else {
-      device.setProgram(CubemapSHProjector._programInst);
-      device.setFramebuffer(this._renderTarget[0].get());
-      device.clearFrameBuffer(clearColor, null, null);
-      const bindGroup = CubemapSHProjector._bindGroupInst;
-      bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
-      device.setBindGroup(0, bindGroup);
-      this._primitive.get().drawInstanced(9);
-    }
+    device.setProgram(CubemapSHProjector._programInst);
+    device.setFramebuffer(this._renderTarget.get());
+    device.clearFrameBuffer(clearColor, null, null);
+    const bindGroup = CubemapSHProjector._bindGroupInst;
+    bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
+    device.setBindGroup(0, bindGroup);
+    this._primitive.get().drawInstanced(9);
     device.popDeviceStates();
-    if (!this._useInstancing) {
-      const promises = this._renderTarget.map((fb, i) => {
-        const subarray = outCoeff.subarray(i * 4, i * 4 + 4);
-        return fb.get().getColorAttachments()[0].readPixels(0, 0, 1, 1, 0, 0, subarray);
-      });
-      await Promise.all(promises);
-    } else {
-      await this._renderTarget[0].get().getColorAttachments()[0].readPixels(0, 0, 3, 3, 0, 0, outCoeff);
-    }
+    await this._renderTarget.get().getColorAttachments()[0].readPixels(0, 0, 3, 3, 0, 0, outCoeff);
     this.applyWindow(outCoeff, windowWeights ?? CubemapSHProjector._windowWeights);
     return outCoeff;
   }
-  private init(device: AbstractDevice, useInstancing: boolean) {
+  private init(device: AbstractDevice) {
     if (!this._primitive.get()) {
       const samples = new Float32Array(this._numSamples * 4);
       for (let i = 0; i < this._numSamples; i++) {
@@ -98,26 +82,24 @@ export class CubemapSHProjector {
       }
       const primitive = new Primitive();
       primitive.createAndSetVertexBuffer('position_f32x4', samples);
+      if (device.type === 'webgl') {
+        primitive.createAndSetVertexBuffer(
+          'tex0_f32',
+          new Float32Array([0, 1, 2, 3, 4, 5, 6, 7, 8]),
+          'instance'
+        );
+      }
       primitive.indexCount = this._numSamples;
       primitive.indexStart = 0;
       primitive.primitiveType = 'point-list';
       this._primitive.set(primitive);
     }
 
-    if (this._renderTarget.length === 0) {
-      if (!useInstancing) {
-        for (let i = 0; i < 9; i++) {
-          const texture = device.createTexture2D('rgba32f', 1, 1, {
-            samplerOptions: { mipFilter: 'none' }
-          });
-          this._renderTarget.push(new DRef(device.createFrameBuffer([texture], null)));
-        }
-      } else {
-        const texture = device.createTexture2D('rgba32f', 3, 3, {
-          samplerOptions: { mipFilter: 'none' }
-        });
-        this._renderTarget.push(new DRef(device.createFrameBuffer([texture], null)));
-      }
+    if (!this._renderTarget.get()) {
+      const texture = device.createTexture2D('rgba32f', 3, 3, {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      this._renderTarget.set(device.createFrameBuffer([texture], null));
     }
 
     if (!CubemapSHProjector._renderStats) {
@@ -134,8 +116,6 @@ export class CubemapSHProjector {
 
     if (!CubemapSHProjector._program) {
       CubemapSHProjector._program = CubemapSHProjector._createProgram(device, false);
-      console.log(CubemapSHProjector._program.getShaderSource('vertex'));
-      console.log(CubemapSHProjector._program.getShaderSource('fragment'));
       for (let i = 0; i < 9; i++) {
         CubemapSHProjector._bindGroup.push(
           device.createBindGroup(CubemapSHProjector._program.bindGroupLayouts[0])
@@ -154,6 +134,9 @@ export class CubemapSHProjector {
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.directionWeight = pb.vec4().attrib('position');
+        if (device.type === 'webgl') {
+          this.$inputs.instanceId = pb.float().attrib('texCoord0');
+        }
         pb.main(function () {
           this.$outputs.direction = this.$inputs.directionWeight.xyz;
           this.$outputs.weight = this.$inputs.directionWeight.w;
@@ -163,7 +146,9 @@ export class CubemapSHProjector {
           if (!instancing) {
             this.$builtins.position = pb.vec4(0, 0, 0, 1);
           } else {
-            this.$outputs.shIndex = pb.int(this.$builtins.instanceIndex);
+            this.$outputs.shIndex = pb.int(
+              device.type === 'webgl' ? this.$inputs.instanceId : this.$builtins.instanceIndex
+            );
             this.$l.x = pb.mod(this.$builtins.instanceIndex, 3);
             this.$l.y = pb.div(this.$builtins.instanceIndex, 3);
             this.$l.ndcX = pb.sub(pb.div(pb.add(pb.float(this.x), 0.5), 1.5), 1);

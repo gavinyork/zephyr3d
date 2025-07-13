@@ -10,8 +10,7 @@ import {
   getTransmittanceLut,
   renderAtmosphereLUTs,
   skyBox,
-  smoothNoise3D,
-  transmittanceToSky
+  smoothNoise3D
 } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -76,6 +75,8 @@ export class SkyRenderer {
     return camera;
   })();
   private static _programSky: Partial<Record<SkyType, GPUProgram>> = {};
+  private static _programDistantLight: GPUProgram = null;
+  protected static _bindgroupDistantLight: BindGroup = null;
   private static _bindgroupSky: Partial<Record<SkyType, BindGroup>> = {};
   private static _programFog: GPUProgram = null;
   private static _bindgroupFog: BindGroup = null;
@@ -165,6 +166,7 @@ export class SkyRenderer {
     this._radianceFrameBuffer.dispose();
     this._irradianceMap.dispose();
     this._irradianceFrameBuffer.dispose();
+    this._shProjector.dispose();
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
@@ -783,6 +785,36 @@ export class SkyRenderer {
   }
   /** @internal */
   private static _prepareSkyBox(device: AbstractDevice) {
+    if (!this._programDistantLight) {
+      this._programDistantLight = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.vector = pb.vec3().attrib('position');
+          pb.main(function () {
+            this.$outputs.vector = this.$inputs.vector;
+            this.$builtins.position = pb.vec4(0, 0, 0, 1);
+          });
+        },
+        fragment(pb) {
+          this.$outputs.color = pb.vec4();
+          this.tLut = pb.tex2D().uniform(0);
+          this.skyLut = pb.tex2D().uniform(0);
+          this.params = getAtmosphereParamsStruct(pb)().uniform(0);
+          pb.main(function () {
+            this.$l.sunColor = pb.vec4();
+            this.$l.skyColor = skyBox(
+              this,
+              this.params,
+              this.sunColor,
+              this.$inputs.vector,
+              pb.float(0.01),
+              this.tLut,
+              this.skyLut
+            ).rgb;
+            this.$outputs.color = pb.vec4(pb.mul(this.skyColor, 1 / 64), 1);
+          });
+        }
+      });
+    }
     if (!this._programFogScatter) {
       this._programFogScatter = device.buildRenderProgram({
         label: 'FogScatter',
@@ -1099,19 +1131,22 @@ export class SkyRenderer {
           this.$return(this.f);
         });
         pb.main(function () {
+          // Calculate sky color
+          this.$l.sunColor = pb.vec4();
+          this.$l.skyColor = skyBox(
+            this,
+            this.params,
+            this.sunColor,
+            this.$inputs.worldDirection,
+            pb.float(0.01),
+            this.tLut,
+            this.skyLut
+          ).rgb;
+
           this.$l.rayDir = pb.normalize(this.$inputs.worldDirection);
           this.$l.sunDir = this.params.lightDir;
           // ad-hoc
           this.$l.sunIntensity = pb.sqrt(pb.max(0, pb.mul(this.sunDir.y, this.rayDir.y)));
-          // sun color
-          this.$l.sunTransmittance = transmittanceToSky(
-            this,
-            this.params,
-            pb.vec3(0, pb.add(this.params.cameraHeightScale, this.params.plantRadius), 0),
-            this.sunDir,
-            this.tLut
-          );
-          this.$l.sunColor = pb.mul(this.params.lightColor, pb.vec4(this.sunTransmittance, 1));
 
           // compute cloud
           if (cloud) {
@@ -1150,14 +1185,6 @@ export class SkyRenderer {
             pb.normalize(pb.vec3(this.rayDir.x, pb.max(0, this.rayDir.y), this.rayDir.z)),
             this.rayDir
           );
-          this.$l.skyColor = skyBox(
-            this,
-            this.params,
-            this.sunColor,
-            this.$inputs.worldDirection,
-            pb.float(0.01),
-            this.skyLut
-          ).rgb;
           if (cloud) {
             // blend
             this.$l.vfactor = pb.clamp(pb.div(pb.sub(this.rayDir.y, 0.01), pb.sub(0.03, 0.01)), 0, 1);

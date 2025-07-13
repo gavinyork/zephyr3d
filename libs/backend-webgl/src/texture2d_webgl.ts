@@ -107,7 +107,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     faceOrLevel: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (faceOrLevel !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter 'faceOrLayer' must be 0`);
     }
@@ -115,14 +115,10 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       throw new Error(`Texture2D.readPixels(): invalid miplevel: ${mipLevel}`);
     }
     if (!this.device.isContextLost() && !this.disposed) {
-      const fb = this._device.createFrameBuffer([this], null);
-      fb.setColorAttachmentMipLevel(0, mipLevel);
-      fb.setColorAttachmentGenerateMipmaps(0, false);
+      const fb = this._getFramebufferForRead(0, mipLevel);
       this._device.pushDeviceStates();
       this._device.setFramebuffer(fb);
-      const result = this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-        fb.dispose();
-      });
+      const result = this._device.readPixels(0, x, y, w, h, buffer);
       this._device.popDeviceStates();
       return result;
     }

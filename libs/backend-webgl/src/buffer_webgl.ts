@@ -145,7 +145,6 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       const gl = this._device.context as WebGL2RenderingContext;
       if (isWebGL2(gl)) {
         const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        gl.flush();
         await this.clientWaitAsync(gl, sync, 0, 10);
         gl.deleteSync(sync);
       }

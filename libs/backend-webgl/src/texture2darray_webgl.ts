@@ -226,7 +226,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       this._device.context.generateMipmap(target);
     }
   }
-  readPixels(
+  async readPixels(
     x: number,
     y: number,
     w: number,
@@ -242,19 +242,12 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       throw new Error(`Texture2DArray.readPixels(): invalid miplevel: ${mipLevel}`);
     }
     if (!this.device.isContextLost() && !this.disposed) {
-      return new Promise<void>((resolve) => {
-        const fb = this._device.createFrameBuffer([this], null);
-        fb.setColorAttachmentLayer(0, layer);
-        fb.setColorAttachmentMipLevel(0, mipLevel);
-        fb.setColorAttachmentGenerateMipmaps(0, false);
-        this._device.pushDeviceStates();
-        this._device.setFramebuffer(fb);
-        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-          fb.dispose();
-          resolve();
-        });
-        this._device.popDeviceStates();
-      });
+      const fb = this._getFramebufferForRead(layer, mipLevel);
+      this._device.pushDeviceStates();
+      this._device.setFramebuffer(fb);
+      const result = this._device.readPixels(0, x, y, w, h, buffer);
+      this._device.popDeviceStates();
+      return result;
     }
   }
   readPixelsToBuffer(

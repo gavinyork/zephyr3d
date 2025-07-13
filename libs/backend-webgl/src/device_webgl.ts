@@ -173,6 +173,13 @@ export class WebGLDevice extends BaseDevice {
   private _deviceUniformBufferOffsets: number[];
   private _bindTextures: Record<number, WebGLTexture[]>;
   private _bindSamplers: WebGLSampler[];
+  private _readFormats: Record<
+    string,
+    {
+      format: number;
+      type: number;
+    }
+  >;
   private _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
@@ -219,6 +226,7 @@ export class WebGLDevice extends BaseDevice {
     this._samplerCache = new SamplerCache(this);
     this._textureSamplerMap = new WeakMap();
     this._loseContextExtension = this._context.getExtension('WEBGL_lose_context');
+    this._readFormats = {};
     this.canvas.addEventListener(
       'webglcontextlost',
       (evt) => {
@@ -851,11 +859,17 @@ export class WebGLDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb ? fb.getColorAttachments()[index] : null;
     const format = colorAttachment ? colorAttachment.format : 'rgba8unorm';
-    let glFormat: number = WebGLEnum.NONE;
-    let glType: number = WebGLEnum.NONE;
+    let formatInfo = this._readFormats[format];
+    if (!formatInfo) {
+      formatInfo = {
+        format: this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_FORMAT),
+        type: this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_TYPE)
+      };
+      this._readFormats[format] = formatInfo;
+    }
+    let glFormat = formatInfo.format;
+    let glType = formatInfo.type;
     const pixelSize = getTextureFormatBlockSize(format);
-    glFormat = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_FORMAT);
-    glType = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_TYPE);
     if (
       (glFormat !== WebGLEnum.RGBA || (glType !== WebGLEnum.UNSIGNED_BYTE && glType !== WebGLEnum.FLOAT)) &&
       !isWebGL2(this.context)
@@ -873,7 +887,7 @@ export class WebGLDevice extends BaseDevice {
       });
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object);
       this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
-      this.flush();
+      //this.flush();
       this.context.readPixels(x, y, w, h, glFormat, glType, 0);
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
       const data = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
@@ -920,7 +934,6 @@ export class WebGLDevice extends BaseDevice {
     }
     this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, buffer.object);
     this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
-    this.flush();
     this.context.readPixels(x, y, w, h, glFormat, glType, 0);
     this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
   }

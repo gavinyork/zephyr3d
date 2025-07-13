@@ -682,6 +682,7 @@ export function skyBox(
   f4SunColor: PBShaderExp,
   f3SkyBoxWorldPos: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
+  texTransmittanceLut: PBShaderExp,
   texSkyViewLut: PBShaderExp
 ) {
   const pb = scope.$builder;
@@ -689,7 +690,7 @@ export function skyBox(
   const Params = getAtmosphereParamsStruct(pb);
   pb.func(
     funcName,
-    [Params('params'), pb.vec4('sunColor'), pb.vec3('worldPos'), pb.float('sunSolidAngle')],
+    [Params('params'), pb.vec4('sunColor').out(), pb.vec3('worldPos'), pb.float('sunSolidAngle')],
     function () {
       this.$l.rgb = pb.vec3(0);
       this.$l.viewDir = pb.normalize(this.worldPos);
@@ -704,6 +705,14 @@ export function skyBox(
         pb.vec3(0, pb.add(this.params.plantRadius, pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale)), 0),
         this.viewDir
       );
+      this.$l.sunTransmittance = transmittanceToSky(
+        this,
+        this.params,
+        pb.vec3(0, pb.add(this.params.cameraHeightScale, this.params.plantRadius), 0),
+        this.params.lightDir,
+        texTransmittanceLut
+      );
+      this.sunColor = pb.mul(this.params.lightColor, pb.vec4(this.sunTransmittance, 1));
       this.$if(pb.lessThan(this.groundDistance, 0), function () {
         this.rgb = pb.add(
           this.rgb,

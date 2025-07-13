@@ -78,7 +78,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       this._device.context.generateMipmap(target);
     }
   }
-  readPixels(
+  async readPixels(
     x: number,
     y: number,
     w: number,
@@ -91,18 +91,12 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       throw new Error(`Texture3D.readPixels(): parameter mipLevel must be 0`);
     }
     if (!this.device.isContextLost() && !this.disposed) {
-      return new Promise<void>((resolve) => {
-        const fb = this._device.createFrameBuffer([this], null);
-        fb.setColorAttachmentLayer(0, layer);
-        fb.setColorAttachmentGenerateMipmaps(0, false);
-        this._device.pushDeviceStates();
-        this._device.setFramebuffer(fb);
-        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-          fb.dispose();
-          resolve();
-        });
-        this._device.popDeviceStates();
-      });
+      const fb = this._getFramebufferForRead(layer, mipLevel);
+      this._device.pushDeviceStates();
+      this._device.setFramebuffer(fb);
+      const result = this._device.readPixels(0, x, y, w, h, buffer);
+      this._device.popDeviceStates();
+      return result;
     }
   }
   readPixelsToBuffer(
