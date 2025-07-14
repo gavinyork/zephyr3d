@@ -14,7 +14,7 @@ import {
 } from '../shaders';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
-import type { Primitive } from './primitive';
+import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
 import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
@@ -34,6 +34,7 @@ import { ShaderHelper } from '../material/shader/helper';
 import { fetchSampler } from '../utility/misc';
 import { DRef } from '../app';
 import { CubemapSHProjector } from '../utility/shprojector';
+import { uniformSphereSamples } from '../values';
 
 /**
  * Type of sky
@@ -84,10 +85,12 @@ export class SkyRenderer {
   private static _bindgroupFogScatter: BindGroup = null;
   private static _vertexLayout: VertexLayout = null;
   private static _primitiveSky: Primitive = null;
+  private static _primitiveDistantLight: Primitive = null;
   private static _renderStatesSky: RenderStateSet = null;
   private static _renderStatesSkyNoDepthTest: RenderStateSet = null;
   private static _renderStatesFog: RenderStateSet = null;
   private static _renderStatesFogScatter: RenderStateSet = null;
+  private static _renderStatesDistantLight: RenderStateSet = null;
   private _skyType: SkyType;
   private _skyColor: Vector4;
   private _bakedSkyboxDirty: boolean;
@@ -99,6 +102,7 @@ export class SkyRenderer {
   private _radianceFrameBuffer: DRef<FrameBuffer>;
   private _irradianceMap: DRef<TextureCube>;
   private _irradianceSH: Float32Array;
+  private _skyDistantLightLut: DRef<FrameBuffer>;
   private _irradianceFrameBuffer: DRef<FrameBuffer>;
   private _radianceMapWidth: number;
   private _irradianceMapWidth: number;
@@ -136,6 +140,7 @@ export class SkyRenderer {
     this._radianceMapWidth = 128;
     this._irradianceMap = new DRef();
     this._irradianceSH = new Float32Array(36);
+    this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
     this._atmosphereParams = { ...defaultAtmosphereParams };
@@ -167,6 +172,10 @@ export class SkyRenderer {
     this._irradianceMap.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
+    if (this._skyDistantLightLut.get()) {
+      this._skyDistantLightLut.get().getColorAttachments()[0].dispose();
+      this._skyDistantLightLut.dispose();
+    }
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
@@ -261,14 +270,20 @@ export class SkyRenderer {
     return this._atmosphereExposure;
   }
   set atmosphereExposure(val) {
-    this._atmosphereExposure = val;
+    if (val !== this._atmosphereExposure) {
+      this._atmosphereExposure = val;
+      this.invalidate();
+    }
   }
   /** Aerial perspective density */
   get cameraHeightScale() {
     return this._atmosphereParams.cameraHeightScale;
   }
   set cameraHeightScale(val: number) {
-    this._atmosphereParams.cameraHeightScale = val;
+    if (val !== this._atmosphereParams.cameraHeightScale) {
+      this._atmosphereParams.cameraHeightScale = val;
+      this.invalidate();
+    }
   }
   /**
    * Light density of the sky.
@@ -465,6 +480,12 @@ export class SkyRenderer {
     if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
       this._bakedSkyboxDirty = true;
     }
+    if (!this._skyDistantLightLut.get()) {
+      const tex = ctx.device.createTexture2D('rgba16f', 1, 1, { samplerOptions: { mipFilter: 'none' } });
+      tex.name = 'DistantSkyLut';
+      this._skyDistantLightLut.set(ctx.device.createFrameBuffer([tex], null));
+      this._bakedSkyboxDirty = true;
+    }
     if (!sunDir.equalsTo(this._lastSunDir) || !sunColor.equalsTo(this._lastSunColor)) {
       this._lastSunDir.set(sunDir);
       this._lastSunColor.set(sunColor);
@@ -497,6 +518,7 @@ export class SkyRenderer {
           this._irradianceSH
         );
         ctx.scene.env.light.irradianceSH = this._irradianceSH;
+        this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get());
       }
     }
   }
@@ -507,6 +529,18 @@ export class SkyRenderer {
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
     renderAtmosphereLUTs(this._atmosphereParams);
+  }
+  renderSkyDistantLut(ctx: DrawContext, skybox: TextureCube) {
+    SkyRenderer._prepareSkyBox(ctx.device);
+    ctx.device.pushDeviceStates();
+    ctx.device.setRenderStates(SkyRenderer._renderStatesDistantLight);
+    ctx.device.setProgram(SkyRenderer._programDistantLight);
+    ctx.device.setFramebuffer(this._skyDistantLightLut.get());
+    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), null, null);
+    SkyRenderer._bindgroupDistantLight.setTexture('skybox', skybox, fetchSampler('clamp_linear_nomip'));
+    ctx.device.setBindGroup(0, SkyRenderer._bindgroupDistantLight);
+    SkyRenderer._primitiveDistantLight.draw();
+    ctx.device.popDeviceStates();
   }
   updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4) {
     if (this._skyType === 'skybox' && this.skyboxTexture) {
@@ -796,24 +830,15 @@ export class SkyRenderer {
         },
         fragment(pb) {
           this.$outputs.color = pb.vec4();
-          this.tLut = pb.tex2D().uniform(0);
-          this.skyLut = pb.tex2D().uniform(0);
-          this.params = getAtmosphereParamsStruct(pb)().uniform(0);
+          this.skybox = pb.texCube().uniform(0);
           pb.main(function () {
             this.$l.sunColor = pb.vec4();
-            this.$l.skyColor = skyBox(
-              this,
-              this.params,
-              this.sunColor,
-              this.$inputs.vector,
-              pb.float(0.01),
-              this.tLut,
-              this.skyLut
-            ).rgb;
+            this.$l.skyColor = pb.textureSampleLevel(this.skybox, this.$inputs.vector, 0).rgb;
             this.$outputs.color = pb.vec4(pb.mul(this.skyColor, 1 / 64), 1);
           });
         }
       });
+      this._bindgroupDistantLight = device.createBindGroup(this._programDistantLight.bindGroupLayouts[0]);
     }
     if (!this._programFogScatter) {
       this._programFogScatter = device.buildRenderProgram({
@@ -1056,6 +1081,17 @@ export class SkyRenderer {
       this._renderStatesFogScatter.useBlendingState().enable(true).setBlendFunc('one', 'inv-src-alpha');
       this._renderStatesFogScatter.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
     }
+    if (!this._renderStatesDistantLight) {
+      this._renderStatesDistantLight = device.createRenderStateSet();
+      this._renderStatesDistantLight.useDepthState().enableTest(false).enableWrite(false);
+      this._renderStatesDistantLight
+        .useBlendingState()
+        .enable(true)
+        .setBlendEquation('add', 'add')
+        .setBlendFuncRGB('one', 'one')
+        .setBlendFuncAlpha('zero', 'one');
+      this._renderStatesDistantLight.useRasterizerState().setCullMode('none');
+    }
     if (!this._vertexLayout) {
       this._vertexLayout = device.createVertexLayout({
         vertexBuffers: [
@@ -1070,6 +1106,20 @@ export class SkyRenderer {
     }
     if (!this._primitiveSky) {
       this._primitiveSky = new BoxShape({ size: 8 });
+    }
+    if (!this._primitiveDistantLight) {
+      const data = new Float32Array(uniformSphereSamples.length * 3);
+      let i = 0;
+      for (const v of uniformSphereSamples) {
+        data[i++] = v.x;
+        data[i++] = v.y;
+        data[i++] = v.z;
+      }
+      this._primitiveDistantLight = new Primitive();
+      this._primitiveDistantLight.createAndSetVertexBuffer('position_f32x3', data);
+      this._primitiveDistantLight.indexCount = uniformSphereSamples.length;
+      this._primitiveDistantLight.indexStart = 0;
+      this._primitiveDistantLight.primitiveType = 'point-list';
     }
   }
   /** @internal */
