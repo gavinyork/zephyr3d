@@ -213,8 +213,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           type: 'string',
           phase: 0,
           enum: {
-            labels: ['None', 'Linear', 'Exp', 'Exp2', 'Scatter'],
-            values: ['none', 'linear', 'exp', 'exp2', 'scatter']
+            labels: ['None', 'Linear', 'Exp', 'Exp2', 'ExponentialHeight'],
+            values: ['none', 'linear', 'exp', 'exp2', 'height_fog']
           },
           default: 'none',
           get(this: Scene, value) {
@@ -225,13 +225,81 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
+          label: 'Density',
+          type: 'float',
+          name: 'HeightFogDensity',
+          default: 0.04,
+          options: { minValue: 0, maxValue: 1 },
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogDensity;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogDensity = value.num[0];
+          }
+        },
+        {
+          label: 'Falloff',
+          name: 'HeightFogFalloff',
+          type: 'float',
+          default: 0.2,
+          options: { minValue: 0, maxValue: 1 },
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogFalloff;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogFalloff = value.num[0];
+          }
+        },
+        {
+          label: 'StartHeight',
+          name: 'HeightFogStartHeight',
+          type: 'float',
+          default: 0,
+          options: { minValue: 0, maxValue: 1000 },
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogStartHeight;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogStartHeight = value.num[0];
+          }
+        },
+        {
+          label: 'FogColor',
+          name: 'HeightFogColor',
+          type: 'rgb',
+          phase: 1,
+          animatable: true,
+          default: [1, 1, 1],
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            const color = this.env.sky.heightFogColor;
+            value.num[0] = color.x;
+            value.num[1] = color.y;
+            value.num[2] = color.z;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
           name: 'FogColor',
           type: 'rgb',
           phase: 1,
           animatable: true,
           default: [1, 1, 1],
-          isValid() {
-            return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
+          isValid(this: Scene) {
+            return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'height_fog';
           },
           get(this: Scene, value) {
             const color = this.env.sky.fogColor;
@@ -248,8 +316,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           type: 'float',
           animatable: true,
           phase: 1,
-          isValid() {
-            return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'scatter';
+          isValid(this: Scene) {
+            return this.env.sky.fogType !== 'none' && this.env.sky.fogType !== 'height_fog';
           },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.fogTop;
@@ -271,7 +339,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           set(this: Scene, value) {
             this.env.sky.fogDensity = value.num[0];
           },
-          isValid() {
+          isValid(this: Scene) {
             return this.env.sky.fogType === 'exp' || this.env.sky.fogType === 'exp2';
           }
         },
@@ -339,24 +407,6 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           },
           isValid() {
             return this.env.sky.skyType === 'scatter';
-          }
-        },
-        {
-          name: 'AerialPerspectiveDebug',
-          type: 'int',
-          enum: {
-            labels: ['None', 'InScattering', 'Transmittance', 'DistanceRatio', 'TransmittanceUV'],
-            values: [0, 1, 2, 3, 4]
-          },
-          default: 0,
-          get(this: Scene, value) {
-            value.num[0] = this.env.sky.aerialPerspectiveDebug;
-          },
-          set(this: Scene, value) {
-            this.env.sky.aerialPerspectiveDebug = value.num[0];
-          },
-          isValid(this: Scene) {
-            return this.env.sky.fogType === 'scatter';
           }
         },
         {

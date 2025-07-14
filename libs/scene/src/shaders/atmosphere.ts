@@ -37,21 +37,25 @@ export type AtmosphereParams = {
   cameraHeightScale: number;
 };
 
-export const defaultAtmosphereParams: Readonly<AtmosphereParams> = {
-  plantRadius: 6360000,
-  atmosphereHeight: 60000,
-  rayleighScatteringHeight: 8000,
-  mieScatteringHeight: 1200,
-  mieAnstropy: 0.8,
-  ozoneCenter: 25000,
-  ozoneWidth: 15000,
-  apDistance: 4000,
-  cameraWorldMatrix: Matrix4x4.identity(),
-  lightDir: new Vector3(1, 0, 0),
-  lightColor: new Vector4(1, 1, 1, 10),
-  cameraAspect: 1,
-  cameraHeightScale: 50
-};
+export function getDefaultAtmosphereParams(): AtmosphereParams {
+  return {
+    plantRadius: 6360000,
+    atmosphereHeight: 60000,
+    rayleighScatteringHeight: 8000,
+    mieScatteringHeight: 1200,
+    mieAnstropy: 0.8,
+    ozoneCenter: 25000,
+    ozoneWidth: 15000,
+    apDistance: 4000,
+    cameraWorldMatrix: Matrix4x4.identity(),
+    lightDir: new Vector3(1, 0, 0),
+    lightColor: new Vector4(1, 1, 1, 10),
+    cameraAspect: 1,
+    cameraHeightScale: 50
+  };
+}
+
+const defaultAtmosphereParams = getDefaultAtmosphereParams();
 
 let currentAtmosphereParams: AtmosphereParams = null;
 
@@ -667,7 +671,6 @@ export function aerialPerspective(
   stParams: PBShaderExp,
   f3CameraPos: PBShaderExp,
   f3WorldPos: PBShaderExp,
-  fAPDistance: PBShaderExp,
   f3Dim: PBShaderExp,
   f4Debug: PBShaderExp,
   texAerialPerspectiveLut: PBShaderExp
@@ -682,7 +685,6 @@ export function aerialPerspective(
       pb.vec2('uv'),
       pb.vec3('cameraPos'),
       pb.vec3('worldPos'),
-      pb.float('apDistance'),
       pb.vec3('dim'),
       pb.vec4('debugValue').out()
     ],
@@ -690,6 +692,7 @@ export function aerialPerspective(
       this.$l.V = pb.sub(this.worldPos, this.cameraPos);
       this.$l.dis = pb.length(this.V);
       this.$l.viewDir = pb.normalize(this.V);
+      this.$l.apDistance = pb.div(this.params.apDistance, this.params.cameraHeightScale);
       this.$l.d0 = pb.clamp(pb.div(this.dis, this.apDistance), 0, 1);
       this.$l.weight = pb.clamp(pb.mul(this.d0, 2), 0, 1);
       this.$l.dz = pb.mul(this.d0, pb.sub(this.dim.z, 1));
@@ -718,7 +721,7 @@ export function aerialPerspective(
       this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
     }
   );
-  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, fAPDistance, f3Dim, f4Debug);
+  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim, f4Debug);
 }
 
 export function aerialPerspectiveLut(

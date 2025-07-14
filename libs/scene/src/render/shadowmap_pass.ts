@@ -37,7 +37,7 @@ export class ShadowMapPass extends RenderPass {
     if (items) {
       ctx.drawEnvLight = false;
       ctx.env = null;
-      ctx.applyFog = null;
+      ctx.fogFlags = 0;
       ctx.flip = this.isAutoFlip(ctx);
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);

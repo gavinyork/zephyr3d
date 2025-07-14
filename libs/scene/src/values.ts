@@ -119,6 +119,17 @@ export const enum MaterialVaryingFlags {
   SSR_STORE_ROUGHNESS = 1 << 3
 }
 
+/**
+ * Atmospheric Fog flag
+ * @public
+ */
+export const ATMOSPHERIC_FOG_BIT = 1 << 0;
+/**
+ * Exponential Fog flag
+ * @public
+ */
+export const HEIGHT_FOG_BIT = 1 << 1;
+
 /** @internal */
 export const uniformSphereSamples = [
   new Vector3(-0.7838, -0.620933, 0.00996137),

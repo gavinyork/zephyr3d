@@ -9,7 +9,7 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
-import type { FogType, Primitive, RenderPass } from '.';
+import type { Primitive, RenderPass } from '.';
 import type { DrawableInstanceInfo, InstanceData, RenderQueue, RenderQueueRef } from './render_queue';
 import type { ShadowMapParams } from '../shadow';
 import type { Environment } from '../scene/environment';
@@ -61,8 +61,8 @@ export interface DrawContext {
   renderPass: RenderPass;
   /** Hash value for the drawing task */
   renderPassHash: string;
-  /** Whether should apply fog to fragment */
-  applyFog: FogType;
+  /** What kinds of fog should be applied to transparent objects */
+  fogFlags: number;
   /** Wether should flip upside down */
   flip: boolean;
   /** Whether current render pass is base light pass */

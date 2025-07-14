@@ -525,7 +525,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
-    if (this.isTransparentPass(pass) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+    if (
+      this.isTransparentPass(pass) &&
+      ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT &&
+      !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
+    ) {
       bindGroup.setValue('zOpacity', this._opacity);
     }
     if (ctx.oit) {

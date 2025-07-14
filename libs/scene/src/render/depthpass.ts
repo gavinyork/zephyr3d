@@ -50,7 +50,7 @@ export class DepthPass extends RenderPass {
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
-      ctx.applyFog = null;
+      ctx.fogFlags = 0;
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.flip = this.isAutoFlip(ctx);

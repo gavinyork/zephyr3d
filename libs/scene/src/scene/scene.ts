@@ -201,31 +201,13 @@ export class Scene extends makeEventTarget(Object)<{
   private updateEnvLight() {
     if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
       if (!this.env.light.radianceMap) {
-        if (this.env.sky.skyType !== 'none') {
-          this.env.light.radianceMap = this.env.sky.radianceMap;
-        }
-      } else if (this.env.light.radianceMap === this.env.sky.radianceMap) {
-        if (this.env.sky.skyType === 'none') {
-          this.env.light.radianceMap = null;
-        }
+        this.env.light.radianceMap = this.env.sky.radianceMap;
       }
       if (!this.env.light.irradianceMap) {
-        if (this.env.sky.skyType !== 'none') {
-          this.env.light.irradianceMap = this.env.sky.irradianceMap;
-        }
-      } else if (this.env.light.irradianceMap === this.env.sky.irradianceMap) {
-        if (this.env.sky.skyType === 'none') {
-          this.env.light.irradianceMap = null;
-        }
+        this.env.light.irradianceMap = this.env.sky.irradianceMap;
       }
       if (!this.env.light.irradianceSH) {
-        if (this.env.sky.skyType !== 'none') {
-          this.env.light.irradianceSH = this.env.sky.irradianceSH;
-        } else if (this.env.light.irradianceSH === this.env.sky.irradianceSH) {
-          if (this.env.sky.skyType === 'none') {
-            this.env.light.irradianceSH = null;
-          }
-        }
+        this.env.light.irradianceSH = this.env.sky.irradianceSH;
       }
     }
   }

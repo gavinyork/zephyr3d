@@ -3,7 +3,7 @@ import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
 import type { AtmosphereParams } from '../shaders';
 import {
   aerialPerspective,
-  defaultAtmosphereParams,
+  getDefaultAtmosphereParams,
   getAerialPerspectiveLut,
   getAtmosphereParamsStruct,
   getSkyViewLut,
@@ -35,6 +35,12 @@ import { fetchSampler } from '../utility/misc';
 import { DRef } from '../app';
 import { CubemapSHProjector } from '../utility/shprojector';
 import { uniformSphereSamples } from '../values';
+import {
+  calculateHeightFog,
+  getDefaultHeightFogParams,
+  getHeightFogParamsStruct,
+  HeightFogParams
+} from '../shaders/fog';
 
 /**
  * Type of sky
@@ -47,19 +53,19 @@ import { uniformSphereSamples } from '../values';
  *
  * @public
  */
-export type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none';
+export type SkyType = 'color' | 'skybox' | 'scatter' | 'none';
 
 /**
  * Type of fog
  * @public
  */
-export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
+export type FogType = 'linear' | 'exp' | 'exp2' | 'height_fog' | 'none';
 
 const fogTypeMap: Record<FogType, number> = {
   linear: ShaderHelper.FOG_TYPE_LINEAR,
   exp: ShaderHelper.FOG_TYPE_EXP,
   exp2: ShaderHelper.FOG_TYPE_EXP2,
-  scatter: ShaderHelper.FOG_TYPE_SCATTER,
+  height_fog: ShaderHelper.FOG_TYPE_HEIGHT,
   none: ShaderHelper.FOG_TYPE_NONE
 };
 
@@ -83,6 +89,8 @@ export class SkyRenderer {
   private static _bindgroupFog: BindGroup = null;
   private static _programFogScatter: GPUProgram = null;
   private static _bindgroupFogScatter: BindGroup = null;
+  private static _programHeightFog: GPUProgram = null;
+  private static _bindgroupHeightFog: BindGroup = null;
   private static _vertexLayout: VertexLayout = null;
   private static _primitiveSky: Primitive = null;
   private static _primitiveDistantLight: Primitive = null;
@@ -111,6 +119,7 @@ export class SkyRenderer {
   private _fogType: FogType;
   private _fogColor: Vector4;
   private _fogParams: Vector4;
+  private _heightFogParams: HeightFogParams;
   private _cloudy: number;
   private _cloudIntensity: number;
   private _debugAerialPerspective: number;
@@ -143,12 +152,13 @@ export class SkyRenderer {
     this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
-    this._atmosphereParams = { ...defaultAtmosphereParams };
+    this._atmosphereParams = getDefaultAtmosphereParams();
     this._atmosphereExposure = 1;
     this._debugAerialPerspective = 0;
-    this._fogType = 'scatter';
+    this._fogType = 'none';
     this._fogColor = Vector4.one();
     this._fogParams = new Vector4(1, 100, 50, 0.002);
+    this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
     this._wind = new Vector2(0, 0);
@@ -179,7 +189,7 @@ export class SkyRenderer {
   }
   /** @internal */
   getHash(ctx: DrawContext): string {
-    return ctx.applyFog === 'scatter' ? '1' : ctx.applyFog ? '2' : '0';
+    return String(ctx.fogFlags);
   }
   /** Which type of the sky should be rendered */
   get skyType(): SkyType {
@@ -284,6 +294,34 @@ export class SkyRenderer {
       this._atmosphereParams.cameraHeightScale = val;
       this.invalidate();
     }
+  }
+  /** Height fog color */
+  get heightFogColor() {
+    return this._heightFogParams.fogColor;
+  }
+  set heightFogColor(val: Vector3) {
+    this._heightFogParams.fogColor.set(val);
+  }
+  /** Height fog density */
+  get heightFogDensity() {
+    return this._heightFogParams.globalDensity;
+  }
+  set heightFogDensity(val: number) {
+    this._heightFogParams.globalDensity = val;
+  }
+  /** Height fog falloff */
+  get heightFogFalloff() {
+    return this._heightFogParams.heightFalloff;
+  }
+  set heightFogFalloff(val: number) {
+    this._heightFogParams.heightFalloff = val;
+  }
+  /** Height fog start height */
+  get heightFogStartHeight() {
+    return this._heightFogParams.startHeight;
+  }
+  set heightFogStartHeight(val: number) {
+    this._heightFogParams.startHeight = val;
   }
   /**
    * Light density of the sky.
@@ -464,7 +502,7 @@ export class SkyRenderer {
   }
   /** @internal */
   drawScatteredFog(ctx: DrawContext) {
-    return ctx.sunLight && this._fogType === 'scatter';
+    return this.skyType === 'scatter';
   }
   /** @internal */
   getAerialPerspectiveLUT(ctx: DrawContext) {
@@ -493,7 +531,7 @@ export class SkyRenderer {
     }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
-      this.updateBakedSkyMap(sunDir, sunColor);
+      this.updateBakedSkyMap();
       if (
         ctx.scene.env.light.radianceMap &&
         (ctx.scene.env.light.radianceMap === this.radianceMap ||
@@ -542,7 +580,7 @@ export class SkyRenderer {
     SkyRenderer._primitiveDistantLight.draw();
     ctx.device.popDeviceStates();
   }
-  updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4) {
+  updateBakedSkyMap() {
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
     } else {
@@ -571,12 +609,34 @@ export class SkyRenderer {
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         camera.lookAtCubeFace(face);
         this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
-        this._renderSky(camera, false, true, true);
+        this._renderSky(camera, false, true);
       }
       device.popDeviceStates();
       device.setRenderStates(saveRenderStates);
       this._bakedSkyboxTexture.set(tex);
     }
+  }
+  /** @internal */
+  renderHeightFog(ctx: DrawContext) {
+    const camera = ctx.camera;
+    const sceneDepthTexture = ctx.linearDepthTexture;
+    const device = ctx.device;
+    const fogProgram = SkyRenderer._programHeightFog;
+    const renderStates = SkyRenderer._renderStatesFog;
+    const bindgroup = SkyRenderer._bindgroupHeightFog;
+    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setTexture('distantLightLut', this._skyDistantLightLut.get().getColorAttachments()[0]);
+    bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
+    bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
+    bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
+    bindgroup.setValue('cameraPosition', camera.getWorldPosition());
+    bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+    bindgroup.setValue('params', this._heightFogParams);
+    device.setProgram(fogProgram);
+    device.setBindGroup(0, bindgroup);
+    device.setVertexLayout(SkyRenderer._vertexLayout);
+    device.setRenderStates(renderStates);
+    device.draw('triangle-strip', 0, 4);
   }
   /** @internal */
   renderAtmosphericFog(ctx: DrawContext) {
@@ -593,10 +653,6 @@ export class SkyRenderer {
     bindgroup.setValue('cameraPosition', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
     bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
-    bindgroup.setValue(
-      'sliceDist',
-      this._atmosphereParams.apDistance / this._atmosphereParams.cameraHeightScale
-    );
     bindgroup.setValue('params', this._atmosphereParams);
     bindgroup.setValue('debug', this._debugAerialPerspective);
     device.setProgram(fogProgram);
@@ -638,7 +694,9 @@ export class SkyRenderer {
     if (this._skyType === 'scatter') {
       this.renderAtmosphericFog(ctx);
     }
-    if (this._fogType !== 'none' && this._fogType !== 'scatter') {
+    if (this._fogType === 'height_fog') {
+      this.renderHeightFog(ctx);
+    } else if (this._fogType !== 'none') {
       this.renderLegacyFog(ctx);
     }
     device.setRenderStates(savedRenderStates);
@@ -650,15 +708,15 @@ export class SkyRenderer {
       skyCamera = SkyRenderer._skyCamera;
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
-    this._renderSky(skyCamera, true, this._drawGround, this._skyType === 'scatter' && this._cloudy > 0);
+    this._renderSky(skyCamera, true, this._drawGround);
   }
   /** @internal */
-  private _renderSky(camera: Camera, depthTest: boolean, drawGround: boolean, drawCloud: boolean) {
+  private _renderSky(camera: Camera, depthTest: boolean, drawGround: boolean) {
     const device = Application.instance.device;
     const savedRenderStates = device.getRenderStates();
     SkyRenderer._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
-      this._drawScattering(camera, depthTest, drawGround, drawCloud);
+      this._drawScattering(camera, depthTest, drawGround);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
     } else {
@@ -783,15 +841,13 @@ export class SkyRenderer {
     return new Vector3(Math.exp(-sum.x), Math.exp(-sum.y), Math.exp(-sum.z));
   }
   /** @internal */
-  private _drawScattering(camera: Camera, depthTest: boolean, drawGround: boolean, drawCloud: boolean) {
+  private _drawScattering(camera: Camera, depthTest: boolean, drawGround: boolean) {
     const device = Application.instance.device;
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
     //const apLut = ScatteringLut.getAerialPerspectiveLut(alpha, 8000);
-    const program = drawCloud ? SkyRenderer._programSky.scatter : SkyRenderer._programSky['scatter-nocloud'];
-    const bindgroup = drawCloud
-      ? SkyRenderer._bindgroupSky.scatter
-      : SkyRenderer._bindgroupSky['scatter-nocloud'];
+    const program = SkyRenderer._programSky.scatter;
+    const bindgroup = SkyRenderer._bindgroupSky.scatter;
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
@@ -803,12 +859,10 @@ export class SkyRenderer {
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
-    if (drawCloud) {
-      bindgroup.setValue('cloudy', this._cloudy);
-      bindgroup.setValue('cloudIntensity', this._cloudIntensity);
-      bindgroup.setValue('time', device.frameInfo.elapsedOverall * 0.001);
-      bindgroup.setValue('velocity', this._wind);
-    }
+    bindgroup.setValue('cloudy', this._cloudy);
+    bindgroup.setValue('cloudIntensity', this._cloudIntensity);
+    bindgroup.setValue('time', device.frameInfo.elapsedOverall * 0.001);
+    bindgroup.setValue('velocity', this._wind);
     bindgroup.setValue('drawGround', drawGround ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindgroup);
@@ -840,6 +894,61 @@ export class SkyRenderer {
       });
       this._bindgroupDistantLight = device.createBindGroup(this._programDistantLight.bindGroupLayouts[0]);
     }
+    if (!this._programHeightFog) {
+      this._programHeightFog = device.buildRenderProgram({
+        vertex(pb) {
+          this.rt = pb.int().uniform(0);
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type === 'webgpu') {
+              this.$if(pb.notEqual(this.rt, 0), function () {
+                this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+              });
+            }
+          });
+        },
+        fragment(pb) {
+          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.distantLightLut = pb.tex2D().uniform(0);
+          this.invProjViewMatrix = pb.mat4().uniform(0);
+          this.cameraNearFar = pb.vec2().uniform(0);
+          this.cameraPosition = pb.vec3().uniform(0);
+          this.params = getHeightFogParamsStruct(pb)().uniform(0);
+          this.srgbOut = pb.int().uniform(0);
+          this.$outputs.outColor = pb.vec4();
+          pb.main(function () {
+            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
+            if (device.type === 'webgl') {
+              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
+            } else {
+              this.$l.linearDepth = this.depthValue.r;
+            }
+            this.$l.nonLinearDepth = pb.div(
+              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
+              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+            );
+            this.$l.clipSpacePos = pb.vec4(
+              pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
+              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              1
+            );
+            this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
+            this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
+            this.$outputs.outColor = calculateHeightFog(
+              this,
+              this.params,
+              this.cameraPosition,
+              this.hPos.xyz,
+              this.distantLightLut
+            );
+          });
+        }
+      });
+      this._bindgroupHeightFog = device.createBindGroup(this._programHeightFog.bindGroupLayouts[0]);
+    }
     if (!this._programFogScatter) {
       this._programFogScatter = device.buildRenderProgram({
         label: 'FogScatter',
@@ -863,7 +972,6 @@ export class SkyRenderer {
           this.cameraNearFar = pb.vec2().uniform(0);
           this.cameraPosition = pb.vec3().uniform(0);
           this.apLut = pb.tex2D().uniform(0);
-          this.sliceDist = pb.float().uniform(0);
           this.params = getAtmosphereParamsStruct(pb)().uniform(0);
           this.debug = pb.int().uniform(0);
           this.srgbOut = pb.int().uniform(0);
@@ -894,7 +1002,6 @@ export class SkyRenderer {
               this.params,
               this.cameraPosition,
               this.hPos.xyz,
-              this.sliceDist,
               pb.vec3(32, 32, 32),
               this.debugValue,
               this.apLut
@@ -1015,12 +1122,6 @@ export class SkyRenderer {
     if (!this._programSky.scatter) {
       this._programSky.scatter = SkyRenderer._createScatterProgram(device, true);
       this._bindgroupSky.scatter = device.createBindGroup(this._programSky.scatter.bindGroupLayouts[0]);
-    }
-    if (!this._programSky['scatter-nocloud']) {
-      this._programSky['scatter-nocloud'] = SkyRenderer._createScatterProgram(device, false);
-      this._bindgroupSky['scatter-nocloud'] = device.createBindGroup(
-        this._programSky['scatter-nocloud'].bindGroupLayouts[0]
-      );
     }
     if (!this._programSky.skybox) {
       this._programSky.skybox = device.buildRenderProgram({

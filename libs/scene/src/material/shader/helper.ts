@@ -1,6 +1,7 @@
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
+  ATMOSPHERIC_FOG_BIT,
   MaterialVaryingFlags,
   MAX_CLUSTERED_LIGHTS,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
@@ -13,7 +14,6 @@ import {
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
-import { ScatteringLut } from '../../render/scatteringlut';
 import type {
   BindGroup,
   PBShaderExp,
@@ -28,6 +28,7 @@ import type { PunctualLight } from '../../scene/light';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
 import { Application } from '../../app';
 import { fetchSampler } from '../../utility/misc';
+import { aerialPerspective, getAtmosphereParamsStruct } from '../../shaders';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -62,7 +63,7 @@ export class ShaderHelper {
   static readonly FOG_TYPE_LINEAR = 1;
   static readonly FOG_TYPE_EXP = 2;
   static readonly FOG_TYPE_EXP2 = 3;
-  static readonly FOG_TYPE_SCATTER = 4;
+  static readonly FOG_TYPE_HEIGHT = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
   static readonly MATERIAL_INSTANCE_DATA_OFFSET = 9;
@@ -223,12 +224,16 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
-      const fogStruct = pb.defineStruct([
+      const fogStructMembers: PBShaderExp[] = [
         pb.int('fogType'),
         pb.vec4('fogColor'),
         pb.vec4('fogParams'),
         pb.float('apDensity')
-      ]);
+      ];
+      if (ctx.fogFlags & ATMOSPHERIC_FOG_BIT) {
+        fogStructMembers.push(getAtmosphereParamsStruct(pb)('atmosphereParams'));
+      }
+      const fogStruct = pb.defineStruct(fogStructMembers);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
             pb.vec3('sunDir'),
@@ -258,7 +263,7 @@ export class ShaderHelper {
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
         ).uniform(0);
       }
-      if (ctx.applyFog === 'scatter') {
+      if (ctx.fogFlags & ATMOSPHERIC_FOG_BIT) {
         scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
       }
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
@@ -1110,6 +1115,14 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_GLOBAL].fog.fogType;
   }
   /**
+   * Gets the uniform variable that contains atmosphere parameters
+   * @param scope - Current shader scope
+   * @returns The atmosphere parameters
+   */
+  static getAtmosphereParams(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_GLOBAL].fog.atmosphereParams;
+  }
+  /**
    * Gets the aerial perspective LUT
    * @param scope - Current shader scope
    * @returns The aerial perspective LUT texture
@@ -1502,53 +1515,26 @@ export class ShaderHelper {
   static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext) {
     const pb = scope.$builder;
     const that = this;
-    if (ctx.applyFog === 'scatter') {
+    if (ctx.fogFlags & ATMOSPHERIC_FOG_BIT) {
       const funcName = 'Z_applySkyFog';
       pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
-        this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
-        this.viewDir.y = pb.max(this.viewDir.y, 0);
-        this.$l.distance = pb.mul(pb.length(this.viewDir), that.getAPDensity(this));
-        this.$l.sliceDist = pb.div(
-          pb.mul(that.getCameraParams(this).y, that.getAPDensity(this)),
-          ScatteringLut.aerialPerspectiveSliceZ
-        );
-        this.$l.slice0 = pb.floor(pb.div(this.distance, this.sliceDist));
-        this.$l.slice1 = pb.add(this.slice0, 1);
-        this.$l.factor = pb.sub(pb.div(this.distance, this.sliceDist), this.slice0);
-        this.$l.viewNormal = pb.normalize(this.viewDir);
-        this.$l.horizonAngle = pb.acos(
-          pb.clamp(pb.dot(pb.normalize(that.getSunLightDir(this).xz), pb.normalize(this.viewNormal.xz)), 0, 1)
-        );
-        this.$l.zenithAngle = pb.asin(this.viewNormal.y);
-        this.$l.sliceU = pb.max(
-          pb.div(this.horizonAngle, Math.PI * 2),
-          0.5 / ScatteringLut.aerialPerspectiveSliceZ
-        );
-        this.$l.u0 = pb.div(pb.add(this.slice0, this.sliceU), ScatteringLut.aerialPerspectiveSliceZ);
-        this.$l.u1 = pb.add(this.u0, 1 / ScatteringLut.aerialPerspectiveSliceZ);
-        this.$l.v = pb.div(this.zenithAngle, Math.PI / 2);
-        this.$l.t0 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u0, this.v), 0);
-        this.$l.t1 = pb.textureSampleLevel(that.getAerialPerspectiveLUT(this), pb.vec2(this.u1, this.v), 0);
-        this.$l.t = pb.mix(this.t0, this.t1, this.factor);
-
-        this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.t.a), this.t.rgb), this.color.a);
-        //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
-      });
-      scope[funcName](worldPos, color);
-    } else if (ctx.applyFog) {
-      const funcName = 'Z_applyFog';
-      pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
-        this.$l.viewDir = pb.sub(this.worldPos, that.getCameraPosition(this));
-        this.$l.fogFactor = that.computeFogFactor(
+        this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
+        this.$l.debug = pb.vec4();
+        this.$l.fog = aerialPerspective(
           this,
-          this.viewDir,
-          that.getFogType(this),
-          that.getFogParams(this)
+          this.uv,
+          that.getAtmosphereParams(this),
+          that.getCameraPosition(this).xyz,
+          this.worldPos,
+          pb.vec3(32),
+          this.debug,
+          that.getAerialPerspectiveLUT(this)
         );
         this.color = pb.vec4(
-          pb.mix(this.color.rgb, that.getFogColor(this).rgb, this.fogFactor),
+          pb.add(pb.mul(this.color.rgb, pb.sub(1, this.fog.a)), this.fog.rgb),
           this.color.a
         );
+        //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
       });
       scope[funcName](worldPos, color);
     }

@@ -135,7 +135,7 @@ export class SceneRenderer {
         lightBlending: false,
         renderPass: null,
         renderPassHash: null,
-        applyFog: null,
+        fogFlags: 0,
         flip: false,
         depthFormat,
         colorFormat,
@@ -296,10 +296,7 @@ export class SceneRenderer {
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
 
     // Update sky
-    const useScatter =
-      ctx.scene.env.sky.skyType === 'scatter' ||
-      ctx.scene.env.sky.skyType === 'scatter-nocloud' ||
-      ctx.scene.env.sky.fogType === 'scatter';
+    const useScatter = ctx.scene.env.sky.skyType === 'scatter';
     if (useScatter) {
       ctx.scene.env.sky.renderAtmosphereLUTs(ctx);
     }
