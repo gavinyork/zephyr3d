@@ -73,16 +73,23 @@ export function calculateHeightFog(
   const funcName = 'Z_calcHeightFog';
   const Params = getHeightFogParamsStruct(pb);
   pb.func(funcName, [Params('params'), pb.vec3('cameraPos'), pb.vec3('worldPos')], function () {
-    this.$l.ray = pb.normalize(pb.sub(this.worldPos, this.cameraPos));
-    this.$l.origin = pb.add(this.cameraPos, pb.mul(this.ray, this.params.startDistance));
-    this.$l.height = pb.sub(this.cameraPos.y, this.params.startHeight);
+    this.$l.ray = pb.sub(this.worldPos, this.cameraPos);
+    this.$l.d = pb.length(this.ray);
+    this.$l.rayNorm = pb.div(this.ray, this.d);
+    this.$l.startDistance = pb.clamp(this.params.startDistance, 0, this.d);
+    this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.startDistance));
+    this.$l.height = pb.sub(this.origin.y, this.params.startHeight);
     this.$l.term = pb.mul(
       this.params.globalDensity,
-      pb.exp(pb.neg(pb.mul(this.params.heightFalloff, this.height)))
+      pb.exp2(pb.neg(pb.mul(this.params.heightFalloff, this.height)))
     );
 
     this.$l.falloff = pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y));
-    this.$l.factor = pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff);
+    this.$l.factor = this.$choice(
+      pb.greaterThan(pb.abs(this.falloff), 0.01),
+      pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
+      pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
+    );
     this.factor = pb.mul(this.term, this.factor);
     this.$l.rayLength = pb.distance(this.origin, this.worldPos);
     this.$l.factor = pb.mul(this.factor, this.rayLength);

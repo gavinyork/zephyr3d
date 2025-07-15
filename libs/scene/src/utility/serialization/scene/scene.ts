@@ -293,6 +293,37 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
+          label: 'StartDistance',
+          name: 'HeightFogStartDistance',
+          type: 'float',
+          default: 0,
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogStartDistance;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogStartDistance = value.num[0];
+          }
+        },
+        {
+          label: 'MaxOpacity',
+          name: 'HeightFogMaxOpacity',
+          type: 'float',
+          options: { minValue: 0, maxValue: 1 },
+          default: 1,
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogMaxOpacity;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogMaxOpacity = value.num[0];
+          }
+        },
+        {
           name: 'FogColor',
           type: 'rgb',
           phase: 1,

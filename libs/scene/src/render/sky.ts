@@ -323,6 +323,20 @@ export class SkyRenderer {
   set heightFogStartHeight(val: number) {
     this._heightFogParams.startHeight = val;
   }
+  /** Height fog start distance */
+  get heightFogStartDistance() {
+    return this._heightFogParams.startDistance;
+  }
+  set heightFogStartDistance(val: number) {
+    this._heightFogParams.startDistance = val;
+  }
+  /** Height fog maximum opacity */
+  get heightFogMaxOpacity() {
+    return this._heightFogParams.maxOpacity;
+  }
+  set heightFogMaxOpacity(val: number) {
+    this._heightFogParams.maxOpacity = val;
+  }
   /**
    * Light density of the sky.
    *
