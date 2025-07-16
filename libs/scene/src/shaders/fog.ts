@@ -11,7 +11,10 @@ export type HeightFogParams = {
   dirInscatteringExponent: number;
   dirInscatteringColor: Vector3;
   dirInscatteringStartDistance: number;
+  atmosphereEffectStrength: number;
+  rayOriginTerm: number;
   lightDir: Vector3;
+  limitCameraHeight: number;
 };
 
 export function getDefaultHeightFogParams(): HeightFogParams {
@@ -25,7 +28,10 @@ export function getDefaultHeightFogParams(): HeightFogParams {
     dirInscatteringStartDistance: 0,
     fogColor: new Vector3(0, 0, 0),
     dirInscatteringColor: new Vector3(1, 1, 1),
-    lightDir: new Vector3(0, 1, 0)
+    atmosphereEffectStrength: 1,
+    rayOriginTerm: 0,
+    lightDir: new Vector3(0, 1, 0),
+    limitCameraHeight: 600
   };
 }
 
@@ -38,8 +44,11 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
     pb.float('maxOpacity'),
     pb.float('dirInscatteringExponent'),
     pb.float('dirInscatteringStartDistance'),
+    pb.float('atmosphereEffectStrength'),
     pb.vec3('fogColor'),
+    pb.float('limitCameraHeight'),
     pb.vec3('dirInscatteringColor'),
+    pb.float('rayOriginTerm'),
     pb.vec3('lightDir')
   ]);
 }
@@ -67,7 +76,7 @@ export function calculateHeightFog(
   params: PBShaderExp,
   cameraPos: PBShaderExp,
   worldPos: PBShaderExp,
-  skyDistantColorLut?: PBShaderExp
+  skyDistantColorLut: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_calcHeightFog';
@@ -76,23 +85,38 @@ export function calculateHeightFog(
     this.$l.ray = pb.sub(this.worldPos, this.cameraPos);
     this.$l.d = pb.length(this.ray);
     this.$l.rayNorm = pb.div(this.ray, this.d);
-    this.$l.startDistance = pb.clamp(this.params.startDistance, 0, this.d);
+    this.$l.offset = pb.clamp(
+      pb.sub(
+        1,
+        pb.div(
+          this.params.limitCameraHeight,
+          pb.max(0.000001, pb.sub(this.cameraPos.y, this.params.startHeight))
+        )
+      ),
+      0,
+      1
+    );
+    this.$l.startDistance = pb.max(
+      pb.clamp(this.params.startDistance, 0, this.d),
+      pb.mul(this.offset, this.d)
+    );
     this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.startDistance));
     this.$l.height = pb.sub(this.origin.y, this.params.startHeight);
-    this.$l.term = pb.mul(
-      this.params.globalDensity,
-      pb.exp2(pb.neg(pb.mul(this.params.heightFalloff, this.height)))
-    );
+    this.$l.term = this.params.rayOriginTerm;
 
-    this.$l.falloff = pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y));
+    this.$l.falloff = pb.clamp(
+      pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y)),
+      -125,
+      126
+    );
     this.$l.factor = this.$choice(
       pb.greaterThan(pb.abs(this.falloff), 0.01),
       pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
       pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
     );
-    this.factor = pb.mul(this.term, this.factor);
+    this.fogFactor = pb.mul(this.term, this.factor);
     this.$l.rayLength = pb.distance(this.origin, this.worldPos);
-    this.$l.factor = pb.mul(this.factor, this.rayLength);
+    this.$l.fogFactor = pb.clamp(pb.mul(this.fogFactor, this.rayLength), -125, 126);
     /*
     this.$l.directionalInscattering = pb.mul(
       this.params.dirInscatteringColor.rgb,
@@ -106,20 +130,18 @@ export function calculateHeightFog(
     this.$l.directionalInscattering = pb.mul(this.$l.directionalInscattering, pb.sub(1, this.dirFactor));
     */
     this.$l.fogFactor = pb.min(
-      pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.factor)), 0, 1)),
+      pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.fogFactor)), 0, 1)),
       this.params.maxOpacity
     );
-    //this.fogFactor = this.term;
-    //this.$l.invFogFactor = pb.sub(1, this.term /*this.fogFactor*/);
     this.$l.fogColor = this.params.fogColor;
-    if (skyDistantColorLut) {
-      this.fogColor = pb.add(this.fogColor, pb.textureSampleLevel(skyDistantColorLut, pb.vec2(0.5), 0).rgb);
-    }
+    this.$if(pb.greaterThan(this.params.atmosphereEffectStrength, 0), function () {
+      this.$l.skyContrib = pb.textureSampleLevel(skyDistantColorLut, pb.vec2(0.5), 0).rgb;
+      this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.atmosphereEffectStrength));
+    });
     this.$l.fogColor = pb.add(
       pb.mul(this.fogColor, this.fogFactor),
       pb.vec3(0) /*this.directionalInscattering*/
     );
-    //this.$return(pb.vec4(this.fogFactor, this.fogFactor, this.fogFactor, 1));
     this.$return(pb.vec4(this.fogColor, this.fogFactor));
   });
   return scope[funcName](params, cameraPos, worldPos);

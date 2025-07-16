@@ -324,6 +324,22 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
+          label: 'AtmosphereStrength',
+          name: 'HeightFogAtmosphereStrength',
+          type: 'float',
+          options: { minValue: 0, maxValue: 10 },
+          default: 1,
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogAtmosphereEffectStrength;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogAtmosphereEffectStrength = value.num[0];
+          }
+        },
+        {
           name: 'FogColor',
           type: 'rgb',
           phase: 1,

@@ -337,6 +337,13 @@ export class SkyRenderer {
   set heightFogMaxOpacity(val: number) {
     this._heightFogParams.maxOpacity = val;
   }
+  /** Height fog atmosphere contribution strength */
+  get heightFogAtmosphereEffectStrength() {
+    return this._heightFogParams.atmosphereEffectStrength;
+  }
+  set heightFogAtmosphereEffectStrength(val: number) {
+    this._heightFogParams.atmosphereEffectStrength = val;
+  }
   /**
    * Light density of the sky.
    *
@@ -527,6 +534,18 @@ export class SkyRenderer {
     }
   }
   update(ctx: DrawContext) {
+    // Update height fog parameters
+    if (this._fogType === 'height_fog') {
+      const p = Math.max(
+        -125,
+        Math.min(
+          126,
+          -this._heightFogParams.heightFalloff *
+            Math.min(600, ctx.camera.getWorldPosition().y - this._heightFogParams.startHeight)
+        )
+      );
+      this._heightFogParams.rayOriginTerm = this._heightFogParams.globalDensity * Math.pow(2, p);
+    }
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
     if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
@@ -951,11 +970,18 @@ export class SkyRenderer {
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
+            this.$l.worldPos = this.hPos.xyz;
+            this.$if(pb.greaterThan(this.$l.linearDepth, 0.9999), function () {
+              this.$l.ray = pb.sub(this.worldPos, this.cameraPosition);
+              this.$l.d = pb.length(this.ray);
+              this.$l.rayNorm = pb.div(this.ray, this.d);
+              this.worldPos = pb.add(this.cameraPosition, pb.mul(this.rayNorm, 6360000));
+            });
             this.$outputs.outColor = calculateHeightFog(
               this,
               this.params,
               this.cameraPosition,
-              this.hPos.xyz,
+              this.worldPos,
               this.distantLightLut
             );
           });
