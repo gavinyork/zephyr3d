@@ -1,6 +1,7 @@
 import { AABB } from '@zephyr3d/base';
 import type { SerializableClass } from '../types';
 
+/** @internal */
 export function getAABBClass(): SerializableClass {
   return {
     ctor: AABB,

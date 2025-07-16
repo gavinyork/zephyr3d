@@ -275,6 +275,7 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
   }
   return props;
 }
+/** @internal */
 export function getTerrainClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ClipmapTerrain,

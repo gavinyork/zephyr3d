@@ -6,6 +6,7 @@ import type { NodeHierarchy } from './node';
 import { SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 
+/** @internal */
 export function getPunctualLightClass(): SerializableClass {
   return {
     ctor: PunctualLight,
@@ -378,6 +379,8 @@ export function getPunctualLightClass(): SerializableClass {
     }
   };
 }
+
+/** @internal */
 export function getDirectionalLightClass(): SerializableClass {
   return {
     ctor: DirectionalLight,
@@ -407,6 +410,7 @@ export function getDirectionalLightClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getPointLightClass(): SerializableClass {
   return {
     ctor: PointLight,
@@ -441,6 +445,7 @@ export function getPointLightClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getSpotLightClass(): SerializableClass {
   return {
     ctor: SpotLight,

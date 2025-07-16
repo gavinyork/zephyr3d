@@ -38,6 +38,10 @@ import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './sc
 import type { SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 
+/**
+ * Serialization manager class
+ * @public
+ */
 export class SerializationManager {
   private _classMap: Map<GenericConstructor, SerializableClass>;
   private _assetRegistry: AssetRegistry;

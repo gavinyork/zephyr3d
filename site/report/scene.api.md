@@ -133,7 +133,7 @@ export class ABufferOIT implements OIT {
 }
 
 // @public (undocumented)
-export function aerialPerspective(scope: PBInsideFunctionScope, f2UV: PBShaderExp, stParams: PBShaderExp, f3CameraPos: PBShaderExp, f3WorldPos: PBShaderExp, fAPDistance: PBShaderExp, f3Dim: PBShaderExp, f4Debug: PBShaderExp, texAerialPerspectiveLut: PBShaderExp): any;
+export function aerialPerspective(scope: PBInsideFunctionScope, f2UV: PBShaderExp, stParams: PBShaderExp, f3CameraPos: PBShaderExp, f3WorldPos: PBShaderExp, f3Dim: PBShaderExp, f4Debug: PBShaderExp, texAerialPerspectiveLut: PBShaderExp): any;
 
 // @public (undocumented)
 export function aerialPerspectiveLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, f3VoxelDim: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
@@ -646,6 +646,9 @@ export type AtmosphereParams = {
 };
 
 // @public
+export const ATMOSPHERIC_FOG_BIT: number;
+
+// @public
 export class BaseCameraController {
     constructor();
     // @internal (undocumented)
@@ -992,10 +995,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set bloomThresholdKnee(val: number);
     // @internal (undocumented)
     protected _bloomThresholdKnee: number;
-    get clearColor(): Vector4;
-    set clearColor(val: Vector4);
-    // @internal (undocumented)
-    protected _clearColor: Vector4;
     clearHistoryData(): void;
     get clipMask(): number;
     set clipMask(val: number);
@@ -1442,7 +1441,9 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
     // (undocumented)
     getDetailNormalMap(index: number): Texture2D;
     // (undocumented)
-    getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
+    // (undocumented)
+    getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
     // (undocumented)
     getSplatMap(): Texture2DArray<unknown>;
     // (undocumented)
@@ -1574,6 +1575,17 @@ export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize
 // @internal (undocumented)
 export function createRandomNoiseTexture(device: AbstractDevice, size: number): _zephyr3d_device.Texture2D<unknown>;
 
+// @public (undocumented)
+export class CubemapSHProjector {
+    constructor(numSamples?: number, useInstancing?: boolean);
+    // (undocumented)
+    applyWindow(coeff: Float32Array, windowWeights: ArrayLike<number>): void;
+    // (undocumented)
+    dispose(): void;
+    // (undocumented)
+    shProject(cubemap: TextureCube, windowWeights?: ArrayLike<number>, outCoeff?: Float32Array): Promise<Float32Array>;
+}
+
 // @public
 export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue, primaryCamera: Camera);
@@ -1664,9 +1676,6 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
 
 // @public
 export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxRange: PBShaderExp | number): PBShaderExp;
-
-// @public (undocumented)
-export const defaultAtmosphereParams: Readonly<AtmosphereParams>;
 
 // @public
 export class DepthPass extends RenderPass {
@@ -1762,7 +1771,6 @@ export interface DrawableInstanceInfo {
 
 // @public
 export interface DrawContext {
-    applyFog: FogType;
     camera: Camera;
     // Warning: (ae-forgotten-export) The symbol "ClusteredLight" needs to be exported by the entry point index.d.ts
     clusteredLight?: ClusteredLight;
@@ -1777,6 +1785,7 @@ export interface DrawContext {
     env: Environment;
     finalFramebuffer: FrameBuffer;
     flip: boolean;
+    fogFlags: number;
     forceColorState?: ColorState;
     forceCullMode?: FaceMode;
     // Warning: (ae-forgotten-export) The symbol "GlobalBindGroupAllocator" needs to be exported by the entry point index.d.ts
@@ -2192,7 +2201,7 @@ export class FFTWaveGenerator implements WaveGenerator {
 export function flushPendingDisposals(): void;
 
 // @public
-export type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
+export type FogType = 'linear' | 'exp' | 'exp2' | 'height_fog' | 'none';
 
 // @public
 export class FPSCameraController extends BaseCameraController {
@@ -2358,6 +2367,9 @@ export function getBatchGroupClass(): SerializableClass;
 
 // @public (undocumented)
 export function getCameraClass(): SerializableClass;
+
+// @public (undocumented)
+export function getDefaultAtmosphereParams(): AtmosphereParams;
 
 // @public (undocumented)
 export function getDirectionalLightClass(): SerializableClass;
@@ -2564,6 +2576,9 @@ export class Grayscale extends AbstractPostEffect {
 
 // @public
 export function hash(scope: PBInsideFunctionScope, p: PBShaderExp): any;
+
+// @public
+export const HEIGHT_FOG_BIT: number;
 
 // Warning: (ae-internal-missing-underscore) The name "HeightField" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -4763,8 +4778,6 @@ export class SceneRenderer {
     // (undocumented)
     protected static _renderScene(ctx: DrawContext): void;
     static get sceneRenderPass(): LightPass;
-    // (undocumented)
-    static setClearColor(color: Vector4): void;
     static get shadowMapRenderPass(): ShadowMapPass;
 }
 
@@ -4848,13 +4861,14 @@ export class ShaderHelper {
     // (undocumented)
     static readonly FOG_TYPE_EXP2 = 3;
     // (undocumented)
+    static readonly FOG_TYPE_HEIGHT = 4;
+    // (undocumented)
     static readonly FOG_TYPE_LINEAR = 1;
     // (undocumented)
     static readonly FOG_TYPE_NONE = 0;
-    // (undocumented)
-    static readonly FOG_TYPE_SCATTER = 4;
     static getAerialPerspectiveLUT(scope: PBInsideFunctionScope): PBShaderExp;
     static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp;
+    static getAtmosphereParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getBakedSkyTexture(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
     static getBoneInvBindMatrixUniformName(): string;
@@ -5250,7 +5264,7 @@ export class Skeleton {
 }
 
 // @public (undocumented)
-export function skyBox(scope: PBInsideFunctionScope, stParams: PBShaderExp, f4SunColor: PBShaderExp, f3SkyBoxWorldPos: PBShaderExp, fSunSolidAngle: PBShaderExp, texSkyViewLut: PBShaderExp): any;
+export function skyBox(scope: PBInsideFunctionScope, stParams: PBShaderExp, f4SunColor: PBShaderExp, f3SkyBoxWorldPos: PBShaderExp, fSunSolidAngle: PBShaderExp, texTransmittanceLut: PBShaderExp, texSkyViewLut: PBShaderExp): any;
 
 // @public
 export class SkyRenderer {
@@ -5262,9 +5276,8 @@ export class SkyRenderer {
     set aerialPerspectiveDistance(val: number);
     get atmosphereExposure(): number;
     set atmosphereExposure(val: number);
-    get autoUpdateIBLMaps(): boolean;
-    set autoUpdateIBLMaps(val: boolean);
-    get bakedSkyTexture(): TextureCube;
+    // (undocumented)
+    protected static _bindgroupDistantLight: BindGroup;
     get cameraHeightScale(): number;
     set cameraHeightScale(val: number);
     get cloudIntensity(): number;
@@ -5294,17 +5307,37 @@ export class SkyRenderer {
     set fogType(val: FogType);
     // @internal (undocumented)
     getAerialPerspectiveLUT(ctx: DrawContext): _zephyr3d_device.Texture2D<unknown>;
+    getBakedSkyTexture(ctx: DrawContext): TextureCube;
     // @internal (undocumented)
     getHash(ctx: DrawContext): string;
+    get heightFogAtmosphereEffectStrength(): number;
+    set heightFogAtmosphereEffectStrength(val: number);
+    get heightFogColor(): Vector3;
+    set heightFogColor(val: Vector3);
+    get heightFogDensity(): number;
+    set heightFogDensity(val: number);
+    get heightFogFalloff(): number;
+    set heightFogFalloff(val: number);
+    get heightFogMaxOpacity(): number;
+    set heightFogMaxOpacity(val: number);
+    get heightFogStartDistance(): number;
+    set heightFogStartDistance(val: number);
+    get heightFogStartHeight(): number;
+    set heightFogStartHeight(val: number);
     invalidate(): void;
+    get irradianceConvSamples(): number;
+    set irradianceConvSamples(val: number);
     // @internal (undocumented)
     get irradianceFramebuffer(): FrameBuffer<unknown>;
     get irradianceMap(): TextureCube;
+    get irradianceSH(): Float32Array;
     // @internal (undocumented)
     get mappedFogType(): number;
     // @internal (undocumented)
     get panoramaTextureAsset(): string;
     set panoramaTextureAsset(id: string);
+    get radianceConvSamples(): number;
+    set radianceConvSamples(val: number);
     // @internal (undocumented)
     get radianceFramebuffer(): FrameBuffer<unknown>;
     get radianceMap(): TextureCube;
@@ -5315,9 +5348,15 @@ export class SkyRenderer {
     // @internal (undocumented)
     renderFog(ctx: DrawContext): void;
     // @internal (undocumented)
+    renderHeightFog(ctx: DrawContext): void;
+    // @internal (undocumented)
     renderLegacyFog(ctx: DrawContext): void;
     // @internal (undocumented)
     renderSky(ctx: DrawContext): void;
+    // (undocumented)
+    renderSkyDistantLut(ctx: DrawContext, skybox: TextureCube): void;
+    get shWindowWeights(): Vector3;
+    set shWindowWeights(weights: Vector3);
     get skyboxTexture(): TextureCube;
     set skyboxTexture(tex: TextureCube);
     get skyColor(): Vector4;
@@ -5332,13 +5371,13 @@ export class SkyRenderer {
     // (undocumented)
     update(ctx: DrawContext): void;
     // (undocumented)
-    updateBakedSkyMap(sunDir: Vector3, sunColor: Vector4): void;
+    updateBakedSkyMap(): void;
     get wind(): Vector2;
     set wind(val: Vector2);
 }
 
 // @public
-export type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none';
+export type SkyType = 'color' | 'skybox' | 'scatter' | 'none';
 
 // @public (undocumented)
 export function skyViewLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
@@ -5438,6 +5477,9 @@ export const TAA_DEBUG_MOTION_VECTOR = 6;
 export const TAA_DEBUG_NONE = 0;
 
 // @public (undocumented)
+export const TAA_DEBUG_STRENGTH = 7;
+
+// @public (undocumented)
 export const TAA_DEBUG_VELOCITY = 3;
 
 // @public (undocumented)
@@ -5523,11 +5565,11 @@ export class TerrainMaterial extends TerrainMaterial_base implements Clonable<Te
     // (undocumented)
     generateMetallicRoughnessMap(): Texture2D;
     // (undocumented)
-    getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getAlbedoTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
     // (undocumented)
-    getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
     // (undocumented)
-    getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+    getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
     // @override
     isBatchable(): boolean;
     // @override
@@ -5728,6 +5770,11 @@ export function transmittanceLutToUV(scope: PBInsideFunctionScope, fBottomRadius
 
 // @public (undocumented)
 export function transmittanceToSky(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3Pos: PBShaderExp, f3Dir: PBShaderExp, texLut: PBShaderExp): any;
+
+// Warning: (ae-internal-missing-underscore) The name "uniformSphereSamples" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export const uniformSphereSamples: Vector3[];
 
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -5988,8 +6035,8 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:2379:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:9876:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:2403:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:9940:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

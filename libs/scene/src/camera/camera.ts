@@ -121,8 +121,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
   protected _TAADebug: number;
   /** @internal */
-  protected _TAABlendFactor: number;
-  /** @internal */
   protected _SSR: boolean;
   /** @internal */
   protected _postEffectSSR: DRef<SSR>;
@@ -226,7 +224,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._TAA = false;
     this._postEffectTAA = new DRef();
     this._TAADebug = 0;
-    this._TAABlendFactor = 1 / 16;
     this._SSR = false;
     this._postEffectSSR = new DRef();
     this._ssrParams = new Vector4(100, 120, 0.5, 0);
@@ -277,7 +274,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this.FXAA = other.FXAA;
     this.TAA = other.TAA;
     this.TAADebug = other.TAADebug;
-    this.TAABlendFactor = other.TAABlendFactor;
     this.SSR = other.SSR;
     this.ssrMaxRoughness = other.ssrMaxRoughness;
     this.ssrRoughnessFactor = other.ssrRoughnessFactor;
@@ -454,15 +450,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   set TAADebug(val: number) {
     this._TAADebug = val;
-  }
-  /**
-   * Gets the blend factor for TAA
-   */
-  get TAABlendFactor(): number {
-    return this._TAABlendFactor;
-  }
-  set TAABlendFactor(val: number) {
-    this._TAABlendFactor = val;
   }
   /**
    * Gets whether Screen Space Reflections (SSR) is enabled.

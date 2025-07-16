@@ -8,6 +8,7 @@ import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SerializationManager } from '../manager';
 
+/** @internal */
 export function getFBMWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FBMWaveGenerator,
@@ -69,6 +70,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getFFTWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FFTWaveGenerator,
@@ -180,6 +182,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getWaterClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Water,

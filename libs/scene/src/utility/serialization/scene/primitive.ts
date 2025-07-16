@@ -2,6 +2,7 @@ import { Primitive } from '../../../render';
 import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
 import type { SerializableClass } from '../types';
 
+/** @internal */
 export function getPrimitiveClass(): SerializableClass {
   return {
     ctor: Primitive,
@@ -23,6 +24,8 @@ export function getPrimitiveClass(): SerializableClass {
     }
   };
 }
+
+/** @internal */
 export function getBoxShapeClass(): SerializableClass {
   return {
     ctor: BoxShape,
@@ -83,6 +86,7 @@ export function getBoxShapeClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getBoxFrameShapeClass(): SerializableClass {
   return {
     ctor: BoxFrameShape,
@@ -143,6 +147,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getTorusShapeClass(): SerializableClass {
   return {
     ctor: TorusShape,
@@ -227,6 +232,7 @@ export function getTorusShapeClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getPlaneShapeClass(): SerializableClass {
   return {
     ctor: PlaneShape,
@@ -311,6 +317,7 @@ export function getPlaneShapeClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getCylinderShapeClass(): SerializableClass {
   return {
     ctor: CylinderShape,
@@ -428,6 +435,7 @@ export function getCylinderShapeClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getSphereShapeClass(): SerializableClass {
   return {
     ctor: SphereShape,

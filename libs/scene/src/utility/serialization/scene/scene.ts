@@ -9,6 +9,7 @@ import { NodeHierarchy } from './node';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 
+/** @internal */
 export function getSceneClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Scene,

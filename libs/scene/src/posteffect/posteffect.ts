@@ -4,6 +4,11 @@ import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import type { Disposable } from '../app';
 
+/**
+ * Rendering layer of post processing effects
+ * @public
+ *
+ */
 export enum PostEffectLayer {
   opaque = 0,
   transparent = 1,

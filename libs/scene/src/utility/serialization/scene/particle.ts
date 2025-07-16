@@ -5,6 +5,7 @@ import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ParticleMaterial } from '../../../material';
 
+/** @internal */
 export function getParticleNodeClass(): SerializableClass {
   return {
     ctor: ParticleSystem,

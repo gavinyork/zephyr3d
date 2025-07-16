@@ -1,6 +1,10 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import type { EmbeddedAssetInfo } from './asset/asset';
 
+/**
+ * Data types of serializable properties
+ * @public
+ */
 export type PropertyType =
   | 'bool'
   | 'int'
@@ -18,6 +22,10 @@ export type PropertyType =
   | 'object_array'
   | 'command';
 
+/**
+ * Object type that holds a value of serializable property
+ * @public
+ */
 export type PropertyValue = {
   num?: number[];
   str?: string[];
@@ -25,8 +33,16 @@ export type PropertyValue = {
   object?: object[];
 };
 
+/**
+ * Edit types of serializable properties which is used by editor
+ * @public
+ */
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
+/**
+ * Object type which defines a serializable property
+ * @public
+ */
 export type PropertyAccessor<T = object> = {
   type: PropertyType;
   name: string;
@@ -54,6 +70,10 @@ export type PropertyAccessor<T = object> = {
   getDefaultValue?: (this: T) => any;
 };
 
+/**
+ * Object type which defines a serializable class
+ * @public
+ */
 export type SerializableClass = {
   ctor: GenericConstructor;
   parent?: GenericConstructor;
@@ -66,5 +86,3 @@ export type SerializableClass = {
   getAssets?: (obj: any) => string[];
   getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
 };
-
-export type SerializationInfo = SerializableClass[];

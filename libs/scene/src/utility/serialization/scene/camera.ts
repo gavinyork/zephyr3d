@@ -13,6 +13,7 @@ import {
   TAA_DEBUG_VELOCITY
 } from '../../../shaders';
 
+/** @internal */
 export function getCameraClass(): SerializableClass {
   return {
     ctor: Camera,
@@ -220,27 +221,6 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.TAADebug = value.num[0];
-          },
-          isValid() {
-            return !!this.TAA;
-          }
-        },
-        {
-          name: 'TAABlendFactor',
-          label: 'BlendFactor',
-          group: 'PostProcessing/TAA',
-          type: 'float',
-          phase: 1,
-          options: {
-            minValue: 0,
-            maxValue: 1
-          },
-          default: 1 / 16,
-          get(this: Camera, value) {
-            value.num[0] = this.TAABlendFactor;
-          },
-          set(this: Camera, value) {
-            this.TAABlendFactor = value.num[0];
           },
           isValid() {
             return !!this.TAA;
@@ -598,6 +578,7 @@ export function getCameraClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getPerspectiveCameraClass(): SerializableClass {
   return {
     ctor: PerspectiveCamera,
@@ -653,6 +634,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getOrthoCameraClass(): SerializableClass {
   return {
     ctor: OrthoCamera,

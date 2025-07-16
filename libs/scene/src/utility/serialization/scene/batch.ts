@@ -2,6 +2,7 @@ import { BatchGroup, GraphNode, SceneNode } from '../../../scene';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 
+/** @internal */
 export function getBatchGroupClass(): SerializableClass {
   return {
     ctor: BatchGroup,

@@ -67,7 +67,6 @@ export class WaterMesh {
   get waveImpl(): WaveGenerator {
     return this._waveGenerator;
   }
-  /** @internal */
   set waveImpl(val: WaveGenerator) {
     if (val && val !== this._waveGenerator) {
       this._waveGenerator = val;

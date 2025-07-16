@@ -10,6 +10,7 @@ import type { Primitive } from '../../../render';
 import type { SerializationManager } from '../manager';
 import { AnimationClip } from '../../../animation';
 
+/** @internal */
 export class GatherVisitor implements Visitor<SceneNode> {
   /** @internal */
   private _primitiveSet: Set<Primitive>;
@@ -73,6 +74,7 @@ export class GatherVisitor implements Visitor<SceneNode> {
   }
 }
 
+/** @internal */
 export class NodeHierarchy {
   private _scene: Scene;
   private _rootNode: SceneNode;
@@ -113,6 +115,7 @@ export class NodeHierarchy {
   }
 }
 
+/** @internal */
 export function getNodeHierarchyClass(): SerializableClass {
   return {
     ctor: NodeHierarchy,
@@ -166,6 +169,7 @@ export function getNodeHierarchyClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getSceneNodeClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: SceneNode,
@@ -347,6 +351,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
   };
 }
 
+/** @internal */
 export function getGraphNodeClass(): SerializableClass {
   return {
     ctor: GraphNode,

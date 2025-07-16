@@ -88,7 +88,6 @@ export class TAA extends AbstractPostEffect {
       this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
       TAA._texSize.setXY(sceneDepthTexture.width, sceneDepthTexture.height);
       this._bindGroup.setValue('texSize', TAA._texSize);
-      this._bindGroup.setValue('blendFactor', ctx.camera.TAABlendFactor);
       //this.passThrough(ctx, inputColorTexture, srgbOutput, AbstractPostEffect.getZTestEqualRenderState(ctx));
       ctx.device.setProgram(program);
       ctx.device.setBindGroup(0, this._bindGroup);
@@ -180,7 +179,6 @@ export class TAA extends AbstractPostEffect {
         this.motionVector = pb.tex2D().uniform(0);
         this.prevMotionVector = pb.tex2D().uniform(0);
         this.texSize = pb.vec2().uniform(0);
-        this.blendFactor = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
@@ -194,7 +192,6 @@ export class TAA extends AbstractPostEffect {
             this.prevMotionVector,
             this.screenUV,
             this.texSize,
-            this.blendFactor,
             debug
           );
           this.$if(pb.equal(this.srgbOut, 0), function () {

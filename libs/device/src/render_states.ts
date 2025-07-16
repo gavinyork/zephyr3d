@@ -195,7 +195,7 @@ export interface DepthState {
   setDepthBias(value: number): this;
   /**
    * Sets the slope scaled depth bias
-   * @param value = Value of the slope scaled depth bias
+   * @param value - Value of the slope scaled depth bias
    */
   setDepthBiasSlopeScale(value: number): this;
 }

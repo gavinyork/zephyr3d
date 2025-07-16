@@ -1,17 +1,38 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
+/** @internal */
 export const TAA_DEBUG_NONE = 0;
+/** @internal */
 export const TAA_DEBUG_CURRENT_COLOR = 1;
+/** @internal */
 export const TAA_DEBUG_HISTORY_COLOR = 2;
+/** @internal */
 export const TAA_DEBUG_VELOCITY = 3;
+/** @internal */
 export const TAA_DEBUG_EDGE = 4;
+/** @internal */
 export const TAA_DEBUG_ALAPH = 5;
+/** @internal */
 export const TAA_DEBUG_MOTION_VECTOR = 6;
+/** @internal */
 export const TAA_DEBUG_STRENGTH = 7;
 
 const FLT_MIN = 0.00000001;
 const FLT_MAX = 32767;
 
+/**
+ * Temporal resolve implementation
+ * @param scope - The shader scope
+ * @param currentColorTex - 2D texture that holds the current color
+ * @param historyColorTex - 2D texture that holds the history color
+ * @param currentDepthTex - 2D texture that holds the scene depth
+ * @param motionVectorTex - 2D texture that holds the motion vector
+ * @param prevMotionVectorTex - 2D texture that holds the previous motion vector
+ * @param uv - Fragment uv coordinate
+ * @param workSize - Target texture size
+ * @param debug
+ * @returns
+ */
 export function temporalResolve(
   scope: PBInsideFunctionScope,
   currentColorTex: PBShaderExp,
@@ -21,7 +42,6 @@ export function temporalResolve(
   prevMotionVectorTex: PBShaderExp,
   uv: PBShaderExp,
   workSize: PBShaderExp,
-  bf: PBShaderExp,
   debug = TAA_DEBUG_NONE
 ): PBShaderExp {
   const pb = scope.$builder;
@@ -208,7 +228,7 @@ export function temporalResolve(
     );
     this.$return(pb.max(this.result, pb.vec3(0)));
   });
-  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize'), pb.float('bf')], function () {
+  pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);
     this.$l.velocity = this.velocitySample.xy;
     this.$l.sampleColor = pb.textureSampleLevel(currentColorTex, this.screenUV, 0).rgb;
@@ -273,5 +293,5 @@ export function temporalResolve(
     }
     this.$return(this.resolvedColor);
   });
-  return scope.temporalResolve(uv, workSize, bf);
+  return scope.temporalResolve(uv, workSize);
 }

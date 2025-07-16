@@ -494,6 +494,7 @@ function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<
   ];
 }
 
+/** @internal */
 export function getMeshMaterialClass(): SerializableClass {
   return {
     ctor: MeshMaterial,
@@ -628,6 +629,7 @@ export function getMeshMaterialClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getParticleMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ParticleMaterial,
@@ -722,6 +724,7 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
   };
 }
 
+/** @internal */
 export function getUnlitMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: UnlitMaterial,
@@ -755,6 +758,8 @@ export function getUnlitMaterialClass(manager: SerializationManager): Serializab
     }
   };
 }
+
+/** @internal */
 export function getLambertMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: LambertMaterial,
@@ -789,6 +794,7 @@ export function getLambertMaterialClass(manager: SerializationManager): Serializ
   };
 }
 
+/** @internal */
 export function getBlinnMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: BlinnMaterial,
@@ -843,6 +849,7 @@ export function getBlinnMaterialClass(manager: SerializationManager): Serializab
   };
 }
 
+/** @internal */
 export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRMetallicRoughnessMaterial,
@@ -944,6 +951,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
   };
 }
 
+/** @internal */
 export function getPBRSpecularGlossinessMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,

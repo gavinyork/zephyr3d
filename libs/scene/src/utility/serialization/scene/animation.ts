@@ -6,6 +6,7 @@ import type { SerializationManager } from '../manager';
 import type { SerializableClass } from '../types';
 import type { SceneNode } from '../../../scene';
 
+/** @internal */
 export function getInterpolatorClass(): SerializableClass {
   return {
     ctor: Interpolator,
@@ -68,6 +69,7 @@ export function getInterpolatorClass(): SerializableClass {
   };
 }
 
+/** @internal */
 export function getPropTrackClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PropertyTrack,
@@ -130,6 +132,7 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
   };
 }
 
+/** @internal */
 export function getAnimationClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: AnimationClip,

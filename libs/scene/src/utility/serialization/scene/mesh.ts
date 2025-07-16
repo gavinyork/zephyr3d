@@ -13,6 +13,7 @@ import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusS
 import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 
+/** @internal */
 export function getMeshClass(): SerializableClass {
   return {
     ctor: Mesh,
