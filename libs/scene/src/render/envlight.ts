@@ -1,7 +1,8 @@
-import type { Vector3 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
+  GPUDataBuffer,
   PBInsideFunctionScope,
   PBShaderExp,
   ProgramBuilder,
@@ -80,37 +81,23 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = 'zIBLIrradianceSH';
   /** @internal */
+  public static readonly UNIFORM_NAME_IBL_IRRADIANCE_WINDOW = 'zIBLIrradianceWindow';
+  /** @internal */
   private _radianceMap: DRef<TextureCube>;
   /** @internal */
-  private _irradianceSH: Float32Array;
+  private _irradianceSH: DRef<GPUDataBuffer>;
+  /** @internal */
+  private _irraidanceWindow: Vector3;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
    * @param irradianceSH - The irradiance SH
    */
-  constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array) {
+  constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer) {
     super();
     this._radianceMap = new DRef(radianceMap || null);
-    if (!irradianceSH) {
-      this._irradianceSH = null;
-    } else {
-      this._irradianceSH = new Float32Array(9 * 4);
-      if (irradianceSH instanceof Float32Array) {
-        if (irradianceSH.length !== 9 * 4) {
-          throw new Error(`3rd order SH coefficients expected`);
-        }
-        this._irradianceSH.set(irradianceSH);
-      } else {
-        if (irradianceSH.length !== 9) {
-          throw new Error(`3rd order SH coefficients expected`);
-        }
-        for (let i = 0; i < 9; i++) {
-          this._irradianceSH[i * 4 + 0] = irradianceSH[i].x;
-          this._irradianceSH[i * 4 + 1] = irradianceSH[i].y;
-          this._irradianceSH[i * 4 + 2] = irradianceSH[i].z;
-        }
-      }
-    }
+    this._irradianceSH = new DRef(irradianceSH || null);
+    this._irraidanceWindow = new Vector3();
   }
   /**
    * {@inheritDoc EnvironmentLighting.getType}
@@ -125,6 +112,7 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   dispose() {
     this._radianceMap.dispose();
+    this._irradianceSH.dispose();
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
@@ -134,14 +122,18 @@ export class EnvShIBL extends EnvironmentLighting {
     this._radianceMap.set(tex);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSH(): Float32Array {
-    return this._irradianceSH;
+  get irradianceSH(): GPUDataBuffer {
+    return this._irradianceSH.get();
   }
-  set irradianceSH(value: Float32Array) {
-    if (value && value.length < 36) {
-      throw new Error(`3rd order SH coefficients expected`);
-    }
-    this._irradianceSH = value;
+  set irradianceSH(value: GPUDataBuffer) {
+    this._irradianceSH.set(value);
+  }
+  /** The irradiance sh window */
+  get irradianceWindow(): Vector3 {
+    return this._irraidanceWindow;
+  }
+  set irradianceWindow(val: Vector3) {
+    this._irraidanceWindow = val;
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
@@ -149,12 +141,13 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      if (this._radianceMap) {
+      if (this.radianceMap) {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (this._irradianceSH) {
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniform(0);
+      if (this.irradianceSH) {
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
       }
     }
   }
@@ -167,8 +160,9 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (this._irradianceSH) {
-      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this._irradianceSH);
+    if (this.irradianceSH) {
+      bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
     }
   }
   /**
@@ -219,38 +213,43 @@ export class EnvShIBL extends EnvironmentLighting {
       this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
     });
     pb.func('Z_sh_eval', [pb.vec3('v')], function () {
-      this.$l.c = pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz, this.Z_sh_Y0(this.v));
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v))
+      this.$l.window = this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW];
+      this.$l.c = pb.mul(
+        this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz,
+        this.Z_sh_Y0(this.v),
+        this.window.x
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v), this.window.y)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v), this.window.y)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v), this.window.y)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v), this.window.z)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v), this.window.z)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v), this.window.z)
       );
       this.c = pb.add(
         this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v))
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v), this.window.z)
+      );
+      this.c = pb.add(
+        this.c,
+        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v), this.window.z)
       );
       this.$return(this.c);
     });

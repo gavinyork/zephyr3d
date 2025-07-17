@@ -20,6 +20,7 @@ import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
 import {
+  GPUDataBuffer,
   type AbstractDevice,
   type BindGroup,
   type FrameBuffer,
@@ -109,7 +110,7 @@ export class SkyRenderer {
   private _radianceMap: DRef<TextureCube>;
   private _radianceFrameBuffer: DRef<FrameBuffer>;
   private _irradianceMap: DRef<TextureCube>;
-  private _irradianceSH: Float32Array;
+  private _irradianceSH: DRef<GPUDataBuffer>;
   private _skyDistantLightLut: DRef<FrameBuffer>;
   private _irradianceFrameBuffer: DRef<FrameBuffer>;
   private _radianceMapWidth: number;
@@ -148,7 +149,7 @@ export class SkyRenderer {
     this._radianceFrameBuffer = new DRef();
     this._radianceMapWidth = 128;
     this._irradianceMap = new DRef();
-    this._irradianceSH = new Float32Array(36);
+    this._irradianceSH = new DRef();
     this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
@@ -180,6 +181,7 @@ export class SkyRenderer {
     this._radianceMap.dispose();
     this._radianceFrameBuffer.dispose();
     this._irradianceMap.dispose();
+    this._irradianceSH.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
     if (this._skyDistantLightLut.get()) {
@@ -418,8 +420,8 @@ export class SkyRenderer {
   /**
    * Irradiance SH coeffecients
    */
-  get irradianceSH(): Float32Array {
-    return this._irradianceSH;
+  get irradianceSH(): GPUDataBuffer {
+    return this._irradianceSH.get();
   }
   /** @internal */
   get irradianceFramebuffer() {
@@ -548,7 +550,7 @@ export class SkyRenderer {
     }
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
-    if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
+    if (this._skyType === 'scatter' && (true || this._wind.x !== 0 || this._wind.y !== 0)) {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
@@ -569,7 +571,7 @@ export class SkyRenderer {
         ctx.scene.env.light.radianceMap &&
         (ctx.scene.env.light.radianceMap === this.radianceMap ||
           ctx.scene.env.light.irradianceMap === this.irradianceMap ||
-          ctx.scene.env.light.irradianceSH === this._irradianceSH)
+          ctx.scene.env.light.irradianceSH === this.irradianceSH)
       ) {
         prefilterCubemap(
           this._bakedSkyboxTexture.get(),
@@ -583,12 +585,16 @@ export class SkyRenderer {
           this.irradianceFramebuffer,
           this._irradianceConvSamples
         );
+        if (!this.irradianceSH) {
+          const buffer = ctx.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
+          this._irradianceSH.set(buffer);
+        }
         this._shProjector.shProject(
           this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
-          this._shWindowWeights,
-          this._irradianceSH
+          this.irradianceSH
         );
-        ctx.scene.env.light.irradianceSH = this._irradianceSH;
+        ctx.scene.env.light.irradianceSH = this.irradianceSH;
+        ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
         this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get());
       }
     }

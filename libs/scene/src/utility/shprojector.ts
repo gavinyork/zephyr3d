@@ -2,6 +2,7 @@ import type {
   AbstractDevice,
   BindGroup,
   FrameBuffer,
+  GPUDataBuffer,
   GPUProgram,
   RenderStateSet,
   TextureCube
@@ -17,7 +18,6 @@ export class CubemapSHProjector {
   private static _bindGroup: BindGroup[] = [];
   private static _bindGroupInst: BindGroup = null;
   private static _renderStats: RenderStateSet = null;
-  private static _windowWeights = [1, 2 / Math.PI, 0];
   private _primitive: DRef<Primitive>;
   private _renderTarget: DRef<FrameBuffer>;
   private _numSamples: number;
@@ -26,14 +26,6 @@ export class CubemapSHProjector {
     this._primitive = new DRef();
     this._renderTarget = new DRef();
   }
-  applyWindow(coeff: Float32Array, windowWeights: ArrayLike<number>) {
-    for (let i = 0; i < 9; i++) {
-      const weight = i < 1 ? windowWeights[0] : i < 4 ? windowWeights[1] : windowWeights[2];
-      coeff[i * 4 + 0] *= weight;
-      coeff[i * 4 + 1] *= weight;
-      coeff[i * 4 + 2] *= weight;
-    }
-  }
   dispose() {
     this._primitive.dispose();
     if (this._renderTarget.get()) {
@@ -41,12 +33,7 @@ export class CubemapSHProjector {
       this._renderTarget.dispose();
     }
   }
-  async shProject(
-    cubemap: TextureCube,
-    windowWeights?: ArrayLike<number>,
-    outCoeff?: Float32Array
-  ): Promise<Float32Array> {
-    outCoeff = outCoeff ?? new Float32Array(9 * 4);
+  shProject(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
     this.init(device);
@@ -60,9 +47,7 @@ export class CubemapSHProjector {
     device.setBindGroup(0, bindGroup);
     this._primitive.get().drawInstanced(9);
     device.popDeviceStates();
-    await this._renderTarget.get().getColorAttachments()[0].readPixels(0, 0, 3, 3, 0, 0, outCoeff);
-    this.applyWindow(outCoeff, windowWeights ?? CubemapSHProjector._windowWeights);
-    return outCoeff;
+    this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
   private init(device: AbstractDevice) {
     if (!this._primitive.get()) {
