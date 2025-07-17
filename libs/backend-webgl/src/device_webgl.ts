@@ -882,7 +882,7 @@ export class WebGLDevice extends BaseDevice {
     }
     if (isWebGL2(this.context)) {
       const stagingBuffer = this.createBuffer(byteSize, {
-        usage: 'read',
+        usage: 'pack-pixel',
         managed: false
       });
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object);

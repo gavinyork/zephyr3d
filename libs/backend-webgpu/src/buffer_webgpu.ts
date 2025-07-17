@@ -125,13 +125,13 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (dstBuffer && dstBuffer.byteLength < sizeInBytes) {
       throw new Error('no enough space for querying buffer data');
     }
-    if (!(this._usage & GPUResourceUsageFlags.BF_READ)) {
+    if (!(this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL))) {
       if (this._gpuUsage & GPUBufferUsage.COPY_SRC) {
         sourceBuffer = this._device.createBuffer(sizeInBytes, { usage: 'read' });
         this.sync();
         this._device.copyBuffer(this, sourceBuffer, offsetInBytes, 0, sizeInBytes);
       } else {
-        throw new Error('getBufferSubData() failed: buffer does not have BF_READ flag set');
+        throw new Error('getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set');
       }
     } else {
       this.sync();
@@ -216,11 +216,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
           this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[storage]';
         }
-        if (this._usage & GPUResourceUsageFlags.BF_READ) {
+        if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL)) {
           this._gpuUsage |= GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ;
           label += '[mapRead]';
         }
-        if (this._usage & GPUResourceUsageFlags.BF_WRITE) {
+        if (this._usage & (GPUResourceUsageFlags.BF_WRITE | GPUResourceUsageFlags.BF_UNPACK_PIXEL)) {
           this._gpuUsage |= GPUBufferUsage.COPY_SRC | GPUBufferUsage.MAP_WRITE;
           label += '[mapWrite]';
         }

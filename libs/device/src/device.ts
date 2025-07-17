@@ -787,6 +787,13 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
         usageFlag = GPUResourceUsageFlags.BF_WRITE;
         options.managed = false;
         break;
+      case 'pack-pixel':
+        usageFlag = GPUResourceUsageFlags.BF_PACK_PIXEL;
+        options.managed = false;
+        break;
+      case 'unpack-pixel':
+        usageFlag = GPUResourceUsageFlags.BF_UNPACK_PIXEL;
+        options.managed = false;
       default:
         usageFlag = 0;
         break;

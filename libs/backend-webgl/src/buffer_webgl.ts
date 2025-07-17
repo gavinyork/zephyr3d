@@ -98,6 +98,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_WRITE)) {
         target = WebGLEnum.COPY_WRITE_BUFFER;
+      } else if (
+        this._usage &
+        (GPUResourceUsageFlags.BF_PACK_PIXEL | GPUResourceUsageFlags.BF_UNPACK_PIXEL)
+      ) {
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
       } else {
         throw new Error(`Invalid buffer usage`);
       }
@@ -158,6 +163,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_WRITE)) {
         target = WebGLEnum.COPY_READ_BUFFER;
+      } else if (
+        this._usage &
+        (GPUResourceUsageFlags.BF_PACK_PIXEL | GPUResourceUsageFlags.BF_UNPACK_PIXEL)
+      ) {
+        target = WebGLEnum.PIXEL_UNPACK_BUFFER;
       } else {
         throw new Error(`Invalid buffer usage`);
       }
@@ -199,10 +209,15 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       } else if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & GPUResourceUsageFlags.BF_READ) {
-        target = WebGLEnum.COPY_READ_BUFFER;
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
         usage = WebGLEnum.STREAM_READ;
       } else if (this._usage & GPUResourceUsageFlags.BF_WRITE) {
         target = WebGLEnum.COPY_WRITE_BUFFER;
+      } else if (this._usage & GPUResourceUsageFlags.BF_PACK_PIXEL) {
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
+        usage = WebGLEnum.STREAM_READ;
+      } else if (this._usage & GPUResourceUsageFlags.BF_UNPACK_PIXEL) {
+        target = WebGLEnum.PIXEL_UNPACK_BUFFER;
       } else {
         throw new Error(`WebGLGPUBuffer.load() failed: invalid buffer usage: ${this._usage}`);
       }
