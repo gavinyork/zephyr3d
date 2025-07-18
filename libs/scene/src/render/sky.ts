@@ -19,8 +19,8 @@ import { BoxShape } from '../shapes';
 import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
+import type { GPUDataBuffer } from '@zephyr3d/device';
 import {
-  GPUDataBuffer,
   type AbstractDevice,
   type BindGroup,
   type FrameBuffer,
@@ -36,12 +36,8 @@ import { fetchSampler } from '../utility/misc';
 import { DRef } from '../app';
 import { CubemapSHProjector } from '../utility/shprojector';
 import { uniformSphereSamples } from '../values';
-import {
-  calculateHeightFog,
-  getDefaultHeightFogParams,
-  getHeightFogParamsStruct,
-  HeightFogParams
-} from '../shaders/fog';
+import type { HeightFogParams } from '../shaders/fog';
+import { calculateHeightFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../shaders/fog';
 
 /**
  * Type of sky
@@ -168,7 +164,7 @@ export class SkyRenderer {
     this._lastSunDir = SkyRenderer._getSunDir(null);
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
-    this._shProjector = new CubemapSHProjector(10000, true);
+    this._shProjector = new CubemapSHProjector(10000);
     this._shWindowWeights = new Vector3(1, 0.8, 0.6);
     this._radianceConvSamples = 64;
     this._irradianceConvSamples = 256;
@@ -550,7 +546,7 @@ export class SkyRenderer {
     }
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
-    if (this._skyType === 'scatter' && (true || this._wind.x !== 0 || this._wind.y !== 0)) {
+    if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
@@ -589,7 +585,7 @@ export class SkyRenderer {
           const buffer = ctx.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
           this._irradianceSH.set(buffer);
         }
-        this._shProjector.shProject(
+        this._shProjector.projectCubemap(
           this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
           this.irradianceSH
         );

@@ -867,8 +867,8 @@ export class WebGLDevice extends BaseDevice {
       };
       this._readFormats[format] = formatInfo;
     }
-    let glFormat = formatInfo.format;
-    let glType = formatInfo.type;
+    const glFormat = formatInfo.format;
+    const glType = formatInfo.type;
     const pixelSize = getTextureFormatBlockSize(format);
     if (
       (glFormat !== WebGLEnum.RGBA || (glType !== WebGLEnum.UNSIGNED_BYTE && glType !== WebGLEnum.FLOAT)) &&

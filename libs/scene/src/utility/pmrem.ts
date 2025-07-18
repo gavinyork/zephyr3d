@@ -322,7 +322,6 @@ function doPrefilterCubemap(
     bindgroup.setValue('front', faceDirections[i][2]);
     device.draw('triangle-list', 0, 6);
   }
-  framebuffer.dispose();
 }
 
 /**
@@ -367,7 +366,7 @@ export function prefilterCubemap(
   device.setRenderStates(rs);
   fb.setColorAttachmentMipLevel(0, attachMiplevel);
   fb.setColorAttachmentGenerateMipmaps(0, generateMipmap);
-  if (!destTex.isFramebuffer()) {
+  if (!destTexture.isFramebuffer()) {
     fb.dispose();
   }
 }

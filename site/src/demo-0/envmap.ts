@@ -1,11 +1,12 @@
-import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D, TextureCube } from '@zephyr3d/device';
 import type { Scene } from '@zephyr3d/scene';
-import { CubemapSHProjector, projectCubemapCPU } from '@zephyr3d/scene';
+import { DRef } from '@zephyr3d/scene';
+import { CubemapSHProjector } from '@zephyr3d/scene';
 import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 
 type EnvMapInfo = {
   path: string;
-  maps?: Promise<{ maps: TextureCube[]; sh: Float32Array }>;
+  maps?: Promise<{ maps: DRef<TextureCube>[]; sh: DRef<GPUDataBuffer> }>;
   sh?: Float32Array;
 };
 
@@ -19,8 +20,7 @@ export class EnvMaps {
     this._envMaps = {
       tower: {
         path: 'assets/images/environments/tower.hdr'
-      }
-      /*
+      },
       doge2: {
         path: 'assets/images/environments/doge2.hdr'
       },
@@ -30,11 +30,10 @@ export class EnvMaps {
       forest: {
         path: 'assets/images/environments/forest.hdr'
       }
-      */
     };
     this._assetManager = new AssetManager();
     this._assetManagerEx = new AssetManager();
-    this._shProjector = new CubemapSHProjector(10000, true);
+    this._shProjector = new CubemapSHProjector(10000);
     this._currentId = '';
     for (const k in this._envMaps) {
       this._envMaps[k].maps = this.loadEnvMap(this._envMaps[k].path, this._assetManager);
@@ -49,26 +48,19 @@ export class EnvMaps {
   async loadEnvMap(
     path: string,
     assetManager: AssetManager
-  ): Promise<{ maps: TextureCube[]; sh: Float32Array }> {
+  ): Promise<{ maps: DRef<TextureCube>[]; sh: DRef<GPUDataBuffer> }> {
     const maps = this.createMaps();
-    const sh = new Float32Array(36);
+    const sh = Application.instance.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
     try {
       const panorama = await assetManager.fetchTexture<Texture2D>(path);
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
       prefilterCubemap(maps[0], 'lambertian', maps[2]);
-      await this._shProjector.shProject(maps[2], sh);
-      const test = await projectCubemapCPU(maps[2]);
-      console.log(test);
-      for (let i = 0; i < 9; i++) {
-        sh[i * 4 + 0] = test[i].x;
-        sh[i * 4 + 1] = test[i].y;
-        sh[i * 4 + 2] = test[i].z;
-      }
+      this._shProjector.projectCubemap(maps[2], sh);
     } catch (err) {
       console.error(err);
     }
-    return { maps, sh };
+    return { maps: maps.map((tex) => new DRef(tex)), sh: new DRef(sh) };
   }
   createMaps(): TextureCube[] {
     return [
@@ -81,14 +73,15 @@ export class EnvMaps {
   }
   async selectByPath(path: string, scene: Scene, urlResolver: (url: string) => string) {
     this._assetManagerEx.httpRequest.urlResolver = urlResolver;
-    const maps = await this.loadEnvMap(path, this._assetManagerEx);
+    const { maps, sh } = await this.loadEnvMap(path, this._assetManagerEx);
     this._currentId = '';
     scene.env.sky.skyType = 'skybox';
-    scene.env.sky.skyboxTexture = maps[0];
+    scene.env.sky.skyboxTexture = maps[0].get();
     scene.env.sky.fogType = 'none';
     scene.env.light.type = 'ibl';
-    scene.env.light.radianceMap = maps[1];
-    scene.env.light.irradianceMap = maps[2];
+    scene.env.light.radianceMap = maps[1].get();
+    scene.env.light.irradianceMap = maps[2].get();
+    scene.env.light.irradianceSH = sh.get();
   }
   async selectById(id: string, scene: Scene) {
     const info = this._envMaps[id];
@@ -97,12 +90,12 @@ export class EnvMaps {
       return;
     }
     this._currentId = id;
-    const maps = await info.maps;
+    const { maps, sh } = await info.maps;
     scene.env.sky.skyType = 'skybox';
-    scene.env.sky.skyboxTexture = maps.maps[0];
+    scene.env.sky.skyboxTexture = maps[0].get();
     scene.env.sky.fogType = 'none';
-    scene.env.light.radianceMap = maps.maps[1];
-    scene.env.light.irradianceMap = maps.maps[2];
-    scene.env.light.irradianceSH = maps.sh;
+    scene.env.light.radianceMap = maps[1].get();
+    scene.env.light.irradianceMap = maps[2].get();
+    scene.env.light.irradianceSH = sh.get();
   }
 }

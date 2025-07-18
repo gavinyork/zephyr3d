@@ -92,7 +92,6 @@ myApp.ready().then(async () => {
   scene.env.light.radianceMap = scene.env.sky.radianceMap;
   scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
   scene.env.sky.skyType = 'scatter';
-  scene.env.sky.fogType = 'scatter';
 
   const assetManager = new AssetManager();
   loadTerrain(scene, assetManager);

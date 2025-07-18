@@ -84,7 +84,6 @@ const myApp = new Application({
 
 myApp.ready().then(async function () {
   const scene = new Scene();
-  scene.env.sky.fogType = 'scatter';
 
   let dlight: DirectionalLight = null;
   // Create directional light

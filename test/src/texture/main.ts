@@ -1,20 +1,12 @@
 import { floatToHalf, halfToFloat, unpackFloat3, Vector4 } from '@zephyr3d/base';
 import { AssetManager, Application } from '@zephyr3d/scene';
 import * as common from '../common';
-import {
-  TestTexture2D,
-  TestTexture2DArray,
-  TestTexture3D,
-  TestTextureCube,
-  TestTextureCubeSH,
-  TestTextureVideo
-} from './case';
+import { TestTexture2D, TestTexture2DArray, TestTexture3D, TestTextureCube, TestTextureVideo } from './case';
 import { packFloat3 } from '@zephyr3d/base';
 
 const test2D = true;
 const test3D = true;
 const testCube = true;
-const testCubeSH = true;
 const test2DArray = true;
 const testVideo = true;
 
@@ -60,8 +52,6 @@ textureApp.ready().then(async () => {
   await case3d?.init();
   const caseCube = new TestTextureCube(assetManager);
   await caseCube.init();
-  const caseCubeSH = new TestTextureCubeSH(assetManager);
-  await caseCubeSH.init();
   const case2dArray = device.type === 'webgl' ? null : new TestTexture2DArray(assetManager);
   await case2dArray?.init();
   const caseVideo = new TestTextureVideo(assetManager, './assets/images/sample-video.mp4');
@@ -102,21 +92,12 @@ textureApp.ready().then(async () => {
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      if (testCubeSH) {
-        caseCubeSH.draw(vp[2], vp[3]);
-      }
-    }
-    {
-      const vp = getSubViewport(4);
-      device.setViewport(vp);
-      device.setScissor(vp);
-      device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
       if (testCube) {
         caseCube.draw(vp[2], vp[3]);
       }
     }
     {
-      const vp = getSubViewport(5);
+      const vp = getSubViewport(4);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);

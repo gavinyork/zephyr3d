@@ -13,15 +13,13 @@ import { Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 
 export class CubemapSHProjector {
-  private static _program: GPUProgram = null;
   private static _programInst: GPUProgram = null;
-  private static _bindGroup: BindGroup[] = [];
   private static _bindGroupInst: BindGroup = null;
   private static _renderStats: RenderStateSet = null;
   private _primitive: DRef<Primitive>;
   private _renderTarget: DRef<FrameBuffer>;
   private _numSamples: number;
-  constructor(numSamples = 10000, useInstancing = false) {
+  constructor(numSamples = 10000) {
     this._numSamples = numSamples;
     this._primitive = new DRef();
     this._renderTarget = new DRef();
@@ -33,7 +31,7 @@ export class CubemapSHProjector {
       this._renderTarget.dispose();
     }
   }
-  shProject(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
+  projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
     this.init(device);
@@ -99,23 +97,14 @@ export class CubemapSHProjector {
       CubemapSHProjector._renderStats.useRasterizerState().setCullMode('none');
     }
 
-    if (!CubemapSHProjector._program) {
-      CubemapSHProjector._program = CubemapSHProjector._createProgram(device, false);
-      for (let i = 0; i < 9; i++) {
-        CubemapSHProjector._bindGroup.push(
-          device.createBindGroup(CubemapSHProjector._program.bindGroupLayouts[0])
-        );
-      }
-    }
-
     if (!CubemapSHProjector._programInst) {
-      CubemapSHProjector._programInst = CubemapSHProjector._createProgram(device, true);
+      CubemapSHProjector._programInst = CubemapSHProjector._createProgram(device);
       CubemapSHProjector._bindGroupInst = device.createBindGroup(
         CubemapSHProjector._programInst.bindGroupLayouts[0]
       );
     }
   }
-  private static _createProgram(device: AbstractDevice, instancing: boolean) {
+  private static _createProgram(device: AbstractDevice) {
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.directionWeight = pb.vec4().attrib('position');
@@ -128,29 +117,22 @@ export class CubemapSHProjector {
           if (pb.getDevice().type !== 'webgpu') {
             this.$builtins.pointSize = 1;
           }
-          if (!instancing) {
-            this.$builtins.position = pb.vec4(0, 0, 0, 1);
-          } else {
-            this.$outputs.shIndex = pb.int(
-              device.type === 'webgl' ? this.$inputs.instanceId : this.$builtins.instanceIndex
-            );
-            this.$l.x = pb.mod(this.$builtins.instanceIndex, 3);
-            this.$l.y = pb.div(this.$builtins.instanceIndex, 3);
-            this.$l.ndcX = pb.sub(pb.div(pb.add(pb.float(this.x), 0.5), 1.5), 1);
-            this.$l.ndcY = pb.sub(pb.div(pb.add(pb.float(this.y), 0.5), 1.5), 1);
-            this.$l.$builtins.position = pb.vec4(this.ndcX, this.ndcY, 0, 1);
-            if (pb.getDevice().type === 'webgpu') {
-              this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, -1, 1, 1));
-            }
+          this.$outputs.shIndex = pb.int(
+            device.type === 'webgl' ? this.$inputs.instanceId : this.$builtins.instanceIndex
+          );
+          this.$l.x = pb.mod(this.$builtins.instanceIndex, 3);
+          this.$l.y = pb.div(this.$builtins.instanceIndex, 3);
+          this.$l.ndcX = pb.sub(pb.div(pb.add(pb.float(this.x), 0.5), 1.5), 1);
+          this.$l.ndcY = pb.sub(pb.div(pb.add(pb.float(this.y), 0.5), 1.5), 1);
+          this.$l.$builtins.position = pb.vec4(this.ndcX, this.ndcY, 0, 1);
+          if (pb.getDevice().type === 'webgpu') {
+            this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, -1, 1, 1));
           }
         });
       },
       fragment(pb) {
         this.$outputs.color = pb.vec4();
         this.cubemap = pb.texCube().uniform(0);
-        if (!instancing) {
-          this.shIndex = pb.int().uniform(0);
-        }
         pb.func('Y0', [pb.vec3('v')], function () {
           this.$return(0.282094791773878);
         });
@@ -212,10 +194,7 @@ export class CubemapSHProjector {
         });
         pb.main(function () {
           this.$l.radiance = pb.textureSampleLevel(this.cubemap, this.$inputs.direction, 0).rgb;
-          this.$l.sh = this.evalBasis(
-            this.$inputs.direction,
-            !instancing ? this.shIndex : this.$inputs.shIndex
-          );
+          this.$l.sh = this.evalBasis(this.$inputs.direction, this.$inputs.shIndex);
           this.$outputs.color = pb.vec4(pb.mul(this.radiance, this.sh, this.$inputs.weight), 1);
         });
       }

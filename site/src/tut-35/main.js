@@ -38,13 +38,7 @@ myApp.ready().then(async () => {
   sunLight.castShadow = true;
   sunLight.shadow.numShadowCascades = 4;
 
-  // Set the sky rendering mode to Atmospheric Scattering
-  scene.env.sky.skyType = 'scatter';
-  // Set the fog effect to atmospheric scattering
-  scene.env.sky.fogType = 'scatter';
-
   // Create the ground and some boxes
-
   const material = new PBRMetallicRoughnessMaterial();
   material.metallic = 0.1;
   material.roughness = 0.6;
