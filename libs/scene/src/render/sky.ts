@@ -973,17 +973,20 @@ export class SkyRenderer {
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.worldPos = this.hPos.xyz;
+            this.$l.fading = pb.float(0);
             this.$if(pb.greaterThan(this.$l.linearDepth, 0.9999), function () {
               this.$l.ray = pb.sub(this.worldPos, this.cameraPosition);
               this.$l.d = pb.length(this.ray);
               this.$l.rayNorm = pb.div(this.ray, this.d);
-              this.worldPos = pb.add(this.cameraPosition, pb.mul(this.rayNorm, 6360000));
+              this.worldPos = pb.add(this.cameraPosition, pb.mul(this.rayNorm, 1e8));
+              this.fading = pb.smoothStep(3e7, 0, this.worldPos.y);
             });
             this.$outputs.outColor = calculateHeightFog(
               this,
               this.params,
               this.cameraPosition,
               this.worldPos,
+              this.fading,
               this.distantLightLut
             );
           });
