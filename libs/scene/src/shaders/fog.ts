@@ -7,6 +7,7 @@ export type HeightFogParams = {
   heightFalloff: number;
   startDistance: number;
   startHeight: number;
+  maxHeight: number;
   maxOpacity: number;
   dirInscatteringExponent: number;
   dirInscatteringColor: Vector3;
@@ -19,10 +20,11 @@ export type HeightFogParams = {
 
 export function getDefaultHeightFogParams(): HeightFogParams {
   return {
-    globalDensity: 0.04,
-    heightFalloff: 0.2,
+    globalDensity: 0.00004,
+    heightFalloff: 0.0002,
     startDistance: 0,
     startHeight: 0,
+    maxHeight: 100,
     maxOpacity: 1,
     dirInscatteringExponent: 4,
     dirInscatteringStartDistance: 0,
@@ -41,6 +43,7 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
     pb.float('heightFalloff'),
     pb.float('startDistance'),
     pb.float('startHeight'),
+    pb.float('maxHeight'),
     pb.float('maxOpacity'),
     pb.float('dirInscatteringExponent'),
     pb.float('dirInscatteringStartDistance'),
@@ -76,7 +79,7 @@ export function calculateHeightFog(
   params: PBShaderExp,
   cameraPos: PBShaderExp,
   worldPos: PBShaderExp,
-  fading: PBShaderExp,
+  isSky: PBShaderExp,
   skyDistantColorLut: PBShaderExp
 ) {
   const pb = scope.$builder;
@@ -84,19 +87,34 @@ export function calculateHeightFog(
   const Params = getHeightFogParamsStruct(pb);
   pb.func(
     funcName,
-    [Params('params'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.float('fading')],
+    [Params('params'), pb.vec3('cameraPosition'), pb.vec3('worldPosition'), pb.bool('isSky')],
     function () {
-      this.$l.ray = pb.sub(this.worldPos, this.cameraPos);
+      this.$l.cameraPos = this.$choice(
+        this.isSky,
+        this.cameraPosition,
+        pb.vec3(
+          this.cameraPosition.x,
+          pb.min(this.cameraPosition.y, pb.add(this.params.startHeight, this.params.maxHeight)),
+          this.cameraPosition.z
+        )
+      );
+      this.$l.ray = pb.sub(this.worldPosition, this.cameraPos);
       this.$l.d = pb.length(this.ray);
       this.$l.rayNorm = pb.div(this.ray, this.d);
       this.$l.startDistance = this.params.startDistance;
       this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.startDistance));
       this.$l.term = this.params.rayOriginTerm;
-
-      this.$l.falloff = pb.max(
-        pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y)),
-        -127
+      this.$l.worldPos = this.$choice(
+        this.isSky,
+        pb.add(this.cameraPosition, pb.mul(this.rayNorm, 1e8)),
+        this.worldPosition
       );
+      this.$l.falloff = pb.clamp(
+        pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y)),
+        -125,
+        this.$choice(this.isSky, pb.float(1e8), pb.float(126))
+      );
+      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(3e7, 0, this.worldPos.y), 0);
       this.$l.factor = this.$choice(
         pb.greaterThan(pb.abs(this.falloff), 0.01),
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
@@ -134,5 +152,5 @@ export function calculateHeightFog(
       this.$return(pb.vec4(this.fogColor, this.fogFactor));
     }
   );
-  return scope[funcName](params, cameraPos, worldPos, fading);
+  return scope[funcName](params, cameraPos, worldPos, isSky);
 }

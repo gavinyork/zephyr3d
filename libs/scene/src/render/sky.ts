@@ -534,13 +534,13 @@ export class SkyRenderer {
   update(ctx: DrawContext) {
     // Update height fog parameters
     if (this._fogType === 'height_fog') {
+      const cameraY = Math.min(
+        this._heightFogParams.startHeight + this._heightFogParams.maxHeight,
+        ctx.camera.getWorldPosition().y
+      );
       const p = Math.max(
         -125,
-        Math.min(
-          126,
-          -this._heightFogParams.heightFalloff *
-            Math.min(600, ctx.camera.getWorldPosition().y - this._heightFogParams.startHeight)
-        )
+        Math.min(126, -this._heightFogParams.heightFalloff * (cameraY - this._heightFogParams.startHeight))
       );
       this._heightFogParams.rayOriginTerm = this._heightFogParams.globalDensity * Math.pow(2, p);
     }
@@ -973,20 +973,13 @@ export class SkyRenderer {
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.worldPos = this.hPos.xyz;
-            this.$l.fading = pb.float(0);
-            this.$if(pb.greaterThan(this.$l.linearDepth, 0.9999), function () {
-              this.$l.ray = pb.sub(this.worldPos, this.cameraPosition);
-              this.$l.d = pb.length(this.ray);
-              this.$l.rayNorm = pb.div(this.ray, this.d);
-              this.worldPos = pb.add(this.cameraPosition, pb.mul(this.rayNorm, 1e8));
-              this.fading = pb.smoothStep(3e7, 0, this.worldPos.y);
-            });
+            this.$l.isSky = pb.greaterThan(this.$l.linearDepth, 0.9999);
             this.$outputs.outColor = calculateHeightFog(
               this,
               this.params,
               this.cameraPosition,
               this.worldPos,
-              this.fading,
+              this.isSky,
               this.distantLightLut
             );
           });
