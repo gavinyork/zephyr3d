@@ -1,58 +1,36 @@
-import { Vector3 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
 
 export type HeightFogParams = {
-  fogColor: Vector3;
-  globalDensity: number;
-  heightFalloff: number;
-  startDistance: number;
-  startHeight: number;
-  maxHeight: number;
-  maxOpacity: number;
-  dirInscatteringExponent: number;
-  dirInscatteringColor: Vector3;
-  dirInscatteringStartDistance: number;
-  atmosphereEffectStrength: number;
-  rayOriginTerm: number;
+  parameter1: Vector4; // [rgb=fogColor a=heightFalloff]
+  parameter2: Vector4; // [r=density g=startHeight b=startDistance a=maxHeight]
+  parameter3: Vector4; // [r=maxOpacity g=atmosphereStrength b=rayOriginTerm a=dirInscatteringExponent]
+  parameter4: Vector4; // [rgb=directionalInscatteringColor a=UNUSED]
   lightDir: Vector3;
-  limitCameraHeight: number;
+  lightColor: Vector3;
 };
 
 export function getDefaultHeightFogParams(): HeightFogParams {
   return {
-    globalDensity: 0.00004,
-    heightFalloff: 0.0002,
-    startDistance: 0,
-    startHeight: 0,
-    maxHeight: 100,
-    maxOpacity: 1,
-    dirInscatteringExponent: 4,
-    dirInscatteringStartDistance: 0,
-    fogColor: new Vector3(0, 0, 0),
-    dirInscatteringColor: new Vector3(1, 1, 1),
-    atmosphereEffectStrength: 1,
-    rayOriginTerm: 0,
+    parameter1: new Vector4(0, 0, 0, 0.2),
+    parameter2: new Vector4(0.04, 0, 0, 100),
+    parameter3: new Vector4(1, 1, 0, 4),
+    parameter4: new Vector4(0, 0, 0, 0),
     lightDir: new Vector3(0, 1, 0),
-    limitCameraHeight: 600
+    lightColor: new Vector3(0, 0, 0)
   };
 }
 
 export function getHeightFogParamsStruct(pb: ProgramBuilder) {
   return pb.defineStruct([
-    pb.float('globalDensity'),
-    pb.float('heightFalloff'),
-    pb.float('startDistance'),
-    pb.float('startHeight'),
-    pb.float('maxHeight'),
-    pb.float('maxOpacity'),
-    pb.float('dirInscatteringExponent'),
+    pb.vec4('parameter1'),
+    pb.vec4('parameter2'),
+    pb.vec4('parameter3'),
+    pb.vec4('parameter4'),
     pb.float('dirInscatteringStartDistance'),
-    pb.float('atmosphereEffectStrength'),
-    pb.vec3('fogColor'),
-    pb.float('limitCameraHeight'),
     pb.vec3('dirInscatteringColor'),
-    pb.float('rayOriginTerm'),
-    pb.vec3('lightDir')
+    pb.vec3('lightDir'),
+    pb.vec3('lightColor')
   ]);
 }
 
@@ -94,23 +72,22 @@ export function calculateHeightFog(
         this.cameraPosition,
         pb.vec3(
           this.cameraPosition.x,
-          pb.min(this.cameraPosition.y, pb.add(this.params.startHeight, this.params.maxHeight)),
+          pb.min(this.cameraPosition.y, pb.add(this.params.parameter2.y, this.params.parameter2.w)),
           this.cameraPosition.z
         )
       );
       this.$l.ray = pb.sub(this.worldPosition, this.cameraPos);
       this.$l.d = pb.length(this.ray);
       this.$l.rayNorm = pb.div(this.ray, this.d);
-      this.$l.startDistance = this.params.startDistance;
-      this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.startDistance));
-      this.$l.term = this.params.rayOriginTerm;
+      this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.params.parameter2.z));
+      this.$l.term = this.params.parameter3.z;
       this.$l.worldPos = this.$choice(
         this.isSky,
         pb.add(this.cameraPosition, pb.mul(this.rayNorm, 1e8)),
         this.worldPosition
       );
       this.$l.falloff = pb.clamp(
-        pb.mul(this.params.heightFalloff, pb.sub(this.worldPos.y, this.origin.y)),
+        pb.mul(this.params.parameter1.w, pb.sub(this.worldPos.y, this.origin.y)),
         -125,
         this.$choice(this.isSky, pb.float(1e8), pb.float(126))
       );
@@ -120,35 +97,25 @@ export function calculateHeightFog(
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
         pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
       );
-      this.fogFactor = pb.mul(this.term, this.factor);
-      this.$l.rayLength = pb.distance(this.origin, this.worldPos);
-      this.$l.fogFactor = pb.mul(this.fogFactor, this.rayLength);
-      /*
-    this.$l.directionalInscattering = pb.mul(
-      this.params.dirInscatteringColor.rgb,
-      pb.pow(pb.clamp(pb.dot(this.ray, this.params.lightDir), 0, 1), this.params.dirInscatteringExponent)
-    );
-    this.$l.dirLineIntegral = pb.mul(
-      this.lineIntegral,
-      pb.max(0, pb.sub(this.rayLength, this.params.dirInscatteringStartDistance))
-    );
-    this.$l.dirFactor = pb.clamp(pb.exp2(pb.neg(this.dirLineIntegral)), 0, 1);
-    this.$l.directionalInscattering = pb.mul(this.$l.directionalInscattering, pb.sub(1, this.dirFactor));
-    */
-      this.$l.fogFactor = pb.min(
-        pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.fogFactor)), 0, 1)),
-        this.params.maxOpacity
+      this.$l.lineIntegral = pb.mul(this.term, this.factor, pb.distance(this.origin, this.worldPos));
+
+      this.$l.directionalInscattering = pb.mul(
+        pb.add(this.params.parameter4.rgb, pb.mul(this.params.lightColor, this.params.parameter3.y)),
+        pb.pow(pb.clamp(pb.dot(this.rayNorm, this.params.lightDir), 0, 1), this.params.parameter3.w)
       );
-      this.fogFactor = pb.max(this.fogFactor, this.fading);
-      this.$l.fogColor = this.params.fogColor;
-      this.$if(pb.greaterThan(this.params.atmosphereEffectStrength, 0), function () {
+      this.$l.fogFactor = pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.lineIntegral)), 0, 1));
+      this.$l.directionalInscattering = pb.mul(
+        this.$l.directionalInscattering,
+        pb.max(this.fogFactor, this.fading)
+      );
+
+      this.$l.fogColor = this.params.parameter1.rgb;
+      this.$if(pb.greaterThan(this.params.parameter3.y, 0), function () {
         this.$l.skyContrib = pb.textureSampleLevel(skyDistantColorLut, pb.vec2(0.5), 0).rgb;
-        this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.atmosphereEffectStrength));
+        this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.parameter3.y));
       });
-      this.$l.fogColor = pb.add(
-        pb.mul(this.fogColor, this.fogFactor),
-        pb.vec3(0) /*this.directionalInscattering*/
-      );
+      this.$l.fogFactor = pb.max(pb.min(this.fogFactor, this.params.parameter3.x), this.fading);
+      this.$l.fogColor = pb.add(pb.mul(this.fogColor, this.fogFactor), this.directionalInscattering);
       this.$return(pb.vec4(this.fogColor, this.fogFactor));
     }
   );

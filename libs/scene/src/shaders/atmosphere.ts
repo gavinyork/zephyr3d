@@ -51,7 +51,7 @@ export function getDefaultAtmosphereParams(): AtmosphereParams {
     lightDir: new Vector3(1, 0, 0),
     lightColor: new Vector4(1, 1, 1, 10),
     cameraAspect: 1,
-    cameraHeightScale: 50
+    cameraHeightScale: 1
   };
 }
 

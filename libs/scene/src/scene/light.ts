@@ -199,7 +199,7 @@ export class PunctualLight extends BaseLight {
    * @param color - The color to set
    * @returns self
    */
-  setColor(color: Vector4) {
+  setColor(color: Vector4 | Vector3) {
     this._color.set(color);
     this.invalidateUniforms();
     return this;

@@ -126,14 +126,10 @@ class PropertyGroup {
       parent = new PropertyGroup(firstPart, this.grid);
       this.properties.push(parent);
     }
-    let group: PropertyGroup = null;
+    let group = parent;
     while (parts.length > 0) {
       const part = parts.shift();
-      group = parent.subgroups.find((g) => g.name === part);
-      if (!group) {
-        group = parent.addGroup(part);
-      }
-      parent = group;
+      group = group.subgroups.find((g) => g.name === part) ?? group.addGroup(part);
     }
     return group;
   }

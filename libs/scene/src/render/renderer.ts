@@ -296,21 +296,7 @@ export class SceneRenderer {
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
 
     // Update sky
-    const useScatter = ctx.scene.env.sky.skyType === 'scatter';
-    if (useScatter) {
-      ctx.scene.env.sky.renderAtmosphereLUTs(ctx);
-    }
-    ctx.scene.env.sky.update(ctx);
-
-    const sunLightColor = ctx.sunLight && useScatter ? ctx.sunLight.color : null;
-    // Apply sun
-    if (sunLightColor) {
-      const sunTransmittance = ctx.scene.env.sky.sunTransmittance(ctx.sunLight);
-      ctx.sunLight.color = Vector4.mul(
-        ctx.sunLight.color,
-        new Vector4(sunTransmittance.x, sunTransmittance.y, sunTransmittance.z, 1)
-      );
-    }
+    const sunLightColor = ctx.scene.env.sky.update(ctx);
 
     // Gather lights
     ctx.clusteredLight = this.getClusteredLight();

@@ -328,7 +328,7 @@ export class ClipmapTerrain
       });
   }
   createHeightMapTexture(width: number, height: number) {
-    return Application.instance.device.createTexture2D('r32f', width, height);
+    return Application.instance.device.createTexture2D('r16f', width, height);
   }
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
