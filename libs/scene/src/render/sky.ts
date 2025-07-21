@@ -1153,9 +1153,9 @@ export class SkyRenderer {
             );
             this.$l.color = pb.mul(this.fogColor.rgb, this.fogFactor);
             this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = pb.vec4(this.color, this.fogFactor);
+              this.$outputs.outColor = pb.vec4(this.color, pb.sub(1, this.fogFactor));
             }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), this.fogFactor);
+              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), pb.sub(1, this.fogFactor));
             });
           });
         }
@@ -1262,16 +1262,13 @@ export class SkyRenderer {
     if (!SkyRenderer._renderStatesFog) {
       SkyRenderer._renderStatesFog = device.createRenderStateSet();
       SkyRenderer._renderStatesFog.useRasterizerState().setCullMode('none');
-      SkyRenderer._renderStatesFog.useBlendingState().enable(true).setBlendFunc('one', 'inv-src-alpha');
+      SkyRenderer._renderStatesFog.useBlendingState().enable(true).setBlendFunc('one', 'src-alpha');
       SkyRenderer._renderStatesFog.useDepthState().enableTest(false).enableWrite(false);
     }
     if (!SkyRenderer._renderStatesFogScatter) {
       SkyRenderer._renderStatesFogScatter = device.createRenderStateSet();
       SkyRenderer._renderStatesFogScatter.useRasterizerState().setCullMode('none');
-      SkyRenderer._renderStatesFogScatter
-        .useBlendingState()
-        .enable(true)
-        .setBlendFunc('one', 'inv-src-alpha');
+      SkyRenderer._renderStatesFogScatter.useBlendingState().enable(true).setBlendFunc('one', 'src-alpha');
       SkyRenderer._renderStatesFogScatter
         .useDepthState()
         .enableTest(true)

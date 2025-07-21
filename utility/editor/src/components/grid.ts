@@ -739,7 +739,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
             if (payload) {
               tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
-              value.set.call(object, tmpProperty);
+              Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                this.refresh();
+              });
               this.dispatchEvent('object_property_changed', object, value);
             }
             ImGui.EndDragDropTarget();
@@ -747,7 +749,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
-              value.set.call(object, null);
+              Promise.resolve(value.set.call(object, null)).then(() => {
+                this.refresh();
+              });
               this.dispatchEvent('object_property_changed', object, value);
               if (property.value.objectTypes?.length > 0) {
                 ImGui.OpenPopup('X##list');

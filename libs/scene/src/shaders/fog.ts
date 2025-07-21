@@ -42,11 +42,8 @@ export function combineAerialPerspectiveFog(
   const pb = scope.$builder;
   const funcName = 'Z_combineAerialPerspectiveFog';
   pb.func(funcName, [pb.vec4('fogging'), pb.vec4('aerialPerspectiveFog')], function () {
-    this.$l.rgb = pb.add(
-      this.fogging.rgb,
-      pb.mul(this.aerialPerspectiveFog.rgb, pb.sub(1, this.fogging.rgb.a))
-    );
-    this.$l.a = pb.mul(pb.sub(1, this.fogging.a), pb.sub(1, this.aerialPerspectiveFog.a));
+    this.$l.rgb = pb.add(this.fogging.rgb, pb.mul(this.aerialPerspectiveFog.rgb, this.fogging.rgb.a));
+    this.$l.a = pb.mul(this.fogging.a, this.aerialPerspectiveFog.a);
     this.$return(pb.vec4(this.rgb, pb.sub(1, this.a)));
   });
   return scope[funcName](fogging, aerialPerspectiveFog);
@@ -116,7 +113,7 @@ export function calculateHeightFog(
       });
       this.$l.fogFactor = pb.max(pb.min(this.fogFactor, this.params.parameter3.x), this.fading);
       this.$l.fogColor = pb.add(pb.mul(this.fogColor, this.fogFactor), this.directionalInscattering);
-      this.$return(pb.vec4(this.fogColor, this.fogFactor));
+      this.$return(pb.vec4(this.fogColor, pb.sub(1, this.fogFactor)));
     }
   );
   return scope[funcName](params, cameraPos, worldPos, isSky);

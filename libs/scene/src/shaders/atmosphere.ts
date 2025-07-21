@@ -718,7 +718,7 @@ export function aerialPerspective(
         pb.vec3(1 / 3, 1 / 3, 1 / 3)
       );
       this.debugValue = pb.vec4(this.d0, this.data.a, this.uv1);
-      this.$return(pb.vec4(this.inscattering, pb.sub(1, this.transmittance)));
+      this.$return(pb.vec4(this.inscattering, this.transmittance));
     }
   );
   return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim, f4Debug);
