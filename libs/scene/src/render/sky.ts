@@ -1,5 +1,5 @@
 import { Application } from '../app/app';
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../shaders/misc';
+import { linearToGamma } from '../shaders/misc';
 import type { AtmosphereParams } from '../shaders';
 import {
   aerialPerspective,
@@ -19,7 +19,7 @@ import { BoxShape } from '../shapes';
 import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
-import type { GPUDataBuffer } from '@zephyr3d/device';
+import type { BaseTexture, GPUDataBuffer } from '@zephyr3d/device';
 import {
   type AbstractDevice,
   type BindGroup,
@@ -550,7 +550,7 @@ export class SkyRenderer {
     let oldSunLight = ctx.sunLight && useScatter ? ctx.sunLight.color : null;
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
-    if (this._skyType === 'scatter' && (true || this._wind.x !== 0 || this._wind.y !== 0)) {
+    if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
@@ -677,14 +677,13 @@ export class SkyRenderer {
     }
   }
   /** @internal */
-  renderHeightFog(ctx: DrawContext) {
+  renderHeightFog(ctx: DrawContext, depthTexture: BaseTexture) {
     const camera = ctx.camera;
-    const sceneDepthTexture = ctx.linearDepthTexture;
     const device = ctx.device;
     const fogProgram = SkyRenderer._programHeightFog;
     const renderStates = SkyRenderer._renderStatesFog;
     const bindgroup = this._bindgroupHeightFog.get();
-    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setTexture('distantLightLut', this._skyDistantLightLut.get().getColorAttachments()[0]);
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
@@ -699,14 +698,13 @@ export class SkyRenderer {
     device.draw('triangle-strip', 0, 4);
   }
   /** @internal */
-  renderAtmosphericFog(ctx: DrawContext) {
+  renderAtmosphericFog(ctx: DrawContext, depthTexture: BaseTexture) {
     const camera = ctx.camera;
-    const sceneDepthTexture = ctx.linearDepthTexture;
     const device = ctx.device;
     const fogProgram = SkyRenderer._programFogScatter;
     const renderStates = SkyRenderer._renderStatesFogScatter;
     const bindgroup = this._bindgroupFogScatter.get();
-    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
     bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
@@ -722,12 +720,11 @@ export class SkyRenderer {
     device.draw('triangle-strip', 0, 4);
   }
   /** @internal */
-  renderLegacyFog(ctx: DrawContext) {
-    const sceneDepthTexture = ctx.linearDepthTexture;
+  renderLegacyFog(ctx: DrawContext, depthTexture: BaseTexture) {
     const camera = ctx.camera;
     const device = ctx.device;
     const bindgroup = this._bindgroupFog.get();
-    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
     bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
@@ -744,22 +741,36 @@ export class SkyRenderer {
   }
   /** @internal */
   renderFog(ctx: DrawContext) {
-    const sceneDepthTexture = ctx.linearDepthTexture;
-    if (!sceneDepthTexture) {
-      return;
+    const currentFramebuffer = ctx.device.getFramebuffer();
+    const depthBuffer = currentFramebuffer?.getDepthAttachment() ?? null;
+    const colorBuffer = currentFramebuffer?.getColorAttachments()[0] ?? null;
+    const fogFramebuffer =
+      depthBuffer && colorBuffer
+        ? ctx.device.pool.fetchTemporalFramebuffer(false, 0, 0, colorBuffer, null, false)
+        : null;
+    if (fogFramebuffer) {
+      const vp = ctx.device.getViewport();
+      const scissor = ctx.device.getScissor();
+      ctx.device.pushDeviceStates();
+      ctx.device.setFramebuffer(fogFramebuffer);
+      ctx.device.setViewport(vp);
+      ctx.device.setScissor(scissor);
     }
-    const device = ctx.device;
-    const savedRenderStates = device.getRenderStates();
-    this._prepareSkyBox(device);
+    const savedRenderStates = ctx.device.getRenderStates();
+    this._prepareSkyBox(ctx.device);
     if (this._skyType === 'scatter') {
-      this.renderAtmosphericFog(ctx);
+      this.renderAtmosphericFog(ctx, depthBuffer);
     }
     if (this._fogType === 'height_fog') {
-      this.renderHeightFog(ctx);
+      this.renderHeightFog(ctx, depthBuffer);
     } else if (this._fogType !== 'none') {
-      this.renderLegacyFog(ctx);
+      this.renderLegacyFog(ctx, depthBuffer);
     }
-    device.setRenderStates(savedRenderStates);
+    ctx.device.setRenderStates(savedRenderStates);
+    if (fogFramebuffer) {
+      ctx.device.popDeviceStates();
+      ctx.device.pool.releaseFrameBuffer(fogFramebuffer);
+    }
   }
   /** @internal */
   renderSky(ctx: DrawContext) {
@@ -986,25 +997,16 @@ export class SkyRenderer {
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
-            if (device.type === 'webgl') {
-              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-            } else {
-              this.$l.linearDepth = this.depthValue.r;
-            }
-            this.$l.nonLinearDepth = pb.div(
-              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
-            );
+            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv).r;
             this.$l.clipSpacePos = pb.vec4(
               pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
-              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              pb.sub(pb.mul(this.depthValue, 2), 1),
               1
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
             this.$l.worldPos = this.hPos.xyz;
-            this.$l.isSky = pb.greaterThan(this.$l.linearDepth, 0.9999);
+            this.$l.isSky = pb.greaterThan(this.$l.depthValue, 0.9999);
             this.$outputs.outColor = calculateHeightFog(
               this,
               this.params,
@@ -1048,20 +1050,10 @@ export class SkyRenderer {
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
-            if (device.type === 'webgl') {
-              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-            } else {
-              this.$l.linearDepth = this.depthValue.r;
-            }
-            this.$l.nonLinearDepth = pb.div(
-              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
-            );
-            //this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), this.nonLinearDepth, 1);
+            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv).r;
             this.$l.clipSpacePos = pb.vec4(
               pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
-              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              pb.sub(pb.mul(this.depthValue, 2), 1),
               1
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
@@ -1126,20 +1118,10 @@ export class SkyRenderer {
           this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv);
-            if (device.type === 'webgl') {
-              this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-            } else {
-              this.$l.linearDepth = this.depthValue.r;
-            }
-            this.$l.nonLinearDepth = pb.div(
-              pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-              pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
-            );
-            //this.$l.clipSpacePos = pb.vec4(pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)), this.nonLinearDepth, 1);
+            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv).r;
             this.$l.clipSpacePos = pb.vec4(
               pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
-              pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+              pb.sub(pb.mul(this.depthValue, 2), 1),
               1
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
