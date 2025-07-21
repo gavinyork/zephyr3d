@@ -197,3 +197,8 @@ export const uniformSphereSamples = [
   new Vector3(0.803855, -0.0902273, 0.587942),
   new Vector3(-0.0555802, -0.374602, -0.925519)
 ];
+
+export enum Fog {
+  FOG_TYPE_NONE = 0,
+  FOG_TYPE_HEIGHT = 4
+}

@@ -1,5 +1,7 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
+import { aerialPerspective, getAtmosphereParamsStruct } from './atmosphere';
+import { Fog } from '../values';
 
 export type HeightFogParams = {
   parameter1: Vector4; // [rgb=fogColor a=heightFalloff]
@@ -34,6 +36,82 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
   ]);
 }
 
+export function calculateFog(
+  scope: PBInsideFunctionScope,
+  aerialperspective: PBShaderExp,
+  fogType: PBShaderExp,
+  atmosphereParams: PBShaderExp,
+  heightFogParams: PBShaderExp,
+  uv: PBShaderExp,
+  isSky: PBShaderExp | boolean,
+  cameraPos: PBShaderExp,
+  worldPos: PBShaderExp,
+  additive: PBShaderExp | number,
+  apLut: PBShaderExp,
+  distantLightLut: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_calculateFog';
+  const AtmosphereParams = getAtmosphereParamsStruct(pb);
+  const HeightFogParams = getHeightFogParamsStruct(pb);
+  pb.func(
+    funcName,
+    [
+      pb.int('withAerialperspective'),
+      pb.int('fogType'),
+      AtmosphereParams('atmosphereParams'),
+      HeightFogParams('heightFogParams'),
+      pb.bool('isSky'),
+      pb.vec2('uv'),
+      pb.vec3('cameraPos'),
+      pb.vec3('worldPos'),
+      pb.int('additive')
+    ],
+    function () {
+      this.$l.fogging = pb.vec4(0);
+      this.$if(pb.equal(this.fogType, Fog.FOG_TYPE_HEIGHT), function () {
+        this.fogging = calculateHeightFog(
+          this,
+          this.heightFogParams,
+          this.cameraPos,
+          this.worldPos,
+          this.isSky,
+          distantLightLut
+        );
+      });
+      this.$if(pb.and(pb.notEqual(this.withAerialPerspective, 0), pb.not(this.isSky)), function () {
+        this.$l.atmosphericFogging = aerialPerspective(
+          this,
+          this.uv,
+          this.atmosphereParams,
+          this.cameraPos,
+          this.worldPos,
+          pb.vec3(32),
+          apLut
+        );
+        this.$if(pb.notEqual(this.fogType, Fog.FOG_TYPE_NONE), function () {
+          this.fogging = combineAerialPerspectiveFog(this, this.fogging, this.atmosphericFogging);
+        });
+      });
+      this.$if(pb.notEqual(this.additive, 0), function () {
+        this.fogging = pb.vec4(pb.vec3(0), this.fogging.a);
+      });
+      this.$return(this.fogging);
+    }
+  );
+  return scope[funcName](
+    aerialperspective,
+    fogType,
+    atmosphereParams,
+    heightFogParams,
+    isSky,
+    uv,
+    cameraPos,
+    worldPos,
+    additive
+  );
+}
+
 export function combineAerialPerspectiveFog(
   scope: PBInsideFunctionScope,
   fogging: PBShaderExp,
@@ -54,7 +132,7 @@ export function calculateHeightFog(
   params: PBShaderExp,
   cameraPos: PBShaderExp,
   worldPos: PBShaderExp,
-  isSky: PBShaderExp,
+  isSky: PBShaderExp | boolean,
   skyDistantColorLut: PBShaderExp
 ) {
   const pb = scope.$builder;

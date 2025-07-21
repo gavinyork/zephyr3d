@@ -38,17 +38,6 @@ myApp.ready().then(async () => {
   sunLight.castShadow = true;
   sunLight.shadow.numShadowCascades = 4;
 
-  // Set the sky rendering mode to Atmospheric Scattering
-  scene.env.sky.skyType = 'scatter';
-  // Set the fog mode to exponential (exp or exp2)
-  scene.env.sky.fogType = 'exp';
-  // Fog density
-  scene.env.sky.fogDensity = 0.006;
-  // Fog height
-  scene.env.sky.fogTop = 120;
-  // Fog color
-  scene.env.sky.fogColor.setXYZW(0, 0.4, 0.7, 1);
-
   // Create the ground and some boxes
   const material = new PBRMetallicRoughnessMaterial();
   material.metallic = 0.1;

@@ -38,7 +38,6 @@ gltfApp.ready().then(async () => {
   //await imGuiInit(gltfApp.device);
   //gltfApp.inputManager.use(imGuiInjectEvent);
   const scene = new Scene();
-  scene.env.sky.fogType = 'exp';
   const gltfViewer = new GLTFViewer(scene);
   await gltfViewer.ready();
   gltfViewer.loadModel('./assets/models/DamagedHelmet.glb');

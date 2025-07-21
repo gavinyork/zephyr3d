@@ -28,13 +28,17 @@ import type { PunctualLight } from '../../scene/light';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
 import { Application } from '../../app';
 import { fetchSampler } from '../../utility/misc';
-import { aerialPerspective, getAtmosphereParamsStruct } from '../../shaders';
+import type { AtmosphereParams } from '../../shaders';
+import { aerialPerspective, getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
+import type { HeightFogParams } from '../../shaders/fog';
+import { getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 
 const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
+const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
@@ -59,11 +63,6 @@ const UNIFORM_NAME_MORPH_INFO = 'Z_UniformMorphInfo';
  * @public
  */
 export class ShaderHelper {
-  static readonly FOG_TYPE_NONE = 0;
-  static readonly FOG_TYPE_LINEAR = 1;
-  static readonly FOG_TYPE_EXP = 2;
-  static readonly FOG_TYPE_EXP2 = 3;
-  static readonly FOG_TYPE_HEIGHT = 4;
   static readonly BILLBOARD_SPHERICAL = 1;
   static readonly BILLBOARD_SYLINDRAL = 2;
   static readonly MATERIAL_INSTANCE_DATA_OFFSET = 9;
@@ -95,11 +94,9 @@ export class ShaderHelper {
   private static _fogUniforms = {
     fog: {
       fogType: 0,
-      fogColor: null,
-      // [near, far, top, density]
-      fogParams: null,
-      // aerial perspective density
-      apDensity: 1
+      additive: 0,
+      atmosphereParams: getDefaultAtmosphereParams(),
+      heightFogParams: getDefaultHeightFogParams()
     }
   };
   static getWorldMatrixUniformName(): string {
@@ -226,13 +223,10 @@ export class ShaderHelper {
       const useClusteredLighting = !ctx.currentShadowLight;
       const fogStructMembers: PBShaderExp[] = [
         pb.int('fogType'),
-        pb.vec4('fogColor'),
-        pb.vec4('fogParams'),
-        pb.float('apDensity')
+        pb.int('additive'),
+        getAtmosphereParamsStruct(pb)('atmosphereParams'),
+        getHeightFogParamsStruct(pb)('heightFogParams')
       ];
-      if (ctx.fogFlags & ATMOSPHERIC_FOG_BIT) {
-        fogStructMembers.push(getAtmosphereParamsStruct(pb)('atmosphereParams'));
-      }
       const fogStruct = pb.defineStruct(fogStructMembers);
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
@@ -263,9 +257,8 @@ export class ShaderHelper {
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
         ).uniform(0);
       }
-      if (ctx.fogFlags & ATMOSPHERIC_FOG_BIT) {
-        scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
-      }
+      scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
+      scope[UNIFORM_NAME_SKYDISTANTLIGHT_LUT] = pb.tex2D().uniform(0);
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
       if (ctx.currentShadowLight) {
         const scope = pb.getGlobalScope();
@@ -851,19 +844,19 @@ export class ShaderHelper {
   static setFogUniforms(
     bindGroup: BindGroup,
     fogType: number,
-    fogColor: Vector4,
-    fogParams: Vector4,
-    apDensity: number,
-    aerialPerspectiveLUT?: Texture2D
+    additive: number,
+    atmosphereParams: AtmosphereParams,
+    heightFogParams: HeightFogParams,
+    aerialPerspectiveLUT: Texture2D,
+    skyDistantLightLUT: Texture2D
   ) {
-    this._fogUniforms.fog.fogColor = fogColor;
-    this._fogUniforms.fog.fogParams = fogParams;
     this._fogUniforms.fog.fogType = fogType;
-    this._fogUniforms.fog.apDensity = apDensity;
+    this._fogUniforms.fog.additive = additive;
+    this._fogUniforms.fog.atmosphereParams = atmosphereParams;
+    this._fogUniforms.fog.heightFogParams = heightFogParams;
     bindGroup.setValue(UNIFORM_NAME_GLOBAL, this._fogUniforms);
-    if (aerialPerspectiveLUT) {
-      bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
-    }
+    bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
+    bindGroup.setTexture(UNIFORM_NAME_SKYDISTANTLIGHT_LUT, skyDistantLightLUT);
   }
   /** @internal */
   static setLightUniforms(
@@ -1131,104 +1124,12 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT];
   }
   /**
-   * Gets the uniform variable of type vec4 which holds the fog parameters
-   * @param scope - Current shader scope
-   * @returns The fog parameters
-   */
-  static getFogParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].fog.fogParams;
-  }
-  /**
    * Gets the uniform variable of type float which holds the aerial perspective density
    * @param scope - Current shader scope
    * @returns aerial perspective density
    */
   static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_GLOBAL].fog.apDensity;
-  }
-  /**
-   * Computes the fog factor for a given view vector
-   * @param scope - Current shader scope
-   * @param viewDir - the view vector
-   * @param fogType - Type of the fog
-   * @param fogParams - Fog parameters [start, end, top, density]
-   * @returns The computed fog factor
-   */
-  static computeFogFactor(
-    scope: PBInsideFunctionScope,
-    viewDir: PBShaderExp,
-    fogType: PBShaderExp,
-    fogParams: PBShaderExp
-  ): PBShaderExp {
-    const pb = scope.$builder;
-    const funcName = 'Z_computeFogFactor';
-    const that = this;
-    pb.func(funcName, [pb.vec3('viewDir'), pb.int('fogType'), pb.vec4('fogParams')], function () {
-      this.$l.distance = pb.length(this.viewDir);
-      this.$l.top = pb.max(this.viewDir.y, 0.0001);
-      this.$l.distance = pb.mul(this.$l.distance, pb.min(1, pb.div(this.fogParams.z, this.top)));
-      this.$if(pb.equal(this.fogType, that.FOG_TYPE_LINEAR), function () {
-        this.$return(
-          pb.clamp(
-            pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)),
-            0,
-            1
-          )
-        );
-      })
-        .$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP), function () {
-          this.$l.e = pb.mul(this.distance, this.fogParams.w);
-          this.$return(pb.sub(1, pb.div(1, pb.exp(this.e))));
-        })
-        .$elseif(pb.equal(this.fogType, that.FOG_TYPE_EXP2), function () {
-          this.$l.e = pb.mul(this.distance, this.fogParams.w);
-          this.$return(pb.sub(1, pb.div(1, pb.exp(pb.mul(this.e, this.e)))));
-        })
-        .$else(function () {
-          this.$return(0);
-        });
-    });
-    return pb.getGlobalScope()[funcName](viewDir, fogType, fogParams);
-  }
-  /**
-   * Computes the fog factor with given type for a given view vector
-   * @param scope - Current shader scope
-   * @param viewDir - the view vector
-   * @param fogParams - The fog params [start, end, top, density]
-   * @param fogType - Type of the fog
-   * @returns The computed fog factor
-   */
-  static computeFogFactorForType(
-    scope: PBInsideFunctionScope,
-    viewDir: PBShaderExp,
-    fogParams: PBShaderExp,
-    fogType: 'linear' | 'exp' | 'exp2'
-  ): PBShaderExp {
-    const pb = scope.$builder;
-    const funcName = `Z_computeFogFactor${fogType[0].toUpperCase()}${fogType.slice(1)}`;
-    pb.func(funcName, [pb.vec3('viewDir'), pb.vec4('fogParams')], function () {
-      this.$l.distance = pb.length(this.viewDir);
-      this.$l.top = pb.max(this.viewDir.y, 0.0001);
-      this.$l.distance = pb.mul(this.$l.distance, pb.min(1, pb.div(this.fogParams.z, this.top)));
-      if (fogType === 'linear') {
-        this.$return(
-          pb.clamp(
-            pb.div(pb.sub(this.distance, this.fogParams.x), pb.sub(this.fogParams.y, this.fogParams.x)),
-            0,
-            1
-          )
-        );
-      } else if (fogType === 'exp') {
-        this.$l.e = pb.mul(this.distance, this.fogParams.w);
-        this.$return(pb.sub(1, pb.div(1, pb.exp(this.e))));
-      } else if (fogType === 'exp2') {
-        this.$l.e = pb.mul(this.distance, this.fogParams.w);
-        this.$return(pb.sub(1, pb.div(1, pb.exp(pb.mul(this.e, this.e)))));
-      } else {
-        this.$return(0);
-      }
-    });
-    return pb.getGlobalScope()[funcName](viewDir, fogParams);
   }
   /**
    * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
@@ -1519,7 +1420,6 @@ export class ShaderHelper {
       const funcName = 'Z_applySkyFog';
       pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
         this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
-        this.$l.debug = pb.vec4();
         this.$l.fog = aerialPerspective(
           this,
           this.uv,
@@ -1527,7 +1427,6 @@ export class ShaderHelper {
           that.getCameraPosition(this).xyz,
           this.worldPos,
           pb.vec3(32),
-          this.debug,
           that.getAerialPerspectiveLUT(this)
         );
         this.color = pb.vec4(

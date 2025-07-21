@@ -38,21 +38,6 @@ myApp.ready().then(async () => {
   sunLight.castShadow = true;
   sunLight.shadow.numShadowCascades = 4;
 
-  // Set the sky rendering mode to Atmospheric Scattering
-  scene.env.sky.skyType = 'scatter';
-  // Sets the fog mode to linear
-  scene.env.sky.fogType = 'linear';
-  // Fog start
-  scene.env.sky.fogStart = 10;
-  // Fog end
-  scene.env.sky.fogEnd = 200;
-  // Fog height
-  scene.env.sky.fogTop = 120;
-  // Fog color
-  scene.env.sky.fogColor.setXYZW(0, 0.4, 0.7, 1);
-
-  // Create the ground and some boxes
-
   const material = new PBRMetallicRoughnessMaterial();
   material.metallic = 0.1;
   material.roughness = 0.6;

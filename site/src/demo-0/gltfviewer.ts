@@ -43,7 +43,6 @@ export class GLTFViewer {
     this._animationSet = new DRef();
     this._scene = scene;
     this._scene.env.light.strength = 0.8;
-    this._scene.env.sky.drawGround = true;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
     this._assetManager = new AssetManager();

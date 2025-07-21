@@ -80,10 +80,11 @@ export class LightPass extends RenderPass {
       ShaderHelper.setFogUniforms(
         bindGroup,
         ctx.env.sky.mappedFogType,
-        baseLightPass ? ctx.env.sky.fogColor : Vector4.zero(),
-        ctx.env.sky.fogParams,
-        ctx.env.sky.aerialPerspectiveDistance * ctx.env.sky.aerialPerspectiveDistance,
-        ctx.env.sky.getAerialPerspectiveLUT(ctx)
+        baseLightPass ? 0 : 1,
+        ctx.env.sky.atmosphereParams,
+        ctx.env.sky.heightFogParams,
+        ctx.env.sky.getAerialPerspectiveLUT(ctx),
+        ctx.env.sky.getSkyDistantLightLUT(ctx)
       );
       flags.fogSet[ctx.renderPassHash] = 1;
     }

@@ -1,4 +1,5 @@
 import type {
+  AbstractDevice,
   BindGroup,
   FrameBuffer,
   GPUProgram,
@@ -672,7 +673,6 @@ export function aerialPerspective(
   f3CameraPos: PBShaderExp,
   f3WorldPos: PBShaderExp,
   f3Dim: PBShaderExp,
-  f4Debug: PBShaderExp,
   texAerialPerspectiveLut: PBShaderExp
 ) {
   const pb = scope.$builder;
@@ -680,14 +680,7 @@ export function aerialPerspective(
   const funcName = 'z_aerialPerspective';
   pb.func(
     funcName,
-    [
-      Params('params'),
-      pb.vec2('uv'),
-      pb.vec3('cameraPos'),
-      pb.vec3('worldPos'),
-      pb.vec3('dim'),
-      pb.vec4('debugValue').out()
-    ],
+    [Params('params'), pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.vec3('dim')],
     function () {
       this.$l.V = pb.sub(this.worldPos, this.cameraPos);
       this.$l.dis = pb.length(this.V);
@@ -717,11 +710,10 @@ export function aerialPerspective(
         ),
         pb.vec3(1 / 3, 1 / 3, 1 / 3)
       );
-      this.debugValue = pb.vec4(this.d0, this.data.a, this.uv1);
       this.$return(pb.vec4(this.inscattering, this.transmittance));
     }
   );
-  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim, f4Debug);
+  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim);
 }
 
 export function aerialPerspectiveLut(
@@ -957,57 +949,63 @@ export function transmittanceLut(scope: PBInsideFunctionScope, stParams: PBShade
   return scope[funcName](stParams, f2UV);
 }
 
+/** @internal */
+export function atmosphereLUTRendered(): boolean {
+  return !!transmittanceLUT && !!multiScatteringLUT && !!skyViewLUT && !!ApLut;
+}
+
+/** @internal */
 export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
   const checkResult = checkParams(params);
-  if (checkResult.transmittance) {
+  if (checkResult.transmittance || !transmittanceLUT) {
     renderTransmittanceLut(currentAtmosphereParams);
   }
-  if (checkResult.multiScattering) {
+  if (checkResult.multiScattering || !multiScatteringLUT) {
     renderMultiScatteringLut(currentAtmosphereParams);
   }
-  if (checkResult.skyView) {
+  if (checkResult.skyView || !skyViewLUT) {
     renderSkyViewLut(currentAtmosphereParams);
   }
-  if (checkResult.aerialPerspective) {
+  if (checkResult.aerialPerspective || !ApLut) {
     renderAPLut(currentAtmosphereParams);
   }
 }
 
 /* For debug */
-let debugTransmittanceLutProgram: GPUProgram = undefined;
-let debugTransmittanceLutBindGroup: BindGroup = undefined;
-let debugTransmittanceLut: Texture2D = undefined;
-let debugTransmittanceFramebuffer: FrameBuffer = undefined;
+let transmittanceLutProgram: GPUProgram = undefined;
+let multiScatteringLutProgram: GPUProgram = undefined;
+let skyViewLutProgram: GPUProgram = undefined;
+let APLutProgram: GPUProgram = undefined;
+let transmittanceLutBindGroup: BindGroup = undefined;
+let transmittanceLUT: Texture2D = undefined;
+let transmittanceFramebuffer: FrameBuffer = undefined;
 
-let debugMultiScatteringLutProgram: GPUProgram = undefined;
-let debugMultiScatteringLutBindGroup: BindGroup = undefined;
-let debugMultiScatteringLut: Texture2D = undefined;
-let debugMultiScatteringFramebuffer: FrameBuffer = undefined;
+let multiScatteringLutBindGroup: BindGroup = undefined;
+let multiScatteringLUT: Texture2D = undefined;
+let multiScatteringFramebuffer: FrameBuffer = undefined;
 
-let debugSkyViewLutProgram: GPUProgram = undefined;
-let debugSkyViewLutBindGroup: BindGroup = undefined;
-let debugSkyViewLut: Texture2D = undefined;
-let debugSkyViewFramebuffer: FrameBuffer = undefined;
+let skyViewLutBindGroup: BindGroup = undefined;
+let skyViewLUT: Texture2D = undefined;
+let skyViewFramebuffer: FrameBuffer = undefined;
 
-let debugAPLutProgram: GPUProgram = undefined;
-let debugAPLutBindGroup: BindGroup = undefined;
-let debugApLut: Texture2D = undefined;
-let debugAPFramebuffer: FrameBuffer = undefined;
+let APLutBindGroup: BindGroup = undefined;
+let ApLut: Texture2D = undefined;
+let APFramebuffer: FrameBuffer = undefined;
 
 export function getTransmittanceLut() {
-  return debugTransmittanceLut;
+  return transmittanceLUT;
 }
 
 export function getMultiScatteringLut() {
-  return debugMultiScatteringLut;
+  return multiScatteringLUT;
 }
 
 export function getSkyViewLut() {
-  return debugSkyViewLut;
+  return skyViewLUT;
 }
 
 export function getAerialPerspectiveLut() {
-  return debugApLut;
+  return ApLut;
 }
 
 export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
@@ -1028,255 +1026,253 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
   ]);
 }
 
+export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram {
+  return device.buildRenderProgram({
+    vertex(pb) {
+      this.flip = pb.int().uniform(0);
+      this.$inputs.pos = pb.vec2().attrib('position');
+      this.$outputs.uv = pb.vec2();
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+        this.$if(pb.notEqual(this.flip, 0), function () {
+          this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+        });
+      });
+    },
+    fragment(pb) {
+      const Params = getAtmosphereParamsStruct(pb);
+      this.params = Params().uniform(0);
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        this.$outputs.outColor = transmittanceLut(this, this.params, this.$inputs.uv);
+      });
+    }
+  });
+}
+
 export function renderTransmittanceLut(params: AtmosphereParams) {
   const device = Application.instance.device;
-  if (debugTransmittanceLutProgram === undefined) {
+  if (transmittanceLutProgram === undefined) {
     try {
-      debugTransmittanceLutProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          const Params = getAtmosphereParamsStruct(pb);
-          this.params = Params().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$outputs.outColor = transmittanceLut(this, this.params, this.$inputs.uv);
-          });
-        }
-      });
-      debugTransmittanceLutBindGroup = device.createBindGroup(
-        debugTransmittanceLutProgram.bindGroupLayouts[0]
-      );
-      debugTransmittanceLut = device.createTexture2D('rgba16f', 256, 64, {
+      transmittanceLutProgram = createTransmittanceLutProgram(device);
+      transmittanceLutBindGroup = device.createBindGroup(transmittanceLutProgram.bindGroupLayouts[0]);
+      transmittanceLUT = device.createTexture2D('rgba16f', 256, 64, {
         samplerOptions: { mipFilter: 'none' }
       });
-      debugTransmittanceLut.name = 'DebugTransmittanceLut';
-      debugTransmittanceFramebuffer = device.createFrameBuffer([debugTransmittanceLut], null);
+      transmittanceLUT.name = 'DebugTransmittanceLut';
+      transmittanceFramebuffer = device.createFrameBuffer([transmittanceLUT], null);
     } catch (err) {
       console.error(err);
-      debugTransmittanceLutProgram = null;
-      debugTransmittanceLutBindGroup = null;
-      debugTransmittanceFramebuffer = null;
+      transmittanceLutProgram = null;
+      transmittanceLutBindGroup = null;
+      transmittanceFramebuffer = null;
     }
   }
-  if (debugTransmittanceLutProgram) {
-    debugTransmittanceLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugTransmittanceLutBindGroup.setValue('params', params);
+  if (transmittanceLutProgram) {
+    transmittanceLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    transmittanceLutBindGroup.setValue('params', params);
     device.pushDeviceStates();
-    device.setFramebuffer(debugTransmittanceFramebuffer);
-    device.setProgram(debugTransmittanceLutProgram);
-    device.setBindGroup(0, debugTransmittanceLutBindGroup);
+    device.setFramebuffer(transmittanceFramebuffer);
+    device.setProgram(transmittanceLutProgram);
+    device.setBindGroup(0, transmittanceLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
 }
 
+export function createMultiScatteringLutProgram(device: AbstractDevice) {
+  return device.buildRenderProgram({
+    vertex(pb) {
+      this.flip = pb.int().uniform(0);
+      this.$inputs.pos = pb.vec2().attrib('position');
+      this.$outputs.uv = pb.vec2();
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+        this.$if(pb.notEqual(this.flip, 0), function () {
+          this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+        });
+      });
+    },
+    fragment(pb) {
+      const Params = getAtmosphereParamsStruct(pb);
+      this.params = Params().uniform(0);
+      this.transmittanceLut = pb.tex2D().uniform(0);
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        this.$outputs.outColor = multiScatteringLut(
+          this,
+          this.params,
+          this.$inputs.uv,
+          this.transmittanceLut
+        );
+      });
+    }
+  });
+}
 export function renderMultiScatteringLut(params: AtmosphereParams) {
   const device = Application.instance.device;
-  if (debugMultiScatteringLutProgram === undefined) {
+  if (multiScatteringLutProgram === undefined) {
     try {
-      debugMultiScatteringLutProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          const Params = getAtmosphereParamsStruct(pb);
-          this.params = Params().uniform(0);
-          this.transmittanceLut = pb.tex2D().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$outputs.outColor = multiScatteringLut(
-              this,
-              this.params,
-              this.$inputs.uv,
-              this.transmittanceLut
-            );
-          });
-        }
-      });
-      debugMultiScatteringLutBindGroup = device.createBindGroup(
-        debugMultiScatteringLutProgram.bindGroupLayouts[0]
-      );
-      debugMultiScatteringLut = device.createTexture2D('rgba16f', 32, 32, {
+      multiScatteringLutProgram = createMultiScatteringLutProgram(device);
+      multiScatteringLutBindGroup = device.createBindGroup(multiScatteringLutProgram.bindGroupLayouts[0]);
+      multiScatteringLUT = device.createTexture2D('rgba16f', 32, 32, {
         samplerOptions: { mipFilter: 'none' }
       });
-      debugMultiScatteringLut.name = 'DebugMultiScatteringLut';
-      debugMultiScatteringFramebuffer = device.createFrameBuffer([debugMultiScatteringLut], null);
+      multiScatteringLUT.name = 'DebugMultiScatteringLut';
+      multiScatteringFramebuffer = device.createFrameBuffer([multiScatteringLUT], null);
     } catch (err) {
       console.error(err);
-      debugMultiScatteringLutProgram = null;
-      debugMultiScatteringLutBindGroup = null;
-      debugMultiScatteringFramebuffer = null;
+      multiScatteringLutProgram = null;
+      multiScatteringLutBindGroup = null;
+      multiScatteringFramebuffer = null;
     }
   }
-  if (debugMultiScatteringLutProgram) {
-    debugMultiScatteringLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugMultiScatteringLutBindGroup.setValue('params', params);
-    debugMultiScatteringLutBindGroup.setTexture(
+  if (multiScatteringLutProgram) {
+    multiScatteringLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    multiScatteringLutBindGroup.setValue('params', params);
+    multiScatteringLutBindGroup.setTexture(
       'transmittanceLut',
-      debugTransmittanceLut,
+      transmittanceLUT,
       fetchSampler('clamp_linear_nomip')
     );
     device.pushDeviceStates();
-    device.setFramebuffer(debugMultiScatteringFramebuffer);
-    device.setProgram(debugMultiScatteringLutProgram);
-    device.setBindGroup(0, debugMultiScatteringLutBindGroup);
+    device.setFramebuffer(multiScatteringFramebuffer);
+    device.setProgram(multiScatteringLutProgram);
+    device.setBindGroup(0, multiScatteringLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
 }
 
+export function createSkyViewLutProgram(device: AbstractDevice) {
+  return device.buildRenderProgram({
+    vertex(pb) {
+      this.flip = pb.int().uniform(0);
+      this.$inputs.pos = pb.vec2().attrib('position');
+      this.$outputs.uv = pb.vec2();
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+        this.$if(pb.notEqual(this.flip, 0), function () {
+          this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+        });
+      });
+    },
+    fragment(pb) {
+      const Params = getAtmosphereParamsStruct(pb);
+      this.params = Params().uniform(0);
+      this.transmittanceLut = pb.tex2D().uniform(0);
+      this.multiScatteringLut = pb.tex2D().uniform(0);
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        this.$outputs.outColor = skyViewLut(
+          this,
+          this.params,
+          this.$inputs.uv,
+          this.transmittanceLut,
+          this.multiScatteringLut
+        );
+      });
+    }
+  });
+}
 export function renderSkyViewLut(params: AtmosphereParams) {
   const device = Application.instance.device;
-  if (debugSkyViewLutProgram === undefined) {
+  if (skyViewLutProgram === undefined) {
     try {
-      debugSkyViewLutProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          const Params = getAtmosphereParamsStruct(pb);
-          this.params = Params().uniform(0);
-          this.transmittanceLut = pb.tex2D().uniform(0);
-          this.multiScatteringLut = pb.tex2D().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$outputs.outColor = skyViewLut(
-              this,
-              this.params,
-              this.$inputs.uv,
-              this.transmittanceLut,
-              this.multiScatteringLut
-            );
-          });
-        }
-      });
-      debugSkyViewLutBindGroup = device.createBindGroup(debugSkyViewLutProgram.bindGroupLayouts[0]);
-      debugSkyViewLut = device.createTexture2D('rgba16f', 256, 128, {
+      skyViewLutProgram = createSkyViewLutProgram(device);
+      skyViewLutBindGroup = device.createBindGroup(skyViewLutProgram.bindGroupLayouts[0]);
+      skyViewLUT = device.createTexture2D('rgba16f', 256, 128, {
         samplerOptions: { mipFilter: 'none' }
       });
-      debugSkyViewLut.name = 'DebugSkyViewLut';
-      debugSkyViewFramebuffer = device.createFrameBuffer([debugSkyViewLut], null);
+      skyViewLUT.name = 'DebugSkyViewLut';
+      skyViewFramebuffer = device.createFrameBuffer([skyViewLUT], null);
     } catch (err) {
       console.error(err);
-      debugSkyViewLutProgram = null;
-      debugSkyViewLutBindGroup = null;
-      debugSkyViewFramebuffer = null;
+      skyViewLutProgram = null;
+      skyViewLutBindGroup = null;
+      skyViewFramebuffer = null;
     }
   }
-  if (debugSkyViewLutProgram) {
-    debugSkyViewLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugSkyViewLutBindGroup.setValue('params', params);
-    debugSkyViewLutBindGroup.setTexture(
-      'transmittanceLut',
-      debugTransmittanceLut,
-      fetchSampler('clamp_linear_nomip')
-    );
-    debugSkyViewLutBindGroup.setTexture(
+  if (skyViewLutProgram) {
+    skyViewLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    skyViewLutBindGroup.setValue('params', params);
+    skyViewLutBindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
+    skyViewLutBindGroup.setTexture(
       'multiScatteringLut',
-      debugMultiScatteringLut,
+      multiScatteringLUT,
       fetchSampler('clamp_linear_nomip')
     );
     device.pushDeviceStates();
-    device.setFramebuffer(debugSkyViewFramebuffer);
-    device.setProgram(debugSkyViewLutProgram);
-    device.setBindGroup(0, debugSkyViewLutBindGroup);
+    device.setFramebuffer(skyViewFramebuffer);
+    device.setProgram(skyViewLutProgram);
+    device.setBindGroup(0, skyViewLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
+}
+
+export function createAPLutProgram(device: AbstractDevice) {
+  return device.buildRenderProgram({
+    vertex(pb) {
+      this.flip = pb.int().uniform(0);
+      this.$inputs.pos = pb.vec2().attrib('position');
+      this.$outputs.uv = pb.vec2();
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+        this.$if(pb.notEqual(this.flip, 0), function () {
+          this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+        });
+      });
+    },
+    fragment(pb) {
+      const Params = getAtmosphereParamsStruct(pb);
+      this.params = Params().uniform(0);
+      this.transmittanceLut = pb.tex2D().uniform(0);
+      this.multiScatteringLut = pb.tex2D().uniform(0);
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        this.$outputs.outColor = aerialPerspectiveLut(
+          this,
+          this.params,
+          this.$inputs.uv,
+          pb.vec3(32, 32, 32),
+          this.transmittanceLut,
+          this.multiScatteringLut
+        );
+      });
+    }
+  });
 }
 
 export function renderAPLut(params: AtmosphereParams) {
   const device = Application.instance.device;
-  if (debugAPLutProgram === undefined) {
+  if (APLutProgram === undefined) {
     try {
-      debugAPLutProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.flip = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          const Params = getAtmosphereParamsStruct(pb);
-          this.params = Params().uniform(0);
-          this.transmittanceLut = pb.tex2D().uniform(0);
-          this.multiScatteringLut = pb.tex2D().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$outputs.outColor = aerialPerspectiveLut(
-              this,
-              this.params,
-              this.$inputs.uv,
-              pb.vec3(32, 32, 32),
-              this.transmittanceLut,
-              this.multiScatteringLut
-            );
-          });
-        }
-      });
-      debugAPLutBindGroup = device.createBindGroup(debugAPLutProgram.bindGroupLayouts[0]);
-      debugApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
-      debugApLut.name = 'DebugAPLut';
-      debugAPFramebuffer = device.createFrameBuffer([debugApLut], null);
+      APLutProgram = createAPLutProgram(device);
+      APLutBindGroup = device.createBindGroup(APLutProgram.bindGroupLayouts[0]);
+      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
+      ApLut.name = 'DebugAPLut';
+      APFramebuffer = device.createFrameBuffer([ApLut], null);
     } catch (err) {
       console.error(err);
-      debugAPLutProgram = null;
-      debugAPLutBindGroup = null;
-      debugAPFramebuffer = null;
+      APLutProgram = null;
+      APLutBindGroup = null;
+      APFramebuffer = null;
     }
   }
-  if (debugAPLutProgram) {
-    debugAPLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    debugAPLutBindGroup.setValue('params', params);
-    debugAPLutBindGroup.setTexture(
-      'transmittanceLut',
-      debugTransmittanceLut,
-      fetchSampler('clamp_linear_nomip')
-    );
-    debugAPLutBindGroup.setTexture(
-      'multiScatteringLut',
-      debugMultiScatteringLut,
-      fetchSampler('clamp_linear_nomip')
-    );
+  if (APLutProgram) {
+    APLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    APLutBindGroup.setValue('params', params);
+    APLutBindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
+    APLutBindGroup.setTexture('multiScatteringLut', multiScatteringLUT, fetchSampler('clamp_linear_nomip'));
     device.pushDeviceStates();
-    device.setFramebuffer(debugAPFramebuffer);
-    device.setProgram(debugAPLutProgram);
-    device.setBindGroup(0, debugAPLutBindGroup);
+    device.setFramebuffer(APFramebuffer);
+    device.setProgram(APLutProgram);
+    device.setBindGroup(0, APLutBindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
