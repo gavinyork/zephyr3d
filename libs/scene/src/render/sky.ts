@@ -660,7 +660,7 @@ export class SkyRenderer {
     const renderStates = SkyRenderer._renderStatesFog;
     const bindgroup = this._bindgroupFog.get();
     bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
-    bindgroup.setTexture('distantLightLut', this._skyDistantLightLut.get().getColorAttachments()[0]);
+    bindgroup.setTexture('skyDistantLightLut', this._skyDistantLightLut.get().getColorAttachments()[0]);
     bindgroup.setTexture('apLut', getAerialPerspectiveLut());
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
@@ -1099,7 +1099,7 @@ export class SkyRenderer {
               1
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
-            this.$l.hPos = pb.div(this.$l.hPos, this.$l.hPos.w);
+            this.$l.worldPos = pb.div(this.$l.hPos, this.$l.hPos.w).xyz;
             this.$l.isSky = pb.greaterThan(this.$l.depthValue, 0.9999);
             this.$l.color = calculateFog(
               this,
@@ -1107,18 +1107,18 @@ export class SkyRenderer {
               this.fogType,
               this.atmosphereParams,
               this.heightFogParams,
-              this.isSky,
               this.$inputs.uv,
+              this.isSky,
               this.cameraPosition,
-              this.hPos,
+              this.worldPos,
               0,
               this.apLut,
               this.skyDistantLightLut
             );
             this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = pb.vec4(this.color, pb.sub(1, this.fogFactor));
+              this.$outputs.outColor = this.color;
             }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color), pb.sub(1, this.fogFactor));
+              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), this.color.a);
             });
           });
         }

@@ -128,6 +128,7 @@ export class RotationEditor {
     light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
     scene.env.sky.skyType = 'color';
     scene.env.sky.skyColor = new Vector4(0, 0.5, 0.5, 1);
+    scene.env.sky.fogType = 'none';
     scene.env.light.type = 'constant';
     scene.env.light.ambientColor = new Vector4(0.3, 0.3, 0.3, 1);
     return scene;

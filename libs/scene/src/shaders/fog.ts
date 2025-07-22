@@ -68,7 +68,7 @@ export function calculateFog(
       pb.int('additive')
     ],
     function () {
-      this.$l.fogging = pb.vec4(0);
+      this.$l.fogging = pb.vec4(0, 0, 0, 1);
       this.$if(pb.equal(this.fogType, Fog.FOG_TYPE_HEIGHT), function () {
         this.fogging = calculateHeightFog(
           this,
@@ -120,7 +120,7 @@ export function combineAerialPerspectiveFog(
   const pb = scope.$builder;
   const funcName = 'Z_combineAerialPerspectiveFog';
   pb.func(funcName, [pb.vec4('fogging'), pb.vec4('aerialPerspectiveFog')], function () {
-    this.$l.rgb = pb.add(this.fogging.rgb, pb.mul(this.aerialPerspectiveFog.rgb, this.fogging.rgb.a));
+    this.$l.rgb = pb.add(this.fogging.rgb, pb.mul(this.aerialPerspectiveFog.rgb, this.fogging.a));
     this.$l.a = pb.mul(this.fogging.a, this.aerialPerspectiveFog.a);
     this.$return(pb.vec4(this.rgb, pb.sub(1, this.a)));
   });

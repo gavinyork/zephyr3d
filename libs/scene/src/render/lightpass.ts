@@ -1,11 +1,5 @@
 import { RenderPass } from './renderpass';
-import {
-  ATMOSPHERIC_FOG_BIT,
-  MaterialVaryingFlags,
-  QUEUE_OPAQUE,
-  QUEUE_TRANSPARENT,
-  RENDER_PASS_TYPE_LIGHT
-} from '../values';
+import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -76,7 +70,7 @@ export class LightPass extends RenderPass {
         flags.lightSet[ctx.renderPassHash] = 1;
       }
     }
-    if (ctx.fogFlags && !flags.fogSet[ctx.renderPassHash]) {
+    if (!flags.fogSet[ctx.renderPassHash]) {
       ShaderHelper.setFogUniforms(
         bindGroup,
         ctx.env.sky.mappedFogType,
@@ -137,12 +131,6 @@ export class LightPass extends RenderPass {
     const transparentPass = lists.length - 1;
     for (let i = 0; i < lists.length; i++) {
       if (lists[i]) {
-        ctx.fogFlags = 0;
-        if (i > 0) {
-          if (ctx.env.sky.skyType === 'scatter') {
-            ctx.fogFlags |= ATMOSPHERIC_FOG_BIT;
-          }
-        }
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
         ctx.oit = i === 0 || !items ? null : oit;
         const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
