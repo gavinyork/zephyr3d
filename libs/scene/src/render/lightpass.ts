@@ -34,8 +34,8 @@ export class LightPass extends RenderPass {
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
     return `${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}:${
-      ctx.linearDepthTexture?.uid ?? 0
-    }:${ctx.sceneColorTexture?.uid ?? 0}:${ctx.HiZTexture?.uid ?? 0}`;
+      ctx.materialFlags
+    }:${ctx.linearDepthTexture?.uid ?? 0}:${ctx.sceneColorTexture?.uid ?? 0}:${ctx.HiZTexture?.uid ?? 0}`;
   }
   /** @internal */
   protected renderLightPass(
@@ -70,9 +70,10 @@ export class LightPass extends RenderPass {
         flags.lightSet[ctx.renderPassHash] = 1;
       }
     }
-    if (!flags.fogSet[ctx.renderPassHash]) {
+    if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG && !flags.fogSet[ctx.renderPassHash]) {
       ShaderHelper.setFogUniforms(
         bindGroup,
+        ctx.env.sky.skyType === 'scatter' ? 1 : 0,
         ctx.env.sky.mappedFogType,
         baseLightPass ? 0 : 1,
         ctx.env.sky.atmosphereParams,
@@ -133,6 +134,9 @@ export class LightPass extends RenderPass {
       if (lists[i]) {
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
         ctx.oit = i === 0 || !items ? null : oit;
+        if (ctx.queue === QUEUE_TRANSPARENT && ctx.scene.env.sky.fogPresents) {
+          ctx.materialFlags |= MaterialVaryingFlags.APPLY_FOG;
+        }
         const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
         for (let p = 0; p < numOitPasses; p++) {
           if (ctx.oit) {
@@ -172,6 +176,7 @@ export class LightPass extends RenderPass {
         if (ctx.oit) {
           ctx.oit.end(ctx);
         }
+        ctx.materialFlags &= ~MaterialVaryingFlags.APPLY_FOG;
       }
       if (i === 0 && !ctx.sceneColorTexture) {
         if (tmpFramebuffer) {

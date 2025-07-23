@@ -491,6 +491,10 @@ export class SkyRenderer {
   set aerialPerspectiveDebug(val: number) {
     this._debugAerialPerspective = val;
   }
+  /** @internal */
+  get fogPresents() {
+    return this._skyType === 'scatter' || this._fogType !== 'none';
+  }
   /**
    * Force the radiance map and irradiance map to be regenerated.
    */

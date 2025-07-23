@@ -57,7 +57,7 @@ export function calculateFog(
   pb.func(
     funcName,
     [
-      pb.int('withAerialperspective'),
+      pb.int('withAerialPerspective'),
       pb.int('fogType'),
       AtmosphereParams('atmosphereParams'),
       HeightFogParams('heightFogParams'),

@@ -756,14 +756,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             );
           }
           output = !that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor);
-          /*
-          if (!that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor)) {
-            this.outColor = pb.vec4(
-              pb.mul(this.outColor.rgb, this.outColor.a),
-              that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
-            );
-          }
-          */
         }
         if (output) {
           ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
