@@ -33,7 +33,6 @@ import { aerialPerspective, getAtmosphereParamsStruct, getDefaultAtmosphereParam
 import type { HeightFogParams } from '../../shaders/fog';
 import { getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 
-const UNIFORM_NAME_GLOBAL = 'Z_UniformGlobal';
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
@@ -76,28 +75,24 @@ export class ShaderHelper {
   private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
   private static _lightUniformShadow = {
-    light: {
-      sunDir: new Vector3(),
-      envLightStrength: 1,
-      shadowCascades: 1,
-      positionAndRange: new Vector4(),
-      directionAndCutoff: new Vector4(),
-      diffuseAndIntensity: new Vector4(),
-      cascadeDistances: new Vector4(),
-      depthBiasValues: new Vector4(),
-      shadowCameraParams: new Vector4(),
-      depthBiasScales: new Vector4(),
-      shadowMatrices: new Float32Array(16 * 4)
-    }
+    sunDir: new Vector3(),
+    envLightStrength: 1,
+    shadowCascades: 1,
+    positionAndRange: new Vector4(),
+    directionAndCutoff: new Vector4(),
+    diffuseAndIntensity: new Vector4(),
+    cascadeDistances: new Vector4(),
+    depthBiasValues: new Vector4(),
+    shadowCameraParams: new Vector4(),
+    depthBiasScales: new Vector4(),
+    shadowMatrices: new Float32Array(16 * 4)
   };
   /** @internal */
   private static _fogUniforms = {
-    fog: {
-      fogType: 0,
-      additive: 0,
-      atmosphereParams: getDefaultAtmosphereParams(),
-      heightFogParams: getDefaultHeightFogParams()
-    }
+    fogType: 0,
+    additive: 0,
+    atmosphereParams: getDefaultAtmosphereParams(),
+    heightFogParams: getDefaultHeightFogParams()
   };
   static getWorldMatrixUniformName(): string {
     return UNIFORM_NAME_WORLD_MATRIX;
@@ -211,14 +206,13 @@ export class ShaderHelper {
         pb.vec4('depthBias'),
         pb.int('lightType')
       ]);
-      const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light')]);
-      scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
+      scope.camera = cameraStruct().uniform(0);
+      scope.light = lightStruct().uniform(0);
     } else if (
       ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH ||
       ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
     ) {
-      const globalStruct = pb.defineStruct([cameraStruct('camera')]);
-      scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
+      scope.camera = cameraStruct().uniform(0);
     } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       const fogStructMembers: PBShaderExp[] = [
@@ -249,8 +243,9 @@ export class ShaderHelper {
             pb.ivec4('countParams'),
             pb.ivec2('lightIndexTexSize')
           ]);
-      const globalStruct = pb.defineStruct([cameraStruct('camera'), lightStruct('light'), fogStruct('fog')]);
-      scope[UNIFORM_NAME_GLOBAL] = globalStruct().uniform(0);
+      scope.camera = cameraStruct().uniform(0);
+      scope.light = lightStruct().uniform(0);
+      scope.fog = fogStruct().uniform(0);
       if (useClusteredLighting) {
         scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
         scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
@@ -821,22 +816,18 @@ export class ShaderHelper {
         );
       }
     }
-    bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
-      camera: cameraStruct
-    });
+    bindGroup.setValue('camera', cameraStruct);
   }
   /** @internal */
   static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     if (light) {
       const shadowMapParams = ctx.shadowMapInfo.get(light);
-      bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
-        light: {
-          positionAndRange: light.positionAndRange,
-          directionCutoff: light.directionAndCutoff,
-          viewMatrix: light.viewMatrix,
-          depthBias: shadowMapParams.depthBiasValues[0],
-          lightType: light.lightType
-        }
+      bindGroup.setValue('light', {
+        positionAndRange: light.positionAndRange,
+        directionCutoff: light.directionAndCutoff,
+        viewMatrix: light.viewMatrix,
+        depthBias: shadowMapParams.depthBiasValues[0],
+        lightType: light.lightType
       });
     }
   }
@@ -850,11 +841,11 @@ export class ShaderHelper {
     aerialPerspectiveLUT: Texture2D,
     skyDistantLightLUT: Texture2D
   ) {
-    this._fogUniforms.fog.fogType = fogType;
-    this._fogUniforms.fog.additive = additive;
-    this._fogUniforms.fog.atmosphereParams = atmosphereParams;
-    this._fogUniforms.fog.heightFogParams = heightFogParams;
-    bindGroup.setValue(UNIFORM_NAME_GLOBAL, this._fogUniforms);
+    this._fogUniforms.fogType = fogType;
+    this._fogUniforms.additive = additive;
+    this._fogUniforms.atmosphereParams = atmosphereParams;
+    this._fogUniforms.heightFogParams = heightFogParams;
+    bindGroup.setValue('fog', this._fogUniforms);
     bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
     bindGroup.setTexture(UNIFORM_NAME_SKYDISTANTLIGHT_LUT, skyDistantLightLUT);
   }
@@ -867,14 +858,12 @@ export class ShaderHelper {
     lightBuffer: StructuredBuffer,
     lightIndexTexture: Texture2D
   ) {
-    bindGroup.setValue(UNIFORM_NAME_GLOBAL, {
-      light: {
-        sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
-        clusterParams: clusterParams,
-        countParams: countParams,
-        envLightStrength: ctx.env.light.strength ?? 0,
-        lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height])
-      }
+    bindGroup.setValue('light', {
+      sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
+      clusterParams: clusterParams,
+      countParams: countParams,
+      envLightStrength: ctx.env.light.strength ?? 0,
+      lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height])
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
@@ -886,20 +875,20 @@ export class ShaderHelper {
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     const shadowMapParams = ctx.shadowMapInfo.get(light);
-    this._lightUniformShadow.light.sunDir = ctx.sunLight
+    this._lightUniformShadow.sunDir = ctx.sunLight
       ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1)
       : this.defaultSunDir;
-    this._lightUniformShadow.light.envLightStrength = ctx.env?.light.strength ?? 0;
-    this._lightUniformShadow.light.shadowCascades = shadowMapParams.numShadowCascades;
-    this._lightUniformShadow.light.positionAndRange.set(light.positionAndRange);
-    this._lightUniformShadow.light.directionAndCutoff.set(light.directionAndCutoff);
-    this._lightUniformShadow.light.diffuseAndIntensity.set(light.diffuseAndIntensity);
-    this._lightUniformShadow.light.cascadeDistances.set(shadowMapParams.cascadeDistances);
-    this._lightUniformShadow.light.depthBiasValues.set(shadowMapParams.depthBiasValues[0]);
-    this._lightUniformShadow.light.shadowCameraParams.set(shadowMapParams.cameraParams);
-    this._lightUniformShadow.light.depthBiasScales.set(shadowMapParams.depthBiasScales);
-    this._lightUniformShadow.light.shadowMatrices.set(shadowMapParams.shadowMatrices);
-    bindGroup.setValue(UNIFORM_NAME_GLOBAL, this._lightUniformShadow);
+    this._lightUniformShadow.envLightStrength = ctx.env?.light.strength ?? 0;
+    this._lightUniformShadow.shadowCascades = shadowMapParams.numShadowCascades;
+    this._lightUniformShadow.positionAndRange.set(light.positionAndRange);
+    this._lightUniformShadow.directionAndCutoff.set(light.directionAndCutoff);
+    this._lightUniformShadow.diffuseAndIntensity.set(light.diffuseAndIntensity);
+    this._lightUniformShadow.cascadeDistances.set(shadowMapParams.cascadeDistances);
+    this._lightUniformShadow.depthBiasValues.set(shadowMapParams.depthBiasValues[0]);
+    this._lightUniformShadow.shadowCameraParams.set(shadowMapParams.cameraParams);
+    this._lightUniformShadow.depthBiasScales.set(shadowMapParams.depthBiasScales);
+    this._lightUniformShadow.shadowMatrices.set(shadowMapParams.shadowMatrices);
+    bindGroup.setValue('light', this._lightUniformShadow);
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_MAP,
       shadowMapParams.shadowMap,
@@ -920,7 +909,7 @@ export class ShaderHelper {
    * @returns The uniform variable of which presents the strength of the environment light
    */
   static getEnvLightStrength(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.envLightStrength;
+    return scope.light.envLightStrength;
   }
   /**
    * Gets current scene color texture
@@ -992,7 +981,7 @@ export class ShaderHelper {
    * @returns The elapsed time in seconds
    */
   static getElapsedTime(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.elapsedTime;
+    return scope.camera.elapsedTime;
   }
   /**
    * Gets the elapsed time since last frame in seconds
@@ -1000,7 +989,7 @@ export class ShaderHelper {
    * @returns The elapsed time since last frame in seconds
    */
   static getElapsedTimeFrame(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.frameDeltaTime;
+    return scope.camera.frameDeltaTime;
   }
   /**
    * Gets the uniform variable of type vec3 which holds the camera position
@@ -1008,7 +997,7 @@ export class ShaderHelper {
    * @returns The camera position
    */
   static getCameraPosition(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.position.xyz;
+    return scope.camera.position.xyz;
   }
   /**
    * Gets the uniform variable of type float which holds the roughness factor
@@ -1016,7 +1005,7 @@ export class ShaderHelper {
    * @returns The roughness factor
    */
   static getCameraRoughnessFactor(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.roughnessFactor;
+    return scope.camera.roughnessFactor;
   }
   /**
    * Gets framebuffer size for rendering
@@ -1024,7 +1013,7 @@ export class ShaderHelper {
    * @returns The roughness factor
    */
   static getRenderSize(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.renderSize;
+    return scope.camera.renderSize;
   }
   /**
    * Gets the uniform variable of type uint which holds the framestamp
@@ -1032,7 +1021,7 @@ export class ShaderHelper {
    * @returns The framestamp
    */
   static getFramestamp(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.framestamp;
+    return scope.camera.framestamp;
   }
   /**
    * Discard the fragment if it was clipped by the clip plane
@@ -1061,7 +1050,7 @@ export class ShaderHelper {
    * @returns A float value of 1 indices the clip plane presents, otherwise 0
    */
   static getCameraClipPlaneFlag(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.position.w;
+    return scope.camera.position.w;
   }
   /**
    * Gets the clip plane
@@ -1069,7 +1058,7 @@ export class ShaderHelper {
    * @returns A vec4 presents the clip plane
    */
   static getCameraClipPlane(scope: PBInsideFunctionScope) {
-    return scope[UNIFORM_NAME_GLOBAL].camera.clipPlane;
+    return scope.camera.clipPlane;
   }
   /**
    * Gets the uniform variable of type vec4 which holds the camera parameters
@@ -1077,7 +1066,7 @@ export class ShaderHelper {
    * @returns The camera parameters
    */
   static getCameraParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.params;
+    return scope.camera.params;
   }
   /**
    * Gets the uniform variable of type vec4 which holds the fog color
@@ -1085,15 +1074,15 @@ export class ShaderHelper {
    * @returns The fog color
    */
   static getFogColor(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].fog.fogColor;
+    return scope.fog.fogColor;
   }
   /** @internal */
   static getClusterParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.clusterParams;
+    return scope.light.clusterParams;
   }
   /** @internal */
   static getCountParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.countParams;
+    return scope.light.countParams;
   }
   /** @internal */
   static getClusteredLightIndexTexture(scope: PBInsideFunctionScope): PBShaderExp {
@@ -1105,7 +1094,7 @@ export class ShaderHelper {
    * @returns The fog color
    */
   static getFogType(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].fog.fogType;
+    return scope.fog.fogType;
   }
   /**
    * Gets the uniform variable that contains atmosphere parameters
@@ -1113,7 +1102,7 @@ export class ShaderHelper {
    * @returns The atmosphere parameters
    */
   static getAtmosphereParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].fog.atmosphereParams;
+    return scope.fog.atmosphereParams;
   }
   /**
    * Gets the aerial perspective LUT
@@ -1129,7 +1118,7 @@ export class ShaderHelper {
    * @returns aerial perspective density
    */
   static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].fog.apDensity;
+    return scope.fog.apDensity;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
@@ -1137,7 +1126,7 @@ export class ShaderHelper {
    * @returns The view projection matrix of current camera
    */
   static getViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.viewProjectionMatrix;
+    return scope.camera.viewProjectionMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the inversed view projection matrix of current camera
@@ -1145,7 +1134,7 @@ export class ShaderHelper {
    * @returns The inversed view projection matrix of current camera
    */
   static getInvViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.invViewProjectionMatrix;
+    return scope.camera.invViewProjectionMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the projection matrix of current camera
@@ -1153,7 +1142,7 @@ export class ShaderHelper {
    * @returns The projection matrix of current camera
    */
   static getProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.projectionMatrix;
+    return scope.camera.projectionMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the inversed projection matrix of current camera
@@ -1161,7 +1150,7 @@ export class ShaderHelper {
    * @returns The inversed projection matrix of current camera
    */
   static getInvProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.invProjectionMatrix;
+    return scope.camera.invProjectionMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the unjittered view projection matrix of current camera
@@ -1169,7 +1158,7 @@ export class ShaderHelper {
    * @returns The unjittered view projection matrix of current camera
    */
   static getUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.unjitteredVPMatrix;
+    return scope.camera.unjitteredVPMatrix;
   }
   /**
    * Gets the uniform variable of type vec2 which holds the jitter value of the projection matrix of current camera
@@ -1177,7 +1166,7 @@ export class ShaderHelper {
    * @returns The jitter value of projection matrix of current camera
    */
   static getProjectionMatrixJitterValue(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.jitterValue;
+    return scope.camera.jitterValue;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the jittered inversed view-projection matrix
@@ -1185,7 +1174,7 @@ export class ShaderHelper {
    * @returns The jittered inversed view-projection matrix
    */
   static getJitteredInvVPMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.jitteredInvVPMatrix;
+    return scope.camera.jitteredInvVPMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the unjittered view projection at previous frame matrix of current camera
@@ -1193,7 +1182,7 @@ export class ShaderHelper {
    * @returns The unjittered view projection matrix at previous frame of current camera
    */
   static getPrevUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.prevUnjitteredVPMatrix;
+    return scope.camera.prevUnjitteredVPMatrix;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the view matrix of current camera
@@ -1201,43 +1190,43 @@ export class ShaderHelper {
    * @returns The view matrix of current camera
    */
   static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].camera.viewMatrix;
+    return scope.camera.viewMatrix;
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.cascadeDistances;
+    return scope.light.cascadeDistances;
   }
   /** @internal */
   static getDepthBiasValues(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.depthBiasValues;
+    return scope.light.depthBiasValues;
   }
   /** @internal */
   static getShadowCameraParams(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.shadowCameraParams;
+    return scope.light.shadowCameraParams;
   }
   /** @internal */
   static getDepthBiasScales(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.depthBiasScales;
+    return scope.light.depthBiasScales;
   }
   /** @internal */
   static getNumLights(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.numLights;
+    return scope.light.numLights;
   }
   /** @internal */
   static getSunLightDir(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.sunDir;
+    return scope.light.sunDir;
   }
   /** @internal */
   static getLightTypeForShadow(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.lightType;
+    return scope.light.lightType;
   }
   /** @internal */
   static getLightPositionAndRangeForShadow(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.positionAndRange;
+    return scope.light.positionAndRange;
   }
   /** @internal */
   static getLightViewMatrixForShadow(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL].light.viewMatrix;
+    return scope.light.viewMatrix;
   }
   /** @internal */
   static calculateShadowSpaceVertex(
@@ -1248,17 +1237,17 @@ export class ShaderHelper {
     const pb = scope.$builder;
     if (typeof cascade === 'number') {
       return pb.vec4(
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 0), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 1), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 2), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(cascade * 4 + 3), worldPos)
+        pb.dot(scope.light.shadowMatrices.at(cascade * 4 + 0), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(cascade * 4 + 1), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(cascade * 4 + 2), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(cascade * 4 + 3), worldPos)
       );
     } else {
       return pb.vec4(
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 0)), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 1)), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 2)), worldPos),
-        pb.dot(scope[UNIFORM_NAME_GLOBAL].light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 3)), worldPos)
+        pb.dot(scope.light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 0)), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 1)), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 2)), worldPos),
+        pb.dot(scope.light.shadowMatrices.at(pb.add(pb.mul(cascade, 4), 3)), worldPos)
       );
     }
   }
@@ -1308,14 +1297,6 @@ export class ShaderHelper {
     }
   }
   /**
-   * Get global uniforms
-   *
-   * @param scope - Shader scope
-   */
-  static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope[UNIFORM_NAME_GLOBAL];
-  }
-  /**
    * Get shadow map uniform value
    *
    * @param scope - Shader scope
@@ -1343,7 +1324,7 @@ export class ShaderHelper {
     const funcName = 'Z_calculateShadow';
     pb.func(funcName, [pb.vec3('worldPos'), pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
-        this.$l.shadowCascades = that.getGlobalUniforms(this).light.shadowCascades;
+        this.$l.shadowCascades = this.light.shadowCascades;
         this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
         this.$l.linearDepth = that.nonLinearDepthToLinear(this, this.$builtins.fragCoord.z);
         this.$l.splitDistances = that.getCascadeDistances(this);

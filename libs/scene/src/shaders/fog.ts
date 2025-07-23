@@ -91,6 +91,8 @@ export function calculateFog(
         );
         this.$if(pb.notEqual(this.fogType, Fog.FOG_TYPE_NONE), function () {
           this.fogging = combineAerialPerspectiveFog(this, this.fogging, this.atmosphericFogging);
+        }).$else(function () {
+          this.fogging = this.atmosphericFogging;
         });
       });
       this.$if(pb.notEqual(this.additive, 0), function () {
@@ -122,7 +124,7 @@ export function combineAerialPerspectiveFog(
   pb.func(funcName, [pb.vec4('fogging'), pb.vec4('aerialPerspectiveFog')], function () {
     this.$l.rgb = pb.add(this.fogging.rgb, pb.mul(this.aerialPerspectiveFog.rgb, this.fogging.a));
     this.$l.a = pb.mul(this.fogging.a, this.aerialPerspectiveFog.a);
-    this.$return(pb.vec4(this.rgb, pb.sub(1, this.a)));
+    this.$return(pb.vec4(this.rgb, this.a));
   });
   return scope[funcName](fogging, aerialPerspectiveFog);
 }
@@ -166,7 +168,7 @@ export function calculateHeightFog(
         -125,
         this.$choice(this.isSky, pb.float(1e8), pb.float(126))
       );
-      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(3e7, 0, this.worldPos.y), 0);
+      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(1e7, 0, this.worldPos.y), 0);
       this.$l.factor = this.$choice(
         pb.greaterThan(pb.abs(this.falloff), 0.01),
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),

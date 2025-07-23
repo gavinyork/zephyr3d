@@ -593,9 +593,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         return;
       }
       if (that.drawContext.currentShadowLight) {
-        const posRange = ShaderHelper.getGlobalUniforms(scope).light.positionAndRange;
-        const dirCutoff = ShaderHelper.getGlobalUniforms(scope).light.directionAndCutoff;
-        const colorIntensity = ShaderHelper.getGlobalUniforms(scope).light.diffuseAndIntensity;
+        const posRange = scope.light.positionAndRange;
+        const dirCutoff = scope.light.directionAndCutoff;
+        const colorIntensity = scope.light.diffuseAndIntensity;
         scope.$scope(function () {
           const lightType = scope.$choice(
             pb.lessThan(posRange.w, 0),
@@ -613,7 +613,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.mul(this.cluster.y, countParams.x),
             pb.mul(this.cluster.z, countParams.x, countParams.y)
           );
-          this.$l.texSize = ShaderHelper.getGlobalUniforms(scope).light.lightIndexTexSize;
+          this.$l.texSize = scope.light.lightIndexTexSize;
           if (pb.getDevice().type === 'webgl') {
             this.$l.texCoordX = pb.div(
               pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5),
