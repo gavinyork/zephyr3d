@@ -40,6 +40,23 @@ function getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
   return v;
 }
 
+/**
+ * Deserializes properties from JSON data into an object instance.
+ *
+ * This function handles the complex process of:
+ * - Processing properties in phase order for proper initialization
+ * - Converting JSON values to appropriate property types
+ * - Handling nested object deserialization
+ * - Managing async operations for complex properties
+ *
+ * @param obj - Target object to populate with deserialized data
+ * @param cls - Serializable class metadata
+ * @param json - JSON object containing property data
+ * @param manager - Serialization manager for context and type resolution
+ *
+ * @public
+ *
+ */
 export async function deserializeObjectProps<T extends object>(
   obj: T,
   cls: SerializableClass,
@@ -136,6 +153,26 @@ export async function deserializeObjectProps<T extends object>(
   }
 }
 
+/**
+ * Serializes object properties to JSON format.
+ *
+ * This function extracts property values from an object and converts them
+ * to JSON-serializable format. It handles:
+ * - Type conversion from internal formats to JSON
+ * - Asset reference collection for dependency tracking
+ * - Default value optimization (omits properties with default values)
+ * - Nested object serialization
+ *
+ * @param obj - Source object to serialize
+ * @param cls - Serializable class metadata
+ * @param json - Target JSON object to populate
+ * @param manager - Serialization manager for context
+ * @param assetList - Optional set to collect asset dependencies
+ * @param embeddedAssetList - Optional array to collect embedded asset promises
+ *
+ * @public
+ *
+ */
 export function serializeObjectProps<T extends object>(
   obj: T,
   cls: SerializableClass,
@@ -252,6 +289,27 @@ export function serializeObjectProps<T extends object>(
   }
 }
 
+/**
+ * Serializes a complete object to JSON format.
+ *
+ * This is the main entry point for object serialization. It handles:
+ * - Class metadata resolution
+ * - Initialization parameter collection
+ * - Inheritance hierarchy traversal
+ * - Asset dependency tracking
+ * - Embedded asset collection
+ *
+ * @param obj - Object to serialize
+ * @param manager - Serialization manager for context and metadata
+ * @param json - Optional existing JSON object to populate
+ * @param assetList - Optional set to collect asset dependencies
+ * @param embeddedAssetList - Optional array to collect embedded asset promises
+ * @returns Serialized JSON representation of the object
+ *
+ * @throws Error if the object's class is not registered for serialization
+ *
+ * @public
+ */
 export function serializeObject(
   obj: any,
   manager: SerializationManager,
@@ -292,6 +350,25 @@ export function serializeObject(
   return json;
 }
 
+/**
+ * Deserializes a complete object from JSON format.
+ *
+ * This is the main entry point for object deserialization. It handles:
+ * - Class metadata resolution from ClassName
+ * - Object construction with initialization parameters
+ * - Custom creation functions vs standard constructors
+ * - Inheritance hierarchy traversal for property loading
+ * - Conditional property loading based on creation results
+ *
+ * @param ctx - Context object passed to custom creation functions
+ * @param json - JSON object containing serialized data
+ * @param manager - Serialization manager for context and metadata
+ * @returns Promise resolving to the deserialized object
+ *
+ * @throws Error if the specified class name is not registered
+ *
+ * @public
+ */
 export async function deserializeObject<T extends object>(
   ctx: any,
   json: object,
@@ -332,6 +409,21 @@ export async function deserializeObject<T extends object>(
   return obj;
 }
 
+/**
+ * Deserializes a complete scene from a URL.
+ *
+ * This is a high-level convenience function that:
+ * - Fetches JSON data from the specified URL
+ * - Parses the JSON content
+ * - Deserializes the scene object
+ * - Extracts metadata if present
+ *
+ * @param url - URL to fetch the scene JSON from
+ * @param manager - Serialization manager with all necessary class registrations
+ * @returns Promise resolving to an object containing the scene and metadata
+ *
+ * @public
+ */
 export async function deserializeSceneFromURL(
   url: string,
   manager: SerializationManager

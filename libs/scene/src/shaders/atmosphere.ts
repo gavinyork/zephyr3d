@@ -20,8 +20,10 @@ const MIE_SIGMA = 3.996;
 const MIE_ABSORPTION_SIGMA = 4.4;
 const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
 
+/** @internal */
 export const CAMERA_POS_Y = 1;
 
+/** @internal */
 export type AtmosphereParams = {
   plantRadius: number;
   atmosphereHeight: number;
@@ -38,6 +40,7 @@ export type AtmosphereParams = {
   cameraHeightScale: number;
 };
 
+/** @internal */
 export function getDefaultAtmosphereParams(): AtmosphereParams {
   return {
     plantRadius: 6360000,
@@ -132,6 +135,7 @@ function checkParams(other?: Partial<AtmosphereParams>): {
   return result;
 }
 
+/** @internal */
 export function rayIntersectSphere(
   scope: PBInsideFunctionScope,
   f3Center: PBShaderExp,
@@ -160,6 +164,7 @@ export function rayIntersectSphere(
   return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir);
 }
 
+/** @internal */
 export function transmittanceToSky(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -182,6 +187,7 @@ export function transmittanceToSky(
   return scope[funcName](stParams, f3Pos, f3Dir);
 }
 
+/** @internal */
 export function rayleighCoefficient(
   scope: PBInsideFunctionScope,
   fRayleighScatteringHeight: PBShaderExp,
@@ -197,6 +203,7 @@ export function rayleighCoefficient(
   return scope[funcName](fRayleighScatteringHeight, fH);
 }
 
+/** @internal */
 export function rayleighPhase(scope: PBInsideFunctionScope, fCosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_rayleighPhase';
@@ -206,6 +213,7 @@ export function rayleighPhase(scope: PBInsideFunctionScope, fCosTheta: PBShaderE
   return scope[funcName](fCosTheta);
 }
 
+/** @internal */
 export function mieCoefficient(
   scope: PBInsideFunctionScope,
   fMieScatteringHeight: PBShaderExp,
@@ -221,6 +229,7 @@ export function mieCoefficient(
   return scope[funcName](fMieScatteringHeight, fH);
 }
 
+/** @internal */
 export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp, fCosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_miePhase';
@@ -235,6 +244,7 @@ export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp
   return scope[funcName](fMieAnstropy, fCosTheta);
 }
 
+/** @internal */
 export function mieAbsorption(
   scope: PBInsideFunctionScope,
   fMieScatteringHeight: PBShaderExp,
@@ -250,6 +260,7 @@ export function mieAbsorption(
   return scope[funcName](fMieScatteringHeight, fH);
 }
 
+/** @internal */
 export function ozoneAbsorption(
   scope: PBInsideFunctionScope,
   fOzoneLevelCenterHeight: PBShaderExp,
@@ -269,6 +280,7 @@ export function ozoneAbsorption(
   return scope[funcName](fOzoneLevelCenterHeight, fOzoneLevelWidth, fH);
 }
 
+/** @internal */
 export function getSkyView(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -338,6 +350,7 @@ export function getSkyView(
   return scope[funcName](stParams, f3EyePos, f3ViewDir, fMaxDis);
 }
 
+/** @internal */
 export function getMultiScattering(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -364,6 +377,7 @@ export function getMultiScattering(
   return scope[funcName](stParams, f3Pos);
 }
 
+/** @internal */
 export function integralMultiScattering(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -431,6 +445,7 @@ export function integralMultiScattering(
   return scope[funcName](stParams, f3LightDir, f3SamplePoint);
 }
 
+/** @internal */
 export function scattering(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -456,6 +471,7 @@ export function scattering(
   return scope[funcName](stParams, f3Pos, f3ViewDir);
 }
 
+/** @internal */
 export function transmittance(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -490,6 +506,7 @@ export function transmittance(
   return scope[funcName](stParams, f3P1, f3P2);
 }
 
+/** @internal */
 export function transmittanceLutToUV(
   scope: PBInsideFunctionScope,
   fBottomRadius: PBShaderExp,
@@ -527,6 +544,7 @@ export function transmittanceLutToUV(
   return scope[funcName](fBottomRadius, fTopRadius, fMu, fR);
 }
 
+/** @internal */
 export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_viewDirToUV';
@@ -539,6 +557,7 @@ export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp
   return scope[funcName](f3ViewDir);
 }
 
+/** @internal */
 export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_uvToViewDir';
@@ -553,6 +572,7 @@ export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp) {
   return scope[funcName](f2UV);
 }
 
+/** @internal */
 export function uvToTransmittanceLut(
   scope: PBInsideFunctionScope,
   f2UV: PBShaderExp,
@@ -588,7 +608,6 @@ export function uvToTransmittanceLut(
   return scope[funcName](f2UV, fBottomRadius, fTopRadius);
 }
 
-/** @internal */
 function sunBloom(
   scope: PBInsideFunctionScope,
   f3ViewDir: PBShaderExp,
@@ -617,6 +636,7 @@ function sunBloom(
   return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle);
 }
 
+/** @internal */
 export function skyBox(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -666,6 +686,7 @@ export function skyBox(
   return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle);
 }
 
+/** @internal */
 export function aerialPerspective(
   scope: PBInsideFunctionScope,
   f2UV: PBShaderExp,
@@ -716,6 +737,7 @@ export function aerialPerspective(
   return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim);
 }
 
+/** @internal */
 export function aerialPerspectiveLut(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -878,6 +900,7 @@ export function aerialPerspectiveLut(
   return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y);
 }
 
+/** @internal */
 export function skyViewLut(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -906,6 +929,7 @@ export function skyViewLut(
   return scope[funcName](stParams, f2UV, CAMERA_POS_Y);
 }
 
+/** @internal */
 export function multiScatteringLut(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -928,6 +952,7 @@ export function multiScatteringLut(
   return scope[funcName](stParams, f2UV);
 }
 
+/** @internal */
 export function transmittanceLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
@@ -992,22 +1017,27 @@ let APLutBindGroup: BindGroup = undefined;
 let ApLut: Texture2D = undefined;
 let APFramebuffer: FrameBuffer = undefined;
 
+/** @internal */
 export function getTransmittanceLut() {
   return transmittanceLUT;
 }
 
+/** @internal */
 export function getMultiScatteringLut() {
   return multiScatteringLUT;
 }
 
+/** @internal */
 export function getSkyViewLut() {
   return skyViewLUT;
 }
 
+/** @internal */
 export function getAerialPerspectiveLut() {
   return ApLut;
 }
 
+/** @internal */
 export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
   return pb.defineStruct([
     pb.mat4('cameraWorldMatrix'),
@@ -1026,6 +1056,7 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
   ]);
 }
 
+/** @internal */
 export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram {
   return device.buildRenderProgram({
     vertex(pb) {
@@ -1051,6 +1082,7 @@ export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgra
   });
 }
 
+/** @internal */
 export function renderTransmittanceLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (transmittanceLutProgram === undefined) {
@@ -1081,6 +1113,7 @@ export function renderTransmittanceLut(params: AtmosphereParams) {
   }
 }
 
+/** @internal */
 export function createMultiScatteringLutProgram(device: AbstractDevice) {
   return device.buildRenderProgram({
     vertex(pb) {
@@ -1111,6 +1144,8 @@ export function createMultiScatteringLutProgram(device: AbstractDevice) {
     }
   });
 }
+
+/** @internal */
 export function renderMultiScatteringLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (multiScatteringLutProgram === undefined) {
@@ -1146,6 +1181,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
   }
 }
 
+/** @internal */
 export function createSkyViewLutProgram(device: AbstractDevice) {
   return device.buildRenderProgram({
     vertex(pb) {
@@ -1178,6 +1214,8 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
     }
   });
 }
+
+/** @internal */
 export function renderSkyViewLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (skyViewLutProgram === undefined) {
@@ -1214,6 +1252,7 @@ export function renderSkyViewLut(params: AtmosphereParams) {
   }
 }
 
+/** @internal */
 export function createAPLutProgram(device: AbstractDevice) {
   return device.buildRenderProgram({
     vertex(pb) {
@@ -1248,6 +1287,7 @@ export function createAPLutProgram(device: AbstractDevice) {
   });
 }
 
+/** @internal */
 export function renderAPLut(params: AtmosphereParams) {
   const device = Application.instance.device;
   if (APLutProgram === undefined) {

@@ -46,9 +46,7 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
   clone(): BoxShape {
     return new BoxShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape#type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'Box';
   }
@@ -202,9 +200,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   clone(): BoxFrameShape {
     return new BoxFrameShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape.type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'BoxFrame';
   }

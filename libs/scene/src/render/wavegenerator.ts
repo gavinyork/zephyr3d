@@ -98,4 +98,5 @@ export interface WaveGenerator extends Disposable {
   /**
    * Dispose the wave generator.
    */
+  dispose(): void;
 }

@@ -54,6 +54,21 @@ class HeightBoundingGenerator extends RenderMipmap {
   }
 }
 
+/**
+ * ClipmapTerrain implements an efficient terrain rendering system using clipmaps.
+ *
+ * Clipmaps provide level-of-detail (LOD) rendering for large terrains by using
+ * multiple nested grids at different resolutions. The terrain automatically
+ * adjusts detail levels based on camera distance, providing high detail near
+ * the camera and lower detail in the distance.
+ *
+ * Key features:
+ * - Automatic LOD management based on camera position
+ * - Support for height maps, splat maps, and detail textures
+ * - Integrated grass rendering system
+ *
+ * @public
+ */
 export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ClipmapTerrain>
@@ -75,6 +90,16 @@ export class ClipmapTerrain
   private _grassAssetId: string;
   private _minHeight: number;
   private _maxHeight: number;
+  /**
+   * Creates a new clipmap terrain instance.
+   *
+   * @param scene - Scene to add the terrain to
+   * @param sizeX - Terrain width in world units (default: 256)
+   * @param sizeZ - Terrain depth in world units (default: 256)
+   * @param clipMapTileSize - Size of each clipmap tile in vertices (default: 64)
+   *                         Larger values use more memory but reduce draw calls
+   *
+   */
   constructor(scene: Scene, sizeX = 256, sizeZ = 256, clipMapTileSize = 64) {
     super(scene);
     this._pickTarget = { node: this };
@@ -96,12 +121,31 @@ export class ClipmapTerrain
     this.updateRegion();
     scene.queuePerCameraUpdateNode(this);
   }
+  /**
+   * Gets the integrated grass renderer for this terrain.
+   * The grass renderer handles vegetation rendering on the terrain surface.
+   *
+   * @returns The grass renderer instance
+   */
   get grassRenderer() {
     return this._grassRenderer.get();
   }
+  /**
+   * Gets the maximum number of detail maps supported by the terrain material.
+   * Detail maps provide surface texturing (grass, rock, sand, etc.).
+   *
+   * @returns Maximum number of detail maps
+   */
   get MAX_DETAIL_MAP_COUNT() {
     return ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
   }
+  /**
+   * Gets the asset ID for the height map texture.
+   * Generates a random UUID if not previously set.
+   *
+   * @returns Height map asset ID
+   * @internal
+   */
   get heightMapAssetId() {
     if (!this._heightMapAssetId) {
       this._heightMapAssetId = crypto.randomUUID();
@@ -111,6 +155,13 @@ export class ClipmapTerrain
   set heightMapAssetId(val: string) {
     this._heightMapAssetId = val;
   }
+  /**
+   * Gets the asset ID for the splat map texture.
+   * Generates a random UUID if not previously set.
+   *
+   * @returns Splat map asset ID
+   * @internal
+   */
   get splatMapAssetId() {
     if (!this._splatMapAssetId) {
       this._splatMapAssetId = crypto.randomUUID();
@@ -120,6 +171,13 @@ export class ClipmapTerrain
   set splatMapAssetId(val: string) {
     this._splatMapAssetId = val;
   }
+  /**
+   * Gets the asset ID for grass configuration.
+   * Generates a random UUID if not previously set.
+   *
+   * @returns Grass asset ID
+   * @internal
+   */
   get grassAssetId() {
     if (!this._grassAssetId) {
       this._grassAssetId = crypto.randomUUID();
@@ -129,24 +187,39 @@ export class ClipmapTerrain
   set grassAssetId(val: string) {
     this._grassAssetId = val;
   }
+  /**
+   * The current number of active detail maps.
+   * Detail maps define different surface materials (grass, rock, etc.).
+   *
+   * @returns Number of active detail maps
+   */
   get numDetailMaps(): number {
     return this.material.numDetailMaps;
   }
   set numDetailMaps(val: number) {
     this.material.numDetailMaps = val;
   }
+  /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean) {
     const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
+  /** {@inheritDoc SceneNode.copyFrom} */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.setSize(other.sizeX, other.sizeZ);
     this.wireframe = other.wireframe;
     this.castShadow = other.castShadow;
   }
+  /**
+   * Sets the terrain size.
+   * Triggers height map resize if dimensions change.
+   *
+   * @param sizeX - New width
+   * @param sizeZ - New depth
+   */
   setSize(sizeX: number, sizeZ: number) {
     if (sizeX !== this._sizeX || sizeZ !== this._sizeZ) {
       this._sizeX = sizeX;
@@ -161,6 +234,7 @@ export class ClipmapTerrain
   set castShadow(val: boolean) {
     this._castShadow = !!val;
   }
+  /** The terrain width. */
   get sizeX() {
     return this._sizeX;
   }
@@ -170,6 +244,7 @@ export class ClipmapTerrain
       this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
+  /** The terrain depth. */
   get sizeZ() {
     return this._sizeZ;
   }
@@ -179,6 +254,7 @@ export class ClipmapTerrain
       this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
+  /** The current height map texture. */
   get heightMap(): Texture2D {
     return this.material.heightMap;
   }
@@ -188,12 +264,15 @@ export class ClipmapTerrain
       this.updateRegion();
     }
   }
+  /** The splat map texture */
   get splatMap(): Texture2DArray {
     return this.material.getSplatMap();
   }
+  /** Material instance of the terrain */
   get material(): ClipmapTerrainMaterial {
     return this._material?.get() ?? null;
   }
+  /** whether wireframe rendering is enabled */
   get wireframe() {
     return this._clipmap.wireframe;
   }
@@ -255,7 +334,7 @@ export class ClipmapTerrain
     return null;
   }
   /**
-   * {@inheritDoc GraphNode.isClipmapTerrain}
+   * {@inheritDoc SceneNode.isClipmapTerrain}
    */
   isClipmapTerrain(): this is ClipmapTerrain {
     return true;
@@ -279,14 +358,26 @@ export class ClipmapTerrain
     );
   }
   /**
-   * World region
+   * the actual world-space region covered by this terrain (After applying world transform).
    */
   get worldRegion(): Vector4 {
     return this.material.region;
   }
+  /**
+   * Calculates the local transformation matrix.
+   * For terrains, this only includes translation.
+   *
+   * @param outMatrix - Output matrix to store the result
+   */
   calculateLocalTransform(outMatrix: Matrix4x4): void {
     outMatrix.translation(this._position);
   }
+  /**
+   * Calculates the world transformation matrix.
+   * Terrains inherit only translation from parent nodes.
+   *
+   * @param outMatrix - Output matrix to store the result
+   */
   calculateWorldTransform(outMatrix: Matrix4x4): void {
     outMatrix.set(this.localMatrix);
     if (this.parent) {
@@ -295,6 +386,19 @@ export class ClipmapTerrain
       outMatrix.m23 += this.parent.worldMatrix.m23;
     }
   }
+  /**
+   * Updates the terrain's bounding box by analyzing the height map.
+   * This is an asynchronous operation that reads back GPU data.
+   *
+   * @param tmpTexture - Optional temporary texture to reuse (optimization)
+   *
+   * @example
+   * ```typescript
+   * // Update bounding box after changing height map
+   * terrain.heightMap = newHeightMap;
+   * terrain.updateBoundingBox();
+   * ```
+   */
   updateBoundingBox(tmpTexture?: Texture2D) {
     const heightMap = this.heightMap;
     const device = Application.instance.device;
@@ -327,13 +431,16 @@ export class ClipmapTerrain
         }
       });
   }
+  /** @internal */
   createHeightMapTexture(width: number, height: number) {
     return Application.instance.device.createTexture2D('r16f', width, height);
   }
+  /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean): void {
     super._onTransformChanged(invalidateLocal);
     this.updateRegion();
   }
+  /** {@inheritDoc SceneNode.updatePerCamera} */
   updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
     const mat = this._material.get();
     const that = this;
@@ -384,6 +491,7 @@ export class ClipmapTerrain
 
     this.scene.queuePerCameraUpdateNode(this);
   }
+  /** @internal */
   updateRegion() {
     if (this.material) {
       const x = Math.abs(this.scale.x);
@@ -398,9 +506,7 @@ export class ClipmapTerrain
     }
     this._grassRenderer?.get().updateMaterial();
   }
-  /**
-   * {@inheritDoc Drawable.draw}
-   */
+  /** {@inheritDoc Drawable.draw} */
   draw(ctx: DrawContext) {
     const mat = this._material?.get();
     this.bind(ctx);
@@ -413,6 +519,7 @@ export class ClipmapTerrain
       this._grassRenderer.get().draw(ctx);
     }
   }
+  /** @internal */
   private resizeHeightMap(sizeX: number, sizeZ: number) {
     const oldHeightMap = this.material.heightMap;
     const device = Application.instance.device;
@@ -480,6 +587,10 @@ export class ClipmapTerrain
     }
   }
   */
+  /**
+   * Disposes of all resources used by this terrain.
+   * Should be called when the terrain is no longer needed.
+   */
   dispose(): void {
     super.dispose();
     this._clipmap?.dispose();

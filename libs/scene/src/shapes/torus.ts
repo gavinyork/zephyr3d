@@ -61,9 +61,7 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
   clone(): TorusShape {
     return new TorusShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape.type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'Torus';
   }

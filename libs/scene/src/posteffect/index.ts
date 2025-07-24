@@ -4,6 +4,5 @@ export * from './tonemap';
 export * from './bloom';
 export * from './sao';
 export * from './fxaa';
-export * from './water';
 export * from './taa';
 export * from './compositor';

@@ -10,7 +10,6 @@ export * from './clipmap';
 export * from './envlight';
 export * from './primitive';
 export * from './cull_visitor';
-export * from './watermesh';
 export * from './oit';
 export * from './weightedblended_oit';
 export * from './abuffer_oit';

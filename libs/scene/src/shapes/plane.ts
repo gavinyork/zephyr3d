@@ -52,9 +52,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
   clone(): PlaneShape {
     return new PlaneShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape.type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'Plane';
   }

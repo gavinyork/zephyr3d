@@ -36,7 +36,7 @@ export class SceneModel extends BaseModel {
       light.intensity = 18;
       light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
       this._camera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
-      this._camera.lookAt(new Vector3(0, 5, 15), new Vector3(0, 5, 0), new Vector3(0, 1, 0));
+      this._camera.lookAt(new Vector3(0, 80, 80), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
     } else {
       this._scene.rootNode.iterate((child) => {
         if (child instanceof PerspectiveCamera) {

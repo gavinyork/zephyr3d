@@ -166,9 +166,9 @@ export function calculateHeightFog(
       this.$l.falloff = pb.clamp(
         pb.mul(this.params.parameter1.w, pb.sub(this.worldPos.y, this.origin.y)),
         -125,
-        this.$choice(this.isSky, pb.float(1e8), pb.float(126))
+        126
       );
-      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(1e7, 0, this.worldPos.y), 0);
+      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(5e6, 0, this.worldPos.y), 0);
       this.$l.factor = this.$choice(
         pb.greaterThan(pb.abs(this.falloff), 0.01),
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),

@@ -12,6 +12,24 @@ import { Primitive } from '../render/primitive';
 import { Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 
+/**
+ * CubemapSHProjector is responsible for projecting a cubemap texture into spherical harmonics (SH) coefficients.
+ * This is commonly used for efficient environment lighting approximation in real-time rendering.
+ *
+ * The class uses Monte Carlo sampling to compute the first 9 spherical harmonics coefficients (up to order 2)
+ * from a cubemap texture, which can then be used for ambient lighting calculations.
+ *
+ * @example
+ * ```typescript
+ * const projector = new CubemapSHProjector(10000);
+ * const shBuffer = device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
+ * projector.projectCubemap(environmentCubemap, shBuffer);
+ * // shBuffer now contains the 9 SH coefficients as RGB values
+ * projector.dispose();
+ * ```
+ *
+ * @public
+ */
 export class CubemapSHProjector {
   private static _programInst: GPUProgram = null;
   private static _bindGroupInst: BindGroup = null;
@@ -19,11 +37,22 @@ export class CubemapSHProjector {
   private _primitive: DRef<Primitive>;
   private _renderTarget: DRef<FrameBuffer>;
   private _numSamples: number;
+  /**
+   * Creates a new CubemapSHProjector instance.
+   *
+   * @param numSamples - Number of Monte Carlo samples to use for SH projection.
+   *                     Higher values provide better accuracy but slower computation.
+   *                     Default is 10000.
+   */
   constructor(numSamples = 10000) {
     this._numSamples = numSamples;
     this._primitive = new DRef();
     this._renderTarget = new DRef();
   }
+  /**
+   * Disposes of all resources allocated by this projector instance.
+   * Should be called when the projector is no longer needed to prevent memory leaks.
+   */
   dispose() {
     this._primitive.dispose();
     if (this._renderTarget.get()) {
@@ -31,6 +60,26 @@ export class CubemapSHProjector {
       this._renderTarget.dispose();
     }
   }
+  /**
+   * Projects a cubemap texture into spherical harmonics coefficients.
+   *
+   * The method performs Monte Carlo integration over the sphere to compute the first 9 SH coefficients.
+   * The results are written to a 3x3 render target where each pixel contains RGB values for one SH coefficient.
+   * The layout is:
+   * - (0,0): Y₀₀  (0,1): Y₁₋₁  (0,2): Y₁₀
+   * - (1,0): Y₁₁  (1,1): Y₂₋₂  (1,2): Y₂₋₁
+   * - (2,0): Y₂₀  (2,1): Y₂₁   (2,2): Y₂₂
+   *
+   * @param cubemap - The input cubemap texture to project
+   * @param outBuffer - GPU data buffer to receive the computed SH coefficients.
+   *                    Must be large enough to hold 9 RGB values (36 floats for RGBA32F format).
+   *
+   * @example
+   * ```typescript
+   * const shBuffer = device.createDataBuffer(9 * 4 * 4); // 9 coefficients * 4 components * 4 bytes
+   * projector.projectCubemap(environmentMap, shBuffer);
+   * ```
+   */
   projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
@@ -47,6 +96,17 @@ export class CubemapSHProjector {
     device.popDeviceStates();
     this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
+  /**
+   * Initializes the GPU resources needed for SH projection.
+   * This method is called automatically by projectCubemap() and sets up:
+   * - Sample directions primitive (Monte Carlo samples on unit sphere)
+   * - Render target (3x3 RGBA32F texture)
+   * - Render states (additive blending, no depth test)
+   * - GPU program for SH evaluation
+   *
+   * @param device - The graphics device to create resources with
+   * @internal
+   */
   private init(device: AbstractDevice) {
     if (!this._primitive.get()) {
       const samples = new Float32Array(this._numSamples * 4);
@@ -104,6 +164,20 @@ export class CubemapSHProjector {
       );
     }
   }
+  /**
+   * Creates the GPU program for spherical harmonics evaluation.
+   *
+   * The vertex shader uses instanced rendering to generate 9 instances (one per SH coefficient).
+   * Each instance renders all sample points, but the vertex shader maps them to different
+   * pixels in the 3x3 output texture based on the instance ID.
+   *
+   * The fragment shader evaluates the appropriate SH basis function based on the pixel location,
+   * samples the cubemap in the sample direction, and multiplies by the integration weight.
+   *
+   * @param device - The graphics device to create the program with
+   * @returns The compiled GPU program
+   * @internal
+   */
   private static _createProgram(device: AbstractDevice) {
     return device.buildRenderProgram({
       vertex(pb) {

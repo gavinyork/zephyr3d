@@ -22,6 +22,7 @@ const FLT_MAX = 32767;
 
 /**
  * Temporal resolve implementation
+ *
  * @param scope - The shader scope
  * @param currentColorTex - 2D texture that holds the current color
  * @param historyColorTex - 2D texture that holds the history color
@@ -30,8 +31,10 @@ const FLT_MAX = 32767;
  * @param prevMotionVectorTex - 2D texture that holds the previous motion vector
  * @param uv - Fragment uv coordinate
  * @param workSize - Target texture size
- * @param debug
+ * @param debug - Value for debugging
  * @returns
+ *
+ * @public
  */
 export function temporalResolve(
   scope: PBInsideFunctionScope,

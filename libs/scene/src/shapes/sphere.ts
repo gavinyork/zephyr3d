@@ -39,9 +39,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
   clone(): SphereShape {
     return new SphereShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape.type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'Sphere';
   }

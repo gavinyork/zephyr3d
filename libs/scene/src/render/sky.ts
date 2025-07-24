@@ -952,7 +952,7 @@ export class SkyRenderer {
             );
             this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
             this.$l.worldPos = pb.div(this.$l.hPos, this.$l.hPos.w).xyz;
-            this.$l.isSky = pb.greaterThan(this.$l.depthValue, 0.9999);
+            this.$l.isSky = pb.equal(this.$l.depthValue, 1);
             this.$l.color = calculateFog(
               this,
               this.withAerialPerspective,

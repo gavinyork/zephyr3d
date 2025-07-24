@@ -574,7 +574,7 @@ export interface BufferCreationOptions extends BaseCreationOptions {
 }
 
 // @public
-export type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write';
+export type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write' | 'pack-pixel' | 'unpack-pixel';
 
 // @public
 export interface ColorState {
@@ -960,19 +960,23 @@ export enum GPUResourceUsageFlags {
     // (undocumented)
     BF_INDEX = 64,
     // (undocumented)
+    BF_PACK_PIXEL = 2048,
+    // (undocumented)
     BF_READ = 128,
     // (undocumented)
     BF_STORAGE = 1024,
     // (undocumented)
     BF_UNIFORM = 512,
     // (undocumented)
+    BF_UNPACK_PIXEL = 4096,
+    // (undocumented)
     BF_VERTEX = 32,
     // (undocumented)
     BF_WRITE = 256,
     // (undocumented)
-    DYNAMIC = 2048,
+    DYNAMIC = 8192,
     // (undocumented)
-    MANAGED = 4096,
+    MANAGED = 16384,
     // (undocumented)
     TF_LINEAR_COLOR_SPACE = 2,
     // (undocumented)

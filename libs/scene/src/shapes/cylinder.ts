@@ -52,9 +52,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
   clone(): CylinderShape {
     return new CylinderShape(this._options);
   }
-  /**
-   * {@inheritDoc Shape.type}
-   */
+  /** type of the shape */
   get type(): string {
     return 'Cylinder';
   }

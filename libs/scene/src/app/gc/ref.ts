@@ -9,19 +9,19 @@ export interface Disposable {
 
 /**
  * Maps disposable objects to their reference counts.
- * @private
+ * @internal
  */
 const objectReferenceMap = new WeakMap<Disposable, number>();
 
 /**
  * Maps disposable objects to their weak references.
- * @private
+ * @internal
  */
 const weakRefMap = new WeakMap<Disposable, Set<DWeakRef<Disposable>>>();
 
 /**
  * Holds objects that are pending disposal.
- * @private
+ * @internal
  */
 const disposalQueue = new Set<Disposable>();
 

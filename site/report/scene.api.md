@@ -132,10 +132,14 @@ export class ABufferOIT implements OIT {
     wantsPremultipliedAlpha(): boolean;
 }
 
-// @public (undocumented)
-export function aerialPerspective(scope: PBInsideFunctionScope, f2UV: PBShaderExp, stParams: PBShaderExp, f3CameraPos: PBShaderExp, f3WorldPos: PBShaderExp, f3Dim: PBShaderExp, f4Debug: PBShaderExp, texAerialPerspectiveLut: PBShaderExp): any;
+// Warning: (ae-internal-missing-underscore) The name "aerialPerspective" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function aerialPerspective(scope: PBInsideFunctionScope, f2UV: PBShaderExp, stParams: PBShaderExp, f3CameraPos: PBShaderExp, f3WorldPos: PBShaderExp, f3Dim: PBShaderExp, texAerialPerspectiveLut: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "aerialPerspectiveLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function aerialPerspectiveLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, f3VoxelDim: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
 
 // @public
@@ -628,7 +632,14 @@ export interface AssetUnlitMaterial extends AssetMaterial {
     diffuseMap?: MaterialTextureInfo;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "atmosphereLUTRendered" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function atmosphereLUTRendered(): boolean;
+
+// Warning: (ae-internal-missing-underscore) The name "AtmosphereParams" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export type AtmosphereParams = {
     plantRadius: number;
     atmosphereHeight: number;
@@ -928,7 +939,6 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
         needUV: boolean;
     };
     static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
-    // (undocumented)
     get type(): string;
 }
 
@@ -947,7 +957,6 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
     get depth(): number;
     static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get height(): number;
-    // (undocumented)
     get type(): string;
     get width(): number;
 }
@@ -1234,10 +1243,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set TAA(val: boolean);
     // @internal (undocumented)
     protected _TAA: boolean;
-    get TAABlendFactor(): number;
-    set TAABlendFactor(val: number);
-    // @internal (undocumented)
-    protected _TAABlendFactor: number;
     get TAADebug(): number;
     set TAADebug(val: number);
     // @internal (undocumented)
@@ -1264,7 +1269,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     protected _viewProjMatrix: Matrix4x4;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "CAMERA_POS_Y" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const CAMERA_POS_Y = 1;
 
 // @public
@@ -1330,24 +1337,19 @@ export interface ClipmapGatherContext {
 
 // Warning: (ae-forgotten-export) The symbol "ClipmapTerrain_base" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable, NodeClonable<ClipmapTerrain> {
     constructor(scene: Scene, sizeX?: number, sizeZ?: number, clipMapTileSize?: number);
-    // (undocumented)
     calculateLocalTransform(outMatrix: Matrix4x4): void;
-    // (undocumented)
     calculateWorldTransform(outMatrix: Matrix4x4): void;
     get castShadow(): boolean;
     set castShadow(val: boolean);
-    // (undocumented)
     clone(method: NodeCloneMethod, recursive: boolean): ClipmapTerrain;
     computeBoundingVolume(): BoundingVolume;
     computeWorldBoundingVolume(): BoundingVolume;
-    // (undocumented)
     copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
-    // (undocumented)
+    // @internal (undocumented)
     createHeightMapTexture(width: number, height: number): Texture2D<unknown>;
-    // (undocumented)
     dispose(): void;
     draw(ctx: DrawContext): void;
     getMaterial(): MeshMaterial;
@@ -1356,53 +1358,38 @@ export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable, Nod
     getPickTarget(): PickTarget;
     getPrimitive(): Primitive;
     getQueueType(): number;
-    // (undocumented)
+    // @internal
     get grassAssetId(): string;
     set grassAssetId(val: string);
-    // (undocumented)
     get grassRenderer(): GrassRenderer;
-    // (undocumented)
     get heightMap(): Texture2D;
     set heightMap(val: Texture2D);
-    // (undocumented)
+    // @internal
     get heightMapAssetId(): string;
     set heightMapAssetId(val: string);
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "isClipmapTerrain"
-    //
-    // (undocumented)
     isClipmapTerrain(): this is ClipmapTerrain;
     isUnlit(): boolean;
-    // (undocumented)
     get material(): ClipmapTerrainMaterial;
-    // (undocumented)
     get MAX_DETAIL_MAP_COUNT(): number;
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
-    // (undocumented)
     get numDetailMaps(): number;
     set numDetailMaps(val: number);
-    // (undocumented)
+    // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
-    // (undocumented)
     setSize(sizeX: number, sizeZ: number): void;
-    // (undocumented)
     get sizeX(): number;
     set sizeX(val: number);
-    // (undocumented)
     get sizeZ(): number;
     set sizeZ(val: number);
-    // (undocumented)
     get splatMap(): Texture2DArray;
-    // (undocumented)
+    // @internal
     get splatMapAssetId(): string;
     set splatMapAssetId(val: string);
-    // (undocumented)
     updateBoundingBox(tmpTexture?: Texture2D): void;
-    // (undocumented)
     updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void;
-    // (undocumented)
+    // @internal (undocumented)
     updateRegion(): void;
-    // (undocumented)
     get wireframe(): boolean;
     set wireframe(val: boolean);
     get worldRegion(): Vector4;
@@ -1535,10 +1522,20 @@ export class CopyBlitter extends Blitter {
 // @internal
 export function copyTexture(src: BaseTexture, dest: BaseTexture | FrameBuffer, sampler?: TextureSampler, renderState?: RenderStateSet, layer?: number, srgbOut?: boolean): void;
 
+// Warning: (ae-internal-missing-underscore) The name "createAPLutProgram" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function createAPLutProgram(device: AbstractDevice): GPUProgram<unknown>;
+
 // Warning: (ae-internal-missing-underscore) The name "createGradientNoiseTexture" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
 export function createGradientNoiseTexture(device: AbstractDevice, size: number, uvscale: number, mono?: boolean, seed?: number): _zephyr3d_device.Texture2D<unknown>;
+
+// Warning: (ae-internal-missing-underscore) The name "createMultiScatteringLutProgram" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function createMultiScatteringLutProgram(device: AbstractDevice): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramFFT2H" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -1575,15 +1572,21 @@ export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize
 // @internal (undocumented)
 export function createRandomNoiseTexture(device: AbstractDevice, size: number): _zephyr3d_device.Texture2D<unknown>;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "createSkyViewLutProgram" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function createSkyViewLutProgram(device: AbstractDevice): GPUProgram<unknown>;
+
+// Warning: (ae-internal-missing-underscore) The name "createTransmittanceLutProgram" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram;
+
+// @public
 export class CubemapSHProjector {
-    constructor(numSamples?: number, useInstancing?: boolean);
-    // (undocumented)
-    applyWindow(coeff: Float32Array, windowWeights: ArrayLike<number>): void;
-    // (undocumented)
+    constructor(numSamples?: number);
     dispose(): void;
-    // (undocumented)
-    shProject(cubemap: TextureCube, windowWeights?: ArrayLike<number>, outCoeff?: Float32Array): Promise<Float32Array>;
+    projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer): void;
 }
 
 // @public
@@ -1656,7 +1659,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         needUV: boolean;
     };
     static generateData(options: CylinderCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
-    // (undocumented)
     get type(): string;
 }
 
@@ -1695,13 +1697,13 @@ export class DepthPass extends RenderPass {
     set transmission(val: boolean);
 }
 
-// @public (undocumented)
+// @public
 export function deserializeObject<T extends object>(ctx: any, json: object, manager: SerializationManager): Promise<T>;
 
-// @public (undocumented)
+// @public
 export function deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object, manager: SerializationManager): Promise<void>;
 
-// @public (undocumented)
+// @public
 export function deserializeSceneFromURL(url: string, manager: SerializationManager): Promise<{
     scene: Scene;
     meta: any;
@@ -1992,8 +1994,10 @@ export class EnvLightWrapper {
     getHash(ctx?: DrawContext): string;
     get irradianceMap(): TextureCube;
     set irradianceMap(tex: TextureCube);
-    get irradianceSH(): Float32Array;
-    set irradianceSH(value: Float32Array);
+    get irradianceSH(): GPUDataBuffer;
+    set irradianceSH(value: GPUDataBuffer);
+    get irradianceWindow(): Vector3;
+    set irradianceWindow(value: Vector3);
     get radianceMap(): TextureCube;
     set radianceMap(tex: TextureCube);
     get strength(): number;
@@ -2004,7 +2008,7 @@ export class EnvLightWrapper {
 
 // @public
 export class EnvShIBL extends EnvironmentLighting {
-    constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array);
+    constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer);
     // @override
     dispose(): void;
     // @override
@@ -2019,12 +2023,16 @@ export class EnvShIBL extends EnvironmentLighting {
     hasRadiance(): boolean;
     // @override
     initShaderBindings(pb: ProgramBuilder): void;
-    get irradianceSH(): Float32Array;
-    set irradianceSH(value: Float32Array);
+    get irradianceSH(): GPUDataBuffer;
+    set irradianceSH(value: GPUDataBuffer);
+    get irradianceWindow(): Vector3;
+    set irradianceWindow(val: Vector3);
     get radianceMap(): TextureCube;
     set radianceMap(tex: TextureCube);
     // @internal (undocumented)
     static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = "zIBLIrradianceSH";
+    // @internal (undocumented)
+    static readonly UNIFORM_NAME_IBL_IRRADIANCE_WINDOW = "zIBLIrradianceWindow";
     // @internal (undocumented)
     static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = "zIBLRadianceMap";
     // @internal (undocumented)
@@ -2126,9 +2134,6 @@ export class FBMWaveGenerator implements WaveGenerator {
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
     // (undocumented)
     clone(): this;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "dispose"
-    //
-    // (undocumented)
     dispose(): void;
     // (undocumented)
     get disposed(): boolean;
@@ -2170,9 +2175,6 @@ export class FFTWaveGenerator implements WaveGenerator {
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
     // (undocumented)
     clone(): this;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "dispose"
-    //
-    // (undocumented)
     dispose(): void;
     // (undocumented)
     get disposed(): boolean;
@@ -2200,8 +2202,18 @@ export class FFTWaveGenerator implements WaveGenerator {
 // @public
 export function flushPendingDisposals(): void;
 
+// Warning: (ae-internal-missing-underscore) The name "Fog" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export enum Fog {
+    // (undocumented)
+    FOG_TYPE_HEIGHT = 4,
+    // (undocumented)
+    FOG_TYPE_NONE = 0
+}
+
 // @public
-export type FogType = 'linear' | 'exp' | 'exp2' | 'height_fog' | 'none';
+export type FogType = 'height_fog' | 'none';
 
 // @public
 export class FPSCameraController extends BaseCameraController {
@@ -2248,7 +2260,9 @@ export class FXAA extends AbstractPostEffect {
 // @public
 export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp): PBShaderExp;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "GatherVisitor" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export class GatherVisitor implements Visitor<SceneNode> {
     constructor();
     // (undocumented)
@@ -2259,9 +2273,9 @@ export class GatherVisitor implements Visitor<SceneNode> {
     get primitiveSet(): Set<Primitive>;
     // (undocumented)
     visit(target: SceneNode): unknown;
-    // @internal (undocumented)
+    // (undocumented)
     visitMesh(node: Mesh): boolean;
-    // @internal (undocumented)
+    // (undocumented)
     visitParticleSystem(node: ParticleSystem): boolean;
 }
 
@@ -2319,9 +2333,6 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     // (undocumented)
     clone(): this;
     deleteWave(index: number): void;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "dispose"
-    //
-    // (undocumented)
     dispose(): void;
     // (undocumented)
     get disposed(): boolean;
@@ -2356,67 +2367,109 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     get version(): number;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getAerialPerspectiveLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getAerialPerspectiveLut(): Texture2D<unknown>;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getAtmosphereParamsStruct" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getAtmosphereParamsStruct(pb: ProgramBuilder): _zephyr3d_device.ShaderTypeFunc;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getBatchGroupClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getBatchGroupClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getCameraClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getCameraClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getDefaultAtmosphereParams" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getDefaultAtmosphereParams(): AtmosphereParams;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getDirectionalLightClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getDirectionalLightClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getGraphNodeClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getGraphNodeClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getMeshClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getMeshClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getMultiScattering" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getMultiScattering(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3Pos: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getMultiScatteringLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getMultiScatteringLut(): Texture2D<unknown>;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getNodeHierarchyClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getNodeHierarchyClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getOrthoCameraClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getOrthoCameraClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getParticleNodeClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getParticleNodeClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getPerspectiveCameraClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getPerspectiveCameraClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getPointLightClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getPointLightClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getPunctualLightClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getPunctualLightClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getSceneNodeClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getSceneNodeClass(manager: SerializationManager): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getSkyView" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getSkyView(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3EyePos: PBShaderExp, f3ViewDir: PBShaderExp, fMaxDis: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp, withGround?: boolean): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getSkyViewLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getSkyViewLut(): Texture2D<unknown>;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getSpotLightClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getSpotLightClass(): SerializableClass;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "getTransmittanceLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function getTransmittanceLut(): Texture2D<unknown>;
 
 // @public
@@ -2838,7 +2891,9 @@ export interface InstanceData {
 // @internal (undocumented)
 export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "integralMultiScattering" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function integralMultiScattering(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3LightDir: PBShaderExp, f3SamplePoint: PBShaderExp, texTransmittanceLut: PBShaderExp): any;
 
 // @public
@@ -2980,6 +3035,8 @@ export interface MaterialTextureInfo {
 
 // @public
 export const enum MaterialVaryingFlags {
+    // (undocumented)
+    APPLY_FOG = 16,
     // (undocumented)
     INSTANCING = 4,
     // (undocumented)
@@ -3166,13 +3223,19 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     vertexShader(scope: PBFunctionScope): void;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "mieAbsorption" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function mieAbsorption(scope: PBInsideFunctionScope, fMieScatteringHeight: PBShaderExp, fH: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "mieCoefficient" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function mieCoefficient(scope: PBInsideFunctionScope, fMieScatteringHeight: PBShaderExp, fH: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "miePhase" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp, fCosTheta: PBShaderExp): any;
 
 // @public
@@ -3269,7 +3332,9 @@ export const MORPH_TARGET_TEX3 = 7;
 // @internal (undocumented)
 export const MORPH_WEIGHTS_VECTOR_COUNT: number;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "multiScatteringLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function multiScatteringLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, texTransmittanceLut: PBShaderExp): any;
 
 // @public
@@ -3307,7 +3372,9 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
     mixState(a: Quaternion, b: Quaternion, t: number): Quaternion;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "NodeHierarchy" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export class NodeHierarchy {
     constructor(scene: Scene, node?: SceneNode);
     // (undocumented)
@@ -3578,7 +3645,9 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
     set window(val: number[]);
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "ozoneAbsorption" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function ozoneAbsorption(scope: PBInsideFunctionScope, fOzoneLevelCenterHeight: PBShaderExp, fOzoneLevelWidth: PBShaderExp, fH: PBShaderExp): any;
 
 // @public
@@ -3927,7 +3996,6 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
         needUV: boolean;
     };
     static generateData(options: PlaneCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
-    // (undocumented)
     get type(): string;
 }
 
@@ -3958,7 +4026,7 @@ export class PointLight extends PunctualLight implements NodeClonable<PointLight
     setRange(val: number): this;
 }
 
-// @public (undocumented)
+// @public
 export enum PostEffectLayer {
     // (undocumented)
     end = 2,
@@ -3966,60 +4034,6 @@ export enum PostEffectLayer {
     opaque = 0,
     // (undocumented)
     transparent = 1
-}
-
-// @public
-export class PostWater extends AbstractPostEffect {
-    constructor(elevation: number, waveGenerator: WaveGenerator);
-    get antiReflectanceLeak(): number;
-    set antiReflectanceLeak(val: number);
-    apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
-    get boundary(): Vector4;
-    set boundary(val: Vector4);
-    // (undocumented)
-    get causticsFalloff(): number;
-    set causticsFalloff(val: number);
-    // (undocumented)
-    get causticsIntensity(): number;
-    set causticsIntensity(val: number);
-    // (undocumented)
-    get causticsSlopeMax(): number;
-    set causticsSlopeMax(val: number);
-    // (undocumented)
-    get causticsSlopeMin(): number;
-    set causticsSlopeMin(val: number);
-    get depthMulti(): number;
-    set depthMulti(val: number);
-    get displace(): number;
-    set displace(val: number);
-    get elevation(): number;
-    set elevation(val: number);
-    get envMap(): TextureCube;
-    set envMap(tex: TextureCube);
-    get gridScale(): number;
-    set gridScale(val: number);
-    get refractionStrength(): number;
-    set refractionStrength(val: number);
-    requireDepthAttachment(): boolean;
-    requireLinearDepthTexture(): boolean;
-    get speed(): number;
-    set speed(val: number);
-    get ssr(): boolean;
-    set ssr(val: boolean);
-    // (undocumented)
-    get ssrIterations(): number;
-    set ssrIterations(val: number);
-    // (undocumented)
-    get ssrMaxDistance(): number;
-    set ssrMaxDistance(val: number);
-    // (undocumented)
-    get ssrThickness(): number;
-    set ssrThickness(val: number);
-    // (undocumented)
-    get waveGenerator(): WaveGenerator;
-    // (undocumented)
-    get wireframe(): boolean;
-    set wireframe(val: boolean);
 }
 
 // Warning: (ae-forgotten-export) The symbol "DistributionType" needs to be exported by the entry point index.d.ts
@@ -4105,15 +4119,9 @@ export type PrimitiveInstanceInfo = {
 };
 
 // @public
-export function projectCubemap(tex: TextureCube): Promise<Vector3[]>;
-
-// @public
-export function projectCubemapCPU(input: TextureCube): Promise<Vector3[]>;
-
-// @public (undocumented)
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
-// @public (undocumented)
+// @public
 export type PropertyAccessor<T = object> = {
     type: PropertyType;
     name: string;
@@ -4174,10 +4182,10 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
     set target(val: string);
 }
 
-// @public (undocumented)
+// @public
 export type PropertyType = 'bool' | 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'int2' | 'int3' | 'int4' | 'string' | 'rgb' | 'rgba' | 'object' | 'object_array' | 'command';
 
-// @public (undocumented)
+// @public
 export type PropertyValue = {
     num?: number[];
     str?: string[];
@@ -4205,7 +4213,7 @@ export class PunctualLight extends BaseLight {
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
     setCastShadow(b: boolean): this;
-    setColor(color: Vector4): this;
+    setColor(color: Vector4 | Vector3): this;
     get shadow(): ShadowMapper;
     // @internal (undocumented)
     protected _shadowMapper: ShadowMapper;
@@ -4301,13 +4309,19 @@ export const QUEUE_OPAQUE = 1;
 // @public
 export const QUEUE_TRANSPARENT = 2;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "rayIntersectSphere" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function rayIntersectSphere(scope: PBInsideFunctionScope, f3Center: PBShaderExp, fRadius: PBShaderExp, f3RayStart: PBShaderExp, f3RayDir: PBShaderExp): PBShaderExp;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "rayleighCoefficient" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function rayleighCoefficient(scope: PBInsideFunctionScope, fRayleighScatteringHeight: PBShaderExp, fH: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "rayleighPhase" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function rayleighPhase(scope: PBInsideFunctionScope, fCosTheta: PBShaderExp): any;
 
 // @public
@@ -4325,10 +4339,14 @@ export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "renderAPLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function renderAPLut(params: AtmosphereParams): void;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "renderAtmosphereLUTs" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>): void;
 
 // Warning: (ae-internal-missing-underscore) The name "RenderItemList" should be prefixed with an underscore because the declaration is marked as @internal
@@ -4389,7 +4407,9 @@ export interface RenderItemListInfo {
     skinRenderBundle?: RenderBundleWrapper;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "renderMultiScatteringLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function renderMultiScatteringLut(params: AtmosphereParams): void;
 
 // @public
@@ -4495,10 +4515,14 @@ export interface RenderQueueRef {
     ref: RenderQueue;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "renderSkyViewLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function renderSkyViewLut(params: AtmosphereParams): void;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "renderTransmittanceLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function renderTransmittanceLut(params: AtmosphereParams): void;
 
 // @public
@@ -4531,7 +4555,9 @@ export class SAO extends AbstractPostEffect {
     set scale(val: number);
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "scattering" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function scattering(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3Pos: PBShaderExp, f3ViewDir: PBShaderExp): PBShaderExp;
 
 // Warning: (ae-forgotten-export) The symbol "Scene_base" needs to be exported by the entry point index.d.ts
@@ -4781,7 +4807,7 @@ export class SceneRenderer {
     static get shadowMapRenderPass(): ShadowMapPass;
 }
 
-// @public (undocumented)
+// @public
 export type SerializableClass = {
     ctor: GenericConstructor;
     parent?: GenericConstructor;
@@ -4798,10 +4824,7 @@ export type SerializableClass = {
     getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
 };
 
-// @public (undocumented)
-export type SerializationInfo = SerializableClass[];
-
-// @public (undocumented)
+// @public
 export class SerializationManager {
     constructor(assetRegistry: AssetRegistry);
     // (undocumented)
@@ -4830,10 +4853,10 @@ export class SerializationManager {
     registerClass(cls: SerializableClass): void;
 }
 
-// @public (undocumented)
+// @public
 export function serializeObject(obj: any, manager: SerializationManager, json?: any, assetList?: Set<string>, embeddedAssetList?: Promise<EmbeddedAssetInfo>[]): any;
 
-// @public (undocumented)
+// @public
 export function serializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object, manager: SerializationManager, assetList?: Set<string>, embeddedAssetList?: Promise<EmbeddedAssetInfo>[]): void;
 
 // @public
@@ -4850,24 +4873,11 @@ export class ShaderHelper {
     // @internal (undocumented)
     static calculateShadowSpaceVertex(scope: PBInsideFunctionScope, worldPos: PBShaderExp, cascade?: PBShaderExp | number): PBShaderExp;
     static calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp;
-    static computeFogFactor(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogType: PBShaderExp, fogParams: PBShaderExp): PBShaderExp;
-    static computeFogFactorForType(scope: PBInsideFunctionScope, viewDir: PBShaderExp, fogParams: PBShaderExp, fogType: 'linear' | 'exp' | 'exp2'): PBShaderExp;
     // @internal (undocumented)
     static defaultSunDir: Vector3;
     static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp): void;
     static encodeColorOutput(scope: PBInsideFunctionScope, outputColor: PBShaderExp): PBShaderExp;
-    // (undocumented)
-    static readonly FOG_TYPE_EXP = 2;
-    // (undocumented)
-    static readonly FOG_TYPE_EXP2 = 3;
-    // (undocumented)
-    static readonly FOG_TYPE_HEIGHT = 4;
-    // (undocumented)
-    static readonly FOG_TYPE_LINEAR = 1;
-    // (undocumented)
-    static readonly FOG_TYPE_NONE = 0;
     static getAerialPerspectiveLUT(scope: PBInsideFunctionScope): PBShaderExp;
-    static getAPDensity(scope: PBInsideFunctionScope): PBShaderExp;
     static getAtmosphereParams(scope: PBInsideFunctionScope): PBShaderExp;
     static getBakedSkyTexture(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
@@ -4898,11 +4908,7 @@ export class ShaderHelper {
     static getElapsedTime(scope: PBInsideFunctionScope): PBShaderExp;
     static getElapsedTimeFrame(scope: PBInsideFunctionScope): PBShaderExp;
     static getEnvLightStrength(scope: PBInsideFunctionScope): PBShaderExp;
-    static getFogColor(scope: PBInsideFunctionScope): PBShaderExp;
-    static getFogParams(scope: PBInsideFunctionScope): PBShaderExp;
-    static getFogType(scope: PBInsideFunctionScope): PBShaderExp;
     static getFramestamp(scope: PBInsideFunctionScope): PBShaderExp;
-    static getGlobalUniforms(scope: PBInsideFunctionScope): PBShaderExp;
     static getHiZDepthTexture(scope: PBInsideFunctionScope): PBShaderExp;
     static getHiZDepthTextureMipLevelCount(scope: PBInsideFunctionScope): PBShaderExp;
     static getHiZDepthTextureSize(scope: PBInsideFunctionScope): PBShaderExp;
@@ -4985,8 +4991,10 @@ export class ShaderHelper {
     // @internal (undocumented)
     static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean): void;
     static setClipSpacePosition(scope: PBInsideFunctionScope, pos: PBShaderExp): void;
+    // Warning: (ae-forgotten-export) The symbol "HeightFogParams" needs to be exported by the entry point index.d.ts
+    //
     // @internal (undocumented)
-    static setFogUniforms(bindGroup: BindGroup, fogType: number, fogColor: Vector4, fogParams: Vector4, apDensity: number, aerialPerspectiveLUT?: Texture2D): void;
+    static setFogUniforms(bindGroup: BindGroup, withAerialPerspective: number, fogType: number, additive: number, atmosphereParams: AtmosphereParams, heightFogParams: HeightFogParams, aerialPerspectiveLUT: Texture2D, skyDistantLightLUT: Texture2D): void;
     // @internal (undocumented)
     static setLightUniforms(bindGroup: BindGroup, ctx: DrawContext, clusterParams: Float32Array, countParams: Int32Array, lightBuffer: StructuredBuffer, lightIndexTexture: Texture2D): void;
     // @internal (undocumented)
@@ -5198,10 +5206,10 @@ export interface ShapeCreationOptions {
     transform?: Matrix4x4;
 }
 
-// @public (undocumented)
+// @public
 export type ShapeOptionType<ST extends ShapeType> = ST extends Shape<infer U> ? U : never;
 
-// @public (undocumented)
+// @public
 export type ShapeType = BoxShape | BoxFrameShape | SphereShape | CylinderShape | PlaneShape | TorusShape;
 
 // @public
@@ -5263,7 +5271,9 @@ export class Skeleton {
     updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4): void;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "skyBox" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function skyBox(scope: PBInsideFunctionScope, stParams: PBShaderExp, f4SunColor: PBShaderExp, f3SkyBoxWorldPos: PBShaderExp, fSunSolidAngle: PBShaderExp, texTransmittanceLut: PBShaderExp, texSkyViewLut: PBShaderExp): any;
 
 // @public
@@ -5276,8 +5286,8 @@ export class SkyRenderer {
     set aerialPerspectiveDistance(val: number);
     get atmosphereExposure(): number;
     set atmosphereExposure(val: number);
-    // (undocumented)
-    protected static _bindgroupDistantLight: BindGroup;
+    // @internal (undocumented)
+    get atmosphereParams(): AtmosphereParams;
     get cameraHeightScale(): number;
     set cameraHeightScale(val: number);
     get cloudIntensity(): number;
@@ -5286,40 +5296,35 @@ export class SkyRenderer {
     set cloudy(val: number);
     // @internal (undocumented)
     dispose(): void;
-    get drawGround(): boolean;
-    set drawGround(val: boolean);
     // @internal (undocumented)
     drawScatteredFog(ctx: DrawContext): boolean;
-    get fogColor(): Vector4;
-    set fogColor(val: Vector4);
-    get fogDensity(): number;
-    set fogDensity(val: number);
-    get fogEnd(): number;
-    set fogEnd(val: number);
     // @internal (undocumented)
-    get fogParams(): Vector4;
-    set fogParams(val: Vector4);
-    get fogStart(): number;
-    set fogStart(val: number);
-    get fogTop(): number;
-    set fogTop(val: number);
+    get fogPresents(): boolean;
     get fogType(): FogType;
     set fogType(val: FogType);
     // @internal (undocumented)
-    getAerialPerspectiveLUT(ctx: DrawContext): _zephyr3d_device.Texture2D<unknown>;
+    getAerialPerspectiveLUT(ctx: DrawContext): Texture2D<unknown>;
     getBakedSkyTexture(ctx: DrawContext): TextureCube;
     // @internal (undocumented)
     getHash(ctx: DrawContext): string;
-    get heightFogAtmosphereEffectStrength(): number;
-    set heightFogAtmosphereEffectStrength(val: number);
+    // @internal (undocumented)
+    getSkyDistantLightLUT(ctx: DrawContext): Texture2D;
+    get heightFogAtmosphereContribution(): number;
+    set heightFogAtmosphereContribution(val: number);
     get heightFogColor(): Vector3;
     set heightFogColor(val: Vector3);
     get heightFogDensity(): number;
     set heightFogDensity(val: number);
+    get heightFogDirColor(): Vector3;
+    set heightFogDirColor(val: Vector3);
+    get heightFogDirExponent(): number;
+    set heightFogDirExponent(val: number);
     get heightFogFalloff(): number;
     set heightFogFalloff(val: number);
     get heightFogMaxOpacity(): number;
     set heightFogMaxOpacity(val: number);
+    // @internal (undocumented)
+    get heightFogParams(): HeightFogParams;
     get heightFogStartDistance(): number;
     set heightFogStartDistance(val: number);
     get heightFogStartHeight(): number;
@@ -5330,7 +5335,7 @@ export class SkyRenderer {
     // @internal (undocumented)
     get irradianceFramebuffer(): FrameBuffer<unknown>;
     get irradianceMap(): TextureCube;
-    get irradianceSH(): Float32Array;
+    get irradianceSH(): GPUDataBuffer;
     // @internal (undocumented)
     get mappedFogType(): number;
     // @internal (undocumented)
@@ -5344,17 +5349,13 @@ export class SkyRenderer {
     // (undocumented)
     renderAtmosphereLUTs(ctx: DrawContext): void;
     // @internal (undocumented)
-    renderAtmosphericFog(ctx: DrawContext): void;
-    // @internal (undocumented)
     renderFog(ctx: DrawContext): void;
-    // @internal (undocumented)
-    renderHeightFog(ctx: DrawContext): void;
-    // @internal (undocumented)
-    renderLegacyFog(ctx: DrawContext): void;
     // @internal (undocumented)
     renderSky(ctx: DrawContext): void;
     // (undocumented)
     renderSkyDistantLut(ctx: DrawContext, skybox: TextureCube): void;
+    // (undocumented)
+    renderUberFog(ctx: DrawContext, depthTexture: BaseTexture): void;
     get shWindowWeights(): Vector3;
     set shWindowWeights(weights: Vector3);
     get skyboxTexture(): TextureCube;
@@ -5369,7 +5370,7 @@ export class SkyRenderer {
     // @internal (undocumented)
     sunTransmittance(sunLight: DirectionalLight): Vector3;
     // (undocumented)
-    update(ctx: DrawContext): void;
+    update(ctx: DrawContext): Vector4;
     // (undocumented)
     updateBakedSkyMap(): void;
     get wind(): Vector2;
@@ -5379,7 +5380,9 @@ export class SkyRenderer {
 // @public
 export type SkyType = 'color' | 'skybox' | 'scatter' | 'none';
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "skyViewLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function skyViewLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
 
 // @public
@@ -5409,7 +5412,6 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     get radius(): number;
     // @override
     raycast(ray: Ray): number;
-    // (undocumented)
     get type(): string;
 }
 
@@ -5458,32 +5460,48 @@ export class TAA extends AbstractPostEffect {
     requireLinearDepthTexture(ctx: DrawContext): boolean;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_ALAPH" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_ALAPH = 5;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_CURRENT_COLOR" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_CURRENT_COLOR = 1;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_EDGE" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_EDGE = 4;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_HISTORY_COLOR" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_HISTORY_COLOR = 2;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_MOTION_VECTOR" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_MOTION_VECTOR = 6;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_NONE" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_NONE = 0;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_STRENGTH" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_STRENGTH = 7;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "TAA_DEBUG_VELOCITY" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export const TAA_DEBUG_VELOCITY = 3;
 
-// @public (undocumented)
-export function temporalResolve(scope: PBInsideFunctionScope, currentColorTex: PBShaderExp, historyColorTex: PBShaderExp, currentDepthTex: PBShaderExp, motionVectorTex: PBShaderExp, prevMotionVectorTex: PBShaderExp, uv: PBShaderExp, workSize: PBShaderExp, bf: PBShaderExp, debug?: number): PBShaderExp;
+// @public
+export function temporalResolve(scope: PBInsideFunctionScope, currentColorTex: PBShaderExp, historyColorTex: PBShaderExp, currentDepthTex: PBShaderExp, motionVectorTex: PBShaderExp, prevMotionVectorTex: PBShaderExp, uv: PBShaderExp, workSize: PBShaderExp, debug?: number): PBShaderExp;
 
 // @public
 export class Terrain extends GraphNode implements NodeClonable<Terrain> {
@@ -5755,20 +5773,27 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
         needUV: boolean;
     };
     static generateData(options: TorusCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
-    // (undocumented)
     get type(): string;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "transmittance" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function transmittance(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3P1: PBShaderExp, f3P2: PBShaderExp): PBShaderExp;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "transmittanceLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function transmittanceLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "transmittanceLutToUV" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function transmittanceLutToUV(scope: PBInsideFunctionScope, fBottomRadius: PBShaderExp, fTopRadius: PBShaderExp, fMu: PBShaderExp, fR: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "transmittanceToSky" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function transmittanceToSky(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3Pos: PBShaderExp, f3Dir: PBShaderExp, texLut: PBShaderExp): any;
 
 // Warning: (ae-internal-missing-underscore) The name "uniformSphereSamples" should be prefixed with an underscore because the declaration is marked as @internal
@@ -5791,13 +5816,19 @@ export class UnlitMaterial extends UnlitMaterial_base implements Clonable<UnlitM
     vertexShader(scope: PBFunctionScope): void;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "uvToTransmittanceLut" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function uvToTransmittanceLut(scope: PBInsideFunctionScope, f2UV: PBShaderExp, fBottomRadius: PBShaderExp, fTopRadius: PBShaderExp): PBShaderExp;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "uvToViewDir" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp): any;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "viewDirToUV" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp): any;
 
 // @public
@@ -5899,9 +5930,6 @@ export class Water extends Water_base implements Drawable, NodeClonable<Water> {
     get gridScale(): number;
     set gridScale(val: number);
     isUnlit(): boolean;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "isWater"
-    //
-    // (undocumented)
     isWater(): this is Water;
     // Warning: (ae-forgotten-export) The symbol "WaterMaterial" needs to be exported by the entry point index.d.ts
     get material(): WaterMaterial;
@@ -5915,45 +5943,6 @@ export class Water extends Water_base implements Drawable, NodeClonable<Water> {
     updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void;
     get waveGenerator(): WaveGenerator;
     set waveGenerator(waveGenerator: WaveGenerator);
-    get wireframe(): boolean;
-    set wireframe(val: boolean);
-}
-
-// Warning: (ae-internal-missing-underscore) The name "WaterMesh" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export class WaterMesh {
-    constructor();
-    // (undocumented)
-    getClipmapBindGroup(device: AbstractDevice): BindGroup;
-    // (undocumented)
-    getWaterBindGroup(device: AbstractDevice): BindGroup;
-    // (undocumented)
-    get gridScale(): number;
-    set gridScale(val: number);
-    // (undocumented)
-    get level(): number;
-    set level(val: number);
-    // (undocumented)
-    prepareForRender(device: AbstractDevice): boolean;
-    // (undocumented)
-    get region(): Vector4;
-    set region(val: Vector4);
-    // (undocumented)
-    render(device: AbstractDevice, camera: Camera, flip?: boolean): void;
-    // (undocumented)
-    get shadingImpl(): WaterShaderImpl;
-    set shadingImpl(val: WaterShaderImpl);
-    // (undocumented)
-    get speed(): number;
-    set speed(val: number);
-    // (undocumented)
-    get tileSize(): number;
-    set tileSize(val: number);
-    // (undocumented)
-    get waveImpl(): WaveGenerator;
-    set waveImpl(val: WaveGenerator);
-    // (undocumented)
     get wireframe(): boolean;
     set wireframe(val: boolean);
 }
@@ -5998,6 +5987,7 @@ export interface WaveGenerator extends Disposable {
     calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
     calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
     clone(): this;
+    dispose(): void;
     getHash(): string;
     isOk(device: AbstractDevice): boolean;
     needUpdate(): boolean;
@@ -6035,8 +6025,8 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:2403:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:9940:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:2855:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:10256:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

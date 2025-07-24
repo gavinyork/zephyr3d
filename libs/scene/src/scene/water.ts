@@ -197,7 +197,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     return null;
   }
   /**
-   * {@inheritDoc GraphNode.isWater}
+   * {@inheritDoc SceneNode.isWater}
    */
   isWater(): this is Water {
     return true;
