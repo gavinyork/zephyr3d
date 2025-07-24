@@ -101,7 +101,13 @@ export class LambertMaterial
             dirCutoff
           );
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-          this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL, this.lightAtten);
+          this.$l.lightContrib = pb.mul(
+            colorIntensity.rgb,
+            colorIntensity.a,
+            this.NoL,
+            this.lightAtten,
+            1 / Math.PI
+          );
           if (shadow) {
             this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
