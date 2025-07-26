@@ -16,7 +16,7 @@ export class ObjectColorPass extends RenderPass {
     super(RENDER_PASS_TYPE_OBJECT_COLOR);
   }
   /** @internal */
-  protected _getGlobalBindGroupHash(ctx: DrawContext) {
+  protected _getGlobalBindGroupHash(_ctx: DrawContext) {
     return '';
   }
   /** @internal */

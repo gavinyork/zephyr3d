@@ -101,7 +101,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     }
     super.updateRenderStates(pass, stateSet, ctx);
   }
-  drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
+  drawPrimitive(pass: number, primitive: Primitive, _ctx: DrawContext, _numInstances: number): void {
     if (pass === 0 || !this._instancing) {
       primitive.draw();
     } else {

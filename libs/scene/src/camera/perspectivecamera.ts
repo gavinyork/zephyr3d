@@ -110,7 +110,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
    * @remarks
    * This method is only valid for {@link Camera} class or {@link OrthoCamera} class.
    */
-  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+  setOrtho(_left: number, _right: number, _bottom: number, _top: number, _near: number, _far: number): this {
     throw new Error(`setOrtho() not allowed on PerspectiveCamera`);
   }
   /**

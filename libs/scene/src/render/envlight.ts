@@ -444,14 +444,14 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
     return null;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+  getIrradiance(scope: PBInsideFunctionScope, _normal: PBShaderExp): PBShaderExp {
     return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb;
   }
   /**
@@ -540,7 +540,7 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(refl.y, 0.5), 0.5);
     return pb.mix(

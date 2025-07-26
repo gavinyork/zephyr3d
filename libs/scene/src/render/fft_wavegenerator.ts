@@ -225,7 +225,7 @@ export class FFTWaveGenerator implements WaveGenerator {
           postfft2Program4:
             this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 4) : null
         },
-        quad: FFTWaveGenerator.createQuad(device),
+        quad: FFTWaveGenerator.createQuad(),
         noiseTextures: new Map(),
         butterflyTextures: new Map()
       };
@@ -388,7 +388,7 @@ export class FFTWaveGenerator implements WaveGenerator {
     }
   }
   /** @internal */
-  private static createQuad(device: AbstractDevice): Primitive {
+  private static createQuad(): Primitive {
     const vertexData = new Float32Array([
       -1, -1, 0, 0.0, 0.0, 1, -1, 0, 1.0, 0.0, 1, 1, 0, 1.0, 1.0, -1, 1, 0, 0.0, 1.0
     ]);
@@ -1180,7 +1180,7 @@ export class FFTWaveGenerator implements WaveGenerator {
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {

@@ -43,7 +43,7 @@ export class WebImageLoader extends AbstractTextureLoader {
               reject('create texture from image element failed');
             }
           })
-          .catch((reason) => {
+          .catch(() => {
             const cvs = document.createElement('canvas');
             cvs.width = img.width;
             cvs.height = img.height;

@@ -225,17 +225,23 @@ const LINE_RE = /^\s*at\s+(.*?)\s+\((.*?):(\d+):(\d+)\)$|^\s*at\s+(.*?):(\d+):(\
 export function getMappedStack(): string {
   function mapFrame(frame: string): string {
     const m = frame.match(LINE_RE);
-    if (!m) return frame;
+    if (!m) {
+      return frame;
+    }
 
     const file = m[2] || m[5];
     const line = Number(m[3] || m[6]);
     const column = Number(m[4] || m[7]);
 
-    if (!file.endsWith('index.js')) return frame;
+    if (!file.endsWith('index.js')) {
+      return frame;
+    }
 
     const pos = originalPositionFor(traceMap, { line, column });
 
-    if (!pos.source) return frame;
+    if (!pos.source) {
+      return frame;
+    }
 
     const fnName = m[1] || '<anonymous>';
     return `    at ${fnName} (${pos.source}:${pos.line}:${pos.column})`;
@@ -254,7 +260,9 @@ export function getStackFrames(stack: string, maxDepth: number) {
 
   for (let i = 2; i < Math.min(lines.length, maxDepth + 2); i++) {
     const line = lines[i];
-    if (!line) continue;
+    if (!line) {
+      continue;
+    }
 
     const frame = parseStackLine(line);
     if (frame) {

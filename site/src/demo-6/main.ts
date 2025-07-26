@@ -56,7 +56,7 @@ app.ready().then(async () => {
 
   const numMaterials = 8;
   const batchGroup = new BatchGroup(scene);
-  const materials = Array.from({ length: numMaterials }).map((val) => {
+  const materials = Array.from({ length: numMaterials }).map(() => {
     const mat = new LambertMaterial();
     mat.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     return mat;

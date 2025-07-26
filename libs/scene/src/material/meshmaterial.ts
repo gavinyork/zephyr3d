@@ -557,7 +557,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param pass - Pass of the material
    * @returns True if it is translucent, otherwise false.
    */
-  isTransparentPass(pass: number): boolean {
+  isTransparentPass(_pass: number): boolean {
     return this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none';
   }
   /** @internal */

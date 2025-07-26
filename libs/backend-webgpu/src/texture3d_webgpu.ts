@@ -41,7 +41,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(_level?: number, face?: number, _mipCount?: number): GPUTextureView {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',

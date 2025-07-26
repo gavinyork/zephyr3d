@@ -313,8 +313,12 @@ export class OrbitCameraController extends BaseCameraController {
         this.panVelocityX *= 1 - this.options.damping;
         this.panVelocityY *= 1 - this.options.damping;
 
-        if (Math.abs(this.panVelocityX) < 0.0001) this.panVelocityX = 0;
-        if (Math.abs(this.panVelocityY) < 0.0001) this.panVelocityY = 0;
+        if (Math.abs(this.panVelocityX) < 0.0001) {
+          this.panVelocityX = 0;
+        }
+        if (Math.abs(this.panVelocityY) < 0.0001) {
+          this.panVelocityY = 0;
+        }
       }
 
       if (Math.abs(this.rotateX) > 0.0001 || Math.abs(this.rotateY) > 0.0001) {

@@ -85,7 +85,7 @@ export class Bloom extends AbstractPostEffect {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
-  apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
+  apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, _srgbOutput: boolean) {
     const device = ctx.device;
     const downsampleTextures: Texture2D[] = [];
     this._prepare(device, inputColorTexture);
@@ -184,7 +184,7 @@ export class Bloom extends AbstractPostEffect {
     }
   }
   /** @internal */
-  private _prepare(device: AbstractDevice, srcTexture: Texture2D) {
+  private _prepare(device: AbstractDevice, _srcTexture: Texture2D) {
     if (!Bloom._programFinalCompose) {
       Bloom._programFinalCompose = device.buildRenderProgram({
         vertex(pb) {

@@ -52,7 +52,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getDynamicOffsets(): number[] {
     return this._dynamicOffsets;
   }
-  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, _bindOffset?: number, _bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
@@ -109,12 +109,12 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     }
   }
   setTextureView(
-    name: string,
-    value: BaseTexture,
-    level?: number,
-    face?: number,
-    mipCount?: number,
-    sampler?: TextureSampler
+    _name: string,
+    _value: BaseTexture,
+    _level?: number,
+    _face?: number,
+    _mipCount?: number,
+    _sampler?: TextureSampler
   ) {
     throw new Error('setTextureView() not supported for webgl device');
   }
@@ -138,7 +138,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       console.log(`setTexture() failed: no texture uniform named '${name}'`);
     }
   }
-  setSampler(name: string, value: TextureSampler) {
+  setSampler(_name: string, _value: TextureSampler) {
     // no sampler uniform support for webgl
   }
   apply(program: WebGLGPUProgram, offsets?: Iterable<number>) {

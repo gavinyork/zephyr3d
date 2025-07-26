@@ -102,7 +102,7 @@ function window_on_gamepaddisconnected(event: any /* GamepadEvent */): void {
   console.log('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
 }
 
-function canvas_on_blur(event: FocusEvent): void {
+function canvas_on_blur(_event: FocusEvent): void {
   const io = ImGui.GetIO();
   io.KeyCtrl = false;
   io.KeyShift = false;
@@ -207,7 +207,9 @@ const mouse_button_map: number[] = [0, 2, 1, 3, 4];
 export function any_pointerdown(): boolean {
   const io = ImGui.GetIO();
   for (let i = 0; i < io.MouseDown.length; i++) {
-    if (io.MouseDown[i]) return true;
+    if (io.MouseDown[i]) {
+      return true;
+    }
   }
   return false;
 }
@@ -223,7 +225,7 @@ function canvas_on_pointerdown(event: PointerEvent): boolean {
   return false;
 }
 
-function canvas_on_contextmenu(event: Event): boolean {
+function canvas_on_contextmenu(_event: Event): boolean {
   const io = ImGui.GetIO();
   if (io.WantCaptureMouse) {
     return true;
@@ -389,7 +391,7 @@ export function Init(device: AbstractDevice): void {
     clipboard_text = text;
     navigator.clipboard.writeText(clipboard_text);
   };
-  io.GetClipboardTextFn = (user_data: any): string => {
+  io.GetClipboardTextFn = (_user_data: any): string => {
     return clipboard_text;
   };
   io.ClipboardUserData = null;
@@ -537,7 +539,9 @@ export function NewFrame(time: number): void {
         if (!gamepad) {
           return;
         }
-        if (buttons_count > BUTTON_NO && gamepad.buttons[BUTTON_NO].pressed) io.NavInputs[NAV_NO] = 1.0;
+        if (buttons_count > BUTTON_NO && gamepad.buttons[BUTTON_NO].pressed) {
+          io.NavInputs[NAV_NO] = 1.0;
+        }
       };
       const MAP_ANALOG = function MAP_ANALOG(NAV_NO: number, AXIS_NO: number, V0: number, V1: number): void {
         if (!gamepad) {
@@ -545,8 +549,12 @@ export function NewFrame(time: number): void {
         }
         let v: number = axes_count > AXIS_NO ? gamepad.axes[AXIS_NO] : V0;
         v = (v - V0) / (V1 - V0);
-        if (v > 1.0) v = 1.0;
-        if (io.NavInputs[NAV_NO] < v) io.NavInputs[NAV_NO] = v;
+        if (v > 1.0) {
+          v = 1.0;
+        }
+        if (io.NavInputs[NAV_NO] < v) {
+          io.NavInputs[NAV_NO] = v;
+        }
       };
       // TODO: map input based on vendor and product id
       // https://developer.mozilla.org/en-US/docs/Web/API/Gamepad/id
@@ -744,8 +752,9 @@ function scroll_update(io: ImGui.IO) {
           scroll.y -= scroll_acc.y;
           scroll_acc.y *= 0.8;
         }
-        if (scroll.y < 0) scroll.y = 0;
-        else if (scroll.y > hoveredWin.ScrollMax.y) {
+        if (scroll.y < 0) {
+          scroll.y = 0;
+        } else if (scroll.y > hoveredWin.ScrollMax.y) {
           scroll.y = hoveredWin.ScrollMax.y;
         }
         hoveredWin.Scroll = scroll;
@@ -755,8 +764,9 @@ function scroll_update(io: ImGui.IO) {
           scroll.x -= io.MouseDelta.x;
           scroll_acc.x = io.MouseDelta.x;
         }
-        if (scroll.x < 0) scroll.x = 0;
-        else if (scroll.x > hoveredWin.ScrollMax.x) {
+        if (scroll.x < 0) {
+          scroll.x = 0;
+        } else if (scroll.x > hoveredWin.ScrollMax.x) {
           scroll.x = hoveredWin.ScrollMax.x;
         }
         hoveredWin.Scroll = scroll;
@@ -766,7 +776,7 @@ function scroll_update(io: ImGui.IO) {
 }
 
 let dom_input: Input;
-function input_text_update(io: ImGui.IO): void {
+function input_text_update(_io: ImGui.IO): void {
   const activeId = ImGui.GetActiveId();
   const inpId = ImGui.GetInputTextId();
   if (!activeId || activeId != inpId) {
@@ -904,7 +914,7 @@ export class Texture {
   public _width = 1;
   public _height = 1;
 
-  constructor(param?: ITextureParam) {}
+  constructor(_param?: ITextureParam) {}
   public Destroy(): void {
     if (this._texture) {
       this._texture.dispose();
@@ -961,7 +971,7 @@ export class TextureCache {
   public constructor() {}
 
   public Destroy(): void {
-    Object.entries(this.cache).forEach(([key, value]) => {
+    Object.entries(this.cache).forEach(([_key, value]) => {
       value.Destroy();
     });
     this.cache = {};

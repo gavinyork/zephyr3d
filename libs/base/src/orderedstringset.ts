@@ -90,7 +90,9 @@ export class OrderedStringSet {
     const index = this.findStringPosition(str);
 
     // Return immediately if no matching element is found
-    if (index === -1) return;
+    if (index === -1) {
+      return;
+    }
 
     // After finding the first matching element, continue to search for all
     // consecutive matching elements

@@ -8,7 +8,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';
-import type { AbstractDevice, GPUDataBuffer, Texture2D } from '@zephyr3d/device';
+import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
@@ -563,7 +563,7 @@ export class ParticleSystem
       this._particleVelocityMin + Math.random() * (this._particleVelocityMax - this._particleVelocityMin)
     );
   }
-  resizeVertexBuffers(device: AbstractDevice) {
+  resizeVertexBuffers() {
     if (!this._primitive.get()) {
       this._primitive.set(new Primitive());
       this._primitive
@@ -646,8 +646,7 @@ export class ParticleSystem
     if (newParticleCount > 0) {
       this.newParticle(newParticleCount, this.worldMatrix);
     }
-    const device = Application.instance.device;
-    this.resizeVertexBuffers(device);
+    this.resizeVertexBuffers();
     this._wsBoundingBox.beginExtend();
     let n = 0;
     const worldSpace = !!(this._flags & PS_WORLDSPACE);

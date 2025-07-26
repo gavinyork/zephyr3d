@@ -14,9 +14,9 @@ export type HeightFogParams = {
 
 export function getDefaultHeightFogParams(): HeightFogParams {
   return {
-    parameter1: new Vector4(0, 0, 0, 0.2),
-    parameter2: new Vector4(0.04, 0, 0, 100),
-    parameter3: new Vector4(1, 1, 0, 4),
+    parameter1: new Vector4(0, 0, 0, 0.5),
+    parameter2: new Vector4(0.02, 0, 0, 100),
+    parameter3: new Vector4(0.8, 1, 0, 4),
     parameter4: new Vector4(0, 0, 0, 0),
     lightDir: new Vector3(0, 1, 0),
     lightColor: new Vector3(0, 0, 0)

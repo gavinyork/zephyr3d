@@ -560,7 +560,7 @@ export class Octree {
     this._leafSize = leafSize;
     this._rootSize = Math.max(leafSize, rootSize);
     let n = 1;
-    for (; rootSize >= leafSize * 2; leafSize *= 2, ++n);
+    for (; rootSize >= leafSize * 2; leafSize *= 2, ++n) {}
     for (let i = 0; i < n; ++i, rootSize *= 0.5) {
       const chunk = new OctreeNodeChunk(this);
       chunk.setLevel(i);

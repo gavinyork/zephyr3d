@@ -126,12 +126,24 @@ export class AABB {
    * @param z - The z coordinate of the point.
    */
   extend3(x: number, y: number, z: number) {
-    if (x < this._minPoint.x) this._minPoint.x = x;
-    if (x > this._maxPoint.x) this._maxPoint.x = x;
-    if (y < this._minPoint.y) this._minPoint.y = y;
-    if (y > this._maxPoint.y) this._maxPoint.y = y;
-    if (z < this._minPoint.z) this._minPoint.z = z;
-    if (z > this._maxPoint.z) this._maxPoint.z = z;
+    if (x < this._minPoint.x) {
+      this._minPoint.x = x;
+    }
+    if (x > this._maxPoint.x) {
+      this._maxPoint.x = x;
+    }
+    if (y < this._minPoint.y) {
+      this._minPoint.y = y;
+    }
+    if (y > this._maxPoint.y) {
+      this._maxPoint.y = y;
+    }
+    if (z < this._minPoint.z) {
+      this._minPoint.z = z;
+    }
+    if (z > this._maxPoint.z) {
+      this._maxPoint.z = z;
+    }
   }
   /**
    * Merge the AABB with another AABB.

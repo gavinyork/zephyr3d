@@ -210,18 +210,22 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         }
       }
     }
-    calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp {
+    calculateMetallic(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp): PBShaderExp {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return instancing ? scope.$inputs.zMetallic : scope.zMetallic;
     }
-    calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp {
+    calculateRoughness(
+      scope: PBInsideFunctionScope,
+      _albedo: PBShaderExp,
+      _normal: PBShaderExp
+    ): PBShaderExp {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return instancing ? scope.$inputs.zRoughness : scope.zRoughness;
     }
     calculateSpecularFactor(
       scope: PBInsideFunctionScope,
-      albedo: PBShaderExp,
-      normal: PBShaderExp
+      _albedo: PBShaderExp,
+      _normal: PBShaderExp
     ): PBShaderExp {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;

@@ -664,7 +664,7 @@ export class WebGPURenderStateSet implements RenderStateSet {
   defaultStencilState() {
     this.stencilState = null;
   }
-  apply(force?: boolean): void {
+  apply(_force?: boolean): void {
     this._device.setRenderStates(this);
   }
 }

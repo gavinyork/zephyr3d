@@ -32,10 +32,18 @@ export abstract class BaseView<Model extends BaseModel> {
   }
   private getShortcutString(event: KeyboardEvent) {
     const keys: string[] = [];
-    if (event.ctrlKey) keys.push('Ctrl');
-    if (event.altKey) keys.push('Alt');
-    if (event.shiftKey) keys.push('Shift');
-    if (event.metaKey) keys.push('Meta');
+    if (event.ctrlKey) {
+      keys.push('Ctrl');
+    }
+    if (event.altKey) {
+      keys.push('Alt');
+    }
+    if (event.shiftKey) {
+      keys.push('Shift');
+    }
+    if (event.metaKey) {
+      keys.push('Meta');
+    }
     const code = event.code;
     if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) {
       let key: string;
@@ -88,7 +96,7 @@ export abstract class BaseView<Model extends BaseModel> {
     this.onDeactivate();
   }
   abstract render();
-  update(dt: number) {}
+  update(_dt: number) {}
   protected onActivate() {}
   protected onDeactivate() {}
 }

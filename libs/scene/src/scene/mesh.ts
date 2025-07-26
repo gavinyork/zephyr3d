@@ -112,7 +112,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc BatchDrawable.getInstanceId}
    */
-  getInstanceId(renderPass: RenderPass): string {
+  getInstanceId(_renderPass: RenderPass): string {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**

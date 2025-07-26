@@ -18,7 +18,7 @@ export class TerrainErosoinBrush extends TerrainHeightBrush {
     mask: PBShaderExp,
     strength: PBShaderExp,
     heightMapUV: PBShaderExp,
-    centerUV: PBShaderExp
+    _centerUV: PBShaderExp
   ) {
     const pb = scope.$builder;
     const EROSION_STRENGTH = 0.3; // 侵蚀强度

@@ -619,6 +619,9 @@ export class SceneView extends BaseView<SceneModel> {
     if (this.model.camera.handleEvent(ev, type)) {
       return true;
     }
+    if (ev instanceof DragEvent) {
+      console.log(ev.type);
+    }
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
       const insideViewport = this.posToViewport(p, this.model.camera.viewport);
@@ -1221,7 +1224,7 @@ export class SceneView extends BaseView<SceneModel> {
             .then(() => {
               zipDownloader.finish();
             })
-            .catch((err) => {
+            .catch((_err) => {
               zipDownloader.finish();
             });
         }

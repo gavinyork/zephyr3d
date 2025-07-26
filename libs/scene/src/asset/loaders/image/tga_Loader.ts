@@ -111,7 +111,7 @@ export class TGALoader extends AbstractTextureLoader {
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
   ): Promise<BaseTexture> {
-    return new Promise<BaseTexture>((resolve, reject) => {
+    return new Promise<BaseTexture>((resolve) => {
       resolve(this.parseTGA(data, srgb, samplerOptions?.mipFilter === 'none', texture));
     });
   }

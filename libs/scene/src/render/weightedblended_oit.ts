@@ -42,7 +42,7 @@ export class WeightedBlendedOIT implements OIT {
   /**
    * {@inheritDoc OIT.supportDevice}
    */
-  supportDevice(deviceType: string): boolean {
+  supportDevice(_deviceType: string): boolean {
     return true;
   }
   /**
@@ -66,13 +66,13 @@ export class WeightedBlendedOIT implements OIT {
   /**
    * {@inheritDoc OIT.begin}
    */
-  begin(ctx: DrawContext): number {
+  begin(_ctx: DrawContext): number {
     return 1;
   }
   /**
    * {@inheritDoc OIT.end}
    */
-  end(ctx: DrawContext) {
+  end(_ctx: DrawContext) {
     return;
   }
   /**
@@ -86,7 +86,7 @@ export class WeightedBlendedOIT implements OIT {
   /**
    * {@inheritDoc OIT.beginPass}
    */
-  beginPass(ctx: DrawContext, pass: number): boolean {
+  beginPass(ctx: DrawContext, _pass: number): boolean {
     const device = ctx.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
     device.pushDeviceStates();
@@ -97,7 +97,7 @@ export class WeightedBlendedOIT implements OIT {
   /**
    * {@inheritDoc OIT.endPass}
    */
-  endPass(ctx: DrawContext, pass: number) {
+  endPass(ctx: DrawContext, _pass: number) {
     const device = ctx.device;
     const accumBuffer = device.getFramebuffer();
     device.popDeviceStates();
@@ -113,7 +113,7 @@ export class WeightedBlendedOIT implements OIT {
   /**
    * {@inheritDoc OIT.applyUniforms}
    */
-  applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
+  applyUniforms(_ctx: DrawContext, _bindGroup: BindGroup) {
     return;
   }
   /**

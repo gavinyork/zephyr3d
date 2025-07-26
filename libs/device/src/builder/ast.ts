@@ -399,16 +399,16 @@ export class ShaderAST {
   getType(): PBTypeInfo {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return this.constructor.name;
   }
 }
@@ -660,10 +660,10 @@ export class ASTPrimitive extends ASTExpression {
   getType(): PBTypeInfo {
     return this.value.$typeinfo;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     return this.name;
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     return this.name;
   }
   toWGSL(indent: string, ctx: ASTContext): string {
@@ -677,7 +677,7 @@ export class ASTPrimitive extends ASTExpression {
       return this.name;
     }
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return this.name;
   }
 }
@@ -839,7 +839,7 @@ export class ASTLValueDeclare extends ASTLValue {
   isReference(): boolean {
     return true;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     let prefix = '';
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -857,7 +857,7 @@ export class ASTLValueDeclare extends ASTLValue {
       return `${prefix}${this.getType().toTypeName('webgl', this.value.name)}`;
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     let prefix = '';
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -875,7 +875,7 @@ export class ASTLValueDeclare extends ASTLValue {
       return `${prefix}${this.getType().toTypeName('webgl2', this.value.name)}`;
     }
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(_indent: string, _ctx: ASTContext): string {
     let prefix: string;
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -975,7 +975,7 @@ export class ASTShaderExpConstructor extends ASTExpression {
     const c = this.convertedArgs.args.map((arg) => unbracket(arg.toWGSL(indent, ctx))).join(',');
     return `${this.convertedArgs.name}(${c})`;
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return 'constructor';
   }
 }
@@ -1024,7 +1024,7 @@ export class ASTScalar extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(_indent: string, _ctx: ASTContext) {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
@@ -1038,7 +1038,7 @@ export class ASTScalar extends ASTExpression {
         throw new Error('Invalid scalar type');
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(_indent: string, _ctx: ASTContext) {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
@@ -1052,7 +1052,7 @@ export class ASTScalar extends ASTExpression {
         throw new Error('Invalid scalar type');
     }
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(_indent: string, _ctx: ASTContext) {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
@@ -1066,7 +1066,7 @@ export class ASTScalar extends ASTExpression {
         throw new Error('Invalid scalar type');
     }
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return `${this.value}`;
   }
 }
@@ -1206,10 +1206,10 @@ export class ASTAddressOf extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return this.value.getAddressSpace();
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     throw new Error('GLSL does not support pointer type');
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     throw new Error('GLSL does not support pointer type');
   }
   toWGSL(indent: string, ctx: ASTContext) {
@@ -1749,39 +1749,39 @@ export class ASTAssignment extends ShaderAST {
 
 /** @internal */
 export class ASTDiscard extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext) {
     return `${indent}discard;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext) {
     return `${indent}discard;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext) {
     return `${indent}discard;\n`;
   }
 }
 
 /** @internal */
 export class ASTBreak extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext) {
     return `${indent}break;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext) {
     return `${indent}break;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext) {
     return `${indent}break;\n`;
   }
 }
 
 /** @internal */
 export class ASTContinue extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext) {
     return `${indent}continue;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext) {
     return `${indent}continue;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext) {
     return `${indent}continue;\n`;
   }
 }
@@ -1936,7 +1936,7 @@ export class ASTCallFunction extends ASTExpression {
     const args = thisArgs.map((arg) => unbracket(arg.toWGSL(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return `${this.name}(...)`;
   }
 }
@@ -2369,7 +2369,7 @@ export class ASTDoWhile extends ASTScope {
       this.condition.isStatement = false;
     }
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     throw new Error(`No do-while() loop support for WebGL1.0 device`);
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
@@ -2445,7 +2445,7 @@ export class ASTStructDefine extends ShaderAST {
   getType(): PBStructTypeInfo {
     return this.type;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       for (const arg of this.type.structMembers) {
@@ -2457,7 +2457,7 @@ export class ASTStructDefine extends ShaderAST {
       return '';
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       for (const arg of this.type.structMembers) {
@@ -2469,7 +2469,7 @@ export class ASTStructDefine extends ShaderAST {
       return '';
     }
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       str += this.type.structMembers

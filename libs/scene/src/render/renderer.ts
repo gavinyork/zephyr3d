@@ -435,7 +435,7 @@ export class SceneRenderer {
     }
     return this._skyMotionVectorProgram;
   }
-  private static _getBox(ctx: DrawContext) {
+  private static _getBox(_ctx: DrawContext) {
     if (!this._box) {
       this._box = new BoxShape({
         size: 2,
@@ -560,7 +560,7 @@ export class SceneRenderer {
         );
         device.pool.releaseFrameBuffer(fb);
       })
-      .catch((err) => {
+      .catch((_err) => {
         camera.getPickResultResolveFunc()?.(null);
         device.pool.releaseFrameBuffer(fb);
       });

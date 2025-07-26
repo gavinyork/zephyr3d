@@ -4,6 +4,12 @@ import { openDB } from 'idb';
 import type { ZipDownloader } from '../helpers/zipdownload';
 import type { ZipWriter } from '@zip.js/zip.js';
 
+export type DBProjectInfo = {
+  uuid?: string;
+  name: string;
+  metadata?: any;
+};
+
 export type DBAssetPackage = {
   uuid?: string;
   name: string;

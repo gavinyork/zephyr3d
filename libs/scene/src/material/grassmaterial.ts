@@ -51,7 +51,7 @@ export class GrassMaterial
    * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparentPass(pass: number): boolean {
+  isTransparentPass(_pass: number): boolean {
     return false;
   }
   /**

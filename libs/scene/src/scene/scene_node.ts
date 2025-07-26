@@ -886,11 +886,11 @@ export class SceneNode
   }
   /**
    * Update node state once per-camera
-   * @param frameId - Current frame id
-   * @param elapsedInSeconds - Elapsed time from game start in seconds
-   * @param deltaInSeconds - Elapsed time since previous frame in seconds
+   * @param _camera - Updates according to which camera
+   * @param _elapsedInSeconds - Elapsed time from game start in seconds
+   * @param _deltaInSeconds - Elapsed time since previous frame in seconds
    */
-  updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number) {}
+  updatePerCamera(_camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {}
   /**
    * Removes this node from it's parent and add this node to another parent node if required
    * @param p - The new parent node that this node should be added to or null

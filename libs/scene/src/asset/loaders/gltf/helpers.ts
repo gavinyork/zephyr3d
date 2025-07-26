@@ -202,13 +202,27 @@ export class GLTFAccessor {
 
   createView() {
     const size = this.count * this.getComponentCount(this.type);
-    if (this.componentType == ComponentType.BYTE) return new Int8Array(size);
-    if (this.componentType == ComponentType.UBYTE) return new Uint8Array(size);
-    if (this.componentType == ComponentType.SHORT) return new Int16Array(size);
-    if (this.componentType == ComponentType.USHORT) return new Uint16Array(size);
-    if (this.componentType == ComponentType.INT) return new Int32Array(size);
-    if (this.componentType == ComponentType.UINT) return new Uint32Array(size);
-    if (this.componentType == ComponentType.FLOAT) return new Float32Array(size);
+    if (this.componentType == ComponentType.BYTE) {
+      return new Int8Array(size);
+    }
+    if (this.componentType == ComponentType.UBYTE) {
+      return new Uint8Array(size);
+    }
+    if (this.componentType == ComponentType.SHORT) {
+      return new Int16Array(size);
+    }
+    if (this.componentType == ComponentType.USHORT) {
+      return new Uint16Array(size);
+    }
+    if (this.componentType == ComponentType.INT) {
+      return new Int32Array(size);
+    }
+    if (this.componentType == ComponentType.UINT) {
+      return new Uint32Array(size);
+    }
+    if (this.componentType == ComponentType.FLOAT) {
+      return new Float32Array(size);
+    }
     return undefined;
   }
 

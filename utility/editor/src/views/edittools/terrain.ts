@@ -415,7 +415,7 @@ export class TerrainEditTool implements EditTool {
 
     this._heightDirty = true;
   }
-  handleKeyboardEvent(evt: KeyboardEvent): boolean {
+  handleKeyboardEvent(_evt: KeyboardEvent): boolean {
     return false;
   }
   renderEditSection() {
@@ -587,7 +587,7 @@ export class TerrainEditTool implements EditTool {
     FilePicker.chooseFiles(false, '.jpg,.tga,.png,.dds').then((files) => {
       if (files.length > 0) {
         const url = URL.createObjectURL(files[0]);
-        const httpRequest = new HttpRequest((path) => url);
+        const httpRequest = new HttpRequest(() => url);
         if (files[0].name.toLowerCase().endsWith('.png')) {
           this.createHeightMapFromPNG(httpRequest, url, this._terrain.get().heightMap)
             .then(() => {

@@ -106,7 +106,7 @@ export class GrassManager {
   private _indexBuffer: DRef<IndexBuffer>;
   private _layers: GrassLayer[];
   private _disposed: boolean;
-  constructor(clusterSize: number, density: number[][]) {
+  constructor(clusterSize: number, _density: number[][]) {
     this._clusterSize = clusterSize;
     this._baseVertexBuffer = new Map();
     this._indexBuffer = new DRef();

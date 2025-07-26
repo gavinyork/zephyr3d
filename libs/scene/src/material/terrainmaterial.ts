@@ -190,7 +190,7 @@ export class TerrainMaterial
    * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparentPass(pass: number): boolean {
+  isTransparentPass(_pass: number): boolean {
     return false;
   }
   /**

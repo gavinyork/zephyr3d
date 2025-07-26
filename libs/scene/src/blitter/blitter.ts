@@ -185,15 +185,15 @@ export abstract class Blitter {
   }
   /**
    * Initialize uniforms of the blit program
-   * @param scope - The shader scope
-   * @param type - The blit type
+   * @param _scope - The shader scope
+   * @param _type - The blit type
    */
-  setup(scope: PBGlobalScope, type: BlitType) {}
+  setup(_scope: PBGlobalScope, _type: BlitType) {}
   /**
    * Update uniforms of the bind group
    * @param bindGroup - The bind group to be updated
    */
-  setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture) {}
+  setUniforms(_bindGroup: BindGroup, _sourceTex: BaseTexture) {}
   /**
    * Calculates the destination texel by the source texel
    * @param scope - The shader scope

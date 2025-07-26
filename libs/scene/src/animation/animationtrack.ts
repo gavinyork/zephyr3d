@@ -38,7 +38,7 @@ export abstract class AnimationTrack<StateType = unknown> {
     this._animation = ani;
   }
   /** Stops playing the track and rewind to the first frame */
-  reset(target: object) {}
+  reset(_target: object) {}
   /**
    * Calculates current animation state
    * @param target - The animated object

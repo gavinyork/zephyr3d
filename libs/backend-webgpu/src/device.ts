@@ -291,7 +291,7 @@ export class WebGPUDevice extends BaseDevice {
     this._commandQueue.finish().then(callback);
     return 0;
   }
-  cancelNextFrame(handle: number) {
+  cancelNextFrame(_handle: number) {
     return;
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {

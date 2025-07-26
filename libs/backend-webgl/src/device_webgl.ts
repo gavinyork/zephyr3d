@@ -238,7 +238,7 @@ export class WebGLDevice extends BaseDevice {
     );
     this.canvas.addEventListener(
       'webglcontextrestored',
-      (evt) => {
+      () => {
         this._contextLost = false;
         this.handleContextRestored();
       },
@@ -1251,7 +1251,7 @@ export class WebGLDevice extends BaseDevice {
   }
   /** @internal */
   clearErrors() {
-    while (this._context.getError());
+    while (this._context.getError()) {}
   }
   /** @internal */
   getCurrentSamplerForTexture(tex: BaseTexture) {

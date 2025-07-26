@@ -20,7 +20,7 @@ export class SSM extends ShadowImpl {
   getType(): ShadowMode {
     return 'hard';
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -39,7 +39,7 @@ export class SSM extends ShadowImpl {
   getDepthScale(): number {
     return 1;
   }
-  setDepthScale(val: number) {}
+  setDepthScale(_val: number) {}
   getShaderHash(): string {
     return '';
   }
@@ -59,7 +59,7 @@ export class SSM extends ShadowImpl {
       }
     }
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
@@ -267,7 +267,7 @@ export class SSM extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return Application.instance.device.type !== 'webgl';
   }
 }

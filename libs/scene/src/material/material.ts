@@ -128,7 +128,7 @@ export class Material implements Clonable<Material> {
     return QUEUE_OPAQUE;
   }
   /** Returns true if given pass is transparent */
-  isTransparentPass(pass: number): boolean {
+  isTransparentPass(_pass: number): boolean {
     return false;
   }
   /** Returns true if shading of the material will be affected by lights  */
@@ -322,7 +322,7 @@ export class Material implements Clonable<Material> {
    * @param func - The material func
    * @returns The created shader program
    */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
+  protected _createProgram(_pb: ProgramBuilder, _ctx: DrawContext, _pass: number): GPUProgram {
     return null;
   }
   /**
@@ -330,14 +330,14 @@ export class Material implements Clonable<Material> {
    * @param bindGroup - The bind group
    * @param ctx - The drawing context
    */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number) {}
+  protected _applyUniforms(_bindGroup: BindGroup, _ctx: DrawContext, _pass: number) {}
   /**
    * Update render states according to draw context and current material pass
    * @param pass - Current material pass
    * @param renderStates - Render state set to be updated
    * @param ctx - Draw context
    */
-  protected updateRenderStates(pass: number, renderStates: RenderStateSet, ctx: DrawContext): void {}
+  protected updateRenderStates(_pass: number, _renderStates: RenderStateSet, _ctx: DrawContext): void {}
   /**
    * Calculates the hash code of the shader program
    * @returns The hash code

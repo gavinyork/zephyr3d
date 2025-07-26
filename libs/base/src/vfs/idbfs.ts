@@ -1,0 +1,769 @@
+import { guessMimeType, PathUtils } from './common';
+import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import { VFS, VFSError } from './vfs';
+
+/**
+ * IndexedDB-based file system implementation.
+ *
+ * Provides a virtual file system interface using IndexedDB as the underlying storage.
+ * Supports standard file operations like create, read, write, delete, and directory listing.
+ *
+ * @example
+ * ```typescript
+ * const fs = new IndexedDBFS('my-app-fs');
+ * await fs.writeFile('/hello.txt', 'Hello World!');
+ * const content = await fs.readFile('/hello.txt', { encoding: 'utf8' });
+ * ```
+ *
+ * @public
+ */
+export class IndexedDBFS extends VFS {
+  private db: IDBDatabase | null = null;
+  private readonly dbName: string;
+  private readonly storeName = 'files';
+
+  /**
+   * Creates a new IndexedDB file system.
+   *
+   * @param dbName - The name of the IndexedDB database to use
+   * @param readonly - Whether the file system should be read-only
+   */
+  constructor(dbName: string = 'vfs-indexeddb', readonly = false) {
+    super(dbName, readonly);
+    this.dbName = dbName;
+  }
+
+  private async ensureDB(): Promise<IDBDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, 1);
+
+      request.onerror = () => reject(new VFSError('Failed to open IndexedDB', 'ENOENT'));
+
+      request.onsuccess = () => {
+        this.db = request.result;
+
+        // 同步检查根目录是否存在，不存在则创建
+        const transaction = this.db.transaction([this.storeName], 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+
+        const checkRequest = store.get('/');
+        checkRequest.onsuccess = () => {
+          if (!checkRequest.result) {
+            // 根目录不存在，创建它
+            const now = new Date();
+            const rootDir = {
+              name: '',
+              path: '/',
+              size: 0,
+              type: 'directory',
+              created: now,
+              modified: now,
+              parent: '',
+              data: null
+            };
+
+            const addRequest = store.add(rootDir);
+            addRequest.onsuccess = () => resolve(this.db!);
+            addRequest.onerror = () => reject(new VFSError('Failed to create root directory', 'EIO'));
+          } else {
+            resolve(this.db!);
+          }
+        };
+
+        checkRequest.onerror = () => reject(new VFSError('Failed to check root directory', 'EIO'));
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, { keyPath: 'path' });
+          store.createIndex('type', 'type', { unique: false });
+          store.createIndex('parent', 'parent', { unique: false });
+          store.createIndex('name', 'name', { unique: false });
+
+          // 在数据库升级时直接创建根目录
+          const now = new Date();
+          const rootDir = {
+            name: '',
+            path: '/',
+            size: 0,
+            type: 'directory',
+            created: now,
+            modified: now,
+            parent: '',
+            data: null
+          };
+          store.add(rootDir);
+        }
+      };
+    });
+  }
+
+  /**
+   * 通用数据库操作方法
+   */
+  private async dbOperation<T>(
+    mode: IDBTransactionMode,
+    operation: (store: IDBObjectStore) => IDBRequest | Promise<T>
+  ): Promise<T> {
+    const db = await this.ensureDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([this.storeName], mode);
+      const store = transaction.objectStore(this.storeName);
+
+      transaction.onerror = () =>
+        reject(new VFSError('Transaction failed', 'EACCES', transaction.error?.message));
+
+      const result = operation(store);
+
+      if (result instanceof Promise) {
+        result.then(resolve).catch(reject);
+      } else if (result instanceof IDBRequest) {
+        result.onsuccess = () => resolve(result.result);
+        result.onerror = () => reject(new VFSError('Operation failed', 'EIO', result.error?.message));
+      }
+    });
+  }
+
+  /**
+   * 匹配过滤器
+   */
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+    if (!options) {
+      return true;
+    }
+
+    // 隐藏文件过滤
+    if (!options.includeHidden && metadata.name.startsWith('.')) {
+      return false;
+    }
+
+    // 模式匹配
+    if (options.pattern) {
+      if (typeof options.pattern === 'string') {
+        return metadata.name.includes(options.pattern);
+      } else if (options.pattern instanceof RegExp) {
+        return options.pattern.test(metadata.name);
+      }
+    }
+
+    return true;
+  }
+
+  protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
+    const normalizedPath = PathUtils.normalize(path);
+    const parent = PathUtils.dirname(normalizedPath);
+
+    // 1. 先在事务外检查和创建父目录
+    if (parent !== '/' && parent !== normalizedPath) {
+      const parentExists = await this._exists(parent);
+      if (!parentExists) {
+        if (recursive) {
+          await this._makeDirectory(parent, true);
+        } else {
+          throw new VFSError('Parent directory does not exist', 'ENOENT', parent);
+        }
+      }
+    }
+
+    // 2. 在事务中处理目录创建
+    const db = await this.ensureDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+
+      // 检查目录是否已存在
+      const existsRequest = store.get(normalizedPath);
+      existsRequest.onsuccess = () => {
+        const existing = existsRequest.result;
+        if (existing) {
+          if (existing.type === 'directory') {
+            resolve(); // 目录已存在，直接返回
+            return;
+          } else {
+            reject(new VFSError('File exists with same name', 'EEXIST', path));
+            return;
+          }
+        }
+
+        // 创建目录
+        const now = new Date();
+        const metadata = {
+          name: PathUtils.basename(normalizedPath),
+          path: normalizedPath,
+          size: 0,
+          type: 'directory',
+          created: now,
+          modified: now,
+          parent: PathUtils.dirname(normalizedPath),
+          data: null
+        };
+
+        const addRequest = store.add(metadata);
+        addRequest.onsuccess = () => resolve();
+        addRequest.onerror = () => reject(new VFSError('Failed to create directory', 'EIO', path));
+      };
+
+      existsRequest.onerror = () => reject(new VFSError('Failed to check directory existence', 'EIO', path));
+    });
+  }
+
+  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    return this.dbOperation('readonly', (store) => {
+      return new Promise<FileMetadata[]>((resolve, reject) => {
+        // 首先检查目录是否存在
+        const dirCheck = store.get(normalizedPath);
+        dirCheck.onsuccess = () => {
+          const dirRecord = dirCheck.result;
+          if (!dirRecord || dirRecord.type !== 'directory') {
+            reject(new VFSError('Directory does not exist', 'ENOENT', path));
+            return;
+          }
+
+          const results: FileMetadata[] = [];
+          const index = store.index('parent');
+
+          if (options?.recursive) {
+            // 递归列出所有子项
+            const request = store.openCursor();
+            request.onsuccess = (event) => {
+              const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+              if (cursor) {
+                const record = cursor.value;
+                const recordPath = record.path as string;
+
+                // 检查是否是子路径（包括间接子路径）
+                if (
+                  recordPath !== normalizedPath &&
+                  (recordPath.startsWith(normalizedPath + '/') || record.parent === normalizedPath)
+                ) {
+                  const metadata: FileMetadata = {
+                    name: record.name,
+                    path: recordPath,
+                    size: record.size,
+                    type: record.type,
+                    created: new Date(record.created),
+                    modified: new Date(record.modified),
+                    mimeType: record.mimeType
+                  };
+
+                  if (this.matchesFilter(metadata, options)) {
+                    results.push(metadata);
+                  }
+                }
+                cursor.continue();
+              } else {
+                resolve(results);
+              }
+            };
+            request.onerror = () => reject(request.error);
+          } else {
+            // 只列出直接子项
+            const request = index.openCursor(IDBKeyRange.only(normalizedPath));
+            request.onsuccess = (event) => {
+              const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+              if (cursor) {
+                const record = cursor.value;
+                const metadata: FileMetadata = {
+                  name: record.name,
+                  path: record.path,
+                  size: record.size,
+                  type: record.type,
+                  created: new Date(record.created),
+                  modified: new Date(record.modified),
+                  mimeType: record.mimeType
+                };
+
+                if (this.matchesFilter(metadata, options)) {
+                  results.push(metadata);
+                }
+                cursor.continue();
+              } else {
+                resolve(results);
+              }
+            };
+            request.onerror = () => reject(request.error);
+          }
+        };
+        dirCheck.onerror = () => reject(dirCheck.error);
+      });
+    });
+  }
+
+  protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    // 1. 先在事务外检查目录内容
+    const children = await this._readDirectory(normalizedPath);
+
+    if (children.length > 0 && !recursive) {
+      throw new VFSError('Directory is not empty', 'ENOTEMPTY', path);
+    }
+
+    // 2. 如果需要递归删除，先删除所有子项
+    if (recursive && children.length > 0) {
+      for (const child of children) {
+        if (child.type === 'directory') {
+          await this._deleteDirectory(child.path, true);
+        } else {
+          await this._deleteFile(child.path);
+        }
+      }
+    }
+
+    // 3. 在事务中删除目录本身
+    return this.dbOperation('readwrite', (store) => {
+      return new Promise<void>((resolve, reject) => {
+        // 检查目录是否存在
+        const dirCheck = store.get(normalizedPath);
+        dirCheck.onsuccess = () => {
+          const dirRecord = dirCheck.result;
+          if (!dirRecord || dirRecord.type !== 'directory') {
+            reject(new VFSError('Directory does not exist', 'ENOENT', path));
+            return;
+          }
+
+          // 删除目录本身
+          const deleteRequest = store.delete(normalizedPath);
+          deleteRequest.onsuccess = () => resolve();
+          deleteRequest.onerror = () => reject(new VFSError('Failed to delete directory', 'EIO', path));
+        };
+        dirCheck.onerror = () => reject(dirCheck.error);
+      });
+    });
+  }
+
+  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    return this.dbOperation('readonly', (store) => {
+      return new Promise<ArrayBuffer | string>((resolve, reject) => {
+        const request = store.get(normalizedPath);
+        request.onsuccess = () => {
+          const record = request.result;
+          if (!record || record.type !== 'file') {
+            reject(new VFSError('File does not exist', 'ENOENT', path));
+            return;
+          }
+
+          let data = record.data;
+
+          // 处理编码转换
+          if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
+            data = new TextDecoder().decode(data);
+          } else if (options?.encoding === 'base64') {
+            if (data instanceof ArrayBuffer) {
+              const bytes = new Uint8Array(data);
+              data = btoa(String.fromCharCode(...bytes));
+            } else if (typeof data === 'string') {
+              data = btoa(data);
+            }
+          }
+
+          // 处理范围读取
+          if (options?.offset !== undefined || options?.length !== undefined) {
+            const offset = options.offset || 0;
+            const length = options.length;
+
+            if (data instanceof ArrayBuffer) {
+              const end = length !== undefined ? offset + length : data.byteLength;
+              data = data.slice(offset, end);
+            } else if (typeof data === 'string') {
+              const end = length !== undefined ? offset + length : data.length;
+              data = data.slice(offset, end);
+            }
+          }
+
+          resolve(data);
+        };
+        request.onerror = () => reject(new VFSError('Failed to read file', 'EIO', path));
+      });
+    });
+  }
+
+  protected async _writeFile(
+    path: string,
+    data: ArrayBuffer | string,
+    options?: WriteOptions
+  ): Promise<void> {
+    const normalizedPath = PathUtils.normalize(path);
+    const parent = PathUtils.dirname(normalizedPath);
+
+    // 1. 先在事务外处理父目录检查和创建
+    if (parent !== '/') {
+      const parentExists = await this._exists(parent);
+      if (!parentExists) {
+        if (options?.create) {
+          await this._makeDirectory(parent, true);
+        } else {
+          throw new VFSError('Parent directory does not exist', 'ENOENT', parent);
+        }
+      }
+    }
+
+    // 2. 在事务中处理文件写入
+    return this.dbOperation('readwrite', (store) => {
+      return new Promise<void>((resolve, reject) => {
+        // 检查现有文件
+        const existingRequest = store.get(normalizedPath);
+        existingRequest.onsuccess = () => {
+          const existingRecord = existingRequest.result;
+          let fileData: ArrayBuffer | string = data;
+
+          // 处理追加模式
+          if (options?.append && existingRecord && existingRecord.type === 'file') {
+            const existingData = existingRecord.data;
+
+            if (typeof data === 'string' && typeof existingData === 'string') {
+              fileData = existingData + data;
+            } else if (data instanceof ArrayBuffer && existingData instanceof ArrayBuffer) {
+              // 合并两个 ArrayBuffer
+              const combined = new Uint8Array(existingData.byteLength + data.byteLength);
+              combined.set(new Uint8Array(existingData), 0);
+              combined.set(new Uint8Array(data), existingData.byteLength);
+              fileData = combined.buffer;
+            } else {
+              // 类型不匹配，转换为统一类型
+              const existingStr =
+                existingData instanceof ArrayBuffer ? new TextDecoder().decode(existingData) : existingData;
+              const newStr = data instanceof ArrayBuffer ? new TextDecoder().decode(data) : data;
+              fileData = existingStr + newStr;
+            }
+          }
+
+          // 处理编码
+          if (options?.encoding === 'base64' && typeof fileData === 'string') {
+            try {
+              const binaryString = atob(fileData);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              fileData = bytes.buffer;
+            } catch (_error) {
+              reject(new VFSError('Invalid base64 data', 'EINVAL', path));
+              return;
+            }
+          }
+
+          // 计算文件大小
+          const size =
+            typeof fileData === 'string' ? new TextEncoder().encode(fileData).length : fileData.byteLength;
+
+          const now = new Date();
+          const created = existingRecord ? new Date(existingRecord.created) : now;
+
+          // 创建文件记录
+          const record = {
+            name: PathUtils.basename(normalizedPath),
+            path: normalizedPath,
+            size: size,
+            type: 'file' as const,
+            created: created,
+            modified: now,
+            parent: parent,
+            data: fileData,
+            mimeType: guessMimeType(normalizedPath)
+          };
+
+          // 保存文件
+          const saveRequest = existingRecord ? store.put(record) : store.add(record);
+          saveRequest.onsuccess = () => resolve();
+          saveRequest.onerror = () =>
+            reject(new VFSError(`Failed to ${existingRecord ? 'update' : 'create'} file`, 'EIO', path));
+        };
+
+        existingRequest.onerror = () => reject(new VFSError('Failed to check existing file', 'EIO', path));
+      });
+    });
+  }
+
+  protected async _deleteFile(path: string): Promise<void> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    return this.dbOperation('readwrite', (store) => {
+      return new Promise<void>((resolve, reject) => {
+        // 首先检查文件是否存在
+        const checkRequest = store.get(normalizedPath);
+        checkRequest.onsuccess = () => {
+          const record = checkRequest.result;
+          if (!record || record.type !== 'file') {
+            reject(new VFSError('File does not exist', 'ENOENT', path));
+            return;
+          }
+
+          // 删除文件
+          const deleteRequest = store.delete(normalizedPath);
+          deleteRequest.onsuccess = () => resolve();
+          deleteRequest.onerror = () => reject(new VFSError('Failed to delete file', 'EIO', path));
+        };
+        checkRequest.onerror = () => reject(new VFSError('Failed to check file existence', 'EIO', path));
+      });
+    });
+  }
+
+  protected async _exists(path: string): Promise<boolean> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    return this.dbOperation('readonly', (store) => {
+      return new Promise<boolean>((resolve, reject) => {
+        const request = store.get(normalizedPath);
+        request.onsuccess = () => {
+          resolve(!!request.result);
+        };
+        request.onerror = () => reject(new VFSError('Failed to check existence', 'EIO', path));
+      });
+    });
+  }
+
+  protected async _stat(path: string): Promise<FileStat> {
+    const normalizedPath = PathUtils.normalize(path);
+
+    return this.dbOperation('readonly', (store) => {
+      return new Promise<FileStat>((resolve, reject) => {
+        const request = store.get(normalizedPath);
+        request.onsuccess = () => {
+          const record = request.result;
+          if (!record) {
+            reject(new VFSError('Path does not exist', 'ENOENT', path));
+            return;
+          }
+
+          resolve({
+            size: record.size,
+            isFile: record.type === 'file',
+            isDirectory: record.type === 'directory',
+            created: new Date(record.created),
+            modified: new Date(record.modified),
+            accessed: new Date(record.modified) // IndexedDB 不跟踪访问时间，使用修改时间
+          });
+        };
+        request.onerror = () => reject(new VFSError('Failed to get file stats', 'EIO', path));
+      });
+    });
+  }
+
+  /**
+   * 清空整个文件系统
+   */
+  async clear(): Promise<void> {
+    return this.dbOperation('readwrite', (store) => {
+      return new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(new VFSError('Failed to clear file system', 'EIO'));
+      });
+    });
+  }
+
+  /**
+   * 获取文件系统使用情况统计
+   */
+  async getUsageStats(): Promise<{
+    totalFiles: number;
+    totalDirectories: number;
+    totalSize: number;
+    storageQuota?: number;
+    usedStorage?: number;
+  }> {
+    return this.dbOperation('readonly', (store) => {
+      return new Promise((resolve, reject) => {
+        let totalFiles = 0;
+        let totalDirectories = 0;
+        let totalSize = 0;
+
+        const request = store.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+          if (cursor) {
+            const record = cursor.value;
+            if (record.type === 'file') {
+              totalFiles++;
+              totalSize += record.size;
+            } else if (record.type === 'directory') {
+              totalDirectories++;
+            }
+            cursor.continue();
+          } else {
+            // 尝试获取存储配额信息
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
+              navigator.storage
+                .estimate()
+                .then((estimate) => {
+                  resolve({
+                    totalFiles,
+                    totalDirectories,
+                    totalSize,
+                    storageQuota: estimate.quota,
+                    usedStorage: estimate.usage
+                  });
+                })
+                .catch(() => {
+                  resolve({
+                    totalFiles,
+                    totalDirectories,
+                    totalSize
+                  });
+                });
+            } else {
+              resolve({
+                totalFiles,
+                totalDirectories,
+                totalSize
+              });
+            }
+          }
+        };
+        request.onerror = () => reject(new VFSError('Failed to calculate usage stats', 'EIO'));
+      });
+    });
+  }
+
+  /**
+   * 导出文件系统数据为 JSON
+   */
+  async exportToJSON(): Promise<string> {
+    return this.dbOperation('readonly', (store) => {
+      return new Promise((resolve, reject) => {
+        const exportData: any[] = [];
+        const request = store.openCursor();
+
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+          if (cursor) {
+            const record = cursor.value;
+
+            // 对于二进制数据，转换为 base64
+            let data = record.data;
+            if (data instanceof ArrayBuffer) {
+              const bytes = new Uint8Array(data);
+              data = btoa(String.fromCharCode(...bytes));
+              record.dataType = 'base64';
+            } else {
+              record.dataType = 'string';
+            }
+
+            exportData.push({
+              ...record,
+              data: data,
+              created: record.created.toISOString(),
+              modified: record.modified.toISOString()
+            });
+
+            cursor.continue();
+          } else {
+            resolve(
+              JSON.stringify(
+                {
+                  version: '1.0',
+                  filesystem: 'IndexedDBFS',
+                  exported: new Date().toISOString(),
+                  data: exportData
+                },
+                null,
+                2
+              )
+            );
+          }
+        };
+
+        request.onerror = () => reject(new VFSError('Failed to export data', 'EIO'));
+      });
+    });
+  }
+
+  /**
+   * 从 JSON 导入文件系统数据
+   */
+  async importFromJSON(jsonData: string): Promise<void> {
+    try {
+      const importData = JSON.parse(jsonData);
+
+      if (!importData.data || !Array.isArray(importData.data)) {
+        throw new VFSError('Invalid import data format', 'EINVAL');
+      }
+
+      return this.dbOperation('readwrite', (store) => {
+        return new Promise<void>((resolve, reject) => {
+          let processed = 0;
+          const total = importData.data.length;
+
+          if (total === 0) {
+            resolve();
+            return;
+          }
+
+          for (const record of importData.data) {
+            // 恢复数据格式
+            if (record.dataType === 'base64' && record.data) {
+              const binaryString = atob(record.data);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              record.data = bytes.buffer;
+            }
+
+            // 恢复日期对象
+            record.created = new Date(record.created);
+            record.modified = new Date(record.modified);
+
+            // 移除临时字段
+            delete record.dataType;
+
+            const request = store.put(record);
+            request.onsuccess = () => {
+              processed++;
+              if (processed === total) {
+                resolve();
+              }
+            };
+            request.onerror = () => reject(new VFSError(`Failed to import record: ${record.path}`, 'EIO'));
+          }
+        });
+      });
+    } catch (_error) {
+      throw new VFSError('Failed to parse import data', 'EINVAL');
+    }
+  }
+  /**
+   * 彻底删除数据库
+   * 这会删除整个 IndexedDB 数据库，而不仅仅是清空内容
+   */
+  async _destroy(): Promise<void> {
+    // 1. 先关闭当前连接
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+
+    // 2. 删除数据库
+    return new Promise((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+
+      deleteRequest.onsuccess = () => {
+        resolve();
+      };
+
+      deleteRequest.onerror = () => {
+        reject(new VFSError('Failed to delete database', 'EIO', deleteRequest.error?.message));
+      };
+
+      deleteRequest.onblocked = () => {
+        // 数据库删除被阻塞，通常是因为其他连接仍然打开
+        // 可以选择等待或者抛出错误
+        console.warn('Database deletion blocked - other connections may still be open');
+        // 继续等待，通常会在其他连接关闭后自动完成
+      };
+    });
+  }
+}

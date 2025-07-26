@@ -1225,14 +1225,20 @@ export class ImGuiTextFilter {
   }
   // IMGUI_API bool      Draw(const char* label = "Filter (inc,-exc)", float width = 0.0f);    // Helper calling InputText+Build
   public Draw(label = 'Filter (inc,-exc)', width = 0.0): boolean {
-    if (width !== 0.0) bind.PushItemWidth(width);
+    if (width !== 0.0) {
+      bind.PushItemWidth(width);
+    }
     const value_changed: boolean = InputText(label, this.InputBuf, IM_ARRAYSIZE(this.InputBuf));
-    if (width !== 0.0) bind.PopItemWidth();
-    if (value_changed) this.Build();
+    if (width !== 0.0) {
+      bind.PopItemWidth();
+    }
+    if (value_changed) {
+      this.Build();
+    }
     return value_changed;
   }
   // IMGUI_API bool      PassFilter(const char* text, const char* text_end = NULL) const;
-  public PassFilter(text: string, text_end: number | null = null): boolean {
+  public PassFilter(_text: string, _text_end: number | null = null): boolean {
     // if (Filters.empty())
     //     return true;
 
@@ -1259,7 +1265,9 @@ export class ImGuiTextFilter {
     // }
 
     // Implicit * grep
-    if (this.CountGrep === 0) return true;
+    if (this.CountGrep === 0) {
+      return true;
+    }
 
     return false;
   }
@@ -3135,15 +3143,15 @@ export class ImFont {
   }
   // IMGUI_API void              RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width = 0.0f, bool cpu_fine_clip = false) const;
   public RenderText(
-    draw_list: ImDrawList,
-    size: number,
-    pos: Readonly<Bind.interface_ImVec2>,
-    col: Bind.ImU32,
-    clip_rect: Readonly<Bind.interface_ImVec4>,
-    text_begin: string,
-    text_end: number | null = null,
-    wrap_width = 0.0,
-    cpu_fine_clip = false
+    _draw_list: ImDrawList,
+    _size: number,
+    _pos: Readonly<Bind.interface_ImVec2>,
+    _col: Bind.ImU32,
+    _clip_rect: Readonly<Bind.interface_ImVec4>,
+    _text_begin: string,
+    _text_end: number | null = null,
+    _wrap_width = 0.0,
+    _cpu_fine_clip = false
   ): void {}
 
   // [Internal]
@@ -3156,7 +3164,7 @@ export class ImFont {
   // #endif
 
   // IMGUI_API bool              IsGlyphRangeUnused(unsigned int c_begin, unsigned int c_last);
-  public IsGlyphRangeUnused(c_begin: number, c_last: number): boolean {
+  public IsGlyphRangeUnused(_c_begin: number, _c_last: number): boolean {
     return false;
   } // TODO
 
@@ -7209,16 +7217,16 @@ export function SetClipboardText(text: string): void {
 // IMGUI_API void          LoadIniSettingsFromMemory(const char* ini_data, size_t ini_size=0); // call after CreateContext() and before the first call to NewFrame() to provide .ini data from your own data source.
 // IMGUI_API void          SaveIniSettingsToDisk(const char* ini_filename);                    // this is automatically called (if io.IniFilename is not empty) a few seconds after any modification that should be reflected in the .ini file (and also by DestroyContext).
 // IMGUI_API const char*   SaveIniSettingsToMemory(size_t* out_ini_size = NULL);               // return a zero-terminated string with the .ini data which you can save by your own mean. call when io.WantSaveIniSettings is set, then save data by your own mean and clear io.WantSaveIniSettings.
-export function LoadIniSettingsFromDisk(ini_filename: string): void {
+export function LoadIniSettingsFromDisk(_ini_filename: string): void {
   throw new Error();
 } // TODO
-export function LoadIniSettingsFromMemory(ini_data: string, ini_size = 0): void {
+export function LoadIniSettingsFromMemory(ini_data: string, _ini_size = 0): void {
   bind.LoadIniSettingsFromMemory(ini_data);
 }
-export function SaveIniSettingsToDisk(ini_filename: string): void {
+export function SaveIniSettingsToDisk(_ini_filename: string): void {
   throw new Error();
 } // TODO
-export function SaveIniSettingsToMemory(out_ini_size: Bind.ImScalar<number> | null = null): string {
+export function SaveIniSettingsToMemory(_out_ini_size: Bind.ImScalar<number> | null = null): string {
   return bind.SaveIniSettingsToMemory();
 }
 

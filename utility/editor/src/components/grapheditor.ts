@@ -157,7 +157,9 @@ export class GraphEditor {
         link.endSlotId === endSlotId
     );
 
-    if (existingLink) return;
+    if (existingLink) {
+      return;
+    }
 
     const link: GraphLink = {
       id: this.nextLinkId++,
@@ -189,7 +191,9 @@ export class GraphEditor {
     const slots = isOutput ? node.outputs : node.inputs;
     const slotIndex = slots.findIndex((slot) => slot.id === slotId);
 
-    if (slotIndex === -1) return new ImGui.ImVec2(0, 0);
+    if (slotIndex === -1) {
+      return new ImGui.ImVec2(0, 0);
+    }
 
     const slotY = node.position.y + NODE_PADDING_TOP + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
     const slotX = isOutput
@@ -235,7 +239,9 @@ export class GraphEditor {
   }
 
   private drawGrid(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
-    if (!this.showGrid) return;
+    if (!this.showGrid) {
+      return;
+    }
 
     const gridColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.3, 0.3, 0.5));
     const gridStep = this.gridSize * this.canvasScale;
@@ -365,7 +371,9 @@ export class GraphEditor {
     const startNode = this.nodes.find((n) => n.id === link.startNodeId);
     const endNode = this.nodes.find((n) => n.id === link.endNodeId);
 
-    if (!startNode || !endNode) return;
+    if (!startNode || !endNode) {
+      return;
+    }
 
     const startPos = this.getSlotPosition(startNode, link.startSlotId, true);
     const endPos = this.getSlotPosition(endNode, link.endSlotId, false);
@@ -401,7 +409,9 @@ export class GraphEditor {
       mousePos.y >= canvasPos.y &&
       mousePos.y <= canvasPos.y + canvasSize.y;
 
-    if (!isMouseInCanvas) return;
+    if (!isMouseInCanvas) {
+      return;
+    }
 
     // 检查鼠标悬停的插槽
     console.log(worldMousePos.x, worldMousePos.y);

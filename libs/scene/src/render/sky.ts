@@ -190,7 +190,7 @@ export class SkyRenderer {
     this._bindgroupFog.dispose();
   }
   /** @internal */
-  getHash(ctx: DrawContext): string {
+  getHash(_ctx: DrawContext): string {
     return `${this.skyType}:${this.fogType}`;
   }
   /** Which type of the sky should be rendered */
@@ -502,15 +502,15 @@ export class SkyRenderer {
     this._bakedSkyboxDirty = true;
   }
   /** @internal */
-  drawScatteredFog(ctx: DrawContext) {
+  drawScatteredFog(_ctx: DrawContext) {
     return this.skyType === 'scatter';
   }
   /** @internal */
-  getAerialPerspectiveLUT(ctx: DrawContext) {
+  getAerialPerspectiveLUT(_ctx: DrawContext) {
     return getAerialPerspectiveLut();
   }
   /** @internal */
-  getSkyDistantLightLUT(ctx: DrawContext) {
+  getSkyDistantLightLUT(_ctx: DrawContext) {
     return this._skyDistantLightLut.get().getColorAttachments()[0] as Texture2D;
   }
   update(ctx: DrawContext) {

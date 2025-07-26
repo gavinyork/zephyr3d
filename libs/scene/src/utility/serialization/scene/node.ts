@@ -323,7 +323,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
               .getAnimationNames()
               .map((name) => animationSet.getAnimationClip(name));
           },
-          set(this: SceneNode, value, index: number) {
+          set(this: SceneNode, value) {
             for (const ani of value.object) {
               const animation = ani as AnimationClip;
               for (const tracks of animation.tracks) {

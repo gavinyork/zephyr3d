@@ -24,8 +24,8 @@ export abstract class RenderMipmap {
     rightBottom: PBShaderExp,
     uv: PBShaderExp
   ): PBShaderExp;
-  setupUniforms(scope: PBGlobalScope): void {}
-  applyUniformValues(bindGroup: BindGroup): void {}
+  setupUniforms(_scope: PBGlobalScope): void {}
+  applyUniformValues(_bindGroup: BindGroup): void {}
   constructor() {
     this._program = new DRef();
     this._bindGroup = new DRef();

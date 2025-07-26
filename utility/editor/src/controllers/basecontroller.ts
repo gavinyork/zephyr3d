@@ -9,7 +9,7 @@ export class BaseController<Model extends BaseModel> {
   get model() {
     return this._model;
   }
-  handleEvent(ev: Event): boolean {
+  handleEvent(_ev: Event): boolean {
     return false;
   }
   activate(...args: any[]) {
@@ -23,6 +23,6 @@ export class BaseController<Model extends BaseModel> {
   onError(err: string) {
     console.error(err);
   }
-  protected onActivate(...args: any[]) {}
+  protected onActivate(..._args: any[]) {}
   protected onDeactivate() {}
 }

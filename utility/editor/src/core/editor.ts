@@ -50,6 +50,9 @@ export class Editor {
     if (imGuiInjectEvent(ev, type)) {
       return true;
     }
+    if (ev.type === 'dragenter' || ev.type === 'dragover' || ev.type === 'drop') {
+      ev.preventDefault();
+    }
     if (this._moduleManager.currentModule.controller?.handleEvent(ev)) {
       return true;
     }

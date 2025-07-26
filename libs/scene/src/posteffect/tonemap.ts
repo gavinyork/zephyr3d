@@ -52,7 +52,7 @@ export class Tonemap extends AbstractPostEffect {
     this.drawFullscreenQuad();
   }
   /** @internal */
-  private _prepare(device: AbstractDevice, srcTexture: Texture2D) {
+  private _prepare(device: AbstractDevice, _srcTexture: Texture2D) {
     if (!Tonemap._programTonemap) {
       Tonemap._programTonemap = device.buildRenderProgram({
         vertex(pb) {

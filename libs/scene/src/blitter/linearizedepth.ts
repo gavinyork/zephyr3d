@@ -51,7 +51,7 @@ export class LinearizeDepthBlitter extends Blitter {
    * {@inheritDoc Blitter.setup}
    * @override
    */
-  setup(scope: PBGlobalScope, type: BlitType) {
+  setup(scope: PBGlobalScope, _type: BlitType) {
     const pb = scope.$builder;
     if (pb.shaderKind === 'fragment') {
       scope.cameraNearFar = pb.vec2().uniform(0);

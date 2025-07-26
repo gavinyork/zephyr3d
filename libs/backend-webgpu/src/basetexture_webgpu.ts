@@ -355,7 +355,7 @@ export abstract class WebGPUBaseTexture<
     */
   }
   /** @internal */
-  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, depth: number): number {
+  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, _depth: number): number {
     if (hasDepthChannel(format) || this.isTexture3D() || this.isTextureVideo()) {
       return 1;
     }

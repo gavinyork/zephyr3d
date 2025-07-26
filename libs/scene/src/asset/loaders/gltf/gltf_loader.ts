@@ -176,7 +176,7 @@ export class GLTFLoader extends AbstractModelLoader {
     const scenes = gltf.scenes;
     if (scenes) {
       const sharedModel = new SharedModel();
-      await this._loadMeshes(gltf, sharedModel);
+      await this._loadMeshes(gltf);
       this._loadNodes(gltf, sharedModel);
       this._loadSkins(gltf, sharedModel);
       for (let i = 0; i < gltf.nodes?.length; i++) {
@@ -267,7 +267,7 @@ export class GLTFLoader extends AbstractModelLoader {
   private _loadAnimations(gltf: GLTFContent, model: SharedModel) {
     if (gltf.animations) {
       for (let i = 0; i < gltf.animations.length; i++) {
-        const animation = this._loadAnimation(gltf, i, model);
+        const animation = this._loadAnimation(gltf, i);
         model.addAnimation(animation);
       }
     }
@@ -368,7 +368,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return { name, channels, samplers, interpolators, interpolatorTypes, maxTime, nodes };
   }
   /** @internal */
-  private _loadAnimation(gltf: GLTFContent, index: number, model: SharedModel): AssetAnimationData {
+  private _loadAnimation(gltf: GLTFContent, index: number): AssetAnimationData {
     const animationInfo = this.getAnimationInfo(gltf, index);
     const animationData: AssetAnimationData = {
       name: animationInfo.name,
@@ -496,7 +496,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return node;
   }
   /** @internal */
-  private async _loadMeshes(gltf: GLTFContent, model: SharedModel) {
+  private async _loadMeshes(gltf: GLTFContent) {
     if (gltf.meshes) {
       for (let i = 0; i < gltf.meshes.length; i++) {
         gltf._meshes[i] = await this._loadMesh(gltf, i);

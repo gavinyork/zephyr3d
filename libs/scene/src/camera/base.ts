@@ -65,7 +65,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseDown(evt: PointerEvent): boolean {
+  protected _onMouseDown(_evt: PointerEvent): boolean {
     return false;
   }
   /**
@@ -73,7 +73,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseUp(evt: PointerEvent): boolean {
+  protected _onMouseUp(_evt: PointerEvent): boolean {
     return false;
   }
   /**
@@ -81,7 +81,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseWheel(evt: WheelEvent): boolean {
+  protected _onMouseWheel(_evt: WheelEvent): boolean {
     return false;
   }
   /**
@@ -89,7 +89,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseMove(evt: PointerEvent): boolean {
+  protected _onMouseMove(_evt: PointerEvent): boolean {
     return false;
   }
   /**
@@ -97,7 +97,7 @@ export class BaseCameraController {
    * @param evt - Keyboard event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onKeyDown(evt: KeyboardEvent): boolean {
+  protected _onKeyDown(_evt: KeyboardEvent): boolean {
     return false;
   }
   /**
@@ -105,7 +105,7 @@ export class BaseCameraController {
    * @param evt - Keyboard event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onKeyUp(evt: KeyboardEvent): boolean {
+  protected _onKeyUp(_evt: KeyboardEvent): boolean {
     return false;
   }
 }

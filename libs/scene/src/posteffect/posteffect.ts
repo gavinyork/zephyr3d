@@ -56,14 +56,14 @@ export class AbstractPostEffect implements Disposable {
    * Checks whether this post effect requires the linear depth texture
    * @returns true if the linear depth texture is required.
    */
-  requireLinearDepthTexture(ctx: DrawContext): boolean {
+  requireLinearDepthTexture(_ctx: DrawContext): boolean {
     return false;
   }
   /**
    * Checks whether this post effect requires the scene depth buffer
    * @returns true if the scene depth buffer is required.
    */
-  requireDepthAttachment(ctx: DrawContext): boolean {
+  requireDepthAttachment(_ctx: DrawContext): boolean {
     return false;
   }
   /**

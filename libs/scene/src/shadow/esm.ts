@@ -132,7 +132,7 @@ export class ESM extends ShadowImpl {
   getType(): ShadowMode {
     return 'esm';
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -254,7 +254,7 @@ export class ESM extends ShadowImpl {
   getShaderHash(): string {
     return '';
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     const device = Application.instance.device;
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? device.type === 'webgl'
@@ -266,7 +266,7 @@ export class ESM extends ShadowImpl {
         : 'r32f'
       : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
   computeShadowMapDepth(
@@ -361,7 +361,7 @@ export class ESM extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return false;
   }
 }

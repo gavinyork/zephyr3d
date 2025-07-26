@@ -236,7 +236,7 @@ export class SAO extends AbstractPostEffect {
       : 'r32f';
   }
   /** @internal */
-  private _prepare(device: AbstractDevice, srcTexture: Texture2D) {
+  private _prepare(device: AbstractDevice, _srcTexture: Texture2D) {
     const fb = device.getFramebuffer();
     const isFloatFramebuffer = fb && isFloatTextureFormat(fb.getColorAttachments()[0].format);
     this._supported = !isFloatFramebuffer || device.getDeviceCaps().framebufferCaps.supportFloatBlending;

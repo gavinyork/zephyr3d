@@ -70,7 +70,7 @@ export class AssetRegistry {
   get assetManager() {
     return this._assetManager;
   }
-  async putEmbeddedAssets(assets: EmbeddedAssetInfo[]) {
+  async putEmbeddedAssets(_assets: EmbeddedAssetInfo[]) {
     console.error('Putting assets not supported');
   }
   getAssetId(asset: any) {
@@ -179,7 +179,7 @@ export class AssetRegistry {
   }
   private resolveUrl(...paths: string[]): string {
     const cleanPaths = paths.filter((path) => path != null && path !== '');
-    const processedPaths = cleanPaths.map((path, index) => {
+    const processedPaths = cleanPaths.map((path) => {
       path = String(path).trim();
       path = path.replace(/^\/+|\/+$/g, '');
       return path;

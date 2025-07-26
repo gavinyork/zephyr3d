@@ -33,7 +33,7 @@ export class PCFOPT extends ShadowImpl {
   resourceDirty(): boolean {
     return false;
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return this._kernelSize;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -52,14 +52,14 @@ export class PCFOPT extends ShadowImpl {
   getDepthScale(): number {
     return 1;
   }
-  setDepthScale(val: number) {}
+  setDepthScale(_val: number) {}
   getShaderHash(): string {
     return `${this._kernelSize}`;
   }
   getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
@@ -197,7 +197,7 @@ export class PCFOPT extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return Application.instance.device.type !== 'webgl';
   }
   /** @internal */

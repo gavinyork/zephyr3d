@@ -45,7 +45,7 @@ function getAlignment(type: LayoutableType): number {
     return Math.max(alignment, 16);
   }
 }
-function getAlignmentPacked(type: LayoutableType): number {
+function getAlignmentPacked(_type: LayoutableType): number {
   return 1;
 }
 function getSize(type: LayoutableType): number {
@@ -644,7 +644,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
     return false;
   }
   /** @internal */
-  getConstructorOverloads(deviceType: string): PBFunctionTypeInfo[] {
+  getConstructorOverloads(_deviceType: string): PBFunctionTypeInfo[] {
     return [];
   }
   /**
@@ -689,7 +689,7 @@ export class PBVoidTypeInfo extends PBTypeInfo<null> {
     return 'void';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
 }
@@ -715,11 +715,11 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     return 'any';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** {@inheritDoc PBTypeInfo.isCompatibleType} */
-  isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
+  isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean {
     return true;
   }
 }
@@ -960,7 +960,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1308,7 +1308,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       : this.dimension * align(this.elementType.getLayoutSize(layout), elementAlignment);
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
@@ -1385,7 +1385,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1428,11 +1428,11 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout): number {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
@@ -1483,11 +1483,11 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout): number {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
@@ -1536,7 +1536,7 @@ export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1662,7 +1662,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1704,7 +1704,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     return `fn(${this.argHash}):${this.returnType.typeId}`;
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */

@@ -146,8 +146,12 @@ export class AABBTree {
           throw new Error(`AABB tree verification failed: triangle not inside AABB`);
         }
         const t = p[node.axis];
-        if (t < min) min = t;
-        if (t > max) max = t;
+        if (t < min) {
+          min = t;
+        }
+        if (t > max) {
+          max = t;
+        }
         if (max - min <= extents) {
           throw new Error(`AABB tree verification failed: extents test failed`);
         }
@@ -244,9 +248,15 @@ export class AABBTree {
     for (const tri of triangles) {
       const max = triangleMax[tri];
       const min = triangleMin[tri];
-      if (max[0] - min[0] >= dx) nx++;
-      if (max[1] - min[1] >= dy) ny++;
-      if (max[2] - min[2] >= dz) nz++;
+      if (max[0] - min[0] >= dx) {
+        nx++;
+      }
+      if (max[1] - min[1] >= dy) {
+        ny++;
+      }
+      if (max[2] - min[2] >= dz) {
+        nz++;
+      }
     }
     if (nx < ny) {
       if (nx < nz) {

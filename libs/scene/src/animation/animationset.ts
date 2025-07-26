@@ -318,7 +318,7 @@ export class AnimationSet implements Disposable {
         info.fadeOutStart = -1;
       } else {
         this._activeAnimations.delete(ani);
-        this._activeTracks.forEach((v, k) => {
+        this._activeTracks.forEach((v) => {
           v.forEach((tracks, id) => {
             v.set(
               id,

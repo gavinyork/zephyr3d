@@ -314,7 +314,7 @@ export class ScatteringLut {
     }
     if (!this._programAerialPerspectiveLut) {
       this._programAerialPerspectiveLut = device.buildRenderProgram({
-        vertex(pb) {
+        vertex(_pb) {
           that.commonVertexShader.call(this);
         },
         fragment(pb) {
@@ -489,7 +489,7 @@ export class ScatteringLut {
     }
     if (!this._programSkyViewLut) {
       this._programSkyViewLut = device.buildRenderProgram({
-        vertex(pb) {
+        vertex(_pb) {
           that.commonVertexShader.call(this);
         },
         fragment(pb) {
@@ -640,7 +640,7 @@ export class ScatteringLut {
     }
     if (!this._programMultiScatteringLut) {
       this._programMultiScatteringLut = device.buildRenderProgram({
-        vertex(pb) {
+        vertex(_pb) {
           that.commonVertexShader.call(this);
         },
         fragment(pb) {
@@ -782,7 +782,7 @@ export class ScatteringLut {
     );
     if (!this._programTransmittanceLut) {
       this._programTransmittanceLut = device.buildRenderProgram({
-        vertex(pb) {
+        vertex(_pb) {
           that.commonVertexShader.call(this);
         },
         fragment(pb) {

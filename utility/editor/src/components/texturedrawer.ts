@@ -453,7 +453,7 @@ export class TextureDrawer {
       }
     });
   }
-  private createVideoProgram(encode: number): GPUProgram {
+  private createVideoProgram(_encode: number): GPUProgram {
     const device = Application.instance.device;
     return device.buildRenderProgram({
       vertex(pb) {

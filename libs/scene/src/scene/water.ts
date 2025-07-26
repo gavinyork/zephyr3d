@@ -122,7 +122,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
-  updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
+  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number): void {
     const mat = this._material.get();
     const that = this;
     this._renderData = this._clipmap.gather({

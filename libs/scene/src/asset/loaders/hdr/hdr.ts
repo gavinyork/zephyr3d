@@ -111,7 +111,9 @@ export class HDRLoader extends AbstractTextureLoader {
     const d8 = buffer;
     let format = undefined;
     // read header.
-    while (!header.match(/\n\n[^\n]+\n/g)) header += String.fromCharCode(d8[pos++]);
+    while (!header.match(/\n\n[^\n]+\n/g)) {
+      header += String.fromCharCode(d8[pos++]);
+    }
     // check format.
     format = header.match(/FORMAT=(.*)$/m);
     if (format.length < 2) {
@@ -154,11 +156,15 @@ export class HDRLoader extends AbstractTextureLoader {
             buf = d8.slice(pos, (pos += 2));
             if (buf[0] > 128) {
               count = buf[0] - 128;
-              while (count-- > 0) scanline[ptr++] = buf[1];
+              while (count-- > 0) {
+                scanline[ptr++] = buf[1];
+              }
             } else {
               count = buf[0] - 1;
               scanline[ptr++] = buf[1];
-              while (count-- > 0) scanline[ptr++] = d8[pos++];
+              while (count-- > 0) {
+                scanline[ptr++] = d8[pos++];
+              }
             }
           }
         }

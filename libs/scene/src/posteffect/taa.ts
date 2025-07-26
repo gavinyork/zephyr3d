@@ -105,10 +105,10 @@ export class TAA extends AbstractPostEffect {
     ctx.device.pool.retainTexture(ctx.motionVectorTexture);
     data.prevMotionVectorTex = ctx.motionVectorTexture;
   }
-  requireLinearDepthTexture(ctx: DrawContext): boolean {
+  requireLinearDepthTexture(_ctx: DrawContext): boolean {
     return true;
   }
-  requireDepthAttachment(ctx: DrawContext): boolean {
+  requireDepthAttachment(_ctx: DrawContext): boolean {
     return true;
   }
   private static _getSkyMotionVectorProgram(ctx: DrawContext): GPUProgram {
@@ -148,7 +148,7 @@ export class TAA extends AbstractPostEffect {
     }
     return this._skyMotionVectorProgram;
   }
-  private static _getBox(ctx: DrawContext) {
+  private static _getBox(_ctx: DrawContext) {
     if (!this._box) {
       this._box = new BoxShape({
         size: 2,

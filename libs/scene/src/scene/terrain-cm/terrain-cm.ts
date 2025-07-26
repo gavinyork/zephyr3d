@@ -422,7 +422,7 @@ export class ClipmapTerrain
         this._maxHeight = data[1];
         this.invalidateWorldBoundingVolume(false);
       })
-      .catch((err) => {
+      .catch((_err) => {
         console.error('Read pixels failed');
       })
       .finally(() => {
@@ -441,7 +441,7 @@ export class ClipmapTerrain
     this.updateRegion();
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
-  updatePerCamera(camera: Camera, elapsedInSeconds: number, deltaInSeconds: number): void {
+  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number): void {
     const mat = this._material.get();
     const that = this;
     const bv = this.getWorldBoundingVolume().toAABB();

@@ -641,7 +641,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     const canvas: HTMLCanvasElement = this._canvas;
     const that = this;
     if (window.ResizeObserver) {
-      new window.ResizeObserver((entries) => {
+      new window.ResizeObserver(() => {
         that._onresize();
       }).observe(canvas, {});
     } else {

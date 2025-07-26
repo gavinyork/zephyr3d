@@ -38,7 +38,7 @@ export class PCFPD extends ShadowImpl {
   resourceDirty(): boolean {
     return false;
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return this._sampleRadius + 1;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -79,7 +79,7 @@ export class PCFPD extends ShadowImpl {
         : 'rgba8unorm';
     }
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
@@ -217,7 +217,7 @@ export class PCFPD extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return Application.instance.device.type !== 'webgl';
   }
   /** @internal */

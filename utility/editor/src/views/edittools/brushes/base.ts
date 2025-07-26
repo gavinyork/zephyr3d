@@ -47,8 +47,8 @@ export abstract class BaseTerrainBrush {
     heightMapUV: PBShaderExp,
     centerUV: PBShaderExp
   ): void;
-  protected setupBrushUniforms(scope: PBGlobalScope) {}
-  protected applyUniformValues(bindGroup: BindGroup) {}
+  protected setupBrushUniforms(_scope: PBGlobalScope) {}
+  protected applyUniformValues(_bindGroup: BindGroup) {}
   protected createBrushProgram(device: AbstractDevice) {
     const that = this;
     return device.buildRenderProgram({

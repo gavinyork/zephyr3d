@@ -400,7 +400,7 @@ export class AssetHierarchyNode extends NamedObject {
    * @param skeleton - The skeleton to which to node will attach
    * @param index - The joint index
    */
-  attachToSkeleton(skeleton: AssetSkeleton, index: number) {
+  attachToSkeleton(skeleton: AssetSkeleton) {
     if (!this._attachToSkeleton) {
       this._attachToSkeleton = new Set();
     }
@@ -444,7 +444,7 @@ export class AssetSkeleton extends NamedObject {
    * @param inverseBindMatrix - Inverse binding matrix of the joint
    */
   addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4) {
-    joint.attachToSkeleton(this, this.joints.length);
+    joint.attachToSkeleton(this);
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
     this.bindPoseMatrices.push(joint.worldMatrix);
