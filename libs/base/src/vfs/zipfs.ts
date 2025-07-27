@@ -3,7 +3,8 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } f
 import { VFS, VFSError } from './vfs';
 
 /**
- * zip.js related type definitions
+ * ZipJSEntry interface of zip.js
+ * @public
  */
 export interface ZipJSEntry {
   filename: string;
@@ -14,26 +15,43 @@ export interface ZipJSEntry {
   getData?(writer: any): Promise<any>;
 }
 
+/**
+ * ZipJSReader interface of zip.js
+ * @public
+ */
 export interface ZipJSReader {
   getEntries(): Promise<ZipJSEntry[]>;
   close?(): Promise<void>;
 }
 
+/**
+ * ZipJSWriter interface of zip.js
+ * @public
+ */
 export interface ZipJSWriter {
   add(filename: string, reader?: any, options?: any): Promise<any>;
   close(): Promise<any>;
 }
 
+/**
+ * ZipJSReader constructor interface of zip.js
+ * @public
+ */
 export interface ZipJSReaderConstructor {
   new (reader: any): ZipJSReader;
 }
 
+/**
+ * ZipJSWriter constructor interface of zip.js
+ * @public
+ */
 export interface ZipJSWriterConstructor {
   new (writer: any): ZipJSWriter;
 }
 
 /**
  * ZipJS dependencies
+ * @public
  */
 export interface ZipJSDependencies {
   // Reader/Writer 构造函数
@@ -55,7 +73,8 @@ export interface ZipJSDependencies {
 }
 
 /**
- * ZIP 文件条目信息
+ * ZIP entry type
+ * @public
  */
 export interface ZipEntry {
   path: string;
@@ -87,6 +106,8 @@ export interface ZipEntry {
  * await zipFS.writeFile('/new.txt', 'Hello!');
  * const outBlob = await zipFS.getZipBlob();
  * ```
+ *
+ * @public
  */
 export class ZipFS extends VFS {
   private zipReader: ZipJSReader | null = null;
@@ -118,7 +139,6 @@ export class ZipFS extends VFS {
    * Reads the structure and caches all entries.
    *
    * @param data - ZIP file as Blob, ArrayBuffer, or Uint8Array
-   * @throws {VFSError} If ZIP loading or parsing fails
    */
   async initializeFromData(data: Blob | Uint8Array | ArrayBuffer): Promise<void> {
     try {

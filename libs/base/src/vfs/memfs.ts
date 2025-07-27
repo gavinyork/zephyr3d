@@ -3,7 +3,9 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } f
 import { VFS, VFSError } from './vfs';
 
 /**
- * 内存文件系统实现
+ * Memory file system.
+ *
+ * @public
  */
 export class MemoryFS extends VFS {
   private files: Map<string, ArrayBuffer | string> = new Map();

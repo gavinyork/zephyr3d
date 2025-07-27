@@ -120,6 +120,42 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
 
 // @public
+export interface FileMetadata {
+    // (undocumented)
+    created: Date;
+    // (undocumented)
+    mimeType?: string;
+    // (undocumented)
+    modified: Date;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    permissions?: number;
+    // (undocumented)
+    size: number;
+    // (undocumented)
+    type: 'file' | 'directory';
+}
+
+// @public
+export interface FileStat {
+    // (undocumented)
+    accessed?: Date;
+    // (undocumented)
+    created: Date;
+    // (undocumented)
+    isDirectory: boolean;
+    // (undocumented)
+    isFile: boolean;
+    // (undocumented)
+    modified: Date;
+    // (undocumented)
+    size: number;
+}
+
+// @public
 export function float2half(f32: number): number;
 
 // @public
@@ -159,6 +195,31 @@ export type GenericConstructor<T = object> = {
 };
 
 // @public
+export class GlobMatcher {
+    constructor(pattern: string, caseSensitive?: boolean);
+    getPattern(): string;
+    test(path: string): boolean;
+}
+
+// @public
+export interface GlobOptions {
+    caseSensitive?: boolean;
+    cwd?: string;
+    ignore?: string | string[];
+    includeDirs?: boolean;
+    includeFiles?: boolean;
+    includeHidden?: boolean;
+    limit?: number;
+    recursive?: boolean;
+}
+
+// @public
+export interface GlobResult extends FileMetadata {
+    matchedPattern: string;
+    relativePath: string;
+}
+
+// @public
 export function half2float(f16: number): number;
 
 // @public
@@ -166,6 +227,28 @@ export function halfToFloat(val: number): number;
 
 // @public
 export function halton23(length: number): [number, number][];
+
+// @public
+export class HttpFS extends VFS {
+    constructor(baseURL: string);
+    // (undocumented)
+    protected _deleteDirectory(path: string, _recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _deleteFile(path: string): Promise<void>;
+    protected _destroy(): Promise<void>;
+    // (undocumented)
+    protected _exists(path: string): Promise<boolean>;
+    // (undocumented)
+    protected _makeDirectory(path: string, _recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    // (undocumented)
+    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected _stat(path: string): Promise<FileStat>;
+    // (undocumented)
+    protected _writeFile(path: string, _data: ArrayBuffer | string, _options?: WriteOptions): Promise<void>;
+}
 
 // @public
 export class HttpRequest {
@@ -190,6 +273,38 @@ export interface IEventTarget<T extends EventMap = any> {
     off<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
     on<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
     once<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
+}
+
+// @public
+export class IndexedDBFS extends VFS {
+    constructor(dbName: string, storeName: string, readonly?: boolean);
+    clear(): Promise<void>;
+    // (undocumented)
+    protected _deleteDirectory(path: string, recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _deleteFile(path: string): Promise<void>;
+    _destroy(): Promise<void>;
+    // (undocumented)
+    protected _exists(path: string): Promise<boolean>;
+    exportToJSON(): Promise<string>;
+    getUsageStats(): Promise<{
+        totalFiles: number;
+        totalDirectories: number;
+        totalSize: number;
+        storageQuota?: number;
+        usedStorage?: number;
+    }>;
+    importFromJSON(jsonData: string): Promise<void>;
+    // (undocumented)
+    protected _makeDirectory(path: string, recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    // (undocumented)
+    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected _stat(path: string): Promise<FileStat>;
+    // (undocumented)
+    protected _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void>;
 }
 
 // @public
@@ -255,6 +370,16 @@ export class ListIterator<T = unknown> {
     prev(): ListIterator<T>;
     get reversed(): boolean;
     valid(): boolean;
+}
+
+// @public
+export interface ListOptions {
+    // (undocumented)
+    includeHidden?: boolean;
+    // (undocumented)
+    pattern?: string | RegExp;
+    // (undocumented)
+    recursive?: boolean;
 }
 
 // @public
@@ -478,6 +603,28 @@ export class Matrix4x4 extends VectorBase {
 export type MaybeArray<T> = T[] | T;
 
 // @public
+export class MemoryFS extends VFS {
+    constructor(name?: string, readonly?: boolean);
+    // (undocumented)
+    protected _deleteDirectory(path: string, recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _deleteFile(path: string): Promise<void>;
+    protected _destroy(): Promise<void>;
+    // (undocumented)
+    protected _exists(path: string): Promise<boolean>;
+    // (undocumented)
+    protected _makeDirectory(path: string, recursive: boolean): Promise<void>;
+    // (undocumented)
+    protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    // (undocumented)
+    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected _stat(path: string): Promise<FileStat>;
+    // (undocumented)
+    protected _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void>;
+}
+
+// @public
 export function nextPowerOf2(value: number): number;
 
 // @public
@@ -671,6 +818,16 @@ export class Ray {
     get origin(): Vector3;
     set(origin: Vector3, directionNormalized: Vector3): void;
     transform(matrix: Matrix4x4, other?: Ray): Ray;
+}
+
+// @public
+export interface ReadOptions {
+    // (undocumented)
+    encoding?: 'utf8' | 'binary' | 'base64';
+    // (undocumented)
+    length?: number;
+    // (undocumented)
+    offset?: number;
 }
 
 // @public
@@ -918,7 +1075,195 @@ export class VectorBase extends Float32Array {
 }
 
 // @public
+export abstract class VFS {
+    constructor(name: string, isReadOnly?: boolean);
+    copyFile(src: string, dest: string, options?: {
+        overwrite?: boolean;
+    }): Promise<void>;
+    deleteDirectory(path: string, options?: {
+        recursive?: boolean;
+    }): Promise<void>;
+    protected abstract _deleteDirectory(path: string, recursive: boolean): Promise<void>;
+    deleteFile(path: string): Promise<void>;
+    protected abstract _deleteFile(path: string): Promise<void>;
+    // (undocumented)
+    protected abstract _destroy(): Promise<void>;
+    dispose(): Promise<void>;
+    exists(path: string): Promise<boolean>;
+    protected abstract _exists(path: string): Promise<boolean>;
+    getInfo(): {
+        name: string;
+        isReadOnly: boolean;
+        mountCount: number;
+        mountPoints: string[];
+    };
+    getSimpleMountPoints(): string[];
+    glob(pattern: string | string[], options?: GlobOptions): Promise<GlobResult[]>;
+    hasMounts(): boolean;
+    readonly isReadOnly: boolean;
+    makeDirectory(path: string, recursive?: boolean): Promise<void>;
+    protected abstract _makeDirectory(path: string, recursive: boolean): Promise<void>;
+    mount(path: string, vfs: VFS): void;
+    moveFile(src: string, dest: string, options?: {
+        overwrite?: boolean;
+    }): Promise<void>;
+    readonly name: string;
+    readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    protected abstract _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected abstract _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    stat(path: string): Promise<FileStat>;
+    protected abstract _stat(path: string): Promise<FileStat>;
+    unmount(path: string): boolean;
+    writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void>;
+    protected abstract _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void>;
+}
+
+// @public
+export class VFSError extends Error {
+    constructor(message: string, code?: string, path?: string);
+    // (undocumented)
+    code?: string;
+    // (undocumented)
+    path?: string;
+}
+
+// @public
 export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a: T, b: T, w: number) => T): T;
+
+// @public
+export interface WriteOptions {
+    // (undocumented)
+    append?: boolean;
+    // (undocumented)
+    create?: boolean;
+    // (undocumented)
+    encoding?: 'utf8' | 'binary' | 'base64';
+}
+
+// @public
+export interface ZipEntry {
+    // (undocumented)
+    comment?: string;
+    // (undocumented)
+    isDirectory: boolean;
+    // (undocumented)
+    lastModified: Date;
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    size: number;
+}
+
+// @public
+export class ZipFS extends VFS {
+    constructor(name: string, zipJS: ZipJSDependencies, readonly?: boolean);
+    addFromVFS(sourceVFS: VFS, sourcePath: string, targetPath?: string, options?: {
+        recursive?: boolean;
+        filter?: (path: string) => boolean;
+        progress?: (current: number, total: number, path: string) => void;
+    }): Promise<void>;
+    close(): Promise<void>;
+    protected _deleteDirectory(path: string, recursive: boolean): Promise<void>;
+    protected _deleteFile(path: string): Promise<void>;
+    protected _destroy(): Promise<void>;
+    protected _exists(path: string): Promise<boolean>;
+    extractTo(targetVFS: VFS, targetPath?: string, options?: {
+        overwrite?: boolean;
+        filter?: (path: string) => boolean;
+        progress?: (current: number, total: number, path: string) => void;
+    }): Promise<void>;
+    flush(): Promise<void>;
+    getCompressionStats(): Promise<{
+        totalEntries: number;
+        totalUncompressedSize: number;
+        totalCompressedSize: number;
+        compressionRatio: number;
+    }>;
+    getEntries(): Promise<ZipEntry[]>;
+    getFileCRC32(path: string): Promise<number | null>;
+    getZipBlob(): Promise<Blob>;
+    getZipData(): Promise<Uint8Array>;
+    hasUnsavedChanges(): boolean;
+    initializeFromData(data: Blob | Uint8Array | ArrayBuffer): Promise<void>;
+    protected _makeDirectory(path: string, recursive: boolean): Promise<void>;
+    protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    saveToVFS(targetVFS: VFS, path: string): Promise<void>;
+    protected _stat(path: string): Promise<FileStat>;
+    verify(): Promise<{
+        isValid: boolean;
+        errors: string[];
+        warnings: string[];
+    }>;
+    protected _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void>;
+}
+
+// @public
+export interface ZipJSDependencies {
+    // (undocumented)
+    BlobReader: new (blob: Blob) => any;
+    // (undocumented)
+    BlobWriter: new () => any;
+    // (undocumented)
+    configure?: (options: any) => void;
+    // (undocumented)
+    TextReader: new (text: string) => any;
+    // (undocumented)
+    TextWriter: new (encoding?: string) => any;
+    // (undocumented)
+    Uint8ArrayReader: new (array: Uint8Array) => any;
+    // (undocumented)
+    Uint8ArrayWriter: new () => any;
+    // (undocumented)
+    ZipReader: ZipJSReaderConstructor;
+    // (undocumented)
+    ZipWriter: ZipJSWriterConstructor;
+}
+
+// @public
+export interface ZipJSEntry {
+    // (undocumented)
+    comment?: string;
+    // (undocumented)
+    directory: boolean;
+    // (undocumented)
+    filename: string;
+    // (undocumented)
+    getData?(writer: any): Promise<any>;
+    // (undocumented)
+    lastModDate?: Date;
+    // (undocumented)
+    uncompressedSize?: number;
+}
+
+// @public
+export interface ZipJSReader {
+    // (undocumented)
+    close?(): Promise<void>;
+    // (undocumented)
+    getEntries(): Promise<ZipJSEntry[]>;
+}
+
+// @public
+export interface ZipJSReaderConstructor {
+    // (undocumented)
+    new (reader: any): ZipJSReader;
+}
+
+// @public
+export interface ZipJSWriter {
+    // (undocumented)
+    add(filename: string, reader?: any, options?: any): Promise<any>;
+    // (undocumented)
+    close(): Promise<any>;
+}
+
+// @public
+export interface ZipJSWriterConstructor {
+    // (undocumented)
+    new (writer: any): ZipJSWriter;
+}
 
 // Warnings were encountered during analysis:
 //

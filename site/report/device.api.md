@@ -1087,8 +1087,8 @@ export enum PBAddressSpace {
 export class PBAnyTypeInfo extends PBTypeInfo<null> {
     constructor();
     isAnyType(): this is PBAnyTypeInfo;
-    isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1100,21 +1100,21 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     isArrayType(): this is PBArrayTypeInfo;
     // (undocumented)
     isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
 export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     constructor();
     haveAtomicMembers(): boolean;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
 export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     constructor();
     haveAtomicMembers(): boolean;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1190,7 +1190,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     }[];
     get name(): string;
     get returnType(): PBTypeInfo;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1245,7 +1245,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     haveAtomicMembers(): boolean;
     isPointerType(): this is PBPointerTypeInfo;
     get pointerType(): PBTypeInfo;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1407,7 +1407,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     resizeType(rows: number, cols: number): PBPrimitiveType;
     get rows(): number;
     get scalarType(): PBPrimitiveType;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1446,7 +1446,7 @@ export enum PBSamplerAccessMode {
 export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     constructor(accessMode: PBSamplerAccessMode);
     get accessMode(): PBSamplerAccessMode;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public
@@ -1607,7 +1607,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     set readable(val: boolean);
     get storageTexelFormat(): TextureFormat;
     get textureType(): PBTextureType;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
     get writable(): boolean;
     set writable(val: boolean);
 }
@@ -1634,7 +1634,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
 export class PBVoidTypeInfo extends PBTypeInfo<null> {
     constructor();
     isVoidType(): this is PBVoidTypeInfo;
-    toBufferLayout(offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): UniformBufferLayout;
 }
 
 // @public

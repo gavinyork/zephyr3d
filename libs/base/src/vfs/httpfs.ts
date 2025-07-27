@@ -3,8 +3,11 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } f
 import { VFS, VFSError } from './vfs';
 
 /**
- * HTTP 文件系统实现
+ * Http file system.
+ *
+ * @public
  */
+
 export class HttpFS extends VFS {
   private baseURL: string;
   private cache: Map<string, ArrayBuffer | string> = new Map();

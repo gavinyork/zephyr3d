@@ -293,7 +293,6 @@ export class GlobMatcher {
  * mounting other VFS instances at specific paths for composition.
  *
  * @public
- * @abstract
  *
  */
 export abstract class VFS {
@@ -416,7 +415,6 @@ export abstract class VFS {
    *
    * @param path - The path where to create the directory
    * @param recursive - Whether to create parent directories if they don't exist
-   * @throws {VFSError} When the file system is read-only or directory creation fails
    *
    * @example
    * ```typescript
@@ -442,7 +440,6 @@ export abstract class VFS {
    * @param path - The path of the directory to read
    * @param options - Options for directory listing
    * @returns Promise that resolves to an array of file metadata
-   * @throws {VFSError} When directory doesn't exist or cannot be read
    *
    * @example
    * ```typescript
@@ -463,7 +460,6 @@ export abstract class VFS {
    *
    * @param path - The path of the directory to delete
    * @param options - Options for directory deletion
-   * @throws {VFSError} When the file system is read-only, directory doesn't exist, is not empty (non-recursive), or deletion fails
    *
    * @example
    * ```typescript
@@ -489,7 +485,6 @@ export abstract class VFS {
    * @param path - The path of the file to read
    * @param options - Options for reading (encoding, offset, length)
    * @returns Promise that resolves to the file contents as ArrayBuffer or string
-   * @throws {VFSError} When file doesn't exist or cannot be read
    *
    * @example
    * ```typescript
@@ -512,7 +507,6 @@ export abstract class VFS {
    * @param path - The path where to write the file
    * @param data - The data to write (ArrayBuffer or string)
    * @param options - Options for writing (append mode, encoding, create parent dirs)
-   * @throws {VFSError} When the file system is read-only, parent directory doesn't exist, or file cannot be written
    *
    * @example
    * ```typescript
@@ -537,7 +531,6 @@ export abstract class VFS {
    * Deletes a file.
    *
    * @param path - The path of the file to delete
-   * @throws {VFSError} When the file system is read-only, file doesn't exist, or cannot be deleted
    *
    * @example
    * ```typescript
@@ -585,7 +578,6 @@ export abstract class VFS {
    *
    * @param path - The path to get statistics for
    * @returns Promise that resolves to file statistics
-   * @throws {VFSError} When path doesn't exist or stats cannot be retrieved
    *
    * @example
    * ```typescript
@@ -608,7 +600,6 @@ export abstract class VFS {
    * @param src - The source file path
    * @param dest - The destination file path
    * @param options - Options for copying
-   * @throws {VFSError} When source doesn't exist, destination exists (non-overwrite), or copy fails
    *
    * @example
    * ```typescript
@@ -630,7 +621,6 @@ export abstract class VFS {
    * @param src - The source file path
    * @param dest - The destination file path
    * @param options - Options for moving
-   * @throws {VFSError} When source doesn't exist, destination exists (non-overwrite), or move fails
    *
    * @example
    * ```typescript
@@ -788,7 +778,6 @@ export abstract class VFS {
    *
    * @param path - Directory path
    * @param recursive - Whether to create parent directories
-   * @throws {VFSError} If parent directory missing or creation fails
    */
   protected abstract _makeDirectory(path: string, recursive: boolean): Promise<void>;
   /**
@@ -804,7 +793,6 @@ export abstract class VFS {
    *
    * @param path - Directory path
    * @param recursive - If true, delete contents recursively
-   * @throws {VFSError} If not empty (non-recursive) or not found
    */
   protected abstract _deleteDirectory(path: string, recursive: boolean): Promise<void>;
   /**
@@ -813,7 +801,6 @@ export abstract class VFS {
    * @param path - Path to file
    * @param options - Read options (encoding, offset, length)
    * @returns File contents as ArrayBuffer or string
-   * @throws {VFSError} If file does not exist or is directory
    */
   protected abstract _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
   /**
@@ -822,7 +809,6 @@ export abstract class VFS {
    * @param path - File path
    * @param data - Data to write
    * @param options - Write options (append, encoding, create parent dirs)
-   * @throws {VFSError} If parent directory missing or invalid base64
    */
   protected abstract _writeFile(
     path: string,
@@ -833,7 +819,6 @@ export abstract class VFS {
    * Deletes a file in the file system.
    *
    * @param path - File path
-   * @throws {VFSError} If file not found
    */
   protected abstract _deleteFile(path: string): Promise<void>;
   /**
@@ -848,7 +833,6 @@ export abstract class VFS {
    *
    * @param path - File or directory path
    * @returns FileStat (type, size, times, etc)
-   * @throws {VFSError} If not found
    */
   protected abstract _stat(path: string): Promise<FileStat>;
   protected abstract _destroy(): Promise<void>;

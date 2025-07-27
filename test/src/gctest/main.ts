@@ -1,5 +1,4 @@
-import { PerspectiveCamera, SerializationManager } from '@zephyr3d/scene';
-import { Application, AssetRegistry, deserializeSceneFromURL, OrbitCameraController } from '@zephyr3d/scene';
+import { Application } from '@zephyr3d/scene';
 import * as common from '../common';
 
 const myApp = new Application({
@@ -8,6 +7,7 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async function () {
+  /*
   const manager = new SerializationManager(new AssetRegistry('assets/scenes/test1'));
   await manager.assetRegistry.loadFromURL('assets/scenes/test1/assets/index.json');
   const { scene, meta } = await deserializeSceneFromURL('assets/scenes/test1/scene.json', manager);
@@ -21,5 +21,6 @@ myApp.ready().then(async function () {
     camera.aspect = myApp.device.getDrawingBufferWidth() / myApp.device.getDrawingBufferHeight();
     camera.render(scene);
   });
+  */
   myApp.run();
 });

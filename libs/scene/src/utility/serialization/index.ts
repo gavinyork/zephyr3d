@@ -302,8 +302,6 @@ export function serializeObjectProps<T extends object>(
  * @param embeddedAssetList - Optional array to collect embedded asset promises
  * @returns Serialized JSON representation of the object
  *
- * @throws Error if the object's class is not registered for serialization
- *
  * @public
  */
 export function serializeObject(
@@ -357,8 +355,6 @@ export function serializeObject(
  * @param json - JSON object containing serialized data
  * @param manager - Serialization manager for context and metadata
  * @returns Promise resolving to the deserialized object
- *
- * @throws Error if the specified class name is not registered
  *
  * @public
  */

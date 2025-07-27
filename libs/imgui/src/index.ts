@@ -117,6 +117,8 @@ export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec
 /**
  * Get char code map, for emoji conversion
  * @returns char code map
+ *
+ * @public
  */
 export function imGuiGetCharCodeMap() {
   return ImGui_Impl.getCharCodeMap();
@@ -125,6 +127,8 @@ export function imGuiGetCharCodeMap() {
 /**
  * Sets char code map, for emoji conversion
  * @param map - Char code map to set
+ *
+ * @public
  */
 export function imGuiSetCharCodeMap(map: Record<number, number>) {
   ImGui_Impl.setCharCodeMap(map);

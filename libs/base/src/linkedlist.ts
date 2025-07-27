@@ -30,7 +30,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns self
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -47,7 +46,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns the new iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -63,7 +61,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns self
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -80,7 +77,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns the new iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -122,7 +118,6 @@ export class ListIterator<T = unknown> {
   /**
    * Gets the data associated with the iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is invalid
    *
    * @public
@@ -264,7 +259,6 @@ export class List<T = unknown> {
    * Gets the data associated to the first element in the linked list
    * @returns The data associated to the first element in the linked list
    *
-   * @throws Error
    * The exception is thrown if the list is empty
    *
    * @public
@@ -279,7 +273,6 @@ export class List<T = unknown> {
    * Gets the data associated to the last element in the linked list
    * @returns The data associated to the last element in the linked list
    *
-   * @throws Error
    * The exception is thrown if the list is empty
    *
    * @public
