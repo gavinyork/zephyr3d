@@ -113,3 +113,19 @@ export function imGuiSetFontGlyph(charCode: number, font: Font) {
 export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
   return ImGui_Impl.calcTextSize(text, out);
 }
+
+/**
+ * Get char code map, for emoji conversion
+ * @returns char code map
+ */
+export function imGuiGetCharCodeMap() {
+  return ImGui_Impl.getCharCodeMap();
+}
+
+/**
+ * Sets char code map, for emoji conversion
+ * @param map - Char code map to set
+ */
+export function imGuiSetCharCodeMap(map: Record<number, number>) {
+  ImGui_Impl.setCharCodeMap(map);
+}

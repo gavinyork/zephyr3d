@@ -1,9 +1,10 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { Scene, SerializableClass, SerializationManager } from '@zephyr3d/scene';
+import type { Scene, SerializableClass } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { BatchGroup } from '@zephyr3d/scene';
+import { ProjectManager } from '../core/projectmgr';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -16,12 +17,10 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
-  private _serializationManager: SerializationManager;
-  constructor(scene: Scene, serializationManager: SerializationManager) {
+  constructor(scene: Scene) {
     super();
     this._scene = scene;
     this._selectedNode = null;
-    this._serializationManager = serializationManager;
   }
   get scene() {
     return this._scene;
@@ -61,7 +60,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     let cls: SerializableClass = null;
     let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = this._serializationManager.getClassByConstructor(ctor);
+      cls = ProjectManager.projectSerializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     return cls.ctor.name;
@@ -70,7 +69,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     let cls: SerializableClass = null;
     let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = this._serializationManager.getClassByConstructor(ctor);
+      cls = ProjectManager.projectSerializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     const label = `${this.getNodeName(node)}##${node.persistentId}`;

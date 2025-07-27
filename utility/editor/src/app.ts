@@ -4,6 +4,7 @@ import { Editor } from './core/editor';
 //import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
+import { initEmojiMapping } from './helpers/emoji';
 
 const studioApp = new Application({
   backend: backendWebGPU,
@@ -14,6 +15,7 @@ studioApp.ready().then(async () => {
   await initLeakDetector();
   const device = studioApp.device;
   await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
+  initEmojiMapping();
   const editor = new Editor();
   await editor.init();
   editor.registerModules();

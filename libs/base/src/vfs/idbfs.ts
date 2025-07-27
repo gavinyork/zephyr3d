@@ -20,7 +20,7 @@ import { VFS, VFSError } from './vfs';
 export class IndexedDBFS extends VFS {
   private db: IDBDatabase | null = null;
   private readonly dbName: string;
-  private readonly storeName = 'files';
+  private readonly storeName: string;
 
   /**
    * Creates a new IndexedDB file system.
@@ -28,9 +28,10 @@ export class IndexedDBFS extends VFS {
    * @param dbName - The name of the IndexedDB database to use
    * @param readonly - Whether the file system should be read-only
    */
-  constructor(dbName: string = 'vfs-indexeddb', readonly = false) {
+  constructor(dbName: string, storeName: string, readonly = false) {
     super(dbName, readonly);
     this.dbName = dbName;
+    this.storeName = storeName;
   }
 
   private async ensureDB(): Promise<IDBDatabase> {
@@ -363,7 +364,7 @@ export class IndexedDBFS extends VFS {
           } else if (options?.encoding === 'base64') {
             if (data instanceof ArrayBuffer) {
               const bytes = new Uint8Array(data);
-              data = btoa(String.fromCharCode(...bytes));
+              data = btoa(String.fromCodePoint(...bytes));
             } else if (typeof data === 'string') {
               data = btoa(data);
             }
@@ -446,7 +447,7 @@ export class IndexedDBFS extends VFS {
               const binaryString = atob(fileData);
               const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+                bytes[i] = binaryString.codePointAt(i);
               }
               fileData = bytes.buffer;
             } catch (_error) {
@@ -646,7 +647,7 @@ export class IndexedDBFS extends VFS {
             let data = record.data;
             if (data instanceof ArrayBuffer) {
               const bytes = new Uint8Array(data);
-              data = btoa(String.fromCharCode(...bytes));
+              data = btoa(String.fromCodePoint(...bytes));
               record.dataType = 'base64';
             } else {
               record.dataType = 'string';
@@ -708,7 +709,7 @@ export class IndexedDBFS extends VFS {
               const binaryString = atob(record.data);
               const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+                bytes[i] = binaryString.codePointAt(i);
               }
               record.data = bytes.buffer;
             }

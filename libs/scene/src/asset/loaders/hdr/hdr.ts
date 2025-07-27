@@ -112,7 +112,7 @@ export class HDRLoader extends AbstractTextureLoader {
     let format = undefined;
     // read header.
     while (!header.match(/\n\n[^\n]+\n/g)) {
-      header += String.fromCharCode(d8[pos++]);
+      header += String.fromCodePoint(d8[pos++]);
     }
     // check format.
     format = header.match(/FORMAT=(.*)$/m);

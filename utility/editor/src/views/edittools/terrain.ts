@@ -1,4 +1,4 @@
-import type { AssetRegistry, ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
+import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
 import {
   Application,
@@ -24,6 +24,7 @@ import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
 import { FilePicker } from '../../components/filepicker';
 import { Dialog } from '../dlg/dlg';
+import { ProjectManager } from '../../core/projectmgr';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
@@ -47,14 +48,12 @@ export class TerrainEditTool implements EditTool {
   private _smoothBrush: TerrainSmoothBrush;
   private _flattenBrush: TerrainFlattenBrush;
   private _textureBrush: TerrainTextureBrush;
-  private _assetRegistry: AssetRegistry;
   private _splatMapCopy: DRef<Texture2DArray>;
   private _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
-  constructor(editor: Editor, terrain: ClipmapTerrain, assetRegistry: AssetRegistry) {
+  constructor(editor: Editor, terrain: ClipmapTerrain) {
     this._terrain = new DRef(terrain);
     this._editor = editor;
-    this._assetRegistry = assetRegistry;
     this._brushSize = 10;
     this._brushAngle = 0;
     this._brushStrength = 1;
@@ -63,20 +62,20 @@ export class TerrainEditTool implements EditTool {
     if (!TerrainEditTool.defaultBrush.get()) {
       TerrainEditTool.defaultBrush.set(TerrainEditTool.createDefaultBrushFallof());
     }
-    this._brushImageList = new ImageList(this._assetRegistry);
+    this._brushImageList = new ImageList();
     this._brushImageList.linearColorSpace = true;
 
-    this._grassAlbedo = new ImageList(this._assetRegistry);
+    this._grassAlbedo = new ImageList();
     this._grassAlbedo.linearColorSpace = false;
     this._grassAlbedo.selectable = true;
 
-    this._detailAlbedo = new ImageList(this._assetRegistry);
+    this._detailAlbedo = new ImageList();
     this._detailAlbedo.linearColorSpace = false;
     this._detailAlbedo.selectable = true;
     this._detailAlbedo.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
     this._detailAlbedo.defaultImage = ClipmapTerrainMaterial.getDefaultDetailMap();
 
-    this._detailNormal = new ImageList(this._assetRegistry);
+    this._detailNormal = new ImageList();
     this._detailNormal.linearColorSpace = true;
     this._detailNormal.selectable = false;
     this._detailNormal.maxImageCount = ClipmapTerrainMaterial.MAX_DETAIL_MAP_COUNT;
@@ -599,7 +598,7 @@ export class TerrainEditTool implements EditTool {
               URL.revokeObjectURL(url);
             });
         } else {
-          const assetManager = new AssetManager();
+          const assetManager = new AssetManager(ProjectManager.projectSerializationManager.vfs);
           assetManager
             .fetchTexture<Texture2D>(
               files[0].name,

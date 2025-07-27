@@ -12,7 +12,6 @@ import type {
   PropertyTrack,
   PropertyValue,
   Scene,
-  SerializationManager,
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
@@ -39,7 +38,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
-import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
+import { ASSERT, MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Database, type DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -66,6 +65,8 @@ import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
+import { VFSView } from '../components/vfsview';
+import { ProjectManager } from '../core/projectmgr';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -75,6 +76,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _toolbar: ToolBar;
   private _tab: Tab;
   private _menubar: MenubarView;
+  private _assetView: VFSView;
   private _statusbar: StatusBar;
   private _transformNode: DRef<SceneNode>;
   private _oldTransform: TRS;
@@ -88,7 +90,6 @@ export class SceneView extends BaseView<SceneModel> {
   private _mousePosX: number;
   private _mousePosY: number;
   private _pickResult: PickResult;
-  private _serializationManager: SerializationManager;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
@@ -105,7 +106,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _animatedCamera: Camera;
   private _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
   private _trackId: number;
-  constructor(editor: Editor, model: SceneModel, serializationManager: SerializationManager) {
+  constructor(editor: Editor, model: SceneModel) {
     super(model);
     this._editor = editor;
     this._cmdManager = new CommandManager();
@@ -137,7 +138,6 @@ export class SceneView extends BaseView<SceneModel> {
     this._animatedCamera = null;
     this._editingProps = new Map();
     this._trackId = 0;
-    this._serializationManager = serializationManager;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -466,15 +466,8 @@ export class SceneView extends BaseView<SceneModel> {
     );
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
-    this._tab = new Tab(
-      this.model.scene,
-      true,
-      this._menubar.height + this._toolbar.height,
-      this._statusbar.height,
-      this._serializationManager
-    );
+    this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
     this._propGrid = new PropertyEditor(
-      this._serializationManager,
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
       400,
@@ -483,6 +476,28 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.4
     );
+    const vfs = new MemoryFS();
+    this._assetView = new VFSView(
+      vfs,
+      0,
+      ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
+      ImGui.GetIO().DisplaySize.x,
+      300
+    );
+    Promise.all([
+      vfs.makeDirectory('/foo/bar', true),
+      vfs.makeDirectory('/projects/A', true),
+      vfs.makeDirectory('/projects/B/src', true),
+      vfs.makeDirectory('/projects/C', true)
+    ]).then(() => {
+      Promise.all([
+        vfs.writeFile('/foo/abc.jpg', 'abc.jpg', { create: true }),
+        vfs.writeFile('/projects/A/hello.txt', 'Hello, world', { create: true }),
+        vfs.writeFile('/projects/B/src/index.js', 'console.log("hello");', { create: true })
+      ]).then(() => {
+        this._assetView.loadFileSystem();
+      });
+    });
   }
   get editor() {
     return this._editor;
@@ -513,14 +528,25 @@ export class SceneView extends BaseView<SceneModel> {
     this.sceneSetup();
   }
   render() {
+    const displaySize = ImGui.GetIO().DisplaySize;
+    this._tab.height =
+      displaySize.y -
+      this._menubar.height -
+      this._toolbar.height -
+      this._statusbar.height -
+      this._assetView.height;
     this._menubar.render();
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
-    const displaySize = ImGui.GetIO().DisplaySize;
+    this._assetView.render(displaySize.x - this._propGrid.width);
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
     const viewportHeight =
-      displaySize.y - this._statusbar.height - this._menubar.height - this._toolbar.height;
+      displaySize.y -
+      this._statusbar.height -
+      this._menubar.height -
+      this._toolbar.height -
+      this._assetView.height;
     if (this._dragDropTypes.length > 0) {
       if (viewportWidth > 0 && viewportHeight > 0) {
         this.renderDropZone(
@@ -531,18 +557,29 @@ export class SceneView extends BaseView<SceneModel> {
         );
       }
     }
-    this.model.camera.viewport = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
-    this.model.camera.scissor = [this._tab.width, this._statusbar.height, viewportWidth, viewportHeight];
-    if (this.model.camera instanceof PerspectiveCamera) {
-      this.model.camera.aspect = viewportWidth / viewportHeight;
-    } else if (this.model.camera instanceof OrthoCamera) {
-      this.model.camera.bottom = -10;
-      this.model.camera.top = 10;
-      this.model.camera.left = (-10 * viewportWidth) / viewportHeight;
-      this.model.camera.right = (10 * viewportWidth) / viewportHeight;
+    if (viewportWidth > 0 && viewportHeight > 0) {
+      this.model.camera.viewport = [
+        this._tab.width,
+        this._statusbar.height + this._assetView.height,
+        viewportWidth,
+        viewportHeight
+      ];
+      this.model.camera.scissor = [
+        this._tab.width,
+        this._statusbar.height + this._assetView.height,
+        viewportWidth,
+        viewportHeight
+      ];
+      if (this.model.camera instanceof PerspectiveCamera) {
+        this.model.camera.aspect = viewportWidth / viewportHeight;
+      } else if (this.model.camera instanceof OrthoCamera) {
+        this.model.camera.bottom = -10;
+        this.model.camera.top = 10;
+        this.model.camera.left = (-10 * viewportWidth) / viewportHeight;
+        this.model.camera.right = (10 * viewportWidth) / viewportHeight;
+      }
+      this.model.camera.render(this.model.scene);
     }
-    this.model.camera.render(this.model.scene);
-
     this._statusbar.render();
 
     this._currentEditTool.get()?.render();
@@ -648,14 +685,7 @@ export class SceneView extends BaseView<SceneModel> {
             switch (this._typeToBePlaced) {
               case 'asset':
                 this._cmdManager
-                  .execute(
-                    new AddAssetCommand(
-                      this.model.scene,
-                      this._serializationManager.assetRegistry,
-                      this._assetToBeAdded,
-                      pos
-                    )
-                  )
+                  .execute(new AddAssetCommand(this.model.scene, this._assetToBeAdded, pos))
                   .then((node) => {
                     this._tab.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
@@ -729,7 +759,7 @@ export class SceneView extends BaseView<SceneModel> {
         ) {
           if (node) {
             let assetNode = node;
-            while (assetNode && !this._serializationManager.assetRegistry.getAssetId(assetNode)) {
+            while (assetNode && !ProjectManager.projectSerializationManager.getAssetId(assetNode)) {
               assetNode = assetNode.parent;
             }
             if (assetNode) {
@@ -954,8 +984,8 @@ export class SceneView extends BaseView<SceneModel> {
     if (!id) {
       const label =
         prop.type === 'rgb' || prop.type === 'rgba'
-          ? `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`
-          : `Edit animation track - ${this._serializationManager.getPropertyName(prop)}`;
+          ? `Edit animation track - ${ProjectManager.projectSerializationManager.getPropertyName(prop)}`
+          : `Edit animation track - ${ProjectManager.projectSerializationManager.getPropertyName(prop)}`;
       const value: PropertyValue = { num: [0, 0, 0, 0] };
       prop.get.call(target, value);
       id = { id: `${label}##EditTrack${this._trackId++}`, value: value.num };
@@ -1027,19 +1057,17 @@ export class SceneView extends BaseView<SceneModel> {
     if (!node) {
       return;
     }
-    this._cmdManager
-      .execute(new NodeCloneCommand(node, method, this._serializationManager.assetRegistry))
-      .then((sceneNode) => {
-        sceneNode.position.x += 1;
-        this._tab.sceneHierarchy.selectNode(sceneNode);
-      });
+    this._cmdManager.execute(new NodeCloneCommand(node, method)).then((sceneNode) => {
+      sceneNode.position.x += 1;
+      this._tab.sceneHierarchy.selectNode(sceneNode);
+    });
   }
   private handleEditNode(node: SceneNode) {
     if (!node) {
       return;
     }
     if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(this.editor, node, this._serializationManager.assetRegistry));
+      this._currentEditTool.set(createEditTool(this.editor, node));
     } else {
       this._currentEditTool.dispose();
     }
@@ -1061,7 +1089,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
     }
-    this._cmdManager.execute(new NodeDeleteCommand(node, this._serializationManager));
+    this._cmdManager.execute(new NodeDeleteCommand(node));
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
@@ -1123,7 +1151,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    this._serializationManager.assetRegistry
+    ProjectManager.projectSerializationManager
       .fetchModel(asset.uuid, this.model.scene)
       .then((node) => {
         node.group.parent = null;
@@ -1186,7 +1214,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      this._serializationManager.getPropertyByName('/SceneNode/Position')
+      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Position')
     );
   }
   private handleEndRotateNode(node: SceneNode) {
@@ -1194,7 +1222,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      this._serializationManager.getPropertyByName('/SceneNode/Rotation')
+      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Rotation')
     );
   }
   private handleEndScaleNode(node: SceneNode) {
@@ -1202,7 +1230,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      this._serializationManager.getPropertyByName('/SceneNode/Scale')
+      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Scale')
     );
   }
   private handleEditAABB(aabb: AABB) {

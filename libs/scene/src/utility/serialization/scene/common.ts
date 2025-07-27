@@ -5,14 +5,14 @@ import type {
   TextureCube,
   TextureSampler
 } from '@zephyr3d/device';
-import type { AssetRegistry } from '../asset/asset';
 import type { PropertyAccessor } from '../types';
 import type { Material } from '../../../material';
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
 import { Application } from '../../../app';
+import { SerializationManager } from '../manager';
 
 export function getTextureProps<T extends Material>(
-  assetRegistry: AssetRegistry,
+  manager: SerializationManager,
   name: keyof T & string & { [P in keyof T]: T[P] extends Texture2D | TextureCube ? P : never }[keyof T],
   type: T[typeof name] extends Texture2D ? '2D' : T[typeof name] extends TextureCube ? 'Cube' : never,
   phase: number,
@@ -28,7 +28,7 @@ export function getTextureProps<T extends Material>(
         return true;
       },
       get(value) {
-        value.str[0] = assetRegistry.getAssetId(this[name]) ?? '';
+        value.str[0] = manager.getAssetId(this[name]) ?? '';
       },
       async set(value) {
         if (!value) {
@@ -36,26 +36,19 @@ export function getTextureProps<T extends Material>(
         } else {
           if (value.str[0]) {
             const assetId = value.str[0];
-            const assetInfo = assetRegistry.getAssetInfo(assetId);
-            if (assetInfo && assetInfo.type === 'texture') {
-              let tex: Texture2D | TextureCube;
-              try {
-                tex = await assetRegistry.fetchTexture<Texture2D | TextureCube>(
-                  assetId,
-                  assetInfo.textureOptions
-                );
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                tex = null;
-              }
-              const isValidTextureType =
-                type === '2D' ? tex?.isTexture2D() : type === 'Cube' ? tex?.isTextureCube() : false;
-              if (isValidTextureType) {
-                tex.name = assetInfo.name;
-                this[name] = tex as any;
-              } else {
-                console.error('Invalid texture type');
-              }
+            let tex: Texture2D | TextureCube;
+            try {
+              tex = await manager.fetchTexture<Texture2D | TextureCube>(assetId);
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+              tex = null;
+            }
+            const isValidTextureType =
+              type === '2D' ? tex?.isTexture2D() : type === 'Cube' ? tex?.isTextureCube() : false;
+            if (isValidTextureType) {
+              this[name] = tex as any;
+            } else {
+              console.error('Invalid texture type');
             }
           }
         }

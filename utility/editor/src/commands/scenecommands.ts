@@ -1,10 +1,8 @@
 import type {
-  AssetRegistry,
   ModelInfo,
   NodeCloneMethod,
   Scene,
   SceneNode,
-  SerializationManager,
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
@@ -24,6 +22,7 @@ import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
+import { ProjectManager } from '../core/projectmgr';
 
 const idNodeMap: Record<string, SceneNode> = {};
 
@@ -31,14 +30,12 @@ export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : vo
 
 export class AddAssetCommand extends Command<SceneNode> {
   private _scene: Scene;
-  private _assetRegistry: AssetRegistry;
   private _asset: DBAssetInfo;
   private _nodeId: string;
   private _position: Vector3;
-  constructor(scene: Scene, assetRegistry: AssetRegistry, asset: DBAssetInfo, position: Vector3) {
+  constructor(scene: Scene, asset: DBAssetInfo, position: Vector3) {
     super('Add asset');
     this._scene = scene;
-    this._assetRegistry = assetRegistry;
     this._nodeId = '';
     this._asset = { ...asset };
     this._position = new Vector3(position);
@@ -46,7 +43,7 @@ export class AddAssetCommand extends Command<SceneNode> {
   async execute() {
     let asset: ModelInfo = null;
     try {
-      asset = await this._assetRegistry.fetchModel(this._asset.uuid, this._scene);
+      asset = await ProjectManager.projectSerializationManager.fetchModel(this._asset.uuid, this._scene);
     } catch (err) {
       console.error(`Load asset failed: ${this._asset.name}: ${err}`);
     }
@@ -218,15 +215,13 @@ export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
 }
 
 export class NodeDeleteCommand extends Command {
-  private _manager: SerializationManager;
   private _scene: any;
   private _archive: any;
   private _nodeId: string;
   private _parentId: string;
-  constructor(node: SceneNode, manager: SerializationManager) {
+  constructor(node: SceneNode) {
     super('Delete node');
     this._scene = node.scene;
-    this._manager = manager;
     this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
     this._parentId = node.parent.persistentId;
@@ -237,7 +232,12 @@ export class NodeDeleteCommand extends Command {
     const node = idNodeMap[this._nodeId];
     if (node) {
       const nodeHierarchy = new NodeHierarchy(node.scene, node);
-      this._archive = await serializeObject(nodeHierarchy, this._manager, null, null); // await serializeObject(node, this._assetRegistry);
+      this._archive = await serializeObject(
+        nodeHierarchy,
+        ProjectManager.projectSerializationManager,
+        null,
+        null
+      ); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.persistentId];
@@ -252,7 +252,7 @@ export class NodeDeleteCommand extends Command {
         const nodeHierarchy = await deserializeObject<NodeHierarchy>(
           this._scene,
           this._archive,
-          this._manager
+          ProjectManager.projectSerializationManager
         );
         const node = nodeHierarchy.rootNode;
         //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
@@ -306,13 +306,11 @@ export class NodeCloneCommand extends Command<SceneNode> {
   private _nodeId: string;
   private _newNodeId: string;
   private _method: NodeCloneMethod;
-  private _assetRegistry: AssetRegistry;
-  constructor(node: SceneNode, method: NodeCloneMethod, assetRegistry: AssetRegistry) {
+  constructor(node: SceneNode, method: NodeCloneMethod) {
     super('Clone node');
     this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
     this._method = method;
-    this._assetRegistry = assetRegistry;
     this._newNodeId = '';
   }
   async execute(): Promise<SceneNode> {
@@ -326,9 +324,9 @@ export class NodeCloneCommand extends Command<SceneNode> {
       if (!node || node.sealed) {
         return null;
       }
-      const assetId = that._assetRegistry.getAssetId(node);
+      const assetId = ProjectManager.projectSerializationManager.getAssetId(node);
       if (assetId) {
-        newNode = (await that._assetRegistry.fetchModel(assetId, node.scene)).group;
+        newNode = (await ProjectManager.projectSerializationManager.fetchModel(assetId, node.scene)).group;
         newNode.copyFrom(node, 'instance', false);
       } else {
         newNode = node.clone(that._method, false);

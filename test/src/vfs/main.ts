@@ -60,7 +60,7 @@ function createVFS(name = 'TestVFS', readonly = false) {
   if (currentTest === 0) {
     return new MemoryFS(name, readonly);
   } else if (currentTest === 1) {
-    return new IndexedDBFS(name, readonly);
+    return new IndexedDBFS(name, 'files', readonly);
   } else {
     return new ZipFS(name, zipjs, readonly);
   }

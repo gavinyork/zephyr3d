@@ -1,5 +1,4 @@
-import type { GenericConstructor } from '@zephyr3d/base';
-import type { AssetRegistry } from './asset/asset';
+import type { GenericConstructor, VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass } from './scene/node';
@@ -35,8 +34,10 @@ import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './scene/animation';
-import type { SceneNode } from '../../scene';
+import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
+import { AssetManager, ModelFetchOptions, TextureFetchOptions } from '../../asset';
+import { Texture2D, TextureCube } from '@zephyr3d/device';
 
 /**
  * Serialization manager class
@@ -44,12 +45,16 @@ import type { PropertyTrack } from '../../animation';
  */
 export class SerializationManager {
   private _classMap: Map<GenericConstructor, SerializableClass>;
-  private _assetRegistry: AssetRegistry;
+  private _vfs: VFS;
   private _propMap: Record<string, PropertyAccessor>;
   private _propNameMap: Map<PropertyAccessor, string>;
   private _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
-  constructor(assetRegistry: AssetRegistry) {
-    this._assetRegistry = assetRegistry;
+  private _assetManager: AssetManager;
+  private _allocated: WeakMap<any, string>;
+  constructor(vfs: VFS) {
+    this._vfs = vfs;
+    this._allocated = new WeakMap();
+    this._assetManager = new AssetManager(this._vfs);
     this._propMap = {};
     this._propNameMap = new Map();
     this._clsPropMap = new Map();
@@ -97,8 +102,8 @@ export class SerializationManager {
       this.registerProps(k[1]);
     }
   }
-  get assetRegistry() {
-    return this._assetRegistry;
+  get vfs() {
+    return this._vfs;
   }
   getClasses(): SerializableClass[] {
     return [...this._classMap.values()];
@@ -142,6 +147,42 @@ export class SerializationManager {
       this._classMap.set(cls.ctor, cls);
       this.registerProps(cls);
     }
+  }
+  getAssetId(asset: unknown) {
+    return this._allocated.get(asset) ?? null;
+  }
+  async fetchBinary(id: string) {
+    const data = await this.doFetchBinary(id);
+    if (data) {
+      this._allocated.set(data, id);
+    }
+    return data;
+  }
+  protected async doFetchBinary(path: string) {
+    return await this._assetManager.fetchBinaryData(path, null);
+  }
+  protected async doFetchModel(path: string, scene: Scene, options?: ModelFetchOptions) {
+    return await this._assetManager.fetchModel(scene, path, options);
+  }
+  protected async doFetchTexture<T extends Texture2D | TextureCube>(
+    path: string,
+    options?: TextureFetchOptions<T>
+  ) {
+    return await this._assetManager.fetchTexture<T>(path, options);
+  }
+  async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions) {
+    const model = await this.doFetchModel(id, scene, options);
+    if (model) {
+      this._allocated.set(model.group, id);
+    }
+    return model;
+  }
+  async fetchTexture<T extends Texture2D | TextureCube>(id: string, options?: TextureFetchOptions<T>) {
+    const texture = await this.doFetchTexture(id, options);
+    if (texture) {
+      this._allocated.set(texture, id);
+    }
+    return texture;
   }
   private static _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {

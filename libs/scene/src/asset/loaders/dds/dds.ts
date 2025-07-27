@@ -73,15 +73,15 @@ enum DXGIFormat {
 
 function FourCCToInt32(value: string) {
   return (
-    value.charCodeAt(0) +
-    (value.charCodeAt(1) << 8) +
-    (value.charCodeAt(2) << 16) +
-    (value.charCodeAt(3) << 24)
+    value.codePointAt(0) +
+    (value.codePointAt(1) << 8) +
+    (value.codePointAt(2) << 16) +
+    (value.codePointAt(3) << 24)
   );
 }
 
 function Int32ToFourCC(value: number) {
-  return String.fromCharCode(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);
+  return String.fromCodePoint(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);
 }
 
 interface DDSPixelFormat {

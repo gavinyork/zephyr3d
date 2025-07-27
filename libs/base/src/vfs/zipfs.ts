@@ -555,7 +555,7 @@ export class ZipFS extends VFS {
       } else if (options?.encoding === 'base64') {
         if (data instanceof ArrayBuffer) {
           const bytes = new Uint8Array(data);
-          data = btoa(String.fromCharCode(...bytes));
+          data = btoa(String.fromCodePoint(...bytes));
         } else if (typeof data === 'string') {
           data = btoa(data);
         }
@@ -607,7 +607,7 @@ export class ZipFS extends VFS {
 
       if (options?.encoding === 'base64') {
         const bytes = new Uint8Array(arrayBuffer);
-        let base64String = btoa(String.fromCharCode(...bytes));
+        let base64String = btoa(String.fromCodePoint(...bytes));
 
         if (options?.offset !== undefined || options?.length !== undefined) {
           const offset = options.offset || 0;
@@ -679,7 +679,7 @@ export class ZipFS extends VFS {
         const binaryString = atob(fileData);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+          bytes[i] = binaryString.codePointAt(i);
         }
         fileData = bytes.buffer;
       } catch (_error) {

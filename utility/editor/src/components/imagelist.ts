@@ -1,9 +1,9 @@
 import { makeEventTarget } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import type { AssetRegistry } from '@zephyr3d/scene';
 import { Application, DRef } from '@zephyr3d/scene';
 import type { DBAssetInfo } from '../storage/db';
+import { ProjectManager } from '../core/projectmgr';
 
 type ImageInfo = {
   texture: DRef<Texture2D>;
@@ -22,11 +22,10 @@ export class ImageList extends makeEventTarget(Object)<{
   private _spacingX: number;
   private _spacingY: number;
   private _acceptDragDrop: boolean;
-  private _assetRegistry: AssetRegistry;
   private _defaultImage: DRef<Texture2D>;
   private _selectable: boolean;
   private _maxImageCount: number;
-  constructor(assetRegistry: AssetRegistry) {
+  constructor() {
     super();
     this._images = [];
     this._isDragging = false;
@@ -39,7 +38,6 @@ export class ImageList extends makeEventTarget(Object)<{
     this._acceptDragDrop = true;
     this._defaultImage = new DRef(Application.instance.device.createTexture2D('rgba8unorm', 1, 1));
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
-    this._assetRegistry = assetRegistry;
     this._maxImageCount = -1;
   }
   get defaultImage() {
@@ -142,30 +140,26 @@ export class ImageList extends makeEventTarget(Object)<{
       const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
       if (payload) {
         const assetId = (payload.Data as DBAssetInfo).uuid;
-        const assetInfo = this._assetRegistry.getAssetInfo(assetId);
-        if (assetInfo && assetInfo.type === 'texture') {
-          this._assetRegistry
-            .fetchTexture<Texture2D>(assetId, {
-              ...assetInfo.textureOptions,
-              linearColorSpace: this._linearColorSpace
-            })
-            .then((tex) => {
-              if (tex?.isTexture2D()) {
-                if (replace) {
-                  this.replaceImage(tex, index);
-                  this.dispatchEvent('update_image', assetId, index);
-                } else {
-                  this.insertImage(tex, index);
-                  this.dispatchEvent('add_image', assetId, index);
-                }
+        ProjectManager.projectSerializationManager
+          .fetchTexture<Texture2D>(assetId, {
+            linearColorSpace: this._linearColorSpace
+          })
+          .then((tex) => {
+            if (tex?.isTexture2D()) {
+              if (replace) {
+                this.replaceImage(tex, index);
+                this.dispatchEvent('update_image', assetId, index);
               } else {
-                console.error('Invalid texture');
+                this.insertImage(tex, index);
+                this.dispatchEvent('add_image', assetId, index);
               }
-            })
-            .catch((err) => {
-              console.error(`Load asset failed: ${assetId}: ${err}`);
-            });
-        }
+            } else {
+              console.error('Invalid texture');
+            }
+          })
+          .catch((err) => {
+            console.error(`Load asset failed: ${assetId}: ${err}`);
+          });
       }
       ImGui.EndDragDropTarget();
     }

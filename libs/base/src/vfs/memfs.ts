@@ -12,6 +12,15 @@ export class MemoryFS extends VFS {
 
   constructor(name = 'MemoryFS', readonly = false) {
     super(name, readonly);
+    const now = new Date();
+    this.metadata.set('/', {
+      created: now,
+      modified: now,
+      name: '',
+      path: '/',
+      size: 0,
+      type: 'directory'
+    });
   }
 
   protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {

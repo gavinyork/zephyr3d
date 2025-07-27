@@ -1,4 +1,3 @@
-import type { Scene } from '../../scene';
 import type { EmbeddedAssetInfo } from './asset/asset';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import type { SerializationManager } from './manager';
@@ -211,9 +210,6 @@ export function serializeObjectProps<T extends object>(
             : null;
         if (value) {
           json[k] = value;
-          if (assetList && typeof json[k] === 'string' && manager.assetRegistry.getAssetInfo(json[k])) {
-            assetList.add(json[k]);
-          }
         }
         break;
       }
@@ -329,9 +325,6 @@ export function serializeObject(
   json.Object = {};
   if (initParams !== undefined && initParams !== null) {
     json.Init = initParams;
-    if (assetList && initParams.asset && manager.assetRegistry.getAssetInfo(initParams.asset)) {
-      assetList.add(initParams.asset);
-    }
   }
   while (info) {
     if (embeddedAssetList && info.getEmbeddedAssets) {
@@ -407,35 +400,4 @@ export async function deserializeObject<T extends object>(
     }
   }
   return obj;
-}
-
-/**
- * Deserializes a complete scene from a URL.
- *
- * This is a high-level convenience function that:
- * - Fetches JSON data from the specified URL
- * - Parses the JSON content
- * - Deserializes the scene object
- * - Extracts metadata if present
- *
- * @param url - URL to fetch the scene JSON from
- * @param manager - Serialization manager with all necessary class registrations
- * @returns Promise resolving to an object containing the scene and metadata
- *
- * @public
- */
-export async function deserializeSceneFromURL(
-  url: string,
-  manager: SerializationManager
-): Promise<{ scene: Scene; meta: any }> {
-  try {
-    const data = await manager.assetRegistry.assetManager.fetchTextData(url);
-    const json = JSON.parse(data);
-    const scene = await deserializeObject<Scene>(null, json, manager);
-    const meta = json['meta'] ?? null;
-    return { scene, meta };
-  } catch (err) {
-    console.error(`Deserialize scene failed: ${err}`);
-    return null;
-  }
 }

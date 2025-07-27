@@ -1,6 +1,6 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, SceneNode } from '../../../scene';
-import type { AssetRegistry, EmbeddedAssetInfo } from '../asset/asset';
+import type { EmbeddedAssetInfo } from '../asset/asset';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
@@ -42,7 +42,7 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
 
 async function getTerrainGrassContent(
   terrain: ClipmapTerrain,
-  assetRegistry: AssetRegistry
+  manager: SerializationManager
 ): Promise<EmbeddedAssetInfo> {
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array[] = [];
@@ -79,7 +79,7 @@ async function getTerrainGrassContent(
   offset += 4;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
     const grassTexture = grassRenderer.getGrassTexture(i);
-    const assetId = grassTexture ? assetRegistry.getAssetId(grassTexture) ?? '' : '';
+    const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
     writeUUID(data, offset, assetId);
     offset += 36;
     data.setUint32(offset, layerDatas[i].length, true);
@@ -147,7 +147,7 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Embed
   };
 }
 
-function getDetailMapProps(assetRegistry: AssetRegistry) {
+function getDetailMapProps(manager: SerializationManager) {
   const props: PropertyAccessor<ClipmapTerrain>[] = [];
   for (let i = 0; i < MAX_TERRAIN_MIPMAP_LEVELS; i++) {
     const accessorDetailAlbedo: PropertyAccessor<ClipmapTerrain> = {
@@ -164,7 +164,7 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
         return true;
       },
       get(this: ClipmapTerrain, value) {
-        value.str[0] = assetRegistry.getAssetId(this.material.getDetailMap(i)) ?? '';
+        value.str[0] = manager.getAssetId(this.material.getDetailMap(i)) ?? '';
       },
       async set(value) {
         if (!value) {
@@ -172,21 +172,17 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
         } else {
           if (value.str[0]) {
             const assetId = value.str[0];
-            const assetInfo = assetRegistry.getAssetInfo(assetId);
-            if (assetInfo && assetInfo.type === 'texture') {
-              let tex: Texture2D;
-              try {
-                tex = await assetRegistry.fetchTexture<Texture2D>(assetId, assetInfo.textureOptions);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                tex = null;
-              }
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.material.setDetailMap(i, tex);
-              } else {
-                console.error('Invalid texture type');
-              }
+            let tex: Texture2D;
+            try {
+              tex = await manager.fetchTexture<Texture2D>(assetId);
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+              tex = null;
+            }
+            if (tex?.isTexture2D()) {
+              this.material.setDetailMap(i, tex);
+            } else {
+              console.error('Invalid texture type');
             }
           }
         }
@@ -206,7 +202,7 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
         return this.numDetailMaps > i;
       },
       get(this: ClipmapTerrain, value) {
-        value.str[0] = assetRegistry.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
+        value.str[0] = manager.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
       },
       async set(value) {
         if (!value) {
@@ -214,24 +210,19 @@ function getDetailMapProps(assetRegistry: AssetRegistry) {
         } else {
           if (value.str[0]) {
             const assetId = value.str[0];
-            const assetInfo = assetRegistry.getAssetInfo(assetId);
-            if (assetInfo && assetInfo.type === 'texture') {
-              let tex: Texture2D;
-              try {
-                tex = await assetRegistry.fetchTexture<Texture2D>(assetId, {
-                  ...assetInfo.textureOptions,
-                  linearColorSpace: true
-                });
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                tex = null;
-              }
-              if (tex?.isTexture2D()) {
-                tex.name = assetInfo.name;
-                this.material.setDetailNormalMap(i, tex);
-              } else {
-                console.error('Invalid texture type');
-              }
+            let tex: Texture2D;
+            try {
+              tex = await manager.fetchTexture<Texture2D>(assetId, {
+                linearColorSpace: true
+              });
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+              tex = null;
+            }
+            if (tex?.isTexture2D()) {
+              this.material.setDetailNormalMap(i, tex);
+            } else {
+              console.error('Invalid texture type');
             }
           }
         }
@@ -295,14 +286,14 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
       return [
         getTerrainHeightMapContent(obj),
         getTerrainSplatMapContent(obj),
-        getTerrainGrassContent(obj, manager.assetRegistry)
+        getTerrainGrassContent(obj, manager)
       ];
     },
     getAssets(obj: ClipmapTerrain) {
       const assets: string[] = [];
       for (let i = 0; i < obj.grassRenderer.numLayers; i++) {
         const grassTexture = obj.grassRenderer.getGrassTexture(i);
-        const assetId = grassTexture ? manager.assetRegistry.getAssetId(grassTexture) ?? '' : '';
+        const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
         if (assetId) {
           assets.push(assetId);
         }
@@ -361,7 +352,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
             this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
-        ...getDetailMapProps(manager.assetRegistry),
+        ...getDetailMapProps(manager),
         {
           name: 'SplatMap',
           type: 'object',
@@ -375,34 +366,31 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'binary') {
-                let data: ArrayBuffer = null;
-                try {
-                  data = await manager.assetRegistry.fetchBinary(assetId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  data = null;
-                }
-                if (!data) {
-                  console.error('Load height map failed');
-                  return;
-                }
-                const dataView = new DataView(data);
-                const width = dataView.getUint32(0, true);
-                const height = dataView.getUint32(4, true);
-                const numLayers = dataView.getUint32(8, true);
-                const splatMap = this.splatMap;
-                if (splatMap.width !== width || splatMap.height !== height) {
-                  console.error('Invalid splatmap data');
-                  return;
-                }
-                for (let i = 0; i < numLayers; i++) {
-                  const content = new Uint8Array(data, 3 * 4 + i * width * height * 4, width * height * 4);
-                  splatMap.update(content, 0, 0, i, width, height, 1);
-                }
-                this.splatMapAssetId = value.str[0];
+              let data: ArrayBuffer = null;
+              try {
+                data = await manager.fetchBinary(assetId);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                data = null;
               }
+              if (!data) {
+                console.error('Load height map failed');
+                return;
+              }
+              const dataView = new DataView(data);
+              const width = dataView.getUint32(0, true);
+              const height = dataView.getUint32(4, true);
+              const numLayers = dataView.getUint32(8, true);
+              const splatMap = this.splatMap;
+              if (splatMap.width !== width || splatMap.height !== height) {
+                console.error('Invalid splatmap data');
+                return;
+              }
+              for (let i = 0; i < numLayers; i++) {
+                const content = new Uint8Array(data, 3 * 4 + i * width * height * 4, width * height * 4);
+                splatMap.update(content, 0, 0, i, width, height, 1);
+              }
+              this.splatMapAssetId = value.str[0];
             }
           }
         },
@@ -419,73 +407,58 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'binary') {
-                let data: ArrayBuffer = null;
-                try {
-                  data = await manager.assetRegistry.fetchBinary(assetId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  data = null;
+              let data: ArrayBuffer = null;
+              try {
+                data = await manager.fetchBinary(assetId);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                data = null;
+              }
+              if (!data) {
+                console.error('Load grass data failed');
+                return;
+              }
+              const dataView = new DataView(data);
+              let offset = 0;
+              const numLayers = dataView.getUint32(offset, true);
+              offset += 4;
+              for (let i = 0; i < numLayers; i++) {
+                const assetId = readUUID(dataView, offset);
+                offset += 36;
+                let texture: Texture2D = null;
+                if (assetId) {
+                  try {
+                    texture = await manager.fetchTexture<Texture2D>(assetId);
+                  } catch (err) {
+                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                    texture = null;
+                  }
+                  if (!texture?.isTexture2D()) {
+                    console.error('Invalid texture type');
+                    texture?.dispose();
+                    texture = null;
+                  }
                 }
-                if (!data) {
-                  console.error('Load grass data failed');
-                  return;
-                }
-                const dataView = new DataView(data);
-                let offset = 0;
-                const numLayers = dataView.getUint32(offset, true);
+                const dataSize = dataView.getUint32(offset, true);
                 offset += 4;
-                for (let i = 0; i < numLayers; i++) {
-                  const assetId = readUUID(dataView, offset);
-                  offset += 36;
-                  let texture: Texture2D = null;
-                  if (assetId) {
-                    const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-                    if (assetInfo && assetInfo.type === 'texture') {
-                      try {
-                        texture = await manager.assetRegistry.fetchTexture<Texture2D>(
-                          assetId,
-                          assetInfo.textureOptions
-                        );
-                      } catch (err) {
-                        console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                        texture = null;
-                      }
-                      if (texture?.isTexture2D()) {
-                        texture.name = assetInfo.name;
-                      } else {
-                        console.error('Invalid texture type');
-                        texture?.dispose();
-                        texture = null;
-                      }
-                    }
+                const bladeWidth = dataView.getFloat32(offset, true);
+                offset += 4;
+                const bladeHeight = dataView.getFloat32(offset, true);
+                offset += 4;
+                this.grassRenderer.addLayer(bladeWidth, bladeHeight, texture);
+                if (dataSize > 0) {
+                  const data = new Float32Array(dataView.buffer, dataView.byteOffset + offset, dataSize >> 2);
+                  const numInstances = data.length >> 2;
+                  const instances: GrassInstanceInfo[] = [];
+                  for (let i = 0; i < numInstances; i++) {
+                    instances.push({
+                      x: data[i * 4 + 0],
+                      y: data[i * 4 + 1],
+                      angle: Math.atan2(data[i * 4 + 2], data[i * 4 + 3])
+                    });
                   }
-                  const dataSize = dataView.getUint32(offset, true);
-                  offset += 4;
-                  const bladeWidth = dataView.getFloat32(offset, true);
-                  offset += 4;
-                  const bladeHeight = dataView.getFloat32(offset, true);
-                  offset += 4;
-                  this.grassRenderer.addLayer(bladeWidth, bladeHeight, texture);
-                  if (dataSize > 0) {
-                    const data = new Float32Array(
-                      dataView.buffer,
-                      dataView.byteOffset + offset,
-                      dataSize >> 2
-                    );
-                    const numInstances = data.length >> 2;
-                    const instances: GrassInstanceInfo[] = [];
-                    for (let i = 0; i < numInstances; i++) {
-                      instances.push({
-                        x: data[i * 4 + 0],
-                        y: data[i * 4 + 1],
-                        angle: Math.atan2(data[i * 4 + 2], data[i * 4 + 3])
-                      });
-                    }
-                    this.grassRenderer.addInstances(i, instances);
-                    offset += dataSize;
-                  }
+                  this.grassRenderer.addInstances(i, instances);
+                  offset += dataSize;
                 }
                 this.grassAssetId = value.str[0];
               }
@@ -505,28 +478,25 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'binary') {
-                let data: ArrayBuffer = null;
-                try {
-                  data = await manager.assetRegistry.fetchBinary(assetId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  data = null;
-                }
-                if (!data) {
-                  console.error('Load height map failed');
-                  return;
-                }
-                const dataView = new DataView(data);
-                const width = dataView.getUint32(0, true);
-                const height = dataView.getUint32(4, true);
-                const heightMap = this.createHeightMapTexture(width, height);
-                heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
-                this.heightMap = heightMap;
-                this.heightMapAssetId = value.str[0];
-                this.updateBoundingBox();
+              let data: ArrayBuffer = null;
+              try {
+                data = await manager.fetchBinary(assetId);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                data = null;
               }
+              if (!data) {
+                console.error('Load height map failed');
+                return;
+              }
+              const dataView = new DataView(data);
+              const width = dataView.getUint32(0, true);
+              const height = dataView.getUint32(4, true);
+              const heightMap = this.createHeightMapTexture(width, height);
+              heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
+              this.heightMap = heightMap;
+              this.heightMapAssetId = value.str[0];
+              this.updateBoundingBox();
             }
           }
         }

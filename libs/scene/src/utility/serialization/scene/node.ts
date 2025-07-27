@@ -175,7 +175,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
     ctor: SceneNode,
     async createFunc(ctx: NodeHierarchy | SceneNode, init?: { asset?: string }) {
       if (init?.asset) {
-        return { obj: (await manager.assetRegistry.fetchModel(init.asset, ctx.scene)).group };
+        return { obj: (await manager.fetchModel(init.asset, ctx.scene)).group };
       }
       const node = new SceneNode(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -184,7 +184,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
       return { obj: node };
     },
     getInitParams(obj: SceneNode) {
-      const asset = manager.assetRegistry.getAssetId(obj);
+      const asset = manager.getAssetId(obj);
       return asset ? { asset } : undefined;
     },
     getProps() {

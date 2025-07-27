@@ -3,24 +3,20 @@ import type { DBAssetInfo, DBAssetPackage } from '../storage/db';
 import { Database } from '../storage/db';
 import { FilePicker } from './filepicker';
 import { DlgProgress } from '../views/dlg/progressdlg';
-import { AssetStore } from '../helpers/assetstore';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
 import type { AssetType } from '@zephyr3d/scene';
-import type { AssetRegistry } from '@zephyr3d/scene';
 
 export class AssetHierarchy {
   private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _assets: { pkg: DBAssetPackage; assets: DBAssetInfo[] }[];
   private _selectedAsset: DBAssetInfo;
   private _zipProgress: DlgProgress;
-  private _assetRegistry: AssetRegistry;
-  constructor(assetRegistry: AssetRegistry) {
+  constructor() {
     this._assets = [];
     this._selectedAsset = null;
     this._zipProgress = null;
-    this._assetRegistry = assetRegistry;
     this.listAssets();
   }
   get assets() {
@@ -28,9 +24,6 @@ export class AssetHierarchy {
   }
   get uploadProgress() {
     return this._zipProgress;
-  }
-  get assetRegistry() {
-    return this._assetRegistry;
   }
   render() {
     this.renderAssetGroup('model');
@@ -74,10 +67,7 @@ export class AssetHierarchy {
     const assetFiles: string[] = [];
     const fileList = files.map((file) => {
       const path = file.webkitRelativePath.split('/').slice(1).join('/');
-      const filename = file.name.toLowerCase();
-      if (AssetStore.modelExtensions.findIndex((ext) => filename.endsWith(ext)) >= 0) {
-        assetFiles.push(path);
-      }
+      assetFiles.push(path);
       return { path, file };
     });
     if (assetFiles.length === 0) {
@@ -111,16 +101,6 @@ export class AssetHierarchy {
   }
   async doUploadAssetFile(type: AssetType, files: File[], name?: string) {
     for (const file of files) {
-      const extensions =
-        type === 'model'
-          ? AssetStore.modelExtensions
-          : type === 'texture'
-          ? AssetStore.textureExtensions
-          : [];
-      if (extensions.findIndex((ext) => file.name.toLowerCase().endsWith(ext)) < 0) {
-        Dialog.messageBox('Error', `Invalid file type. Only ${extensions.join(', ')} files are supported.`);
-        return;
-      }
       await Database.uploadAssets(type, file.name, [
         { data: file, path: file.name, name: name ?? file.name }
       ]);
@@ -234,15 +214,6 @@ export class AssetHierarchy {
     if (ImGui.BeginPopup(`context_${asset.uuid}`)) {
       if (asset.type === 'model' && ImGui.MenuItem('Add to scene')) {
         eventBus.dispatchEvent('scene_add_asset', asset);
-      }
-      if (ImGui.MenuItem('Rename')) {
-        Dialog.rename('Rename Asset', asset.name, 300).then((name) => {
-          if (name) {
-            asset.name = name;
-            this._assetRegistry.renameAsset(asset.uuid, name);
-            Database.putAsset(asset);
-          }
-        });
       }
       if (ImGui.MenuItem('Export')) {
         Database.getPackage(asset.pkg)

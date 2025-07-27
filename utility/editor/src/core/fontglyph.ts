@@ -21,7 +21,7 @@ export class FontGlyph {
       for (const glyph of config.glyphs) {
         imGuiSetFontGlyph(glyph.code, deviceFont);
         //console.log(`==> ${glyph.css}`);
-        this.glyphs[glyph.css] = String.fromCharCode(glyph.code);
+        this.glyphs[glyph.css] = String.fromCodePoint(glyph.code);
         this.allGlyphs += this.glyphs[glyph.css];
       }
     } catch (err) {

@@ -55,7 +55,7 @@ export class AssetRegistry {
   constructor(baseUrl?: string) {
     this._assetMap = new Map();
     this._allocated = new WeakMap();
-    this._assetManager = new AssetManager();
+    this._assetManager = new AssetManager(null);
     this._baseUrl = baseUrl ?? '';
   }
   async loadFromURL(url: string) {
@@ -104,8 +104,8 @@ export class AssetRegistry {
     }
     return data;
   }
-  async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions, request?: HttpRequest) {
-    const model = await this.doFetchModel(id, scene, options, request);
+  async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions) {
+    const model = await this.doFetchModel(id, scene, options);
     if (model) {
       this._allocated.set(model.group, id);
     }
@@ -154,17 +154,12 @@ export class AssetRegistry {
     }
     return await this._assetManager.fetchBinaryData(info.path, null, request);
   }
-  protected async doFetchModel(
-    name: string,
-    scene: Scene,
-    options?: ModelFetchOptions,
-    request?: HttpRequest
-  ) {
+  protected async doFetchModel(name: string, scene: Scene, options?: ModelFetchOptions) {
     const info = this._assetMap.get(name);
     if (!info || info.type !== 'model') {
       return null;
     }
-    return await this._assetManager.fetchModel(scene, info.path, options, request);
+    return await this._assetManager.fetchModel(scene, info.path, options);
   }
   protected async doFetchTexture<T extends Texture2D | TextureCube>(
     name: string,

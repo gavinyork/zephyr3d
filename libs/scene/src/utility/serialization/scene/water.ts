@@ -309,7 +309,7 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
             return true;
           },
           get(this: Water, value) {
-            value.str[0] = manager.assetRegistry.getAssetId(this.material.scatterRampTexture) ?? '';
+            value.str[0] = manager.getAssetId(this.material.scatterRampTexture) ?? '';
           },
           async set(value) {
             if (!value) {
@@ -317,24 +317,17 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-                if (assetInfo && assetInfo.type === 'texture') {
-                  let tex: Texture2D;
-                  try {
-                    tex = await manager.assetRegistry.fetchTexture<Texture2D>(
-                      assetId,
-                      assetInfo.textureOptions
-                    );
-                  } catch (err) {
-                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    tex = null;
-                  }
-                  if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
-                    this.material.scatterRampTexture = tex;
-                  } else {
-                    console.error('Invalid texture type');
-                  }
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(assetId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  this.material.scatterRampTexture = tex;
+                } else {
+                  console.error('Invalid texture type');
                 }
               }
             }
@@ -348,7 +341,7 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
             return true;
           },
           get(this: Water, value) {
-            value.str[0] = manager.assetRegistry.getAssetId(this.material.absorptionRampTexture) ?? '';
+            value.str[0] = manager.getAssetId(this.material.absorptionRampTexture) ?? '';
           },
           async set(this: Water, value) {
             if (!value) {
@@ -356,24 +349,17 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-                if (assetInfo && assetInfo.type === 'texture') {
-                  let tex: Texture2D;
-                  try {
-                    tex = await manager.assetRegistry.fetchTexture<Texture2D>(
-                      assetId,
-                      assetInfo.textureOptions
-                    );
-                  } catch (err) {
-                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    tex = null;
-                  }
-                  if (tex?.isTexture2D()) {
-                    tex.name = assetInfo.name;
-                    this.material.absorptionRampTexture = tex;
-                  } else {
-                    console.error('Invalid texture type');
-                  }
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(assetId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  this.material.absorptionRampTexture = tex;
+                } else {
+                  console.error('Invalid texture type');
                 }
               }
             }

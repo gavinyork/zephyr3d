@@ -50,7 +50,7 @@ export class Input {
     e.preventDefault();
     for (let i = 0; i < e.data.length; i++) {
       const io = ImGui.GetIO();
-      io.AddInputCharacter(e.data.charCodeAt(i));
+      io.AddInputCharacter(e.data.codePointAt(i));
     }
   }
   blur() {
@@ -654,6 +654,8 @@ function toRgba(col:number):string
 }
 */
 
+let charCodeMap: Record<number, number> = null;
+
 const glyphFontMap: Record<number, DeviceFont> = {};
 
 /** @internal */
@@ -696,9 +698,10 @@ export function font_update(io: ImGui.IO) {
     }
     let glyph = font.GlyphToCreate;
     while (glyph) {
-      const f = glyphFontMap[glyph.Char];
+      const charCode = charCodeMap?.[glyph.Char] ?? glyph.Char;
+      const f = glyphFontMap[charCode];
       let glyphInfo: AtlasInfo;
-      const char = String.fromCharCode(glyph.Char);
+      const char = String.fromCodePoint(charCode);
       if (f) {
         glyphInfo = glyphManager.getGlyphInfo(char, f);
       } else {
@@ -708,7 +711,7 @@ export function font_update(io: ImGui.IO) {
       glyph.X1 = glyphInfo.width;
       glyph.Y0 = 0;
       glyph.Y1 = glyphInfo.height;
-      glyph.AdvanceX = glyphInfo.width + (glyph.Char < 256 ? font.SpaceX[0] : font.SpaceX[1]);
+      glyph.AdvanceX = glyphInfo.width + (charCode < 256 ? font.SpaceX[0] : font.SpaceX[1]);
       glyph.U0 = glyphInfo.uMin;
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
@@ -884,6 +887,16 @@ export function CreateFontsTexture(): void {
     io.Fonts.TexID = g_FontTexture || null;
     // console.log("font texture id", g_FontTexture);
   }
+}
+
+/** @internal */
+export function getCharCodeMap() {
+  return charCodeMap ?? {};
+}
+
+/** @internal */
+export function setCharCodeMap(map: Record<number, number>) {
+  charCodeMap = map;
 }
 
 export function DestroyFontsTexture(): void {

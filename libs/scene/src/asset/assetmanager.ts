@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, HttpRequest, VFS } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -83,8 +83,6 @@ export class AssetManager {
   /** @internal */
   private static _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
   /** @internal */
-  private _httpRequest: HttpRequest;
-  /** @internal */
   private _textures: {
     [hash: string]: Promise<BaseTexture> | DWeakRef<BaseTexture>;
   };
@@ -104,11 +102,13 @@ export class AssetManager {
   private _jsonDatas: {
     [url: string]: Promise<any>;
   };
+  /** @internal */
+  private _vfs: VFS;
   /**
    * Creates an instance of AssetManager
    */
-  constructor() {
-    this._httpRequest = new HttpRequest();
+  constructor(vfs: VFS) {
+    this._vfs = vfs;
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
@@ -116,10 +116,10 @@ export class AssetManager {
     this._jsonDatas = {};
   }
   /**
-   * HttpRequest instance of the asset manager
+   * VFS used to resources
    */
-  get httpRequest(): HttpRequest {
-    return this._httpRequest;
+  get vfs() {
+    return this._vfs;
   }
   /**
    * Adds a texture loader to the asset manager
@@ -169,7 +169,7 @@ export class AssetManager {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._textDatas[hash];
     if (!P) {
-      P = this.loadTextData(url, postProcess, httpRequest);
+      P = this.loadTextData(url, postProcess);
       this._textDatas[hash] = P;
     }
     return P;
@@ -196,7 +196,7 @@ export class AssetManager {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._jsonDatas[hash];
     if (!P) {
-      P = this.loadJsonData(url, postProcess, httpRequest);
+      P = this.loadJsonData(url, postProcess);
       this._jsonDatas[hash] = P;
     }
     return P;
@@ -223,7 +223,7 @@ export class AssetManager {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._binaryDatas[hash];
     if (!P) {
-      P = this.loadBinaryData(url, postProcess, httpRequest);
+      P = this.loadBinaryData(url, postProcess);
       this._binaryDatas[hash] = P;
     }
     return P;
@@ -247,8 +247,7 @@ export class AssetManager {
         options.mimeType ?? null,
         !options.linearColorSpace,
         options.samplerOptions,
-        options.texture,
-        httpRequest
+        options.texture
       ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
@@ -261,8 +260,7 @@ export class AssetManager {
           options?.mimeType ?? null,
           !options?.linearColorSpace,
           options?.samplerOptions,
-          null,
-          httpRequest
+          null
         ) as Promise<T>;
         this._textures[hash] = P;
       }
@@ -274,17 +272,13 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async fetchModelData(
-    url: string,
-    options?: ModelFetchOptions,
-    httpRequest?: HttpRequest
-  ): Promise<SharedModel> {
+  async fetchModelData(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
     if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
       return P.get();
     } else if (!P || P instanceof DWeakRef) {
-      P = this.loadModel(url, options, httpRequest);
+      P = this.loadModel(url, options);
       this._models[hash] = P;
     }
     const sharedModel = await P;
@@ -308,23 +302,14 @@ export class AssetManager {
    *
    * @returns The created model node
    */
-  async fetchModel(
-    scene: Scene,
-    url: string,
-    options?: ModelFetchOptions,
-    httpRequest?: HttpRequest
-  ): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(url, options, httpRequest);
+  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
+    const sharedModel = await this.fetchModelData(url, options);
     const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
     return { group: node, animationSet: node.animationSet };
   }
   /** @internal */
-  async loadTextData(
-    url: string,
-    postProcess?: (text: string) => string,
-    httpRequest?: HttpRequest
-  ): Promise<string> {
-    let text = await (httpRequest ?? this._httpRequest).requestText(url);
+  async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
+    let text = (await this._vfs.readFile(url, { encoding: 'utf8' })) as string;
     if (postProcess) {
       try {
         text = postProcess(text);
@@ -335,12 +320,8 @@ export class AssetManager {
     return text;
   }
   /** @internal */
-  async loadJsonData(
-    url: string,
-    postProcess?: (json: any) => any,
-    httpRequest?: HttpRequest
-  ): Promise<string> {
-    let json = await (httpRequest ?? this._httpRequest).requestJson(url);
+  async loadJsonData(url: string, postProcess?: (json: any) => any): Promise<string> {
+    let json = (await this._vfs.readFile(url, { encoding: 'utf8' })) as string;
     if (postProcess) {
       try {
         json = postProcess(json);
@@ -351,12 +332,8 @@ export class AssetManager {
     return json;
   }
   /** @internal */
-  async loadBinaryData(
-    url: string,
-    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
-    httpRequest?: HttpRequest
-  ): Promise<ArrayBuffer> {
-    let data = await (httpRequest ?? this._httpRequest).requestArrayBuffer(url);
+  async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
+    let data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     if (postProcess) {
       try {
         data = postProcess(data);
@@ -372,10 +349,9 @@ export class AssetManager {
     mimeType?: string,
     srgb?: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture,
-    httpRequest?: HttpRequest
+    texture?: BaseTexture
   ): Promise<BaseTexture> {
-    const data = await (httpRequest ?? this._httpRequest).requestArrayBuffer(url);
+    const data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     let ext = '';
     let filename = '';
     const dataUriMatchResult = url.match(/^data:([^;]+)/);
@@ -465,9 +441,9 @@ export class AssetManager {
     }
   }
   /** @internal */
-  async loadModel(url: string, options?: ModelFetchOptions, httpRequest?: HttpRequest): Promise<SharedModel> {
-    httpRequest = httpRequest ?? this.httpRequest;
-    const data = await httpRequest.requestBlob(url);
+  async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
+    const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'utf8' })) as ArrayBuffer;
+    const data = new Blob([arrayBuffer], { type: options?.mimeType ?? undefined });
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')
       .filter((val) => !!val)
@@ -483,7 +459,6 @@ export class AssetManager {
         url,
         options?.mimeType || data.type,
         data,
-        httpRequest,
         options?.dracoDecoderModule
       );
       if (!model) {

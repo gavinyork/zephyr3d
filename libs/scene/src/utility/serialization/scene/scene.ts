@@ -478,40 +478,33 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           async set(this: Scene, value) {
             if (value.str[0]) {
               const assetId = value.str[0];
-              const assetInfo = manager.assetRegistry.getAssetInfo(assetId);
-              if (assetInfo && assetInfo.type === 'texture') {
-                let tex: Texture2D;
-                try {
-                  tex = await manager.assetRegistry.fetchTexture<Texture2D>(
-                    assetId,
-                    assetInfo.textureOptions
-                  );
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  tex = null;
-                }
-                if (tex?.isTexture2D()) {
-                  const device = Application.instance.device;
-                  const skyBoxTexture =
-                    this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
-                  const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
-                  const irradianceMap =
-                    this.env.light.irradianceMap ??
-                    device.createCubeTexture('rgba16f', 64, {
-                      samplerOptions: { mipFilter: 'none' }
-                    });
-                  panoramaToCubemap(tex, skyBoxTexture);
-                  prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
-                  prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
-                  this.env.sky.skyboxTexture = skyBoxTexture;
-                  this.env.light.radianceMap = radianceMap;
-                  this.env.light.irradianceMap = irradianceMap;
-                  this.env.sky.panoramaTextureAsset = assetId;
-                  this.env.sky.invalidate();
-                  tex.dispose();
-                } else {
-                  console.error('Invalid skybox texture');
-                }
+              let tex: Texture2D;
+              try {
+                tex = await manager.fetchTexture<Texture2D>(assetId);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                tex = null;
+              }
+              if (tex?.isTexture2D()) {
+                const device = Application.instance.device;
+                const skyBoxTexture = this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
+                const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
+                const irradianceMap =
+                  this.env.light.irradianceMap ??
+                  device.createCubeTexture('rgba16f', 64, {
+                    samplerOptions: { mipFilter: 'none' }
+                  });
+                panoramaToCubemap(tex, skyBoxTexture);
+                prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
+                prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
+                this.env.sky.skyboxTexture = skyBoxTexture;
+                this.env.light.radianceMap = radianceMap;
+                this.env.light.irradianceMap = irradianceMap;
+                this.env.sky.panoramaTextureAsset = assetId;
+                this.env.sky.invalidate();
+                tex.dispose();
+              } else {
+                console.error('Invalid skybox texture');
               }
             }
           },
