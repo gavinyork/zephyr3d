@@ -8,7 +8,7 @@ import { Database, type DBSceneInfo } from '../storage/db';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
 import type { Editor } from '../core/editor';
-import { ProjectManager } from '../core/projectmgr';
+import { ProjectService } from '../core/services/project';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _editor: Editor;
@@ -134,7 +134,7 @@ export class SceneController extends BaseController<SceneModel> {
     this._scene = Object.assign({}, scene, {
       content: await serializeObject(
         this.model.scene,
-        ProjectManager.projectSerializationManager,
+        ProjectService.serializationManager,
         null,
         assetList,
         embeddedAssetList
@@ -151,7 +151,7 @@ export class SceneController extends BaseController<SceneModel> {
     console.log([...assetList]);
     console.log([...embeddedAssetList]);
     const embeddedAssets = await Promise.all(embeddedAssetList);
-    await ProjectManager.putEmbeddedAssets(embeddedAssets);
+    await ProjectService.putEmbeddedAssets(embeddedAssets);
     await Database.putScene(this._scene);
     const uuid = await Database.putScene(this._scene);
     this._scene.uuid = uuid;
@@ -162,9 +162,7 @@ export class SceneController extends BaseController<SceneModel> {
   private async batchExportScene(scenes: { scene: Scene; name: string }[], name: string) {
     const assetList = new Set<string>();
     const contents = await Promise.all(
-      scenes.map((val) =>
-        serializeObject(val.scene, ProjectManager.projectSerializationManager, null, assetList)
-      )
+      scenes.map((val) => serializeObject(val.scene, ProjectService.serializationManager, null, assetList))
     );
     const zipDownloader = new ZipDownloader(`${name}.zip`);
     if (assetList.size > 0) {
@@ -182,7 +180,7 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async exportScene(scene: Scene) {
     const assetList = new Set<string>();
-    const content = await serializeObject(scene, ProjectManager.projectSerializationManager, null, assetList);
+    const content = await serializeObject(scene, ProjectService.serializationManager, null, assetList);
     content.meta = {
       activeCamera: this.model.camera?.persistentId ?? ''
     };
@@ -197,7 +195,7 @@ export class SceneController extends BaseController<SceneModel> {
     await zipDownloader.finish();
   }
   async loadScene(sceneinfo: DBSceneInfo) {
-    return deserializeObject<Scene>(null, sceneinfo.content, ProjectManager.projectSerializationManager);
+    return deserializeObject<Scene>(null, sceneinfo.content, ProjectService.serializationManager);
   }
   openScene(uuid: string) {
     Database.getScene(uuid)

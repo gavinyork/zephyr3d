@@ -6,7 +6,6 @@ import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
 import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
-import { Database } from '../storage/db';
 import { AssetManager, DRef } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
@@ -15,15 +14,20 @@ import {
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
 import { HttpFS } from '@zephyr3d/base';
+import { ProjectInfo, ProjectService } from './services/project';
 
 export class Editor {
   private _moduleManager: ModuleManager;
   private _assetImages: { brushes: { [key: string]: DRef<Texture2D> } };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
+  private _currentProject: ProjectInfo;
+  private _currentProjectIsTemporal: boolean;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {} };
     this._leakTestA = null;
+    this._currentProject = null;
+    this._currentProjectIsTemporal = false;
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (
@@ -67,10 +71,22 @@ export class Editor {
   getBrushes() {
     return this._assetImages.brushes;
   }
+  get currentProject() {
+    return this._currentProject;
+  }
   async init() {
-    await Database.init();
+    //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
+    const recentProjects = await ProjectService.getRecentProjects();
+    if (recentProjects.length === 0) {
+      const uuid = await ProjectService.createProject('MyProject');
+      this._currentProject = await ProjectService.openProject(uuid);
+      this._currentProjectIsTemporal = true;
+    } else {
+      this._currentProject = await ProjectService.openProject(recentProjects[0].uuid);
+      this._currentProjectIsTemporal = false;
+    }
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -97,7 +113,9 @@ export class Editor {
     const module = this._moduleManager.currentModule;
     if (module?.view) {
       imGuiNewFrame();
-      module.view.render();
+      if (this._currentProject) {
+        module.view.render();
+      }
       DialogRenderer.render();
       imGuiEndFrame();
     }

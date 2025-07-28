@@ -24,7 +24,7 @@ import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
 import { FilePicker } from '../../components/filepicker';
 import { Dialog } from '../dlg/dlg';
-import { ProjectManager } from '../../core/projectmgr';
+import { ProjectService } from '../../core/services/project';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
@@ -598,7 +598,7 @@ export class TerrainEditTool implements EditTool {
               URL.revokeObjectURL(url);
             });
         } else {
-          const assetManager = new AssetManager(ProjectManager.projectSerializationManager.vfs);
+          const assetManager = new AssetManager(ProjectService.serializationManager.vfs);
           assetManager
             .fetchTexture<Texture2D>(
               files[0].name,

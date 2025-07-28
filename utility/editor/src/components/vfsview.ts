@@ -2,6 +2,8 @@ import { FileMetadata, VFS } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
+import { ProjectInfo } from '../core/services/project';
+import { Dialog } from '../views/dlg/dlg';
 
 type FileInfo = {
   meta: FileMetadata;
@@ -17,26 +19,25 @@ type DirectoryInfo = {
 };
 
 export class VFSView {
-  private static baseFlags =
-    ImGui.TreeNodeFlags.SpanAvailWidth |
-    ImGui.TreeNodeFlags.SpanFullWidth |
-    ImGui.TreeNodeFlags.OpenOnDoubleClick;
+  private static baseFlags = ImGui.TreeNodeFlags.SpanAvailWidth | ImGui.TreeNodeFlags.SpanFullWidth;
   private _vfs: VFS;
+  private _project: ProjectInfo;
   private _panel: DockPannel;
   private _treePanel: DockPannel;
   private _filesystem: DirectoryInfo;
   private _selectedDir: DirectoryInfo;
 
-  constructor(vfs: VFS, left: number, top: number, width: number, height: number) {
+  constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {
     this._vfs = vfs;
+    this._project = project;
     this._panel = new DockPannel(left, top, width, height, 8, 0, 99999, ResizeDirection.Top, 200, 600);
     this._treePanel = new DockPannel(0, 0, 200, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
     this._selectedDir = null;
     this.loadFileSystem();
   }
-  get vfs() {
-    return this._vfs;
+  get width() {
+    return this._panel.width;
   }
   get height() {
     return this._panel.height;
@@ -68,7 +69,9 @@ export class VFSView {
     const name = dir.path.slice(dir.path.lastIndexOf('/') + 1);
     const emoji = '📁';
     const id = dir.path;
-    const label = convertEmojiString(`${emoji}${name || 'asset://'}##${id}`);
+    const label = convertEmojiString(
+      `${emoji}${dir === this._filesystem ? this._project.name : name}##${id}`
+    );
     let flags = VFSView.baseFlags;
     if (this._selectedDir === dir) {
       flags |= ImGui.TreeNodeFlags.Selected;
@@ -79,6 +82,64 @@ export class VFSView {
     dir.open = ImGui.TreeNodeEx(label, flags);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       this.selectDir(dir);
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
+      ImGui.OpenPopup(`vfs_${id}`);
+    }
+    if (ImGui.BeginPopup(`vfs_${id}`)) {
+      if (ImGui.BeginMenu('Create New##VFSCreate')) {
+        if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
+          Dialog.promptName('Create Folder', 'NewFolder').then((name) => {
+            if (name) {
+              if (/[\\/?*]/.test(name)) {
+                Dialog.messageBox('Error', 'Invalid folder name');
+              } else {
+                this._vfs
+                  .readDirectory(dir.path, { includeHidden: true, recursive: false })
+                  .then((items) => {
+                    if (items.find((item) => item.type === 'directory' && item.name === name)) {
+                      Dialog.messageBox('Error', 'A folder with same name already exists');
+                    } else {
+                      this._vfs
+                        .makeDirectory(this._vfs.join(dir.path, name), false)
+                        .then(() => {
+                          this.loadFileSystem();
+                        })
+                        .catch((err) => {
+                          Dialog.messageBox('Error', `Create folder failed: ${err}`);
+                        });
+                    }
+                  })
+                  .catch((err) => {
+                    Dialog.messageBox('Error', `Read parent path failed: ${err}`);
+                  });
+              }
+            }
+          });
+        }
+        ImGui.Separator();
+        if (ImGui.MenuItem('Scene...##VFSCreateScene')) {
+          console.log('Create scene');
+        }
+        ImGui.EndMenu();
+      }
+      if (dir !== this._filesystem) {
+        if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
+          this._vfs
+            .deleteDirectory(dir.path, true)
+            .then(() => {
+              if (dir === this._selectedDir) {
+                this._selectedDir = null;
+              }
+              this.loadFileSystem();
+            })
+            .catch((err) => {
+              Dialog.messageBox('Error', `Delete directory failed: ${err}`);
+            });
+          console.log('Delete folder');
+        }
+      }
+      ImGui.EndPopup();
     }
     if (dir.open) {
       for (const subdir of dir.subDir) {
@@ -95,10 +156,13 @@ export class VFSView {
     }
   }
   async loadFileSystem() {
-    const rootDir = await this.loadDirectoryInfo('/');
+    const rootDir = await this.loadDirectoryInfo(this._project.homedir);
     this._filesystem = rootDir;
   }
   async loadDirectoryInfo(path: string): Promise<DirectoryInfo> {
+    if (!this._vfs) {
+      return null;
+    }
     const dirExists = await this._vfs.exists(path);
     if (!dirExists) {
       return null;

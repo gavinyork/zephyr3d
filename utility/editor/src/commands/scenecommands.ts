@@ -22,7 +22,7 @@ import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
-import { ProjectManager } from '../core/projectmgr';
+import { ProjectService } from '../core/services/project';
 
 const idNodeMap: Record<string, SceneNode> = {};
 
@@ -43,7 +43,7 @@ export class AddAssetCommand extends Command<SceneNode> {
   async execute() {
     let asset: ModelInfo = null;
     try {
-      asset = await ProjectManager.projectSerializationManager.fetchModel(this._asset.uuid, this._scene);
+      asset = await ProjectService.serializationManager.fetchModel(this._asset.uuid, this._scene);
     } catch (err) {
       console.error(`Load asset failed: ${this._asset.name}: ${err}`);
     }
@@ -232,12 +232,7 @@ export class NodeDeleteCommand extends Command {
     const node = idNodeMap[this._nodeId];
     if (node) {
       const nodeHierarchy = new NodeHierarchy(node.scene, node);
-      this._archive = await serializeObject(
-        nodeHierarchy,
-        ProjectManager.projectSerializationManager,
-        null,
-        null
-      ); // await serializeObject(node, this._assetRegistry);
+      this._archive = await serializeObject(nodeHierarchy, ProjectService.serializationManager, null, null); // await serializeObject(node, this._assetRegistry);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.persistentId];
@@ -252,7 +247,7 @@ export class NodeDeleteCommand extends Command {
         const nodeHierarchy = await deserializeObject<NodeHierarchy>(
           this._scene,
           this._archive,
-          ProjectManager.projectSerializationManager
+          ProjectService.serializationManager
         );
         const node = nodeHierarchy.rootNode;
         //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
@@ -324,9 +319,9 @@ export class NodeCloneCommand extends Command<SceneNode> {
       if (!node || node.sealed) {
         return null;
       }
-      const assetId = ProjectManager.projectSerializationManager.getAssetId(node);
+      const assetId = ProjectService.serializationManager.getAssetId(node);
       if (assetId) {
-        newNode = (await ProjectManager.projectSerializationManager.fetchModel(assetId, node.scene)).group;
+        newNode = (await ProjectService.serializationManager.fetchModel(assetId, node.scene)).group;
         newNode.copyFrom(node, 'instance', false);
       } else {
         newNode = node.clone(that._method, false);

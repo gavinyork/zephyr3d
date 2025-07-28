@@ -6,6 +6,8 @@ type EventBusEventMap = {
   resize: [width: number, height: number];
   update: [frameElapsed: number];
   shortcut: [key: string];
+  project_closed: [uuid: string];
+  project_opened: [uuid: string];
   switch_module: [name: string, ...args: any[]];
   input_event: [ev: Event, type: string];
   scene_add_asset: [asset: DBAssetInfo];

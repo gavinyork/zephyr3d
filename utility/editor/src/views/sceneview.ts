@@ -40,7 +40,7 @@ import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
 import { ASSERT, MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import { Database, type DBAssetInfo } from '../storage/db';
+import type { DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
@@ -56,17 +56,16 @@ import {
   NodeReparentCommand,
   NodeTransformCommand
 } from '../commands/scenecommands';
-import { ZipDownloader } from '../helpers/zipdownload';
 import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
-import type { Editor } from '../core/editor';
+import { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { VFSView } from '../components/vfsview';
-import { ProjectManager } from '../core/projectmgr';
+import { ProjectService } from '../core/services/project';
 
 export class SceneView extends BaseView<SceneModel> {
   private _editor: Editor;
@@ -476,28 +475,14 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.4
     );
-    const vfs = new MemoryFS();
     this._assetView = new VFSView(
-      vfs,
+      ProjectService.VFS,
+      this._editor.currentProject,
       0,
       ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
       ImGui.GetIO().DisplaySize.x,
       300
     );
-    Promise.all([
-      vfs.makeDirectory('/foo/bar', true),
-      vfs.makeDirectory('/projects/A', true),
-      vfs.makeDirectory('/projects/B/src', true),
-      vfs.makeDirectory('/projects/C', true)
-    ]).then(() => {
-      Promise.all([
-        vfs.writeFile('/foo/abc.jpg', 'abc.jpg', { create: true }),
-        vfs.writeFile('/projects/A/hello.txt', 'Hello, world', { create: true }),
-        vfs.writeFile('/projects/B/src/index.js', 'console.log("hello");', { create: true })
-      ]).then(() => {
-        this._assetView.loadFileSystem();
-      });
-    });
   }
   get editor() {
     return this._editor;
@@ -759,7 +744,7 @@ export class SceneView extends BaseView<SceneModel> {
         ) {
           if (node) {
             let assetNode = node;
-            while (assetNode && !ProjectManager.projectSerializationManager.getAssetId(assetNode)) {
+            while (assetNode && !ProjectService.serializationManager.getAssetId(assetNode)) {
               assetNode = assetNode.parent;
             }
             if (assetNode) {
@@ -984,8 +969,8 @@ export class SceneView extends BaseView<SceneModel> {
     if (!id) {
       const label =
         prop.type === 'rgb' || prop.type === 'rgba'
-          ? `Edit animation track - ${ProjectManager.projectSerializationManager.getPropertyName(prop)}`
-          : `Edit animation track - ${ProjectManager.projectSerializationManager.getPropertyName(prop)}`;
+          ? `Edit animation track - ${ProjectService.serializationManager.getPropertyName(prop)}`
+          : `Edit animation track - ${ProjectService.serializationManager.getPropertyName(prop)}`;
       const value: PropertyValue = { num: [0, 0, 0, 0] };
       prop.get.call(target, value);
       id = { id: `${label}##EditTrack${this._trackId++}`, value: value.num };
@@ -1151,7 +1136,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    ProjectManager.projectSerializationManager
+    ProjectService.serializationManager
       .fetchModel(asset.uuid, this.model.scene)
       .then((node) => {
         node.group.parent = null;
@@ -1214,7 +1199,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Position')
+      ProjectService.serializationManager.getPropertyByName('/SceneNode/Position')
     );
   }
   private handleEndRotateNode(node: SceneNode) {
@@ -1222,7 +1207,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Rotation')
+      ProjectService.serializationManager.getPropertyByName('/SceneNode/Rotation')
     );
   }
   private handleEndScaleNode(node: SceneNode) {
@@ -1230,7 +1215,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectManager.projectSerializationManager.getPropertyByName('/SceneNode/Scale')
+      ProjectService.serializationManager.getPropertyByName('/SceneNode/Scale')
     );
   }
   private handleEditAABB(aabb: AABB) {
@@ -1240,28 +1225,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleSceneAction(action: string) {
-    switch (action) {
-      case 'TEST_ZIP_DOWNLOAD': {
-        const assetList: string[] = [];
-        for (const asset of this._tab.assetHierarchy.assets) {
-          assetList.push(...asset.assets.map((val) => val.uuid));
-        }
-        if (assetList.length > 0) {
-          const zipDownloader = new ZipDownloader('test.zip');
-          Database.exportAssets(zipDownloader, assetList, 'ASSET')
-            .then(() => {
-              zipDownloader.finish();
-            })
-            .catch((_err) => {
-              zipDownloader.finish();
-            });
-        }
-        break;
-      }
-      default:
-        eventBus.dispatchEvent('action', action);
-        break;
-    }
+    eventBus.dispatchEvent('action', action);
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {

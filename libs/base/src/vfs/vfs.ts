@@ -317,6 +317,14 @@ export abstract class VFS {
   }
 
   /**
+   * Join path together
+   * @param paths - Paths to join
+   * @returns Complete path
+   */
+  join(...paths: string[]) {
+    return PathUtils.join(...paths);
+  }
+  /**
    * Mounts another VFS at the specified path.
    *
    * Simple mounting functionality for backward compatibility.
@@ -466,17 +474,17 @@ export abstract class VFS {
    * await fs.deleteDirectory('/path/to/dir', { recursive: true });
    * ```
    */
-  async deleteDirectory(path: string, options?: { recursive?: boolean }): Promise<void> {
+  async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
     const mounted = this.getMountedVFS(path);
     if (mounted) {
-      return mounted.vfs.deleteDirectory(mounted.relativePath, options);
+      return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
     }
 
     if (this.isReadOnly) {
       throw new VFSError('File system is read-only', 'EROFS', path);
     }
 
-    return this._deleteDirectory(path, options?.recursive ?? false);
+    return this._deleteDirectory(path, recursive ?? false);
   }
 
   /**

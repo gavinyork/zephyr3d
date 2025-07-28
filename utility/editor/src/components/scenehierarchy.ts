@@ -4,7 +4,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { Scene, SerializableClass } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { BatchGroup } from '@zephyr3d/scene';
-import { ProjectManager } from '../core/projectmgr';
+import { ProjectService } from '../core/services/project';
 
 export class SceneHierarchy extends makeEventTarget(Object)<{
   node_deselected: [node: SceneNode];
@@ -60,7 +60,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     let cls: SerializableClass = null;
     let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = ProjectManager.projectSerializationManager.getClassByConstructor(ctor);
+      cls = ProjectService.serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     return cls.ctor.name;
@@ -69,7 +69,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     let cls: SerializableClass = null;
     let ctor = node.constructor as GenericConstructor;
     while (!cls) {
-      cls = ProjectManager.projectSerializationManager.getClassByConstructor(ctor);
+      cls = ProjectService.serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
     const label = `${this.getNodeName(node)}##${node.persistentId}`;

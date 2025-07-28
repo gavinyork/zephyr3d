@@ -13,7 +13,7 @@ import type { GenericConstructor } from '@zephyr3d/base';
 import { AABB, ASSERT, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
-import { ProjectManager } from '../core/projectmgr';
+import { ProjectService } from '../core/services/project';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -145,7 +145,7 @@ class PropertyGroup {
   }
   setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any, index?: number, count?: number) {
     if (this.value.object[0] !== obj || this.prop !== prop) {
-      const serializationManager = ProjectManager.projectSerializationManager;
+      const serializationManager = ProjectService.serializationManager;
       this.value.object[0] = obj ?? null;
       this.property = null;
       this.object = parentObj;
@@ -456,7 +456,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 this.dispatchEvent(
                   'end_edit_track',
                   group.value.object[0],
-                  ProjectManager.projectSerializationManager.findAnimationTarget(node, group.value.object[0]),
+                  ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0]),
                   false
                 );
               }
@@ -476,7 +476,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
               this.dispatchEvent(
                 'request_edit_track',
                 group.value.object[0],
-                ProjectManager.projectSerializationManager.findAnimationTarget(node, group.value.object[0])
+                ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0])
               );
             }
           }
@@ -753,7 +753,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 ImGui.OpenPopup('X##list');
                 if (ImGui.BeginPopup('X##list')) {
                   for (const t of property.value.objectTypes) {
-                    const cls = ProjectManager.projectSerializationManager.getClassByConstructor(t);
+                    const cls = ProjectService.serializationManager.getClassByConstructor(t);
                     if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
                       alert(cls.ctor.name);
                     }
