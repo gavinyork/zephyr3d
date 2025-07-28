@@ -142,13 +142,13 @@ const key_code_to_index: Record<string, number> = {
 };
 
 export function canvas_on_keydown(event: KeyboardEvent): boolean {
+  const io = ImGui.GetIO();
+  io.KeyCtrl = event.ctrlKey;
+  io.KeyShift = event.shiftKey;
+  io.KeyAlt = event.altKey;
+  io.KeySuper = event.metaKey;
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    const io = ImGui.GetIO();
-    io.KeyCtrl = event.ctrlKey;
-    io.KeyShift = event.shiftKey;
-    io.KeyAlt = event.altKey;
-    io.KeySuper = event.metaKey;
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = true;
     // forward to the keypress event
@@ -160,13 +160,13 @@ export function canvas_on_keydown(event: KeyboardEvent): boolean {
 }
 
 export function canvas_on_keyup(event: KeyboardEvent): boolean {
+  const io = ImGui.GetIO();
+  io.KeyCtrl = event.ctrlKey;
+  io.KeyShift = event.shiftKey;
+  io.KeyAlt = event.altKey;
+  io.KeySuper = event.metaKey;
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    const io = ImGui.GetIO();
-    io.KeyCtrl = event.ctrlKey;
-    io.KeyShift = event.shiftKey;
-    io.KeyAlt = event.altKey;
-    io.KeySuper = event.metaKey;
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = false;
     if (io.WantCaptureKeyboard || io.WantTextInput || key_index == 9) {

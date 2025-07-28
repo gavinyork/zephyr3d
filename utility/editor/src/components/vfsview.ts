@@ -18,6 +18,21 @@ type DirectoryInfo = {
   open: boolean;
 };
 
+// 视图模式枚举
+enum ViewMode {
+  List = 0,
+  Grid = 1,
+  Details = 2
+}
+
+// 排序方式枚举
+enum SortBy {
+  Name = 0,
+  Size = 1,
+  Type = 2,
+  Modified = 3
+}
+
 export class VFSView {
   private static baseFlags = ImGui.TreeNodeFlags.SpanAvailWidth | ImGui.TreeNodeFlags.SpanFullWidth;
   private _vfs: VFS;
@@ -26,6 +41,17 @@ export class VFSView {
   private _treePanel: DockPannel;
   private _filesystem: DirectoryInfo;
   private _selectedDir: DirectoryInfo;
+
+  // 新增属性：右侧面板相关
+  private _currentDirContent: (FileInfo | DirectoryInfo)[] = [];
+  private _viewMode: ViewMode = ViewMode.List;
+  private _sortBy: SortBy = SortBy.Name;
+  private _sortAscending: boolean = true;
+  private _selectedItems: Set<FileInfo | DirectoryInfo> = new Set();
+  private _lastClickTime: number = 0;
+  private _lastClickedItem: FileInfo | DirectoryInfo = null;
+  private _gridItemSize: number = 80;
+  private _showHidden: boolean = false;
 
   constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {
     this._vfs = vfs;
@@ -36,35 +62,688 @@ export class VFSView {
     this._selectedDir = null;
     this.loadFileSystem();
   }
+
   get width() {
     return this._panel.width;
   }
+
   get height() {
     return this._panel.height;
   }
+
   render(width: number) {
     this._panel.width = width;
     if (this._panel.begin('##VFSView')) {
+      // 左侧目录树
       if (this._treePanel.beginChild('##VFSViewTree')) {
         if (this._filesystem) {
           this.renderDir(this._filesystem);
         }
       }
       this._treePanel.endChild();
+
+      // 右侧内容区域
       ImGui.SetCursorPos(new ImGui.ImVec2(this._treePanel.width, 0));
       if (ImGui.BeginChild('##VFSViewContent', new ImGui.ImVec2(-1, -1), true, ImGui.WindowFlags.None)) {
+        this.renderContentArea();
       }
       ImGui.EndChild();
     }
     this._panel.end();
   }
+
+  // 渲染右侧内容区域
+  private renderContentArea() {
+    // 工具栏
+    this.renderToolbar();
+    ImGui.Separator();
+
+    // 内容区域
+    if (this._selectedDir) {
+      switch (this._viewMode) {
+        case ViewMode.List:
+          this.renderListView();
+          break;
+        case ViewMode.Grid:
+          this.renderGridView();
+          break;
+        case ViewMode.Details:
+          this.renderDetailsView();
+          break;
+      }
+    } else {
+      // 没有选中目录时的提示
+      const windowSize = ImGui.GetWindowSize();
+      const textSize = ImGui.CalcTextSize('Select a folder to view its contents');
+      ImGui.SetCursorPos(
+        new ImGui.ImVec2((windowSize.x - textSize.x) * 0.5, (windowSize.y - textSize.y) * 0.5)
+      );
+      ImGui.TextDisabled('Select a folder to view its contents');
+    }
+
+    // 处理右键菜单
+    this.handleContextMenu();
+  }
+
+  // 渲染工具栏
+  private renderToolbar() {
+    // 视图模式切换
+    ImGui.Text('View:');
+    ImGui.SameLine();
+
+    if (ImGui.RadioButton('List', this._viewMode === ViewMode.List)) {
+      this._viewMode = ViewMode.List;
+    }
+    ImGui.SameLine();
+
+    if (ImGui.RadioButton('Grid', this._viewMode === ViewMode.Grid)) {
+      this._viewMode = ViewMode.Grid;
+    }
+    ImGui.SameLine();
+
+    if (ImGui.RadioButton('Details', this._viewMode === ViewMode.Details)) {
+      this._viewMode = ViewMode.Details;
+    }
+
+    ImGui.SameLine();
+    ImGui.Dummy(new ImGui.ImVec2(20, 0));
+    ImGui.SameLine();
+
+    // 排序选项
+    ImGui.Text('Sort by:');
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(100);
+
+    const sortItems = ['Name', 'Size', 'Type', 'Modified'];
+    let currentSort = this._sortBy;
+    if (ImGui.Combo('##SortBy', [currentSort], sortItems)) {
+      this._sortBy = currentSort;
+      this.sortContent();
+    }
+
+    ImGui.SameLine();
+    if (ImGui.Button(this._sortAscending ? '↑' : '↓')) {
+      this._sortAscending = !this._sortAscending;
+      this.sortContent();
+    }
+
+    ImGui.SameLine();
+    ImGui.Dummy(new ImGui.ImVec2(20, 0));
+    ImGui.SameLine();
+
+    // 显示隐藏文件
+    if (ImGui.Checkbox('Show Hidden', [this._showHidden])) {
+      this.refreshFileView();
+    }
+
+    // 网格视图时的图标大小滑块
+    if (this._viewMode === ViewMode.Grid) {
+      ImGui.SameLine();
+      ImGui.Text('Size:');
+      ImGui.SameLine();
+      ImGui.SetNextItemWidth(100);
+      ImGui.SliderInt('##GridSize', [this._gridItemSize], 40, 120);
+    }
+  }
+
+  // 列表视图
+  private renderListView() {
+    for (let i = 0; i < this._currentDirContent.length; i++) {
+      const item = this._currentDirContent[i];
+      this.renderListItem(item, i);
+    }
+  }
+
+  // 网格视图
+  private renderGridView() {
+    const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
+    const itemsPerRow = Math.max(1, Math.floor(windowWidth / (this._gridItemSize + 10)));
+
+    for (let i = 0; i < this._currentDirContent.length; i++) {
+      const item = this._currentDirContent[i];
+
+      if (i % itemsPerRow !== 0) {
+        ImGui.SameLine();
+      }
+
+      this.renderGridItem(item, i);
+    }
+  }
+
+  // 详细视图
+  private renderDetailsView() {
+    // 表头
+    if (
+      ImGui.BeginTable(
+        '##FileTable',
+        4,
+        ImGui.TableFlags.Resizable | ImGui.TableFlags.Sortable | ImGui.TableFlags.BordersInnerV
+      )
+    ) {
+      ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.DefaultSort);
+      ImGui.TableSetupColumn('Size');
+      ImGui.TableSetupColumn('Type');
+      ImGui.TableSetupColumn('Modified');
+      ImGui.TableHeadersRow();
+
+      // 处理表格排序
+      const sortSpecs = ImGui.TableGetSortSpecs();
+      if (sortSpecs && sortSpecs.SpecsDirty) {
+        this.handleTableSort(sortSpecs);
+        sortSpecs.SpecsDirty = false;
+      }
+
+      // 渲染行
+      for (let i = 0; i < this._currentDirContent.length; i++) {
+        const item = this._currentDirContent[i];
+        this.renderTableRow(item, i);
+      }
+
+      ImGui.EndTable();
+    }
+  }
+  // 渲染列表项
+  private renderListItem(item: FileInfo | DirectoryInfo, index: number) {
+    const isDir = 'subDir' in item;
+    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
+
+    const emoji = isDir ? '📁' : this.getFileEmoji((item as FileInfo).meta);
+    const label = convertEmojiString(`${emoji} ${name}##item_${index}`);
+
+    const isSelected = this._selectedItems.has(item);
+
+    if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
+      this.handleItemClick(item, index);
+    }
+
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+  }
+
+  // 渲染网格项
+  private renderGridItem(item: FileInfo | DirectoryInfo, index: number) {
+    const isDir = 'subDir' in item;
+    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
+
+    const emoji = isDir ? '📁' : this.getFileEmoji((item as FileInfo).meta);
+    const isSelected = this._selectedItems.has(item);
+
+    ImGui.BeginGroup();
+
+    // 图标
+    const iconSize = this._gridItemSize;
+    if (
+      ImGui.Selectable(
+        `##icon_${index}`,
+        isSelected,
+        ImGui.SelectableFlags.AllowDoubleClick,
+        new ImGui.ImVec2(iconSize, iconSize)
+      )
+    ) {
+      this.handleItemClick(item, index);
+    }
+
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+
+    // 在图标中央显示 emoji
+    const drawList = ImGui.GetWindowDrawList();
+    const pos = ImGui.GetItemRectMin();
+    const emojiSize = ImGui.CalcTextSize(convertEmojiString(emoji));
+    const emojiPos = new ImGui.ImVec2(
+      pos.x + (iconSize - emojiSize.x) * 0.5,
+      pos.y + (iconSize - emojiSize.y) * 0.5
+    );
+    drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), convertEmojiString(emoji));
+
+    // 文件名
+    const textWidth = Math.min(iconSize, ImGui.CalcTextSize(name).x);
+    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
+    ImGui.TextWrapped(name);
+    ImGui.PopTextWrapPos();
+
+    ImGui.EndGroup();
+  }
+
+  // 渲染表格行
+  private renderTableRow(item: FileInfo | DirectoryInfo, index: number) {
+    const isDir = 'subDir' in item;
+    const meta = isDir ? null : (item as FileInfo).meta;
+    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : meta.name;
+
+    ImGui.TableNextRow();
+
+    // 名称列
+    ImGui.TableSetColumnIndex(0);
+    const emoji = isDir ? '📁' : this.getFileEmoji(meta);
+    const label = convertEmojiString(`${emoji} ${name}##row_${index}`);
+    const isSelected = this._selectedItems.has(item);
+
+    if (
+      ImGui.Selectable(
+        label,
+        isSelected,
+        ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
+      )
+    ) {
+      this.handleItemClick(item, index);
+    }
+
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+
+    // 大小列
+    ImGui.TableSetColumnIndex(1);
+    if (!isDir && meta) {
+      ImGui.Text(this.formatFileSize(meta.size));
+    } else {
+      ImGui.Text('--');
+    }
+
+    // 类型列
+    ImGui.TableSetColumnIndex(2);
+    if (isDir) {
+      ImGui.Text('Folder');
+    } else if (meta?.mimeType) {
+      ImGui.Text(meta.mimeType.split('/')[1] || 'File');
+    } else {
+      ImGui.Text('File');
+    }
+
+    // 修改时间列
+    ImGui.TableSetColumnIndex(3);
+    const modifiedDate = isDir ? null : meta?.modified;
+    if (modifiedDate) {
+      ImGui.Text(this.formatDate(modifiedDate));
+    } else {
+      ImGui.Text('--');
+    }
+  }
+
+  // 处理项目点击
+  private handleItemClick(item: FileInfo | DirectoryInfo, index: number) {
+    const currentTime = Date.now();
+    const io = ImGui.GetIO();
+
+    if (io.KeyCtrl) {
+      // Ctrl+点击：多选
+      if (this._selectedItems.has(item)) {
+        this._selectedItems.delete(item);
+      } else {
+        this._selectedItems.add(item);
+      }
+    } else if (io.KeyShift && this._selectedItems.size > 0) {
+      // Shift+点击：范围选择
+      this._selectedItems.clear();
+      this._selectedItems.add(item);
+    } else {
+      // 普通点击：单选
+      this._selectedItems.clear();
+      this._selectedItems.add(item);
+    }
+
+    this._lastClickTime = currentTime;
+    this._lastClickedItem = item;
+  }
+
+  // 处理双击
+  private handleItemDoubleClick(item: FileInfo | DirectoryInfo) {
+    const isDir = 'subDir' in item;
+
+    if (isDir) {
+      // 双击目录：选中并展开
+      this.selectDir(item as DirectoryInfo);
+      (item as DirectoryInfo).open = true;
+    } else {
+      // 双击文件：打开文件（这里可以触发文件打开事件）
+      console.log('Open file:', (item as FileInfo).meta.path);
+      // 可以在这里添加文件打开的逻辑
+    }
+  }
+
+  // 处理右键菜单
+  private handleContextMenu() {
+    if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGui.MouseButton.Right)) {
+      ImGui.OpenPopup('##ContentContextMenu');
+    }
+
+    if (ImGui.BeginPopup('##ContentContextMenu')) {
+      if (this._selectedItems.size === 0) {
+        // 空白区域右键
+        if (ImGui.BeginMenu('Create New')) {
+          if (ImGui.MenuItem('Folder...')) {
+            this.createNewFolder();
+          }
+          ImGui.Separator();
+          if (ImGui.MenuItem('File...')) {
+            this.createNewFile();
+          }
+          ImGui.EndMenu();
+        }
+      } else {
+        // 选中项目右键
+        if (ImGui.MenuItem(`Delete (${this._selectedItems.size} items)`)) {
+          this.deleteSelectedItems();
+        }
+        if (this._selectedItems.size === 1) {
+          ImGui.Separator();
+          if (ImGui.MenuItem('Rename')) {
+            this.renameSelectedItem();
+          }
+        }
+      }
+      ImGui.EndPopup();
+    }
+  }
+
+  // 处理表格排序
+  private handleTableSort(sortSpecs: any) {
+    if (sortSpecs.Specs.length > 0) {
+      const spec = sortSpecs.Specs[0];
+      switch (spec.ColumnIndex) {
+        case 0:
+          this._sortBy = SortBy.Name;
+          break;
+        case 1:
+          this._sortBy = SortBy.Size;
+          break;
+        case 2:
+          this._sortBy = SortBy.Type;
+          break;
+        case 3:
+          this._sortBy = SortBy.Modified;
+          break;
+      }
+      this._sortAscending = spec.SortDirection === ImGui.SortDirection.Ascending;
+      this.sortContent();
+    }
+  }
+
+  // 排序内容
+  private sortContent() {
+    this._currentDirContent.sort((a, b) => {
+      const isADir = 'subDir' in a;
+      const isBDir = 'subDir' in b;
+
+      // 目录总是在文件前面
+      if (isADir && !isBDir) return -1;
+      if (!isADir && isBDir) return 1;
+
+      let comparison = 0;
+
+      switch (this._sortBy) {
+        case SortBy.Name:
+          const nameA = isADir ? a.path.slice(a.path.lastIndexOf('/') + 1) : (a as FileInfo).meta.name;
+          const nameB = isBDir ? b.path.slice(b.path.lastIndexOf('/') + 1) : (b as FileInfo).meta.name;
+          comparison = nameA.localeCompare(nameB);
+          break;
+
+        case SortBy.Size:
+          if (!isADir && !isBDir) {
+            comparison = (a as FileInfo).meta.size - (b as FileInfo).meta.size;
+          }
+          break;
+
+        case SortBy.Type:
+          if (!isADir && !isBDir) {
+            const typeA = (a as FileInfo).meta.mimeType || '';
+            const typeB = (b as FileInfo).meta.mimeType || '';
+            comparison = typeA.localeCompare(typeB);
+          }
+          break;
+
+        case SortBy.Modified:
+          if (!isADir && !isBDir) {
+            const timeA = (a as FileInfo).meta.modified?.getTime() || 0;
+            const timeB = (b as FileInfo).meta.modified?.getTime() || 0;
+            comparison = timeA - timeB;
+          }
+          break;
+      }
+
+      return this._sortAscending ? comparison : -comparison;
+    });
+  }
+
+  // 获取文件 emoji
+  private getFileEmoji(meta: FileMetadata): string {
+    if (!meta?.mimeType) return '📄';
+
+    const mimeType = meta.mimeType.toLowerCase();
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType.startsWith('video/')) return '🎥';
+    if (mimeType.startsWith('audio/')) return '🎵';
+    if (mimeType.includes('text') || mimeType.includes('json')) return '📝';
+    if (mimeType.includes('pdf')) return '📕';
+    if (mimeType.includes('zip') || mimeType.includes('archive')) return '📦';
+
+    const ext = meta.name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'js':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+        return '📜';
+      case 'css':
+      case 'scss':
+      case 'sass':
+      case 'less':
+        return '🎨';
+      case 'html':
+      case 'htm':
+        return '🌐';
+      case 'md':
+      case 'markdown':
+        return '📖';
+      case 'py':
+        return '🐍';
+      case 'java':
+        return '☕';
+      case 'cpp':
+      case 'c':
+      case 'h':
+        return '⚙️';
+      case 'exe':
+      case 'app':
+      case 'dmg':
+        return '💿';
+      default:
+        return '📄';
+    }
+  }
+
+  // 格式化文件大小
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // 格式化日期
+  private formatDate(date: Date): string {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) {
+      // 今天
+      return date.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } else if (days === 1) {
+      // 昨天
+      return (
+        'Yesterday ' +
+        date.toLocaleTimeString('en-US', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      );
+    } else if (days < 7) {
+      // 本周内
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    } else {
+      // 更早
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  }
+
+  // 创建新文件夹
+  private createNewFolder() {
+    if (!this._selectedDir) return;
+
+    Dialog.promptName('Create Folder', 'NewFolder').then((name) => {
+      if (name) {
+        if (/[\\/?*]/.test(name)) {
+          Dialog.messageBox('Error', 'Invalid folder name');
+        } else {
+          const newPath = this._vfs.join(this._selectedDir.path, name);
+          this._vfs
+            .makeDirectory(newPath, false)
+            .then(() => {
+              this.loadFileSystem().then(() => {
+                this.refreshFileView();
+              });
+            })
+            .catch((err) => {
+              Dialog.messageBox('Error', `Create folder failed: ${err}`);
+            });
+        }
+      }
+    });
+  }
+
+  // 创建新文件
+  private createNewFile() {
+    if (!this._selectedDir) return;
+
+    Dialog.promptName('Create File', 'NewFile.txt').then((name) => {
+      if (name) {
+        if (/[\\/?*]/.test(name)) {
+          Dialog.messageBox('Error', 'Invalid file name');
+        } else {
+          const newPath = this._vfs.join(this._selectedDir.path, name);
+          this._vfs
+            .writeFile(newPath, '', { encoding: 'utf8' })
+            .then(() => {
+              this.loadFileSystem().then(() => {
+                this.refreshFileView();
+              });
+            })
+            .catch((err) => {
+              Dialog.messageBox('Error', `Create file failed: ${err}`);
+            });
+        }
+      }
+    });
+  }
+
+  // 删除选中项目
+  private deleteSelectedItems() {
+    if (this._selectedItems.size === 0) return;
+
+    const items = Array.from(this._selectedItems);
+
+    const deletePromises = items.map((item) => {
+      const isDir = 'subDir' in item;
+      if (isDir) {
+        return this._vfs.deleteDirectory(item.path, true);
+      } else {
+        return this._vfs.deleteFile((item as FileInfo).meta.path);
+      }
+    });
+
+    Promise.all(deletePromises)
+      .then(() => {
+        this._selectedItems.clear();
+        this.loadFileSystem().then(() => {
+          this.refreshFileView();
+        });
+      })
+      .catch((err) => {
+        Dialog.messageBox('Error', `Delete failed: ${err}`);
+      });
+  }
+
+  // 重命名选中项目
+  private renameSelectedItem() {
+    if (this._selectedItems.size !== 1) return;
+
+    const item = Array.from(this._selectedItems)[0];
+    const isDir = 'subDir' in item;
+    const currentName = isDir
+      ? item.path.slice(item.path.lastIndexOf('/') + 1)
+      : (item as FileInfo).meta.name;
+
+    Dialog.promptName('Rename', currentName).then((newName) => {
+      if (newName && newName !== currentName) {
+        if (/[\\/?*]/.test(newName)) {
+          Dialog.messageBox('Error', 'Invalid name');
+        } else {
+          const parentPath = isDir
+            ? item.path.slice(0, item.path.lastIndexOf('/'))
+            : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
+          const newPath = this._vfs.join(parentPath, newName);
+
+          this._vfs.moveFile(isDir ? item.path : item.meta.path, newPath);
+          // 这里需要实现重命名功能，VFS 可能需要添加 rename 方法
+          // 暂时通过复制+删除来实现
+          //console.log(`Rename ${isDir ? 'directory' : 'file'} from ${item.path} to ${newPath}`);
+          //Dialog.messageBox('Info', 'Rename functionality needs to be implemented in VFS');
+        }
+      }
+    });
+  }
+
+  // 选择目录
   selectDir(dir: DirectoryInfo) {
     if (dir !== this._selectedDir) {
       this._selectedDir = dir;
       this.refreshFileView();
     }
   }
-  refreshFileView() {}
+
+  // 刷新文件视图
+  refreshFileView() {
+    if (!this._selectedDir) {
+      this._currentDirContent = [];
+      return;
+    }
+
+    // 合并目录和文件
+    this._currentDirContent = [...this._selectedDir.subDir, ...this._selectedDir.files];
+
+    // 过滤隐藏文件
+    if (!this._showHidden) {
+      this._currentDirContent = this._currentDirContent.filter((item) => {
+        const isDir = 'subDir' in item;
+        const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
+        return !name.startsWith('.');
+      });
+    }
+
+    // 排序
+    this.sortContent();
+
+    // 清空选择
+    this._selectedItems.clear();
+  }
+
+  // 原有的目录树渲染方法
   renderDir(dir: DirectoryInfo) {
     const name = dir.path.slice(dir.path.lastIndexOf('/') + 1);
     const emoji = '📁';
@@ -145,33 +824,57 @@ export class VFSView {
       for (const subdir of dir.subDir) {
         this.renderDir(subdir);
       }
-      /*
-      for (const file of dir.files) {
-        if (ImGui.TreeNodeEx(file.meta.name, VFSView.baseFlags | ImGui.TreeNodeFlags.Leaf)) {
-          ImGui.TreePop();
-        }
-      }
-      */
       ImGui.TreePop();
     }
   }
+
   async loadFileSystem() {
     const rootDir = await this.loadDirectoryInfo(this._project.homedir);
     this._filesystem = rootDir;
+
+    // 如果之前有选中的目录，尝试重新找到它
+    if (this._selectedDir) {
+      const newSelectedDir = this.findDirectoryByPath(this._filesystem, this._selectedDir.path);
+      if (newSelectedDir) {
+        this._selectedDir = newSelectedDir;
+        this.refreshFileView();
+      } else {
+        this._selectedDir = null;
+        this._currentDirContent = [];
+      }
+    }
   }
+  // 根据路径查找目录
+  private findDirectoryByPath(root: DirectoryInfo, path: string): DirectoryInfo | null {
+    if (root.path === path) {
+      return root;
+    }
+
+    for (const subDir of root.subDir) {
+      const found = this.findDirectoryByPath(subDir, path);
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
   async loadDirectoryInfo(path: string): Promise<DirectoryInfo> {
     if (!this._vfs) {
       return null;
     }
+
     const dirExists = await this._vfs.exists(path);
     if (!dirExists) {
       return null;
     }
+
     const stats = await this._vfs.stat(path);
     if (!stats || !stats.isDirectory) {
       return null;
     }
-    this._vfs.getInfo();
+
     const info: DirectoryInfo = {
       files: [],
       subDir: [],
@@ -179,10 +882,12 @@ export class VFSView {
       open: false,
       path
     };
+
     const content = await this._vfs.readDirectory(path, {
       includeHidden: true,
       recursive: false
     });
+
     for (const entry of content) {
       if (entry.type === 'directory') {
         const dirInfo = await this.loadDirectoryInfo(entry.path);
@@ -197,6 +902,7 @@ export class VFSView {
         });
       }
     }
+
     return info;
   }
 }
