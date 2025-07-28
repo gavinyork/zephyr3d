@@ -736,34 +736,62 @@ export class IndexedDBFS extends VFS {
       throw new VFSError('Failed to parse import data', 'EINVAL');
     }
   }
-  /**
-   * 彻底删除数据库
-   * 这会删除整个 IndexedDB 数据库，而不仅仅是清空内容
-   */
-  async _destroy(): Promise<void> {
-    // 1. 先关闭当前连接
+  protected async _deleteFileSystem(): Promise<void> {
     if (this.db) {
       this.db.close();
       this.db = null;
     }
-
-    // 2. 删除数据库
+    const currentVersion = await this.getCurrentDatabaseVersion();
     return new Promise((resolve, reject) => {
-      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+      const newVersion = currentVersion + 1;
+      const request = indexedDB.open(this.dbName, newVersion);
 
-      deleteRequest.onsuccess = () => {
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+
+        if (db.objectStoreNames.contains(this.storeName)) {
+          try {
+            db.deleteObjectStore(this.storeName);
+            console.log(`Object Store '${this.storeName}' deleted successfully`);
+          } catch (error) {
+            console.error(`Failed to delete Object Store '${this.storeName}':`, error);
+            reject(new VFSError('Failed to delete object store', 'EIO', error?.toString()));
+            return;
+          }
+        } else {
+          console.warn(`Object Store '${this.storeName}' does not exist`);
+        }
+      };
+
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        db.close();
         resolve();
       };
 
-      deleteRequest.onerror = () => {
-        reject(new VFSError('Failed to delete database', 'EIO', deleteRequest.error?.message));
+      request.onerror = () => {
+        reject(new VFSError('Failed to upgrade database for store deletion', 'EIO', request.error?.message));
       };
 
-      deleteRequest.onblocked = () => {
-        // 数据库删除被阻塞，通常是因为其他连接仍然打开
-        // 可以选择等待或者抛出错误
-        console.warn('Database deletion blocked - other connections may still be open');
-        // 继续等待，通常会在其他连接关闭后自动完成
+      request.onblocked = () => {
+        reject(new VFSError('Database upgrade blocked - close other connections first', 'EBUSY'));
+      };
+    });
+  }
+
+  private async getCurrentDatabaseVersion(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName);
+
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        const version = db.version;
+        db.close();
+        resolve(version);
+      };
+
+      request.onerror = () => {
+        reject(new VFSError('Failed to get database version', 'EIO', request.error?.message));
       };
     });
   }

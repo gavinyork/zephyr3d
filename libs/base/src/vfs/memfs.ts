@@ -248,7 +248,7 @@ export class MemoryFS extends VFS {
    * 不支持删除
    * @returns
    */
-  protected async _destroy(): Promise<void> {
+  protected async _deleteFileSystem(): Promise<void> {
     return;
   }
 }

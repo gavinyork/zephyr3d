@@ -321,7 +321,8 @@ export class AssetManager {
   }
   /** @internal */
   async loadJsonData(url: string, postProcess?: (json: any) => any): Promise<string> {
-    let json = (await this._vfs.readFile(url, { encoding: 'utf8' })) as string;
+    let json = JSON.parse((await this._vfs.readFile(url, { encoding: 'utf8' })) as string);
+
     if (postProcess) {
       try {
         json = postProcess(json);

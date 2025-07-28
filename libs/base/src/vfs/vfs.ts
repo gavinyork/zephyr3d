@@ -640,8 +640,8 @@ export abstract class VFS {
    * await fs.dispose();
    * ```
    */
-  async dispose() {
-    await this._destroy();
+  async deleteFileSystem() {
+    await this._deleteFileSystem();
   }
   /**
    * Gets information about this file system.
@@ -835,5 +835,5 @@ export abstract class VFS {
    * @returns FileStat (type, size, times, etc)
    */
   protected abstract _stat(path: string): Promise<FileStat>;
-  protected abstract _destroy(): Promise<void>;
+  protected abstract _deleteFileSystem(): Promise<void>;
 }

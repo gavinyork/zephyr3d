@@ -1111,7 +1111,7 @@ export class ZipFS extends VFS {
   /**
    * No support for destroying
    */
-  protected async _destroy(): Promise<void> {
+  protected async _deleteFileSystem(): Promise<void> {
     return;
   }
 }

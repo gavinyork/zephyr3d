@@ -73,7 +73,9 @@ export class Editor {
     await this.loadAssets();
   }
   async loadAssets() {
-    const assetManager = new AssetManager(new HttpFS('/'));
+    const assetManager = new AssetManager(
+      new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
+    );
     const brushConfig = await assetManager.fetchJsonData('assets/conf/brushes.json');
     for (const name in brushConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
