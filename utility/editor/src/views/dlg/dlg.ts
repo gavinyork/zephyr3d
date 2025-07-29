@@ -1,4 +1,4 @@
-import type { Interpolator } from '@zephyr3d/base';
+import type { Interpolator, VFS } from '@zephyr3d/base';
 import { DlgCurveEditor } from './curveeditordlg';
 import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
@@ -12,6 +12,9 @@ import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgEditColorTrack } from './editcolortrackdlg';
 import { DialogRenderer } from '../../components/modal';
 import { ImGui } from '@zephyr3d/imgui';
+import { DlgOpen } from './opendlg';
+import { ProjectInfo } from '../../core/services/project';
+import { DlgSaveFile } from './savefiledlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -42,13 +45,25 @@ export class Dialog {
   ): Promise<string> {
     return new DlgOpenScene(title, scene, width, height).showModal();
   }
-  public static async promptName(
+  public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
+    return new DlgSaveFile(title, vfs, project, width, height).showModal();
+  }
+  public static async openFromList(
     title: string,
-    defaultName?: string,
+    names: string[],
+    ids: string[],
     width?: number,
     height?: number
   ): Promise<string> {
-    return new DlgPromptName(title, defaultName, width, height).showModal();
+    return new DlgOpen(title, names, ids, width, height).showModal();
+  }
+  public static async promptName(
+    title: string,
+    hint?: string,
+    defaultName?: string,
+    width?: number
+  ): Promise<string> {
+    return new DlgPromptName(title, defaultName, hint, width).showModal();
   }
   public static async rename(title: string, name: string, width?: number): Promise<string> {
     return new DlgRename(title, width, name).showModal();

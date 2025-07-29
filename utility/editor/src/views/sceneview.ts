@@ -465,7 +465,7 @@ export class SceneView extends BaseView<SceneModel> {
     );
     this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
-    this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
+    this._tab = null;
     this._propGrid = new PropertyEditor(
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
@@ -475,14 +475,7 @@ export class SceneView extends BaseView<SceneModel> {
       200,
       0.4
     );
-    this._assetView = new VFSView(
-      ProjectService.VFS,
-      this._editor.currentProject,
-      0,
-      ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
-      ImGui.GetIO().DisplaySize.x,
-      300
-    );
+    this._assetView = null;
   }
   get editor() {
     return this._editor;
@@ -514,24 +507,26 @@ export class SceneView extends BaseView<SceneModel> {
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
+    this._assetView.panel.top = ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300;
+    this._assetView.panel.width = Math.max(0, displaySize.x - this._propGrid.width);
     this._tab.height =
       displaySize.y -
       this._menubar.height -
       this._toolbar.height -
       this._statusbar.height -
-      this._assetView.height;
+      this._assetView.panel.height;
     this._menubar.render();
     this._tab.render();
     this._propGrid.render();
     this._toolbar.render();
-    this._assetView.render(displaySize.x - this._propGrid.width);
+    this._assetView.render();
     const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
     const viewportHeight =
       displaySize.y -
       this._statusbar.height -
       this._menubar.height -
       this._toolbar.height -
-      this._assetView.height;
+      this._assetView.panel.height;
     if (this._dragDropTypes.length > 0) {
       if (viewportWidth > 0 && viewportHeight > 0) {
         this.renderDropZone(
@@ -545,13 +540,13 @@ export class SceneView extends BaseView<SceneModel> {
     if (viewportWidth > 0 && viewportHeight > 0) {
       this.model.camera.viewport = [
         this._tab.width,
-        this._statusbar.height + this._assetView.height,
+        this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       ];
       this.model.camera.scissor = [
         this._tab.width,
-        this._statusbar.height + this._assetView.height,
+        this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       ];
@@ -791,6 +786,15 @@ export class SceneView extends BaseView<SceneModel> {
   }
   protected onActivate(): void {
     super.onActivate();
+    this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
+    this._assetView = new VFSView(
+      ProjectService.VFS,
+      this._editor.currentProject,
+      0,
+      ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
+      ImGui.GetIO().DisplaySize.x,
+      300
+    );
     this._menubar.registerShortcuts(this);
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
@@ -811,6 +815,9 @@ export class SceneView extends BaseView<SceneModel> {
   }
   protected onDeactivate(): void {
     super.onDeactivate();
+    this._tab = null;
+    this._assetView?.dispose();
+    this._assetView = null;
     this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);

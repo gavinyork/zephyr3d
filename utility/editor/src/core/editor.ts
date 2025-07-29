@@ -15,6 +15,7 @@ import {
 } from '../helpers/leakdetector';
 import { HttpFS } from '@zephyr3d/base';
 import { ProjectInfo, ProjectService } from './services/project';
+import { Dialog } from '../views/dlg/dlg';
 
 export class Editor {
   private _moduleManager: ModuleManager;
@@ -24,15 +25,11 @@ export class Editor {
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
-  private _recentProjects: ProjectInfo[];
-  private _currentProjectIsTemporal: boolean;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
-    this._recentProjects = [];
-    this._currentProjectIsTemporal = false;
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (
@@ -92,7 +89,6 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
-    this._recentProjects = await ProjectService.getRecentProjects();
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -171,7 +167,42 @@ export class Editor {
         ImGui.SetCursorPosX(Math.max(0, (displaySize.x - textSize.x) >> 1));
         const selected = [false] as [boolean];
         if (ImGui.Selectable(label, selected, ImGui.SelectableFlags.None, textSize)) {
-          alert(label);
+          if (i === 0) {
+            // Create project
+            Dialog.promptName('Create Project', 'Project Name', 'New Project', 400).then((name) => {
+              if (name) {
+                ProjectService.createProject(name).then((uuid) => {
+                  ProjectService.openProject(uuid).then((project) => {
+                    this._currentProject = project;
+                    this._moduleManager.activate('Scene', null);
+                    Dialog.saveFile(
+                      'Test Save File',
+                      ProjectService.VFS,
+                      this._currentProject,
+                      500,
+                      400
+                    ).then((path) => {
+                      alert(path);
+                    });
+                  });
+                });
+              }
+            });
+          }
+          if (i === 1) {
+            ProjectService.listProjects().then((projects) => {
+              const names = projects.map((project) => project.name);
+              const ids = projects.map((project) => project.uuid);
+              Dialog.openFromList('Open Project', names, ids, 400, 400).then((id) => {
+                if (id) {
+                  ProjectService.openProject(id).then((project) => {
+                    this._currentProject = project;
+                    this._moduleManager.activate('Scene', null);
+                  });
+                }
+              });
+            });
+          }
         }
         if (ImGui.IsItemHovered()) {
           ImGui.SetMouseCursor(ImGui.MouseCursor.Hand);
