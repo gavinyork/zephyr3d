@@ -15,6 +15,10 @@ type EventBusEventMap = {
   workspace_drag_end: [type: string, data: any];
   workspace_drag_drop: [type: string, data: any, x: number, y: number];
   workspace_dragging: [type: string, data: any, x: number, y: number];
+  external_dragenter: [ev: DragEvent];
+  external_dragleave: [ev: DragEvent];
+  external_dragover: [ev: DragEvent];
+  external_drop: [ev: DragEvent];
   action: [action: string];
 };
 

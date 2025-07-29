@@ -5,6 +5,7 @@ import { convertEmojiString } from '../helpers/emoji';
 import { ProjectInfo } from '../core/services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
+import { eventBus } from '../core/eventbus';
 
 type FileInfo = {
   meta: FileMetadata;
@@ -34,6 +35,17 @@ enum SortBy {
   Modified = 3
 }
 
+interface AreaBounds {
+  min: ImGui.ImVec2;
+  max: ImGui.ImVec2;
+}
+
+const enum DropZone {
+  None = 'none',
+  Navigation = 'navigation', // 拖放到根目录
+  Content = 'content' // 拖放到当前内容区目录
+}
+
 export class VFSView {
   private static baseFlags = ImGui.TreeNodeFlags.SpanAvailWidth | ImGui.TreeNodeFlags.SpanFullWidth;
   private _vfs: VFS;
@@ -54,6 +66,10 @@ export class VFSView {
   private _gridItemSize: number = 80;
   private _showHidden: boolean = false;
   private _hoveredItem: FileInfo | DirectoryInfo | null = null;
+  private _navigationBounds: AreaBounds | null = null;
+  private _contentBounds: AreaBounds | null = null;
+  private _isDragOverNavigation = false;
+  private _isDragOverContent = false;
 
   constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {
     this._vfs = vfs;
@@ -63,6 +79,10 @@ export class VFSView {
     this._filesystem = null;
     this._selectedDir = null;
     this.loadFileSystem();
+    eventBus.on('external_dragenter', this.handleDragEvent, this);
+    eventBus.on('external_dragover', this.handleDragEvent, this);
+    eventBus.on('external_dragleave', this.handleDragEvent, this);
+    eventBus.on('external_drop', this.handleDragEvent, this);
   }
 
   get width() {
@@ -78,6 +98,21 @@ export class VFSView {
     if (this._panel.begin('##VFSView')) {
       // 左侧目录树
       if (this._treePanel.beginChild('##VFSViewTree')) {
+        const contentMin = ImGui.GetWindowPos();
+        const contentMax = new ImGui.ImVec2(
+          contentMin.x + ImGui.GetWindowSize().x,
+          contentMin.y + ImGui.GetWindowSize().y
+        );
+
+        this._navigationBounds = {
+          min: contentMin,
+          max: contentMax
+        };
+
+        // 如果正在拖放并且鼠标在导航区域内，显示高亮效果
+        if (this._isDragOverNavigation) {
+          this.renderNavigationDropHighlight();
+        }
         if (this._filesystem) {
           this.renderDir(this._filesystem);
         }
@@ -94,12 +129,61 @@ export class VFSView {
     this._panel.end();
   }
 
+  public isMouseInArea(mousePos: ImGui.ImVec2, area: 'navigation' | 'content'): boolean {
+    const bounds = area === 'navigation' ? this._navigationBounds : this._contentBounds;
+
+    if (!bounds) return false;
+
+    return (
+      mousePos.x >= bounds.min.x &&
+      mousePos.x <= bounds.max.x &&
+      mousePos.y >= bounds.min.y &&
+      mousePos.y <= bounds.max.y
+    );
+  }
+
+  // 获取鼠标当前所在的拖放区域
+  public getDropZoneAtPosition(mousePos: ImGui.ImVec2): DropZone {
+    if (this.isMouseInArea(mousePos, 'navigation')) {
+      return DropZone.Navigation;
+    } else if (this.isMouseInArea(mousePos, 'content')) {
+      return DropZone.Content;
+    }
+    return DropZone.None;
+  }
+
+  // 设置拖放状态
+  public setDragOverState(mousePos: ImGui.ImVec2, isDragging: boolean) {
+    if (!isDragging) {
+      this._isDragOverNavigation = false;
+      this._isDragOverContent = false;
+      return;
+    }
+
+    const zone = this.getDropZoneAtPosition(mousePos);
+    this._isDragOverNavigation = zone === DropZone.Navigation;
+    this._isDragOverContent = zone === DropZone.Content;
+  }
   // 渲染右侧内容区域
   private renderContentArea() {
     this._hoveredItem = null;
     // 工具栏
     this.renderToolbar();
     ImGui.Separator();
+
+    const contentMin = ImGui.GetCursorScreenPos();
+    const availableSize = ImGui.GetContentRegionAvail();
+    const contentMax = new ImGui.ImVec2(contentMin.x + availableSize.x, contentMin.y + availableSize.y);
+
+    this._contentBounds = {
+      min: contentMin,
+      max: contentMax
+    };
+
+    // 如果正在拖放并且鼠标在内容区域内，显示高亮效果
+    if (this._isDragOverContent) {
+      this.renderContentDropHighlight();
+    }
 
     // 内容区域
     if (this._selectedDir) {
@@ -126,6 +210,140 @@ export class VFSView {
 
     // 处理右键菜单
     this.handleContextMenu();
+  }
+
+  private renderNavigationDropHighlight() {
+    const drawList = ImGui.GetWindowDrawList();
+    const bounds = this._navigationBounds;
+
+    if (!bounds) return;
+
+    // 绘制高亮边框和背景
+    const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.7, 1.0, 0.6));
+    const backgroundColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.7, 1.0, 0.1));
+
+    // 背景高亮
+    drawList.AddRectFilled(bounds.min, bounds.max, backgroundColor, 4.0);
+
+    // 边框高亮
+    drawList.AddRect(bounds.min, bounds.max, highlightColor, 4.0, ImGui.DrawCornerFlags.None, 2.0);
+
+    // 添加提示文字
+    const rootDirName = this._filesystem
+      ? this._filesystem.path.slice(this._filesystem.path.lastIndexOf('/') + 1) || 'Root'
+      : 'Root Directory';
+
+    const text = `Drop to ${rootDirName}`;
+    const textSize = ImGui.CalcTextSize(text);
+    const textPos = new ImGui.ImVec2(
+      bounds.min.x + (bounds.max.x - bounds.min.x - textSize.x) * 0.5,
+      bounds.max.y - textSize.y - 10
+    );
+
+    // 文字背景
+    const textBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.0, 0.0, 0.0, 0.7));
+    drawList.AddRectFilled(
+      new ImGui.ImVec2(textPos.x - 8, textPos.y - 3),
+      new ImGui.ImVec2(textPos.x + textSize.x + 8, textPos.y + textSize.y + 3),
+      textBg,
+      3.0
+    );
+
+    // 文字
+    const textColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0));
+    drawList.AddText(textPos, textColor, text);
+  }
+
+  // 渲染内容区域拖放高亮效果
+  private renderContentDropHighlight() {
+    const drawList = ImGui.GetWindowDrawList();
+    const bounds = this._contentBounds;
+
+    if (!bounds) return;
+
+    const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.6));
+    const backgroundColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.1));
+
+    // 背景高亮
+    drawList.AddRectFilled(bounds.min, bounds.max, backgroundColor, 4.0);
+
+    // 边框高亮
+    drawList.AddRect(bounds.min, bounds.max, highlightColor, 4.0, ImGui.DrawCornerFlags.None, 2.0);
+
+    // 添加提示文字
+    const currentDirName = this._selectedDir
+      ? this._selectedDir.path.slice(this._selectedDir.path.lastIndexOf('/') + 1) || 'Current Directory'
+      : 'Current Directory';
+
+    const text = `Drop to ${currentDirName}`;
+    const textSize = ImGui.CalcTextSize(text);
+    const textPos = new ImGui.ImVec2(
+      bounds.min.x + (bounds.max.x - bounds.min.x - textSize.x) * 0.5,
+      bounds.min.y + (bounds.max.y - bounds.min.y - textSize.y) * 0.5
+    );
+
+    // 文字背景
+    const textBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.0, 0.0, 0.0, 0.7));
+    drawList.AddRectFilled(
+      new ImGui.ImVec2(textPos.x - 10, textPos.y - 5),
+      new ImGui.ImVec2(textPos.x + textSize.x + 10, textPos.y + textSize.y + 5),
+      textBg,
+      4.0
+    );
+
+    // 文字
+    const textColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0));
+    drawList.AddText(textPos, textColor, text);
+  }
+
+  public getDropTargetDirectory(): DirectoryInfo | null {
+    if (this._isDragOverNavigation) {
+      return this._filesystem; // 拖放到根目录
+    } else if (this._isDragOverContent) {
+      return this._selectedDir; // 拖放到当前内容区目录
+    }
+    return null;
+  }
+
+  // 获取当前拖放信息（供外部使用）
+  public getDragDropInfo() {
+    return {
+      isOverNavigation: this._isDragOverNavigation,
+      isOverContent: this._isDragOverContent,
+      targetDirectory: this.getDropTargetDirectory(),
+      dropZone: this._isDragOverNavigation
+        ? DropZone.Navigation
+        : this._isDragOverContent
+        ? DropZone.Content
+        : DropZone.None
+    };
+  }
+
+  // 处理外部文件拖放
+  public handleExternalDrop(files: FileList, mousePos: ImGui.ImVec2): boolean {
+    const targetDirectory = this.getDropTargetDirectory();
+
+    if (!targetDirectory) {
+      console.log('No valid drop target');
+      return false;
+    }
+
+    const zone = this.getDropZoneAtPosition(mousePos);
+    const targetPath = targetDirectory.path;
+
+    console.log(`Dropping ${files.length} files to: ${targetPath} (zone: ${zone})`);
+
+    // 实现文件拖放逻辑
+    Array.from(files).forEach((file, index) => {
+      console.log(`  File ${index + 1}: ${file.name} -> ${targetPath}`);
+      // 这里实现实际的文件操作
+      //this.handleFileUpload(file, targetDirectory);
+    });
+
+    // 刷新文件视图
+    this.refreshFileView();
+
+    return true;
   }
 
   private showItemProperties(item: FileInfo | DirectoryInfo) {
@@ -832,10 +1050,7 @@ export class VFSView {
           const newPath = this._vfs.join(parentPath, newName);
 
           this._vfs.moveFile(isDir ? item.path : item.meta.path, newPath);
-          // 这里需要实现重命名功能，VFS 可能需要添加 rename 方法
-          // 暂时通过复制+删除来实现
-          //console.log(`Rename ${isDir ? 'directory' : 'file'} from ${item.path} to ${newPath}`);
-          //Dialog.messageBox('Info', 'Rename functionality needs to be implemented in VFS');
+          this.loadFileSystem();
         }
       }
     });
@@ -1036,5 +1251,16 @@ export class VFSView {
     }
 
     return info;
+  }
+
+  handleDragEvent(ev: DragEvent) {
+    const info = this.getDragDropInfo();
+    this.setDragOverState(
+      new ImGui.ImVec2(ev.offsetX, ev.offsetY),
+      ev.type !== 'dragleave' && ev.type !== 'drop'
+    );
+    if (ev.type === 'drop') {
+      console.log(info);
+    }
   }
 }

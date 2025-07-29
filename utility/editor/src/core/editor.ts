@@ -54,8 +54,17 @@ export class Editor {
     if (imGuiInjectEvent(ev, type)) {
       return true;
     }
-    if (ev.type === 'dragenter' || ev.type === 'dragover' || ev.type === 'drop') {
+    if (ev.type === 'dragenter' || ev.type === 'dragover' || ev.type === 'drop' || ev.type === 'dragleave') {
       ev.preventDefault();
+      if (ev.type === 'dragenter') {
+        eventBus.dispatchEvent('external_dragenter', ev as DragEvent);
+      } else if (ev.type === 'dragover') {
+        eventBus.dispatchEvent('external_dragover', ev as DragEvent);
+      } else if (ev.type === 'dragleave') {
+        eventBus.dispatchEvent('external_dragleave', ev as DragEvent);
+      } else {
+        eventBus.dispatchEvent('external_drop', ev as DragEvent);
+      }
     }
     if (this._moduleManager.currentModule.controller?.handleEvent(ev)) {
       return true;

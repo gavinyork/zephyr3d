@@ -1,6 +1,6 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3, HttpRequest } from '@zephyr3d/base';
+import { Vector4, Vector3, HttpFS } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
 import { DRef } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
@@ -45,7 +45,9 @@ export class GLTFViewer {
     this._scene.env.light.strength = 0.8;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
-    this._assetManager = new AssetManager();
+    this._assetManager = new AssetManager(
+      new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
+    );
     const floorMaterial = new LambertMaterial();
     floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
     this._floor = new Mesh(scene, new PlaneShape({ size: 1, anchor: 0 }), floorMaterial);
@@ -135,17 +137,12 @@ export class GLTFViewer {
     await reader.close();
     return fileMap;
   }
-  async loadModel(url: string, httpRequest?: HttpRequest) {
+  async loadModel(url: string) {
     this._assetManager
-      .fetchModel(
-        this._scene,
-        url,
-        {
-          enableInstancing: true,
-          dracoDecoderModule: this._dracoModule
-        },
-        httpRequest
-      )
+      .fetchModel(this._scene, url, {
+        enableInstancing: true,
+        dracoDecoderModule: this._dracoModule
+      })
       .then((info) => {
         this._camera.clearHistoryData();
         this._modelNode.get()?.remove();
@@ -191,7 +188,7 @@ export class GLTFViewer {
           if (!modelFile) {
             console.error('GLTF model not found');
           } else {
-            await this.loadModel(modelFile, new HttpRequest((url) => fileMap.get(url) ?? url));
+            await this.loadModel(modelFile /*, new HttpRequest((url) => fileMap.get(url) ?? url)*/);
           }
         }
       }
