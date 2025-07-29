@@ -1,6 +1,6 @@
 import { FileMetadata, VFS } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
-import { ImGui } from '@zephyr3d/imgui';
+import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 import { ProjectInfo } from '../core/services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -201,7 +201,7 @@ export class VFSView {
     } else {
       // 没有选中目录时的提示
       const windowSize = ImGui.GetWindowSize();
-      const textSize = ImGui.CalcTextSize('Select a folder to view its contents');
+      const textSize = imGuiCalcTextSize('Select a folder to view its contents');
       ImGui.SetCursorPos(
         new ImGui.ImVec2((windowSize.x - textSize.x) * 0.5, (windowSize.y - textSize.y) * 0.5)
       );
@@ -1176,6 +1176,9 @@ export class VFSView {
   }
 
   async loadFileSystem() {
+    if (!this._project) {
+      return;
+    }
     const rootDir = await this.loadDirectoryInfo(this._project.homedir);
     this._filesystem = rootDir;
 

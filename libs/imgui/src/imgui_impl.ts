@@ -500,7 +500,7 @@ export function NewFrame(time: number): void {
           canvas.style.cursor = 'nwse-resize';
           break; // When hovering over the bottom-right corner of a window
         case ImGui.MouseCursor.Hand:
-          canvas.style.cursor = 'move';
+          canvas.style.cursor = 'pointer';
           break;
         case ImGui.MouseCursor.NotAllowed:
           canvas.style.cursor = 'not-allowed';

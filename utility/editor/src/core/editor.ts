@@ -1,4 +1,4 @@
-import { imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
+import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
@@ -18,15 +18,20 @@ import { ProjectInfo, ProjectService } from './services/project';
 
 export class Editor {
   private _moduleManager: ModuleManager;
-  private _assetImages: { brushes: { [key: string]: DRef<Texture2D> } };
+  private _assetImages: {
+    brushes: { [key: string]: DRef<Texture2D> };
+    app: { [key: string]: DRef<Texture2D> };
+  };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
+  private _recentProjects: ProjectInfo[];
   private _currentProjectIsTemporal: boolean;
   constructor() {
     this._moduleManager = new ModuleManager();
-    this._assetImages = { brushes: {} };
+    this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
+    this._recentProjects = [];
     this._currentProjectIsTemporal = false;
   }
   handleEvent(ev: Event, type?: string): boolean {
@@ -66,7 +71,7 @@ export class Editor {
         eventBus.dispatchEvent('external_drop', ev as DragEvent);
       }
     }
-    if (this._moduleManager.currentModule.controller?.handleEvent(ev)) {
+    if (this._moduleManager.currentModule?.controller?.handleEvent(ev)) {
       return true;
     }
     return false;
@@ -87,15 +92,7 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
-    const recentProjects = await ProjectService.getRecentProjects();
-    if (recentProjects.length === 0) {
-      const uuid = await ProjectService.createProject('MyProject');
-      this._currentProject = await ProjectService.openProject(uuid);
-      this._currentProjectIsTemporal = true;
-    } else {
-      this._currentProject = await ProjectService.openProject(recentProjects[0].uuid);
-      this._currentProjectIsTemporal = false;
-    }
+    this._recentProjects = await ProjectService.getRecentProjects();
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -106,6 +103,13 @@ export class Editor {
       const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
       this._assetImages.brushes[name] = new DRef(tex);
     }
+    const appConfig = await assetManager.fetchJsonData('assets/conf/app.json');
+    for (const name in appConfig) {
+      const tex = await assetManager.fetchTexture<Texture2D>(appConfig[name], {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      this._assetImages.app[name] = new DRef(tex);
+    }
   }
   registerModules() {
     const sceneModel = new SceneModel(this);
@@ -113,20 +117,71 @@ export class Editor {
     const sceneController = new SceneController(this, sceneModel, sceneView);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
-    this._moduleManager.activate('Scene', null);
+    //this._moduleManager.activate('Scene', null);
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);
     });
   }
   render() {
+    imGuiNewFrame();
     const module = this._moduleManager.currentModule;
     if (module?.view) {
-      imGuiNewFrame();
-      if (this._currentProject) {
-        module.view.render();
-      }
-      DialogRenderer.render();
-      imGuiEndFrame();
+      module.view.render();
+    } else {
+      this.renderWelcomePage();
     }
+    DialogRenderer.render();
+    imGuiEndFrame();
+  }
+  renderWelcomePage() {
+    const io = ImGui.GetIO();
+    const displaySize = io.DisplaySize;
+    ImGui.SetNextWindowPos(new ImGui.ImVec2(0, 0));
+    ImGui.SetNextWindowSize(displaySize);
+    const frameHeight = ImGui.GetFrameHeight();
+    const itemSpacing = 10;
+    const flags =
+      ImGui.WindowFlags.NoDecoration |
+      ImGui.WindowFlags.NoMove |
+      ImGui.WindowFlags.NoResize |
+      ImGui.WindowFlags.NoSavedSettings |
+      ImGui.WindowFlags.NoBringToFrontOnFocus;
+    if (ImGui.Begin('WelcomePage', null, flags)) {
+      ImGui.TextColored(new ImGui.ImVec4(0.3, 1, 0.3, 1), 'Welcome to zephyr3d editor');
+      ImGui.Separator();
+      const panelHeight = 10 * frameHeight + 9 * itemSpacing;
+      const iconTex = this._assetImages.app.icon.get();
+      const imageSize = new ImGui.ImVec2(160, 160);
+      let cursorPosY = Math.max(imageSize.y + 10, (displaySize.y - panelHeight) >> 1);
+      ImGui.SetCursorPosX(Math.max(0, (displaySize.x - imageSize.x) >> 1));
+      ImGui.SetCursorPosY((cursorPosY - imageSize.y) >> 1);
+      ImGui.Image(iconTex, imageSize);
+
+      ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.ImVec4(0.3, 0.5, 1, 1));
+      ImGui.PushStyleColor(ImGui.Col.HeaderHovered, new ImGui.Vec4(0, 0, 0, 0)); // 透明悬停
+      ImGui.PushStyleColor(ImGui.Col.HeaderActive, new ImGui.Vec4(0, 0, 0, 0)); // 透明激活
+      ImGui.PushStyleColor(ImGui.Col.Header, new ImGui.Vec4(0, 0, 0, 0));
+      const links = ['Create Project...', 'Open Project...'];
+      ImGui.PushID('WelcomeLink');
+      for (let i = 0; i < links.length; i++) {
+        ImGui.PushID(i);
+        const label = links[i];
+        const textSize = imGuiCalcTextSize(label);
+        ImGui.SetCursorPosY(cursorPosY);
+        ImGui.SetCursorPosX(Math.max(0, (displaySize.x - textSize.x) >> 1));
+        const selected = [false] as [boolean];
+        if (ImGui.Selectable(label, selected, ImGui.SelectableFlags.None, textSize)) {
+          alert(label);
+        }
+        if (ImGui.IsItemHovered()) {
+          ImGui.SetMouseCursor(ImGui.MouseCursor.Hand);
+        }
+        ImGui.PopID();
+        cursorPosY += frameHeight + itemSpacing;
+      }
+      ImGui.PopID();
+      ImGui.PopStyleColor(4);
+    }
+    ImGui.End();
   }
 }

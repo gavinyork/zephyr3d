@@ -29,8 +29,11 @@ export class SceneModel extends BaseModel {
   }
   reset(scene?: Scene, activeCameraId?: string, cameraLookAt?: number[]) {
     this._scene?.dispose();
-    this._scene = scene ?? new Scene();
+    this._scene = scene ?? null;
     this._camera = null;
+    if (!this._scene) {
+      return;
+    }
     if (!scene) {
       this._scene.env.sky.fogType = 'height_fog';
       const light = new DirectionalLight(this._scene);
