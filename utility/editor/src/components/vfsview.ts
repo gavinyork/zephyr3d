@@ -4,6 +4,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 import { ProjectInfo } from '../core/services/project';
 import { Dialog } from '../views/dlg/dlg';
+import { enableWorkspaceDragging } from './dragdrop';
 
 type FileInfo = {
   meta: FileMetadata;
@@ -52,6 +53,7 @@ export class VFSView {
   private _lastClickedItem: FileInfo | DirectoryInfo = null;
   private _gridItemSize: number = 80;
   private _showHidden: boolean = false;
+  private _hoveredItem: FileInfo | DirectoryInfo | null = null;
 
   constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {
     this._vfs = vfs;
@@ -94,6 +96,7 @@ export class VFSView {
 
   // 渲染右侧内容区域
   private renderContentArea() {
+    this._hoveredItem = null;
     // 工具栏
     this.renderToolbar();
     ImGui.Separator();
@@ -123,6 +126,25 @@ export class VFSView {
 
     // 处理右键菜单
     this.handleContextMenu();
+  }
+
+  private showItemProperties(item: FileInfo | DirectoryInfo) {
+    const isDir = 'subDir' in item;
+    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
+
+    let info = `Name: ${name}\n`;
+    info += `Type: ${isDir ? 'Folder' : 'File'}\n`;
+
+    if (!isDir) {
+      const meta = (item as FileInfo).meta;
+      info += `Size: ${this.formatFileSize(meta.size)}\n`;
+      if (meta.mimeType) info += `MIME Type: ${meta.mimeType}\n`;
+      if (meta.modified) info += `Modified: ${this.formatDate(meta.modified)}\n`;
+    }
+
+    info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
+
+    Dialog.messageBox('Properties', info);
   }
 
   // 渲染工具栏
@@ -256,8 +278,17 @@ export class VFSView {
       this.handleItemClick(item, index);
     }
 
+    // 跟踪鼠标悬停状态
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
+    }
+
+    if (!isDir) {
+      enableWorkspaceDragging(item, 'asset', item.meta.path);
     }
   }
 
@@ -284,8 +315,17 @@ export class VFSView {
       this.handleItemClick(item, index);
     }
 
+    // 跟踪鼠标悬停状态
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
+    }
+
+    if (!isDir) {
+      enableWorkspaceDragging(item, 'asset', item.meta.path);
     }
 
     // 在图标中央显示 emoji
@@ -299,7 +339,6 @@ export class VFSView {
     drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), convertEmojiString(emoji));
 
     // 文件名
-    const textWidth = Math.min(iconSize, ImGui.CalcTextSize(name).x);
     ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
     ImGui.TextWrapped(name);
     ImGui.PopTextWrapPos();
@@ -331,8 +370,17 @@ export class VFSView {
       this.handleItemClick(item, index);
     }
 
+    // 跟踪鼠标悬停状态
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
+    }
+
+    if (!isDir) {
+      enableWorkspaceDragging(item, 'asset', item.meta.path);
     }
 
     // 大小列
@@ -405,38 +453,131 @@ export class VFSView {
   }
 
   // 处理右键菜单
+  // 处理右键菜单
   private handleContextMenu() {
     if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGui.MouseButton.Right)) {
-      ImGui.OpenPopup('##ContentContextMenu');
+      // 检查是否右键点击了某个项目
+      const clickedItem = this.getItemUnderMouse();
+
+      if (clickedItem) {
+        // 右键点击了项目
+        if (this._selectedItems.has(clickedItem)) {
+          // 点击的是已选中的项目：保持当前选择状态，显示多选菜单
+          // 不改变选择状态
+        } else {
+          // 点击的是未选中的项目：选中该项目并清除其他选择
+          this._selectedItems.clear();
+          this._selectedItems.add(clickedItem);
+          this._lastClickedItem = clickedItem;
+        }
+        ImGui.OpenPopup('##ItemContextMenu');
+      } else {
+        // 右键点击了空白区域：显示通用菜单
+        ImGui.OpenPopup('##ContentContextMenu');
+      }
     }
 
-    if (ImGui.BeginPopup('##ContentContextMenu')) {
-      if (this._selectedItems.size === 0) {
-        // 空白区域右键
-        if (ImGui.BeginMenu('Create New')) {
-          if (ImGui.MenuItem('Folder...')) {
-            this.createNewFolder();
-          }
-          ImGui.Separator();
-          if (ImGui.MenuItem('File...')) {
-            this.createNewFile();
-          }
-          ImGui.EndMenu();
-        }
-      } else {
-        // 选中项目右键
-        if (ImGui.MenuItem(`Delete (${this._selectedItems.size} items)`)) {
+    // 项目相关的右键菜单
+    if (ImGui.BeginPopup('##ItemContextMenu')) {
+      const selectedCount = this._selectedItems.size;
+      const selectedItems = Array.from(this._selectedItems);
+
+      if (selectedCount > 0) {
+        // 删除操作
+        if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
           this.deleteSelectedItems();
         }
-        if (this._selectedItems.size === 1) {
+
+        if (selectedCount === 1) {
+          // 单个项目的操作
+          const item = selectedItems[0];
+
           ImGui.Separator();
           if (ImGui.MenuItem('Rename')) {
             this.renameSelectedItem();
           }
+
+          ImGui.Separator();
+          if (ImGui.MenuItem('Properties')) {
+            this.showItemProperties(item);
+          }
         }
       }
+
       ImGui.EndPopup();
     }
+
+    // 空白区域的右键菜单保持不变...
+    if (ImGui.BeginPopup('##ContentContextMenu')) {
+      if (ImGui.BeginMenu('Create New')) {
+        if (ImGui.MenuItem('Folder...')) {
+          this.createNewFolder();
+        }
+        ImGui.Separator();
+        if (ImGui.MenuItem('File...')) {
+          this.createNewFile();
+        }
+        ImGui.EndMenu();
+      }
+
+      ImGui.Separator();
+
+      if (ImGui.BeginMenu('View')) {
+        if (ImGui.RadioButton('List View', this._viewMode === ViewMode.List)) {
+          this._viewMode = ViewMode.List;
+        }
+        if (ImGui.RadioButton('Grid View', this._viewMode === ViewMode.Grid)) {
+          this._viewMode = ViewMode.Grid;
+        }
+        if (ImGui.RadioButton('Details View', this._viewMode === ViewMode.Details)) {
+          this._viewMode = ViewMode.Details;
+        }
+        ImGui.EndMenu();
+      }
+
+      if (ImGui.BeginMenu('Sort by')) {
+        if (ImGui.RadioButton('Name', this._sortBy === SortBy.Name)) {
+          this._sortBy = SortBy.Name;
+          this.sortContent();
+        }
+        if (ImGui.RadioButton('Size', this._sortBy === SortBy.Size)) {
+          this._sortBy = SortBy.Size;
+          this.sortContent();
+        }
+        if (ImGui.RadioButton('Type', this._sortBy === SortBy.Type)) {
+          this._sortBy = SortBy.Type;
+          this.sortContent();
+        }
+        if (ImGui.RadioButton('Modified', this._sortBy === SortBy.Modified)) {
+          this._sortBy = SortBy.Modified;
+          this.sortContent();
+        }
+        ImGui.Separator();
+        if (ImGui.MenuItem(this._sortAscending ? 'Descending' : 'Ascending')) {
+          this._sortAscending = !this._sortAscending;
+          this.sortContent();
+        }
+        ImGui.EndMenu();
+      }
+
+      if (ImGui.MenuItem('Refresh')) {
+        this.refreshFileView();
+      }
+
+      ImGui.EndPopup();
+    }
+  }
+  private selectAll() {
+    this._selectedItems.clear();
+    for (const item of this._currentDirContent) {
+      this._selectedItems.add(item);
+    }
+  }
+  // 获取鼠标下的项目
+  private getItemUnderMouse(): FileInfo | DirectoryInfo | null {
+    // 这个方法需要根据当前的视图模式来实现
+    // 由于 ImGui 的限制，我们需要在渲染时记录项目的位置信息
+    return this._hoveredItem;
   }
 
   // 处理表格排序
@@ -514,10 +655,9 @@ export class VFSView {
 
     const mimeType = meta.mimeType.toLowerCase();
     if (mimeType.startsWith('image/')) return '🖼️';
-    if (mimeType.startsWith('video/')) return '🎥';
-    if (mimeType.startsWith('audio/')) return '🎵';
+    if (mimeType.startsWith('video/')) return '🎬';
+    if (mimeType.startsWith('audio/')) return '🔊';
     if (mimeType.includes('text') || mimeType.includes('json')) return '📝';
-    if (mimeType.includes('pdf')) return '📕';
     if (mimeType.includes('zip') || mimeType.includes('archive')) return '📦';
 
     const ext = meta.name.split('.').pop()?.toLowerCase();
@@ -526,30 +666,22 @@ export class VFSView {
       case 'ts':
       case 'jsx':
       case 'tsx':
-        return '📜';
+      case 'py':
+      case 'java':
+      case 'cpp':
+      case 'c':
+      case 'h':
       case 'css':
       case 'scss':
       case 'sass':
       case 'less':
-        return '🎨';
+        return '📜';
       case 'html':
       case 'htm':
+        return '🌍';
+      case 'gltf':
+      case 'glb':
         return '🌐';
-      case 'md':
-      case 'markdown':
-        return '📖';
-      case 'py':
-        return '🐍';
-      case 'java':
-        return '☕';
-      case 'cpp':
-      case 'c':
-      case 'h':
-        return '⚙️';
-      case 'exe':
-      case 'app':
-      case 'dmg':
-        return '💿';
       default:
         return '📄';
     }
