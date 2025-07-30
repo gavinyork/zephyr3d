@@ -9,6 +9,9 @@ export class DlgRename extends DialogRenderer<string> {
     this._name = name;
     this._firstOpen = true;
   }
+  public static async rename(title: string, name: string, width?: number): Promise<string> {
+    return new DlgRename(title, width, name).showModal();
+  }
   doRender(): void {
     const text = [this._name] as [string];
     if (this._firstOpen) {

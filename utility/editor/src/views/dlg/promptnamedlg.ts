@@ -4,6 +4,14 @@ import { DialogRenderer } from '../../components/modal';
 export class DlgPromptName extends DialogRenderer<string> {
   private _name: string;
   private _hint: string;
+  public static async promptName(
+    title: string,
+    hint?: string,
+    defaultName?: string,
+    width?: number
+  ): Promise<string> {
+    return new DlgPromptName(title, defaultName, hint, width).showModal();
+  }
   constructor(id: string, defaultName: string, hint: string, width = 300) {
     super(
       id,

@@ -3,6 +3,9 @@ import { DialogRenderer } from '../../components/modal';
 
 export class DlgMessage extends DialogRenderer<void> {
   private _text: string;
+  public static messageBox(title: string, message: string, width?: number, height?: number) {
+    return new DlgMessage(`${title}##Dialog`, message, width, height).showModal();
+  }
   constructor(id?: string, message?: string, width?: number, height?: number) {
     super(id ?? 'MessageBox', width ?? 300, height ?? 0);
     this._text = message ?? '';

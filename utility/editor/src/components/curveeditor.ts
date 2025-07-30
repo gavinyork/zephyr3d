@@ -51,6 +51,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
   private _positionIndicatorTime: number;
   private _isDraggingIndicator: boolean;
   private _showPositionIndicator: boolean;
+  private _changed: boolean;
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
   constructor(interpolator?: Interpolator, settings?: Partial<CurveSettings>);
@@ -62,6 +63,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     let valueRangeMin = Number.MAX_VALUE;
     let valueRangeMax = -Number.MAX_VALUE;
     let interpolationMode: InterpolationMode;
+    let initialChanged = false;
     if (pointsOrInterpolator instanceof Interpolator) {
       this._interpolator = pointsOrInterpolator;
       this._resultBuffer = new Float32Array(this._interpolator.stride);
@@ -111,6 +113,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
         { x: timeRangeMin, value: [0] },
         { x: timeRangeMax, value: [0] }
       ];
+      initialChanged = !pointsOrInterpolator;
     }
     // Default settings
     this._settings = {
@@ -144,7 +147,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     this._isDraggingIndicator = false;
     this._showPositionIndicator = this._settings.showPositionIndicator;
 
-    this.updateInterpolator();
+    this.updateInterpolator(initialChanged);
   }
 
   get interpolator() {
@@ -192,6 +195,9 @@ export class CurveEditor extends makeEventTarget(Object)<{
   }
   set showPositionIndicator(show: boolean) {
     this._showPositionIndicator = show;
+  }
+  get changed() {
+    return this._changed;
   }
   private emitPreviewPosition(): void {
     if (!this._interpolator || this._points.length < 2) {
@@ -764,7 +770,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
     this.updateInterpolator();
   }
 
-  private updateInterpolator(): void {
+  private updateInterpolator(changed = true): void {
     const stride = this._interpolator?.stride ?? 1;
     const inputs = new Float32Array(this._points.length);
     const outputs = new Float32Array(this._points.length * stride);
@@ -789,6 +795,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
       this._resultBuffer = new Float32Array(stride);
     }
     this._curveDirty = true;
+    this._changed = changed;
     this.dispatchEvent('curve_changed');
   }
   setKeyframeValue(value: number[]) {

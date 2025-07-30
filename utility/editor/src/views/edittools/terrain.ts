@@ -25,6 +25,7 @@ import { TerrainFlattenBrush } from './brushes/flatten';
 import { FilePicker } from '../../components/filepicker';
 import { Dialog } from '../dlg/dlg';
 import { ProjectService } from '../../core/services/project';
+import { eventBus } from '../../core/eventbus';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
@@ -85,17 +86,20 @@ export class TerrainEditTool implements EditTool {
     this._grassAlbedo.on('update_image', (asset: string, index: number) => {
       this._terrain.get().grassRenderer.setGrassTexture(index, this._grassAlbedo.getImage(index));
       this.refreshGrassTextures();
+      eventBus.dispatchEvent('scene_changed');
     });
     this._grassAlbedo.on('add_image', (asset: string, index: number) => {
       const grassRenderer = this._terrain.get().grassRenderer;
       grassRenderer.addLayer(1, 1, this._grassAlbedo.getImage(index));
       this.refreshGrassTextures();
+      eventBus.dispatchEvent('scene_changed');
     });
 
     this.refreshDetailMaps();
     this._detailAlbedo.on('update_image', (asset: string, index: number) => {
       this._terrain.get().material.setDetailMap(index, this._detailAlbedo.getImage(index));
       this.refreshDetailMaps();
+      eventBus.dispatchEvent('scene_changed');
     });
     this._detailAlbedo.on('add_image', (asset: string, index: number) => {
       const material = this._terrain.get().material;
@@ -105,10 +109,12 @@ export class TerrainEditTool implements EditTool {
       }
       material.setDetailMap(index, this._detailAlbedo.getImage(index));
       this.refreshDetailMaps();
+      eventBus.dispatchEvent('scene_changed');
     });
     this._detailNormal.on('update_image', (asset: string, index: number) => {
       this._terrain.get().material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
+      eventBus.dispatchEvent('scene_changed');
     });
     this._detailNormal.on('add_image', (asset: string, index: number) => {
       const material = this._terrain.get().material;
@@ -118,6 +124,7 @@ export class TerrainEditTool implements EditTool {
       }
       material.setDetailNormalMap(index, this._detailNormal.getImage(index));
       this.refreshDetailMaps();
+      eventBus.dispatchEvent('scene_changed');
     });
     this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture', 'grass', 'erase grass'];
     this._editSelected = 0;
@@ -299,6 +306,7 @@ export class TerrainEditTool implements EditTool {
         (posMaxZ - region.y) * regionHeightInv,
         numInstances
       );
+    eventBus.dispatchEvent('scene_changed');
   }
   applyGrassBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
     const region = this._terrain.get().worldRegion;
@@ -345,6 +353,7 @@ export class TerrainEditTool implements EditTool {
       };
     });
     this._terrain.get().grassRenderer.addInstances(grassIndex, instances);
+    eventBus.dispatchEvent('scene_changed');
   }
   applyTextureBrush(
     brushTexture: Texture2D,
@@ -389,6 +398,7 @@ export class TerrainEditTool implements EditTool {
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+    eventBus.dispatchEvent('scene_changed');
   }
   applyHeightBrush(
     brush: TerrainHeightBrush,
@@ -413,6 +423,7 @@ export class TerrainEditTool implements EditTool {
     device.pool.releaseFrameBuffer(fb);
 
     this._heightDirty = true;
+    eventBus.dispatchEvent('scene_changed');
   }
   handleKeyboardEvent(_evt: KeyboardEvent): boolean {
     return false;
@@ -597,6 +608,7 @@ export class TerrainEditTool implements EditTool {
               Dialog.messageBox('Error', String(err));
               URL.revokeObjectURL(url);
             });
+          eventBus.dispatchEvent('scene_changed');
         } else {
           const assetManager = new AssetManager(ProjectService.serializationManager.vfs);
           assetManager
@@ -623,6 +635,7 @@ export class TerrainEditTool implements EditTool {
                 )
               );
               this._terrain.get().updateBoundingBox();
+              eventBus.dispatchEvent('scene_changed');
 
               URL.revokeObjectURL(url);
             })

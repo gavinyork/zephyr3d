@@ -38,7 +38,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
-import { ASSERT, MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
+import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import type { DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
@@ -141,35 +141,44 @@ export class SceneView extends BaseView<SceneModel> {
     this._menubar = new MenubarView({
       items: [
         {
-          label: 'File',
+          label: 'Project',
           subMenus: [
             {
-              label: 'New',
+              label: 'New Project...',
+              action: () => eventBus.dispatchEvent('action', 'NEW_PROJECT')
+            },
+            {
+              label: 'Open Project...',
+              action: () => eventBus.dispatchEvent('action', 'OPEN_PROJECT')
+            },
+            {
+              label: 'Close Project',
+              action: () => eventBus.dispatchEvent('action', 'CLOSE_PROJECT')
+            }
+          ]
+        },
+        {
+          label: 'Scene',
+          subMenus: [
+            {
+              label: 'New Scene',
               shortCut: 'Ctrl+N',
               action: () => eventBus.dispatchEvent('action', 'NEW_DOC')
             },
             {
-              label: 'Open',
+              label: 'Open Scene...',
               shortCut: 'Ctrl+O',
               action: () => eventBus.dispatchEvent('action', 'OPEN_DOC')
             },
             {
-              label: 'Save',
+              label: 'Save Scene',
               shortCut: 'Ctrl+S',
               action: () => eventBus.dispatchEvent('action', 'SAVE_DOC')
             },
             {
-              label: 'Save As...',
+              label: 'Save Scene As...',
               shortCut: 'Ctrl+Alt+S',
               action: () => eventBus.dispatchEvent('action', 'SAVE_DOC_AS')
-            },
-            {
-              label: 'Export',
-              action: () => eventBus.dispatchEvent('action', 'EXPORT_DOC')
-            },
-            {
-              label: 'Batch export...',
-              action: () => eventBus.dispatchEvent('action', 'BATCH_EXPORT_DOC')
             }
           ]
         },
@@ -486,13 +495,9 @@ export class SceneView extends BaseView<SceneModel> {
   get cmdManager() {
     return this._cmdManager;
   }
-  reset(scene: Scene) {
+  reset() {
     this.sceneFinialize();
     this._cmdManager.clear();
-    this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
-    this._postGizmoRenderer.mode = 'select';
-    this._tab.sceneHierarchy.selectNode(null);
-    this._tab.sceneHierarchy.scene = scene;
     this._propGrid.object = null;
     this._transformNode.dispose();
     this._oldTransform = null;
@@ -516,7 +521,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._statusbar.height -
       this._assetView.panel.height;
     this._menubar.render();
-    this._tab.render();
+    this._tab.render(this._editor.sceneChanged);
     this._propGrid.render();
     this._toolbar.render();
     this._assetView.render();
@@ -669,6 +674,7 @@ export class SceneView extends BaseView<SceneModel> {
                   .then((node) => {
                     this._tab.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
+                    eventBus.dispatchEvent('scene_changed');
                   });
                 break;
               case 'shape':
@@ -684,6 +690,7 @@ export class SceneView extends BaseView<SceneModel> {
                   .then((mesh) => {
                     this._tab.sceneHierarchy.selectNode(mesh);
                     placeNode.parent = null;
+                    eventBus.dispatchEvent('scene_changed');
                   });
                 break;
               case 'node':
@@ -697,6 +704,7 @@ export class SceneView extends BaseView<SceneModel> {
                     this._tab.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
                     this._proxy.createProxy(node);
+                    eventBus.dispatchEvent('scene_changed');
                   });
                 break;
             }
@@ -786,7 +794,6 @@ export class SceneView extends BaseView<SceneModel> {
   }
   protected onActivate(): void {
     super.onActivate();
-    this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
     this._assetView = new VFSView(
       ProjectService.VFS,
       this._editor.currentProject,
@@ -799,35 +806,22 @@ export class SceneView extends BaseView<SceneModel> {
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
     this._toolbar.on('action', this.handleSceneAction, this);
-    this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
-    this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
-    this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
-    this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
-    this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
-    this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.on('request_edit_track', this.editPropAnimation, this);
     this._propGrid.on('end_edit_track', this.endEditPropAnimation, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
-    this.sceneSetup();
+    this.reset();
   }
   protected onDeactivate(): void {
     super.onDeactivate();
-    this._tab = null;
     this._assetView?.dispose();
     this._assetView = null;
     this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);
     this._toolbar.off('action', this.handleSceneAction, this);
-    this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
-    this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
-    this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
-    this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
-    this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
-    this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
@@ -837,32 +831,60 @@ export class SceneView extends BaseView<SceneModel> {
     this.sceneFinialize();
   }
   private sceneSetup() {
-    this._proxy = new NodeProxy(this.model.scene);
-    this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-    this.model.scene.rootNode.iterate((node) => this._proxy.createProxy(node));
-    this.model.scene.on('startrender', this.handleStartRender, this);
-    this.model.scene.on('endrender', this.handleEndRender, this);
-    this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.on('end_translate', this.handleEndTranslateNode, this);
-    this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
-    this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
-    this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
+    if (this.model.scene) {
+      this._proxy = new NodeProxy(this.model.scene);
+      this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
+      this._postGizmoRenderer.mode = 'select';
+      this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
+      this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
+      this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
+      this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
+      this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
+      this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
+      this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
+      this.model.scene.rootNode.iterate((node) => this._proxy.createProxy(node));
+      this.model.scene.on('startrender', this.handleStartRender, this);
+      this.model.scene.on('endrender', this.handleEndRender, this);
+      this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.on('end_translate', this.handleEndTranslateNode, this);
+      this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
+      this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
+      this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
+    }
   }
   private sceneFinialize() {
-    this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
-    this.model.scene.off('startrender', this.handleStartRender, this);
-    this.model.scene.off('endrender', this.handleEndRender, this);
-    this._postGizmoRenderer.off('begin_translate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.off('begin_rotate', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.off('begin_scale', this.handleBeginTransformNode, this);
-    this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
-    this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
-    this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
-    this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
-    this._proxy?.dispose();
-    this._proxy = null;
+    if (this._tab) {
+      this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
+      this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
+      this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
+      this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
+      this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
+      this._tab = null;
+    }
+    if (this.model.scene) {
+      this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
+      this.model.scene.off('startrender', this.handleStartRender, this);
+      this.model.scene.off('endrender', this.handleEndRender, this);
+    }
+    if (this._postGizmoRenderer) {
+      this._postGizmoRenderer.off('begin_translate', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.off('begin_rotate', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.off('begin_scale', this.handleBeginTransformNode, this);
+      this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
+      this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
+      this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
+      this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
+      this._postGizmoRenderer.dispose();
+      this._postGizmoRenderer = null;
+    }
+    if (this._proxy) {
+      this._proxy.dispose();
+      this._proxy = null;
+    }
     this.closeAllTrackEditors();
   }
   private renderDeviceInfo() {
@@ -936,6 +958,7 @@ export class SceneView extends BaseView<SceneModel> {
         }
       }
     }
+    eventBus.dispatchEvent('scene_changed');
   }
   update(dt: number) {
     const placeNode = this._nodeToBePlaced.get();
@@ -1024,6 +1047,9 @@ export class SceneView extends BaseView<SceneModel> {
         this._editingProps.delete(target);
       }
     }
+    if (edited) {
+      eventBus.dispatchEvent('scene_changed');
+    }
   }
   private editAABB(aabb: AABB) {
     this._aabbForEdit = aabb;
@@ -1033,6 +1059,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (aabb === this._aabbForEdit) {
       this._aabbForEdit = null;
       this._postGizmoRenderer.endEditAABB();
+      eventBus.dispatchEvent('scene_changed');
     }
   }
   private handleCopyNode(node: SceneNode) {
@@ -1053,6 +1080,7 @@ export class SceneView extends BaseView<SceneModel> {
       sceneNode.position.x += 1;
       this._tab.sceneHierarchy.selectNode(sceneNode);
     });
+    eventBus.dispatchEvent('scene_changed');
   }
   private handleEditNode(node: SceneNode) {
     if (!node) {
@@ -1082,6 +1110,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._postGizmoRenderer.node = null;
     }
     this._cmdManager.execute(new NodeDeleteCommand(node));
+    eventBus.dispatchEvent('scene_changed');
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
@@ -1097,6 +1126,7 @@ export class SceneView extends BaseView<SceneModel> {
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
       this._cmdManager.execute(new NodeReparentCommand(src, dst));
+      eventBus.dispatchEvent('scene_changed');
     }
   }
   private handleNodeDoubleClicked(node: SceneNode) {
@@ -1162,6 +1192,7 @@ export class SceneView extends BaseView<SceneModel> {
   private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
       this._tab.sceneHierarchy.selectNode(node);
+      eventBus.dispatchEvent('scene_changed');
     });
   }
   private handleNodeRemoved(node: SceneNode) {

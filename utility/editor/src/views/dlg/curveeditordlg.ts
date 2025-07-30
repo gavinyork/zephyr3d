@@ -24,6 +24,21 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
       this.channel = [0];
     }
   }
+  public static async editCurve(
+    title: string,
+    interpolator: Interpolator,
+    onPreview?: (value: number[]) => void,
+    width?: number,
+    height?: number
+  ): Promise<boolean> {
+    const existing = DialogRenderer.findModeless(title);
+    if (existing >= 0) {
+      ImGui.SetWindowFocus(title);
+      return DialogRenderer.getModeless(existing).promise;
+    } else {
+      return new DlgCurveEditor(title, onPreview, width, height, interpolator).show();
+    }
+  }
   get curveEditor() {
     return this.editor;
   }
@@ -48,8 +63,9 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
     ImGui.EndChild();
     ImGui.Columns(2, 'ButtonLayout', false);
     if (ImGui.Button('Ok')) {
+      const edited = this.editor.changed;
       this.editor.off('preview_position', this.preview, this);
-      this.close(true);
+      this.close(edited);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {

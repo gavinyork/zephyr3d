@@ -31,6 +31,9 @@ export class Editor {
     this._leakTestA = null;
     this._currentProject = null;
   }
+  get sceneChanged() {
+    return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
+  }
   handleEvent(ev: Event, type?: string): boolean {
     if (
       ev.type === 'keyup' &&
@@ -113,7 +116,6 @@ export class Editor {
     const sceneController = new SceneController(this, sceneModel, sceneView);
     this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
 
-    //this._moduleManager.activate('Scene', null);
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);
     });
@@ -168,26 +170,7 @@ export class Editor {
         const selected = [false] as [boolean];
         if (ImGui.Selectable(label, selected, ImGui.SelectableFlags.None, textSize)) {
           if (i === 0) {
-            // Create project
-            Dialog.promptName('Create Project', 'Project Name', 'New Project', 400).then((name) => {
-              if (name) {
-                ProjectService.createProject(name).then((uuid) => {
-                  ProjectService.openProject(uuid).then((project) => {
-                    this._currentProject = project;
-                    this._moduleManager.activate('Scene', null);
-                    Dialog.saveFile(
-                      'Test Save File',
-                      ProjectService.VFS,
-                      this._currentProject,
-                      500,
-                      400
-                    ).then((path) => {
-                      alert(path);
-                    });
-                  });
-                });
-              }
-            });
+            this.newProject();
           }
           if (i === 1) {
             ProjectService.listProjects().then((projects) => {
@@ -197,7 +180,7 @@ export class Editor {
                 if (id) {
                   ProjectService.openProject(id).then((project) => {
                     this._currentProject = project;
-                    this._moduleManager.activate('Scene', null);
+                    this._moduleManager.activate('Scene', this._currentProject.lastEditScene ?? '');
                   });
                 }
               });
@@ -214,5 +197,34 @@ export class Editor {
       ImGui.PopStyleColor(4);
     }
     ImGui.End();
+  }
+  async closeProject(lastScenePath: string) {
+    if (this._currentProject) {
+      this._currentProject.lastEditScene = lastScenePath ?? '';
+      await ProjectService.saveProject(this._currentProject);
+      await ProjectService.closeCurrentProject();
+      this._currentProject = null;
+      this._moduleManager.activate('');
+    }
+  }
+  async newProject() {
+    const name = await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400);
+    if (name) {
+      const uuid = await ProjectService.createProject(name);
+      const project = await ProjectService.openProject(uuid);
+      this._currentProject = project;
+      this._moduleManager.activate('Scene', '');
+    }
+  }
+  async openProject() {
+    const projects = await ProjectService.listProjects();
+    const names = projects.map((project) => project.name);
+    const ids = projects.map((project) => project.uuid);
+    const id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
+    if (id) {
+      const project = await ProjectService.openProject(id);
+      this._currentProject = project;
+      this._moduleManager.activate('Scene', project.lastEditScene ?? '');
+    }
   }
 }

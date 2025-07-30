@@ -1,123 +1,125 @@
 import type { EmbeddedAssetInfo, Scene } from '@zephyr3d/scene';
-import { deserializeObject, OrbitCameraController, serializeObject } from '@zephyr3d/scene';
+import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
 import type { SceneView } from '../views/sceneview';
-import { Database, type DBSceneInfo } from '../storage/db';
 import { Dialog } from '../views/dlg/dlg';
-import { ZipDownloader } from '../helpers/zipdownload';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
 
 export class SceneController extends BaseController<SceneModel> {
   protected _editor: Editor;
-  protected _scene: DBSceneInfo;
+  protected _scenePath: string;
+  protected _sceneChanged: boolean;
   protected _view: SceneView;
   constructor(editor: Editor, model: SceneModel, view: SceneView) {
     super(model);
     this._editor = editor;
     this._view = view;
+    this._sceneChanged = false;
   }
   get editor() {
     return this._editor;
   }
+  get sceneChanged() {
+    return this._sceneChanged;
+  }
   handleEvent(ev: Event, type?: string): boolean {
     return this._view.handleEvent(ev, type);
   }
-  protected onActivate(scene: DBSceneInfo): void {
-    this._scene = scene;
+  protected async onActivate(scenePath: string): Promise<void> {
+    this._scenePath = '';
+    this._sceneChanged = !scenePath;
+    if (scenePath) {
+      await this.openScene(scenePath, false);
+    } else {
+      await this.createScene(false);
+    }
     eventBus.on('update', this.update, this);
     eventBus.on('action', this.sceneAction, this);
+    eventBus.on('scene_changed', this.invalidateScene, this);
   }
   protected onDeactivate(): void {
-    this._scene = null;
+    this._scenePath = '';
+    this._sceneChanged = false;
     eventBus.off('update', this.update, this);
     eventBus.off('action', this.sceneAction, this);
+    eventBus.off('scene_changed', this.invalidateScene, this);
   }
-  private async promptSceneName(title?: string): Promise<DBSceneInfo> {
-    const defaultName = this._scene?.name ?? '';
-    const name = await Dialog.promptName(title ?? 'Input name:', defaultName);
-    if (name) {
-      const scenes = await Database.listScenes();
-      let scene = scenes.find((val) => val.name === name);
-      if (!scene) {
-        scene = { name, content: null };
-      } else if (scene !== this._scene) {
-        if (
-          (await Dialog.messageBoxEx(
-            'zephyr3d',
-            `'${name}' already exists, do you want to overwrite it?`,
-            ['Yes', 'No'],
-            300
-          )) !== 'Yes'
-        ) {
-          return null;
-        }
-      }
-      return scene;
-    }
+  private invalidateScene() {
+    this._sceneChanged = true;
   }
-  private sceneAction(action: string) {
+  private async sceneAction(action: string) {
     switch (action) {
+      case 'OPEN_PROJECT':
+        await this.sceneAction('CLOSE_PROJECT');
+        if (!this._editor.currentProject) {
+          await this._editor.openProject();
+        }
+        break;
+      case 'NEW_PROJECT':
+        await this.sceneAction('CLOSE_PROJECT');
+        if (!this._editor.currentProject) {
+          await this._editor.newProject();
+        }
+        break;
+      case 'CLOSE_PROJECT':
+        if (this._sceneChanged) {
+          const value = await Dialog.messageBoxEx('zephyr3d editor', 'Save current scene?', [
+            'Yes',
+            'No',
+            'Cancel'
+          ]);
+          if (value === 'Cancel') {
+            return;
+          }
+          if (value === 'Yes') {
+            await this.sceneAction('SAVE_DOC');
+            if (this._sceneChanged) {
+              return;
+            }
+          }
+        }
+        await this._editor.closeProject(this._scenePath);
+        break;
       case 'NEW_DOC':
-        this.createScene();
+        this.createScene(true);
         break;
       case 'SAVE_DOC':
-        if (!this._scene) {
-          this.promptSceneName().then((info) => {
-            if (info) {
-              this.saveScene(info);
-            }
-          });
+        if (!this._scenePath) {
+          await this.sceneAction('SAVE_DOC_AS');
         } else {
-          this.saveScene(this._scene);
+          await this.saveScene();
         }
         break;
-      case 'SAVE_DOC_AS':
-        this.promptSceneName().then((info) => {
-          if (info) {
-            this.saveScene(info);
-          }
-        });
-        break;
-      case 'EXPORT_DOC':
-        if (!this._scene) {
-          this.promptSceneName().then((info) => {
-            if (info) {
-              this.saveScene(info, false);
-              this.exportScene(this.model.scene);
-            }
-          });
-        } else {
-          this.saveScene(this._scene, false).then(() => {
-            this.exportScene(this.model.scene);
-          });
+      case 'SAVE_DOC_AS': {
+        const name = await Dialog.saveFile(
+          'Save Scene',
+          ProjectService.VFS,
+          this._editor.currentProject,
+          500,
+          400
+        );
+        if (name) {
+          this._scenePath = name;
+          await this.sceneAction('SAVE_DOC');
         }
         break;
-      case 'BATCH_EXPORT_DOC':
-        Database.listScenes().then((scenes) => {
-          Dialog.batchExportScene('Batch export scene', scenes, 300).then((sceneList) => {
-            if (sceneList.length > 0) {
-              Promise.all(sceneList.map((val) => this.loadScene(val))).then((scenes) => {
-                this.batchExportScene(
-                  scenes.map((scene, index) => ({ scene: scene, name: sceneList[index].name })),
-                  'scenes'
-                );
-              });
-            }
-          });
-        });
+      }
+      case 'OPEN_DOC': {
+        const name = await Dialog.openFile(
+          'Open Scene',
+          ProjectService.VFS,
+          this._editor.currentProject,
+          500,
+          400
+        );
+        if (name) {
+          await this.openScene(name, true);
+        }
         break;
-      case 'OPEN_DOC':
-        Database.listScenes().then((scenes) => {
-          Dialog.openScene('Select scene:', scenes, 300).then((sceneId) => {
-            if (sceneId) {
-              this.openScene(sceneId);
-            }
-          });
-        });
-        break;
+      }
       default:
         console.log('Unknown action');
         break;
@@ -127,104 +129,50 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
     this._view.update(dt);
   }
-  private async saveScene(scene: DBSceneInfo, showMessage = true) {
+  private async saveScene(showMessage = true) {
     const assetList = new Set<string>();
     const embeddedAssetList: Promise<EmbeddedAssetInfo>[] = [];
-    this.model.scene.name = scene.name;
-    this._scene = Object.assign({}, scene, {
-      content: await serializeObject(
-        this.model.scene,
-        ProjectService.serializationManager,
-        null,
-        assetList,
-        embeddedAssetList
-      ),
-      metadata: {
-        activeCamera: this.model.camera?.persistentId ?? '',
-        activeCameraLookAt:
-          this.model.camera?.controller instanceof OrbitCameraController
-            ? [...this.model.camera.controller.center]
-            : [0, 0, 0]
-      }
+    const content = await serializeObject(
+      this.model.scene,
+      ProjectService.serializationManager,
+      null,
+      assetList,
+      embeddedAssetList
+    );
+    await ProjectService.VFS.writeFile(this._scenePath, JSON.stringify(content), {
+      encoding: 'utf8',
+      create: true
     });
-    console.log(JSON.stringify(this._scene.content, null, 2));
+    console.log(JSON.stringify(content, null, 2));
     console.log([...assetList]);
     console.log([...embeddedAssetList]);
     const embeddedAssets = await Promise.all(embeddedAssetList);
     await ProjectService.putEmbeddedAssets(embeddedAssets);
-    await Database.putScene(this._scene);
-    const uuid = await Database.putScene(this._scene);
-    this._scene.uuid = uuid;
+    this._sceneChanged = false;
     if (showMessage) {
-      Dialog.messageBox('Zephyr3d', `Scene saved: ${uuid}`);
+      Dialog.messageBox('Zephyr3d', `Scene saved: ${this._scenePath}`);
     }
   }
-  private async batchExportScene(scenes: { scene: Scene; name: string }[], name: string) {
-    const assetList = new Set<string>();
-    const contents = await Promise.all(
-      scenes.map((val) => serializeObject(val.scene, ProjectService.serializationManager, null, assetList))
-    );
-    const zipDownloader = new ZipDownloader(`${name}.zip`);
-    if (assetList.size > 0) {
-      await Database.exportAssets(zipDownloader, [...assetList], 'assets');
+  async loadScene(path: string) {
+    const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+    const json = JSON.parse(content);
+    return deserializeObject<Scene>(null, json, ProjectService.serializationManager);
+  }
+  async openScene(path: string, resetView: boolean) {
+    const scene = await this.loadScene(path);
+    this._scenePath = path;
+    this._sceneChanged = false;
+    this.reset(scene, resetView);
+  }
+  createScene(resetView: boolean) {
+    this._scenePath = '';
+    this._sceneChanged = true;
+    this.reset(null, resetView);
+  }
+  reset(scene?: Scene, resetView?: boolean) {
+    this.model.reset(scene);
+    if (resetView) {
+      this._view.reset();
     }
-    for (let i = 0; i < contents.length; i++) {
-      const content = contents[i];
-      const name = scenes[i].name;
-      await zipDownloader.zipWriter.add(
-        `scene.${name}.json`,
-        new Blob([JSON.stringify(content, null, 2)]).stream()
-      );
-    }
-    await zipDownloader.finish();
-  }
-  private async exportScene(scene: Scene) {
-    const assetList = new Set<string>();
-    const content = await serializeObject(scene, ProjectService.serializationManager, null, assetList);
-    content.meta = {
-      activeCamera: this.model.camera?.persistentId ?? ''
-    };
-    const zipDownloader = new ZipDownloader(`${scene.name}.zip`);
-    if (assetList.size > 0) {
-      await Database.exportAssets(zipDownloader, [...assetList], 'assets');
-    }
-    await zipDownloader.zipWriter.add(
-      `scene.${name}.json`,
-      new Blob([JSON.stringify(content, null, 2)]).stream()
-    );
-    await zipDownloader.finish();
-  }
-  async loadScene(sceneinfo: DBSceneInfo) {
-    return deserializeObject<Scene>(null, sceneinfo.content, ProjectService.serializationManager);
-  }
-  openScene(uuid: string) {
-    Database.getScene(uuid)
-      .then((sceneinfo) => {
-        if (sceneinfo) {
-          this._scene = sceneinfo;
-          this.loadScene(sceneinfo).then((scene) => {
-            if (scene) {
-              const cameraId = sceneinfo.metadata?.activeCamera as string;
-              const cameraLookAt = sceneinfo.metadata?.activeCameraLookAt as number[];
-              this.reset(scene, cameraId, cameraLookAt);
-            } else {
-              throw new Error('Cannot load scene');
-            }
-          });
-        } else {
-          Dialog.messageBox('Zephyr3d', `Scene not found: ${uuid}`);
-        }
-      })
-      .catch((err) => {
-        Dialog.messageBox('Zephyr3d', `Error loading scene: ${err}`);
-      });
-  }
-  createScene() {
-    this._scene = null;
-    this.reset();
-  }
-  reset(scene?: Scene, cameraId?: string, cameraLookAt?: number[]) {
-    this.model.reset(scene, cameraId, cameraLookAt);
-    this._view.reset(this.model.scene);
   }
 }

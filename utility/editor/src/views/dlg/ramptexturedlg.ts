@@ -18,6 +18,23 @@ export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedAr
     this._name = 'ramp texture';
     this._creator = new RampTextureCreator(useAlpha, rgbInterpolator, alphaInterpolator);
   }
+  public static async createRampTexture(
+    title: string,
+    useAlpha: boolean,
+    rgbInterpolator: Interpolator,
+    alphaInterpolator: Interpolator,
+    width?: number,
+    height?: number
+  ): Promise<{ data: Uint8ClampedArray; name: string }> {
+    return new DlgRampTextureCreator(
+      title,
+      useAlpha,
+      rgbInterpolator,
+      alphaInterpolator,
+      width,
+      height
+    ).showModal();
+  }
   close(result: { data: Uint8ClampedArray; name: string }) {
     this._creator.dispose();
     super.close(result);

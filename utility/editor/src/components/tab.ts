@@ -25,14 +25,11 @@ export class Tab {
   get sceneHierarchy() {
     return this._sceneHierarchy;
   }
-  render() {
+  render(sceneChanged: boolean) {
     if (this._panel.begin('##SceneTabPanel')) {
       if (ImGui.BeginTabBar('##SceneTabBar')) {
         if (ImGui.BeginTabItem('Scene##SceneHierarchy')) {
-          this._sceneHierarchy.render();
-          ImGui.EndTabItem();
-        }
-        if (ImGui.BeginTabItem('Assets##SceneAssets')) {
+          this._sceneHierarchy.render(sceneChanged);
           ImGui.EndTabItem();
         }
         ImGui.EndTabBar();

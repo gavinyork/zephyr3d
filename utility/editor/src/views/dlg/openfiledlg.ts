@@ -4,11 +4,11 @@ import { DirectoryInfo, FileInfo, VFSRenderer } from '../../components/vfsrender
 import { VFS } from '@zephyr3d/base';
 import { ProjectInfo } from '../../core/services/project';
 
-export class DlgSaveFile extends DialogRenderer<string> {
+export class DlgOpenFile extends DialogRenderer<string> {
   private _renderer: VFSRenderer;
   private _name: [string];
-  public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
-    return new DlgSaveFile(title, vfs, project, width, height).showModal();
+  public static async openFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
+    return new DlgOpenFile(title, vfs, project, width, height).showModal();
   }
   constructor(id: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
     super(id, width, height);
@@ -30,12 +30,20 @@ export class DlgSaveFile extends DialogRenderer<string> {
     }
     ImGui.EndChild();
     ImGui.InputText('File Name', this._name, undefined);
-    if (ImGui.Button('Save')) {
+    if (ImGui.Button('Open')) {
       if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
         const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
-        this._renderer.off('selection_changed', this.updateSelection, this);
-        this._renderer.dispose();
-        this.close(name);
+        this._renderer.VFS.exists(name).then((exists) => {
+          if (exists) {
+            this._renderer.VFS.stat(name).then((stat) => {
+              if (stat.isFile) {
+                this._renderer.off('selection_changed', this.updateSelection, this);
+                this._renderer.dispose();
+                this.close(name);
+              }
+            });
+          }
+        });
       }
     }
     ImGui.SameLine();

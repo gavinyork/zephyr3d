@@ -5,6 +5,15 @@ export class DlgOpen extends DialogRenderer<string> {
   private _names: string[];
   private _ids: string[];
   private _selected: [number];
+  public static async openFromList(
+    title: string,
+    names: string[],
+    ids: string[],
+    width?: number,
+    height?: number
+  ): Promise<string> {
+    return new DlgOpen(title, names, ids, width, height).showModal();
+  }
   constructor(id: string, names: string[], ids: string[], width: number, height: number) {
     super(id, width, height);
     this._names = names.slice();

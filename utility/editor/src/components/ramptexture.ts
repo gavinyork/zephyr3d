@@ -20,6 +20,7 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
   private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
   private _hasAlpha: boolean;
+  private _changed: boolean;
 
   // 新增：位置指示器相关属性
   private _positionIndicator: number; // 指示器位置 (0-1)
@@ -87,7 +88,10 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
       this._alphaEditor.on('curve_changed', this.onAlphaChanged, this);
       this._alphaEditor.on('preview_position', this.preview, this);
     }
-    this.updateInterpolator();
+    this.updateInterpolator(!rgbInterpolator);
+  }
+  get changed() {
+    return this._changed;
   }
   private onAlphaChanged() {
     this.updateTexture();
@@ -103,7 +107,7 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
     }
     this.dispatchEvent('preview_position', { key: this._positionIndicator, value: currentColor });
   }
-  private updateInterpolator() {
+  private updateInterpolator(changed = true) {
     this._keyframes.sort((a, b) => a.time - b.time);
     const times = new Float32Array(this._keyframes.length);
     const colors = new Float32Array(this._keyframes.length * 3);
@@ -121,6 +125,7 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
       this._interpolator.outputs = colors;
     }
     this.updateTexture();
+    this._changed = changed;
   }
 
   // 新增：检查鼠标是否在指示器上

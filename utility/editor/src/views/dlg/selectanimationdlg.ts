@@ -18,6 +18,13 @@ export class DlgSelectAnimation extends DialogRenderer<{ animationName: string; 
     this._selected = [''];
     this._trackName = [''];
   }
+  public static async selectAnimationAndTrack(
+    title: string,
+    animationNames: string[],
+    width?: number
+  ): Promise<{ animationName: string; trackName: string }> {
+    return new DlgSelectAnimation(title, animationNames, width).showModal();
+  }
   doRender(): void {
     if (ImGui.BeginChild('Panel', new ImGui.ImVec2(0, -ImGui.GetFrameHeightWithSpacing()), true)) {
       renderEditableCombo(

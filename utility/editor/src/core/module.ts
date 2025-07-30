@@ -29,18 +29,21 @@ export class ModuleManager {
     }
     this._modules[name] = { name, model, view, controller };
   }
-  activate(name: string, ...args: any[]) {
-    const module = this._modules[name];
-    if (!module) {
-      throw new Error(`Cannot activate module ${name}: Module not exists`);
-    }
+  async activate(name: string, ...args: any[]) {
     const currentModule = this._modules[this._currentModule];
     if (currentModule) {
       currentModule.controller?.deactivate();
       currentModule.view?.deactivate();
     }
-    this._currentModule = name;
-    module.controller?.activate(...args);
-    module.view?.activate();
+    this._currentModule = '';
+    if (name) {
+      const module = this._modules[name];
+      if (!module) {
+        throw new Error(`Cannot activate module ${name}: Module not exists`);
+      }
+      await module.controller?.activate(...args);
+      module.view?.activate();
+      this._currentModule = name;
+    }
   }
 }

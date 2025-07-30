@@ -14,6 +14,7 @@ import { AABB, ASSERT, degree2radian, makeEventTarget, Quaternion, radian2degree
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 import { ProjectService } from '../core/services/project';
+import { eventBus } from '../core/eventbus';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -531,6 +532,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             track.name = val.trackName;
             animation.addTrack(object, track);
             this.refresh();
+            eventBus.dispatchEvent('scene_changed');
           }
         });
       }

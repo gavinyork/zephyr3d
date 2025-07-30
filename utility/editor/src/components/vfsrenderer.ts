@@ -3,9 +3,10 @@ import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 import { ProjectInfo } from '../core/services/project';
-import { Dialog } from '../views/dlg/dlg';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
+import { DlgPromptName } from '../views/dlg/promptnamedlg';
+import { DlgMessage } from '../views/dlg/messagedlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -376,7 +377,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
     info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
 
-    Dialog.messageBox('Properties', info);
+    DlgMessage.messageBox('Properties', info);
   }
 
   // 渲染工具栏
@@ -955,10 +956,10 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private createNewFolder() {
     if (!this._selectedDir) return;
 
-    Dialog.promptName('Create Folder', 'NewFolder').then((name) => {
+    DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
       if (name) {
         if (/[\\/?*]/.test(name)) {
-          Dialog.messageBox('Error', 'Invalid folder name');
+          DlgMessage.messageBox('Error', 'Invalid folder name');
         } else {
           const newPath = this._vfs.join(this._selectedDir.path, name);
           this._vfs
@@ -969,7 +970,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
               });
             })
             .catch((err) => {
-              Dialog.messageBox('Error', `Create folder failed: ${err}`);
+              DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
             });
         }
       }
@@ -980,10 +981,10 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private createNewFile() {
     if (!this._selectedDir) return;
 
-    Dialog.promptName('Create File', 'NewFile.txt').then((name) => {
+    DlgPromptName.promptName('Create File', 'NewFile.txt').then((name) => {
       if (name) {
         if (/[\\/?*]/.test(name)) {
-          Dialog.messageBox('Error', 'Invalid file name');
+          DlgMessage.messageBox('Error', 'Invalid file name');
         } else {
           const newPath = this._vfs.join(this._selectedDir.path, name);
           this._vfs
@@ -994,7 +995,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
               });
             })
             .catch((err) => {
-              Dialog.messageBox('Error', `Create file failed: ${err}`);
+              DlgMessage.messageBox('Error', `Create file failed: ${err}`);
             });
         }
       }
@@ -1025,7 +1026,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         });
       })
       .catch((err) => {
-        Dialog.messageBox('Error', `Delete failed: ${err}`);
+        DlgMessage.messageBox('Error', `Delete failed: ${err}`);
       });
   }
 
@@ -1039,10 +1040,10 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
 
-    Dialog.promptName('Rename', currentName).then((newName) => {
+    DlgPromptName.promptName('Rename', currentName).then((newName) => {
       if (newName && newName !== currentName) {
         if (/[\\/?*]/.test(newName)) {
-          Dialog.messageBox('Error', 'Invalid name');
+          DlgMessage.messageBox('Error', 'Invalid name');
         } else {
           const parentPath = isDir
             ? item.path.slice(0, item.path.lastIndexOf('/'))
@@ -1113,16 +1114,16 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     if (ImGui.BeginPopup(`vfs_${id}`)) {
       if (ImGui.BeginMenu('Create New##VFSCreate')) {
         if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
-          Dialog.promptName('Create Folder', 'NewFolder').then((name) => {
+          DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
             if (name) {
               if (/[\\/?*]/.test(name)) {
-                Dialog.messageBox('Error', 'Invalid folder name');
+                DlgMessage.messageBox('Error', 'Invalid folder name');
               } else {
                 this._vfs
                   .readDirectory(dir.path, { includeHidden: true, recursive: false })
                   .then((items) => {
                     if (items.find((item) => item.type === 'directory' && item.name === name)) {
-                      Dialog.messageBox('Error', 'A folder with same name already exists');
+                      DlgMessage.messageBox('Error', 'A folder with same name already exists');
                     } else {
                       this._vfs
                         .makeDirectory(this._vfs.join(dir.path, name), false)
@@ -1130,12 +1131,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
                           this.loadFileSystem();
                         })
                         .catch((err) => {
-                          Dialog.messageBox('Error', `Create folder failed: ${err}`);
+                          DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
                         });
                     }
                   })
                   .catch((err) => {
-                    Dialog.messageBox('Error', `Read parent path failed: ${err}`);
+                    DlgMessage.messageBox('Error', `Read parent path failed: ${err}`);
                   });
               }
             }
@@ -1158,7 +1159,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
               this.loadFileSystem();
             })
             .catch((err) => {
-              Dialog.messageBox('Error', `Delete directory failed: ${err}`);
+              DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
             });
           console.log('Delete folder');
         }

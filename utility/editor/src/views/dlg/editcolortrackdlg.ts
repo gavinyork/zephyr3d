@@ -32,6 +32,25 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     this._onPreview = onPreview;
     this._creator.on('preview_position', this.preview, this);
   }
+  public static editColorTrack(
+    title: string,
+    useAlpha: boolean,
+    rgbInterpolator: Interpolator,
+    alphaInterpolator: Interpolator,
+    onPreview: (value: number[]) => void,
+    width?: number,
+    height?: number
+  ) {
+    return new DlgEditColorTrack(
+      title,
+      useAlpha,
+      rgbInterpolator,
+      alphaInterpolator,
+      onPreview,
+      width,
+      height
+    ).show();
+  }
   get rampTextureCreator() {
     return this._creator;
   }
@@ -47,8 +66,9 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     }
     ImGui.EndChild();
     if (ImGui.Button('Ok')) {
+      const edited = this._creator.changed;
       this._creator.dispose();
-      this.close(true);
+      this.close(edited);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {

@@ -5,6 +5,7 @@ export type ProjectInfo = {
   name: string;
   uuid?: string;
   homedir?: string;
+  lastEditScene?: string;
 };
 
 export type RecentProject = {
@@ -57,11 +58,8 @@ export class ProjectService {
   static async getCurrentProjectInfo() {
     return this._currentProject ? await this.getProjectInfo(this._currentProject) : null;
   }
-  static async closeCurrentProject(purge: boolean) {
+  static async closeCurrentProject() {
     if (this._currentProject) {
-      if (purge) {
-        await this.deleteProject(this._currentProject);
-      }
       this._currentProject = '';
     }
   }
@@ -71,9 +69,8 @@ export class ProjectService {
     if (!info) {
       throw new Error(`Cannot open project: Project <${uuid}> not found`);
     }
-    if (uuid !== this._currentProject) {
-      this.closeCurrentProject(false);
-      this._currentProject = info.uuid;
+    if (this._currentProject) {
+      throw new Error('Current project must be closed before opening another project');
     }
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
@@ -84,24 +81,6 @@ export class ProjectService {
     project.uuid = project.uuid || crypto.randomUUID();
     manifest.projectList[project.uuid] = project;
     await this.writeManifest(manifest);
-  }
-  static async deleteProject(uuid: string) {
-    if (this._currentProject === uuid) {
-      await this.closeCurrentProject(true);
-    } else {
-      new IndexedDBFS(DATABASE_NAME, uuid, false).deleteFileSystem();
-    }
-    const manifest = await this.readManifest();
-    delete manifest.projectList[uuid];
-    delete manifest.history[uuid];
-    await this.deleteHomeDir(uuid);
-    await this.writeManifest(manifest);
-  }
-  static async openScene(path: string) {
-    /*
-    const content = (await this._currentProjectVFS.readFile(path, { encoding: 'utf8' })) as string;
-    const sceneinfo = JSON.parse(content);
-    */
   }
   static get serializationManager() {
     return this._serializationManager;
@@ -133,7 +112,7 @@ export class ProjectService {
     await this._vfs.makeDirectory(homedir, true);
     return homedir;
   }
-  private static async deleteHomeDir(uuid: string) {
+  static async deleteHomeDir(uuid: string) {
     const homedir = this.getHomeDirName(uuid);
     await this._vfs.deleteDirectory(homedir, true);
   }

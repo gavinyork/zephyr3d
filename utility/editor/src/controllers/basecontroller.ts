@@ -12,9 +12,9 @@ export class BaseController<Model extends BaseModel> {
   handleEvent(_ev: Event): boolean {
     return false;
   }
-  activate(...args: any[]) {
+  async activate(...args: any[]): Promise<void> {
     eventBus.on('error', this.onError, this);
-    this.onActivate(...args);
+    await this.onActivate(...args);
   }
   deactivate() {
     eventBus.off('error', this.onError, this);
@@ -23,6 +23,6 @@ export class BaseController<Model extends BaseModel> {
   onError(err: string) {
     console.error(err);
   }
-  protected onActivate(..._args: any[]) {}
+  protected async onActivate(..._args: any[]) {}
   protected onDeactivate() {}
 }

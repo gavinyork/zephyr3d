@@ -31,8 +31,8 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       this._scene = scene;
     }
   }
-  render() {
-    this.renderSceneNode(this._scene.rootNode);
+  render(sceneChanged: boolean) {
+    this.renderSceneNode(this._scene.rootNode, sceneChanged);
   }
   selectNode(node: SceneNode) {
     if (this._selectedNode !== node) {
@@ -48,10 +48,10 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   get selectedNode() {
     return this._selectedNode;
   }
-  private getNodeName(node: unknown): string {
+  private getNodeName(node: unknown, sceneChanged: boolean): string {
     if (node instanceof SceneNode) {
       if (node === node.scene.rootNode) {
-        return node.scene.name || '*Untitled';
+        return `${sceneChanged ? '*' : ''}${node.scene.name || 'Scene'}`;
       }
       if (node.name) {
         return node.name;
@@ -65,14 +65,14 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
     }
     return cls.ctor.name;
   }
-  private renderSceneNode(node: SceneNode) {
+  private renderSceneNode(node: SceneNode, sceneChanged: boolean) {
     let cls: SerializableClass = null;
     let ctor = node.constructor as GenericConstructor;
     while (!cls) {
       cls = ProjectService.serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    const label = `${this.getNodeName(node)}##${node.persistentId}`;
+    const label = `${this.getNodeName(node, sceneChanged)}##${node.persistentId}`;
     let flags = SceneHierarchy.baseFlags;
     if (this._selectedNode === node) {
       flags |= ImGui.TreeNodeFlags.Selected;
@@ -149,7 +149,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       if (!leaf) {
         for (const child of node.children) {
           if (!child.get().sealed) {
-            this.renderSceneNode(child.get());
+            this.renderSceneNode(child.get(), false);
           }
         }
       }

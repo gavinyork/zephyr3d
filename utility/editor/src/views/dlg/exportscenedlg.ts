@@ -5,6 +5,14 @@ import { renderMultiSelectedCombo } from '../../components/multicombo';
 
 export class DlgExportScene extends DialogRenderer<DBSceneInfo[]> {
   private _sceneList: { text: string; selected: boolean; info: DBSceneInfo }[];
+  public static async batchExportScene(
+    title: string,
+    scene: DBSceneInfo[],
+    width?: number,
+    height?: number
+  ): Promise<DBSceneInfo[]> {
+    return new DlgExportScene(title, scene, width, height).showModal();
+  }
   constructor(id: string, scenes: DBSceneInfo[], width: number, height: number) {
     super(id, width, height);
     this._sceneList = scenes.map((scene) => ({ text: scene.name, selected: false, info: scene }));
