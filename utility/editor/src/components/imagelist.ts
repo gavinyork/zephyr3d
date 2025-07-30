@@ -2,7 +2,6 @@ import { makeEventTarget } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import { Application, DRef } from '@zephyr3d/scene';
-import type { DBAssetInfo } from '../storage/db';
 import { ProjectService } from '../core/services/project';
 
 type ImageInfo = {
@@ -139,7 +138,7 @@ export class ImageList extends makeEventTarget(Object)<{
     if (this._acceptDragDrop && ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
       if (payload) {
-        const assetId = (payload.Data as DBAssetInfo).uuid;
+        const assetId = payload.Data as string;
         ProjectService.serializationManager
           .fetchTexture<Texture2D>(assetId, {
             linearColorSpace: this._linearColorSpace

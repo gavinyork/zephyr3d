@@ -7,7 +7,6 @@ import {
   type PropertyValue,
   type SerializableClass
 } from '@zephyr3d/scene';
-import type { DBAssetInfo } from '../storage/db';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
 import { AABB, ASSERT, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
@@ -736,7 +735,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           if (ImGui.BeginDragDropTarget()) {
             const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
             if (payload) {
-              tmpProperty.str[0] = (payload.Data as DBAssetInfo).uuid;
+              tmpProperty.str[0] = payload.Data as string;
               Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
                 this.refresh();
               });

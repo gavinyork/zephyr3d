@@ -51,7 +51,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   private getNodeName(node: unknown, sceneChanged: boolean): string {
     if (node instanceof SceneNode) {
       if (node === node.scene.rootNode) {
-        return `${sceneChanged ? '*' : ''}${node.scene.name || 'Scene'}`;
+        return `${node.scene.name || 'Scene'}${sceneChanged ? ' (Unsaved)' : ''}`;
       }
       if (node.name) {
         return node.name;

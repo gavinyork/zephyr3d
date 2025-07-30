@@ -21,7 +21,6 @@ import {
 import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import type { DBAssetInfo } from '../storage/db';
 import { ProjectService } from '../core/services/project';
 
 const idNodeMap: Record<string, SceneNode> = {};
@@ -30,22 +29,22 @@ export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : vo
 
 export class AddAssetCommand extends Command<SceneNode> {
   private _scene: Scene;
-  private _asset: DBAssetInfo;
+  private _asset: string;
   private _nodeId: string;
   private _position: Vector3;
-  constructor(scene: Scene, asset: DBAssetInfo, position: Vector3) {
+  constructor(scene: Scene, asset: string, position: Vector3) {
     super('Add asset');
     this._scene = scene;
     this._nodeId = '';
-    this._asset = { ...asset };
+    this._asset = asset;
     this._position = new Vector3(position);
   }
   async execute() {
     let asset: ModelInfo = null;
     try {
-      asset = await ProjectService.serializationManager.fetchModel(this._asset.uuid, this._scene);
+      asset = await ProjectService.serializationManager.fetchModel(this._asset, this._scene);
     } catch (err) {
-      console.error(`Load asset failed: ${this._asset.name}: ${err}`);
+      console.error(`Load asset failed: ${this._asset}: ${err}`);
     }
     if (asset) {
       asset.group.position.set(this._position);

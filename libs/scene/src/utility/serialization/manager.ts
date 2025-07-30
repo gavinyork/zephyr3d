@@ -36,8 +36,9 @@ import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } fro
 import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './scene/animation';
 import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
-import { AssetManager, ModelFetchOptions, TextureFetchOptions } from '../../asset';
-import { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
+import { AssetManager } from '../../asset';
+import type { Texture2D, TextureCube } from '@zephyr3d/device';
 
 /**
  * Serialization manager class

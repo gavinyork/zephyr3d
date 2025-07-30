@@ -1,5 +1,4 @@
 import type { GenericConstructor } from '@zephyr3d/base';
-import type { EmbeddedAssetInfo } from './asset/asset';
 
 /**
  * Data types of serializable properties
@@ -20,6 +19,7 @@ export type PropertyType =
   | 'rgba'
   | 'object'
   | 'object_array'
+  | 'resource'
   | 'command';
 
 /**
@@ -31,6 +31,17 @@ export type PropertyValue = {
   str?: string[];
   bool?: boolean[];
   object?: object[];
+};
+
+/**
+ * Embedded resource information
+ * @public
+ */
+export type EmbeddedResource = {
+  /** File name */
+  fileName: string;
+  /** Asset data */
+  data: ArrayBuffer;
 };
 
 /**
@@ -84,5 +95,5 @@ export type SerializableClass = {
   getInitParams?: (obj: any) => any;
   getProps: () => PropertyAccessor<any>[];
   getAssets?: (obj: any) => string[];
-  getEmbeddedAssets?: (obj: any) => (EmbeddedAssetInfo | Promise<EmbeddedAssetInfo>)[];
+  getEmbeddedAssets?: (obj: any) => (EmbeddedResource | Promise<EmbeddedResource>)[];
 };

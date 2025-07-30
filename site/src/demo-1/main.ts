@@ -1,4 +1,5 @@
 import * as zip from '@zip.js/zip.js';
+import type { HttpFS } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SceneNode, Material, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
 import {
@@ -72,7 +73,7 @@ async function fetchModel(scene: Scene, url: string) {
   if (/(\.zip)$/i.test(url)) {
     const fileMap = await readZip(url);
     url = Array.from(fileMap.keys()).find((val) => /(\.gltf|\.glb)$/i.test(val));
-    assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
+    (assetManager.vfs as HttpFS).urlResolver = (url) => fileMap.get(url) || url;
   }
   return url ? await assetManager.fetchModel(scene, url) : null;
 }

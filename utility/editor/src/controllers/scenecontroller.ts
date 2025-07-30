@@ -1,4 +1,4 @@
-import type { EmbeddedAssetInfo, Scene } from '@zephyr3d/scene';
+import type { Scene } from '@zephyr3d/scene';
 import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
@@ -131,23 +131,23 @@ export class SceneController extends BaseController<SceneModel> {
   }
   private async saveScene(showMessage = true) {
     const assetList = new Set<string>();
-    const embeddedAssetList: Promise<EmbeddedAssetInfo>[] = [];
+    const asyncTasks: Promise<unknown>[] = [];
     const content = await serializeObject(
       this.model.scene,
       ProjectService.serializationManager,
       null,
       assetList,
-      embeddedAssetList
+      asyncTasks
     );
+    await Promise.all(asyncTasks);
     await ProjectService.VFS.writeFile(this._scenePath, JSON.stringify(content), {
       encoding: 'utf8',
       create: true
     });
     console.log(JSON.stringify(content, null, 2));
     console.log([...assetList]);
-    console.log([...embeddedAssetList]);
-    const embeddedAssets = await Promise.all(embeddedAssetList);
-    await ProjectService.putEmbeddedAssets(embeddedAssets);
+    console.log([...asyncTasks]);
+    await Promise.all(asyncTasks);
     this._sceneChanged = false;
     if (showMessage) {
       Dialog.messageBox('Zephyr3d', `Scene saved: ${this._scenePath}`);

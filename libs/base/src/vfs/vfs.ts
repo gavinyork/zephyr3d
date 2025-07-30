@@ -301,6 +301,10 @@ export abstract class VFS {
   /** Whether this file system is read-only */
   public readonly isReadOnly: boolean;
 
+  // CWD 支持
+  private _cwd: string = '/';
+  private _dirStack: string[] = [];
+
   // 简单挂载支持（向后兼容）
   private simpleMounts: Map<string, VFS> = new Map();
   private sortedMountPaths: string[] = [];
@@ -317,12 +321,406 @@ export abstract class VFS {
   }
 
   /**
-   * Join path together
-   * @param paths - Paths to join
-   * @returns Complete path
+   * Gets the current working directory.
+   *
+   * @returns The current working directory path
+   *
+   * @example
+   * ```typescript
+   * const cwd = fs.getCwd();
+   * console.log(`Current directory: ${cwd}`);
+   * ```
    */
-  join(...paths: string[]) {
-    return PathUtils.join(...paths);
+  getCwd(): string {
+    return this._cwd;
+  }
+
+  /**
+   * Changes the current working directory.
+   *
+   * @param path - The new working directory path (absolute or relative)
+   * @returns Promise that resolves when directory is changed
+   *
+   * @example
+   * ```typescript
+   * await fs.chdir('/home/user');
+   * await fs.chdir('../documents'); // Relative path
+   * ```
+   */
+  async chdir(path: string): Promise<void> {
+    const normalizedPath = this.normalizePath(path);
+
+    // 检查目录是否存在
+    if (!(await this.exists(normalizedPath))) {
+      throw new VFSError(`Directory does not exist: ${normalizedPath}`, 'ENOENT', normalizedPath);
+    }
+
+    // 检查是否为目录
+    const stat = await this.stat(normalizedPath);
+    if (!stat.isDirectory) {
+      throw new VFSError(`Not a directory: ${normalizedPath}`, 'ENOTDIR', normalizedPath);
+    }
+
+    this._cwd = normalizedPath;
+  }
+
+  /**
+   * Pushes the current directory onto the directory stack and changes to the specified directory.
+   *
+   * @param path - The directory to change to (absolute or relative)
+   * @returns Promise that resolves when directory is changed
+   *
+   * @example
+   * ```typescript
+   * await fs.pushd('/tmp');        // Push current dir and go to /tmp
+   * await fs.pushd('../other');    // Push /tmp and go to /other
+   * ```
+   */
+  async pushd(path: string): Promise<void> {
+    this._dirStack.push(this._cwd);
+    await this.chdir(path);
+  }
+
+  /**
+   * Pops a directory from the directory stack and changes to it.
+   *
+   * @returns Promise that resolves when directory is changed
+   * @throws VFSError if the directory stack is empty
+   *
+   * @example
+   * ```typescript
+   * await fs.popd(); // Return to previously pushed directory
+   * ```
+   */
+  async popd(): Promise<void> {
+    if (this._dirStack.length === 0) {
+      throw new VFSError('Directory stack is empty', 'ENOENT');
+    }
+
+    const previousDir = this._dirStack.pop()!;
+    this._cwd = previousDir;
+  }
+
+  /**
+   * Gets the current directory stack.
+   *
+   * @returns Array of directory paths in the stack
+   *
+   * @example
+   * ```typescript
+   * const stack = fs.getDirStack();
+   * console.log(`Stack depth: ${stack.length}`);
+   * ```
+   */
+  getDirStack(): string[] {
+    return [...this._dirStack]; // 返回副本
+  }
+
+  /**
+   * Normalizes a path, resolving . and .. components and making it absolute.
+   * Supports both absolute and relative paths.
+   *
+   * @param path - The path to normalize
+   * @returns The normalized absolute path
+   *
+   * @example
+   * ```typescript
+   * // Assuming CWD is /home/user
+   * fs.normalizePath('.');           // -> /home/user
+   * fs.normalizePath('..');          // -> /home
+   * fs.normalizePath('../docs');     // -> /home/docs
+   * fs.normalizePath('/tmp');        // -> /tmp
+   * fs.normalizePath('sub/dir');     // -> /home/user/sub/dir
+   * ```
+   */
+  normalizePath(path: string): string {
+    if (!path) {
+      return this._cwd;
+    }
+
+    // 如果是绝对路径，直接使用 PathUtils.normalize
+    if (path.startsWith('/')) {
+      return PathUtils.normalize(path);
+    }
+
+    // 相对路径：先与 CWD 合并，然后规范化
+    const absolutePath = PathUtils.join(this._cwd, path);
+    return PathUtils.normalize(absolutePath);
+  }
+
+  /**
+   * Join paths together, making the result relative to CWD if not absolute.
+   *
+   * @param paths - Paths to join
+   * @returns Complete normalized path
+   *
+   * @example
+   * ```typescript
+   * // Assuming CWD is /home/user
+   * fs.join('docs', 'file.txt');     // -> /home/user/docs/file.txt
+   * fs.join('/tmp', 'file.txt');     // -> /tmp/file.txt
+   * ```
+   */
+  join(...paths: string[]): string {
+    if (paths.length === 0) {
+      return this._cwd;
+    }
+
+    // 如果第一个路径是绝对路径，直接使用 PathUtils.join
+    if (paths[0].startsWith('/')) {
+      return PathUtils.normalize(PathUtils.join(...paths));
+    }
+
+    // 如果是相对路径，先与 CWD 合并，然后 join 剩余路径
+    const allPaths = [this._cwd, ...paths];
+    return PathUtils.normalize(PathUtils.join(...allPaths));
+  }
+  /**
+   * Converts an absolute path to a path relative to the current working directory.
+   *
+   * @param path - The absolute path to convert
+   * @returns The relative path from CWD
+   *
+   * @example
+   * ```typescript
+   * // Assuming CWD is /home/user
+   * fs.relative('/home/user/docs');  // -> docs
+   * fs.relative('/home');            // -> ..
+   * fs.relative('/tmp');             // -> ../../tmp
+   * ```
+   */
+  relative(path: string): string {
+    const absolutePath = this.normalizePath(path);
+    return PathUtils.relative(this._cwd, absolutePath);
+  }
+
+  // 修改所有公共方法以使用新的路径规范化
+  async makeDirectory(path: string, recursive?: boolean): Promise<void> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.makeDirectory(mounted.relativePath, recursive);
+    }
+
+    if (this.isReadOnly) {
+      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+    }
+
+    return this._makeDirectory(normalizedPath, recursive ?? false);
+  }
+
+  async readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.readDirectory(mounted.relativePath, options);
+    }
+
+    return this._readDirectory(normalizedPath, options);
+  }
+
+  async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
+    }
+
+    if (this.isReadOnly) {
+      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+    }
+
+    return this._deleteDirectory(normalizedPath, recursive ?? false);
+  }
+
+  async readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.readFile(mounted.relativePath, options);
+    }
+
+    return this._readFile(normalizedPath, options);
+  }
+
+  async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.writeFile(mounted.relativePath, data, options);
+    }
+
+    if (this.isReadOnly) {
+      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+    }
+
+    return this._writeFile(normalizedPath, data, options);
+  }
+
+  async deleteFile(path: string): Promise<void> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.deleteFile(mounted.relativePath);
+    }
+
+    if (this.isReadOnly) {
+      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+    }
+
+    return this._deleteFile(normalizedPath);
+  }
+
+  async exists(path: string): Promise<boolean> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.exists(mounted.relativePath);
+    }
+
+    return this._exists(normalizedPath);
+  }
+
+  async stat(path: string): Promise<FileStat> {
+    const normalizedPath = this.normalizePath(path);
+    const mounted = this.getMountedVFS(normalizedPath);
+    if (mounted) {
+      return mounted.vfs.stat(mounted.relativePath);
+    }
+
+    return this._stat(normalizedPath);
+  }
+
+  async copyFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
+    const normalizedSrc = this.normalizePath(src);
+    const normalizedDest = this.normalizePath(dest);
+
+    if (!options?.overwrite && (await this.exists(normalizedDest))) {
+      throw new VFSError('Destination file already exists', 'EEXIST', normalizedDest);
+    }
+
+    const data = await this.readFile(normalizedSrc);
+    await this.writeFile(normalizedDest, data, { create: true });
+  }
+
+  async moveFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
+    const normalizedSrc = this.normalizePath(src);
+    const normalizedDest = this.normalizePath(dest);
+
+    await this.copyFile(normalizedSrc, normalizedDest, options);
+    await this.deleteFile(normalizedSrc);
+  }
+
+  async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
+    // 使用 CWD 作为默认搜索根目录
+    const defaultOptions = {
+      cwd: this._cwd,
+      ...options
+    };
+
+    // 规范化 cwd 选项
+    if (defaultOptions.cwd) {
+      defaultOptions.cwd = this.normalizePath(defaultOptions.cwd);
+    }
+
+    const {
+      recursive = true,
+      includeHidden = false,
+      includeDirs = true,
+      includeFiles = true,
+      caseSensitive = true,
+      cwd = this._cwd,
+      ignore = [],
+      limit
+    } = defaultOptions;
+
+    const patterns = (Array.isArray(pattern) ? pattern : [pattern]).filter((pattern) => !!pattern);
+    if (patterns.length === 0) {
+      return [];
+    }
+
+    const ignorePatterns = Array.isArray(ignore) ? ignore : [ignore];
+    const matchers = patterns.map((p) => new GlobMatcher(p, caseSensitive));
+    const ignoreMatchers = ignorePatterns.map((p) => new GlobMatcher(p, caseSensitive));
+
+    const results: GlobResult[] = [];
+    const normalizedCwd = this.normalizePath(cwd);
+
+    const searchDirectory = async (dirPath: string): Promise<void> => {
+      if (limit && results.length >= limit) {
+        return;
+      }
+
+      try {
+        const entries = await this._readDirectory(dirPath, {
+          includeHidden: true
+        });
+
+        for (const entry of entries) {
+          if (limit && results.length >= limit) {
+            break;
+          }
+
+          const fullPath = entry.path;
+          const relativePath = PathUtils.relative(normalizedCwd, fullPath);
+
+          if (entry.type === 'file' && !includeFiles) {
+            continue;
+          }
+          if (entry.type === 'file' || (entry.type === 'directory' && includeDirs)) {
+            if (!includeHidden && entry.name.startsWith('.')) {
+              continue;
+            }
+
+            const shouldIgnore = ignoreMatchers.some(
+              (matcher) => matcher.test(relativePath) || matcher.test(fullPath)
+            );
+            if (shouldIgnore) {
+              continue;
+            }
+
+            for (const matcher of matchers) {
+              if (matcher.test(relativePath)) {
+                const result: GlobResult = {
+                  ...entry,
+                  relativePath,
+                  matchedPattern: matcher.getPattern()
+                };
+                results.push(result);
+                break;
+              }
+            }
+          }
+          if (recursive && entry.type === 'directory') {
+            await searchDirectory(fullPath);
+          }
+        }
+      } catch (error) {
+        console.warn(`Cannot access directory: ${dirPath}`, error);
+      }
+    };
+
+    await searchDirectory(normalizedCwd);
+    return results;
+  }
+
+  // 更新 getInfo 方法以包含 CWD 信息
+  getInfo(): {
+    name: string;
+    isReadOnly: boolean;
+    cwd: string;
+    dirStackDepth: number;
+    mountCount: number;
+    mountPoints: string[];
+  } {
+    return {
+      name: this.name,
+      isReadOnly: this.isReadOnly,
+      cwd: this._cwd,
+      dirStackDepth: this._dirStack.length,
+      mountCount: this.simpleMounts.size,
+      mountPoints: this.getSimpleMountPoints()
+    };
   }
   /**
    * Mounts another VFS at the specified path.
@@ -416,369 +814,18 @@ export abstract class VFS {
     return this.simpleMounts.size > 0;
   }
 
-  // 公共接口方法
-
   /**
-   * Creates a directory at the specified path.
-   *
-   * @param path - The path where to create the directory
-   * @param recursive - Whether to create parent directories if they don't exist
-   *
-   * @example
-   * ```typescript
-   * await fs.makeDirectory('/path/to/dir', true); // Create with parents
-   * ```
-   */
-  async makeDirectory(path: string, recursive?: boolean): Promise<void> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.makeDirectory(mounted.relativePath, recursive);
-    }
-
-    if (this.isReadOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', path);
-    }
-
-    return this._makeDirectory(path, recursive ?? false);
-  }
-
-  /**
-   * Reads the contents of a directory.
-   *
-   * @param path - The path of the directory to read
-   * @param options - Options for directory listing
-   * @returns Promise that resolves to an array of file metadata
-   *
-   * @example
-   * ```typescript
-   * const files = await fs.readDirectory('/path', { recursive: true });
-   * ```
-   */
-  async readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.readDirectory(mounted.relativePath, options);
-    }
-
-    return this._readDirectory(path, options);
-  }
-
-  /**
-   * Deletes a directory.
-   *
-   * @param path - The path of the directory to delete
-   * @param options - Options for directory deletion
-   *
-   * @example
-   * ```typescript
-   * await fs.deleteDirectory('/path/to/dir', { recursive: true });
-   * ```
-   */
-  async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
-    }
-
-    if (this.isReadOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', path);
-    }
-
-    return this._deleteDirectory(path, recursive ?? false);
-  }
-
-  /**
-   * Reads the contents of a file.
-   *
-   * @param path - The path of the file to read
-   * @param options - Options for reading (encoding, offset, length)
-   * @returns Promise that resolves to the file contents as ArrayBuffer or string
-   *
-   * @example
-   * ```typescript
-   * const content = await fs.readFile('/file.txt', { encoding: 'utf8' });
-   * const buffer = await fs.readFile('/binary.dat');
-   * ```
-   */
-  async readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.readFile(mounted.relativePath, options);
-    }
-
-    return this._readFile(path, options);
-  }
-
-  /**
-   * Writes data to a file.
-   *
-   * @param path - The path where to write the file
-   * @param data - The data to write (ArrayBuffer or string)
-   * @param options - Options for writing (append mode, encoding, create parent dirs)
-   *
-   * @example
-   * ```typescript
-   * await fs.writeFile('/file.txt', 'Hello World!', { create: true });
-   * await fs.writeFile('/data.bin', buffer);
-   * ```
-   */
-  async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.writeFile(mounted.relativePath, data, options);
-    }
-
-    if (this.isReadOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', path);
-    }
-
-    return this._writeFile(path, data, options);
-  }
-
-  /**
-   * Deletes a file.
-   *
-   * @param path - The path of the file to delete
-   *
-   * @example
-   * ```typescript
-   * await fs.deleteFile('/file.txt');
-   * ```
-   */
-  async deleteFile(path: string): Promise<void> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.deleteFile(mounted.relativePath);
-    }
-
-    if (this.isReadOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', path);
-    }
-
-    return this._deleteFile(path);
-  }
-
-  /**
-   * Checks if a path exists in the file system.
-   *
-   * @param path - The path to check
-   * @returns Promise that resolves to true if path exists, false otherwise
-   *
-   * @example
-   * ```typescript
-   * const exists = await fs.exists('/file.txt');
-   * if (exists) {
-   *   // File exists
-   * }
-   * ```
-   */
-  async exists(path: string): Promise<boolean> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.exists(mounted.relativePath);
-    }
-
-    return this._exists(path);
-  }
-
-  /**
-   * Gets file or directory statistics.
-   *
-   * @param path - The path to get statistics for
-   * @returns Promise that resolves to file statistics
-   *
-   * @example
-   * ```typescript
-   * const stats = await fs.stat('/file.txt');
-   * console.log(`Size: ${stats.size}, Modified: ${stats.modified}`);
-   * ```
-   */
-  async stat(path: string): Promise<FileStat> {
-    const mounted = this.getMountedVFS(path);
-    if (mounted) {
-      return mounted.vfs.stat(mounted.relativePath);
-    }
-
-    return this._stat(path);
-  }
-
-  /**
-   * Copies a file from source to destination.
-   *
-   * @param src - The source file path
-   * @param dest - The destination file path
-   * @param options - Options for copying
-   *
-   * @example
-   * ```typescript
-   * await fs.copyFile('/src.txt', '/dest.txt', { overwrite: true });
-   * ```
-   */
-  async copyFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
-    if (!options?.overwrite && (await this.exists(dest))) {
-      throw new VFSError('Destination file already exists', 'EEXIST', dest);
-    }
-
-    const data = await this.readFile(src);
-    await this.writeFile(dest, data, { create: true });
-  }
-
-  /**
-   * Moves or renames a file from source to destination.
-   *
-   * @param src - The source file path
-   * @param dest - The destination file path
-   * @param options - Options for moving
-   *
-   * @example
-   * ```typescript
-   * await fs.moveFile('/old.txt', '/new.txt');
-   * ```
-   */
-  async moveFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
-    await this.copyFile(src, dest, options);
-    await this.deleteFile(src);
-  }
-
-  /**
-   * Disposes of this file system and cleans up resources.
-   *
-   * @example
-   * ```typescript
-   * await fs.dispose();
-   * ```
+   * Disposes of this file system and cleans up resources. (for IndexedDB only).
    */
   async deleteFileSystem() {
     await this._deleteFileSystem();
   }
-  /**
-   * Gets information about this file system.
-   *
-   * @returns Object containing file system information
-   *
-   * @example
-   * ```typescript
-   * const info = fs.getInfo();
-   * console.log(`FS: ${info.name}, Read-only: ${info.isReadOnly}`);
-   * ```
-   */
-  getInfo(): {
-    name: string;
-    isReadOnly: boolean;
-    mountCount: number;
-    mountPoints: string[];
-  } {
-    return {
-      name: this.name,
-      isReadOnly: this.isReadOnly,
-      mountCount: this.simpleMounts.size,
-      mountPoints: this.getSimpleMountPoints()
-    };
-  }
 
   /**
-   * Searches for files and directories using glob patterns.
-   *
-   * Supports standard glob patterns including wildcards (*), character classes ([abc]),
-   * and globstar (**) for recursive matching.
-   *
-   * @param pattern - The glob pattern(s) to match
-   * @param options - Options for glob matching
-   * @returns Promise that resolves to an array of matching files and directories
-   *
-   * @example
-   * ```typescript
-   * // Find all .txt files
-   * const txtFiles = await fs.glob('**\/*.txt');
-   *
-   * // Find files with multiple patterns
-   * const files = await fs.glob(['**\/*.js', '**\/*.ts'], {
-   *   cwd: '/src',
-   *   ignore: ['node_modules/**']
-   * });
-   * ```
+   * Delete entire database (for IndexedDB only).
    */
-  async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
-    const {
-      recursive = true,
-      includeHidden = false,
-      includeDirs = true,
-      includeFiles = true,
-      caseSensitive = true,
-      cwd = '/',
-      ignore = [],
-      limit
-    } = options;
-
-    const patterns = (Array.isArray(pattern) ? pattern : [pattern]).filter((pattern) => !!pattern);
-    if (patterns.length === 0) {
-      return [];
-    }
-    const ignorePatterns = Array.isArray(ignore) ? ignore : [ignore];
-
-    const matchers = patterns.map((p) => new GlobMatcher(p, caseSensitive));
-    const ignoreMatchers = ignorePatterns.map((p) => new GlobMatcher(p, caseSensitive));
-
-    const results: GlobResult[] = [];
-    const normalizedCwd = PathUtils.normalize(cwd);
-
-    const searchDirectory = async (dirPath: string): Promise<void> => {
-      if (limit && results.length >= limit) {
-        return;
-      }
-
-      try {
-        const entries = await this._readDirectory(dirPath, {
-          includeHidden: true
-        });
-
-        for (const entry of entries) {
-          if (limit && results.length >= limit) {
-            break;
-          }
-
-          const fullPath = entry.path;
-          const relativePath = PathUtils.relative(normalizedCwd, fullPath);
-
-          if (entry.type === 'file' && !includeFiles) {
-            continue;
-          }
-          if (entry.type === 'file' || (entry.type === 'directory' && includeDirs)) {
-            if (!includeHidden && entry.name.startsWith('.')) {
-              continue;
-            }
-
-            const shouldIgnore = ignoreMatchers.some(
-              (matcher) => matcher.test(relativePath) || matcher.test(fullPath)
-            );
-            if (shouldIgnore) {
-              continue;
-            }
-
-            for (const matcher of matchers) {
-              if (matcher.test(relativePath)) {
-                const result: GlobResult = {
-                  ...entry,
-                  relativePath,
-                  matchedPattern: matcher.getPattern()
-                };
-                results.push(result);
-                break;
-              }
-            }
-          }
-          if (recursive && entry.type === 'directory') {
-            await searchDirectory(fullPath);
-          }
-        }
-      } catch (error) {
-        console.warn(`Cannot access directory: ${dirPath}`, error);
-      }
-    };
-
-    await searchDirectory(normalizedCwd);
-
-    return results;
+  async deleteDatabase() {
+    await this._deleteDatabase();
   }
 
   /**
@@ -844,4 +891,5 @@ export abstract class VFS {
    */
   protected abstract _stat(path: string): Promise<FileStat>;
   protected abstract _deleteFileSystem(): Promise<void>;
+  protected abstract _deleteDatabase(): Promise<void>;
 }

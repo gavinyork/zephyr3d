@@ -1,3 +1,4 @@
+import type { HttpFS } from '@zephyr3d/base';
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
@@ -144,7 +145,7 @@ export class Demo {
     });
     Application.instance.device.runNextFrame(async () => {
       const fileMap = await this.readZip(zipContent);
-      this._assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
+      (this._assetManager.vfs as HttpFS).urlResolver = (url) => fileMap.get(url) || url;
 
       // load world
       this._terrain = await this.loadTerrain(this._scene, this._assetManager);

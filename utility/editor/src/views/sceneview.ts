@@ -40,7 +40,6 @@ import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import type { DBAssetInfo } from '../storage/db';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
@@ -60,7 +59,7 @@ import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
-import { Editor } from '../core/editor';
+import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
@@ -84,7 +83,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
   private _descToBePlaced: string;
-  private _assetToBeAdded: DBAssetInfo;
+  private _assetToBeAdded: string;
   private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
   private _mousePosX: number;
   private _mousePosY: number;
@@ -1166,7 +1165,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._ctorToBePlaced = ctor;
     this._descToBePlaced = desc;
   }
-  private handleAddAsset(asset: DBAssetInfo) {
+  private handleAddAsset(asset: string) {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
       placeNode.remove();
@@ -1174,7 +1173,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._typeToBePlaced = 'none';
     }
     ProjectService.serializationManager
-      .fetchModel(asset.uuid, this.model.scene)
+      .fetchModel(asset, this.model.scene)
       .then((node) => {
         node.group.parent = null;
         node.group.iterate((node) => {

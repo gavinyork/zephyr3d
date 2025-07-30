@@ -1,5 +1,6 @@
 import type { DecoderModule } from 'draco3d';
-import { isPowerOf2, nextPowerOf2, HttpRequest, VFS } from '@zephyr3d/base';
+import type { HttpRequest, VFS } from '@zephyr3d/base';
+import { HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -17,6 +18,15 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 import { DWeakRef } from '../app';
 
+function getDefaultBaseURL() {
+  if (
+    window.location.href.toLowerCase().endsWith('.html') ||
+    window.location.href.toLowerCase().endsWith('.htm')
+  ) {
+    return window.location.href.slice(0, window.location.href.lastIndexOf('/'));
+  }
+  return window.location.href;
+}
 /**
  * Options for texture fetching
  * @public
@@ -107,8 +117,8 @@ export class AssetManager {
   /**
    * Creates an instance of AssetManager
    */
-  constructor(vfs: VFS) {
-    this._vfs = vfs;
+  constructor(vfs?: VFS) {
+    this._vfs = vfs ?? new HttpFS(getDefaultBaseURL());
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
@@ -236,11 +246,7 @@ export class AssetManager {
    *
    * @returns The fetched texture
    */
-  async fetchTexture<T extends BaseTexture>(
-    url: string,
-    options?: TextureFetchOptions<T>,
-    httpRequest?: HttpRequest
-  ): Promise<T> {
+  async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
     if (options?.texture) {
       return this.loadTexture(
         url,

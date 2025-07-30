@@ -1,3 +1,4 @@
+import type { HttpFS } from '@zephyr3d/base';
 import type { GPUDataBuffer, Texture2D, TextureCube } from '@zephyr3d/device';
 import type { Scene } from '@zephyr3d/scene';
 import { DRef } from '@zephyr3d/scene';
@@ -72,7 +73,7 @@ export class EnvMaps {
     ];
   }
   async selectByPath(path: string, scene: Scene, urlResolver: (url: string) => string) {
-    this._assetManagerEx.httpRequest.urlResolver = urlResolver;
+    (this._assetManagerEx.vfs as HttpFS).urlResolver = urlResolver;
     const { maps, sh } = await this.loadEnvMap(path, this._assetManagerEx);
     this._currentId = '';
     scene.env.sky.skyType = 'skybox';

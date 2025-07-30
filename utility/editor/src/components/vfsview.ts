@@ -1,6 +1,6 @@
-import { VFS } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
-import { ProjectInfo } from '../core/services/project';
+import type { ProjectInfo } from '../core/services/project';
 import { VFSRenderer } from './vfsrenderer';
 
 export class VFSView {

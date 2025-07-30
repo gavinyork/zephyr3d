@@ -9,7 +9,7 @@ import type { PropertyAccessor } from '../types';
 import type { Material } from '../../../material';
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
 import { Application } from '../../../app';
-import { SerializationManager } from '../manager';
+import type { SerializationManager } from '../manager';
 
 export function getTextureProps<T extends Material>(
   manager: SerializationManager,

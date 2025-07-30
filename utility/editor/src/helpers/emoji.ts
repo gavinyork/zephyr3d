@@ -27,7 +27,7 @@ export function initEmojiMapping() {
 
 export function convertEmojiString(text: string) {
   let result = '';
-  for (let c of text) {
+  for (const c of text) {
     if (c in EMOJI_TO_PRIVATE_MAP) {
       result += String.fromCodePoint(EMOJI_TO_PRIVATE_MAP[c]);
     } else {

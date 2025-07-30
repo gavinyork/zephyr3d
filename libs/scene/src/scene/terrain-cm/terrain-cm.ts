@@ -110,9 +110,9 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
-    this._heightMapAssetId = '';
-    this._grassAssetId = '';
-    this._splatMapAssetId = '';
+    this._heightMapAssetId = `${this.persistentId}-heightmap.bin`;
+    this._grassAssetId = `${this.persistentId}-grass.bin`;
+    this._splatMapAssetId = `${this.persistentId}-splatmap.bin`;
     this._minHeight = 0;
     this._maxHeight = 0;
     this._material = new DRef(

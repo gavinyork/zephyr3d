@@ -1,7 +1,6 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, SceneNode } from '../../../scene';
-import type { EmbeddedAssetInfo } from '../asset/asset';
-import type { PropertyAccessor, SerializableClass } from '../types';
+import type { EmbeddedResource, PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
@@ -43,7 +42,7 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
 async function getTerrainGrassContent(
   terrain: ClipmapTerrain,
   manager: SerializationManager
-): Promise<EmbeddedAssetInfo> {
+): Promise<EmbeddedResource> {
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array[] = [];
   let dataSize = 4 + (4 * 3 + 36) * grassRenderer.numLayers;
@@ -92,58 +91,51 @@ async function getTerrainGrassContent(
     offset += layerDatas[i].length;
   }
   return {
-    assetType: 'binary',
-    assetId: terrain.grassAssetId,
-    data: new Blob([data.buffer]),
-    pkgId: terrain.persistentId,
-    path: 'grass.bin'
+    fileName: terrain.grassAssetId,
+    data: data.buffer
   };
 }
 
-async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
+async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedResource> {
   const device = Application.instance.device;
   const heightmap = terrain.heightMap;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(heightmap.format);
-  const head = new DataView(new ArrayBuffer(2 * 4));
+  const buffer = new Uint8Array(
+    2 * 4 + heightmap.width * heightmap.height * info.blockWidth * info.blockHeight * info.size
+  );
+  const head = new DataView(buffer.buffer);
   head.setUint32(0, heightmap.width, true);
   head.setUint32(4, heightmap.height, true);
-  const data = new Uint8Array(
-    heightmap.width * heightmap.height * info.blockWidth * info.blockHeight * info.size
-  );
+  const data = new Uint8Array(buffer, 2 * 4);
   await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, data);
   return {
-    assetType: 'binary',
-    assetId: terrain.heightMapAssetId,
-    data: new Blob([head.buffer, data]),
-    pkgId: terrain.persistentId,
-    path: 'heightmap.raw'
+    fileName: terrain.heightMapAssetId,
+    data: buffer
   };
 }
 
-async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<EmbeddedAssetInfo> {
+async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<EmbeddedResource> {
   const device = Application.instance.device;
   const splatMap = terrain.splatMap;
   const numLayers = (terrain.material.numDetailMaps + 3) >> 2;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(splatMap.format);
-  const data: BufferSource[] = [];
-  const head = new DataView(new ArrayBuffer(3 * 4));
+  const buffer = new ArrayBuffer(
+    3 * 4 + numLayers * splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
+  );
+  const head = new DataView(buffer);
   head.setUint32(0, splatMap.width, true);
   head.setUint32(4, splatMap.height, true);
   head.setUint32(8, numLayers, true);
-  data.push(head);
   for (let i = 0; i < numLayers; i++) {
     const layerData = new Uint8Array(
-      splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
+      buffer,
+      3 * 4 + i * splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
     );
     await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, 0, 0, layerData);
-    data.push(layerData);
   }
   return {
-    assetType: 'binary',
-    assetId: terrain.splatMapAssetId,
-    data: new Blob(data),
-    pkgId: terrain.persistentId,
-    path: 'splatmap.raw'
+    fileName: terrain.splatMapAssetId,
+    data: buffer
   };
 }
 
@@ -355,24 +347,18 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         ...getDetailMapProps(manager),
         {
           name: 'SplatMap',
-          type: 'object',
+          type: 'resource',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
-            value.str[0] = this.splatMapAssetId;
+            value.object[0] = getTerrainSplatMapContent(this);
           },
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
-              const assetId = value.str[0];
-              let data: ArrayBuffer = null;
-              try {
-                data = await manager.fetchBinary(assetId);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                data = null;
-              }
+              const path = value.str[0];
+              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load height map failed');
                 return;
@@ -396,24 +382,18 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         },
         {
           name: 'Grass',
-          type: 'object',
+          type: 'resource',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
-            value.str[0] = this.grassAssetId;
+            value.object[0] = getTerrainGrassContent(this, manager);
           },
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
-              const assetId = value.str[0];
-              let data: ArrayBuffer = null;
-              try {
-                data = await manager.fetchBinary(assetId);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                data = null;
-              }
+              const path = value.str[0];
+              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load grass data failed');
                 return;
@@ -467,24 +447,18 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         },
         {
           name: 'HeightMap',
-          type: 'object',
+          type: 'resource',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
-            value.str[0] = this.heightMapAssetId;
+            value.object[0] = getTerrainHeightMapContent(this);
           },
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
-              const assetId = value.str[0];
-              let data: ArrayBuffer = null;
-              try {
-                data = await manager.fetchBinary(assetId);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                data = null;
-              }
+              const path = value.str[0];
+              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load height map failed');
                 return;

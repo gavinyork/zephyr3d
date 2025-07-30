@@ -1,8 +1,6 @@
-import type { EmbeddedAssetInfo } from './asset/asset';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import type { SerializationManager } from './manager';
 
-export * from './asset/asset';
 export * from './scene/batch';
 export * from './scene/camera';
 export * from './scene/light';
@@ -21,6 +19,7 @@ const defaultValues: Record<PropertyType, any> = {
   int4: [0, 0, 0, 0],
   object: null,
   object_array: [],
+  resource: '',
   rgb: [0, 0, 0],
   rgba: [0, 0, 0, 0],
   string: '',
@@ -114,6 +113,11 @@ export async function deserializeObjectProps<T extends object>(
           }
         }
         break;
+      case 'resource':
+        if (typeof v === 'string' && v) {
+          tmpVal.str[0] = v;
+        }
+        break;
       case 'float':
       case 'int':
         tmpVal.num[0] = v;
@@ -167,7 +171,7 @@ export async function deserializeObjectProps<T extends object>(
  * @param json - Target JSON object to populate
  * @param manager - Serialization manager for context
  * @param assetList - Optional set to collect asset dependencies
- * @param embeddedAssetList - Optional array to collect embedded asset promises
+ * @param asyncTasks - Optional array to collect serialization promises
  *
  * @public
  *
@@ -178,7 +182,7 @@ export function serializeObjectProps<T extends object>(
   json: object,
   manager: SerializationManager,
   assetList?: Set<string>,
-  embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
+  asyncTasks?: Promise<unknown>[]
 ) {
   const props = manager.getPropertiesByClass(cls) ?? [];
   for (const prop of props) {
@@ -206,7 +210,7 @@ export function serializeObjectProps<T extends object>(
           typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
             ? tmpVal.str[0]
             : tmpVal.object[0]
-            ? serializeObject(tmpVal.object[0], manager, {}, assetList, embeddedAssetList)
+            ? serializeObject(tmpVal.object[0], manager, {}, assetList, asyncTasks)
             : null;
         if (value) {
           json[k] = value;
@@ -216,8 +220,14 @@ export function serializeObjectProps<T extends object>(
       case 'object_array':
         json[k] = [];
         for (const p of tmpVal.object) {
-          json[k].push(serializeObject(p, manager, {}, assetList, embeddedAssetList));
+          json[k].push(serializeObject(p, manager, {}, assetList, asyncTasks));
         }
+        break;
+      case 'resource':
+        json[k] = tmpVal.object[0]['fileName'];
+        asyncTasks.push(
+          manager.vfs.writeFile(json[k], tmpVal.object[0]['data'], { encoding: 'binary', create: true })
+        );
         break;
       case 'float':
       case 'int':
@@ -299,7 +309,7 @@ export function serializeObjectProps<T extends object>(
  * @param manager - Serialization manager for context and metadata
  * @param json - Optional existing JSON object to populate
  * @param assetList - Optional set to collect asset dependencies
- * @param embeddedAssetList - Optional array to collect embedded asset promises
+ * @param asyncTasks - Optional array to collect embedded asset promises
  * @returns Serialized JSON representation of the object
  *
  * @public
@@ -309,7 +319,7 @@ export function serializeObject(
   manager: SerializationManager,
   json?: any,
   assetList?: Set<string>,
-  embeddedAssetList?: Promise<EmbeddedAssetInfo>[]
+  asyncTasks?: Promise<unknown>[]
 ) {
   const cls = manager.getClasses();
   const index = cls.findIndex((val) => val.ctor === obj.constructor);
@@ -325,8 +335,8 @@ export function serializeObject(
     json.Init = initParams;
   }
   while (info) {
-    if (embeddedAssetList && info.getEmbeddedAssets) {
-      embeddedAssetList?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
+    if (asyncTasks && info.getEmbeddedAssets) {
+      asyncTasks?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
     }
     if (assetList && info.getAssets) {
       for (const asset of info.getAssets(obj) ?? []) {
@@ -335,7 +345,7 @@ export function serializeObject(
         }
       }
     }
-    serializeObjectProps(obj, info, json.Object, manager, assetList, embeddedAssetList);
+    serializeObjectProps(obj, info, json.Object, manager, assetList, asyncTasks);
     info = manager.getClassByConstructor(info.parent);
   }
   return json;

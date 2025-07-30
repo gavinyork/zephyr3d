@@ -1,5 +1,5 @@
 import * as zip from '@zip.js/zip.js';
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, HttpFS } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SceneNode } from '@zephyr3d/scene';
 import {
@@ -122,7 +122,7 @@ lightApp.ready().then(async () => {
     message = `Loading %${percent} ...`;
   }).then(async (zipContent) => {
     const fileMap = await readZip(zipContent);
-    assetManager.httpRequest.urlResolver = (url) => fileMap.get(url) || url;
+    (assetManager.vfs as HttpFS).urlResolver = (url) => fileMap.get(url) || url;
 
     assetManager.fetchModel(scene, '/sponza/Sponza.gltf').then((info) => {
       message = '';

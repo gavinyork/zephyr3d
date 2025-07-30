@@ -1,8 +1,9 @@
-import { FileMetadata, makeEventTarget, VFS } from '@zephyr3d/base';
+import type { FileMetadata, VFS } from '@zephyr3d/base';
+import { makeEventTarget } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
-import { ProjectInfo } from '../core/services/project';
+import type { ProjectInfo } from '../core/services/project';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
@@ -55,7 +56,11 @@ type VFSRendererOptions = {
 export class VFSRenderer extends makeEventTarget(Object)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
 }>() {
-  private static baseFlags = ImGui.TreeNodeFlags.SpanAvailWidth | ImGui.TreeNodeFlags.SpanFullWidth;
+  private static baseFlags =
+    ImGui.TreeNodeFlags.SpanAvailWidth |
+    ImGui.TreeNodeFlags.SpanFullWidth |
+    ImGui.TreeNodeFlags.OpenOnArrow |
+    ImGui.TreeNodeFlags.OpenOnDoubleClick;
   private _vfs: VFS;
   private _project: ProjectInfo;
   private _treePanel: DockPannel;
@@ -140,7 +145,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   public isMouseInArea(mousePos: ImGui.ImVec2, area: 'navigation' | 'content'): boolean {
     const bounds = area === 'navigation' ? this._navigationBounds : this._contentBounds;
 
-    if (!bounds) return false;
+    if (!bounds) {
+      return false;
+    }
 
     return (
       mousePos.x >= bounds.min.x &&
@@ -231,7 +238,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const drawList = ImGui.GetWindowDrawList();
     const bounds = this._navigationBounds;
 
-    if (!bounds) return;
+    if (!bounds) {
+      return;
+    }
 
     // 绘制高亮边框和背景
     const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.7, 1.0, 0.6));
@@ -274,7 +283,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const drawList = ImGui.GetWindowDrawList();
     const bounds = this._contentBounds;
 
-    if (!bounds) return;
+    if (!bounds) {
+      return;
+    }
 
     const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.6));
     const backgroundColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.1));
@@ -371,8 +382,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     if (!isDir) {
       const meta = (item as FileInfo).meta;
       info += `Size: ${this.formatFileSize(meta.size)}\n`;
-      if (meta.mimeType) info += `MIME Type: ${meta.mimeType}\n`;
-      if (meta.modified) info += `Modified: ${this.formatDate(meta.modified)}\n`;
+      if (meta.mimeType) {
+        info += `MIME Type: ${meta.mimeType}\n`;
+      }
+      if (meta.modified) {
+        info += `Modified: ${this.formatDate(meta.modified)}\n`;
+      }
     }
 
     info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
@@ -406,7 +421,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     ImGui.SetNextItemWidth(100);
 
     const sortItems = ['Name', 'Size', 'Type', 'Modified'];
-    let currentSort = this._sortBy;
+    const currentSort = this._sortBy;
     if (ImGui.Combo('##SortBy', [currentSort], sortItems)) {
       this._sortBy = currentSort;
       this.sortContent();
@@ -502,7 +517,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const isSelected = this._selectedItems.has(item);
 
     if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
-      this.handleItemClick(item, index);
+      this.handleItemClick(item);
     }
 
     // 跟踪鼠标悬停状态
@@ -539,7 +554,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         new ImGui.ImVec2(iconSize, iconSize)
       )
     ) {
-      this.handleItemClick(item, index);
+      this.handleItemClick(item);
     }
 
     // 跟踪鼠标悬停状态
@@ -594,7 +609,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
       )
     ) {
-      this.handleItemClick(item, index);
+      this.handleItemClick(item);
     }
 
     // 跟踪鼠标悬停状态
@@ -639,7 +654,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   }
 
   // 处理项目点击
-  private handleItemClick(item: FileInfo | DirectoryInfo, index: number) {
+  private handleItemClick(item: FileInfo | DirectoryInfo) {
     const io = ImGui.GetIO();
 
     if (this._options.multiSelect && io.KeyCtrl) {
@@ -828,8 +843,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       const isBDir = 'subDir' in b;
 
       // 目录总是在文件前面
-      if (isADir && !isBDir) return -1;
-      if (!isADir && isBDir) return 1;
+      if (isADir && !isBDir) {
+        return -1;
+      }
+      if (!isADir && isBDir) {
+        return 1;
+      }
 
       let comparison = 0;
 
@@ -869,14 +888,26 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 获取文件 emoji
   private getFileEmoji(meta: FileMetadata): string {
-    if (!meta?.mimeType) return '📄';
+    if (!meta?.mimeType) {
+      return '📄';
+    }
 
     const mimeType = meta.mimeType.toLowerCase();
-    if (mimeType.startsWith('image/')) return '🖼️';
-    if (mimeType.startsWith('video/')) return '🎬';
-    if (mimeType.startsWith('audio/')) return '🔊';
-    if (mimeType.includes('text') || mimeType.includes('json')) return '📝';
-    if (mimeType.includes('zip') || mimeType.includes('archive')) return '📦';
+    if (mimeType.startsWith('image/')) {
+      return '🖼️';
+    }
+    if (mimeType.startsWith('video/')) {
+      return '🎬';
+    }
+    if (mimeType.startsWith('audio/')) {
+      return '🔊';
+    }
+    if (mimeType.includes('text') || mimeType.includes('json')) {
+      return '📝';
+    }
+    if (mimeType.includes('zip') || mimeType.includes('archive')) {
+      return '📦';
+    }
 
     const ext = meta.name.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -907,7 +938,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 格式化文件大小
   private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) {
+      return '0 B';
+    }
 
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -954,7 +987,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 创建新文件夹
   private createNewFolder() {
-    if (!this._selectedDir) return;
+    if (!this._selectedDir) {
+      return;
+    }
 
     DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
       if (name) {
@@ -979,7 +1014,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 创建新文件
   private createNewFile() {
-    if (!this._selectedDir) return;
+    if (!this._selectedDir) {
+      return;
+    }
 
     DlgPromptName.promptName('Create File', 'NewFile.txt').then((name) => {
       if (name) {
@@ -1004,7 +1041,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 删除选中项目
   private deleteSelectedItems() {
-    if (this._selectedItems.size === 0) return;
+    if (this._selectedItems.size === 0) {
+      return;
+    }
 
     const items = Array.from(this._selectedItems);
 
@@ -1032,7 +1071,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   // 重命名选中项目
   private renameSelectedItem() {
-    if (this._selectedItems.size !== 1) return;
+    if (this._selectedItems.size !== 1) {
+      return;
+    }
 
     const item = Array.from(this._selectedItems)[0];
     const isDir = 'subDir' in item;

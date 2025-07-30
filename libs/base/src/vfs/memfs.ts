@@ -26,13 +26,11 @@ export class MemoryFS extends VFS {
   }
 
   protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (this.directories.has(normalizedPath)) {
+    if (this.directories.has(path)) {
       throw new VFSError('Directory already exists', 'EEXIST', path);
     }
 
-    const parent = PathUtils.dirname(normalizedPath);
+    const parent = PathUtils.dirname(path);
     if (!this.directories.has(parent)) {
       if (recursive) {
         await this._makeDirectory(parent, true);
@@ -41,10 +39,10 @@ export class MemoryFS extends VFS {
       }
     }
 
-    this.directories.add(normalizedPath);
-    this.metadata.set(normalizedPath, {
-      name: PathUtils.basename(normalizedPath),
-      path: normalizedPath,
+    this.directories.add(path);
+    this.metadata.set(path, {
+      name: PathUtils.basename(path),
+      path: path,
       size: 0,
       type: 'directory',
       created: new Date(),
@@ -53,18 +51,16 @@ export class MemoryFS extends VFS {
   }
 
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (!this.directories.has(normalizedPath)) {
+    if (!this.directories.has(path)) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
     }
 
     const results: FileMetadata[] = [];
-    const pathPrefix = normalizedPath === '/' ? '/' : normalizedPath + '/';
+    const pathPrefix = path === '/' ? '/' : path + '/';
 
     // 列出目录
     for (const dir of this.directories) {
-      if (dir !== normalizedPath && dir.startsWith(pathPrefix)) {
+      if (dir !== path && dir.startsWith(pathPrefix)) {
         const relativePath = dir.slice(pathPrefix.length);
         if (!options?.recursive && relativePath.includes('/')) {
           continue;
@@ -96,20 +92,18 @@ export class MemoryFS extends VFS {
   }
 
   protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (!this.directories.has(normalizedPath)) {
+    if (!this.directories.has(path)) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
     }
 
-    const children = await this._readDirectory(normalizedPath);
+    const children = await this._readDirectory(path);
     if (children.length > 0 && !recursive) {
       throw new VFSError('Directory is not empty', 'ENOTEMPTY', path);
     }
 
     if (recursive) {
       // 删除所有子项
-      const pathPrefix = normalizedPath + '/';
+      const pathPrefix = path + '/';
 
       // 删除子文件
       for (const [filePath] of this.files) {
@@ -128,18 +122,16 @@ export class MemoryFS extends VFS {
       }
     }
 
-    this.directories.delete(normalizedPath);
-    this.metadata.delete(normalizedPath);
+    this.directories.delete(path);
+    this.metadata.delete(path);
   }
 
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (!this.files.has(normalizedPath)) {
+    if (!this.files.has(path)) {
       throw new VFSError('File does not exist', 'ENOENT', path);
     }
 
-    const data = this.files.get(normalizedPath)!;
+    const data = this.files.get(path)!;
 
     if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
       return new TextDecoder().decode(data);
@@ -153,8 +145,7 @@ export class MemoryFS extends VFS {
     data: ArrayBuffer | string,
     options?: WriteOptions
   ): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-    const parent = PathUtils.dirname(normalizedPath);
+    const parent = PathUtils.dirname(path);
 
     if (!this.directories.has(parent)) {
       if (options?.create) {
@@ -167,8 +158,8 @@ export class MemoryFS extends VFS {
     let fileData: ArrayBuffer | string;
 
     // 处理追加模式
-    if (options?.append && this.files.has(normalizedPath)) {
-      const existingData = this.files.get(normalizedPath)!;
+    if (options?.append && this.files.has(path)) {
+      const existingData = this.files.get(path)!;
 
       // 统一数据类型进行追加
       if (typeof existingData === 'string' && typeof data === 'string') {
@@ -196,41 +187,37 @@ export class MemoryFS extends VFS {
       }
     }
 
-    this.files.set(normalizedPath, fileData);
+    this.files.set(path, fileData);
 
     const size =
       typeof fileData === 'string' ? new TextEncoder().encode(fileData).length : fileData.byteLength;
 
-    this.metadata.set(normalizedPath, {
-      name: PathUtils.basename(normalizedPath),
-      path: normalizedPath,
+    this.metadata.set(path, {
+      name: PathUtils.basename(path),
+      path: path,
       size,
       type: 'file',
-      created: this.metadata.get(normalizedPath)?.created || new Date(),
+      created: this.metadata.get(path)?.created || new Date(),
       modified: new Date(),
-      mimeType: guessMimeType(normalizedPath)
+      mimeType: guessMimeType(path)
     });
   }
 
   protected async _deleteFile(path: string): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (!this.files.has(normalizedPath)) {
+    if (!this.files.has(path)) {
       throw new VFSError('File does not exist', 'ENOENT', path);
     }
 
-    this.files.delete(normalizedPath);
-    this.metadata.delete(normalizedPath);
+    this.files.delete(path);
+    this.metadata.delete(path);
   }
 
   protected async _exists(path: string): Promise<boolean> {
-    const normalizedPath = PathUtils.normalize(path);
-    return this.files.has(normalizedPath) || this.directories.has(normalizedPath);
+    return this.files.has(path) || this.directories.has(path);
   }
 
   protected async _stat(path: string): Promise<FileStat> {
-    const normalizedPath = PathUtils.normalize(path);
-    const metadata = this.metadata.get(normalizedPath);
+    const metadata = this.metadata.get(path);
 
     if (!metadata) {
       throw new VFSError('Path does not exist', 'ENOENT', path);
@@ -246,9 +233,14 @@ export class MemoryFS extends VFS {
   }
   /**
    * 不支持删除
-   * @returns
    */
   protected async _deleteFileSystem(): Promise<void> {
+    return;
+  }
+  /**
+   * 不支持删除
+   */
+  protected async _deleteDatabase(): Promise<void> {
     return;
   }
 }

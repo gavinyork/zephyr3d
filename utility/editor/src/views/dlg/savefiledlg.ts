@@ -1,8 +1,9 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
-import { DirectoryInfo, FileInfo, VFSRenderer } from '../../components/vfsrenderer';
-import { VFS } from '@zephyr3d/base';
-import { ProjectInfo } from '../../core/services/project';
+import type { DirectoryInfo, FileInfo } from '../../components/vfsrenderer';
+import { VFSRenderer } from '../../components/vfsrenderer';
+import type { VFS } from '@zephyr3d/base';
+import type { ProjectInfo } from '../../core/services/project';
 
 export class DlgSaveFile extends DialogRenderer<string> {
   private _renderer: VFSRenderer;

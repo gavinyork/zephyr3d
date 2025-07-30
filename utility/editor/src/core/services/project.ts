@@ -1,5 +1,5 @@
 import { IndexedDBFS } from '@zephyr3d/base';
-import { EmbeddedAssetInfo, SerializationManager } from '@zephyr3d/scene';
+import { SerializationManager } from '@zephyr3d/scene';
 
 export type ProjectInfo = {
   name: string;
@@ -84,9 +84,6 @@ export class ProjectService {
   }
   static get serializationManager() {
     return this._serializationManager;
-  }
-  static async putEmbeddedAssets(assets: EmbeddedAssetInfo[]) {
-    // TODO
   }
   private static async readManifest() {
     const exists = await this._vfs.exists(ProjectService.PROJECT_MANIFEST);

@@ -9,7 +9,7 @@ import {
   fetchSampler
 } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { ASSERT, degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -610,16 +610,14 @@ export class TerrainEditTool implements EditTool {
             });
           eventBus.dispatchEvent('scene_changed');
         } else {
+          // TODO: should use a http VFS here, current not working
+          ASSERT(false, 'To be implemented');
           const assetManager = new AssetManager(ProjectService.serializationManager.vfs);
           assetManager
-            .fetchTexture<Texture2D>(
-              files[0].name,
-              {
-                linearColorSpace: true,
-                samplerOptions: { mipFilter: 'none' }
-              },
-              httpRequest
-            )
+            .fetchTexture<Texture2D>(files[0].name, {
+              linearColorSpace: true,
+              samplerOptions: { mipFilter: 'none' }
+            })
             .then((tex) => {
               if (!tex || !tex.isTexture2D()) {
                 Dialog.messageBox('Error', 'Invalid texture');

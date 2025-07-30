@@ -14,7 +14,8 @@ import {
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
 import { HttpFS } from '@zephyr3d/base';
-import { ProjectInfo, ProjectService } from './services/project';
+import type { ProjectInfo } from './services/project';
+import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 
 export class Editor {

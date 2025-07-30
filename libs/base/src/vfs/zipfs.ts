@@ -162,7 +162,7 @@ export class ZipFS extends VFS {
       this.entries.clear();
 
       for (const entry of entries) {
-        const normalizedPath = PathUtils.normalize('/' + entry.filename);
+        const normalizedPath = this.normalizePath('/' + entry.filename);
         this.entries.set(normalizedPath, entry);
       }
     } catch (error) {
@@ -362,14 +362,12 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._makeDirectory} */
   protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (await this._exists(normalizedPath)) {
+    if (await this._exists(path)) {
       return;
     }
 
-    const parent = PathUtils.dirname(normalizedPath);
-    if (parent !== '/' && parent !== normalizedPath) {
+    const parent = PathUtils.dirname(path);
+    if (parent !== '/' && parent !== path) {
       const parentExists = await this._exists(parent);
       if (!parentExists) {
         if (recursive) {
@@ -381,7 +379,7 @@ export class ZipFS extends VFS {
     }
 
     const writer = await this.ensureWriter();
-    const dirPath = normalizedPath.endsWith('/') ? normalizedPath.slice(1) : normalizedPath.slice(1) + '/';
+    const dirPath = path.endsWith('/') ? path.slice(1) : path.slice(1) + '/';
 
     await writer.add(dirPath, undefined, {
       directory: true,
@@ -390,7 +388,7 @@ export class ZipFS extends VFS {
 
     this.isModified = true;
 
-    this.entries.set(normalizedPath, {
+    this.entries.set(path, {
       filename: dirPath,
       directory: true,
       uncompressedSize: 0,
@@ -401,17 +399,20 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._readDirectory} */
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
-    const normalizedPath = PathUtils.normalize(path);
+    // 根目录的特殊处理 - 即使是空 ZIP 也应该能读取根目录
+    if (path === '/' && this.entries.size === 0 && this.virtualFiles.size === 0) {
+      return []; // 空目录，但不抛出错误
+    }
+
     const results: FileMetadata[] = [];
-
-    const searchPath = normalizedPath === '/' ? '' : normalizedPath.slice(1) + '/';
-
+    const searchPath = path === '/' ? '' : path.slice(1) + '/';
     const foundEntries = new Set<string>();
 
+    // ... 其余代码保持不变
     for (const [_entryPath, entry] of this.entries) {
       const relativePath = entry.filename;
 
-      if (normalizedPath === '/') {
+      if (path === '/') {
         const parts = relativePath.split('/').filter((p) => p);
         if (parts.length === 0) {
           continue;
@@ -437,6 +438,7 @@ export class ZipFS extends VFS {
           }
         }
       } else if (relativePath.startsWith(searchPath)) {
+        // ... 其余逻辑保持不变
         const remainingPath = relativePath.slice(searchPath.length);
 
         if (!remainingPath) {
@@ -466,7 +468,7 @@ export class ZipFS extends VFS {
           if (parts.length > 0) {
             const firstPart = parts[0];
             const isDir = remainingPath.includes('/') || relativePath.endsWith('/');
-            const childPath = PathUtils.join(normalizedPath, firstPart);
+            const childPath = PathUtils.join(path, firstPart);
 
             if (!foundEntries.has(firstPart)) {
               foundEntries.add(firstPart);
@@ -489,9 +491,10 @@ export class ZipFS extends VFS {
       }
     }
 
+    // 处理虚拟文件
     for (const [virtualPath, virtualFile] of this.virtualFiles) {
       const parent = PathUtils.dirname(virtualPath);
-      if (parent === normalizedPath || (options?.recursive && virtualPath.startsWith(normalizedPath + '/'))) {
+      if (parent === path || (options?.recursive && virtualPath.startsWith(path + '/'))) {
         const name = PathUtils.basename(virtualPath);
         if (!foundEntries.has(name)) {
           foundEntries.add(name);
@@ -522,14 +525,12 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._deleteDirectory} */
   protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    const dirExists = await this._exists(normalizedPath);
+    const dirExists = await this._exists(path);
     if (!dirExists) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
     }
 
-    const children = await this._readDirectory(normalizedPath);
+    const children = await this._readDirectory(path);
     if (children.length > 0 && !recursive) {
       throw new VFSError('Directory is not empty', 'ENOTEMPTY', path);
     }
@@ -544,7 +545,7 @@ export class ZipFS extends VFS {
       }
     }
 
-    const searchPath = normalizedPath.slice(1);
+    const searchPath = path.slice(1);
     const toDelete: string[] = [];
 
     for (const [entryPath, entry] of this.entries) {
@@ -557,17 +558,15 @@ export class ZipFS extends VFS {
       this.entries.delete(path);
     }
 
-    this.virtualFiles.delete(normalizedPath);
+    this.virtualFiles.delete(path);
 
     this.isModified = true;
   }
 
   /** {@inheritDoc VFS._readFile} */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (this.virtualFiles.has(normalizedPath)) {
-      const virtualFile = this.virtualFiles.get(normalizedPath)!;
+    if (this.virtualFiles.has(path)) {
+      const virtualFile = this.virtualFiles.get(path)!;
       let data = virtualFile.data;
 
       if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
@@ -597,7 +596,7 @@ export class ZipFS extends VFS {
       return data;
     }
 
-    const searchPath = normalizedPath.slice(1);
+    const searchPath = path.slice(1);
     const entry = Array.from(this.entries.values()).find((e) => e.filename === searchPath);
 
     if (!entry || entry.directory) {
@@ -656,8 +655,7 @@ export class ZipFS extends VFS {
     data: ArrayBuffer | string,
     options?: WriteOptions
   ): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-    const parent = PathUtils.dirname(normalizedPath);
+    const parent = PathUtils.dirname(path);
 
     if (parent !== '/' && !(await this._exists(parent))) {
       if (options?.create) {
@@ -673,7 +671,7 @@ export class ZipFS extends VFS {
       let existingData: ArrayBuffer | string | null = null;
 
       try {
-        existingData = await this._readFile(normalizedPath);
+        existingData = await this._readFile(path);
       } catch (_error) {}
 
       if (existingData) {
@@ -707,7 +705,7 @@ export class ZipFS extends VFS {
       }
     }
 
-    this.virtualFiles.set(normalizedPath, {
+    this.virtualFiles.set(path, {
       data: fileData,
       modified: new Date()
     });
@@ -717,15 +715,13 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._deleteFile} */
   protected async _deleteFile(path: string): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (!(await this._exists(normalizedPath))) {
+    if (!(await this._exists(path))) {
       throw new VFSError('File does not exist', 'ENOENT', path);
     }
 
-    this.virtualFiles.delete(normalizedPath);
+    this.virtualFiles.delete(path);
 
-    const searchPath = normalizedPath.slice(1);
+    const searchPath = path.slice(1);
     const toDelete: string[] = [];
 
     for (const [entryPath, entry] of this.entries) {
@@ -743,32 +739,37 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._exists} */
   protected async _exists(path: string): Promise<boolean> {
-    const normalizedPath = PathUtils.normalize(path);
-
-    if (this.virtualFiles.has(normalizedPath)) {
+    // 根目录总是存在
+    if (path === '/') {
       return true;
     }
 
-    const searchPath = normalizedPath.slice(1);
+    // 检查虚拟文件
+    if (this.virtualFiles.has(path)) {
+      return true;
+    }
 
+    const searchPath = path.slice(1);
+
+    // 检查确切匹配
     for (const entry of this.entries.values()) {
       if (entry.filename === searchPath || entry.filename === searchPath + '/') {
         return true;
       }
     }
 
-    if (normalizedPath !== '/') {
-      const searchPrefix = searchPath + '/';
-      for (const entry of this.entries.values()) {
-        if (entry.filename.startsWith(searchPrefix)) {
-          return true;
-        }
+    // 检查是否作为目录存在（有子条目）
+    const searchPrefix = searchPath + '/';
+    for (const entry of this.entries.values()) {
+      if (entry.filename.startsWith(searchPrefix)) {
+        return true;
       }
+    }
 
-      for (const virtualPath of this.virtualFiles.keys()) {
-        if (virtualPath.startsWith(normalizedPath + '/')) {
-          return true;
-        }
+    // 检查虚拟文件中是否有子条目
+    for (const virtualPath of this.virtualFiles.keys()) {
+      if (virtualPath.startsWith(path + '/')) {
+        return true;
       }
     }
 
@@ -777,10 +778,21 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._stat} */
   protected async _stat(path: string): Promise<FileStat> {
-    const normalizedPath = PathUtils.normalize(path);
+    // 根目录的特殊处理
+    if (path === '/') {
+      return {
+        size: 0,
+        isFile: false,
+        isDirectory: true,
+        created: new Date(),
+        modified: new Date(),
+        accessed: new Date()
+      };
+    }
 
-    if (this.virtualFiles.has(normalizedPath)) {
-      const virtualFile = this.virtualFiles.get(normalizedPath)!;
+    // 检查虚拟文件
+    if (this.virtualFiles.has(path)) {
+      const virtualFile = this.virtualFiles.get(path)!;
       const size =
         virtualFile.data instanceof ArrayBuffer
           ? virtualFile.data.byteLength
@@ -796,8 +808,9 @@ export class ZipFS extends VFS {
       };
     }
 
-    const searchPath = normalizedPath.slice(1);
+    const searchPath = path.slice(1);
 
+    // 检查 ZIP 条目中的确切匹配
     for (const entry of this.entries.values()) {
       if (entry.filename === searchPath || entry.filename === searchPath + '/') {
         return {
@@ -811,32 +824,32 @@ export class ZipFS extends VFS {
       }
     }
 
-    if (normalizedPath !== '/') {
-      const searchPrefix = searchPath + '/';
-      for (const entry of this.entries.values()) {
-        if (entry.filename.startsWith(searchPrefix)) {
-          return {
-            size: 0,
-            isFile: false,
-            isDirectory: true,
-            created: new Date(),
-            modified: new Date(),
-            accessed: new Date()
-          };
-        }
+    // 检查是否作为目录存在（有子条目）
+    const searchPrefix = searchPath + '/';
+    for (const entry of this.entries.values()) {
+      if (entry.filename.startsWith(searchPrefix)) {
+        return {
+          size: 0,
+          isFile: false,
+          isDirectory: true,
+          created: new Date(),
+          modified: new Date(),
+          accessed: new Date()
+        };
       }
+    }
 
-      for (const virtualPath of this.virtualFiles.keys()) {
-        if (virtualPath.startsWith(normalizedPath + '/')) {
-          return {
-            size: 0,
-            isFile: false,
-            isDirectory: true,
-            created: new Date(),
-            modified: new Date(),
-            accessed: new Date()
-          };
-        }
+    // 检查虚拟文件中是否有子条目
+    for (const virtualPath of this.virtualFiles.keys()) {
+      if (virtualPath.startsWith(path + '/')) {
+        return {
+          size: 0,
+          isFile: false,
+          isDirectory: true,
+          created: new Date(),
+          modified: new Date(),
+          accessed: new Date()
+        };
       }
     }
 
@@ -1095,8 +1108,7 @@ export class ZipFS extends VFS {
    * Gets CRC32 of a file in the zip archive（if it exists）
    */
   async getFileCRC32(path: string): Promise<number | null> {
-    const normalizedPath = PathUtils.normalize(path);
-    const searchPath = normalizedPath.slice(1);
+    const searchPath = path.slice(1);
 
     for (const entry of this.entries.values()) {
       if (entry.filename === searchPath && !entry.directory) {
@@ -1109,9 +1121,15 @@ export class ZipFS extends VFS {
   }
 
   /**
-   * No support for destroying
+   * No support for deleting filesystem
    */
   protected async _deleteFileSystem(): Promise<void> {
+    return;
+  }
+  /**
+   * No support for deleting database
+   */
+  protected async _deleteDatabase(): Promise<void> {
     return;
   }
 }

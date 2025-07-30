@@ -1,17 +1,14 @@
 import type { Interpolator, VFS } from '@zephyr3d/base';
 import { DlgCurveEditor } from './curveeditordlg';
-import type { DBSceneInfo } from '../../storage/db';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './promptnamedlg';
-import { DlgOpenScene } from './openscenedlg';
 import { DlgRampTextureCreator } from './ramptexturedlg';
 import { DlgRename } from './renamedlg';
-import { DlgExportScene } from './exportscenedlg';
 import { DlgSelectAnimation } from './selectanimationdlg';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgEditColorTrack } from './editcolortrackdlg';
 import { DlgOpen } from './opendlg';
-import { ProjectInfo } from '../../core/services/project';
+import type { ProjectInfo } from '../../core/services/project';
 import { DlgSaveFile } from './savefiledlg';
 import { DlgOpenFile } from './openfiledlg';
 
@@ -27,22 +24,6 @@ export class Dialog {
     height?: number
   ) {
     return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height);
-  }
-  public static async batchExportScene(
-    title: string,
-    scene: DBSceneInfo[],
-    width?: number,
-    height?: number
-  ): Promise<DBSceneInfo[]> {
-    return DlgExportScene.batchExportScene(title, scene, width, height);
-  }
-  public static async openScene(
-    title: string,
-    scene: DBSceneInfo[],
-    width?: number,
-    height?: number
-  ): Promise<string> {
-    return DlgOpenScene.openScene(title, scene, width, height);
   }
   public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
     return DlgSaveFile.saveFile(title, vfs, project, width, height);

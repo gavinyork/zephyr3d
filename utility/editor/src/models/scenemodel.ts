@@ -1,4 +1,5 @@
-import { Camera, DRef } from '@zephyr3d/scene';
+import type { Camera } from '@zephyr3d/scene';
+import { DRef } from '@zephyr3d/scene';
 import { DirectionalLight, OrbitCameraController, PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';

@@ -62,7 +62,7 @@ export class IndexedDBFS extends VFS {
    * 获取数据库信息
    */
   private async getDatabaseInfo(): Promise<{ version: number; storeExists: boolean }> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const request = indexedDB.open(this.dbName);
 
       request.onsuccess = (event) => {
@@ -79,8 +79,10 @@ export class IndexedDBFS extends VFS {
       };
       request.onupgradeneeded = (event) => {
         const tempDb = (event.target as IDBOpenDBRequest).result;
+        const version = tempDb.version;
+        const storeExists = tempDb.objectStoreNames.contains(this.storeName);
         tempDb.close();
-        resolve({ version: 0, storeExists: false });
+        resolve({ version, storeExists });
       };
     });
   }
@@ -285,11 +287,10 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-    const parent = PathUtils.dirname(normalizedPath);
+    const parent = PathUtils.dirname(path);
 
     // 1. 先在事务外检查和创建父目录
-    if (parent !== '/' && parent !== normalizedPath) {
+    if (parent !== '/' && parent !== path) {
       const parentExists = await this._exists(parent);
       if (!parentExists) {
         if (recursive) {
@@ -308,7 +309,7 @@ export class IndexedDBFS extends VFS {
       const store = transaction.objectStore(this.storeName);
 
       // 检查目录是否已存在
-      const existsRequest = store.get(normalizedPath);
+      const existsRequest = store.get(path);
       existsRequest.onsuccess = () => {
         const existing = existsRequest.result;
         if (existing) {
@@ -324,13 +325,13 @@ export class IndexedDBFS extends VFS {
         // 创建目录
         const now = new Date();
         const metadata = {
-          name: PathUtils.basename(normalizedPath),
-          path: normalizedPath,
+          name: PathUtils.basename(path),
+          path: path,
           size: 0,
           type: 'directory',
           created: now,
           modified: now,
-          parent: PathUtils.dirname(normalizedPath),
+          parent: PathUtils.dirname(path),
           data: null
         };
 
@@ -344,12 +345,10 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
-    const normalizedPath = PathUtils.normalize(path);
-
     return this.dbOperation('readonly', (store) => {
       return new Promise<FileMetadata[]>((resolve, reject) => {
         // 首先检查目录是否存在
-        const dirCheck = store.get(normalizedPath);
+        const dirCheck = store.get(path);
         dirCheck.onsuccess = () => {
           const dirRecord = dirCheck.result;
           if (!dirRecord || dirRecord.type !== 'directory') {
@@ -370,10 +369,7 @@ export class IndexedDBFS extends VFS {
                 const recordPath = record.path as string;
 
                 // 检查是否是子路径（包括间接子路径）
-                if (
-                  recordPath !== normalizedPath &&
-                  (recordPath.startsWith(normalizedPath + '/') || record.parent === normalizedPath)
-                ) {
+                if (recordPath !== path && (recordPath.startsWith(path + '/') || record.parent === path)) {
                   const metadata: FileMetadata = {
                     name: record.name,
                     path: recordPath,
@@ -396,7 +392,7 @@ export class IndexedDBFS extends VFS {
             request.onerror = () => reject(request.error);
           } else {
             // 只列出直接子项
-            const request = index.openCursor(IDBKeyRange.only(normalizedPath));
+            const request = index.openCursor(IDBKeyRange.only(path));
             request.onsuccess = (event) => {
               const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
               if (cursor) {
@@ -428,10 +424,8 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
     // 1. 先在事务外检查目录内容
-    const children = await this._readDirectory(normalizedPath);
+    const children = await this._readDirectory(path);
 
     if (children.length > 0 && !recursive) {
       throw new VFSError('Directory is not empty', 'ENOTEMPTY', path);
@@ -452,7 +446,7 @@ export class IndexedDBFS extends VFS {
     return this.dbOperation('readwrite', (store) => {
       return new Promise<void>((resolve, reject) => {
         // 检查目录是否存在
-        const dirCheck = store.get(normalizedPath);
+        const dirCheck = store.get(path);
         dirCheck.onsuccess = () => {
           const dirRecord = dirCheck.result;
           if (!dirRecord || dirRecord.type !== 'directory') {
@@ -461,7 +455,7 @@ export class IndexedDBFS extends VFS {
           }
 
           // 删除目录本身
-          const deleteRequest = store.delete(normalizedPath);
+          const deleteRequest = store.delete(path);
           deleteRequest.onsuccess = () => resolve();
           deleteRequest.onerror = () => reject(new VFSError('Failed to delete directory', 'EIO', path));
         };
@@ -471,11 +465,9 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
-    const normalizedPath = PathUtils.normalize(path);
-
     return this.dbOperation('readonly', (store) => {
       return new Promise<ArrayBuffer | string>((resolve, reject) => {
-        const request = store.get(normalizedPath);
+        const request = store.get(path);
         request.onsuccess = () => {
           const record = request.result;
           if (!record || record.type !== 'file') {
@@ -523,8 +515,7 @@ export class IndexedDBFS extends VFS {
     data: ArrayBuffer | string,
     options?: WriteOptions
   ): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-    const parent = PathUtils.dirname(normalizedPath);
+    const parent = PathUtils.dirname(path);
 
     // 1. 先在事务外处理父目录检查和创建
     if (parent !== '/') {
@@ -542,7 +533,7 @@ export class IndexedDBFS extends VFS {
     return this.dbOperation('readwrite', (store) => {
       return new Promise<void>((resolve, reject) => {
         // 检查现有文件
-        const existingRequest = store.get(normalizedPath);
+        const existingRequest = store.get(path);
         existingRequest.onsuccess = () => {
           const existingRecord = existingRequest.result;
           let fileData: ArrayBuffer | string = data;
@@ -592,15 +583,15 @@ export class IndexedDBFS extends VFS {
 
           // 创建文件记录
           const record = {
-            name: PathUtils.basename(normalizedPath),
-            path: normalizedPath,
+            name: PathUtils.basename(path),
+            path: path,
             size: size,
             type: 'file' as const,
             created: created,
             modified: now,
             parent: parent,
             data: fileData,
-            mimeType: guessMimeType(normalizedPath)
+            mimeType: guessMimeType(path)
           };
 
           // 保存文件
@@ -616,12 +607,10 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _deleteFile(path: string): Promise<void> {
-    const normalizedPath = PathUtils.normalize(path);
-
     return this.dbOperation('readwrite', (store) => {
       return new Promise<void>((resolve, reject) => {
         // 首先检查文件是否存在
-        const checkRequest = store.get(normalizedPath);
+        const checkRequest = store.get(path);
         checkRequest.onsuccess = () => {
           const record = checkRequest.result;
           if (!record || record.type !== 'file') {
@@ -630,7 +619,7 @@ export class IndexedDBFS extends VFS {
           }
 
           // 删除文件
-          const deleteRequest = store.delete(normalizedPath);
+          const deleteRequest = store.delete(path);
           deleteRequest.onsuccess = () => resolve();
           deleteRequest.onerror = () => reject(new VFSError('Failed to delete file', 'EIO', path));
         };
@@ -640,11 +629,9 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _exists(path: string): Promise<boolean> {
-    const normalizedPath = PathUtils.normalize(path);
-
     return this.dbOperation('readonly', (store) => {
       return new Promise<boolean>((resolve, reject) => {
-        const request = store.get(normalizedPath);
+        const request = store.get(path);
         request.onsuccess = () => {
           resolve(!!request.result);
         };
@@ -654,11 +641,9 @@ export class IndexedDBFS extends VFS {
   }
 
   protected async _stat(path: string): Promise<FileStat> {
-    const normalizedPath = PathUtils.normalize(path);
-
     return this.dbOperation('readonly', (store) => {
       return new Promise<FileStat>((resolve, reject) => {
-        const request = store.get(normalizedPath);
+        const request = store.get(path);
         request.onsuccess = () => {
           const record = request.result;
           if (!record) {
@@ -862,6 +847,30 @@ export class IndexedDBFS extends VFS {
     } catch (_error) {
       throw new VFSError('Failed to parse import data', 'EINVAL');
     }
+  }
+  async _deleteDatabase(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+
+      deleteRequest.onsuccess = () => {
+        console.log(`数据库 "${this.dbName}" 删除成功`);
+        resolve();
+      };
+
+      deleteRequest.onerror = () => {
+        console.error(`删除数据库 "${this.dbName}" 失败:`, deleteRequest.error);
+        reject(deleteRequest.error);
+      };
+
+      deleteRequest.onblocked = () => {
+        console.warn(`删除数据库 "${this.dbName}" 被阻塞，可能有其他连接正在使用`);
+        // 可以选择等待或强制关闭其他连接
+      };
+    });
   }
   protected async _deleteFileSystem(): Promise<void> {
     if (this.db) {
