@@ -79,6 +79,7 @@ export function guessMimeType(path: string): string {
     '.jpg': 'image/jpeg',
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
+    '.wav': 'audio/wav',
     '.mp3': 'audio/mpeg',
     '.mp4': 'video/mp4',
     '.zip': 'application/zip',

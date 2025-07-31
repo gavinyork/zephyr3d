@@ -147,8 +147,14 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => eventBus.dispatchEvent('action', 'NEW_PROJECT')
             },
             {
+              label: '-'
+            },
+            {
               label: 'Open Project...',
               action: () => eventBus.dispatchEvent('action', 'OPEN_PROJECT')
+            },
+            {
+              label: '-'
             },
             {
               label: 'Close Project',
@@ -165,14 +171,23 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => eventBus.dispatchEvent('action', 'NEW_DOC')
             },
             {
+              label: '-'
+            },
+            {
               label: 'Open Scene...',
               shortCut: 'Ctrl+O',
               action: () => eventBus.dispatchEvent('action', 'OPEN_DOC')
             },
             {
+              label: '-'
+            },
+            {
               label: 'Save Scene',
               shortCut: 'Ctrl+S',
               action: () => eventBus.dispatchEvent('action', 'SAVE_DOC')
+            },
+            {
+              label: '-'
             },
             {
               label: 'Save Scene As...',
@@ -190,6 +205,9 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => {
                 this._cmdManager.undo();
               }
+            },
+            {
+              label: '-'
             },
             {
               label: 'Redo',
@@ -212,6 +230,9 @@ export class SceneView extends BaseView<SceneModel> {
               }
             },
             {
+              label: '-'
+            },
+            {
               label: 'Paste',
               shortCut: 'Ctrl+V',
               action: () => {
@@ -231,22 +252,37 @@ export class SceneView extends BaseView<SceneModel> {
                   action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
                 },
                 {
+                  label: '-'
+                },
+                {
                   label: 'Sphere',
                   action: () => this.handleAddShape(SphereShape)
+                },
+                {
+                  label: '-'
                 },
                 {
                   label: 'Plane',
                   action: () => this.handleAddShape(PlaneShape)
                 },
                 {
+                  label: '-'
+                },
+                {
                   label: 'Cylinder',
                   action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
+                },
+                {
+                  label: '-'
                 },
                 {
                   label: 'Torus',
                   action: () => this.handleAddShape(TorusShape)
                 }
               ]
+            },
+            {
+              label: '-'
             },
             {
               label: 'Light',
@@ -256,8 +292,14 @@ export class SceneView extends BaseView<SceneModel> {
                   action: () => this.handleAddNode(DirectionalLight, 'Add directional light')
                 },
                 {
+                  label: '-'
+                },
+                {
                   label: 'Point Light',
                   action: () => this.handleAddNode(PointLight, 'Add point light')
+                },
+                {
+                  label: '-'
                 },
                 {
                   label: 'Spot Light',
@@ -266,12 +308,21 @@ export class SceneView extends BaseView<SceneModel> {
               ]
             },
             {
+              label: '-'
+            },
+            {
               label: 'Particle System',
               action: () => this.handleAddNode(ParticleSystem, 'Add particle system')
             },
             {
+              label: '-'
+            },
+            {
               label: 'Water',
               action: () => this.handleAddNode(Water, 'Add water')
+            },
+            {
+              label: '-'
             },
             {
               label: 'Terrain',
@@ -288,10 +339,16 @@ export class SceneView extends BaseView<SceneModel> {
               checked: () => !!this._postGizmoRenderer.drawGrid
             },
             {
+              label: '-'
+            },
+            {
               label: 'Texture viewer',
               id: 'SHOW_TEXTURE_VIEWER',
               action: () => (this._showTextureViewer = !this._showTextureViewer),
               checked: () => this._showTextureViewer
+            },
+            {
+              label: '-'
             },
             {
               label: 'Device Information',

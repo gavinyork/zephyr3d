@@ -96,18 +96,24 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
         if (ImGui.MenuItem('Delete', 'Delete')) {
           this.dispatchEvent('node_request_delete', node);
         }
+        ImGui.Separator();
       }
       if (ImGui.MenuItem('Create static batch')) {
         this.dispatchEvent('request_add_child', node, BatchGroup);
       }
+      ImGui.Separator();
       if (ImGui.MenuItem('Create group')) {
         this.dispatchEvent('request_add_child', node, SceneNode);
       }
       const animationSet = node.animationSet;
       if (animationSet && animationSet.getAnimationNames().length > 0) {
+        ImGui.Separator();
         if (ImGui.BeginMenu('Animation')) {
           ImGui.PushID(node.persistentId);
           for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
+            if (i > 0) {
+              ImGui.Separator();
+            }
             ImGui.PushID(i);
             const name = animationSet.getAnimationNames()[i];
             const playing = animationSet.isPlayingAnimation(name);

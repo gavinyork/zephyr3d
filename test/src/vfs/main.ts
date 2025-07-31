@@ -177,7 +177,7 @@ async function testMountOperations() {
   await subFS.deleteDatabase();
 }
 
-async function testFileCopyMove() {
+async function testFileCopy() {
   const fs = createVFS();
 
   // 创建源文件
@@ -189,14 +189,7 @@ async function testFileCopyMove() {
   assertEqual(copyContent, 'original content', '复制的文件内容应该匹配');
   assert(await fs.exists('/source.txt'), '原文件应该仍然存在');
 
-  // 移动文件
-  await fs.moveFile('/source.txt', '/moved.txt');
-  const movedContent = await fs.readFile('/moved.txt', { encoding: 'utf8' });
-  assertEqual(movedContent, 'original content', '移动的文件内容应该匹配');
-  assert(!(await fs.exists('/source.txt')), '原文件应该不存在');
-
   console.log('   - 文件复制: 正常');
-  console.log('   - 文件移动: 正常');
 
   await fs.deleteDatabase();
 }
@@ -478,13 +471,947 @@ async function testLargeFileOperations() {
   await fs.deleteDatabase();
 }
 
+async function testMoveBasicOperations() {
+  const fs = createVFS('MoveBasicTest');
+
+  // 创建测试文件和目录
+  await fs.writeFile('/source.txt', 'Hello World');
+  await fs.makeDirectory('/testdir');
+  await fs.writeFile('/testdir/nested.txt', 'nested content');
+
+  // 测试文件重命名
+  await fs.move('/source.txt', '/renamed.txt');
+  assert(await fs.exists('/renamed.txt'), '重命名后的文件应该存在');
+  assert(!(await fs.exists('/source.txt')), '原文件应该不存在');
+
+  const content = await fs.readFile('/renamed.txt', { encoding: 'utf8' });
+  assertEqual(content, 'Hello World', '重命名文件内容应该保持不变');
+
+  // 测试目录重命名
+  await fs.move('/testdir', '/newdir');
+  assert(await fs.exists('/newdir'), '重命名后的目录应该存在');
+  assert(!(await fs.exists('/testdir')), '原目录应该不存在');
+  assert(await fs.exists('/newdir/nested.txt'), '目录内的文件应该还在');
+
+  console.log('   - 文件重命名: 正常');
+  console.log('   - 目录重命名: 正常');
+  console.log('   - 内容保持: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveToDirectory() {
+  const fs = createVFS('MoveToDirectoryTest');
+
+  // 创建测试结构
+  await fs.writeFile('/file1.txt', 'content1');
+  await fs.writeFile('/file2.txt', 'content2');
+  await fs.makeDirectory('/target');
+  await fs.makeDirectory('/source');
+  await fs.writeFile('/source/nested.txt', 'nested');
+
+  // 测试文件移动到目录
+  await fs.move('/file1.txt', '/target/file1.txt');
+  assert(await fs.exists('/target/file1.txt'), '文件应该移动到目标目录');
+  assert(!(await fs.exists('/file1.txt')), '原文件应该不存在');
+
+  // 测试目录移动到另一个目录
+  await fs.move('/source', '/target/source');
+  assert(await fs.exists('/target/source'), '目录应该移动到目标位置');
+  assert(await fs.exists('/target/source/nested.txt'), '嵌套文件应该还在');
+  assert(!(await fs.exists('/source')), '原目录应该不存在');
+
+  console.log('   - 文件移动到目录: 正常');
+  console.log('   - 目录移动到目录: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveComplexDirectory() {
+  const fs = createVFS('MoveComplexTest');
+
+  // 创建复杂的目录结构
+  await fs.makeDirectory('/project/src/components', true);
+  await fs.makeDirectory('/project/tests/unit', true);
+  await fs.writeFile('/project/src/app.js', 'app code');
+  await fs.writeFile('/project/src/utils.js', 'utils');
+  await fs.writeFile('/project/src/components/Button.jsx', 'button');
+  await fs.writeFile('/project/src/components/Modal.jsx', 'modal');
+  await fs.writeFile('/project/tests/app.test.js', 'app test');
+  await fs.writeFile('/project/tests/unit/utils.test.js', 'utils test');
+  await fs.writeFile('/project/package.json', 'package');
+
+  // 移动整个项目目录
+  await fs.move('/project', '/workspace');
+
+  // 验证所有文件都被正确移动
+  assert(await fs.exists('/workspace'), '项目目录应该移动成功');
+  assert(!(await fs.exists('/project')), '原项目目录应该不存在');
+
+  // 验证深层嵌套文件
+  assert(await fs.exists('/workspace/src/app.js'), '根级源文件应该存在');
+  assert(await fs.exists('/workspace/src/components/Button.jsx'), '深层组件文件应该存在');
+  assert(await fs.exists('/workspace/tests/unit/utils.test.js'), '最深层测试文件应该存在');
+
+  // 验证文件内容
+  const appContent = await fs.readFile('/workspace/src/app.js', { encoding: 'utf8' });
+  assertEqual(appContent, 'app code', '移动后文件内容应该保持不变');
+
+  const buttonContent = await fs.readFile('/workspace/src/components/Button.jsx', { encoding: 'utf8' });
+  assertEqual(buttonContent, 'button', '深层文件内容应该保持不变');
+
+  console.log('   - 复杂目录结构移动: 正常');
+  console.log('   - 深层嵌套文件保持: 正常');
+  console.log('   - 移动后内容完整: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveOverwrite() {
+  const fs = createVFS('MoveOverwriteTest');
+
+  // 创建源文件和目标文件
+  await fs.writeFile('/source.txt', 'source content');
+  await fs.writeFile('/target.txt', 'target content');
+
+  // 创建源目录和目标目录
+  await fs.makeDirectory('/sourcedir');
+  await fs.writeFile('/sourcedir/file.txt', 'source dir file');
+  await fs.makeDirectory('/targetdir');
+  await fs.writeFile('/targetdir/file.txt', 'target dir file');
+
+  // 测试不允许覆盖（默认行为）
+  try {
+    await fs.move('/source.txt', '/target.txt');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '不允许覆盖应该抛出 VFSError');
+    assertEqual(error['code'], 'EEXIST', '错误代码应该是 EEXIST');
+  }
+
+  // 测试允许覆盖文件
+  await fs.move('/source.txt', '/target.txt', { overwrite: true });
+  assert(await fs.exists('/target.txt'), '目标文件应该存在');
+  assert(!(await fs.exists('/source.txt')), '源文件应该不存在');
+
+  const content = await fs.readFile('/target.txt', { encoding: 'utf8' });
+  assertEqual(content, 'source content', '目标文件应该包含源文件内容');
+
+  // 测试允许覆盖目录
+  await fs.move('/sourcedir', '/targetdir', { overwrite: true });
+  assert(await fs.exists('/targetdir'), '目标目录应该存在');
+  assert(!(await fs.exists('/sourcedir')), '源目录应该不存在');
+
+  const dirContent = await fs.readFile('/targetdir/file.txt', { encoding: 'utf8' });
+  assertEqual(dirContent, 'source dir file', '目标目录应该包含源目录内容');
+
+  console.log('   - 默认不覆盖: 正常');
+  console.log('   - 文件覆盖: 正常');
+  console.log('   - 目录覆盖: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveErrorHandling() {
+  const fs = createVFS('MoveErrorTest');
+
+  // 创建测试文件和目录
+  await fs.writeFile('/file.txt', 'content');
+  await fs.makeDirectory('/dir');
+  await fs.writeFile('/dir/nested.txt', 'nested');
+
+  // 测试移动不存在的文件
+  try {
+    await fs.move('/nonexistent.txt', '/target.txt');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动不存在文件应该抛出 VFSError');
+    assertEqual(error['code'], 'ENOENT', '错误代码应该是 ENOENT');
+  }
+
+  // 测试移动根目录
+  try {
+    await fs.move('/', '/newroot');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动根目录应该抛出 VFSError');
+    assertEqual(error['code'], 'EINVAL', '错误代码应该是 EINVAL');
+  }
+
+  // 测试移动到根目录
+  try {
+    await fs.move('/file.txt', '/');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动到根目录应该抛出 VFSError');
+    assertEqual(error['code'], 'EINVAL', '错误代码应该是 EINVAL');
+  }
+
+  // 测试移动到自己的子目录
+  try {
+    await fs.move('/dir', '/dir/subdir');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动到子目录应该抛出 VFSError');
+    assertEqual(error['code'], 'EINVAL', '错误代码应该是 EINVAL');
+  }
+
+  // 测试文件与目录类型不匹配
+  try {
+    await fs.move('/file.txt', '/dir', { overwrite: true });
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '类型不匹配应该抛出 VFSError');
+    assertEqual(error['code'], 'EISDIR', '错误代码应该是 EISDIR');
+  }
+
+  // 测试移动到不存在的父目录
+  try {
+    await fs.move('/file.txt', '/nonexistent/file.txt');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '父目录不存在应该抛出 VFSError');
+    assertEqual(error['code'], 'ENOENT', '错误代码应该是 ENOENT');
+  }
+
+  console.log('   - 不存在文件错误: 正常');
+  console.log('   - 根目录限制: 正常');
+  console.log('   - 子目录限制: 正常');
+  console.log('   - 类型匹配检查: 正常');
+  console.log('   - 父目录检查: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveCrossVFSRestriction() {
+  const rootFS = createVFS('RootFS');
+  const subFS1 = createVFS('SubFS1');
+  const subFS2 = createVFS('SubFS2');
+
+  // 在不同的VFS中创建文件
+  await subFS1.writeFile('/file1.txt', 'content1');
+  await subFS2.writeFile('/file2.txt', 'content2');
+
+  // 挂载两个VFS
+  rootFS.mount('/vfs1', subFS1);
+  rootFS.mount('/vfs2', subFS2);
+
+  // 测试跨VFS移动应该失败
+  try {
+    await rootFS.move('/vfs1/file1.txt', '/vfs2/file1.txt');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '跨VFS移动应该抛出 VFSError');
+    assertEqual(error['code'], 'EXDEV', '错误代码应该是 EXDEV');
+  }
+
+  // 测试从挂载点移动到根VFS也应该失败
+  try {
+    await rootFS.move('/vfs1/file1.txt', '/moved.txt');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '跨VFS移动应该抛出 VFSError');
+    assertEqual(error['code'], 'EXDEV', '错误代码应该是 EXDEV');
+  }
+
+  // 测试同一VFS内的移动应该成功
+  await rootFS.move('/vfs1/file1.txt', '/vfs1/renamed.txt');
+  assert(await rootFS.exists('/vfs1/renamed.txt'), '同VFS内移动应该成功');
+  assert(!(await rootFS.exists('/vfs1/file1.txt')), '原文件应该不存在');
+
+  console.log('   - 跨VFS移动限制: 正常');
+  console.log('   - 同VFS内移动: 正常');
+
+  await rootFS.deleteDatabase();
+  await subFS1.deleteDatabase();
+  await subFS2.deleteDatabase();
+}
+
+async function testMoveWithRelativePaths() {
+  const fs = createVFS('MoveRelativeTest');
+
+  // 创建目录结构
+  await fs.makeDirectory('/project/src', true);
+  await fs.makeDirectory('/project/build', true);
+  await fs.writeFile('/project/src/app.js', 'app code');
+  await fs.writeFile('/project/temp.txt', 'temp');
+
+  // 设置工作目录
+  await fs.chdir('/project');
+
+  // 测试相对路径移动
+  await fs.move('temp.txt', 'src/temp.txt');
+  assert(await fs.exists('/project/src/temp.txt'), '相对路径移动应该成功');
+  assert(!(await fs.exists('/project/temp.txt')), '原文件应该不存在');
+
+  // 测试混合绝对和相对路径
+  await fs.move('/project/src/app.js', 'build/app.js');
+  assert(await fs.exists('/project/build/app.js'), '混合路径移动应该成功');
+  assert(!(await fs.exists('/project/src/app.js')), '原文件应该不存在');
+
+  // 测试 .. 相对路径
+  await fs.chdir('/project/build');
+  await fs.move('app.js', '../app.js');
+  assert(await fs.exists('/project/app.js'), '.. 路径移动应该成功');
+  assert(!(await fs.exists('/project/build/app.js')), '原文件应该不存在');
+
+  console.log('   - 相对路径移动: 正常');
+  console.log('   - 混合路径移动: 正常');
+  console.log('   - .. 路径移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMovePreservesMetadata() {
+  const fs = createVFS('MoveMetadataTest');
+
+  // 创建文件并等待一段时间以确保时间戳不同
+  await fs.writeFile('/original.txt', 'content');
+  const originalStat = await fs.stat('/original.txt');
+
+  // 等待一小段时间
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  // 移动文件
+  await fs.move('/original.txt', '/moved.txt');
+  const movedStat = await fs.stat('/moved.txt');
+
+  // 验证创建时间保持不变，修改时间已更新
+  assertEqual(originalStat.created.getTime(), movedStat.created.getTime(), '创建时间应该保持不变');
+  assert(movedStat.modified >= originalStat.modified, '修改时间应该被更新');
+  assertEqual(originalStat.size, movedStat.size, '文件大小应该保持不变');
+  assertEqual(originalStat.isFile, movedStat.isFile, '文件类型应该保持不变');
+
+  // 测试目录元数据
+  await fs.makeDirectory('/testdir');
+  const originalDirStat = await fs.stat('/testdir');
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  await fs.move('/testdir', '/moveddir');
+  const movedDirStat = await fs.stat('/moveddir');
+
+  assertEqual(originalDirStat.created.getTime(), movedDirStat.created.getTime(), '目录创建时间应该保持不变');
+  assert(movedDirStat.modified >= originalDirStat.modified, '目录修改时间应该被更新');
+  assertEqual(originalDirStat.isDirectory, movedDirStat.isDirectory, '目录类型应该保持不变');
+
+  console.log('   - 文件元数据保持: 正常');
+  console.log('   - 目录元数据保持: 正常');
+  console.log('   - 修改时间更新: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveLargeFiles() {
+  const fs = createVFS('MoveLargeTest');
+
+  // 创建大文件（1MB）
+  const largeContent = 'x'.repeat(1024 * 1024);
+  await fs.writeFile('/large.txt', largeContent);
+
+  const startTime = Date.now();
+  await fs.move('/large.txt', '/moved_large.txt');
+  const endTime = Date.now();
+
+  // 验证文件移动成功且内容完整
+  assert(await fs.exists('/moved_large.txt'), '大文件应该移动成功');
+  assert(!(await fs.exists('/large.txt')), '原大文件应该不存在');
+
+  const movedContent = await fs.readFile('/moved_large.txt', { encoding: 'utf8' });
+  assertEqual(movedContent, largeContent, '大文件内容应该完整');
+
+  // 移动应该很快（因为不拷贝内容）
+  const moveTime = endTime - startTime;
+  console.log(`   - 大文件移动时间: ${moveTime}ms`);
+  assert(moveTime < 1000, '大文件移动应该很快');
+
+  console.log('   - 大文件移动: 正常');
+  console.log('   - 内容完整性: 正常');
+  console.log('   - 性能表现: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveBinaryFiles() {
+  const fs = createVFS('MoveBinaryTest');
+
+  // 创建二进制数据
+  const binaryData = new ArrayBuffer(256);
+  const view = new Uint8Array(binaryData);
+  for (let i = 0; i < 256; i++) {
+    view[i] = i;
+  }
+
+  await fs.writeFile('/binary.dat', binaryData);
+  await fs.move('/binary.dat', '/moved_binary.dat');
+
+  // 验证二进制文件移动成功
+  assert(await fs.exists('/moved_binary.dat'), '二进制文件应该移动成功');
+  assert(!(await fs.exists('/binary.dat')), '原二进制文件应该不存在');
+
+  const movedData = (await fs.readFile('/moved_binary.dat')) as ArrayBuffer;
+  const movedView = new Uint8Array(movedData);
+
+  assertEqual(movedData.byteLength, 256, '二进制数据长度应该正确');
+  for (let i = 0; i < 256; i++) {
+    assertEqual(movedView[i], i, `字节 ${i} 应该正确`);
+  }
+
+  console.log('   - 二进制文件移动: 正常');
+  console.log('   - 二进制数据完整: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveEmptyDirectories() {
+  const fs = createVFS('MoveEmptyTest');
+
+  // 创建空目录
+  await fs.makeDirectory('/empty1');
+  await fs.makeDirectory('/empty2');
+  await fs.makeDirectory('/parent');
+
+  // 移动空目录
+  await fs.move('/empty1', '/moved_empty');
+  assert(await fs.exists('/moved_empty'), '空目录应该移动成功');
+  assert(!(await fs.exists('/empty1')), '原空目录应该不存在');
+
+  const movedStat = await fs.stat('/moved_empty');
+  assert(movedStat.isDirectory, '移动后应该仍是目录');
+
+  // 移动空目录到另一个目录中
+  await fs.move('/empty2', '/parent/empty2');
+  assert(await fs.exists('/parent/empty2'), '空目录应该移动到父目录');
+  assert(!(await fs.exists('/empty2')), '原空目录应该不存在');
+
+  // 验证目录列表
+  const parentContents = await fs.readDirectory('/parent');
+  assertEqual(parentContents.length, 1, '父目录应该包含一个子目录');
+  assertEqual(parentContents[0].name, 'empty2', '子目录名称应该正确');
+
+  console.log('   - 空目录移动: 正常');
+  console.log('   - 空目录到子目录: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveNestedDirectories() {
+  const fs = createVFS('MoveNestedTest');
+
+  // 创建深层嵌套目录结构
+  const depth = 10;
+  let currentPath = '/deep';
+
+  for (let i = 0; i < depth; i++) {
+    currentPath += `/level${i}`;
+    await fs.makeDirectory(currentPath, true);
+  }
+
+  // 在最深层创建文件
+  await fs.writeFile(`${currentPath}/deep_file.txt`, 'deep content');
+
+  // 移动整个深层结构
+  await fs.move('/deep', '/moved_deep');
+
+  // 验证深层结构完整性
+  assert(await fs.exists('/moved_deep'), '根目录应该移动成功');
+  assert(!(await fs.exists('/deep')), '原根目录应该不存在');
+
+  // 验证每一层都存在
+  let checkPath = '/moved_deep';
+  for (let i = 0; i < depth; i++) {
+    checkPath += `/level${i}`;
+    assert(await fs.exists(checkPath), `层级 ${i} 应该存在`);
+  }
+
+  // 验证最深层文件
+  const deepFile = `${checkPath}/deep_file.txt`;
+  assert(await fs.exists(deepFile), '最深层文件应该存在');
+
+  const content = await fs.readFile(deepFile, { encoding: 'utf8' });
+  assertEqual(content, 'deep content', '最深层文件内容应该正确');
+
+  console.log('   - 深层嵌套移动: 正常');
+  console.log('   - 结构完整性: 正常');
+  console.log(`   - ${depth}层深度处理: 正常`);
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveSpecialCharacters() {
+  const fs = createVFS('MoveSpecialTest');
+
+  // 创建包含特殊字符的文件和目录
+  const specialNames = [
+    'file with spaces.txt',
+    'file-with-dashes.txt',
+    'file_with_underscores.txt',
+    'file.with.dots.txt',
+    '中文文件.txt',
+    'файл.txt',
+    'ファイル.txt'
+  ];
+
+  for (const name of specialNames) {
+    await fs.writeFile(`/${name}`, `content of ${name}`);
+  }
+
+  // 移动特殊字符文件
+  for (let i = 0; i < specialNames.length; i++) {
+    const oldName = specialNames[i];
+    const newName = `moved_${i}_${oldName}`;
+
+    await fs.move(`/${oldName}`, `/${newName}`);
+
+    assert(await fs.exists(`/${newName}`), `移动后的文件 ${newName} 应该存在`);
+    assert(!(await fs.exists(`/${oldName}`)), `原文件 ${oldName} 应该不存在`);
+
+    const content = await fs.readFile(`/${newName}`, { encoding: 'utf8' });
+    assertEqual(content, `content of ${oldName}`, `文件 ${newName} 内容应该正确`);
+  }
+
+  // 创建包含特殊字符的目录
+  await fs.makeDirectory('/special dir with spaces');
+  await fs.writeFile('/special dir with spaces/nested file.txt', 'nested content');
+
+  await fs.move('/special dir with spaces', '/moved special dir');
+
+  assert(await fs.exists('/moved special dir'), '特殊字符目录应该移动成功');
+  assert(await fs.exists('/moved special dir/nested file.txt'), '嵌套文件应该还在');
+
+  console.log('   - 空格文件名: 正常');
+  console.log('   - 特殊符号: 正常');
+  console.log('   - 多语言字符: 正常');
+  console.log('   - 特殊字符目录: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveConcurrentOperations() {
+  const fs = createVFS('MoveConcurrentTest');
+
+  // 创建多个文件进行并发移动测试
+  const fileCount = 4;
+  const createPromises = [];
+
+  for (let i = 0; i < fileCount; i++) {
+    createPromises.push(fs.writeFile(`/file${i}.txt`, `content ${i}`));
+  }
+
+  await Promise.all(createPromises);
+
+  // 并发移动所有文件
+  const movePromises = [];
+  for (let i = 0; i < fileCount; i++) {
+    movePromises.push(fs.move(`/file${i}.txt`, `/moved${i}.txt`));
+  }
+
+  await Promise.all(movePromises);
+
+  // 验证所有文件都移动成功
+  for (let i = 0; i < fileCount; i++) {
+    assert(await fs.exists(`/moved${i}.txt`), `文件 moved${i}.txt 应该存在`);
+    assert(!(await fs.exists(`/file${i}.txt`)), `原文件 file${i}.txt 应该不存在`);
+
+    const content = await fs.readFile(`/moved${i}.txt`, { encoding: 'utf8' });
+    assertEqual(content, `content ${i}`, `文件 moved${i}.txt 内容应该正确`);
+  }
+
+  console.log(`   - ${fileCount}个文件并发移动: 正常`);
+  console.log('   - 数据完整性: 正常');
+
+  await fs.deleteDatabase();
+}
+async function testMoveWithCWD() {
+  const fs = createVFS('MoveCWDTest');
+
+  // 创建测试目录结构
+  await fs.makeDirectory('/project/src/components', true);
+  await fs.makeDirectory('/project/build', true);
+  await fs.makeDirectory('/project/docs', true);
+  await fs.writeFile('/project/src/main.js', 'main code');
+  await fs.writeFile('/project/src/utils.js', 'utils code');
+  await fs.writeFile('/project/src/components/Button.js', 'button component');
+  await fs.writeFile('/project/README.md', 'readme');
+
+  // 测试从根目录移动
+  assertEqual(fs.getCwd(), '/', '初始CWD应该是根目录');
+
+  // 使用相对路径移动文件
+  await fs.move('project/README.md', 'project/docs/README.md');
+  assert(await fs.exists('/project/docs/README.md'), '文件应该移动到docs目录');
+  assert(!(await fs.exists('/project/README.md')), '原文件应该不存在');
+
+  // 切换到project目录
+  await fs.chdir('/project');
+  assertEqual(fs.getCwd(), '/project', 'CWD应该切换到project');
+
+  // 在project目录下移动文件
+  await fs.move('src/main.js', 'build/main.js');
+  assert(await fs.exists('/project/build/main.js'), '文件应该移动到build目录');
+  assert(!(await fs.exists('/project/src/main.js')), '原文件应该不存在');
+
+  // 使用相对路径移动到上级目录
+  await fs.move('src/utils.js', '../utils.js');
+  assert(await fs.exists('/utils.js'), '文件应该移动到根目录');
+  assert(!(await fs.exists('/project/src/utils.js')), '原文件应该不存在');
+
+  // 切换到src目录
+  await fs.chdir('src');
+  assertEqual(fs.getCwd(), '/project/src', 'CWD应该切换到src');
+
+  // 从当前目录移动文件
+  await fs.move('components/Button.js', '../build/Button.js');
+  assert(await fs.exists('/project/build/Button.js'), '组件文件应该移动到build目录');
+  assert(!(await fs.exists('/project/src/components/Button.js')), '原文件应该不存在');
+
+  console.log('   - 根目录相对路径移动: 正常');
+  console.log('   - CWD切换后移动: 正常');
+  console.log('   - 上级目录移动: 正常');
+  console.log('   - 当前目录相对移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveWithDotPaths() {
+  const fs = createVFS('MoveDotPathTest');
+
+  // 创建测试结构
+  await fs.makeDirectory('/workspace/project/src', true);
+  await fs.makeDirectory('/workspace/project/test', true);
+  await fs.makeDirectory('/workspace/backup', true);
+  await fs.writeFile('/workspace/project/src/app.js', 'app');
+  await fs.writeFile('/workspace/project/test/app.test.js', 'test');
+  await fs.writeFile('/workspace/project/config.json', 'config');
+
+  // 切换到project目录
+  await fs.chdir('/workspace/project');
+
+  // 使用 . 移动到当前目录的子目录
+  await fs.move('./config.json', './src/config.json');
+  assert(await fs.exists('/workspace/project/src/config.json'), '文件应该移动到src目录');
+  assert(!(await fs.exists('/workspace/project/config.json')), '原文件应该不存在');
+
+  // 使用 .. 移动到父目录
+  await fs.move('src/app.js', '../backup/app.js');
+  assert(await fs.exists('/workspace/backup/app.js'), '文件应该移动到backup目录');
+  assert(!(await fs.exists('/workspace/project/src/app.js')), '原文件应该不存在');
+
+  // 使用 ../../ 移动到更上级目录
+  await fs.chdir('/workspace/project/test');
+  await fs.move('app.test.js', '../../app.test.js');
+  assert(await fs.exists('/workspace/app.test.js'), '文件应该移动到workspace目录');
+  assert(!(await fs.exists('/workspace/project/test/app.test.js')), '原文件应该不存在');
+
+  // 混合使用绝对路径和相对路径
+  await fs.move('/workspace/backup/app.js', './restored_app.js');
+  assert(await fs.exists('/workspace/project/test/restored_app.js'), '文件应该移动到当前test目录');
+  assert(!(await fs.exists('/workspace/backup/app.js')), '原文件应该不存在');
+
+  console.log('   - . 路径移动: 正常');
+  console.log('   - .. 路径移动: 正常');
+  console.log('   - ../../ 路径移动: 正常');
+  console.log('   - 混合路径移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveDirectoryWithCWD() {
+  const fs = createVFS('MoveDirCWDTest');
+
+  // 创建测试目录结构
+  await fs.makeDirectory('/home/user/projects/app/src', true);
+  await fs.makeDirectory('/home/user/projects/app/assets', true);
+  await fs.makeDirectory('/home/user/backup', true);
+  await fs.writeFile('/home/user/projects/app/src/main.js', 'main');
+  await fs.writeFile('/home/user/projects/app/assets/logo.png', 'logo');
+
+  // 切换到projects目录
+  await fs.chdir('/home/user/projects');
+
+  // 移动整个app目录到backup
+  await fs.move('app', '../backup/app');
+  assert(await fs.exists('/home/user/backup/app'), 'app目录应该移动到backup');
+  assert(await fs.exists('/home/user/backup/app/src/main.js'), '源码文件应该还在');
+  assert(await fs.exists('/home/user/backup/app/assets/logo.png'), '资源文件应该还在');
+  assert(!(await fs.exists('/home/user/projects/app')), '原app目录应该不存在');
+
+  // 切换到backup目录
+  await fs.chdir('/home/user/backup');
+
+  // 重命名目录
+  await fs.move('app', 'old_app');
+  assert(await fs.exists('/home/user/backup/old_app'), '目录应该重命名成功');
+  assert(await fs.exists('/home/user/backup/old_app/src/main.js'), '内部文件应该还在');
+  assert(!(await fs.exists('/home/user/backup/app')), '原目录名应该不存在');
+
+  // 移动目录到子目录
+  await fs.makeDirectory('archive');
+  await fs.move('./old_app', './archive/old_app');
+  assert(await fs.exists('/home/user/backup/archive/old_app'), '目录应该移动到archive');
+  assert(!(await fs.exists('/home/user/backup/old_app')), '原目录应该不存在');
+
+  console.log('   - CWD相对目录移动: 正常');
+  console.log('   - CWD目录重命名: 正常');
+  console.log('   - CWD子目录移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveWithPushdPopd() {
+  const fs = createVFS('MovePushdPopdTest');
+
+  // 创建测试结构
+  await fs.makeDirectory('/workspace/src', true);
+  await fs.makeDirectory('/workspace/build', true);
+  await fs.makeDirectory('/tmp', true);
+  await fs.writeFile('/workspace/src/file1.js', 'file1');
+  await fs.writeFile('/workspace/src/file2.js', 'file2');
+  await fs.writeFile('/tmp/temp.txt', 'temp');
+
+  // 初始在根目录
+  assertEqual(fs.getCwd(), '/', '初始在根目录');
+
+  // pushd到workspace并移动文件
+  await fs.pushd('/workspace');
+  assertEqual(fs.getCwd(), '/workspace', '应该切换到workspace');
+
+  await fs.move('src/file1.js', 'build/file1.js');
+  assert(await fs.exists('/workspace/build/file1.js'), '文件应该移动成功');
+
+  // pushd到tmp并移动文件
+  await fs.pushd('/tmp');
+  assertEqual(fs.getCwd(), '/tmp', '应该切换到tmp');
+
+  await fs.move('temp.txt', '../workspace/build/temp.txt');
+  assert(await fs.exists('/workspace/build/temp.txt'), '文件应该移动到build');
+  assert(!(await fs.exists('/tmp/temp.txt')), '原文件应该不存在');
+
+  // popd回到workspace
+  await fs.popd();
+  assertEqual(fs.getCwd(), '/workspace', '应该回到workspace');
+
+  await fs.move('src/file2.js', 'build/file2.js');
+  assert(await fs.exists('/workspace/build/file2.js'), '文件应该移动成功');
+
+  // popd回到根目录
+  await fs.popd();
+  assertEqual(fs.getCwd(), '/', '应该回到根目录');
+
+  // 验证目录栈为空
+  assertEqual(fs.getDirStack().length, 0, '目录栈应该为空');
+
+  console.log('   - pushd后移动: 正常');
+  console.log('   - 目录栈状态: 正常');
+  console.log('   - popd后移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveCWDValidation() {
+  const fs = createVFS('MoveCWDValidationTest');
+
+  // 创建测试结构
+  await fs.makeDirectory('/project/src', true);
+  await fs.writeFile('/project/src/main.js', 'main');
+  await fs.writeFile('/project/config.json', 'config');
+
+  // 切换到project目录
+  await fs.chdir('/project');
+
+  // 测试移动当前工作目录应该失败
+  try {
+    await fs.move('.', '../moved_project');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动当前目录应该抛出VFSError');
+    assertEqual(error['code'], 'EBUSY', '错误代码应该是EBUSY');
+  }
+
+  // 测试移动CWD的父目录也应该失败
+  await fs.chdir('/project/src');
+  try {
+    await fs.move('/project', '/moved_project');
+    throw new Error('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '移动CWD父目录应该抛出VFSError');
+    assertEqual(error['code'], 'EBUSY', '错误代码应该是EBUSY');
+  }
+
+  // 但可以移动CWD中的文件
+  await fs.chdir('/project');
+  await fs.move('config.json', 'src/config.json');
+  assert(await fs.exists('/project/src/config.json'), '移动CWD中的文件应该成功');
+
+  // 可以移动到CWD的兄弟目录
+  await fs.chdir('/project/src');
+  await fs.makeDirectory('/project/build');
+  await fs.move('main.js', '../build/main.js');
+  assert(await fs.exists('/project/build/main.js'), '移动到兄弟目录应该成功');
+
+  // 可以移动不相关的目录
+  await fs.makeDirectory('/other');
+  await fs.makeDirectory('/another');
+  await fs.move('/other', '/moved_other');
+  assert(await fs.exists('/moved_other'), '移动不相关目录应该成功');
+
+  console.log('   - CWD移动限制: 正常');
+  console.log('   - CWD父目录移动限制: 正常');
+  console.log('   - CWD内文件移动: 正常');
+  console.log('   - 兄弟目录移动: 正常');
+  console.log('   - 不相关目录移动: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveComplexRelativePaths() {
+  const fs = createVFS('MoveComplexRelativeTest');
+
+  // 创建复杂的目录结构
+  await fs.makeDirectory('/deep/nested/structure/with/many/levels', true);
+  await fs.makeDirectory('/another/path/here', true);
+  await fs.makeDirectory('/target/destination', true);
+
+  await fs.writeFile('/deep/nested/structure/file1.txt', 'file1');
+  await fs.writeFile('/deep/nested/structure/with/file2.txt', 'file2');
+  await fs.writeFile('/deep/nested/structure/with/many/file3.txt', 'file3');
+  await fs.writeFile('/another/path/file4.txt', 'file4');
+
+  // 切换到深层目录
+  await fs.chdir('/deep/nested/structure/with/many');
+
+  // 使用复杂的相对路径移动文件
+  await fs.move('file3.txt', '../../../file3_moved.txt');
+  assert(await fs.exists('/deep/nested/file3_moved.txt'), '复杂相对路径移动应该成功');
+  assert(!(await fs.exists('/deep/nested/structure/with/many/file3.txt')), '原文件应该不存在');
+
+  // 移动到完全不同的路径
+  await fs.move('../../file1.txt', '../../../../../target/destination/file1.txt');
+  assert(await fs.exists('/target/destination/file1.txt'), '跨路径移动应该成功');
+  assert(!(await fs.exists('/deep/nested/structure/file1.txt')), '原文件应该不存在');
+
+  // 切换到另一个路径
+  await fs.chdir('/another/path');
+
+  // 使用混合路径（绝对路径源，相对路径目标）
+  await fs.move('/deep/nested/structure/with/file2.txt', './file2_moved.txt');
+  assert(await fs.exists('/another/path/file2_moved.txt'), '混合路径移动应该成功');
+  assert(!(await fs.exists('/deep/nested/structure/with/file2.txt')), '原文件应该不存在');
+
+  // 使用相对路径源，绝对路径目标
+  await fs.move('file4.txt', '/target/destination/file4.txt');
+  assert(await fs.exists('/target/destination/file4.txt'), '相对到绝对路径移动应该成功');
+  assert(!(await fs.exists('/another/path/file4.txt')), '原文件应该不存在');
+
+  // 测试更复杂的相对路径组合
+  await fs.chdir('/target');
+  await fs.writeFile('/target/temp.txt', 'temp');
+
+  // 移动到当前目录的子目录
+  await fs.move('./temp.txt', './destination/temp.txt');
+  assert(await fs.exists('/target/destination/temp.txt'), '当前目录移动应该成功');
+  assert(!(await fs.exists('/target/temp.txt')), '原文件应该不存在');
+
+  // 测试包含 . 和 .. 的复杂路径
+  await fs.chdir('/deep/nested');
+  await fs.writeFile('/deep/nested/test.txt', 'test');
+
+  await fs.move('./test.txt', './../test_moved.txt');
+  assert(await fs.exists('/deep/test_moved.txt'), '. 和 .. 组合路径应该成功');
+  assert(!(await fs.exists('/deep/nested/test.txt')), '原文件应该不存在');
+
+  // 测试多重 ../ 路径
+  await fs.chdir('/deep/nested/structure/with/many/levels');
+  await fs.writeFile('/deep/nested/structure/with/many/levels/deep_file.txt', 'deep');
+
+  await fs.move('deep_file.txt', '../../../../../moved_deep.txt');
+  assert(await fs.exists('/deep/moved_deep.txt'), '多重..路径应该成功');
+  assert(!(await fs.exists('/deep/nested/structure/with/many/levels/deep_file.txt')), '原文件应该不存在');
+
+  console.log('   - 复杂相对路径: 正常');
+  console.log('   - 跨路径移动: 正常');
+  console.log('   - 混合路径类型: 正常');
+  console.log('   - . 和 .. 组合: 正常');
+  console.log('   - 多重..路径: 正常');
+
+  await fs.deleteDatabase();
+}
+
+async function testMoveCWDPathNormalization() {
+  const fs = createVFS('MoveCWDNormalizationTest');
+
+  // 创建测试结构
+  await fs.makeDirectory('/project/src/components', true);
+  await fs.writeFile('/project/src/app.js', 'app');
+  await fs.writeFile('/project/src/components/Button.js', 'button');
+
+  // 切换到src目录
+  await fs.chdir('/project/src');
+
+  // 测试路径规范化：重复的斜杠
+  await fs.move('./app.js', './/renamed_app.js');
+  assert(await fs.exists('/project/src/renamed_app.js'), '重复斜杠路径应该正常处理');
+  assert(!(await fs.exists('/project/src/app.js')), '原文件应该不存在');
+
+  // 测试路径规范化：多余的 ./
+  await fs.move('./components/Button.js', './././moved_button.js');
+  assert(await fs.exists('/project/src/moved_button.js'), '多余的./应该正常处理');
+  assert(!(await fs.exists('/project/src/components/Button.js')), '原文件应该不存在');
+
+  // 测试路径规范化：. 和 .. 混合
+  await fs.writeFile('/project/src/test.js', 'test');
+  await fs.move('./test.js', './../src/../src/normalized_test.js');
+  assert(await fs.exists('/project/src/normalized_test.js'), '复杂路径规范化应该成功');
+  assert(!(await fs.exists('/project/src/test.js')), '原文件应该不存在');
+
+  // 测试目录移动的路径规范化
+  await fs.chdir('/project');
+  await fs.makeDirectory('/project/temp');
+  await fs.writeFile('/project/temp/temp_file.js', 'temp');
+
+  await fs.move('./temp/../temp', './src/../normalized_temp');
+  assert(await fs.exists('/project/normalized_temp'), '目录路径规范化应该成功');
+  assert(await fs.exists('/project/normalized_temp/temp_file.js'), '目录内文件应该保持');
+  assert(!(await fs.exists('/project/temp')), '原目录应该不存在');
+
+  console.log('   - 重复斜杠处理: 正常');
+  console.log('   - 多余./处理: 正常');
+  console.log('   - 复杂路径规范化: 正常');
+  console.log('   - 目录路径规范化: 正常');
+
+  await fs.deleteDatabase();
+}
+
 // 主测试函数
 export async function runAllVFSTests() {
-  const tests = [
+  const testsWithoutZipFS = [
+    ['Move基础操作', testMoveBasicOperations],
+    ['Move到目录', testMoveToDirectory],
+    ['Move复杂目录', testMoveComplexDirectory],
+    ['Move覆盖操作', testMoveOverwrite],
+    ['Move错误处理', testMoveErrorHandling],
+    ['Move跨VFS限制', testMoveCrossVFSRestriction],
+    ['Move相对路径', testMoveWithRelativePaths],
+    ['Move元数据保持', testMovePreservesMetadata],
+    ['Move大文件', testMoveLargeFiles],
+    ['Move二进制文件', testMoveBinaryFiles],
+    ['Move空目录', testMoveEmptyDirectories],
+    ['Move嵌套目录', testMoveNestedDirectories],
+    ['Move特殊字符', testMoveSpecialCharacters],
+    ['Move并发操作', testMoveConcurrentOperations],
+    ['Move与CWD', testMoveWithCWD],
+    ['Move点路径', testMoveWithDotPaths],
+    ['Move目录与CWD', testMoveDirectoryWithCWD],
+    ['Move与目录栈', testMoveWithPushdPopd],
+    ['Move CWD验证', testMoveCWDValidation],
+    ['Move复杂相对路径', testMoveComplexRelativePaths],
+    ['Move路径规范化', testMoveCWDPathNormalization]
+  ] as const;
+  const testsWithZipFS = [
     ['基础文件操作', testBasicFileOperations],
     ['目录操作', testDirectoryOperations],
     ['挂载操作', testMountOperations],
-    ['文件复制移动', testFileCopyMove],
+    ['文件复制', testFileCopy],
     ['错误处理', testErrorHandling],
     ['二进制数据', testBinaryData],
     ['二进制数据追加', testBinaryDataAppend],
@@ -519,14 +1446,25 @@ export async function runAllVFSTests() {
   for (currentTest = 0; currentTest < 3; currentTest++) {
     console.log(`--------------- 🚀 开始 ${VFSTypes[currentTest]} 文件系统测试 ---------------\n`);
     let passed = 0;
-    const total = tests.length;
+    let total = testsWithZipFS.length;
 
-    for (const [name, testFn] of tests) {
+    for (const [name, testFn] of testsWithZipFS) {
       const success = await runTest(name, testFn);
       if (success) {
         passed++;
       }
       console.log(); // 空行分隔
+    }
+
+    if (currentTest !== 2) {
+      total += testsWithoutZipFS.length;
+      for (const [name, testFn] of testsWithoutZipFS) {
+        const success = await runTest(name, testFn);
+        if (success) {
+          passed++;
+        }
+        console.log(); // 空行分隔
+      }
     }
 
     console.log(`📊 测试完成: ${passed}/${total} 通过`);
@@ -1260,7 +2198,7 @@ export async function runSingleTest(testName) {
     basic: testBasicFileOperations,
     directory: testDirectoryOperations,
     mount: testMountOperations,
-    copy: testFileCopyMove,
+    copy: testFileCopy,
     error: testErrorHandling,
     binary: testBinaryData,
     'binary-append': testBinaryDataAppend,

@@ -81,6 +81,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   constructor(vfs: VFS, project: ProjectInfo, treePanelWidth = 200, options?: VFSRendererOptions) {
     super();
     this._vfs = vfs;
+    this._vfs.on('changed', this.onVFSChanged, this);
     this._project = project;
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
@@ -838,16 +839,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
           DlgMessage.messageBox('Error', 'Invalid folder name');
         } else {
           const newPath = this._vfs.join(this._selectedDir.path, name);
-          this._vfs
-            .makeDirectory(newPath, false)
-            .then(() => {
-              this.loadFileSystem().then(() => {
-                this.refreshFileView();
-              });
-            })
-            .catch((err) => {
-              DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
-            });
+          this._vfs.makeDirectory(newPath, false).catch((err) => {
+            DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
+          });
         }
       }
     });
@@ -864,16 +858,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
           DlgMessage.messageBox('Error', 'Invalid file name');
         } else {
           const newPath = this._vfs.join(this._selectedDir.path, name);
-          this._vfs
-            .writeFile(newPath, '', { encoding: 'utf8' })
-            .then(() => {
-              this.loadFileSystem().then(() => {
-                this.refreshFileView();
-              });
-            })
-            .catch((err) => {
-              DlgMessage.messageBox('Error', `Create file failed: ${err}`);
-            });
+          this._vfs.writeFile(newPath, '', { encoding: 'utf8' }).catch((err) => {
+            DlgMessage.messageBox('Error', `Create file failed: ${err}`);
+          });
         }
       }
     });
@@ -898,26 +885,17 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       .then(() => {
         this._selectedItems.clear();
         this.emitSelectedChanged();
-        this.loadFileSystem().then(() => {
-          this.refreshFileView();
-        });
       })
       .catch((err) => {
         DlgMessage.messageBox('Error', `Delete failed: ${err}`);
       });
   }
 
-  private renameSelectedItem() {
-    if (this._selectedItems.size !== 1) {
-      return;
-    }
-
-    const item = Array.from(this._selectedItems)[0];
+  private renameItem(item: DirectoryInfo | FileInfo) {
     const isDir = 'subDir' in item;
     const currentName = isDir
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
-
     DlgPromptName.promptName('Rename', 'Name', currentName).then((newName) => {
       if (newName && newName !== currentName) {
         if (/[\\/?*]/.test(newName)) {
@@ -928,14 +906,17 @@ export class VFSRenderer extends makeEventTarget(Object)<{
             : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
           const newPath = this._vfs.join(parentPath, newName);
 
-          this._vfs.moveFile(isDir ? item.path : item.meta.path, newPath).then(() => {
-            this.loadFileSystem().then(() => {
-              this.refreshFileView();
-            });
-          });
+          this._vfs.move(isDir ? item.path : item.meta.path, newPath);
         }
       }
     });
+  }
+
+  private renameSelectedItem() {
+    if (this._selectedItems.size !== 1) {
+      return;
+    }
+    this.renameItem(Array.from(this._selectedItems)[0]);
   }
 
   selectDir(dir: DirectoryInfo) {
@@ -998,14 +979,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
                     if (items.find((item) => item.type === 'directory' && item.name === name)) {
                       DlgMessage.messageBox('Error', 'A folder with same name already exists');
                     } else {
-                      this._vfs
-                        .makeDirectory(this._vfs.join(dir.path, name), false)
-                        .then(() => {
-                          this.loadFileSystem();
-                        })
-                        .catch((err) => {
-                          DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
-                        });
+                      this._vfs.makeDirectory(this._vfs.join(dir.path, name), false).catch((err) => {
+                        DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
+                      });
                     }
                   })
                   .catch((err) => {
@@ -1029,12 +1005,14 @@ export class VFSRenderer extends makeEventTarget(Object)<{
               if (dir === this._selectedDir) {
                 this.selectDir(null);
               }
-              this.loadFileSystem();
             })
             .catch((err) => {
               DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
             });
           console.log('Delete folder');
+        }
+        if (ImGui.MenuItem('Rename##VFSRenameFolder')) {
+          this.renameItem(dir);
         }
       }
       ImGui.EndPopup();
@@ -1150,8 +1128,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
           const buffer = await entry[1].arrayBuffer();
           await this._vfs.writeFile(path, buffer, { create: true, encoding: 'binary' });
         }
-        await this.loadFileSystem();
-        this.refreshFileView();
       }
     }
   }
@@ -1220,7 +1196,16 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   emitSelectedChanged() {
     this.dispatchEvent('selection_changed', this._selectedDir ?? null, this.selectedFiles);
   }
+
+  onVFSChanged(type: 'created' | 'deleted' | 'moved' | 'modified') {
+    if (type !== 'modified') {
+      this.loadFileSystem().then(() => {
+        this.refreshFileView();
+      });
+    }
+  }
   dispose() {
+    this._vfs.off('changed', this.onVFSChanged, this);
     if (this._options.allowDrop) {
       eventBus.off('external_dragenter', this.handleDragEvent, this);
       eventBus.off('external_dragover', this.handleDragEvent, this);
