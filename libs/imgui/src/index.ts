@@ -130,6 +130,6 @@ export function imGuiGetCharCodeMap() {
  *
  * @public
  */
-export function imGuiSetCharCodeMap(map: Record<number, number>) {
+export function imGuiSetCharCodeMap(map: Record<number, string>) {
   ImGui_Impl.setCharCodeMap(map);
 }

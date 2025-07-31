@@ -97,15 +97,15 @@ async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<Arra
   const device = Application.instance.device;
   const heightmap = terrain.heightMap;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(heightmap.format);
-  const buffer = new Uint8Array(
+  const buffer = new ArrayBuffer(
     2 * 4 + heightmap.width * heightmap.height * info.blockWidth * info.blockHeight * info.size
   );
-  const head = new DataView(buffer.buffer);
+  const head = new DataView(buffer);
   head.setUint32(0, heightmap.width, true);
   head.setUint32(4, heightmap.height, true);
   const data = new Uint8Array(buffer, 2 * 4);
   await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, data);
-  return buffer.buffer;
+  return buffer;
 }
 
 async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {

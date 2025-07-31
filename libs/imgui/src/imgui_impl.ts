@@ -654,7 +654,7 @@ function toRgba(col:number):string
 }
 */
 
-let charCodeMap: Record<number, number> = null;
+let charCodeMap: Record<number, string> = null;
 
 const glyphFontMap: Record<number, DeviceFont> = {};
 
@@ -699,9 +699,15 @@ export function font_update(io: ImGui.IO) {
     let glyph = font.GlyphToCreate;
     while (glyph) {
       const charCode = charCodeMap?.[glyph.Char] ?? glyph.Char;
-      const f = glyphFontMap[charCode];
+      let char: string;
       let glyphInfo: AtlasInfo;
-      const char = String.fromCodePoint(charCode);
+      let f: DeviceFont = null;
+      if (typeof charCode === 'number') {
+        f = glyphFontMap[charCode];
+        char = String.fromCodePoint(charCode);
+      } else {
+        char = charCode;
+      }
       if (f) {
         glyphInfo = glyphManager.getGlyphInfo(char, f);
       } else {
@@ -711,7 +717,7 @@ export function font_update(io: ImGui.IO) {
       glyph.X1 = glyphInfo.width;
       glyph.Y0 = 0;
       glyph.Y1 = glyphInfo.height;
-      glyph.AdvanceX = glyphInfo.width + (charCode < 256 ? font.SpaceX[0] : font.SpaceX[1]);
+      glyph.AdvanceX = glyphInfo.width;
       glyph.U0 = glyphInfo.uMin;
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
@@ -895,7 +901,7 @@ export function getCharCodeMap() {
 }
 
 /** @internal */
-export function setCharCodeMap(map: Record<number, number>) {
+export function setCharCodeMap(map: Record<number, string>) {
   charCodeMap = map;
 }
 

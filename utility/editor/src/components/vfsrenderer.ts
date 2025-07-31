@@ -443,7 +443,10 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.Text('Size:');
       ImGui.SameLine();
       ImGui.SetNextItemWidth(100);
-      ImGui.SliderInt('##GridSize', [this._gridItemSize], 40, 120);
+      const size = [this._gridItemSize] as [number];
+      if (ImGui.SliderInt('##GridSize', size, 40, 120)) {
+        this._gridItemSize = size[0];
+      }
     }
   }
 
@@ -1301,15 +1304,85 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     return info;
   }
 
-  handleDragEvent(ev: DragEvent) {
+  async handleDragEvent(ev: DragEvent) {
     const info = this.getDragDropInfo();
     this.setDragOverState(
       new ImGui.ImVec2(ev.offsetX, ev.offsetY),
       ev.type !== 'dragleave' && ev.type !== 'drop'
     );
-    if (ev.type === 'drop') {
-      console.log(info);
+    if (info.targetDirectory && ev.type === 'drop') {
+      const data = ev.dataTransfer;
+      const files = Array.from(data.files);
+      const entries = Array.from(data.items).map((item) => item.webkitGetAsEntry());
+      const map = await this.resolveDirectoryEntries(files, entries);
+      const result = await this.resolveFileEntries(map);
+      for (const entry of result) {
+        const path = this._vfs.join(info.targetDirectory.path, entry[0]);
+        const buffer = await entry[1].arrayBuffer();
+        await this._vfs.writeFile(path, buffer, { create: true, encoding: 'binary' });
+      }
     }
+  }
+  private async readDirectoryEntry(entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
+    return new Promise((resolve, reject) => {
+      entry.createReader().readEntries(
+        (fileEntries) => resolve(fileEntries),
+        (err) => reject(err)
+      );
+    });
+  }
+  private async resolveDirectoryEntries(
+    files: File[],
+    entries: FileSystemEntry[]
+  ): Promise<Map<string, { entry: FileSystemEntry; file: File }>> {
+    const map: Map<string, { entry: FileSystemEntry; file: File }> = new Map();
+    let i = 0;
+    while (i < entries.length) {
+      const entry = entries[i];
+      if (entry.isDirectory) {
+        entries.splice(i, 1);
+        if (i < files.length) {
+          files.splice(i, 1);
+        }
+        entries.push(...(await this.readDirectoryEntry(entry as FileSystemDirectoryEntry)));
+      } else {
+        map.set(entry.fullPath, {
+          entry,
+          file: i < files.length ? files[i] : null
+        });
+        i++;
+      }
+    }
+    return map;
+  }
+  private async resolveFileEntries(
+    map: Map<string, { entry: FileSystemEntry; file: File }>
+  ): Promise<Map<string, File>> {
+    const result: Map<string, File> = new Map();
+    const promises = Array.from(map.entries()).map(
+      (entry) =>
+        new Promise<File>((resolve, reject) => {
+          const key = `/${entry[0]
+            .slice(1)
+            .split('/')
+            .map((val) => encodeURIComponent(val))
+            .join('/')}`;
+          if (entry[1].file) {
+            result.set(key, entry[1].file);
+            resolve(null);
+          } else {
+            (entry[1].entry as FileSystemFileEntry).file(
+              (f) => {
+                result.set(key, f);
+                resolve(null);
+              },
+              (err) => reject(err)
+            );
+          }
+        })
+    );
+    await Promise.all(promises);
+    return result;
   }
 
   emitSelectedChanged() {

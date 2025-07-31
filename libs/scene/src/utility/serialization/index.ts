@@ -227,6 +227,7 @@ export function serializeObjectProps<T extends object>(
         const resource = tmpVal.object[0];
         asyncTasks.push(
           (async function () {
+            console.log(k);
             const buffer = (await resource) as ArrayBuffer;
             await manager.vfs.writeFile(relativePath, buffer, {
               encoding: 'binary',
@@ -340,9 +341,6 @@ export function serializeObject(
     json.Init = initParams;
   }
   while (info) {
-    if (asyncTasks && info.getEmbeddedAssets) {
-      asyncTasks?.push(...(info.getEmbeddedAssets(obj) ?? []).map((val) => Promise.resolve(val)));
-    }
     serializeObjectProps(obj, info, json.Object, manager, asyncTasks);
     info = manager.getClassByConstructor(info.parent);
   }

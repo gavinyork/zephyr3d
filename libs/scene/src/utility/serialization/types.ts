@@ -34,17 +34,6 @@ export type PropertyValue = {
 };
 
 /**
- * Embedded resource information
- * @public
- */
-export type EmbeddedResource = {
-  /** File name */
-  fileName: string;
-  /** Asset data */
-  data: Promise<ArrayBuffer> | ArrayBuffer;
-};
-
-/**
  * Edit types of serializable properties which is used by editor
  * @public
  */
@@ -94,5 +83,4 @@ export type SerializableClass = {
   ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
   getInitParams?: (obj: any) => any;
   getProps: () => PropertyAccessor<any>[];
-  getEmbeddedAssets?: (obj: any) => (EmbeddedResource | Promise<EmbeddedResource>)[];
 };
