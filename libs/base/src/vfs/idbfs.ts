@@ -1,5 +1,5 @@
 import { guessMimeType, PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -95,7 +95,6 @@ export class IndexedDBFS extends VFS {
       const request = indexedDB.open(this.dbName, version);
 
       request.onsuccess = () => {
-        console.log('openDatabase succeeded');
         resolve(request.result);
       };
 
@@ -104,7 +103,6 @@ export class IndexedDBFS extends VFS {
       };
 
       request.onblocked = (ev) => {
-        console.log(ev);
         reject(new VFSError('Database open blocked', 'EBUSY'));
       };
     });
@@ -141,7 +139,6 @@ export class IndexedDBFS extends VFS {
             };
 
             store.add(rootDir);
-            console.log(`Object Store '${this.storeName}' created successfully`);
           }
         } catch (error) {
           console.error(`Failed to create Object Store '${this.storeName}':`, error);
@@ -150,7 +147,6 @@ export class IndexedDBFS extends VFS {
       };
 
       request.onsuccess = () => {
-        console.log('createObjectStoreAsync succeeded');
         resolve(request.result);
       };
 
@@ -159,7 +155,6 @@ export class IndexedDBFS extends VFS {
       };
 
       request.onblocked = (ev) => {
-        console.log(ev);
         reject(new VFSError('Database creation blocked - close other connections first', 'EBUSY'));
       };
     });
@@ -196,7 +191,6 @@ export class IndexedDBFS extends VFS {
 
           const addRequest = store.add(rootDir);
           addRequest.onsuccess = () => {
-            console.log('Root directory created');
             resolve();
           };
           addRequest.onerror = () => {
@@ -250,7 +244,6 @@ export class IndexedDBFS extends VFS {
         result.then(resolve).catch(reject);
       } else if (result instanceof IDBRequest) {
         result.onsuccess = () => {
-          console.log(`${mode} succeeded`);
           resolve(result.result);
         };
         result.onerror = () => reject(new VFSError('Operation failed', 'EIO', result.error?.message));
@@ -888,7 +881,6 @@ export class IndexedDBFS extends VFS {
         if (db.objectStoreNames.contains(this.storeName)) {
           try {
             db.deleteObjectStore(this.storeName);
-            console.log(`Object Store '${this.storeName}' deleted successfully`);
           } catch (error) {
             console.error(`Failed to delete Object Store '${this.storeName}':`, error);
             reject(new VFSError('Failed to delete object store', 'EIO', error?.toString()));
@@ -910,10 +902,342 @@ export class IndexedDBFS extends VFS {
       };
 
       request.onblocked = (ev) => {
-        console.log(ev);
         reject(new VFSError('Database upgrade blocked - close other connections first', 'EBUSY'));
       };
     });
+  }
+
+  // 在 IndexedDBFS 类中添加这个方法
+
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+    return this.dbOperation('readwrite', (store) => {
+      return new Promise<void>((resolve, reject) => {
+        // 首先检查源路径是否存在
+        const sourceRequest = store.get(sourcePath);
+
+        sourceRequest.onsuccess = () => {
+          const sourceRecord = sourceRequest.result;
+          if (!sourceRecord) {
+            reject(new VFSError('Source path does not exist', 'ENOENT', sourcePath));
+            return;
+          }
+
+          // 检查目标是否已存在
+          const targetRequest = store.get(targetPath);
+
+          targetRequest.onsuccess = () => {
+            const targetRecord = targetRequest.result;
+            if (targetRecord && !options?.overwrite) {
+              reject(new VFSError('Target already exists', 'EEXIST', targetPath));
+              return;
+            }
+
+            // 检查目标父目录是否存在
+            const targetParent = PathUtils.dirname(targetPath);
+            const parentRequest = store.get(targetParent);
+
+            parentRequest.onsuccess = () => {
+              const parentRecord = parentRequest.result;
+              if (!parentRecord || parentRecord.type !== 'directory') {
+                reject(new VFSError('Target parent directory does not exist', 'ENOENT', targetParent));
+                return;
+              }
+
+              if (sourceRecord.type === 'file') {
+                // 移动文件
+                this.moveFile(store, sourceRecord, targetPath, targetRecord, options, resolve, reject);
+              } else if (sourceRecord.type === 'directory') {
+                // 移动目录
+                this.moveDirectory(
+                  store,
+                  sourcePath,
+                  targetPath,
+                  sourceRecord,
+                  targetRecord,
+                  options,
+                  resolve,
+                  reject
+                );
+              }
+            };
+
+            parentRequest.onerror = () => {
+              reject(new VFSError('Failed to check target parent directory', 'EIO', targetParent));
+            };
+          };
+
+          targetRequest.onerror = () => {
+            reject(new VFSError('Failed to check target existence', 'EIO', targetPath));
+          };
+        };
+
+        sourceRequest.onerror = () => {
+          reject(new VFSError('Failed to check source existence', 'EIO', sourcePath));
+        };
+      });
+    });
+  }
+
+  /**
+   * 移动单个文件
+   */
+  private moveFile(
+    store: IDBObjectStore,
+    sourceRecord: any,
+    targetPath: string,
+    targetRecord: any,
+    options: MoveOptions | undefined,
+    resolve: () => void,
+    reject: (error: VFSError) => void
+  ): void {
+    const now = new Date();
+
+    // 创建新的文件记录
+    const newRecord = {
+      ...sourceRecord,
+      name: PathUtils.basename(targetPath),
+      path: targetPath,
+      parent: PathUtils.dirname(targetPath),
+      modified: now
+    };
+
+    // 如果目标存在且允许覆盖，先删除目标
+    const handleUpdate = () => {
+      // 添加新记录
+      const addRequest = store.put(newRecord);
+      addRequest.onsuccess = () => {
+        // 删除源记录
+        const deleteRequest = store.delete(sourceRecord.path);
+        deleteRequest.onsuccess = () => resolve();
+        deleteRequest.onerror = () => {
+          reject(new VFSError('Failed to delete source file', 'EIO', sourceRecord.path));
+        };
+      };
+      addRequest.onerror = () => {
+        reject(new VFSError('Failed to create target file', 'EIO', targetPath));
+      };
+    };
+
+    if (targetRecord && options?.overwrite) {
+      // 先删除目标记录
+      const deleteTargetRequest = store.delete(targetPath);
+      deleteTargetRequest.onsuccess = handleUpdate;
+      deleteTargetRequest.onerror = () => {
+        reject(new VFSError('Failed to delete target file', 'EIO', targetPath));
+      };
+    } else {
+      handleUpdate();
+    }
+  }
+
+  /**
+   * 移动目录及其所有子项
+   */
+  private moveDirectory(
+    store: IDBObjectStore,
+    sourcePath: string,
+    targetPath: string,
+    sourceRecord: any,
+    targetRecord: any,
+    options: MoveOptions | undefined,
+    resolve: () => void,
+    reject: (error: VFSError) => void
+  ): void {
+    // 获取所有需要移动的子项
+    const itemsToMove: any[] = [];
+    const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
+
+    const cursorRequest = store.openCursor();
+
+    cursorRequest.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+
+      if (cursor) {
+        const record = cursor.value;
+        const recordPath = record.path as string;
+
+        // 收集需要移动的项目（包括源目录本身和所有子项）
+        if (recordPath === sourcePath || recordPath.startsWith(sourcePrefix)) {
+          itemsToMove.push(record);
+        }
+
+        cursor.continue();
+      } else {
+        // 所有项目收集完成，开始移动
+        this.performDirectoryMove(
+          store,
+          itemsToMove,
+          sourcePath,
+          targetPath,
+          targetRecord,
+          options,
+          resolve,
+          reject
+        );
+      }
+    };
+
+    cursorRequest.onerror = () => {
+      reject(new VFSError('Failed to scan directory contents', 'EIO', sourcePath));
+    };
+  }
+
+  /**
+   * 执行目录移动操作
+   */
+  private performDirectoryMove(
+    store: IDBObjectStore,
+    itemsToMove: any[],
+    sourcePath: string,
+    targetPath: string,
+    targetRecord: any,
+    options: MoveOptions | undefined,
+    resolve: () => void,
+    reject: (error: VFSError) => void
+  ): void {
+    if (itemsToMove.length === 0) {
+      resolve();
+      return;
+    }
+
+    const now = new Date();
+    const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
+    const targetPrefix = targetPath === '/' ? '/' : targetPath + '/';
+
+    let processed = 0;
+    let hasError = false;
+
+    // 如果目标存在且允许覆盖，先删除目标目录的所有内容
+    const processMove = () => {
+      // 为每个项目创建新记录
+      for (const item of itemsToMove) {
+        if (hasError) break;
+
+        const oldPath = item.path;
+        let newPath: string;
+
+        if (oldPath === sourcePath) {
+          newPath = targetPath;
+        } else {
+          newPath = oldPath.replace(sourcePrefix, targetPrefix);
+        }
+
+        const newRecord = {
+          ...item,
+          name: PathUtils.basename(newPath),
+          path: newPath,
+          parent: PathUtils.dirname(newPath),
+          modified: now
+        };
+
+        // 添加新记录
+        const addRequest = store.put(newRecord);
+
+        addRequest.onsuccess = () => {
+          // 删除旧记录
+          const deleteRequest = store.delete(oldPath);
+
+          deleteRequest.onsuccess = () => {
+            processed++;
+            if (processed === itemsToMove.length) {
+              resolve();
+            }
+          };
+
+          deleteRequest.onerror = () => {
+            if (!hasError) {
+              hasError = true;
+              reject(new VFSError(`Failed to delete source item: ${oldPath}`, 'EIO', oldPath));
+            }
+          };
+        };
+
+        addRequest.onerror = () => {
+          if (!hasError) {
+            hasError = true;
+            reject(new VFSError(`Failed to create target item: ${newPath}`, 'EIO', newPath));
+          }
+        };
+      }
+    };
+
+    if (targetRecord && options?.overwrite) {
+      // 需要先删除目标目录的所有内容
+      this.deleteDirectoryContents(
+        store,
+        targetPath,
+        () => {
+          processMove();
+        },
+        reject
+      );
+    } else {
+      processMove();
+    }
+  }
+
+  /**
+   * 删除目录的所有内容（用于覆盖模式）
+   */
+  private deleteDirectoryContents(
+    store: IDBObjectStore,
+    dirPath: string,
+    onSuccess: () => void,
+    onError: (error: VFSError) => void
+  ): void {
+    const itemsToDelete: string[] = [];
+    const dirPrefix = dirPath === '/' ? '/' : dirPath + '/';
+
+    const cursorRequest = store.openCursor();
+
+    cursorRequest.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+
+      if (cursor) {
+        const record = cursor.value;
+        const recordPath = record.path as string;
+
+        // 收集需要删除的项目（包括目录本身和所有子项）
+        if (recordPath === dirPath || recordPath.startsWith(dirPrefix)) {
+          itemsToDelete.push(recordPath);
+        }
+
+        cursor.continue();
+      } else {
+        // 删除所有收集到的项目
+        if (itemsToDelete.length === 0) {
+          onSuccess();
+          return;
+        }
+
+        let deleted = 0;
+        let hasError = false;
+
+        for (const pathToDelete of itemsToDelete) {
+          if (hasError) break;
+
+          const deleteRequest = store.delete(pathToDelete);
+
+          deleteRequest.onsuccess = () => {
+            deleted++;
+            if (deleted === itemsToDelete.length) {
+              onSuccess();
+            }
+          };
+
+          deleteRequest.onerror = () => {
+            if (!hasError) {
+              hasError = true;
+              onError(new VFSError(`Failed to delete existing item: ${pathToDelete}`, 'EIO', pathToDelete));
+            }
+          };
+        }
+      }
+    };
+
+    cursorRequest.onerror = () => {
+      onError(new VFSError('Failed to scan existing directory contents', 'EIO', dirPath));
+    };
   }
 
   private async getCurrentDatabaseVersion(): Promise<number> {

@@ -1,3 +1,4 @@
+import { makeEventTarget } from '../event';
 import { PathUtils } from './common';
 
 /**
@@ -28,6 +29,15 @@ export interface FileStat {
   created: Date;
   modified: Date;
   accessed?: Date;
+}
+
+/**
+ * Options for move operations.
+ *
+ * @public
+ */
+export interface MoveOptions {
+  overwrite?: boolean; // 是否覆盖目标（如果存在）
 }
 
 /**
@@ -295,7 +305,9 @@ export class GlobMatcher {
  * @public
  *
  */
-export abstract class VFS {
+export abstract class VFS extends makeEventTarget(Object)<{
+  changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
+}>() {
   /** The name of this file system instance */
   public readonly name: string;
   /** Whether this file system is read-only */
@@ -316,6 +328,7 @@ export abstract class VFS {
    * @param isReadOnly - Whether this file system should be read-only
    */
   constructor(name: string, isReadOnly: boolean = false) {
+    super();
     this.name = name;
     this.isReadOnly = isReadOnly;
   }
@@ -494,6 +507,68 @@ export abstract class VFS {
     return PathUtils.relative(this._cwd, absolutePath);
   }
 
+  /**
+   * Moves/renames a file or directory.
+   *
+   * @param sourcePath - Source path
+   * @param targetPath - Target path
+   * @param options - Move options
+   *
+   * @example
+   * ```typescript
+   * // Rename file
+   * await fs.move('/old_name.txt', '/new_name.txt');
+   *
+   * // Move file to directory
+   * await fs.move('/file.txt', '/subdir/file.txt');
+   *
+   * // Rename directory
+   * await fs.move('/old_dir', '/new_dir');
+   * ```
+   */
+  async move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+    const normalizedSource = this.normalizePath(sourcePath);
+    const normalizedTarget = this.normalizePath(targetPath);
+
+    // 1. 检查根目录限制
+    this._validateMoveRootRestrictions(normalizedSource, normalizedTarget);
+
+    // 2. 检查是否跨 VFS
+    const sourceMount = this.getMountedVFS(normalizedSource);
+    const targetMount = this.getMountedVFS(normalizedTarget);
+
+    if (sourceMount || targetMount) {
+      // 如果涉及挂载点，检查是否为同一个VFS
+      const sourceVFS = sourceMount ? sourceMount.vfs : this;
+      const targetVFS = targetMount ? targetMount.vfs : this;
+
+      if (sourceVFS !== targetVFS) {
+        throw new VFSError('Cross-VFS move is not supported', 'EXDEV', normalizedSource);
+      }
+
+      // 如果都在同一个挂载的VFS中，委托给该VFS处理
+      if (sourceMount && targetMount && sourceMount.vfs === targetMount.vfs) {
+        return sourceMount.vfs.move(sourceMount.relativePath, targetMount.relativePath, options);
+      }
+    }
+
+    // 3. 检查源和目标类型匹配
+    await this._validateMoveTypeCompatibility(normalizedSource, normalizedTarget, options);
+
+    // 4. 如果文件系统是只读的，抛出错误
+    if (this.isReadOnly) {
+      throw new VFSError('File system is read-only', 'EROFS', normalizedSource);
+    }
+
+    const sourceStat = await this.stat(normalizedSource);
+    const itemType = sourceStat.isDirectory ? 'directory' : 'file';
+
+    // 5. 执行移动操作
+    await this._move(normalizedSource, normalizedTarget, options);
+
+    this.onChange('moved', normalizedTarget, itemType);
+  }
+
   // 修改所有公共方法以使用新的路径规范化
   async makeDirectory(path: string, recursive?: boolean): Promise<void> {
     const normalizedPath = this.normalizePath(path);
@@ -506,7 +581,8 @@ export abstract class VFS {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
-    return this._makeDirectory(normalizedPath, recursive ?? false);
+    await this._makeDirectory(normalizedPath, recursive ?? false);
+    this.onChange('created', normalizedPath, 'directory');
   }
 
   async readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
@@ -530,7 +606,8 @@ export abstract class VFS {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
-    return this._deleteDirectory(normalizedPath, recursive ?? false);
+    await this._deleteDirectory(normalizedPath, recursive ?? false);
+    this.onChange('deleted', normalizedPath, 'directory');
   }
 
   async readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
@@ -554,7 +631,9 @@ export abstract class VFS {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
-    return this._writeFile(normalizedPath, data, options);
+    const existed = await this._exists(normalizedPath);
+    await this._writeFile(normalizedPath, data, options);
+    this.onChange(existed ? 'modified' : 'created', normalizedPath, 'file');
   }
 
   async deleteFile(path: string): Promise<void> {
@@ -568,7 +647,8 @@ export abstract class VFS {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
-    return this._deleteFile(normalizedPath);
+    await this._deleteFile(normalizedPath);
+    this.onChange('deleted', normalizedPath, 'file');
   }
 
   async exists(path: string): Promise<boolean> {
@@ -601,14 +681,6 @@ export abstract class VFS {
 
     const data = await this.readFile(normalizedSrc);
     await this.writeFile(normalizedDest, data, { create: true });
-  }
-
-  async moveFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
-    const normalizedSrc = this.normalizePath(src);
-    const normalizedDest = this.normalizePath(dest);
-
-    await this.copyFile(normalizedSrc, normalizedDest, options);
-    await this.deleteFile(normalizedSrc);
   }
 
   async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
@@ -828,6 +900,74 @@ export abstract class VFS {
     await this._deleteDatabase();
   }
 
+  private _validateMoveRootRestrictions(sourcePath: string, targetPath: string): void {
+    // 不允许移动根目录
+    if (sourcePath === '/') {
+      throw new VFSError('Cannot move root directory', 'EINVAL', sourcePath);
+    }
+
+    // 不允许移动到根目录（替换根目录）
+    if (targetPath === '/') {
+      throw new VFSError('Cannot move to root directory', 'EINVAL', targetPath);
+    }
+
+    // 不允许移动到自己的子目录
+    if (targetPath.startsWith(sourcePath + '/')) {
+      throw new VFSError('Cannot move directory to its subdirectory', 'EINVAL', sourcePath);
+    }
+
+    const cwd = this.getCwd();
+
+    // 检查是否尝试移动当前工作目录
+    if (sourcePath === cwd) {
+      throw new VFSError('Cannot move current working directory', 'EBUSY', sourcePath);
+    }
+
+    // 检查是否尝试移动当前工作目录的父目录
+    // 如果CWD在源路径下面，说明源路径是CWD的父目录
+    if (cwd.startsWith(sourcePath + '/')) {
+      throw new VFSError('Cannot move parent directory of current working directory', 'EBUSY', sourcePath);
+    }
+  }
+
+  /**
+   * 检查源和目标类型兼容性
+   */
+  private async _validateMoveTypeCompatibility(
+    sourcePath: string,
+    targetPath: string,
+    options?: MoveOptions
+  ): Promise<void> {
+    const sourceExists = await this.exists(sourcePath);
+    if (!sourceExists) {
+      throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);
+    }
+
+    const sourceStat = await this.stat(sourcePath);
+
+    // 检查目标是否存在
+    const targetExists = await this.exists(targetPath);
+    if (targetExists) {
+      if (!options?.overwrite) {
+        throw new VFSError('Target already exists', 'EEXIST', targetPath);
+      }
+
+      const targetStat = await this.stat(targetPath);
+
+      // 只允许相同类型的替换
+      if (sourceStat.isFile !== targetStat.isFile || sourceStat.isDirectory !== targetStat.isDirectory) {
+        throw new VFSError('Cannot move file to directory or directory to file', 'EISDIR', sourcePath);
+      }
+    }
+  }
+
+  protected onChange(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory'
+  ): void {
+    this.dispatchEvent('changed', type, path, itemType);
+  }
   /**
    * Creates a directory in the file system.
    *
@@ -892,4 +1032,13 @@ export abstract class VFS {
   protected abstract _stat(path: string): Promise<FileStat>;
   protected abstract _deleteFileSystem(): Promise<void>;
   protected abstract _deleteDatabase(): Promise<void>;
+  /**
+   * Moves/renames a file or directory within the same VFS.
+   * Implementation should avoid file copying and use metadata operations only.
+   *
+   * @param sourcePath - Source path (normalized)
+   * @param targetPath - Target path (normalized)
+   * @param options - Move options
+   */
+  protected abstract _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
 }

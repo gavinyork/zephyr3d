@@ -1,5 +1,5 @@
 import { guessMimeType, PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -242,5 +242,134 @@ export class MemoryFS extends VFS {
    */
   protected async _deleteDatabase(): Promise<void> {
     return;
+  }
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+    // 检查源路径是否存在
+    if (!this.files.has(sourcePath) && !this.directories.has(sourcePath)) {
+      throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);
+    }
+
+    // 检查目标是否已存在
+    const targetExists = this.files.has(targetPath) || this.directories.has(targetPath);
+    if (targetExists && !options?.overwrite) {
+      throw new VFSError('Target already exists', 'EEXIST', targetPath);
+    }
+
+    // 确保目标父目录存在
+    const targetParent = PathUtils.dirname(targetPath);
+    if (!this.directories.has(targetParent)) {
+      throw new VFSError('Target parent directory does not exist', 'ENOENT', targetParent);
+    }
+
+    const now = new Date();
+
+    if (this.files.has(sourcePath)) {
+      // 移动文件
+      const fileData = this.files.get(sourcePath)!;
+      const sourceMetadata = this.metadata.get(sourcePath)!;
+
+      // 如果目标存在且允许覆盖，先删除目标
+      if (targetExists && options?.overwrite) {
+        this.files.delete(targetPath);
+        this.directories.delete(targetPath);
+        this.metadata.delete(targetPath);
+      }
+
+      // 移动文件数据和元数据
+      this.files.set(targetPath, fileData);
+      this.metadata.set(targetPath, {
+        ...sourceMetadata,
+        name: PathUtils.basename(targetPath),
+        path: targetPath,
+        modified: now
+      });
+
+      // 删除源文件
+      this.files.delete(sourcePath);
+      this.metadata.delete(sourcePath);
+    } else if (this.directories.has(sourcePath)) {
+      // 移动目录
+      const sourceMetadata = this.metadata.get(sourcePath)!;
+
+      // 如果目标存在且允许覆盖，先删除目标（递归删除）
+      if (targetExists && options?.overwrite) {
+        if (this.directories.has(targetPath)) {
+          await this._deleteDirectory(targetPath, true);
+        } else {
+          this.files.delete(targetPath);
+          this.metadata.delete(targetPath);
+        }
+      }
+
+      // 获取所有需要移动的子项（文件和目录）
+      const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
+      const targetPrefix = targetPath === '/' ? '/' : targetPath + '/';
+
+      // 收集所有需要移动的路径
+      const filesToMove: string[] = [];
+      const dirsToMove: string[] = [];
+
+      // 收集子文件
+      for (const [filePath] of this.files) {
+        if (filePath.startsWith(sourcePrefix)) {
+          filesToMove.push(filePath);
+        }
+      }
+
+      // 收集子目录（排序确保父目录在子目录之前处理）
+      for (const dirPath of this.directories) {
+        if (dirPath !== sourcePath && dirPath.startsWith(sourcePrefix)) {
+          dirsToMove.push(dirPath);
+        }
+      }
+      dirsToMove.sort(); // 确保父目录在前
+
+      // 移动所有子文件
+      for (const oldFilePath of filesToMove) {
+        const newFilePath = oldFilePath.replace(sourcePrefix, targetPrefix);
+        const fileData = this.files.get(oldFilePath)!;
+        const fileMetadata = this.metadata.get(oldFilePath)!;
+
+        this.files.set(newFilePath, fileData);
+        this.metadata.set(newFilePath, {
+          ...fileMetadata,
+          name: PathUtils.basename(newFilePath),
+          path: newFilePath,
+          modified: now
+        });
+
+        this.files.delete(oldFilePath);
+        this.metadata.delete(oldFilePath);
+      }
+
+      // 移动所有子目录
+      for (const oldDirPath of dirsToMove) {
+        const newDirPath = oldDirPath.replace(sourcePrefix, targetPrefix);
+        const dirMetadata = this.metadata.get(oldDirPath)!;
+
+        this.directories.add(newDirPath);
+        this.metadata.set(newDirPath, {
+          ...dirMetadata,
+          name: PathUtils.basename(newDirPath),
+          path: newDirPath,
+          modified: now
+        });
+
+        this.directories.delete(oldDirPath);
+        this.metadata.delete(oldDirPath);
+      }
+
+      // 最后移动源目录本身
+      this.directories.add(targetPath);
+      this.metadata.set(targetPath, {
+        ...sourceMetadata,
+        name: PathUtils.basename(targetPath),
+        path: targetPath,
+        modified: now
+      });
+
+      this.directories.delete(sourcePath);
+      this.metadata.delete(sourcePath);
+    }
   }
 }

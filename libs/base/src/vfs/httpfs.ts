@@ -185,4 +185,8 @@ export class HttpFS extends VFS {
   protected async _deleteDatabase(): Promise<void> {
     return;
   }
+
+  protected async _move(): Promise<void> {
+    throw new VFSError('HTTP file system is read-only', 'EROFS');
+  }
 }
