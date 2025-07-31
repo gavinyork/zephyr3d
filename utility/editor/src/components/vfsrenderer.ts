@@ -918,7 +918,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
 
-    DlgPromptName.promptName('Rename', currentName).then((newName) => {
+    DlgPromptName.promptName('Rename', 'Name', currentName).then((newName) => {
       if (newName && newName !== currentName) {
         if (/[\\/?*]/.test(newName)) {
           DlgMessage.messageBox('Error', 'Invalid name');
@@ -928,8 +928,11 @@ export class VFSRenderer extends makeEventTarget(Object)<{
             : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
           const newPath = this._vfs.join(parentPath, newName);
 
-          this._vfs.moveFile(isDir ? item.path : item.meta.path, newPath);
-          this.loadFileSystem();
+          this._vfs.moveFile(isDir ? item.path : item.meta.path, newPath).then(() => {
+            this.loadFileSystem().then(() => {
+              this.refreshFileView();
+            });
+          });
         }
       }
     });
