@@ -22,14 +22,12 @@ export type DirectoryInfo = {
   open: boolean;
 };
 
-// 视图模式枚举
 enum ViewMode {
   List = 0,
   Grid = 1,
   Details = 2
 }
 
-// 排序方式枚举
 enum SortBy {
   Name = 0,
   Size = 1,
@@ -44,8 +42,8 @@ interface AreaBounds {
 
 const enum DropZone {
   None = 'none',
-  Navigation = 'navigation', // 拖放到根目录
-  Content = 'content' // 拖放到当前内容区目录
+  Navigation = 'navigation', // Drag to home directory
+  Content = 'content' // Drag to current selected directory
 }
 
 type VFSRendererOptions = {
@@ -67,7 +65,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private _filesystem: DirectoryInfo;
   private _selectedDir: DirectoryInfo;
 
-  // 新增属性：右侧面板相关
   private _currentDirContent: (FileInfo | DirectoryInfo)[] = [];
   private _viewMode: ViewMode = ViewMode.List;
   private _sortBy: SortBy = SortBy.Name;
@@ -111,7 +108,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     return this._selectedItems;
   }
   render() {
-    // 左侧目录树
     if (this._treePanel.beginChild('##VFSViewTree')) {
       const contentMin = ImGui.GetWindowPos();
       const contentMax = new ImGui.ImVec2(
@@ -124,7 +120,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         max: contentMax
       };
 
-      // 如果正在拖放并且鼠标在导航区域内，显示高亮效果
       if (this._isDragOverNavigation) {
         this.renderNavigationDropHighlight();
       }
@@ -134,7 +129,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
     this._treePanel.endChild();
 
-    // 右侧内容区域
     ImGui.SetCursorPos(new ImGui.ImVec2(this._treePanel.width + 8, 0));
     if (ImGui.BeginChild('##VFSViewContent', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
       this.renderContentArea();
@@ -157,7 +151,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     );
   }
 
-  // 获取鼠标当前所在的拖放区域
   public getDropZoneAtPosition(mousePos: ImGui.ImVec2): DropZone {
     if (this.isMouseInArea(mousePos, 'navigation')) {
       return DropZone.Navigation;
@@ -167,7 +160,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     return DropZone.None;
   }
 
-  // 设置拖放状态
   public setDragOverState(mousePos: ImGui.ImVec2, isDragging: boolean) {
     if (!isDragging) {
       this._isDragOverNavigation = false;
@@ -179,10 +171,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     this._isDragOverNavigation = zone === DropZone.Navigation;
     this._isDragOverContent = zone === DropZone.Content;
   }
-  // 渲染右侧内容区域
+
   private renderContentArea() {
     this._hoveredItem = null;
-    // 工具栏
     ImGui.BeginChild(
       '##VFSContentToolBar',
       new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + 2 * ImGui.GetStyle().WindowPadding.y),
@@ -201,12 +192,10 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       max: contentMax
     };
 
-    // 如果正在拖放并且鼠标在内容区域内，显示高亮效果
     if (this._isDragOverContent) {
       this.renderContentDropHighlight();
     }
 
-    // 内容区域
     if (this._selectedDir) {
       switch (this._viewMode) {
         case ViewMode.List:
@@ -220,7 +209,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
           break;
       }
     } else {
-      // 没有选中目录时的提示
       const windowSize = ImGui.GetWindowSize();
       const textSize = imGuiCalcTextSize('Select a folder to view its contents');
       ImGui.SetCursorPos(
@@ -229,7 +217,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.TextDisabled('Select a folder to view its contents');
     }
 
-    // 处理右键菜单
     this.handleContextMenu();
     ImGui.EndChild();
   }
@@ -242,43 +229,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       return;
     }
 
-    // 绘制高亮边框和背景
     const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.7, 1.0, 0.6));
     const backgroundColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.7, 1.0, 0.1));
-
-    // 背景高亮
     drawList.AddRectFilled(bounds.min, bounds.max, backgroundColor, 4.0);
-
-    // 边框高亮
     drawList.AddRect(bounds.min, bounds.max, highlightColor, 4.0, ImGui.DrawCornerFlags.None, 2.0);
-
-    // 添加提示文字
-    const rootDirName = this._filesystem
-      ? this._filesystem.path.slice(this._filesystem.path.lastIndexOf('/') + 1) || 'Root'
-      : 'Root Directory';
-
-    const text = `Drop to ${rootDirName}`;
-    const textSize = ImGui.CalcTextSize(text);
-    const textPos = new ImGui.ImVec2(
-      bounds.min.x + (bounds.max.x - bounds.min.x - textSize.x) * 0.5,
-      bounds.max.y - textSize.y - 10
-    );
-
-    // 文字背景
-    const textBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.0, 0.0, 0.0, 0.7));
-    drawList.AddRectFilled(
-      new ImGui.ImVec2(textPos.x - 8, textPos.y - 3),
-      new ImGui.ImVec2(textPos.x + textSize.x + 8, textPos.y + textSize.y + 3),
-      textBg,
-      3.0
-    );
-
-    // 文字
-    const textColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0));
-    drawList.AddText(textPos, textColor, text);
   }
 
-  // 渲染内容区域拖放高亮效果
   private renderContentDropHighlight() {
     const drawList = ImGui.GetWindowDrawList();
     const bounds = this._contentBounds;
@@ -289,49 +245,19 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
     const highlightColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.6));
     const backgroundColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 1.0, 0.3, 0.1));
-
-    // 背景高亮
     drawList.AddRectFilled(bounds.min, bounds.max, backgroundColor, 4.0);
-
-    // 边框高亮
     drawList.AddRect(bounds.min, bounds.max, highlightColor, 4.0, ImGui.DrawCornerFlags.None, 2.0);
-
-    // 添加提示文字
-    const currentDirName = this._selectedDir
-      ? this._selectedDir.path.slice(this._selectedDir.path.lastIndexOf('/') + 1) || 'Current Directory'
-      : 'Current Directory';
-
-    const text = `Drop to ${currentDirName}`;
-    const textSize = ImGui.CalcTextSize(text);
-    const textPos = new ImGui.ImVec2(
-      bounds.min.x + (bounds.max.x - bounds.min.x - textSize.x) * 0.5,
-      bounds.min.y + (bounds.max.y - bounds.min.y - textSize.y) * 0.5
-    );
-
-    // 文字背景
-    const textBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.0, 0.0, 0.0, 0.7));
-    drawList.AddRectFilled(
-      new ImGui.ImVec2(textPos.x - 10, textPos.y - 5),
-      new ImGui.ImVec2(textPos.x + textSize.x + 10, textPos.y + textSize.y + 5),
-      textBg,
-      4.0
-    );
-
-    // 文字
-    const textColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0));
-    drawList.AddText(textPos, textColor, text);
   }
 
   public getDropTargetDirectory(): DirectoryInfo | null {
     if (this._isDragOverNavigation) {
-      return this._filesystem; // 拖放到根目录
+      return this._filesystem;
     } else if (this._isDragOverContent) {
-      return this._selectedDir; // 拖放到当前内容区目录
+      return this._selectedDir;
     }
     return null;
   }
 
-  // 获取当前拖放信息（供外部使用）
   public getDragDropInfo() {
     return {
       isOverNavigation: this._isDragOverNavigation,
@@ -345,40 +271,11 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     };
   }
 
-  // 处理外部文件拖放
-  public handleExternalDrop(files: FileList, mousePos: ImGui.ImVec2): boolean {
-    const targetDirectory = this.getDropTargetDirectory();
-
-    if (!targetDirectory) {
-      console.log('No valid drop target');
-      return false;
-    }
-
-    const zone = this.getDropZoneAtPosition(mousePos);
-    const targetPath = targetDirectory.path;
-
-    console.log(`Dropping ${files.length} files to: ${targetPath} (zone: ${zone})`);
-
-    // 实现文件拖放逻辑
-    Array.from(files).forEach((file, index) => {
-      console.log(`  File ${index + 1}: ${file.name} -> ${targetPath}`);
-      // 这里实现实际的文件操作
-      //this.handleFileUpload(file, targetDirectory);
-    });
-
-    // 刷新文件视图
-    this.refreshFileView();
-
-    return true;
-  }
-
   private showItemProperties(item: FileInfo | DirectoryInfo) {
     const isDir = 'subDir' in item;
     const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
-
     let info = `Name: ${name}\n`;
     info += `Type: ${isDir ? 'Folder' : 'File'}\n`;
-
     if (!isDir) {
       const meta = (item as FileInfo).meta;
       info += `Size: ${this.formatFileSize(meta.size)}\n`;
@@ -391,11 +288,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
 
     info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
-
     DlgMessage.messageBox('Properties', info);
   }
 
-  // 渲染工具栏
   private renderToolbar() {
     if (ImGui.RadioButton('List', this._viewMode === ViewMode.List)) {
       this._viewMode = ViewMode.List;
@@ -415,7 +310,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     ImGui.Dummy(new ImGui.ImVec2(20, 0));
     ImGui.SameLine();
 
-    // 排序选项
     ImGui.Text('Sort by:');
     ImGui.SameLine();
     ImGui.SetNextItemWidth(100);
@@ -437,7 +331,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     ImGui.Dummy(new ImGui.ImVec2(20, 0));
     ImGui.SameLine();
 
-    // 网格视图时的图标大小滑块
     if (this._viewMode === ViewMode.Grid) {
       ImGui.SameLine();
       ImGui.Text('Size:');
@@ -450,7 +343,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 列表视图
   private renderListView() {
     for (let i = 0; i < this._currentDirContent.length; i++) {
       const item = this._currentDirContent[i];
@@ -458,7 +350,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 网格视图
   private renderGridView() {
     const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
     const itemsPerRow = Math.max(1, Math.floor(windowWidth / (this._gridItemSize + 10)));
@@ -474,9 +365,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 详细视图
   private renderDetailsView() {
-    // 表头
     if (
       ImGui.BeginTable(
         '##FileTable',
@@ -493,14 +382,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.TableSetupColumn('Modified');
       ImGui.TableHeadersRow();
 
-      // 处理表格排序
       const sortSpecs = ImGui.TableGetSortSpecs();
       if (sortSpecs && sortSpecs.SpecsDirty) {
         this.handleTableSort(sortSpecs);
         sortSpecs.SpecsDirty = false;
       }
 
-      // 渲染行
       for (let i = 0; i < this._currentDirContent.length; i++) {
         const item = this._currentDirContent[i];
         this.renderTableRow(item, i);
@@ -509,7 +396,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.EndTable();
     }
   }
-  // 渲染列表项
+
   private renderListItem(item: FileInfo | DirectoryInfo, index: number) {
     const isDir = 'subDir' in item;
     const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
@@ -523,7 +410,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       this.handleItemClick(item);
     }
 
-    // 跟踪鼠标悬停状态
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
@@ -537,7 +423,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 渲染网格项
   private renderGridItem(item: FileInfo | DirectoryInfo, index: number) {
     const isDir = 'subDir' in item;
     const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
@@ -547,7 +432,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
     ImGui.BeginGroup();
 
-    // 图标
     const iconSize = this._gridItemSize;
     if (
       ImGui.Selectable(
@@ -560,7 +444,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       this.handleItemClick(item);
     }
 
-    // 跟踪鼠标悬停状态
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
@@ -573,7 +456,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       enableWorkspaceDragging(item, 'asset', item.meta.path);
     }
 
-    // 在图标中央显示 emoji
     const drawList = ImGui.GetWindowDrawList();
     const pos = ImGui.GetItemRectMin();
     const emojiSize = ImGui.CalcTextSize(convertEmojiString(emoji));
@@ -583,7 +465,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     );
     drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), convertEmojiString(emoji));
 
-    // 文件名
     ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
     ImGui.TextWrapped(name);
     ImGui.PopTextWrapPos();
@@ -591,20 +472,16 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     ImGui.EndGroup();
   }
 
-  // 渲染表格行
   private renderTableRow(item: FileInfo | DirectoryInfo, index: number) {
     const isDir = 'subDir' in item;
     const meta = isDir ? null : (item as FileInfo).meta;
     const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : meta.name;
 
     ImGui.TableNextRow();
-
-    // 名称列
     ImGui.TableSetColumnIndex(0);
     const emoji = isDir ? '📁' : this.getFileEmoji(meta);
     const label = convertEmojiString(`${emoji} ${name}##row_${index}`);
     const isSelected = this._selectedItems.has(item);
-
     if (
       ImGui.Selectable(
         label,
@@ -615,7 +492,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       this.handleItemClick(item);
     }
 
-    // 跟踪鼠标悬停状态
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
@@ -628,7 +504,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       enableWorkspaceDragging(item, 'asset', item.meta.path);
     }
 
-    // 大小列
     ImGui.TableSetColumnIndex(1);
     if (!isDir && meta) {
       ImGui.Text(this.formatFileSize(meta.size));
@@ -636,7 +511,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.Text('--');
     }
 
-    // 类型列
     ImGui.TableSetColumnIndex(2);
     if (isDir) {
       ImGui.Text('Folder');
@@ -646,7 +520,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.Text('File');
     }
 
-    // 修改时间列
     ImGui.TableSetColumnIndex(3);
     const modifiedDate = isDir ? null : meta?.modified;
     if (modifiedDate) {
@@ -656,82 +529,61 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 处理项目点击
   private handleItemClick(item: FileInfo | DirectoryInfo) {
     const io = ImGui.GetIO();
 
     if (this._options.multiSelect && io.KeyCtrl) {
-      // Ctrl+点击：多选
       if (this._selectedItems.has(item)) {
         this._selectedItems.delete(item);
       } else {
         this._selectedItems.add(item);
       }
     } else if (this._options.multiSelect && io.KeyShift && this._selectedItems.size > 0) {
-      // Shift+点击：范围选择
       this._selectedItems.clear();
       this._selectedItems.add(item);
     } else {
-      // 普通点击：单选
       this._selectedItems.clear();
       this._selectedItems.add(item);
     }
     this.emitSelectedChanged();
   }
 
-  // 处理双击
   private handleItemDoubleClick(item: FileInfo | DirectoryInfo) {
     const isDir = 'subDir' in item;
 
     if (isDir) {
-      // 双击目录：选中并展开
       this.selectDir(item as DirectoryInfo);
       (item as DirectoryInfo).open = true;
     } else {
-      // 双击文件：打开文件（这里可以触发文件打开事件）
       console.log('Open file:', (item as FileInfo).meta.path);
-      // 可以在这里添加文件打开的逻辑
     }
   }
 
-  // 处理右键菜单
-  // 处理右键菜单
   private handleContextMenu() {
     if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGui.MouseButton.Right)) {
-      // 检查是否右键点击了某个项目
       const clickedItem = this.getItemUnderMouse();
-
       if (clickedItem) {
-        // 右键点击了项目
-        if (this._selectedItems.has(clickedItem)) {
-          // 点击的是已选中的项目：保持当前选择状态，显示多选菜单
-          // 不改变选择状态
-        } else {
-          // 点击的是未选中的项目：选中该项目并清除其他选择
+        if (!this._selectedItems.has(clickedItem)) {
           this._selectedItems.clear();
           this._selectedItems.add(clickedItem);
           this.emitSelectedChanged();
         }
         ImGui.OpenPopup('##ItemContextMenu');
       } else {
-        // 右键点击了空白区域：显示通用菜单
         ImGui.OpenPopup('##ContentContextMenu');
       }
     }
 
-    // 项目相关的右键菜单
     if (ImGui.BeginPopup('##ItemContextMenu')) {
       const selectedCount = this._selectedItems.size;
       const selectedItems = Array.from(this._selectedItems);
 
       if (selectedCount > 0) {
-        // 删除操作
         if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
           this.deleteSelectedItems();
         }
 
         if (selectedCount === 1) {
-          // 单个项目的操作
           const item = selectedItems[0];
 
           ImGui.Separator();
@@ -749,7 +601,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.EndPopup();
     }
 
-    // 空白区域的右键菜单保持不变...
     if (ImGui.BeginPopup('##ContentContextMenu')) {
       if (ImGui.BeginMenu('Create New')) {
         if (ImGui.MenuItem('Folder...')) {
@@ -809,14 +660,11 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.EndPopup();
     }
   }
-  // 获取鼠标下的项目
+
   private getItemUnderMouse(): FileInfo | DirectoryInfo | null {
-    // 这个方法需要根据当前的视图模式来实现
-    // 由于 ImGui 的限制，我们需要在渲染时记录项目的位置信息
     return this._hoveredItem;
   }
 
-  // 处理表格排序
   private handleTableSort(sortSpecs: any) {
     if (sortSpecs.Specs.length > 0) {
       const spec = sortSpecs.Specs[0];
@@ -839,13 +687,11 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 排序内容
   private sortContent() {
     this._currentDirContent.sort((a, b) => {
       const isADir = 'subDir' in a;
       const isBDir = 'subDir' in b;
 
-      // 目录总是在文件前面
       if (isADir && !isBDir) {
         return -1;
       }
@@ -889,7 +735,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     });
   }
 
-  // 获取文件 emoji
   private getFileEmoji(meta: FileMetadata): string {
     if (!meta?.mimeType) {
       return '📄';
@@ -939,7 +784,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 格式化文件大小
   private formatFileSize(bytes: number): string {
     if (bytes === 0) {
       return '0 B';
@@ -952,21 +796,18 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  // 格式化日期
   private formatDate(date: Date): string {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
     if (days === 0) {
-      // 今天
       return date.toLocaleTimeString('en-US', {
         hour12: false,
         hour: '2-digit',
         minute: '2-digit'
       });
     } else if (days === 1) {
-      // 昨天
       return (
         'Yesterday ' +
         date.toLocaleTimeString('en-US', {
@@ -976,10 +817,8 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         })
       );
     } else if (days < 7) {
-      // 本周内
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     } else {
-      // 更早
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -988,7 +827,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 创建新文件夹
   private createNewFolder() {
     if (!this._selectedDir) {
       return;
@@ -1015,7 +853,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     });
   }
 
-  // 创建新文件
   private createNewFile() {
     if (!this._selectedDir) {
       return;
@@ -1042,14 +879,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     });
   }
 
-  // 删除选中项目
   private deleteSelectedItems() {
     if (this._selectedItems.size === 0) {
       return;
     }
 
     const items = Array.from(this._selectedItems);
-
     const deletePromises = items.map((item) => {
       const isDir = 'subDir' in item;
       if (isDir) {
@@ -1072,7 +907,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       });
   }
 
-  // 重命名选中项目
   private renameSelectedItem() {
     if (this._selectedItems.size !== 1) {
       return;
@@ -1101,7 +935,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     });
   }
 
-  // 选择目录
   selectDir(dir: DirectoryInfo) {
     if (dir !== this._selectedDir) {
       this._selectedDir = dir;
@@ -1109,27 +942,20 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
   }
 
-  // 刷新文件视图
   refreshFileView() {
     if (!this._selectedDir) {
       this._currentDirContent = [];
       return;
     }
 
-    // 合并目录和文件
     this._currentDirContent = [...this._selectedDir.subDir, ...this._selectedDir.files];
-
-    // 排序
     this.sortContent();
-
-    // 清空选择
     if (this._selectedItems.size > 0) {
       this._selectedItems.clear();
       this.emitSelectedChanged();
     }
   }
 
-  // 原有的目录树渲染方法
   renderDir(dir: DirectoryInfo) {
     const name = dir.path.slice(dir.path.lastIndexOf('/') + 1);
     const emoji = '📁';
@@ -1225,7 +1051,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const rootDir = await this.loadDirectoryInfo(this._project.homedir);
     this._filesystem = rootDir;
 
-    // 如果之前有选中的目录，尝试重新找到它
     if (this._selectedDir) {
       const newSelectedDir = this.findDirectoryByPath(this._filesystem, this._selectedDir.path);
       this.selectDir(newSelectedDir ?? null);
@@ -1233,7 +1058,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       this.selectDir(this._filesystem);
     }
   }
-  // 根据路径查找目录
+
   private findDirectoryByPath(root: DirectoryInfo, path: string): DirectoryInfo | null {
     if (root.path === path) {
       return root;
@@ -1316,10 +1141,14 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       const entries = Array.from(data.items).map((item) => item.webkitGetAsEntry());
       const map = await this.resolveDirectoryEntries(files, entries);
       const result = await this.resolveFileEntries(map);
-      for (const entry of result) {
-        const path = this._vfs.join(info.targetDirectory.path, entry[0]);
-        const buffer = await entry[1].arrayBuffer();
-        await this._vfs.writeFile(path, buffer, { create: true, encoding: 'binary' });
+      if (result.size > 0) {
+        for (const entry of result) {
+          const path = this._vfs.join(info.targetDirectory.path, entry[0]);
+          const buffer = await entry[1].arrayBuffer();
+          await this._vfs.writeFile(path, buffer, { create: true, encoding: 'binary' });
+        }
+        await this.loadFileSystem();
+        this.refreshFileView();
       }
     }
   }
