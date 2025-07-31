@@ -1,6 +1,6 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, SceneNode } from '../../../scene';
-import type { EmbeddedResource, PropertyAccessor, SerializableClass } from '../types';
+import type { PropertyAccessor, SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
@@ -42,7 +42,7 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
 async function getTerrainGrassContent(
   terrain: ClipmapTerrain,
   manager: SerializationManager
-): Promise<EmbeddedResource> {
+): Promise<ArrayBuffer> {
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array[] = [];
   let dataSize = 4 + (4 * 3 + 36) * grassRenderer.numLayers;
@@ -90,13 +90,10 @@ async function getTerrainGrassContent(
     view.set(layerDatas[i], offset);
     offset += layerDatas[i].length;
   }
-  return {
-    fileName: terrain.grassAssetId,
-    data: data.buffer
-  };
+  return data.buffer;
 }
 
-async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<EmbeddedResource> {
+async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
   const device = Application.instance.device;
   const heightmap = terrain.heightMap;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(heightmap.format);
@@ -108,13 +105,10 @@ async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<Embe
   head.setUint32(4, heightmap.height, true);
   const data = new Uint8Array(buffer, 2 * 4);
   await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, data);
-  return {
-    fileName: terrain.heightMapAssetId,
-    data: buffer
-  };
+  return buffer.buffer;
 }
 
-async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<EmbeddedResource> {
+async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
   const device = Application.instance.device;
   const splatMap = terrain.splatMap;
   const numLayers = (terrain.material.numDetailMaps + 3) >> 2;
@@ -133,10 +127,7 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Embed
     );
     await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, 0, 0, layerData);
   }
-  return {
-    fileName: terrain.splatMapAssetId,
-    data: buffer
-  };
+  return buffer;
 }
 
 function getDetailMapProps(manager: SerializationManager) {
@@ -274,24 +265,6 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
     getInitParams(obj: ClipmapTerrain) {
       return obj.numDetailMaps;
     },
-    getEmbeddedAssets(obj: ClipmapTerrain) {
-      return [
-        getTerrainHeightMapContent(obj),
-        getTerrainSplatMapContent(obj),
-        getTerrainGrassContent(obj, manager)
-      ];
-    },
-    getAssets(obj: ClipmapTerrain) {
-      const assets: string[] = [];
-      for (let i = 0; i < obj.grassRenderer.numLayers; i++) {
-        const grassTexture = obj.grassRenderer.getGrassTexture(i);
-        const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
-        if (assetId) {
-          assets.push(assetId);
-        }
-      }
-      return assets;
-    },
     getProps() {
       return [
         {
@@ -347,12 +320,13 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         ...getDetailMapProps(manager),
         {
           name: 'SplatMap',
-          type: 'resource',
+          type: 'embedded',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
+            value.str[0] = this.splatMapAssetId;
             value.object[0] = getTerrainSplatMapContent(this);
           },
           async set(this: ClipmapTerrain, value) {
@@ -382,12 +356,13 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         },
         {
           name: 'Grass',
-          type: 'resource',
+          type: 'embedded',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
+            value.str[0] = this.grassAssetId;
             value.object[0] = getTerrainGrassContent(this, manager);
           },
           async set(this: ClipmapTerrain, value) {
@@ -447,12 +422,13 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         },
         {
           name: 'HeightMap',
-          type: 'resource',
+          type: 'embedded',
           default: null,
           isHidden() {
             return true;
           },
           get(this: ClipmapTerrain, value) {
+            value.str[0] = this.heightMapAssetId;
             value.object[0] = getTerrainHeightMapContent(this);
           },
           async set(this: ClipmapTerrain, value) {

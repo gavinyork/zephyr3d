@@ -130,13 +130,11 @@ export class SceneController extends BaseController<SceneModel> {
     this._view.update(dt);
   }
   private async saveScene(showMessage = true) {
-    const assetList = new Set<string>();
     const asyncTasks: Promise<unknown>[] = [];
     const content = await serializeObject(
       this.model.scene,
       ProjectService.serializationManager,
       null,
-      assetList,
       asyncTasks
     );
     await Promise.all(asyncTasks);
@@ -145,7 +143,6 @@ export class SceneController extends BaseController<SceneModel> {
       create: true
     });
     console.log(JSON.stringify(content, null, 2));
-    console.log([...assetList]);
     console.log([...asyncTasks]);
     await Promise.all(asyncTasks);
     this._sceneChanged = false;

@@ -19,7 +19,7 @@ export type PropertyType =
   | 'rgba'
   | 'object'
   | 'object_array'
-  | 'resource'
+  | 'embedded'
   | 'command';
 
 /**
@@ -41,7 +41,7 @@ export type EmbeddedResource = {
   /** File name */
   fileName: string;
   /** Asset data */
-  data: ArrayBuffer;
+  data: Promise<ArrayBuffer> | ArrayBuffer;
 };
 
 /**
@@ -94,6 +94,5 @@ export type SerializableClass = {
   ) => { obj: any; loadProps?: boolean } | Promise<{ obj: any; loadProps?: boolean }>;
   getInitParams?: (obj: any) => any;
   getProps: () => PropertyAccessor<any>[];
-  getAssets?: (obj: any) => string[];
   getEmbeddedAssets?: (obj: any) => (EmbeddedResource | Promise<EmbeddedResource>)[];
 };

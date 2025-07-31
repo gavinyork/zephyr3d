@@ -61,6 +61,7 @@ export class ProjectService {
   static async closeCurrentProject() {
     if (this._currentProject) {
       this._currentProject = '';
+      await this._serializationManager.vfs.chdir('/');
     }
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
@@ -74,6 +75,7 @@ export class ProjectService {
     }
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
+    await this._serializationManager.vfs.chdir(info.homedir);
     return info;
   }
   static async saveProject(project: ProjectInfo) {
