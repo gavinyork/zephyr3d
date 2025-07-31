@@ -129,7 +129,11 @@ export class SceneController extends BaseController<SceneModel> {
     this.model.camera.updateController();
     this._view.update(dt);
   }
-  private async saveScene(showMessage = true) {
+  private async saveScene() {
+    // Don't export editor camera
+    const parent = this.model.camera.parent;
+    this.model.camera.parent = null;
+
     const asyncTasks: Promise<unknown>[] = [];
     const content = await serializeObject(
       this.model.scene,
@@ -146,9 +150,9 @@ export class SceneController extends BaseController<SceneModel> {
     console.log([...asyncTasks]);
     await Promise.all(asyncTasks);
     this._sceneChanged = false;
-    if (showMessage) {
-      Dialog.messageBox('Zephyr3d', `Scene saved: ${this._scenePath}`);
-    }
+
+    // Restore editor camera
+    this.model.camera.parent = parent;
   }
   async loadScene(path: string) {
     const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
