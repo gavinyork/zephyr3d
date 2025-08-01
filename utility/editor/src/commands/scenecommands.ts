@@ -320,8 +320,14 @@ export class NodeCloneCommand extends Command<SceneNode> {
       }
       const assetId = ProjectService.serializationManager.getAssetId(node);
       if (assetId) {
-        newNode = (await ProjectService.serializationManager.fetchModel(assetId, node.scene)).group;
-        newNode.copyFrom(node, 'instance', false);
+        newNode = (
+          await ProjectService.serializationManager.fetchModel(assetId, node.scene, {
+            enableInstancing: that._method === 'instance'
+          })
+        ).group;
+        newNode.position = node.position;
+        newNode.rotation = node.rotation;
+        newNode.scale = node.scale;
       } else {
         newNode = node.clone(that._method, false);
       }
