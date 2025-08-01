@@ -118,9 +118,9 @@ interface DDSHeaderDX10 {
   arraySize: number;
 }
 
-function loadDDSHeader(dds: ArrayBuffer): DDSHeader {
+function loadDDSHeader(dds: ArrayBuffer, offset: number): DDSHeader {
   const ddsHeader = {} as DDSHeader;
-  const header = new Uint32Array(dds, 0, DDSHeaderSize + 1);
+  const header = new Uint32Array(dds, offset, DDSHeaderSize + 1);
   const magic = header[0];
   if (magic !== DDS_MAGIC) {
     console.log('Invalid DDS magic');
@@ -151,7 +151,7 @@ function loadDDSHeader(dds: ArrayBuffer): DDSHeader {
   ddsHeader.dwCaps3 = header[29];
   ddsHeader.dwCaps4 = header[30];
   if (Int32ToFourCC(ddsHeader.ddsPixelFormat.dwFourCC) === 'DX10') {
-    const headerEx = new Uint32Array(dds, 0, DDSHeaderSizeExtended + 1);
+    const headerEx = new Uint32Array(dds, offset, DDSHeaderSizeExtended + 1);
     ddsHeader.ddsHeaderDX10 = {} as DDSHeaderDX10;
     ddsHeader.ddsHeaderDX10.dxgiFormat = headerEx[32];
     ddsHeader.ddsPixelFormat.dwFourCC = ddsHeader.ddsHeaderDX10.dxgiFormat;
@@ -575,8 +575,8 @@ function getMipmapData(
 }
 
 /** @internal */
-export function getDDSMipLevelsInfo(dds: ArrayBuffer): DDSMetaData {
-  const ddsHeader = loadDDSHeader(dds);
+export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number): DDSMetaData {
+  const ddsHeader = loadDDSHeader(dds, offset);
   if (!ddsHeader) {
     return null;
   }
@@ -589,7 +589,7 @@ export function getDDSMipLevelsInfo(dds: ArrayBuffer): DDSMetaData {
     let width = ddsLevelsInfo.width;
     let height = ddsLevelsInfo.height;
     for (let mip = 0; mip < ddsLevelsInfo.mipLevels; mip++) {
-      const mipData = getMipmapData(dds, width, height, ddsLevelsInfo.format, dataOffset);
+      const mipData = getMipmapData(dds, width, height, ddsLevelsInfo.format, dataOffset + offset);
       mipDatas.push({ data: mipData, width: width, height: height });
       dataOffset += mipData.byteLength;
       width = Math.max(1, width >> 1);

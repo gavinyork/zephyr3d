@@ -1,6 +1,7 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
+import { TypedArray } from '@zephyr3d/base';
 
 /**
  * Web image loader
@@ -15,7 +16,7 @@ export class WebImageLoader extends AbstractTextureLoader {
   }
   async load(
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture

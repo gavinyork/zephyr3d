@@ -420,7 +420,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
 
     if (!isDir) {
-      enableWorkspaceDragging(item, 'asset', item.meta.path);
+      enableWorkspaceDragging(item, 'ASSET', item.meta.path);
     }
   }
 

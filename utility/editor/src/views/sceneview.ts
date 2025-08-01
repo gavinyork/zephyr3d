@@ -78,7 +78,8 @@ export class SceneView extends BaseView<SceneModel> {
   private _statusbar: StatusBar;
   private _transformNode: DRef<SceneNode>;
   private _oldTransform: TRS;
-  private _dragDropTypes: string[];
+  private _workspaceDragging: boolean;
+  private _renderDropZone: boolean;
   private _nodeToBePlaced: DRef<SceneNode>;
   private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
@@ -110,7 +111,8 @@ export class SceneView extends BaseView<SceneModel> {
     this._cmdManager = new CommandManager();
     this._transformNode = new DRef();
     this._oldTransform = null;
-    this._dragDropTypes = [];
+    this._workspaceDragging = false;
+    this._renderDropZone = false;
     this._nodeToBePlaced = new DRef();
     this._typeToBePlaced = 'none';
     this._ctorToBePlaced = null;
@@ -557,7 +559,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.object = null;
     this._transformNode.dispose();
     this._oldTransform = null;
-    this._dragDropTypes = [];
+    this._workspaceDragging = false;
     this._nodeToBePlaced.dispose();
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
@@ -588,16 +590,6 @@ export class SceneView extends BaseView<SceneModel> {
       this._menubar.height -
       this._toolbar.height -
       this._assetView.panel.height;
-    if (this._dragDropTypes.length > 0) {
-      if (viewportWidth > 0 && viewportHeight > 0) {
-        this.renderDropZone(
-          this._tab.width,
-          this._menubar.height + this._toolbar.height,
-          viewportWidth,
-          viewportHeight
-        );
-      }
-    }
     if (viewportWidth > 0 && viewportHeight > 0) {
       this.model.camera.viewport = [
         this._tab.width,
@@ -620,6 +612,14 @@ export class SceneView extends BaseView<SceneModel> {
         this.model.camera.right = (10 * viewportWidth) / viewportHeight;
       }
       this.model.camera.render(this.model.scene);
+      if (this._renderDropZone) {
+        this.renderDropZone(
+          this._tab.width,
+          this._menubar.height + this._toolbar.height,
+          viewportWidth,
+          viewportHeight
+        );
+      }
     }
     this._statusbar.render();
 
@@ -662,25 +662,29 @@ export class SceneView extends BaseView<SceneModel> {
     ImGui.PushStyleColor(ImGui.Col.HeaderHovered, color);
     ImGui.Selectable('##dropzone', false, ImGui.SelectableFlags.Disabled, ImGui.GetContentRegionAvail());
     if (ImGui.BeginDragDropTarget()) {
-      for (const type of this._dragDropTypes) {
-        const peekPayload = ImGui.AcceptDragDropPayload(type, ImGui.DragDropFlags.AcceptBeforeDelivery);
-        const payload = ImGui.AcceptDragDropPayload(type);
-        if (payload || peekPayload) {
-          const mousePos = ImGui.GetMousePos();
-          const pos = [mousePos.x, mousePos.y];
-          if (this.posToViewport(pos, this.model.camera.viewport)) {
-            eventBus.dispatchEvent(
-              payload ? 'workspace_drag_drop' : 'workspace_dragging',
-              type,
-              payload ? payload.Data : peekPayload.Data,
-              pos[0],
-              pos[1]
-            );
-          }
-          break;
+      const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
+      const payload = ImGui.AcceptDragDropPayload('ASSET');
+      if (payload || peekPayload) {
+        if (!this._workspaceDragging) {
+          this._workspaceDragging = true;
+          this.handleWorkspaceDragEnter('ASSET', payload ? payload.Data : peekPayload.Data);
+        }
+        const mousePos = ImGui.GetMousePos();
+        const pos = [mousePos.x, mousePos.y];
+        if (this.posToViewport(pos, this.model.camera.viewport)) {
+          eventBus.dispatchEvent(
+            payload ? 'workspace_drag_drop' : 'workspace_dragging',
+            'ASSET',
+            payload ? payload.Data : peekPayload.Data,
+            pos[0],
+            pos[1]
+          );
         }
       }
       ImGui.EndDragDropTarget();
+    } else if (this._workspaceDragging) {
+      this._workspaceDragging = false;
+      this.handleWorkspaceDragLeave();
     }
     ImGui.PopStyleColor(3);
     ImGui.End();
@@ -868,6 +872,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.on('request_edit_track', this.editPropAnimation, this);
     this._propGrid.on('end_edit_track', this.endEditPropAnimation, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
+    eventBus.on('workspace_drag_start', this.handleWorkspaceDragStart, this);
+    eventBus.on('workspace_drag_end', this.handleWorkspaceDragEnd, this);
+    eventBus.on('workspace_dragging', this.handleWorkspaceDragging, this);
+    eventBus.on('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
     this.reset();
   }
   protected onDeactivate(): void {
@@ -884,6 +892,10 @@ export class SceneView extends BaseView<SceneModel> {
     this._propGrid.off('request_edit_track', this.editPropAnimation, this);
     this._propGrid.off('end_edit_track', this.endEditPropAnimation, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
+    eventBus.off('workspace_drag_start', this.handleWorkspaceDragStart, this);
+    eventBus.off('workspace_drag_end', this.handleWorkspaceDragEnd, this);
+    eventBus.off('workspace_dragging', this.handleWorkspaceDragging, this);
+    eventBus.off('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
     this.sceneFinialize();
   }
   private sceneSetup() {
@@ -1167,6 +1179,72 @@ export class SceneView extends BaseView<SceneModel> {
     }
     this._cmdManager.execute(new NodeDeleteCommand(node));
     eventBus.dispatchEvent('scene_changed');
+  }
+  private handleWorkspaceDragEnter(type: string, payload: unknown) {
+    console.log(`Workspace DragEnter: ${type} ${payload}`);
+    if (
+      typeof payload === 'string' &&
+      (payload.toLowerCase().endsWith('glb') || payload.toLowerCase().endsWith('gltf'))
+    ) {
+      this.handleAddAsset(payload);
+    }
+  }
+  private handleWorkspaceDragLeave() {
+    console.log('Workspace DragLeave');
+  }
+  private handleWorkspaceDragStart(type: string, payload: unknown) {
+    console.log(`Workspace DragStart: ${type} ${payload}`);
+    this._renderDropZone = true;
+  }
+  private handleWorkspaceDragging(type: string, payload: unknown, x: number, y: number) {
+    this._mousePosX = x;
+    this._mousePosY = y;
+    const placeNode = this._nodeToBePlaced?.get();
+    if (placeNode) {
+      const pickResult = this._pickResult;
+      const p = [x, y];
+      const hitPos = pickResult?.intersectedPoint ?? null;
+      if (placeNode?.parent) {
+        if (hitPos) {
+          placeNode.position.set(hitPos);
+        } else {
+          const ray = this.model.camera.constructRay(p[0], p[1]);
+          let hitDistance = -ray.origin.y / ray.direction.y;
+          if (Number.isNaN(hitDistance) || hitDistance < 0) {
+            hitDistance = 10;
+          }
+          const x = ray.origin.x + ray.direction.x * hitDistance;
+          const y = ray.origin.y + ray.direction.y * hitDistance;
+          const z = ray.origin.z + ray.direction.z * hitDistance;
+          placeNode.position.setXYZ(x, y, z);
+        }
+      }
+    }
+  }
+  private handleWorkspaceDragDrop(type: string, payload: unknown, x: number, y: number) {
+    this._renderDropZone = false;
+    const placeNode = this._nodeToBePlaced?.get();
+    if (placeNode) {
+      const pos = placeNode.position.clone();
+      placeNode.parent = null;
+      this._nodeToBePlaced.dispose();
+      this._cmdManager
+        .execute(new AddAssetCommand(this.model.scene, this._assetToBeAdded, pos))
+        .then((node) => {
+          this._tab.sceneHierarchy.selectNode(node);
+          eventBus.dispatchEvent('scene_changed');
+        });
+    }
+  }
+  private handleWorkspaceDragEnd(type: string, payload: unknown) {
+    if (!this._workspaceDragging) {
+      this._renderDropZone = false;
+      const node = this._nodeToBePlaced?.get();
+      if (node) {
+        node.parent = null;
+        this._nodeToBePlaced.dispose();
+      }
+    }
   }
   private handleNodeSelected(node: SceneNode) {
     this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;

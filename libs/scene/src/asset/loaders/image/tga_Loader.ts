@@ -1,6 +1,7 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app/app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
+import { TypedArray } from '@zephyr3d/base';
 
 /**
  * TGA image loader
@@ -13,8 +14,15 @@ export class TGALoader extends AbstractTextureLoader {
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }
-  private parseTGA(content: ArrayBuffer, sRGB: boolean, noMipmap: boolean, texture: BaseTexture) {
-    const dataView = new DataView(content);
+  private parseTGA(
+    content: ArrayBuffer | TypedArray,
+    sRGB: boolean,
+    noMipmap: boolean,
+    texture: BaseTexture
+  ) {
+    const arrayBuffer = content instanceof ArrayBuffer ? content : content.buffer;
+    const offset = content instanceof ArrayBuffer ? 0 : content.byteOffset;
+    const dataView = new DataView(arrayBuffer, offset);
     const p: number[] = [0, 0, 0, 0];
     do {
       let skip = 0;
@@ -106,7 +114,7 @@ export class TGALoader extends AbstractTextureLoader {
   }
   async load(
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture

@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import type { HttpRequest, VFS } from '@zephyr3d/base';
+import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
 import { HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
@@ -350,6 +350,61 @@ export class AssetManager {
     }
     return data;
   }
+  /**
+   * Guesses the MIME type by image filename
+   * @param name - Filename of the image
+   * @returns MIME type
+   */
+  async guessMIMEByName(name: string) {
+    let ext = '';
+    let filename = '';
+    let mimeType = '';
+    const dataUriMatchResult = name.match(/^data:([^;]+)/);
+    if (dataUriMatchResult) {
+      mimeType = dataUriMatchResult[1];
+    } else {
+      filename = name
+        .split('/')
+        .filter((val) => !!val)
+        .slice(-1)[0];
+      const p = filename ? filename.lastIndexOf('.') : -1;
+      ext = p >= 0 ? filename.substring(p).toLowerCase() : null;
+      if (ext === '.jpg' || ext === '.jpeg') {
+        mimeType = 'image/jpg';
+      } else if (ext === '.png') {
+        mimeType = 'image/png';
+      }
+    }
+    return mimeType;
+  }
+  /**
+   * Load a texture resource from ArrayBuffer
+   * @param arrayBuffer - ArrayBuffer that contains the texture data
+   * @param byteOffset - Byte offset of the ArrayBuffer to read
+   * @param byteLength - Byte length of the ArrayBuffer to read
+   * @param mimeType - MIME type for the image
+   * @param srgb - Whether to load the texture data in sRGB color space
+   * @param samplerOptions - Texture sampler options
+   * @param texture - load into existing texture
+   *
+   * @returns The loaded texture
+   */
+  async loadTextureFromBuffer<T extends BaseTexture>(
+    arrayBuffer: ArrayBuffer | TypedArray,
+    mimeType: string,
+    srgb?: boolean,
+    samplerOptions?: SamplerOptions,
+    texture?: BaseTexture
+  ): Promise<T> {
+    for (const loader of AssetManager._textureLoaders) {
+      if (!loader.supportMIMEType(mimeType)) {
+        continue;
+      }
+      const tex = await this.doLoadTexture(loader, mimeType, arrayBuffer, !!srgb, samplerOptions, texture);
+      return tex as T;
+    }
+    throw new Error(`Can not find loader for MIME type '${mimeType}'`);
+  }
   /** @internal */
   async loadTexture(
     url: string,
@@ -393,7 +448,7 @@ export class AssetManager {
   async doLoadTexture(
     loader: AbstractTextureLoader,
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
@@ -449,7 +504,7 @@ export class AssetManager {
   }
   /** @internal */
   async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
-    const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'utf8' })) as ArrayBuffer;
+    const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     const data = new Blob([arrayBuffer], { type: options?.mimeType ?? undefined });
     const filename = new URL(url, new URL(location.href).origin).pathname
       .split('/')

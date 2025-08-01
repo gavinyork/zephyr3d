@@ -2,6 +2,7 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../assetmanager';
 import type { SharedModel } from '../model';
 import type { DecoderModule } from 'draco3d';
+import { TypedArray } from '@zephyr3d/base';
 
 /**
  * Base interface for any kind loaders
@@ -76,7 +77,7 @@ export abstract class AbstractTextureLoader extends LoaderBase {
    */
   abstract load(
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture

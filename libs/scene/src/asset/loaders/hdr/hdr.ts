@@ -1,5 +1,5 @@
 import { AbstractTextureLoader } from '../loader';
-import { floatToHalf, packFloat3 } from '@zephyr3d/base';
+import { floatToHalf, packFloat3, TypedArray } from '@zephyr3d/base';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
 
@@ -17,7 +17,7 @@ export class HDRLoader extends AbstractTextureLoader {
   }
   async load(
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
@@ -30,7 +30,9 @@ export class HDRLoader extends AbstractTextureLoader {
         break;
       }
     }
-    const textureData = await this.loadHDR(new Uint8Array(data), format);
+    const arrayBuffer = data instanceof ArrayBuffer ? data : data.buffer;
+    const offset = data instanceof ArrayBuffer ? 0 : data.byteOffset;
+    const textureData = await this.loadHDR(new Uint8Array(arrayBuffer, offset), format);
     const options: TextureCreationOptions = {
       texture: texture,
       samplerOptions

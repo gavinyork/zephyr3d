@@ -1198,13 +1198,7 @@ export class GLTFLoader extends AbstractModelLoader {
               if (arrayBuffer) {
                 const view = new Uint8Array(arrayBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
                 const mimeType = image.mimeType;
-                const blob = new Blob([view], { type: mimeType });
-                const sourceURI = URL.createObjectURL(blob);
-                mt.texture = await gltf._manager.fetchTexture(sourceURI, {
-                  mimeType,
-                  linearColorSpace: !sRGB
-                });
-                URL.revokeObjectURL(sourceURI);
+                mt.texture = await gltf._manager.loadTextureFromBuffer<Texture2D>(view, mimeType, sRGB);
               }
             }
           }
