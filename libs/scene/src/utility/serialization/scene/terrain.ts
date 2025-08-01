@@ -415,8 +415,8 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
                   this.grassRenderer.addInstances(i, instances);
                   offset += dataSize;
                 }
-                this.grassAssetId = value.str[0];
               }
+              this.grassAssetId = value.str[0];
             }
           }
         },

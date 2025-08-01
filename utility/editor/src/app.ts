@@ -1,13 +1,13 @@
 import { Application } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
-//import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+//import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 
 const studioApp = new Application({
-  backend: backendWebGPU,
+  backend: backendWebGL2,
   canvas: document.querySelector('#canvas')
 });
 

@@ -224,17 +224,19 @@ export function serializeObjectProps<T extends object>(
       case 'embedded': {
         const relativePath = tmpVal.str[0].startsWith('/') ? tmpVal.str[0].slice(1) : tmpVal.str[0];
         json[k] = relativePath;
-        const resource = tmpVal.object[0];
-        asyncTasks.push(
-          (async function () {
-            console.log(k);
-            const buffer = (await resource) as ArrayBuffer;
-            await manager.vfs.writeFile(relativePath, buffer, {
-              encoding: 'binary',
-              create: true
-            });
-          })()
-        );
+        if (asyncTasks) {
+          const resource = tmpVal.object[0];
+          asyncTasks.push(
+            (async function () {
+              console.log(k);
+              const buffer = (await resource) as ArrayBuffer;
+              await manager.vfs.writeFile(relativePath, buffer, {
+                encoding: 'binary',
+                create: true
+              });
+            })()
+          );
+        }
         break;
       }
       case 'float':
