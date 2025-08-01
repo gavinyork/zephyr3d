@@ -65,26 +65,32 @@ export class SceneController extends BaseController<SceneModel> {
         }
         break;
       case 'CLOSE_PROJECT':
-        if (this._sceneChanged) {
-          const value = await Dialog.messageBoxEx('zephyr3d editor', 'Save current scene?', [
-            'Yes',
-            'No',
-            'Cancel'
-          ]);
-          if (value === 'Cancel') {
-            return;
-          }
-          if (value === 'Yes') {
-            await this.sceneAction('SAVE_DOC');
-            if (this._sceneChanged) {
-              return;
+        if (await this.ensureSceneSaved()) {
+          await this._editor.closeProject(this._scenePath);
+        }
+        break;
+      case 'DELETE_PROJECT': {
+        if (this._editor.currentProject) {
+          const uuid = this._editor.currentProject.uuid;
+          if (
+            (await Dialog.messageBoxEx(
+              'zephyr3d editor',
+              'Are you sure you want to delete current project?',
+              ['Yes', 'Cancel']
+            )) === 'Yes'
+          ) {
+            this._sceneChanged = false;
+            await this.sceneAction('CLOSE_PROJECT');
+            if (!this._editor.currentProject) {
+              await this._editor.deleteProject(uuid);
             }
           }
         }
-        await this._editor.closeProject(this._scenePath);
-        break;
+      }
       case 'NEW_DOC':
-        this.createScene(true);
+        if (await this.ensureSceneSaved()) {
+          this.createScene(true);
+        }
         break;
       case 'SAVE_DOC':
         if (!this._scenePath) {
@@ -108,15 +114,17 @@ export class SceneController extends BaseController<SceneModel> {
         break;
       }
       case 'OPEN_DOC': {
-        const name = await Dialog.openFile(
-          'Open Scene',
-          ProjectService.VFS,
-          this._editor.currentProject,
-          500,
-          400
-        );
-        if (name) {
-          await this.openScene(name, true);
+        if (await this.ensureSceneSaved()) {
+          const name = await Dialog.openFile(
+            'Open Scene',
+            ProjectService.VFS,
+            this._editor.currentProject,
+            500,
+            400
+          );
+          if (name) {
+            await this.openScene(name, true);
+          }
         }
         break;
       }
@@ -169,6 +177,25 @@ export class SceneController extends BaseController<SceneModel> {
     this._scenePath = '';
     this._sceneChanged = true;
     this.reset(null, resetView);
+  }
+  async ensureSceneSaved(): Promise<boolean> {
+    if (this._sceneChanged) {
+      const value = await Dialog.messageBoxEx('zephyr3d editor', 'Save current scene?', [
+        'Yes',
+        'No',
+        'Cancel'
+      ]);
+      if (value === 'Cancel') {
+        return false;
+      }
+      if (value === 'Yes') {
+        await this.sceneAction('SAVE_DOC');
+        if (this._sceneChanged) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
   reset(scene?: Scene, resetView?: boolean) {
     this.model.reset(scene);

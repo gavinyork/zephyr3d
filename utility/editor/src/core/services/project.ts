@@ -78,6 +78,19 @@ export class ProjectService {
     await this._serializationManager.vfs.chdir(info.homedir);
     return info;
   }
+  static async deleteProject(uuid: string): Promise<void> {
+    if (this._currentProject === uuid) {
+      throw new Error('Project must be closed before delete it');
+    }
+    const manifest = await this.readManifest();
+    const info = manifest.projectList[uuid];
+    if (info) {
+      delete manifest.projectList[uuid];
+      delete manifest.history[uuid];
+      await this.writeManifest(manifest);
+      await this._serializationManager.vfs.deleteDirectory(info.homedir, true);
+    }
+  }
   static async saveProject(project: ProjectInfo) {
     const manifest = await this.readManifest();
     project.uuid = project.uuid || crypto.randomUUID();

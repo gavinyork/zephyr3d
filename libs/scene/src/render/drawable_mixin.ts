@@ -49,6 +49,7 @@ function releaseBindGroup(bindGroup: BindGroup) {
     const hash = usedBindGroups.get(bindGroup);
     if (hash) {
       usedBindGroups.delete(bindGroup);
+      drawableBindGroupTransfromTags.delete(bindGroup);
       const bindGroups = bindGroupCache[hash];
       if (bindGroups) {
         bindGroups.push(bindGroup);

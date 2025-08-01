@@ -228,4 +228,7 @@ export class Editor {
       this._moduleManager.activate('Scene', project.lastEditScene ?? '');
     }
   }
+  async deleteProject(uuid: string) {
+    await ProjectService.deleteProject(uuid);
+  }
 }

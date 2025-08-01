@@ -161,6 +161,13 @@ export class SceneView extends BaseView<SceneModel> {
             {
               label: 'Close Project',
               action: () => eventBus.dispatchEvent('action', 'CLOSE_PROJECT')
+            },
+            {
+              label: '-'
+            },
+            {
+              label: 'Delete Project',
+              action: () => eventBus.dispatchEvent('action', 'DELETE_PROJECT')
             }
           ]
         },
@@ -761,6 +768,9 @@ export class SceneView extends BaseView<SceneModel> {
                     )
                   )
                   .then((node) => {
+                    if (node instanceof DirectionalLight) {
+                      node.sunLight = true;
+                    }
                     this._tab.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
                     this._proxy.createProxy(node);

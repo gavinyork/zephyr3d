@@ -354,9 +354,26 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     pb.func(funcName, [], function () {
       const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       if (numDetailMaps === 0) {
-        this.$l.checkerPos = pb.floor(pb.mul(this.$inputs.uv, pb.sub(this.region.zw, this.region.xy)));
-        this.$l.checker = pb.mod(pb.add(this.checkerPos.x, this.checkerPos.y), 2);
-        this.$l.checkerColor = pb.mix(pb.vec3(0.4), pb.vec3(1), this.checker);
+        this.$l.checkerPos = pb.mul(this.$inputs.uv, pb.sub(this.region.zw, this.region.xy));
+        this.$l.ddx = pb.dpdx(this.checkerPos);
+        this.$l.ddy = pb.dpdy(this.checkerPos);
+        this.$l.w = pb.add(pb.max(pb.abs(this.ddx), pb.abs(this.ddy)), 0.01);
+        this.$l.i = pb.div(
+          pb.mul(
+            2,
+            pb.sub(
+              pb.abs(pb.sub(pb.fract(pb.mul(pb.sub(this.checkerPos, pb.mul(this.w, 0.5)), 0.5)), 0.5)),
+              pb.abs(pb.sub(pb.fract(pb.mul(pb.add(this.checkerPos, pb.mul(this.w, 0.5)), 0.5)), 0.5))
+            )
+          ),
+          this.w
+        );
+        this.$l.changeRate = pb.add(pb.length(this.ddx), pb.length(this.ddy));
+        this.$l.fadeStart = pb.float(0);
+        this.$l.fadeEnd = pb.float(10);
+        this.$l.fadeFactor = pb.sub(1, pb.smoothStep(this.fadeStart, this.fadeEnd, this.changeRate));
+        this.$l.checker = pb.mix(0.5, pb.sub(0.5, pb.mul(0.5, this.i.x, this.i.y)), this.fadeFactor);
+        this.$l.checkerColor = pb.mix(pb.vec3(0.4), pb.vec3(1), pb.vec3(this.checker));
         this.$return(pb.vec4(this.checkerColor, 1));
       } else {
         this.$l.color = pb.vec3(0);
