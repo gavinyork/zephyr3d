@@ -24,7 +24,8 @@ export class ImageList extends makeEventTarget(Object)<{
   private _defaultImage: DRef<Texture2D>;
   private _selectable: boolean;
   private _maxImageCount: number;
-  constructor() {
+  private _mimeTypes: string[];
+  constructor(mimeTypes?: string[]) {
     super();
     this._images = [];
     this._isDragging = false;
@@ -38,6 +39,14 @@ export class ImageList extends makeEventTarget(Object)<{
     this._defaultImage = new DRef(Application.instance.device.createTexture2D('rgba8unorm', 1, 1));
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
     this._maxImageCount = -1;
+    this._mimeTypes = mimeTypes?.slice() ?? [
+      'image/jpg',
+      'image/jpeg',
+      'image/png',
+      'image/tga',
+      'image/vnd.radiance',
+      'image/x-dds'
+    ];
   }
   get defaultImage() {
     return this._defaultImage.get();
@@ -136,29 +145,33 @@ export class ImageList extends makeEventTarget(Object)<{
   }
   acceptTarget(index: number, replace: boolean) {
     if (this._acceptDragDrop && ImGui.BeginDragDropTarget()) {
-      const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
+      const payload = ImGui.AcceptDragDropPayload('ASSET');
       if (payload) {
         const assetId = payload.Data as string;
-        ProjectService.serializationManager
-          .fetchTexture<Texture2D>(assetId, {
-            linearColorSpace: this._linearColorSpace
-          })
-          .then((tex) => {
-            if (tex?.isTexture2D()) {
-              if (replace) {
-                this.replaceImage(tex, index);
-                this.dispatchEvent('update_image', assetId, index);
+        const mimeType = ProjectService.VFS.guessMIMEType(assetId);
+        if (this._mimeTypes.includes(mimeType)) {
+          const path = ProjectService.VFS.relative(assetId);
+          ProjectService.serializationManager
+            .fetchTexture<Texture2D>(path, {
+              linearColorSpace: this._linearColorSpace
+            })
+            .then((tex) => {
+              if (tex?.isTexture2D()) {
+                if (replace) {
+                  this.replaceImage(tex, index);
+                  this.dispatchEvent('update_image', path, index);
+                } else {
+                  this.insertImage(tex, index);
+                  this.dispatchEvent('add_image', path, index);
+                }
               } else {
-                this.insertImage(tex, index);
-                this.dispatchEvent('add_image', assetId, index);
+                console.error('Invalid texture');
               }
-            } else {
-              console.error('Invalid texture');
-            }
-          })
-          .catch((err) => {
-            console.error(`Load asset failed: ${assetId}: ${err}`);
-          });
+            })
+            .catch((err) => {
+              console.error(`Load asset failed: ${path}: ${err}`);
+            });
+        }
       }
       ImGui.EndDragDropTarget();
     }

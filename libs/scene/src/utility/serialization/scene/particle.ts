@@ -66,8 +66,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'Gravity',
           type: 'vec3',
-          animatable: true,
           default: [0, 0, 0],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             const gravity = this.gravity;
             value.num[0] = gravity.x;
@@ -81,8 +83,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'Wind',
           type: 'vec3',
-          animatable: true,
           default: [0, 0, 0],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             const wind = this.wind;
             value.num[0] = wind.x;
@@ -95,9 +99,11 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Scalar',
-          animatable: true,
           type: 'float',
           default: 1,
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.scalar;
           },
@@ -107,9 +113,11 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Aspect',
-          animatable: true,
           type: 'float',
           default: 1,
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.aspect;
           },
@@ -131,8 +139,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'JitterSpeed',
           type: 'float',
-          animatable: true,
           default: 1,
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterSpeed;
           },
@@ -143,8 +153,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'JitterPower',
           type: 'float',
-          animatable: true,
           default: 0,
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.jitterPower;
           },
@@ -155,9 +167,11 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'EmitterShape',
           type: 'string',
-          enum: {
-            labels: ['Point', 'Sphere', 'Box', 'Cylinder', 'Cone'],
-            values: ['point', 'sphere', 'box', 'cylinder', 'cone']
+          options: {
+            enum: {
+              labels: ['Point', 'Sphere', 'Box', 'Cylinder', 'Cone'],
+              values: ['point', 'sphere', 'box', 'cylinder', 'cone']
+            }
           },
           default: 'point',
           get(this: ParticleSystem, value) {
@@ -170,9 +184,11 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'EmitterBehavior',
           type: 'string',
-          enum: {
-            labels: ['Surface', 'Volume'],
-            values: ['surface', 'volume']
+          options: {
+            enum: {
+              labels: ['Surface', 'Volume'],
+              values: ['surface', 'volume']
+            }
           },
           default: 'surface',
           get(this: ParticleSystem, value) {
@@ -196,8 +212,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'Rotation',
           type: 'vec2',
-          animatable: true,
           default: [0, 0],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleRotationMin;
             value.num[1] = this.particleRotationMax;
@@ -210,8 +228,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'ConeRadius',
           type: 'vec2',
-          animatable: true,
           default: [0, 0.1],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.emitterConeRadiusMin;
             value.num[1] = this.emitterConeRadiusMax;
@@ -224,8 +244,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'Velocity',
           type: 'vec2',
-          animatable: true,
           default: [2, 3],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleVelocityMin;
             value.num[1] = this.particleVelocityMax;
@@ -238,8 +260,10 @@ export function getParticleNodeClass(): SerializableClass {
         {
           name: 'Life',
           type: 'vec2',
-          animatable: true,
           default: [1, 1.5],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleLifeMin;
             value.num[1] = this.particleLifeMax;
@@ -251,9 +275,11 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Size1',
-          animatable: true,
           type: 'vec2',
           default: [0.4, 0.5],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize1Min;
             value.num[1] = this.particleSize1Max;
@@ -265,9 +291,11 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Size2',
-          animatable: true,
           type: 'vec2',
           default: [0, 0.1],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleSize2Min;
             value.num[1] = this.particleSize2Max;
@@ -279,9 +307,11 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Acceleration',
-          animatable: true,
           type: 'vec2',
           default: [-0.01, -0.02],
+          options: {
+            animatable: true
+          },
           get(this: ParticleSystem, value) {
             value.num[0] = this.particleAccelMin;
             value.num[1] = this.particleAccelMax;
@@ -295,7 +325,9 @@ export function getParticleNodeClass(): SerializableClass {
           name: 'Material',
           type: 'object',
           default: null,
-          objectTypes: [ParticleMaterial],
+          options: {
+            objectTypes: [ParticleMaterial]
+          },
           get(this: ParticleSystem, value) {
             value.object[0] = this.getMaterial();
           },

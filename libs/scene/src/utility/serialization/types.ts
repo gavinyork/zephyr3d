@@ -39,6 +39,19 @@ export type PropertyValue = {
  */
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
+export type PropertyAccessorOptions = {
+  label?: string;
+  group?: string;
+  edit?: PropEdit;
+  minValue?: number;
+  maxValue?: number;
+  speed?: number;
+  animatable?: boolean;
+  mimeTypes?: string[];
+  objectTypes?: GenericConstructor[];
+  enum?: { labels: string[]; values: unknown[] };
+};
+
 /**
  * Object type which defines a serializable property
  * @public
@@ -46,18 +59,11 @@ export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 export type PropertyAccessor<T = object> = {
   type: PropertyType;
   name: string;
-  label?: string;
-  group?: string;
   phase?: number;
-  options?: { minValue: number; maxValue: number; speed?: number };
-  enum?: { labels: string[]; values: (number | string)[] };
-  instance?: boolean;
-  objectTypes?: GenericConstructor[];
   readonly?: boolean;
   default?: any;
-  animatable?: boolean;
   persistent?: boolean;
-  edit?: PropEdit;
+  options?: PropertyAccessorOptions;
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   create?: (this: T, ctor: GenericConstructor, index: number) => object;

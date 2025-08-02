@@ -83,8 +83,10 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
       return [
         {
           name: 'TrackName',
-          label: 'Name',
           type: 'string',
+          options: {
+            label: 'Name'
+          },
           get(this: PropertyTrack, value) {
             value.str[0] = this.name;
           },
@@ -94,8 +96,10 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         },
         {
           name: 'TrackTarget',
-          label: 'Target',
           type: 'string',
+          options: {
+            label: 'Target'
+          },
           get(this: PropertyTrack, value) {
             value.str[0] = this.target;
           },
@@ -113,7 +117,9 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
         {
           name: 'TrackData',
           type: 'object_array',
-          objectTypes: [Interpolator],
+          options: {
+            objectTypes: [Interpolator]
+          },
           isHidden(this: PropertyTrack, index: number) {
             return index >= 0;
           },
@@ -187,8 +193,10 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
         {
           name: 'Tracks',
           type: 'object_array',
-          objectTypes: [PropertyTrack],
-          edit: 'proptrack',
+          options: {
+            edit: 'proptrack',
+            objectTypes: [PropertyTrack]
+          },
           readonly: true,
           get(this: AnimationClip, value) {
             value.object = [];

@@ -72,8 +72,8 @@ class PropertyGroup {
     if (value.isValid && !value.isValid.call(obj)) {
       return;
     }
-    if (value.group) {
-      group = this.findOrAddGroup(value.group);
+    if (value.options?.group) {
+      group = this.findOrAddGroup(value.options.group);
     }
     const tmpProperty: PropertyValue = {
       num: [0, 0, 0, 0],
@@ -81,11 +81,11 @@ class PropertyGroup {
       bool: [false],
       object: []
     };
-    if (value.type === 'object' && value.objectTypes?.length > 0) {
+    if (value.type === 'object' && value.options?.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       const propGroup = group.addGroup(value.name);
       propGroup.setObject(tmpProperty.object[0], value, obj, null, 1);
-    } else if (value.type === 'object_array' && value.objectTypes?.length > 0) {
+    } else if (value.type === 'object_array' && value.options?.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
         for (let i = 0; i < tmpProperty.object.length; i++) {
@@ -157,8 +157,8 @@ class PropertyGroup {
         this.path = `${this.path}/${this.prop.name}${typeof index === 'number' ? `[${index}]` : ''}`;
       }
       this.objectTypes =
-        prop?.objectTypes?.length > 0
-          ? prop.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
+        prop?.options?.objectTypes?.length > 0
+          ? prop.options.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
           : [];
       if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
         this.objectTypes.unshift(null);
@@ -383,8 +383,8 @@ export class PropertyEditor extends makeEventTarget(Object)<{
       group.objectTypes.length > 0
     ) {
       const editable =
-        (group.value.object?.[0] instanceof AABB && group.prop.edit === 'aabb') ||
-        (group.value.object?.[0] instanceof PropertyTrack && group.prop.edit === 'proptrack');
+        (group.value.object?.[0] instanceof AABB && group.prop.options?.edit === 'aabb') ||
+        (group.value.object?.[0] instanceof PropertyTrack && group.prop.options?.edit === 'proptrack');
       const settable =
         !group.prop.readonly &&
         !!group.prop.set &&
@@ -443,9 +443,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             this.dispatchEvent('object_property_changed', group.object, group.prop);
             this.refresh();
             if (editable) {
-              if (group.prop.edit === 'aabb') {
+              if (group.prop.options?.edit === 'aabb') {
                 this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
-              } else if (group.prop.edit === 'proptrack') {
+              } else if (group.prop.options?.edit === 'proptrack') {
                 const animation: unknown = group.object;
                 ASSERT(
                   animation instanceof AnimationClip,
@@ -466,9 +466,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         if (editable) {
           ImGui.SameLine(0, 0);
           if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-            if (group.prop.edit === 'aabb') {
+            if (group.prop.options?.edit === 'aabb') {
               this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
-            } else if (group.prop.edit === 'proptrack') {
+            } else if (group.prop.options?.edit === 'proptrack') {
               const animation: unknown = group.object;
               ASSERT(animation instanceof AnimationClip, 'PropertyTrack can only be edited in AnimationClip');
               ASSERT(group.value.object[0] instanceof PropertyTrack);
@@ -510,7 +510,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     ImGui.SetNextItemWidth(-1);
-    const animatable = value && !!value.animatable;
+    const animatable = value && !!value.options?.animatable;
     if (animatable && this.object instanceof SceneNode) {
       if (ImGui.Button('A')) {
         const animationSet = this.object.animationSet;
@@ -545,7 +545,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     if (!value) {
       ImGui.TextDisabled(name ?? '');
     } else {
-      ImGui.Text(value.label ?? name);
+      ImGui.Text(value.options?.label ?? name);
       if (level > 0) {
         ImGui.SetCursorPosX(baseX);
       }
@@ -569,11 +569,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           break;
         }
         case 'int': {
-          if (value.enum) {
-            const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
-            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+          if (value.options?.enum) {
+            const val = [value.options.enum.values.indexOf(tmpProperty.num[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
             if (changed) {
-              tmpProperty.num[0] = value.enum.values[val[0]] as number;
+              tmpProperty.num[0] = value.options.enum.values[val[0]] as number;
             }
           } else {
             const val = tmpProperty.num as [number];
@@ -588,11 +588,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           break;
         }
         case 'float': {
-          if (value.enum) {
-            const val = [value.enum.values.indexOf(tmpProperty.num[0])] as [number];
-            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+          if (value.options?.enum) {
+            const val = [value.options.enum.values.indexOf(tmpProperty.num[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
             if (changed) {
-              tmpProperty.num[0] = value.enum.values[val[0]] as number;
+              tmpProperty.num[0] = value.options.enum.values[val[0]] as number;
             }
           } else {
             const val = [tmpProperty.num[0]] as [number];
@@ -609,11 +609,11 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           break;
         }
         case 'string': {
-          if (value.enum) {
-            const val = [value.enum.values.indexOf(tmpProperty.str[0])] as [number];
-            changed = ImGui.Combo('##value', val, value.enum.labels) && !readonly;
+          if (value.options?.enum) {
+            const val = [value.options.enum.values.indexOf(tmpProperty.str[0])] as [number];
+            changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
             if (changed) {
-              tmpProperty.str[0] = value.enum.values[val[0]] as string;
+              tmpProperty.str[0] = value.options.enum.values[val[0]] as string;
             }
           } else {
             const val = tmpProperty.str as [string];
@@ -653,7 +653,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         }
         case 'vec3': {
           const val = tmpProperty.num as [number, number, number];
-          if (value.edit === 'quaternion') {
+          if (value.options?.edit === 'quaternion') {
             ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
@@ -663,7 +663,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             undefined,
             readonly ? ImGui.InputTextFlags.ReadOnly : undefined
           );
-          if (value.edit === 'quaternion') {
+          if (value.options?.edit === 'quaternion') {
             ImGui.SameLine(0, 0);
             if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
               ImGui.OpenPopup('EditQuaternion');
@@ -732,14 +732,23 @@ export class PropertyEditor extends makeEventTarget(Object)<{
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
-          if (ImGui.BeginDragDropTarget()) {
-            const payload = ImGui.AcceptDragDropPayload('ASSET:texture');
-            if (payload) {
-              tmpProperty.str[0] = payload.Data as string;
-              Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
-                this.refresh();
-              });
-              this.dispatchEvent('object_property_changed', object, value);
+          if (value.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
+            const peekPayload = ImGui.AcceptDragDropPayload(
+              'ASSET',
+              ImGui.DragDropFlags.AcceptBeforeDelivery
+            );
+            if (peekPayload) {
+              const mimeType = ProjectService.VFS.guessMIMEType(peekPayload.Data as string);
+              if (value.options.mimeTypes.includes(mimeType)) {
+                const payload = ImGui.AcceptDragDropPayload('ASSET');
+                if (payload) {
+                  tmpProperty.str[0] = ProjectService.VFS.relative(payload.Data as string);
+                  Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                    this.refresh();
+                  });
+                  this.dispatchEvent('object_property_changed', object, value);
+                }
+              }
             }
             ImGui.EndDragDropTarget();
           }
@@ -750,10 +759,10 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 this.refresh();
               });
               this.dispatchEvent('object_property_changed', object, value);
-              if (property.value.objectTypes?.length > 0) {
+              if (property.value.options?.objectTypes?.length > 0) {
                 ImGui.OpenPopup('X##list');
                 if (ImGui.BeginPopup('X##list')) {
-                  for (const t of property.value.objectTypes) {
+                  for (const t of property.value.options.objectTypes) {
                     const cls = ProjectService.serializationManager.getClassByConstructor(t);
                     if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
                       alert(cls.ctor.name);

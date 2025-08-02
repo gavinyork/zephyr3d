@@ -53,7 +53,9 @@ export function getMeshClass(): SerializableClass {
           type: 'object',
           persistent: false,
           default: null,
-          objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape],
+          options: {
+            objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape]
+          },
           get(this: Mesh, value) {
             value.object[0] = this.primitive;
           },
@@ -82,13 +84,15 @@ export function getMeshClass(): SerializableClass {
           type: 'object',
           default: null,
           persistent: false,
-          objectTypes: [
-            UnlitMaterial,
-            LambertMaterial,
-            BlinnMaterial,
-            PBRMetallicRoughnessMaterial,
-            PBRSpecularGlossinessMaterial
-          ],
+          options: {
+            objectTypes: [
+              UnlitMaterial,
+              LambertMaterial,
+              BlinnMaterial,
+              PBRMetallicRoughnessMaterial,
+              PBRSpecularGlossinessMaterial
+            ]
+          },
           get(this: Mesh, value) {
             value.object[0] = this.material;
           },

@@ -14,7 +14,7 @@ import { DlgOpenFile } from './openfiledlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
-    return DlgMessage.messageBox(title, message, width, height);
+    return DlgMessage.messageBox(title, message, width, height ?? 0);
   }
   public static async messageBoxEx(
     title: string,
@@ -23,7 +23,7 @@ export class Dialog {
     width?: number,
     height?: number
   ) {
-    return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height);
+    return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height ?? 0);
   }
   public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
     return DlgSaveFile.saveFile(title, vfs, project, width, height);

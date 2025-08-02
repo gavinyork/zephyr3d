@@ -216,7 +216,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Position',
           type: 'vec3',
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: SceneNode, value) {
             value.num[0] = this.position.x;
             value.num[1] = this.position.y;
@@ -229,7 +231,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Scale',
           type: 'vec3',
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: SceneNode, value) {
             value.num[0] = this.scale.x;
             value.num[1] = this.scale.y;
@@ -242,8 +246,10 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Rotation',
           type: 'vec3',
-          edit: 'quaternion',
-          animatable: true,
+          options: {
+            animatable: true,
+            edit: 'quaternion'
+          },
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
             value.num[0] = Math.round(radian2degree(zyx.x));
@@ -271,9 +277,11 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Visible',
           type: 'string',
-          enum: {
-            labels: ['Visible', 'Hidden', 'Inherit'],
-            values: ['visible', 'hidden', 'inherit']
+          options: {
+            enum: {
+              labels: ['Visible', 'Hidden', 'Inherit'],
+              values: ['visible', 'hidden', 'inherit']
+            }
           },
           get(this: SceneNode, value) {
             value.str[0] = this.showState;
@@ -316,7 +324,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           name: 'Animations',
           type: 'object_array',
           readonly: true,
-          objectTypes: [AnimationClip],
+          options: {
+            objectTypes: [AnimationClip]
+          },
           get(this: SceneNode, value) {
             const animationSet = this.animationSet;
             value.object = animationSet

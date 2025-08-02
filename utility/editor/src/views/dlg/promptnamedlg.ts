@@ -13,13 +13,7 @@ export class DlgPromptName extends DialogRenderer<string> {
     return new DlgPromptName(title, defaultName, hint, width).showModal();
   }
   constructor(id: string, defaultName: string, hint: string, width = 300) {
-    super(
-      id,
-      width,
-      2 * ImGui.GetStyle().WindowPadding.y + 3 * ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y,
-      true,
-      true
-    );
+    super(id, width, 0, true, true);
     this._name = defaultName ?? '';
     this._hint = hint ?? '';
   }

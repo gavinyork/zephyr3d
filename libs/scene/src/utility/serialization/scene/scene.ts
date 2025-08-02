@@ -36,9 +36,11 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'EnvLightType',
           phase: 0,
           type: 'string',
-          enum: {
-            labels: ['None', 'Constant', 'Hemispheric', 'IBL', 'IBL-SH'],
-            values: ['none', 'constant', 'hemisphere', 'ibl', 'ibl-sh']
+          options: {
+            enum: {
+              labels: ['None', 'Constant', 'Hemispheric', 'IBL', 'IBL-SH'],
+              values: ['none', 'constant', 'hemisphere', 'ibl', 'ibl-sh']
+            }
           },
           default: 'ibl',
           get(this: Scene, value) {
@@ -51,9 +53,11 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'AmbientColor',
           type: 'rgb',
-          animatable: true,
           phase: 1,
           default: [0.2, 0.2, 0.2],
+          options: {
+            animatable: true
+          },
           get(this: Scene, value) {
             const color = this.env.light.ambientColor;
             value.num[0] = color.x;
@@ -71,8 +75,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'AmbientUp',
           type: 'rgb',
           phase: 1,
-          animatable: true,
           default: [0.3, 0.5, 0.8],
+          options: {
+            animatable: true
+          },
           get(this: Scene, value) {
             const color = this.env.light.ambientUp;
             value.num[0] = color.x;
@@ -90,8 +96,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'AmbientDown',
           type: 'rgb',
           phase: 1,
-          animatable: true,
           default: [0.2, 0.2, 0.2],
+          options: {
+            animatable: true
+          },
           get(this: Scene, value) {
             const color = this.env.light.ambientDown;
             value.num[0] = color.x;
@@ -108,9 +116,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'EnvLightStrength',
           type: 'float',
-          animatable: true,
           phase: 0,
-          options: { minValue: 0, maxValue: 10 },
+          options: { animatable: true, minValue: 0, maxValue: 10 },
           default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.light.strength;
@@ -162,9 +169,11 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'SkyType',
           type: 'string',
           phase: 0,
-          enum: {
-            labels: ['None', 'Color', 'SkyBox', 'Scatter'],
-            values: ['none', 'color', 'skybox', 'scatter']
+          options: {
+            enum: {
+              labels: ['None', 'Color', 'SkyBox', 'Scatter'],
+              values: ['none', 'color', 'skybox', 'scatter']
+            }
           },
           default: 'scatter',
           get(this: Scene, value) {
@@ -177,9 +186,11 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'SkyColor',
           type: 'rgb',
-          animatable: true,
           phase: 1,
           default: [1, 1, 1],
+          options: {
+            animatable: true
+          },
           isValid() {
             return this.env.sky.skyType === 'color';
           },
@@ -198,9 +209,11 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'FogType',
           type: 'string',
           phase: 0,
-          enum: {
-            labels: ['None', 'Linear', 'Exp', 'Exp2', 'ExponentialHeight'],
-            values: ['none', 'linear', 'exp', 'exp2', 'height_fog']
+          options: {
+            enum: {
+              labels: ['None', 'Linear', 'Exp', 'Exp2', 'ExponentialHeight'],
+              values: ['none', 'linear', 'exp', 'exp2', 'height_fog']
+            }
           },
           default: 'none',
           get(this: Scene, value) {
@@ -211,12 +224,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'Density',
-          group: 'HeightFog',
           type: 'float',
           name: 'HeightFogDensity',
           default: 0.04,
-          options: { minValue: 0, maxValue: 1 },
+          options: { group: 'HeightFog', label: 'Density', minValue: 0, maxValue: 1 },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -228,12 +239,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'Falloff',
-          group: 'HeightFog',
           name: 'HeightFogFalloff',
           type: 'float',
           default: 0.2,
-          options: { minValue: 0, maxValue: 1 },
+          options: { group: 'HeightFog', label: 'Falloff', minValue: 0, maxValue: 1 },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -245,12 +254,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'StartHeight',
-          group: 'HeightFog',
           name: 'HeightFogStartHeight',
           type: 'float',
           default: 0,
-          options: { minValue: 0, maxValue: 1000 },
+          options: { group: 'HeightFog', label: 'StartHeight', minValue: 0, maxValue: 1000 },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -262,13 +269,15 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'FogColor',
-          group: 'HeightFog',
           name: 'HeightFogColor',
           type: 'rgb',
           phase: 1,
-          animatable: true,
           default: [0, 0, 0],
+          options: {
+            group: 'HeightFog',
+            label: 'FogColor',
+            animatable: true
+          },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -283,11 +292,13 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'StartDistance',
-          group: 'HeightFog',
           name: 'HeightFogStartDistance',
           type: 'float',
           default: 0,
+          options: {
+            group: 'HeightFog',
+            label: 'StartDistance'
+          },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -299,11 +310,9 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'MaxOpacity',
-          group: 'HeightFog',
           name: 'HeightFogMaxOpacity',
           type: 'float',
-          options: { minValue: 0, maxValue: 1 },
+          options: { group: 'HeightFog', label: 'MaxOpacity', minValue: 0, maxValue: 1 },
           default: 1,
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
@@ -316,11 +325,9 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'AtmosphereStrength',
-          group: 'HeightFog',
           name: 'HeightFogAtmosphereStrength',
           type: 'float',
-          options: { minValue: 0, maxValue: 10 },
+          options: { group: 'HeightFog', label: 'AtmosphereStrength', minValue: 0, maxValue: 10 },
           default: 1,
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
@@ -333,11 +340,10 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'DirectionalExponent',
-          group: 'HeightFog',
           name: 'HeightFogDirExponent',
           type: 'float',
           default: 4,
+          options: { group: 'HeightFog', label: 'DirectionalExponent' },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -349,11 +355,13 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
-          label: 'DirectionalInscattering',
-          group: 'HeightFog',
           name: 'HeightFogDirColor',
           type: 'rgb',
           default: [0, 0, 0],
+          options: {
+            group: 'HeightFog',
+            label: 'DirectionalInscattering'
+          },
           isValid(this: Scene) {
             return this.env.sky.fogType === 'height_fog';
           },
@@ -369,9 +377,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'AerialPerspectiveDistance',
           type: 'float',
-          animatable: true,
           phase: 1,
-          options: { minValue: 1, maxValue: 50000 },
+          options: { animatable: true, minValue: 1, maxValue: 50000 },
           default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.aerialPerspectiveDistance;
@@ -386,9 +393,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'CameraHeightScale',
           type: 'float',
-          animatable: true,
           phase: 1,
-          options: { minValue: 1, maxValue: 1000 },
+          options: { animatable: true, minValue: 1, maxValue: 1000 },
           default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cameraHeightScale;
@@ -403,8 +409,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'AtmosphereExposure',
           type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 8 },
+          options: { animatable: true, minValue: 0, maxValue: 8 },
           default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.atmosphereExposure;
@@ -420,9 +425,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'Cloudy',
           type: 'float',
           default: 0.6,
-          animatable: true,
           phase: 1,
-          options: { minValue: 0, maxValue: 1 },
+          options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cloudy;
           },
@@ -436,10 +440,9 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'CloudIntensity',
           type: 'float',
-          animatable: true,
           default: 40,
           phase: 1,
-          options: { minValue: 0, maxValue: 200 },
+          options: { animatable: true, minValue: 0, maxValue: 200 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cloudIntensity;
           },
@@ -453,10 +456,9 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
         {
           name: 'Wind',
           type: 'vec2',
-          animatable: true,
           default: [0, 0],
           phase: 1,
-          options: { minValue: -100, maxValue: 100 },
+          options: { animatable: true, minValue: -100, maxValue: 100 },
           get(this: Scene, value) {
             value.num[0] = this.env.sky.wind.x;
             value.num[1] = this.env.sky.wind.y;

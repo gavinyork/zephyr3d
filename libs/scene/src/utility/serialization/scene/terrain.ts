@@ -305,9 +305,11 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
         {
           name: 'Debug',
           type: 'string',
-          enum: {
-            labels: ['None', 'UV', 'VertexNormal', 'DetailNormal', 'Tangent', 'Binormal', 'Albedo'],
-            values: ['none', 'uv', 'vertex_normal', 'detail_normal', 'tangent', 'bitangent', 'albedo']
+          options: {
+            enum: {
+              labels: ['None', 'UV', 'VertexNormal', 'DetailNormal', 'Tangent', 'Binormal', 'Albedo'],
+              values: ['none', 'uv', 'vertex_normal', 'detail_normal', 'tangent', 'bitangent', 'albedo']
+            }
           },
           default: 'none',
           get(this: ClipmapTerrain, value) {

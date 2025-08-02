@@ -30,7 +30,9 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
           name: 'Wind',
           type: 'vec2',
           default: [0.1, 0],
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: FBMWaveGenerator, value) {
             value.num[0] = this.wind.x;
             value.num[1] = this.wind.y;
@@ -42,8 +44,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
         {
           name: 'Amplitude',
           type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 5 },
+          options: { animatable: true, minValue: 0, maxValue: 5 },
           default: 0.3,
           get(this: FBMWaveGenerator, value) {
             value.num[0] = this.amplitude;
@@ -55,8 +56,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
         {
           name: 'Frequency',
           type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 16 },
+          options: { animatable: true, minValue: 0, maxValue: 16 },
           default: 3,
           get(this: FBMWaveGenerator, value) {
             value.num[0] = this.frequency;
@@ -79,8 +79,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         {
           name: 'Alignment',
           type: 'float',
-          animatable: true,
-          options: { minValue: 0, maxValue: 1 },
+          options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.alignment;
           },
@@ -91,7 +90,9 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         {
           name: 'Wind',
           type: 'vec2',
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.wind.x;
             value.num[1] = this.wind.y;
@@ -104,8 +105,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
           name: 'FoamWidth',
           type: 'float',
           default: 1.2,
-          animatable: true,
-          options: { minValue: 0, maxValue: 10 },
+          options: { animatable: true, minValue: 0, maxValue: 10 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.foamWidth;
           },
@@ -117,8 +117,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
           name: 'FoamContrast',
           type: 'float',
           default: 7.2,
-          animatable: true,
-          options: { minValue: 0, maxValue: 10 },
+          options: { animatable: true, minValue: 0, maxValue: 10 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.foamContrast;
           },
@@ -129,9 +128,8 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         {
           name: 'WaveLengthCascades',
           type: 'vec3',
-          animatable: true,
           default: [400, 100, 15],
-          options: { minValue: 0, maxValue: 1000 },
+          options: { animatable: true, minValue: 0, maxValue: 1000 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.getWaveLength(0);
             value.num[1] = this.getWaveLength(1);
@@ -146,9 +144,8 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         {
           name: 'WaveStrengthCascades',
           type: 'vec3',
-          animatable: true,
           default: [0.4, 0.4, 0.2],
-          options: { minValue: 0, maxValue: 1 },
+          options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.getWaveStrength(0);
             value.num[1] = this.getWaveStrength(1);
@@ -163,9 +160,8 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         {
           name: 'WaveCroppinessCascades',
           type: 'vec3',
-          animatable: true,
           default: [-1.5, -1.2, -0.5],
-          options: { minValue: -4, maxValue: 0 },
+          options: { animatable: true, minValue: -4, maxValue: 0 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.getWaveCroppiness(0);
             value.num[1] = this.getWaveCroppiness(1);
@@ -200,7 +196,9 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
           name: 'WaveGenerator',
           type: 'object',
           default: null,
-          objectTypes: [FFTWaveGenerator, FBMWaveGenerator],
+          options: {
+            objectTypes: [FFTWaveGenerator, FBMWaveGenerator]
+          },
           isNullable() {
             return true;
           },
@@ -242,8 +240,7 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
           name: 'AnimationSpeed',
           type: 'float',
           default: 1,
-          animatable: true,
-          options: { minValue: 0, maxValue: 100 },
+          options: { animatable: true, minValue: 0, maxValue: 100 },
           get(this: Water, value) {
             value.num[0] = this.animationSpeed;
           },
@@ -254,9 +251,8 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
         {
           name: 'DepthScale',
           type: 'float',
-          animatable: true,
           default: 10,
-          options: { minValue: 0, maxValue: 100 },
+          options: { animatable: true, minValue: 0, maxValue: 100 },
           get(this: Water, value) {
             value.num[0] = this.material.depthMulti;
           },
@@ -268,8 +264,7 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
           name: 'RefractionStrength',
           type: 'float',
           default: 0,
-          animatable: true,
-          options: { minValue: 0, maxValue: 1 },
+          options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: Water, value) {
             value.num[0] = this.material.refractionStrength;
           },

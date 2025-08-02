@@ -24,8 +24,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'IOR',
       type: 'float',
-      animatable: true,
       default: 1.5,
+      options: {
+        animatable: true
+      },
       get(this: PBRMaterial, value) {
         value.num[0] = this.ior;
       },
@@ -39,10 +41,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'OcclusionStrength',
       type: 'float',
-      animatable: true,
       phase: 2,
       default: 1,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -60,7 +62,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'EmissiveColor',
       type: 'rgb',
-      animatable: true,
+      options: {
+        animatable: true
+      },
       get(this: PBRMaterial, value) {
         value.num[0] = this.emissiveColor.x;
         value.num[1] = this.emissiveColor.y;
@@ -76,8 +80,8 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'EmissiveStrength',
       type: 'float',
-      animatable: true,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -112,9 +116,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'TransmissionFactor',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 0,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -136,8 +140,8 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       type: 'float',
       phase: 1,
       default: 0,
-      animatable: true,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 99999
       },
@@ -158,8 +162,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'AttenuationColor',
       type: 'rgb',
       phase: 1,
-      animatable: true,
       default: [1, 1, 1],
+      options: {
+        animatable: true
+      },
       get(this: PBRMaterial, value) {
         value.num[0] = this.attenuationColor.x;
         value.num[1] = this.attenuationColor.y;
@@ -175,10 +181,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'AttenuationDistance',
       type: 'float',
-      animatable: true,
       phase: 1,
       default: 99999,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 99999
       },
@@ -210,10 +216,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
     {
       name: 'IridescenceFactor',
       type: 'float',
-      animatable: true,
       phase: 1,
       default: 0,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -234,8 +240,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'IridescenceIOR',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 1.3,
+      options: {
+        animatable: true
+      },
       get(this: PBRMaterial, value) {
         value.num[0] = this.iridescenceIor;
       },
@@ -250,9 +258,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'IridescenceThicknessMin',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 100,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1000
       },
@@ -270,9 +278,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'IridescenceThicknessMax',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 400,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1000
       },
@@ -308,9 +316,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'ClearCoatIntensity',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 0,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -332,8 +340,8 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       type: 'float',
       phase: 1,
       default: 0,
-      animatable: true,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -372,8 +380,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'SheenColorFactor',
       type: 'rgb',
       phase: 1,
-      animatable: true,
       default: [0, 0, 0],
+      options: {
+        animatable: true
+      },
       get(this: PBRMaterial, value) {
         value.num[0] = this.sheenColorFactor.x;
         value.num[1] = this.sheenColorFactor.y;
@@ -393,9 +403,9 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
       name: 'SheenRoughnessFactor',
       type: 'float',
       phase: 1,
-      animatable: true,
       default: 0,
       options: {
+        animatable: true,
         minValue: 0,
         maxValue: 1
       },
@@ -469,7 +479,9 @@ function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<
     {
       name: 'AlbedoColor',
       type: 'rgba',
-      animatable: true,
+      options: {
+        animatable: true
+      },
       get(this: UnlitPropTypes, value) {
         const color = this.albedoColor;
         value.num[0] = color.x;
@@ -521,9 +533,9 @@ export function getMeshMaterialClass(): SerializableClass {
         {
           name: 'AlphaCutoff',
           type: 'float',
-          animatable: true,
           default: 0,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1
           },
@@ -554,7 +566,9 @@ export function getMeshMaterialClass(): SerializableClass {
         {
           name: 'BlendMode',
           type: 'string',
-          enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] },
+          options: {
+            enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] }
+          },
           default: 'none',
           get(this: MeshMaterial, value) {
             value.str[0] = this.blendMode;
@@ -569,7 +583,9 @@ export function getMeshMaterialClass(): SerializableClass {
         {
           name: 'CullMode',
           type: 'string',
-          enum: { labels: ['None', 'Front', 'Back'], values: ['none', 'front', 'back'] },
+          options: {
+            enum: { labels: ['None', 'Front', 'Back'], values: ['none', 'front', 'back'] }
+          },
           default: 'back',
           get(this: MeshMaterial, value) {
             value.str[0] = this.cullMode;
@@ -585,10 +601,10 @@ export function getMeshMaterialClass(): SerializableClass {
           name: 'Opacity',
           type: 'float',
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1
           },
-          animatable: true,
           default: 1,
           get(this: MeshMaterial, value) {
             value.num[0] = this.opacity;
@@ -808,8 +824,8 @@ export function getBlinnMaterialClass(manager: SerializationManager): Serializab
         {
           name: 'Shininess',
           type: 'float',
-          animatable: true,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 2048
           },
@@ -863,8 +879,8 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
         {
           name: 'Metallic',
           type: 'float',
-          animatable: true,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1
           },
@@ -881,8 +897,8 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
         {
           name: 'Roughness',
           type: 'float',
-          animatable: true,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1
           },
@@ -899,7 +915,9 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
         {
           name: 'SpecularFactor',
           type: 'rgba',
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: PBRMetallicRoughnessMaterial, value) {
             value.num[0] = this.specularFactor.x;
             value.num[1] = this.specularFactor.y;
@@ -955,7 +973,9 @@ export function getPBRSpecularGlossinessMaterialClass(manager: SerializationMana
         {
           name: 'SpecularFactor',
           type: 'rgb',
-          animatable: true,
+          options: {
+            animatable: true
+          },
           get(this: PBRSpecularGlossinessMaterial, value) {
             value.num[0] = this.specularFactor.x;
             value.num[1] = this.specularFactor.y;
@@ -971,8 +991,8 @@ export function getPBRSpecularGlossinessMaterialClass(manager: SerializationMana
         {
           name: 'GlossnessFactor',
           type: 'float',
-          animatable: true,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1
           },

@@ -24,6 +24,12 @@ export function getTextureProps<T extends Material>(
       type: 'object',
       default: null,
       phase: phase,
+      options: {
+        mimeTypes:
+          type === '2D'
+            ? ['image/jpg', 'image/jpeg', 'image/png', 'image/tga', 'image/vnd.radiance', 'image/x-dds']
+            : ['image/x-dds']
+      },
       isNullable() {
         return true;
       },
@@ -67,8 +73,10 @@ export function getTextureProps<T extends Material>(
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordScale',
       type: 'vec2',
       phase: phase + 1,
-      animatable: true,
       default: [1, 1],
+      options: {
+        animatable: true
+      },
       get(this: T, value) {
         const matrix = this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] as Matrix4x4;
         if (!matrix) {
@@ -104,7 +112,12 @@ export function getTextureProps<T extends Material>(
     {
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressU',
       type: 'string',
-      enum: { labels: ['Clamp', 'Repeat', 'MirroredRepeat'], values: ['clamp', 'repeat', 'mirrored_repeat'] },
+      options: {
+        enum: {
+          labels: ['Clamp', 'Repeat', 'MirroredRepeat'],
+          values: ['clamp', 'repeat', 'mirrored_repeat']
+        }
+      },
       phase: phase + 1,
       default: 'clamp',
       get(this: T, value) {
@@ -142,7 +155,12 @@ export function getTextureProps<T extends Material>(
     {
       name: name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressV',
       type: 'string',
-      enum: { labels: ['Clamp', 'Repeat', 'MirroredRepeat'], values: ['clamp', 'repeat', 'mirrored_repeat'] },
+      options: {
+        enum: {
+          labels: ['Clamp', 'Repeat', 'MirroredRepeat'],
+          values: ['clamp', 'repeat', 'mirrored_repeat']
+        }
+      },
       phase: phase + 1,
       default: 'clamp',
       get(this: T, value) {

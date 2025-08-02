@@ -16,8 +16,10 @@ export function getPunctualLightClass(): SerializableClass {
         {
           name: 'Color',
           type: 'rgb',
-          animatable: true,
           default: [1, 1, 1],
+          options: {
+            animatable: true
+          },
           get(this: PunctualLight, value) {
             value.num[0] = this.color.x;
             value.num[1] = this.color.y;
@@ -30,9 +32,9 @@ export function getPunctualLightClass(): SerializableClass {
         {
           name: 'Intensity',
           type: 'float',
-          animatable: true,
           default: 1,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 100
           },
@@ -60,9 +62,11 @@ export function getPunctualLightClass(): SerializableClass {
           type: 'string',
           phase: 1,
           default: 'hard',
-          enum: {
-            labels: ['Hard', 'PCF', 'PCF-PD', 'VSM', 'ESM'],
-            values: ['hard', 'pcf-opt', 'pcf-pd', 'vsm', 'esm']
+          options: {
+            enum: {
+              labels: ['Hard', 'PCF', 'PCF-PD', 'VSM', 'ESM'],
+              values: ['hard', 'pcf-opt', 'pcf-pd', 'vsm', 'esm']
+            }
           },
           get(this: PunctualLight, value) {
             value.str[0] = this.shadow.mode;
@@ -98,9 +102,11 @@ export function getPunctualLightClass(): SerializableClass {
           phase: 1,
           type: 'int',
           default: 1024,
-          enum: {
-            labels: ['128x128', '256x256', '512x512', '1024x1024', '2048x2048', '4096x4096'],
-            values: [128, 256, 512, 1024, 2048, 4096]
+          options: {
+            enum: {
+              labels: ['128x128', '256x256', '512x512', '1024x1024', '2048x2048', '4096x4096'],
+              values: [128, 256, 512, 1024, 2048, 4096]
+            }
           },
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.shadowMapSize;
@@ -116,9 +122,11 @@ export function getPunctualLightClass(): SerializableClass {
           name: 'ShadowRegion',
           phase: 1,
           type: 'object',
-          edit: 'aabb',
           default: null,
-          objectTypes: [AABB],
+          options: {
+            edit: 'aabb',
+            objectTypes: [AABB]
+          },
           isNullable() {
             return true;
           },
@@ -194,9 +202,11 @@ export function getPunctualLightClass(): SerializableClass {
           phase: 2,
           type: 'int',
           default: 5,
-          enum: {
-            labels: ['3x3', '5x5', '7x7'],
-            values: [3, 5, 7]
+          options: {
+            enum: {
+              labels: ['3x3', '5x5', '7x7'],
+              values: [3, 5, 7]
+            }
           },
           get(this: PunctualLight, value) {
             value.num[0] = this.shadow.pcfKernelSize;
@@ -427,9 +437,9 @@ export function getPointLightClass(): SerializableClass {
         {
           name: 'Range',
           type: 'float',
-          animatable: true,
           default: 10,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1000
           },
@@ -462,9 +472,9 @@ export function getSpotLightClass(): SerializableClass {
         {
           name: 'Range',
           type: 'float',
-          animatable: true,
           default: 10,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 1000
           },
@@ -478,9 +488,9 @@ export function getSpotLightClass(): SerializableClass {
         {
           name: 'BeamAngle',
           type: 'float',
-          animatable: true,
           default: 90,
           options: {
+            animatable: true,
             minValue: 0,
             maxValue: 180
           },
