@@ -121,12 +121,11 @@ export class ZipFS extends VFS {
   /**
    * Constructs a ZIP file system instance.
    *
-   * @param name - The name of the ZIP file system (used as its identifier)
    * @param zipJS - Dependency injection of zip.js constructors/readers/writers
    * @param readonly - Whether the file system should operate in read-only mode
    */
-  constructor(name: string, zipJS: ZipJSDependencies, readonly = false) {
-    super(name, readonly);
+  constructor(zipJS: ZipJSDependencies, readonly = false) {
+    super(readonly);
     this.zipJS = zipJS;
     if (!readonly) {
       // 创建新的空 ZIP
@@ -185,7 +184,7 @@ export class ZipFS extends VFS {
    * 确保 ZIP writer 存在
    */
   private async ensureWriter(): Promise<ZipJSWriter> {
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 
@@ -978,7 +977,7 @@ export class ZipFS extends VFS {
       progress?: (current: number, total: number, path: string) => void;
     }
   ): Promise<void> {
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 
@@ -1116,7 +1115,7 @@ export class ZipFS extends VFS {
     return;
   }
   protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 

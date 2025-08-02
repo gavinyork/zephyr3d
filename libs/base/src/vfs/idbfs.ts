@@ -29,7 +29,7 @@ export class IndexedDBFS extends VFS {
    * @param readonly - Whether the file system should be read-only
    */
   constructor(dbName: string, storeName: string, readonly = false) {
-    super(dbName, readonly);
+    super(readonly);
     this.dbName = dbName;
     this.storeName = storeName;
   }

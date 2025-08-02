@@ -12,8 +12,8 @@ export class MemoryFS extends VFS {
   private directories: Set<string> = new Set(['/']);
   private metadata: Map<string, FileMetadata> = new Map();
 
-  constructor(name = 'MemoryFS', readonly = false) {
-    super(name, readonly);
+  constructor(readonly = false) {
+    super(readonly);
     const now = new Date();
     this.metadata.set('/', {
       created: now,

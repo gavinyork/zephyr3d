@@ -20,7 +20,7 @@ export class HttpFS extends VFS {
   private options: HttpFSOptions;
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
-    super('HttpFS', true); // 只读
+    super(true); // 只读
     baseURL = baseURL || new URL(window.location.href).origin;
     if (!URL.canParse(baseURL)) {
       throw new Error(`Invalid base URL while contructing HttpFS: ${baseURL}`);

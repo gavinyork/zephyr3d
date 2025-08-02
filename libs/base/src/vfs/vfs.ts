@@ -308,10 +308,8 @@ export class GlobMatcher {
 export abstract class VFS extends makeEventTarget(Object)<{
   changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
 }>() {
-  /** The name of this file system instance */
-  public readonly name: string;
   /** Whether this file system is read-only */
-  public readonly isReadOnly: boolean;
+  public readonly readOnly: boolean;
 
   // CWD 支持
   private _cwd: string = '/';
@@ -324,13 +322,11 @@ export abstract class VFS extends makeEventTarget(Object)<{
   /**
    * Creates a new VFS instance.
    *
-   * @param name - The name of this file system
-   * @param isReadOnly - Whether this file system should be read-only
+   * @param readOnly - Whether this file system should be read-only
    */
-  constructor(name: string, isReadOnly: boolean = false) {
+  constructor(readOnly: boolean = false) {
     super();
-    this.name = name;
-    this.isReadOnly = isReadOnly;
+    this.readOnly = readOnly;
   }
 
   /**
@@ -581,7 +577,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
     await this._validateMoveTypeCompatibility(normalizedSource, normalizedTarget, options);
 
     // 4. 如果文件系统是只读的，抛出错误
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedSource);
     }
 
@@ -602,7 +598,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return mounted.vfs.makeDirectory(mounted.relativePath, recursive);
     }
 
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -627,7 +623,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
     }
 
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -674,7 +670,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return mounted.vfs.writeFile(mounted.relativePath, data, options);
     }
 
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -690,7 +686,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return mounted.vfs.deleteFile(mounted.relativePath);
     }
 
-    if (this.isReadOnly) {
+    if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -718,30 +714,244 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return this._stat(normalizedPath);
   }
 
-  async copyFile(src: string, dest: string, options?: { overwrite?: boolean }): Promise<void> {
+  async copyFile(
+    src: string,
+    dest: string,
+    options?: { overwrite?: boolean; targetVFS?: VFS }
+  ): Promise<void> {
+    const targetVFS = options?.targetVFS ?? this;
+    const overwrite = !!options?.overwrite;
+    if (targetVFS.readOnly) {
+      throw new VFSError('Target VFS is read-only', 'EROFS');
+    }
     const normalizedSrc = this.normalizePath(src);
-    const normalizedDest = this.normalizePath(dest);
+    const normalizedDest = targetVFS.normalizePath(dest);
+    if (!(await this.exists(normalizedSrc))) {
+      throw new VFSError('Source file does not exist', 'ENOENT', normalizedSrc);
+    }
+    const sourceStat = await this.stat(normalizedSrc);
+    if (!sourceStat.isFile) {
+      throw new VFSError('Source path is not a file', 'EISDIR', normalizedSrc);
+    }
+    const targetExists = await targetVFS.exists(normalizedDest);
+    if (targetExists && !overwrite) {
+      if (!overwrite) {
+        throw new VFSError('Target file already exists', 'EEXIST', normalizedDest);
+      }
+      const targetStat = await targetVFS.stat(normalizedDest);
+      if (!targetStat.isFile) {
+        throw new VFSError('Target path is not a file', 'EISDIR', normalizedDest);
+      }
+    }
+    const parentPath = targetVFS.dirname(normalizedDest);
+    if (parentPath !== '/' && !(await targetVFS.exists(parentPath))) {
+      await targetVFS.makeDirectory(parentPath, true);
+    }
+    const data = await this.readFile(normalizedSrc, { encoding: 'binary' });
+    await targetVFS.writeFile(normalizedDest, data, { create: true, encoding: 'binary' });
+  }
 
-    if (!options?.overwrite && (await this.exists(normalizedDest))) {
-      throw new VFSError('Destination file already exists', 'EEXIST', normalizedDest);
+  /**
+   * Copy multiple files matching a pattern to a target directory
+   *
+   * @param sourcePattern - Source pattern (glob pattern, file path, or array of file paths)
+   * @param targetDirectory - Target directory path
+   * @param options - Copy options (can include targetVFS for cross-VFS copy)
+   * @returns Copy operation result
+   *
+   * @example
+   * ```typescript
+   * // Copy all .txt files to backup directory
+   * const result = await vfs.copyFileEx('/data/*.txt', '/backup');
+   *
+   * // Copy directory to different VFS
+   * const result = await vfsA.copyFileEx('DirToCopy/**\/*', 'Foo/DirToCopy', {
+   *   overwrite: true,
+   *   targetVFS: vfsB
+   * });
+   *
+   * // Copy specific files
+   * const result = await vfs.copyFileEx(['/file1.txt', '/file2.txt'], '/backup');
+   * ```
+   */
+  async copyFileEx(
+    sourcePattern: string | string[],
+    targetDirectory: string,
+    options?: { overwrite?: boolean; targetVFS?: VFS }
+  ): Promise<void> {
+    const targetVFS = options?.targetVFS ?? this;
+    const overwrite = !!options?.overwrite;
+
+    if (targetVFS.readOnly) {
+      throw new VFSError('Target VFS is read-only', 'EROFS');
     }
 
-    const data = await this.readFile(normalizedSrc);
-    await this.writeFile(normalizedDest, data, { create: true });
+    try {
+      const normalizedTargetDir = targetVFS.normalizePath(targetDirectory);
+
+      // Always create target directory
+      if (!(await targetVFS.exists(normalizedTargetDir))) {
+        await targetVFS.makeDirectory(normalizedTargetDir, true);
+      } else {
+        // Check if target is a directory
+        const targetStat = await targetVFS.stat(normalizedTargetDir);
+        if (!targetStat.isDirectory) {
+          throw new VFSError('Target path is not a directory', 'ENOTDIR', normalizedTargetDir);
+        }
+      }
+
+      // Get list of files to copy
+      let filesToCopy: string[] = [];
+
+      if (Array.isArray(sourcePattern)) {
+        // Array of specific file paths
+        filesToCopy = sourcePattern;
+      } else {
+        // Glob pattern or single path
+        filesToCopy = await this.expandGlobPattern(sourcePattern);
+      }
+
+      // Copy each file
+      for (const sourcePath of filesToCopy) {
+        try {
+          // Check if source exists and is a file
+          if (!(await this.exists(sourcePath))) {
+            console.error(`Source file does not exist: ${sourcePath}`);
+            continue;
+          }
+
+          const sourceStat = await this.stat(sourcePath);
+          if (!sourceStat.isFile) {
+            console.error(`Source file is not a file: ${sourcePath}`);
+            continue;
+          }
+
+          // Determine target file path - preserve relative directory structure
+          const targetFilePath = this.calculateTargetPath(sourcePattern, sourcePath, normalizedTargetDir);
+
+          // Check if target already exists
+          const targetExists = await targetVFS.exists(targetFilePath);
+          if (targetExists && !overwrite) {
+            continue;
+          }
+
+          // Always create parent directory for target file
+          const targetParent = targetVFS.dirname(targetFilePath);
+          if (!(await targetVFS.exists(targetParent))) {
+            await targetVFS.makeDirectory(targetParent, true);
+          }
+
+          // Copy the file
+          const data = await this.readFile(sourcePath, { encoding: 'binary' });
+          await targetVFS.writeFile(targetFilePath, data, { create: true, encoding: 'binary' });
+        } catch (error) {
+          console.error(String(error));
+        }
+      }
+    } catch (error) {
+      console.error(String(error));
+    }
+  }
+
+  /**
+   * Calculate target file path preserving relative directory structure
+   */
+  private calculateTargetPath(
+    sourcePattern: string | string[],
+    sourcePath: string,
+    targetDirectory: string
+  ): string {
+    if (Array.isArray(sourcePattern)) {
+      // For explicit file list, just use filename
+      const fileName = this.basename(sourcePath);
+      return PathUtils.join(targetDirectory, fileName);
+    }
+
+    // For glob patterns, preserve relative structure
+    const patternDir = this.extractPatternDirectory(sourcePattern);
+
+    // 规范化路径以便比较
+    const normalizedPatternDir = this.normalizePath(patternDir);
+    const normalizedSourcePath = this.normalizePath(sourcePath);
+
+    if (normalizedSourcePath.startsWith(normalizedPatternDir)) {
+      const relativePath = PathUtils.relative(normalizedPatternDir, normalizedSourcePath);
+      return PathUtils.join(targetDirectory, relativePath);
+    } else {
+      // Fallback to just filename
+      const fileName = this.basename(sourcePath);
+      return PathUtils.join(targetDirectory, fileName);
+    }
+  }
+  /**
+   * Expand a glob pattern to a list of matching file paths
+   */
+  private async expandGlobPattern(pattern: string): Promise<string[]> {
+    const matchedFiles: string[] = [];
+
+    if (pattern.includes('*') || pattern.includes('?')) {
+      // It's a glob pattern - use existing glob method
+      const globResults = await this.glob(pattern, {
+        includeFiles: true,
+        includeDirs: false,
+        recursive: pattern.includes('**'),
+        cwd: this._cwd // 明确指定搜索根目录
+      });
+
+      matchedFiles.push(...globResults.map((result) => result.path));
+    } else {
+      // It's a regular path
+      const normalizedPattern = this.normalizePath(pattern);
+      if (await this.exists(normalizedPattern)) {
+        const stat = await this.stat(normalizedPattern);
+        if (stat.isFile) {
+          matchedFiles.push(normalizedPattern);
+        }
+      }
+    }
+
+    return matchedFiles;
+  }
+
+  /**
+   * Extract the directory part from a glob pattern
+   */
+  private extractPatternDirectory(pattern: string): string {
+    // 处理以 / 开头的绝对路径模式
+    if (pattern.startsWith('/')) {
+      const parts = pattern.substring(1).split('/'); // 移除开头的 /
+      const dirParts: string[] = [];
+
+      for (const part of parts) {
+        if (part.includes('*') || part.includes('?')) {
+          break;
+        }
+        dirParts.push(part);
+      }
+
+      // 如果没有非通配符部分，返回根目录
+      if (dirParts.length === 0) {
+        return '/';
+      }
+
+      return '/' + dirParts.join('/');
+    } else {
+      // 相对路径模式
+      const parts = pattern.split('/');
+      const dirParts: string[] = [];
+
+      for (const part of parts) {
+        if (part.includes('*') || part.includes('?')) {
+          break;
+        }
+        dirParts.push(part);
+      }
+
+      return dirParts.length > 0 ? dirParts.join('/') : '.';
+    }
   }
 
   async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
-    // 使用 CWD 作为默认搜索根目录
-    const defaultOptions = {
-      cwd: this._cwd,
-      ...options
-    };
-
-    // 规范化 cwd 选项
-    if (defaultOptions.cwd) {
-      defaultOptions.cwd = this.normalizePath(defaultOptions.cwd);
-    }
-
     const {
       recursive = true,
       includeHidden = false,
@@ -751,7 +961,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
       cwd = this._cwd,
       ignore = [],
       limit
-    } = defaultOptions;
+    } = options;
 
     const patterns = (Array.isArray(pattern) ? pattern : [pattern]).filter((pattern) => !!pattern);
     if (patterns.length === 0) {
@@ -765,14 +975,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const results: GlobResult[] = [];
     const normalizedCwd = this.normalizePath(cwd);
 
-    const searchDirectory = async (dirPath: string): Promise<void> => {
+    const searchDirectory = async (dirPath: string, depth: number = 0): Promise<void> => {
       if (limit && results.length >= limit) {
         return;
       }
 
       try {
         const entries = await this._readDirectory(dirPath, {
-          includeHidden: true
+          includeHidden: true // 内部总是包含隐藏文件，后面再过滤
         });
 
         for (const entry of entries) {
@@ -781,63 +991,103 @@ export abstract class VFS extends makeEventTarget(Object)<{
           }
 
           const fullPath = entry.path;
-          const relativePath = PathUtils.relative(normalizedCwd, fullPath);
 
-          if (entry.type === 'file' && !includeFiles) {
+          // 计算相对于搜索根目录的路径
+          let relativePath: string;
+          if (fullPath === normalizedCwd) {
+            relativePath = '.';
+          } else if (fullPath.startsWith(normalizedCwd + '/')) {
+            relativePath = fullPath.substring(normalizedCwd.length + 1);
+          } else if (normalizedCwd === '/' && fullPath.startsWith('/')) {
+            relativePath = fullPath.substring(1);
+          } else {
+            // 如果不在搜索根目录下，跳过
             continue;
           }
-          if (entry.type === 'file' || (entry.type === 'directory' && includeDirs)) {
-            if (!includeHidden && entry.name.startsWith('.')) {
-              continue;
-            }
 
-            const shouldIgnore = ignoreMatchers.some(
-              (matcher) => matcher.test(relativePath) || matcher.test(fullPath)
-            );
-            if (shouldIgnore) {
-              continue;
+          // 过滤隐藏文件
+          if (!includeHidden && entry.name.startsWith('.')) {
+            // 如果是目录且需要递归，仍需搜索（隐藏目录下可能有非隐藏文件）
+            if (recursive && entry.type === 'directory') {
+              await searchDirectory(fullPath, depth + 1);
             }
+            continue;
+          }
 
-            for (const matcher of matchers) {
-              if (matcher.test(relativePath)) {
-                const result: GlobResult = {
-                  ...entry,
-                  relativePath,
-                  matchedPattern: matcher.getPattern()
-                };
-                results.push(result);
-                break;
-              }
+          // 检查忽略模式
+          const shouldIgnore = ignoreMatchers.some(
+            (matcher) => matcher.test(relativePath) || matcher.test(fullPath)
+          );
+          if (shouldIgnore) {
+            // 如果是目录且需要递归，仍需搜索（被忽略的目录下可能有需要的文件）
+            if (recursive && entry.type === 'directory') {
+              await searchDirectory(fullPath, depth + 1);
+            }
+            continue;
+          }
+
+          // 检查是否匹配任何模式
+          let matched = false;
+          let matchedPattern = '';
+
+          for (const matcher of matchers) {
+            // 同时测试相对路径和绝对路径
+            if (matcher.test(relativePath) || matcher.test(fullPath)) {
+              matched = true;
+              matchedPattern = matcher.getPattern();
+              break;
             }
           }
+
+          // 根据类型和选项决定是否包含在结果中
+          let shouldIncludeInResults = false;
+
+          if (matched) {
+            if (entry.type === 'file' && includeFiles) {
+              shouldIncludeInResults = true;
+            } else if (entry.type === 'directory' && includeDirs) {
+              shouldIncludeInResults = true;
+            }
+          }
+
+          if (shouldIncludeInResults) {
+            const result: GlobResult = {
+              ...entry,
+              relativePath,
+              matchedPattern
+            };
+            results.push(result);
+          }
+
+          // 递归搜索子目录（无论是否匹配都要搜索）
           if (recursive && entry.type === 'directory') {
-            await searchDirectory(fullPath);
+            await searchDirectory(fullPath, depth + 1);
           }
         }
       } catch (error) {
-        console.warn(`Cannot access directory: ${dirPath}`, error);
+        // 只在根级别输出警告，避免过多日志
+        if (depth === 0) {
+          console.warn(`Cannot access directory: ${dirPath}`, error);
+        }
       }
     };
 
     await searchDirectory(normalizedCwd);
     return results;
   }
-
   guessMIMEType(path: string) {
     return guessMimeType(this.normalizePath(path));
   }
   // 更新 getInfo 方法以包含 CWD 信息
   getInfo(): {
-    name: string;
-    isReadOnly: boolean;
+    readOnly: boolean;
     cwd: string;
     dirStackDepth: number;
     mountCount: number;
     mountPoints: string[];
   } {
     return {
-      name: this.name,
-      isReadOnly: this.isReadOnly,
+      readOnly: this.readOnly,
       cwd: this._cwd,
       dirStackDepth: this._dirStack.length,
       mountCount: this.simpleMounts.size,

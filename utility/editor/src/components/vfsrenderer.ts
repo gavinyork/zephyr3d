@@ -1,5 +1,5 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
-import { makeEventTarget } from '@zephyr3d/base';
+import { DataTransferVFS, makeEventTarget } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -1118,79 +1118,9 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     );
     if (info.targetDirectory && ev.type === 'drop') {
       const data = ev.dataTransfer;
-      const files = Array.from(data.files);
-      const entries = Array.from(data.items).map((item) => item.webkitGetAsEntry());
-      const map = await this.resolveDirectoryEntries(files, entries);
-      const result = await this.resolveFileEntries(map);
-      if (result.size > 0) {
-        for (const entry of result) {
-          const path = this._vfs.join(info.targetDirectory.path, entry[0]);
-          const buffer = await entry[1].arrayBuffer();
-          await this._vfs.writeFile(path, buffer, { create: true, encoding: 'binary' });
-        }
-      }
+      const testVFS = new DataTransferVFS(data);
+      await testVFS.copyFileEx('/**/*', info.targetDirectory.path, { overwrite: true, targetVFS: this._vfs });
     }
-  }
-  private async readDirectoryEntry(entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
-    return new Promise((resolve, reject) => {
-      entry.createReader().readEntries(
-        (fileEntries) => resolve(fileEntries),
-        (err) => reject(err)
-      );
-    });
-  }
-  private async resolveDirectoryEntries(
-    files: File[],
-    entries: FileSystemEntry[]
-  ): Promise<Map<string, { entry: FileSystemEntry; file: File }>> {
-    const map: Map<string, { entry: FileSystemEntry; file: File }> = new Map();
-    let i = 0;
-    while (i < entries.length) {
-      const entry = entries[i];
-      if (entry.isDirectory) {
-        entries.splice(i, 1);
-        if (i < files.length) {
-          files.splice(i, 1);
-        }
-        entries.push(...(await this.readDirectoryEntry(entry as FileSystemDirectoryEntry)));
-      } else {
-        map.set(entry.fullPath, {
-          entry,
-          file: i < files.length ? files[i] : null
-        });
-        i++;
-      }
-    }
-    return map;
-  }
-  private async resolveFileEntries(
-    map: Map<string, { entry: FileSystemEntry; file: File }>
-  ): Promise<Map<string, File>> {
-    const result: Map<string, File> = new Map();
-    const promises = Array.from(map.entries()).map(
-      (entry) =>
-        new Promise<File>((resolve, reject) => {
-          const key = `/${entry[0]
-            .slice(1)
-            .split('/')
-            .map((val) => encodeURIComponent(val))
-            .join('/')}`;
-          if (entry[1].file) {
-            result.set(key, entry[1].file);
-            resolve(null);
-          } else {
-            (entry[1].entry as FileSystemFileEntry).file(
-              (f) => {
-                result.set(key, f);
-                resolve(null);
-              },
-              (err) => reject(err)
-            );
-          }
-        })
-    );
-    await Promise.all(promises);
-    return result;
   }
 
   emitSelectedChanged() {

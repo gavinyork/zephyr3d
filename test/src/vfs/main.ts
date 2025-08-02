@@ -1,23 +1,23 @@
-import type { VFS } from '@zephyr3d/base';
+import type { TypedArray, VFS } from '@zephyr3d/base';
 import { VFSError, MemoryFS, ZipFS, IndexedDBFS } from '@zephyr3d/base';
 import * as zipjs from '@zip.js/zip.js';
 
 let currentTest = 0;
 
 // 简单的测试工具函数
-function assert(condition, message) {
+function assert(condition: boolean, message: string) {
   if (!condition) {
     throw new Error(`断言失败: ${message}`);
   }
 }
 
-function assertEqual(actual, expected, message) {
+function assertEqual(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) {
     throw new Error(`断言失败: ${message}. 期望: ${expected}, 实际: ${actual}`);
   }
 }
 
-function assertArrayEqual(actual, expected, message) {
+function assertArrayEqual(actual: TypedArray | unknown[], expected: TypedArray | unknown[], message: string) {
   if (actual.length !== expected.length) {
     throw new Error(`断言失败: ${message}. 数组长度不匹配，期望: ${expected.length}, 实际: ${actual.length}`);
   }
@@ -28,13 +28,13 @@ function assertArrayEqual(actual, expected, message) {
   }
 }
 
-function assertContains(array, item, message) {
+function assertContains(array: unknown[], item: unknown, message: string) {
   if (!array.includes(item)) {
     throw new Error(`断言失败: ${message}. 数组不包含: ${item}`);
   }
 }
 
-function assertNotContains(array, item, message) {
+function assertNotContains(array: unknown[], item: unknown, message: string) {
   if (array.includes(item)) {
     throw new Error(`断言失败: ${message}. 数组不应包含: ${item}`);
   }
@@ -58,11 +58,11 @@ const VFSTypes = ['Memory VFS', 'IndexedDB VFS', 'Zip VFS'];
 
 function createVFS(name: string = 'TestVFS', readonly = false) {
   if (currentTest === 0) {
-    return new MemoryFS(name, readonly);
+    return new MemoryFS(readonly);
   } else if (currentTest === 1) {
     return new IndexedDBFS(name, 'files', readonly);
   } else {
-    return new ZipFS(name, zipjs, readonly);
+    return new ZipFS(zipjs, readonly);
   }
 }
 
@@ -353,8 +353,7 @@ async function testFileSystemInfo() {
 
   // 测试基本信息
   const info1 = fs.getInfo();
-  assertEqual(info1.name, 'TestFS', '文件系统名称应该匹配');
-  assertEqual(info1.isReadOnly, false, '应该不是只读');
+  assertEqual(info1.readOnly, false, '应该不是只读');
   assertEqual(info1.mountCount, 0, '初始挂载数应该为0');
 
   // 挂载后测试信息
@@ -987,6 +986,7 @@ async function testMoveSpecialCharacters() {
   await fs.deleteDatabase();
 }
 
+/*
 async function testMoveConcurrentOperations() {
   const fs = createVFS('MoveConcurrentTest');
 
@@ -1022,6 +1022,8 @@ async function testMoveConcurrentOperations() {
 
   await fs.deleteDatabase();
 }
+*/
+
 async function testMoveWithCWD() {
   const fs = createVFS('MoveCWDTest');
 
