@@ -15,12 +15,22 @@ export interface HttpFSOptions {
  */
 
 export class HttpFS extends VFS {
-  private baseURL: string;
+  private baseOrigin: string;
+  private basePath: string;
   private options: HttpFSOptions;
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
     super('HttpFS', true); // 只读
-    this.baseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+    baseURL = baseURL || new URL(window.location.href).origin;
+    if (!URL.canParse(baseURL)) {
+      throw new Error(`Invalid base URL while contructing HttpFS: ${baseURL}`);
+    }
+    const url = new URL(baseURL);
+    this.basePath = url.pathname;
+    if (this.basePath.endsWith('/')) {
+      this.basePath = this.basePath.slice(0, -1);
+    }
+    this.baseOrigin = url.origin;
     this.options = {
       timeout: 30000, // 默认30秒超时
       ...options
@@ -38,19 +48,16 @@ export class HttpFS extends VFS {
       path = this.options.urlResolver(path);
     }
     path = path.trim();
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    if (this.parseDataURI(path) || this.isObjectURL(path)) {
       return path;
     }
-
-    const normalizedPath = super.normalizePath(path);
-    return `${this.baseURL}${normalizedPath}`;
+    return super.normalizePath(path);
   }
 
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
-
+    url = new URL(this.join(this.basePath, url), this.baseOrigin).href;
     try {
       const response = await fetch(url, {
         ...init,
@@ -120,6 +127,13 @@ export class HttpFS extends VFS {
     }
   }
 
+  guessMIMEType(path: string): string {
+    const dataUriMatchResult = this.parseDataURI(path);
+    if (dataUriMatchResult) {
+      return dataUriMatchResult[1];
+    } else {
+    }
+  }
   protected async _writeFile(
     path: string,
     _data: ArrayBuffer | string,

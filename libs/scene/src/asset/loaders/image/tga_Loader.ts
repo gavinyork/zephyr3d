@@ -8,9 +8,6 @@ import { TypedArray } from '@zephyr3d/base';
  * @internal
  */
 export class TGALoader extends AbstractTextureLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.tga';
-  }
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }

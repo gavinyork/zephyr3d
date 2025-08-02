@@ -70,9 +70,6 @@ export interface GLTFContent extends GlTf {
  * @internal
  */
 export class GLTFLoader extends AbstractModelLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.gltf' || ext === '.glb';
-  }
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary';
   }

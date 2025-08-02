@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
-import { HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
+import { guessMimeType, HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -356,7 +356,6 @@ export class AssetManager {
    * @returns MIME type
    */
   async guessMIMEByName(name: string) {
-    let ext = '';
     let filename = '';
     let mimeType = '';
     const dataUriMatchResult = name.match(/^data:([^;]+)/);
@@ -367,13 +366,7 @@ export class AssetManager {
         .split('/')
         .filter((val) => !!val)
         .slice(-1)[0];
-      const p = filename ? filename.lastIndexOf('.') : -1;
-      ext = p >= 0 ? filename.substring(p).toLowerCase() : null;
-      if (ext === '.jpg' || ext === '.jpeg') {
-        mimeType = 'image/jpg';
-      } else if (ext === '.png') {
-        mimeType = 'image/png';
-      }
+      return guessMimeType(filename);
     }
     return mimeType;
   }
@@ -435,7 +428,7 @@ export class AssetManager {
       }
     }
     for (const loader of AssetManager._textureLoaders) {
-      if ((!ext || !loader.supportExtension(ext)) && (!mimeType || !loader.supportMIMEType(mimeType))) {
+      if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
@@ -505,15 +498,11 @@ export class AssetManager {
   /** @internal */
   async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
-    const data = new Blob([arrayBuffer], { type: options?.mimeType ?? undefined });
-    const filename = new URL(url, new URL(location.href).origin).pathname
-      .split('/')
-      .filter((val) => !!val)
-      .slice(-1)[0];
-    const p = filename ? filename.lastIndexOf('.') : -1;
-    const ext = p >= 0 ? filename.substring(p) : null;
+    const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
+    const data = new Blob([arrayBuffer], { type: mimeType });
+    const filename = this.vfs.basename(url);
     for (const loader of AssetManager._modelLoaders) {
-      if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
+      if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
       let model = await loader.load(

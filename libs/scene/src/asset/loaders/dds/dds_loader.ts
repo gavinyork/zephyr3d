@@ -9,9 +9,6 @@ import { TypedArray } from '@zephyr3d/base';
  * @internal
  */
 export class DDSLoader extends AbstractTextureLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.dds';
-  }
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'image/dds' || mimeType === 'image/x-dds';
   }

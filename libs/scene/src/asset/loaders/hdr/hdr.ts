@@ -9,11 +9,8 @@ const _f16one = floatToHalf(1);
  * @internal
  */
 export class HDRLoader extends AbstractTextureLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.hdr';
-  }
   supportMIMEType(mimeType: string): boolean {
-    return mimeType === 'image/hdr';
+    return mimeType === 'image/hdr' || mimeType === 'image/x-hdr' || mimeType === 'image/vnd.radiance';
   }
   async load(
     mimeType: string,

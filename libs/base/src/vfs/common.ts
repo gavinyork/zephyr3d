@@ -67,7 +67,11 @@ export class PathUtils {
   }
 }
 
-/** @internal */
+/**
+ * Detect MIME type from file path
+ * @param path - file path
+ * @returns MIME type
+ */
 export function guessMimeType(path: string): string {
   const ext = PathUtils.extname(path).toLowerCase();
   const mimeTypes: Record<string, string> = {
@@ -77,8 +81,14 @@ export function guessMimeType(path: string): string {
     '.json': 'application/json',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
+    '.tga': 'image/tga',
+    '.dds': 'image/x-dds',
     '.svg': 'image/svg+xml',
+    '.hdr': 'image/vnd.radiance',
+    '.exr': 'image/x-exr',
+    '.tiff': 'image/tiff',
     '.wav': 'audio/wav',
     '.mp3': 'audio/mpeg',
     '.mp4': 'video/mp4',
@@ -87,7 +97,6 @@ export function guessMimeType(path: string): string {
     '.obj': 'model/obj',
     '.gltf': 'model/gltf+json',
     '.glb': 'model/gltf-binary',
-    '.dds': 'image/vnd-ms.dds',
     '.ktx': 'image/ktx',
     '.ktx2': 'image/ktx2'
   };

@@ -1,5 +1,5 @@
 import { makeEventTarget } from '../event';
-import { PathUtils } from './common';
+import { guessMimeType, PathUtils } from './common';
 
 /**
  * Represents metadata information for a file or directory.
@@ -456,6 +456,11 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return PathUtils.normalize(path);
     }
 
+    if (this.isObjectURL(path) || this.parseDataURI(path)) {
+      // 是ObjectURL或dataURL，不执行规范化
+      return path;
+    }
+
     // 相对路径：先与 CWD 合并，然后规范化
     const absolutePath = PathUtils.join(this._cwd, path);
     return PathUtils.normalize(absolutePath);
@@ -489,6 +494,22 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return PathUtils.normalize(PathUtils.join(...allPaths));
   }
   /**
+   * Extract directory part for a path
+   * @param path - path
+   * @returns Directory part of the path
+   */
+  dirname(path: string) {
+    return PathUtils.dirname(path);
+  }
+  /**
+   * Extract base file name part for a path
+   * @param path - path
+   * @returns Base file name part of the path
+   */
+  basename(path: string) {
+    return PathUtils.basename(path);
+  }
+  /**
    * Converts an absolute path to a path relative to the current working directory.
    *
    * @param path - The absolute path to convert
@@ -503,6 +524,10 @@ export abstract class VFS extends makeEventTarget(Object)<{
    * ```
    */
   relative(path: string): string {
+    if (this.isObjectURL(path) || this.parseDataURI(path)) {
+      // ObjectURL和DataURL不支持相对路径
+      return path;
+    }
     const absolutePath = this.normalizePath(path);
     return PathUtils.relative(this._cwd, absolutePath);
   }
@@ -611,6 +636,28 @@ export abstract class VFS extends makeEventTarget(Object)<{
   }
 
   async readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+    // Special case for Object URL and Data URL
+    if (this.isObjectURL(path) || this.parseDataURI(path)) {
+      try {
+        const response = await fetch(path);
+        if (!response.ok) {
+          throw new VFSError('Failed to fetch', 'ENOENT', path);
+        }
+        let data: ArrayBuffer | string;
+        if (options?.encoding === 'utf8') {
+          data = await response.text();
+        } else if (options?.encoding === 'base64') {
+          const arrayBuffer = await response.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          data = btoa(String.fromCodePoint(...bytes));
+        } else {
+          data = await response.arrayBuffer();
+        }
+        return data;
+      } catch (err) {
+        throw new VFSError(`Failed to fetch: ${err}`, 'EIO', path);
+      }
+    }
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
@@ -776,6 +823,9 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return results;
   }
 
+  guessMIMEType(path: string) {
+    return guessMimeType(this.normalizePath(path));
+  }
   // 更新 getInfo 方法以包含 CWD 信息
   getInfo(): {
     name: string;
@@ -886,6 +936,22 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return this.simpleMounts.size > 0;
   }
 
+  /**
+   * Parse DataURL
+   * @param uri - URL to parse
+   * @returns parts of data URL
+   */
+  parseDataURI(uri: string) {
+    return uri?.match(/^data:([^;]+)/) ?? null;
+  }
+  /**
+   * Checks wether a URL is object url created by URL.createObjectURL()
+   * @param url - URL to check
+   * @returns true if the URL is object url, otherwise false
+   */
+  isObjectURL(url: string) {
+    return typeof url === 'string' && url.startsWith('blob:');
+  }
   /**
    * Disposes of this file system and cleans up resources. (for IndexedDB only).
    */

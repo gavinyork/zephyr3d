@@ -53,12 +53,6 @@ export class LoaderBase {
  */
 export abstract class AbstractTextureLoader extends LoaderBase {
   /**
-   * Tests whether the loader supports loading a texture with given file extension.
-   * @param ext - The file extension to test
-   * @returns true if it supports
-   */
-  abstract supportExtension(ext: string): boolean;
-  /**
    * Tests whether the loader supports loading a texture with given MIME type.
    * @param mimeType - The MIME type to test
    * @returns true if it supports
@@ -89,12 +83,6 @@ export abstract class AbstractTextureLoader extends LoaderBase {
  * @public
  */
 export abstract class AbstractModelLoader extends LoaderBase {
-  /**
-   * Tests whether the loader supports loading a model with given file extension.
-   * @param ext - The file extension to test
-   * @returns true if it supports
-   */
-  abstract supportExtension(ext: string): boolean;
   /**
    * Tests whether the loader supports loading a model with given MIME type.
    * @param mimeType - The MIME type to test

@@ -8,9 +8,6 @@ import { TypedArray } from '@zephyr3d/base';
  * @internal
  */
 export class WebImageLoader extends AbstractTextureLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.jpg' || ext === '.jpeg' || ext === '.png';
-  }
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'image/jpg' || mimeType === 'image/jpeg' || mimeType === 'image/png';
   }
