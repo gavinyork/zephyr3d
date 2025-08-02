@@ -469,17 +469,31 @@ export class IndexedDBFS extends VFS {
           }
 
           let data = record.data;
+          const requestedEncoding = options?.encoding;
 
-          // 处理编码转换
-          if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
-            data = new TextDecoder().decode(data);
-          } else if (options?.encoding === 'base64') {
+          // 根据请求的编码格式进行转换
+          if (requestedEncoding === 'utf8') {
+            // 请求 UTF-8 字符串
+            if (data instanceof ArrayBuffer) {
+              data = new TextDecoder().decode(data);
+            }
+            // 如果已经是 string，直接使用
+          } else if (requestedEncoding === 'base64') {
+            // 请求 Base64 字符串
             if (data instanceof ArrayBuffer) {
               const bytes = new Uint8Array(data);
               data = btoa(String.fromCodePoint(...bytes));
             } else if (typeof data === 'string') {
-              data = btoa(data);
+              // 字符串先转为 ArrayBuffer，再转 Base64
+              const bytes = new TextEncoder().encode(data);
+              data = btoa(String.fromCodePoint(...bytes));
             }
+          } else if (requestedEncoding === 'binary' || !requestedEncoding) {
+            // 请求 ArrayBuffer（binary 或默认）
+            if (typeof data === 'string') {
+              data = new TextEncoder().encode(data).buffer;
+            }
+            // 如果已经是 ArrayBuffer，直接使用
           }
 
           // 处理范围读取

@@ -166,6 +166,13 @@ export class SceneView extends BaseView<SceneModel> {
               label: '-'
             },
             {
+              label: 'Export Project',
+              action: () => eventBus.dispatchEvent('action', 'EXPORT_PROJECT')
+            },
+            {
+              label: '-'
+            },
+            {
               label: 'Delete Project',
               action: () => eventBus.dispatchEvent('action', 'DELETE_PROJECT')
             }

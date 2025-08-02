@@ -69,6 +69,11 @@ export class SceneController extends BaseController<SceneModel> {
           await this._editor.closeProject(this._scenePath);
         }
         break;
+      case 'EXPORT_PROJECT':
+        if (await this.ensureSceneSaved()) {
+          await this._editor.exportProject();
+        }
+        break;
       case 'DELETE_PROJECT': {
         if (this._editor.currentProject) {
           const uuid = this._editor.currentProject.uuid;

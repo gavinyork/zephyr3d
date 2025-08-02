@@ -17,6 +17,7 @@ import { HttpFS } from '@zephyr3d/base';
 import type { ProjectInfo } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
+import { ZipDownloader } from '../helpers/zipdownload';
 
 export class Editor {
   private _moduleManager: ModuleManager;
@@ -207,6 +208,28 @@ export class Editor {
       this._currentProject = null;
       this._moduleManager.activate('');
     }
+  }
+  async exportProject() {
+    if (!this._currentProject) {
+      return;
+    }
+    const zipDownloader = new ZipDownloader(`${this._currentProject.name}.zip`);
+    const fileList = await ProjectService.VFS.readDirectory(this.currentProject.homedir, {
+      includeHidden: true,
+      recursive: true
+    });
+    const files = fileList.filter((path) => path.type === 'file');
+    let directories = fileList.filter((path) => path.type === 'directory');
+    for (const file of files) {
+      const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
+      const path = ProjectService.VFS.relative(file.path);
+      await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
+      directories = directories.filter((dir) => !file.path.startsWith(`${dir.path}/`));
+    }
+    for (const dir of directories) {
+      await zipDownloader.zipWriter.add(`${ProjectService.VFS.relative(dir.path)}/`);
+    }
+    await zipDownloader.finish();
   }
   async newProject() {
     const name = await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400);

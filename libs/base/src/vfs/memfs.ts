@@ -131,10 +131,46 @@ export class MemoryFS extends VFS {
       throw new VFSError('File does not exist', 'ENOENT', path);
     }
 
-    const data = this.files.get(path)!;
+    let data = this.files.get(path)!;
+    const requestedEncoding = options?.encoding;
 
-    if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
-      return new TextDecoder().decode(data);
+    // 根据请求的编码格式进行转换
+    if (requestedEncoding === 'utf8') {
+      // 请求 UTF-8 字符串
+      if (data instanceof ArrayBuffer) {
+        data = new TextDecoder().decode(data);
+      }
+      // 如果已经是 string，直接使用
+    } else if (requestedEncoding === 'base64') {
+      // 请求 Base64 字符串
+      if (data instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(data);
+        data = btoa(String.fromCodePoint(...bytes));
+      } else if (typeof data === 'string') {
+        // 字符串先转为 ArrayBuffer，再转 Base64
+        const bytes = new TextEncoder().encode(data);
+        data = btoa(String.fromCodePoint(...bytes));
+      }
+    } else if (requestedEncoding === 'binary' || !requestedEncoding) {
+      // 请求 ArrayBuffer（binary 或默认）
+      if (typeof data === 'string') {
+        data = new TextEncoder().encode(data).buffer;
+      }
+      // 如果已经是 ArrayBuffer，直接使用
+    }
+
+    // 处理范围读取
+    if (options?.offset !== undefined || options?.length !== undefined) {
+      const offset = options.offset || 0;
+      const length = options.length;
+
+      if (data instanceof ArrayBuffer) {
+        const end = length !== undefined ? offset + length : data.byteLength;
+        data = data.slice(offset, end);
+      } else if (typeof data === 'string') {
+        const end = length !== undefined ? offset + length : data.length;
+        data = data.slice(offset, end);
+      }
     }
 
     return data;
@@ -155,35 +191,51 @@ export class MemoryFS extends VFS {
       }
     }
 
-    let fileData: ArrayBuffer | string;
+    let fileData: ArrayBuffer | string = data;
+
+    // 处理编码选项
+    if (options?.encoding === 'base64' && typeof data === 'string') {
+      try {
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        fileData = bytes.buffer;
+      } catch (error) {
+        throw new VFSError('Invalid base64 data', 'EINVAL', path);
+      }
+    } else if (options?.encoding === 'utf8') {
+      // 确保以字符串形式存储UTF-8数据
+      if (data instanceof ArrayBuffer) {
+        fileData = new TextDecoder().decode(data);
+      }
+    } else if (options?.encoding === 'binary' || !options?.encoding) {
+      // 默认以二进制（ArrayBuffer）形式存储
+      if (typeof data === 'string') {
+        fileData = new TextEncoder().encode(data).buffer;
+      }
+    }
 
     // 处理追加模式
     if (options?.append && this.files.has(path)) {
       const existingData = this.files.get(path)!;
 
-      // 统一数据类型进行追加
-      if (typeof existingData === 'string' && typeof data === 'string') {
+      if (typeof existingData === 'string' && typeof fileData === 'string') {
         // 字符串 + 字符串
-        fileData = existingData + data;
-      } else if (existingData instanceof ArrayBuffer && data instanceof ArrayBuffer) {
+        fileData = existingData + fileData;
+      } else if (existingData instanceof ArrayBuffer && fileData instanceof ArrayBuffer) {
         // ArrayBuffer + ArrayBuffer
-        const combined = new Uint8Array(existingData.byteLength + data.byteLength);
+        const combined = new Uint8Array(existingData.byteLength + fileData.byteLength);
         combined.set(new Uint8Array(existingData), 0);
-        combined.set(new Uint8Array(data), existingData.byteLength);
+        combined.set(new Uint8Array(fileData), existingData.byteLength);
         fileData = combined.buffer;
       } else {
         // 混合类型：转换为字符串处理
         const existingStr =
           typeof existingData === 'string' ? existingData : new TextDecoder().decode(existingData);
-        const newStr = typeof data === 'string' ? data : new TextDecoder().decode(data);
+        const newStr = typeof fileData === 'string' ? fileData : new TextDecoder().decode(fileData);
         fileData = existingStr + newStr;
-      }
-    } else {
-      // 非追加模式，直接设置数据
-      if (typeof data === 'string' && options?.encoding !== 'utf8') {
-        fileData = new TextEncoder().encode(data).buffer;
-      } else {
-        fileData = data;
       }
     }
 

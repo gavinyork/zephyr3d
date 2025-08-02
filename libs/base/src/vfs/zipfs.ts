@@ -1,5 +1,5 @@
 import { guessMimeType, PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -378,13 +378,24 @@ export class ZipFS extends VFS {
       }
     }
 
+    // 使用 writer 创建目录（保持原有行为）
     const writer = await this.ensureWriter();
     const dirPath = path.endsWith('/') ? path.slice(1) : path.slice(1) + '/';
 
-    await writer.add(dirPath, undefined, {
-      directory: true,
-      lastModDate: new Date()
-    });
+    try {
+      await writer.add(dirPath, undefined, {
+        directory: true,
+        lastModDate: new Date()
+      });
+    } catch (error) {
+      // 如果是重复条目错误，忽略它（目录已存在）
+      if (String(error).includes('already exists')) {
+        // 目录已存在，直接更新内部数据结构
+      } else {
+        // 其他错误，重新抛出
+        throw error;
+      }
+    }
 
     this.isModified = true;
 
@@ -565,37 +576,13 @@ export class ZipFS extends VFS {
 
   /** {@inheritDoc VFS._readFile} */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+    // 先检查虚拟文件
     if (this.virtualFiles.has(path)) {
       const virtualFile = this.virtualFiles.get(path)!;
-      let data = virtualFile.data;
-
-      if (options?.encoding === 'utf8' && data instanceof ArrayBuffer) {
-        data = new TextDecoder().decode(data);
-      } else if (options?.encoding === 'base64') {
-        if (data instanceof ArrayBuffer) {
-          const bytes = new Uint8Array(data);
-          data = btoa(String.fromCodePoint(...bytes));
-        } else if (typeof data === 'string') {
-          data = btoa(data);
-        }
-      }
-
-      if (options?.offset !== undefined || options?.length !== undefined) {
-        const offset = options.offset || 0;
-        const length = options.length;
-
-        if (data instanceof ArrayBuffer) {
-          const end = length !== undefined ? offset + length : data.byteLength;
-          data = data.slice(offset, end);
-        } else if (typeof data === 'string') {
-          const end = length !== undefined ? offset + length : data.length;
-          data = data.slice(offset, end);
-        }
-      }
-
-      return data;
+      return this.processFileData(virtualFile.data, options);
     }
 
+    // 检查ZIP条目
     const searchPath = path.slice(1);
     const entry = Array.from(this.entries.values()).find((e) => e.filename === searchPath);
 
@@ -607,48 +594,64 @@ export class ZipFS extends VFS {
       throw new VFSError('Cannot read file data', 'EIO', path);
     }
 
-    if (options?.encoding === 'utf8') {
-      const textWriter = new this.zipJS.TextWriter();
-      let data = await entry.getData(textWriter);
+    // 总是先读取为ArrayBuffer，然后统一处理编码
+    const arrayWriter = new this.zipJS.Uint8ArrayWriter();
+    const uint8Array = await entry.getData(arrayWriter);
+    const arrayBuffer = uint8Array.buffer;
 
-      if (options?.offset !== undefined || options?.length !== undefined) {
-        const offset = options.offset || 0;
-        const length = options.length;
-        const end = length !== undefined ? offset + length : data.length;
-        data = data.slice(offset, end);
-      }
-
-      return data;
-    } else {
-      const arrayWriter = new this.zipJS.Uint8ArrayWriter();
-      const uint8Array = await entry.getData(arrayWriter);
-      let arrayBuffer: ArrayBuffer = uint8Array.buffer;
-
-      if (options?.encoding === 'base64') {
-        const bytes = new Uint8Array(arrayBuffer);
-        let base64String = btoa(String.fromCodePoint(...bytes));
-
-        if (options?.offset !== undefined || options?.length !== undefined) {
-          const offset = options.offset || 0;
-          const length = options.length;
-          const end = length !== undefined ? offset + length : base64String.length;
-          base64String = base64String.slice(offset, end);
-        }
-
-        return base64String;
-      }
-
-      if (options?.offset !== undefined || options?.length !== undefined) {
-        const offset = options.offset || 0;
-        const length = options.length;
-        const end = length !== undefined ? offset + length : arrayBuffer.byteLength;
-        arrayBuffer = arrayBuffer.slice(offset, end);
-      }
-
-      return arrayBuffer;
-    }
+    return this.processFileData(arrayBuffer, options);
   }
 
+  /**
+   * 统一的文件数据处理方法
+   */
+  private processFileData(data: ArrayBuffer | string, options?: ReadOptions): ArrayBuffer | string {
+    let processedData = data;
+    const requestedEncoding = options?.encoding;
+
+    // 根据请求的编码格式进行转换
+    if (requestedEncoding === 'utf8') {
+      // 请求 UTF-8 字符串
+      if (processedData instanceof ArrayBuffer) {
+        processedData = new TextDecoder().decode(processedData);
+      }
+      // 如果已经是 string，直接使用
+    } else if (requestedEncoding === 'base64') {
+      // 请求 Base64 字符串
+      if (processedData instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(processedData);
+        processedData = btoa(String.fromCodePoint(...bytes));
+      } else if (typeof processedData === 'string') {
+        // 字符串先转为 ArrayBuffer，再转 Base64
+        const bytes = new TextEncoder().encode(processedData);
+        processedData = btoa(String.fromCodePoint(...bytes));
+      }
+    } else if (requestedEncoding === 'binary' || !requestedEncoding) {
+      // 请求 ArrayBuffer（binary 或默认）
+      if (typeof processedData === 'string') {
+        processedData = new TextEncoder().encode(processedData).buffer;
+      }
+      // 如果已经是 ArrayBuffer，直接使用
+    }
+
+    // 处理范围读取
+    if (options?.offset !== undefined || options?.length !== undefined) {
+      const offset = options.offset || 0;
+      const length = options.length;
+
+      if (processedData instanceof ArrayBuffer) {
+        const end = length !== undefined ? offset + length : processedData.byteLength;
+        processedData = processedData.slice(offset, end);
+      } else if (typeof processedData === 'string') {
+        const end = length !== undefined ? offset + length : processedData.length;
+        processedData = processedData.slice(offset, end);
+      }
+    }
+
+    return processedData;
+  }
+
+  /** {@inheritDoc VFS._writeFile} */
   /** {@inheritDoc VFS._writeFile} */
   protected async _writeFile(
     path: string,
@@ -665,50 +668,110 @@ export class ZipFS extends VFS {
       }
     }
 
-    let fileData: ArrayBuffer | string = data;
-
-    if (options?.append) {
-      let existingData: ArrayBuffer | string | null = null;
-
-      try {
-        existingData = await this._readFile(path);
-      } catch (_error) {}
-
-      if (existingData) {
-        if (typeof data === 'string' && typeof existingData === 'string') {
-          fileData = existingData + data;
-        } else if (data instanceof ArrayBuffer && existingData instanceof ArrayBuffer) {
-          const combined = new Uint8Array(existingData.byteLength + data.byteLength);
-          combined.set(new Uint8Array(existingData), 0);
-          combined.set(new Uint8Array(data), existingData.byteLength);
-          fileData = combined.buffer;
-        } else {
-          const existingStr =
-            existingData instanceof ArrayBuffer ? new TextDecoder().decode(existingData) : existingData;
-          const newStr = data instanceof ArrayBuffer ? new TextDecoder().decode(data) : data;
-          fileData = existingStr + newStr;
-        }
+    // 检查文件是否已存在
+    const fileExists = await this._exists(path);
+    if (fileExists) {
+      // 检查是否是目录
+      const stat = await this._stat(path);
+      if (stat.isDirectory) {
+        throw new VFSError('Path is a directory', 'EISDIR', path);
       }
+
+      // 只有在明确指定 create: false 时才抛出错误
+      if (options?.create === false) {
+        throw new VFSError('File already exists', 'EEXIST', path);
+      }
+      // 否则允许覆盖（这是标准的文件系统行为）
     }
 
-    // 处理编码
+    let fileData: ArrayBuffer | string = data;
+
+    // 处理编码选项
     if (options?.encoding === 'base64' && typeof fileData === 'string') {
       try {
         const binaryString = atob(fileData);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.codePointAt(i);
+          bytes[i] = binaryString.charCodeAt(i);
         }
         fileData = bytes.buffer;
-      } catch (_error) {
+      } catch (error) {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
+      }
+    } else if (options?.encoding === 'utf8') {
+      // 确保以字符串形式存储UTF-8数据
+      if (fileData instanceof ArrayBuffer) {
+        fileData = new TextDecoder().decode(fileData);
+      }
+    } else if (options?.encoding === 'binary' || !options?.encoding) {
+      // 默认以二进制（ArrayBuffer）形式存储
+      if (typeof fileData === 'string') {
+        fileData = new TextEncoder().encode(fileData).buffer;
       }
     }
 
+    // 获取现有文件的创建时间（如果存在）
+    let createdTime = new Date();
+    let isExistingFile = false;
+
+    if (fileExists) {
+      try {
+        const existingStat = await this._stat(path);
+        createdTime = existingStat.created;
+        isExistingFile = true;
+      } catch (error) {
+        // 忽略错误，使用默认时间
+      }
+    }
+
+    // 处理追加模式
+    if (options?.append && isExistingFile) {
+      let existingData: ArrayBuffer | string | null = null;
+
+      try {
+        existingData = await this._readFile(path);
+      } catch (error) {
+        // 读取失败，忽略错误
+      }
+
+      if (existingData) {
+        if (typeof fileData === 'string' && typeof existingData === 'string') {
+          fileData = existingData + fileData;
+        } else if (fileData instanceof ArrayBuffer && existingData instanceof ArrayBuffer) {
+          const combined = new Uint8Array(existingData.byteLength + fileData.byteLength);
+          combined.set(new Uint8Array(existingData), 0);
+          combined.set(new Uint8Array(fileData), existingData.byteLength);
+          fileData = combined.buffer;
+        } else {
+          // 混合类型：转换为字符串处理
+          const existingStr =
+            existingData instanceof ArrayBuffer ? new TextDecoder().decode(existingData) : existingData;
+          const newStr = fileData instanceof ArrayBuffer ? new TextDecoder().decode(fileData) : fileData;
+          fileData = existingStr + newStr;
+        }
+      }
+    }
+
+    // 存储为虚拟文件
     this.virtualFiles.set(path, {
       data: fileData,
       modified: new Date()
     });
+
+    // 如果这是一个现有文件，保持元数据
+    if (isExistingFile) {
+      // 保持现有文件的创建时间，更新修改时间
+      const searchPath = path.slice(1);
+      this.entries.set(path, {
+        filename: searchPath,
+        directory: false,
+        uncompressedSize:
+          typeof fileData === 'string' ? new TextEncoder().encode(fileData).length : fileData.byteLength,
+        lastModDate: createdTime, // 保持原始创建时间
+        comment: '',
+        getData: undefined // 这个会在applyVirtualFiles时重新设置
+      } as ZipJSEntry);
+    }
 
     this.isModified = true;
   }
@@ -774,86 +837,6 @@ export class ZipFS extends VFS {
     }
 
     return false;
-  }
-
-  /** {@inheritDoc VFS._stat} */
-  protected async _stat(path: string): Promise<FileStat> {
-    // 根目录的特殊处理
-    if (path === '/') {
-      return {
-        size: 0,
-        isFile: false,
-        isDirectory: true,
-        created: new Date(),
-        modified: new Date(),
-        accessed: new Date()
-      };
-    }
-
-    // 检查虚拟文件
-    if (this.virtualFiles.has(path)) {
-      const virtualFile = this.virtualFiles.get(path)!;
-      const size =
-        virtualFile.data instanceof ArrayBuffer
-          ? virtualFile.data.byteLength
-          : new TextEncoder().encode(virtualFile.data).length;
-
-      return {
-        size,
-        isFile: true,
-        isDirectory: false,
-        created: virtualFile.modified,
-        modified: virtualFile.modified,
-        accessed: virtualFile.modified
-      };
-    }
-
-    const searchPath = path.slice(1);
-
-    // 检查 ZIP 条目中的确切匹配
-    for (const entry of this.entries.values()) {
-      if (entry.filename === searchPath || entry.filename === searchPath + '/') {
-        return {
-          size: entry.directory ? 0 : entry.uncompressedSize || 0,
-          isFile: !entry.directory,
-          isDirectory: entry.directory,
-          created: entry.lastModDate || new Date(),
-          modified: entry.lastModDate || new Date(),
-          accessed: entry.lastModDate || new Date()
-        };
-      }
-    }
-
-    // 检查是否作为目录存在（有子条目）
-    const searchPrefix = searchPath + '/';
-    for (const entry of this.entries.values()) {
-      if (entry.filename.startsWith(searchPrefix)) {
-        return {
-          size: 0,
-          isFile: false,
-          isDirectory: true,
-          created: new Date(),
-          modified: new Date(),
-          accessed: new Date()
-        };
-      }
-    }
-
-    // 检查虚拟文件中是否有子条目
-    for (const virtualPath of this.virtualFiles.keys()) {
-      if (virtualPath.startsWith(path + '/')) {
-        return {
-          size: 0,
-          isFile: false,
-          isDirectory: true,
-          created: new Date(),
-          modified: new Date(),
-          accessed: new Date()
-        };
-      }
-    }
-
-    throw new VFSError('Path does not exist', 'ENOENT', path);
   }
 
   /**
@@ -1132,7 +1115,309 @@ export class ZipFS extends VFS {
   protected async _deleteDatabase(): Promise<void> {
     return;
   }
-  protected async _move(): Promise<void> {
-    throw new VFSError('ZIP file system is read-only', 'EROFS');
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+    if (this.isReadOnly) {
+      throw new VFSError('ZIP file system is read-only', 'EROFS');
+    }
+
+    // 检查源路径是否存在
+    if (!(await this._exists(sourcePath))) {
+      throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);
+    }
+
+    // 检查目标是否已存在
+    const targetExists = await this._exists(targetPath);
+    if (targetExists && !options?.overwrite) {
+      throw new VFSError('Target already exists', 'EEXIST', targetPath);
+    }
+
+    // 确保目标父目录存在
+    const targetParent = PathUtils.dirname(targetPath);
+    if (targetParent !== '/' && !(await this._exists(targetParent))) {
+      throw new VFSError('Target parent directory does not exist', 'ENOENT', targetParent);
+    }
+
+    const sourceStat = await this._stat(sourcePath);
+
+    if (sourceStat.isFile) {
+      // 移动文件
+      await this.moveFile(sourcePath, targetPath, sourceStat, options);
+    } else if (sourceStat.isDirectory) {
+      // 移动目录
+      await this.moveDirectory(sourcePath, targetPath, sourceStat, options);
+    }
+
+    this.isModified = true;
+  }
+
+  private async moveFile(
+    sourcePath: string,
+    targetPath: string,
+    sourceStat: FileStat,
+    options?: MoveOptions
+  ): Promise<void> {
+    // 读取源文件数据
+    const fileData = await this._readFile(sourcePath);
+
+    // 获取源文件的原始创建时间
+    let originalCreated = sourceStat.created;
+
+    // 如果源文件在ZIP条目中，尝试获取更准确的创建时间
+    if (!this.virtualFiles.has(sourcePath)) {
+      const searchPath = sourcePath.slice(1);
+      const entry = Array.from(this.entries.values()).find((e) => e.filename === searchPath);
+      if (entry && entry.lastModDate) {
+        originalCreated = entry.lastModDate;
+      }
+    }
+
+    // 如果目标存在且允许覆盖，先删除
+    if (options?.overwrite && (await this._exists(targetPath))) {
+      await this._deleteFile(targetPath);
+    }
+
+    // 删除源文件
+    await this._deleteFile(sourcePath);
+
+    // 直接写入目标位置，绕过 _writeFile 的存在性检查
+    const moveTime = new Date(); // 移动操作的时间
+
+    this.virtualFiles.set(targetPath, {
+      data: fileData,
+      modified: moveTime // 移动操作更新修改时间
+    });
+
+    // 创建新条目来保持元数据
+    const targetSearchPath = targetPath.slice(1);
+    this.entries.set(targetPath, {
+      filename: targetSearchPath,
+      directory: false,
+      uncompressedSize:
+        typeof fileData === 'string' ? new TextEncoder().encode(fileData).length : fileData.byteLength,
+      lastModDate: originalCreated, // 保持原始创建时间
+      comment: '',
+      getData: undefined // 会在applyVirtualFiles时重新设置
+    } as ZipJSEntry);
+  }
+
+  private async moveDirectoryImproved(
+    sourcePath: string,
+    targetPath: string,
+    sourceStat: FileStat,
+    options?: MoveOptions
+  ): Promise<void> {
+    // 获取源目录的原始创建时间
+    let originalCreated = sourceStat.created;
+
+    // 尝试从ZIP条目获取更准确的创建时间
+    const searchPath = sourcePath.slice(1);
+    const entry = Array.from(this.entries.values()).find(
+      (e) => e.filename === searchPath || e.filename === searchPath + '/'
+    );
+    if (entry && entry.lastModDate) {
+      originalCreated = entry.lastModDate;
+    }
+
+    // 如果目标存在且允许覆盖，先删除
+    if (options?.overwrite && (await this._exists(targetPath))) {
+      await this._deleteDirectory(targetPath, true);
+    }
+
+    // 获取所有子项并备份文件数据
+    const children = await this._readDirectory(sourcePath, { recursive: true });
+    const fileDataBackup = new Map<string, ArrayBuffer | string>();
+
+    // 备份所有文件数据
+    for (const child of children) {
+      if (child.type === 'file') {
+        try {
+          const data = await this._readFile(child.path);
+          fileDataBackup.set(child.path, data);
+        } catch (error) {
+          console.warn(`Failed to backup file ${child.path}:`, error);
+        }
+      }
+    }
+
+    // 移动操作的时间
+    const moveTime = new Date();
+
+    // 删除源目录
+    await this._deleteDirectory(sourcePath, true);
+
+    // 创建目标目录，保持原始创建时间但更新修改时间
+    await this.createDirectoryWithMetadata(targetPath, originalCreated, moveTime);
+
+    // 移动所有子项
+    const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
+    const targetPrefix = targetPath === '/' ? '/' : targetPath + '/';
+
+    // 按路径长度排序，确保先处理父目录
+    const sortedChildren = children.sort((a, b) => a.path.length - b.path.length);
+
+    for (const child of sortedChildren) {
+      const relativePath = child.path.slice(sourcePrefix.length);
+      const newPath = targetPrefix + relativePath;
+
+      if (child.type === 'directory') {
+        await this.createDirectoryWithMetadata(newPath, child.created, moveTime);
+      } else {
+        // 从备份恢复文件数据
+        const fileData = fileDataBackup.get(child.path);
+        if (!fileData) {
+          throw new VFSError('Failed to recover file data', 'EIO', child.path);
+        }
+
+        // 直接写入新位置
+        this.virtualFiles.set(newPath, {
+          data: fileData,
+          modified: moveTime // 移动操作更新修改时间
+        });
+
+        // 保持原始创建时间
+        const newSearchPath = newPath.slice(1);
+        this.entries.set(newPath, {
+          filename: newSearchPath,
+          directory: false,
+          uncompressedSize:
+            typeof fileData === 'string' ? new TextEncoder().encode(fileData).length : fileData.byteLength,
+          lastModDate: child.created, // 保持原始创建时间
+          comment: '',
+          getData: undefined
+        } as ZipJSEntry);
+      }
+    }
+  }
+
+  // 更新 moveDirectory 方法使用改进版本
+  private async moveDirectory(
+    sourcePath: string,
+    targetPath: string,
+    sourceStat: FileStat,
+    options?: MoveOptions
+  ): Promise<void> {
+    return this.moveDirectoryImproved(sourcePath, targetPath, sourceStat, options);
+  }
+  /**
+   * 创建目录并设置指定的创建时间和修改时间
+   */
+  private async createDirectoryWithMetadata(
+    path: string,
+    createdTime: Date,
+    modifiedTime?: Date
+  ): Promise<void> {
+    if (await this._exists(path)) {
+      return;
+    }
+
+    const parent = PathUtils.dirname(path);
+    if (parent !== '/' && parent !== path) {
+      const parentExists = await this._exists(parent);
+      if (!parentExists) {
+        await this._makeDirectory(parent, true);
+      }
+    }
+
+    // 直接更新内部数据结构，避免通过 ZIP writer 可能的重复条目错误
+    const dirPath = path.endsWith('/') ? path.slice(1) : path.slice(1) + '/';
+
+    this.entries.set(path, {
+      filename: dirPath,
+      directory: true,
+      uncompressedSize: 0,
+      lastModDate: createdTime, // ZIP条目中保存创建时间
+      comment: ''
+    } as ZipJSEntry);
+
+    this.isModified = true;
+  }
+
+  /** {@inheritDoc VFS._stat} */
+  protected async _stat(path: string): Promise<FileStat> {
+    // 根目录的特殊处理
+    if (path === '/') {
+      return {
+        size: 0,
+        isFile: false,
+        isDirectory: true,
+        created: new Date(),
+        modified: new Date(),
+        accessed: new Date()
+      };
+    }
+
+    // 检查虚拟文件
+    if (this.virtualFiles.has(path)) {
+      const virtualFile = this.virtualFiles.get(path)!;
+      const size =
+        virtualFile.data instanceof ArrayBuffer
+          ? virtualFile.data.byteLength
+          : new TextEncoder().encode(virtualFile.data).length;
+
+      // 从ZIP条目获取创建时间，虚拟文件记录修改时间
+      let createdTime = virtualFile.modified; // 默认值
+      const searchPath = path.slice(1);
+      const entry = Array.from(this.entries.values()).find((e) => e.filename === searchPath);
+      if (entry && entry.lastModDate) {
+        createdTime = entry.lastModDate; // ZIP条目中的时间作为创建时间
+      }
+
+      return {
+        size,
+        isFile: true,
+        isDirectory: false,
+        created: createdTime, // 从ZIP条目获取的创建时间
+        modified: virtualFile.modified, // 虚拟文件的修改时间
+        accessed: virtualFile.modified
+      };
+    }
+
+    const searchPath = path.slice(1);
+
+    // 检查 ZIP 条目中的确切匹配
+    for (const entry of this.entries.values()) {
+      if (entry.filename === searchPath || entry.filename === searchPath + '/') {
+        const timestamp = entry.lastModDate || new Date();
+        return {
+          size: entry.directory ? 0 : entry.uncompressedSize || 0,
+          isFile: !entry.directory,
+          isDirectory: entry.directory,
+          created: timestamp, // ZIP中只有一个时间戳，用作创建时间
+          modified: timestamp, // 同时也用作修改时间
+          accessed: timestamp
+        };
+      }
+    }
+
+    // 检查是否作为目录存在（有子条目）
+    const searchPrefix = searchPath + '/';
+    for (const entry of this.entries.values()) {
+      if (entry.filename.startsWith(searchPrefix)) {
+        return {
+          size: 0,
+          isFile: false,
+          isDirectory: true,
+          created: new Date(),
+          modified: new Date(),
+          accessed: new Date()
+        };
+      }
+    }
+
+    // 检查虚拟文件中是否有子条目
+    for (const virtualPath of this.virtualFiles.keys()) {
+      if (virtualPath.startsWith(path + '/')) {
+        return {
+          size: 0,
+          isFile: false,
+          isDirectory: true,
+          created: new Date(),
+          modified: new Date(),
+          accessed: new Date()
+        };
+      }
+    }
+
+    throw new VFSError('Path does not exist', 'ENOENT', path);
   }
 }
