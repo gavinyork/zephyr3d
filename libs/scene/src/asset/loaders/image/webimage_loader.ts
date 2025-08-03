@@ -1,7 +1,7 @@
 import { AbstractTextureLoader } from '../loader';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import { TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 
 /**
  * Web image loader

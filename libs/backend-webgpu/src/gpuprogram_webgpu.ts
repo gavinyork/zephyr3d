@@ -15,15 +15,15 @@ import type { WebGPUDevice } from './device';
 
 export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private static _hashCounter = 0;
-  private _type: 'render' | 'compute';
-  private _vs: string;
-  private _fs: string;
-  private _cs: string;
-  private _label: string;
-  private _hash: string;
+  private readonly _type: 'render' | 'compute';
+  private readonly _vs: string;
+  private readonly _fs: string;
+  private readonly _cs: string;
+  private readonly _label: string;
+  private readonly _hash: string;
   private _error: string;
-  private _bindGroupLayouts: BindGroupLayout[];
-  private _vertexAttributes: string;
+  private readonly _bindGroupLayouts: BindGroupLayout[];
+  private readonly _vertexAttributes: string;
   private _csModule: GPUShaderModule;
   private _vsModule: GPUShaderModule;
   private _fsModule: GPUShaderModule;

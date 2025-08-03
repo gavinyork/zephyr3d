@@ -4,7 +4,7 @@ import type { SamplerOptions, TextureSampler } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements TextureSampler<GPUSampler> {
-  private _options: SamplerOptions;
+  private readonly _options: SamplerOptions;
   constructor(device: WebGPUDevice, options: SamplerOptions) {
     super(device);
     this._options = Object.assign(

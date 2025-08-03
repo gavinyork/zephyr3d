@@ -2,9 +2,9 @@ import { ZipWriter } from '@zip.js/zip.js';
 import * as streamSaver from 'streamsaver';
 
 export class ZipDownloader {
-  private _zipWriter: ZipWriter<any>;
-  private _downloadPromise: Promise<void>;
-  private _transformStream: TransformStream;
+  private readonly _zipWriter: ZipWriter<any>;
+  private readonly _downloadPromise: Promise<void>;
+  private readonly _transformStream: TransformStream;
   constructor(filename: string) {
     const fileStream = streamSaver.createWriteStream(filename);
     this._transformStream = new TransformStream();

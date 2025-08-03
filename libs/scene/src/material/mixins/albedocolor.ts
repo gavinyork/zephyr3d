@@ -31,7 +31,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
   const ALBEDO_COLOR_UNIFORM = S.defineInstanceUniform('albedoColor', 'rgba');
   return class extends S {
     static albedoColorMixed = true;
-    private _albedoColor: Vector4;
+    private readonly _albedoColor: Vector4;
     constructor() {
       super();
       this._albedoColor = Vector4.one();

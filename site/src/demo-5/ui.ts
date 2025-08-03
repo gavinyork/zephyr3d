@@ -10,9 +10,9 @@ interface GUIParams {
 }
 
 export class Panel {
-  private _deviceList: string[];
-  private _params: GUIParams;
-  private _gui: GUI;
+  private readonly _deviceList: string[];
+  private readonly _params: GUIParams;
+  private readonly _gui: GUI;
   constructor(instanceCount: number, vertexCount: number, faceCount: number) {
     this._deviceList = ['WebGL2', 'WebGPU'];
     this._params = {

@@ -19,16 +19,16 @@ import { TreeMaterialMetallicRoughness } from './treematerial';
 import { Panel } from './ui';
 
 export class Demo {
-  private _assetManager: AssetManager;
-  private _scene: Scene;
-  private _root: SceneNode;
+  private readonly _assetManager: AssetManager;
+  private readonly _scene: Scene;
+  private readonly _root: SceneNode;
   private _terrain: Terrain;
-  private _camera: PerspectiveCamera;
+  private readonly _camera: PerspectiveCamera;
   private _character: ModelInfo;
-  private _axisPZ: Vector3;
-  private _actorTarget: Vector3;
-  private _actorDirection: Vector3;
-  private _actorSpeed: number;
+  private readonly _axisPZ: Vector3;
+  private readonly _actorTarget: Vector3;
+  private readonly _actorDirection: Vector3;
+  private readonly _actorSpeed: number;
   private _actorRunning: boolean;
   private _loaded: boolean;
   private _loadPercent: number;

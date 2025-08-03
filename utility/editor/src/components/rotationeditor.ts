@@ -12,7 +12,7 @@ import {
 import { createRotationEditGizmo } from '../views/gizmo/gizmo';
 
 export class RotationEditor {
-  private static _rotation: Quaternion = Quaternion.identity();
+  private static readonly _rotation: Quaternion = Quaternion.identity();
   private static _fb: FrameBuffer = null;
   private static _scene: Scene = null;
   private static _camera: PerspectiveCamera = null;
@@ -20,11 +20,11 @@ export class RotationEditor {
   private static _isDragging = false;
   private static _lastMousePos: ImGui.ImVec2 = null;
   private static _dirty = false;
-  private static _axisLength = 8;
-  private static _axisRadius = 0.5;
-  private static _arrowLength = 3;
-  private static _arrowRadius = 1;
-  private static _sphereRaidus = 8;
+  private static readonly _axisLength = 8;
+  private static readonly _axisRadius = 0.5;
+  private static readonly _arrowLength = 3;
+  private static readonly _arrowRadius = 1;
+  private static readonly _sphereRaidus = 8;
   private static _canvasSize: ImGui.ImVec2 = null;
   static reset(rotation: Quaternion, canvasSize: ImGui.ImVec2) {
     this._rotation.set(rotation);

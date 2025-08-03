@@ -147,13 +147,13 @@ const tempInt32Array = new Int32Array(4);
 const tempUint32Array = new Uint32Array(4);
 
 export class WebGLDevice extends BaseDevice {
-  private _context: WebGLContext;
-  private _isWebGL2: boolean;
-  private _msaaSampleCount: number;
-  private _loseContextExtension: WEBGL_lose_context;
+  private readonly _context: WebGLContext;
+  private readonly _isWebGL2: boolean;
+  private readonly _msaaSampleCount: number;
+  private readonly _loseContextExtension: WEBGL_lose_context;
   private _contextLost: boolean;
   private _isRendering: boolean;
-  private _dpr: number;
+  private readonly _dpr: number;
   private _reverseWindingOrder: boolean;
   private _deviceCaps: DeviceCaps;
   private _vaoExt: VertexArrayObjectEXT;
@@ -180,7 +180,7 @@ export class WebGLDevice extends BaseDevice {
       type: number;
     }
   >;
-  private _adapterInfo: { vendor: string; renderer: string; version: string };
+  private readonly _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));

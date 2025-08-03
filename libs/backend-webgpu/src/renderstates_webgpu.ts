@@ -596,7 +596,7 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
 }
 
 export class WebGPURenderStateSet implements RenderStateSet {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   colorState: WebGPUColorState;
   blendingState: WebGPUBlendingState;
   rasterizerState: WebGPURasterizerState;

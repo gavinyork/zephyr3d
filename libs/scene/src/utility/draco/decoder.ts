@@ -2,9 +2,9 @@ import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { Decoder, Mesh, DecoderModule, DataType } from 'draco3d';
 
 export class DracoMeshDecoder {
-  private _module: DecoderModule;
-  private _decoder: Decoder;
-  private _mesh: Mesh;
+  private readonly _module: DecoderModule;
+  private readonly _decoder: Decoder;
+  private readonly _mesh: Mesh;
   constructor(data: Int8Array, decoderModule: DecoderModule) {
     this._module = decoderModule;
     this._decoder = new this._module.Decoder();

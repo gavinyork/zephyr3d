@@ -14,7 +14,7 @@ export type PBReflectionTagGetter = (scope: PBGlobalScope) => PBShaderExp;
  */
 export class PBReflection {
   /** @internal */
-  private _builder: ProgramBuilder;
+  private readonly _builder: ProgramBuilder;
   /** @internal */
   private _tagList: Record<string, PBReflectionTagGetter>;
   /** @internal */

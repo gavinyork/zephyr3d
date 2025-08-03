@@ -14,13 +14,13 @@ import { DRef } from '../app';
  */
 export class EnvLightWrapper {
   private _envLight: EnvironmentLighting;
-  private _ambientColor: ObservableVector4;
-  private _ambientDown: ObservableVector4;
-  private _ambientUp: ObservableVector4;
-  private _radianceMap: DRef<TextureCube>;
-  private _irradianceMap: DRef<TextureCube>;
-  private _irradianceSH: DRef<GPUDataBuffer>;
-  private _irradianceWindow: Vector3;
+  private readonly _ambientColor: ObservableVector4;
+  private readonly _ambientDown: ObservableVector4;
+  private readonly _ambientUp: ObservableVector4;
+  private readonly _radianceMap: DRef<TextureCube>;
+  private readonly _irradianceMap: DRef<TextureCube>;
+  private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _irradianceWindow: Vector3;
   private _strength: number;
   /** @internal */
   constructor() {
@@ -181,8 +181,8 @@ export class EnvLightWrapper {
  * @public
  */
 export class Environment {
-  private _sky: SkyRenderer;
-  private _light: EnvLightWrapper;
+  private readonly _sky: SkyRenderer;
+  private readonly _light: EnvLightWrapper;
   /** @internal */
   constructor() {
     this._sky = new SkyRenderer();

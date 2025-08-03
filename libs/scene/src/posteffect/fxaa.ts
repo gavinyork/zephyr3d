@@ -12,7 +12,7 @@ import { fetchSampler } from '../utility/misc';
 export class FXAA extends AbstractPostEffect {
   private static _program: GPUProgram = null;
   private static _bindgroup: BindGroup = null;
-  private _invTexSize: Vector2;
+  private readonly _invTexSize: Vector2;
   /**
    * Creates an instance of grayscale post effect
    */

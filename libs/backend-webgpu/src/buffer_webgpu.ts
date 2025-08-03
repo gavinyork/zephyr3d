@@ -7,11 +7,11 @@ import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuffer<GPUBuffer> {
-  private _size: number;
-  private _usage: number;
+  private readonly _size: number;
+  private readonly _usage: number;
   private _gpuUsage: number;
   private _memCost: number;
-  private _ringBuffer: UploadRingBuffer;
+  private readonly _ringBuffer: UploadRingBuffer;
   protected _pendingUploads: UploadBuffer[];
   constructor(device: WebGPUDevice, usage: number, data: TypedArray | number) {
     super(device);

@@ -3,9 +3,17 @@ import { eventBus } from '../core/eventbus';
 
 let isDragging = null;
 
-export function enableWorkspaceDragging(object: unknown, type: string, payload: unknown) {
+export function enableWorkspaceDragging(
+  object: unknown,
+  type: string,
+  payload?: () => unknown,
+  renderFunc?: () => void
+) {
   if (ImGui.BeginDragDropSource()) {
-    ImGui.SetDragDropPayload(type, payload);
+    ImGui.SetDragDropPayload(type, payload ? payload() : null);
+    if (renderFunc) {
+      renderFunc();
+    }
     ImGui.EndDragDropSource();
     if (isDragging !== object) {
       isDragging = object;

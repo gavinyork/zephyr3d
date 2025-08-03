@@ -133,7 +133,7 @@ export function perlinNoise3D(
   freqX: number,
   freqY: number,
   freqZ: number
-) {
+): number {
   return interpolateNoise3(x * freqX, y * freqY, z * freqZ) * amp;
 }
 
@@ -144,7 +144,7 @@ export function perlinNoise3D(
  * @public
  */
 export function halton23(length: number): [number, number][] {
-  function halton(base: number, index: number) {
+  function halton(base: number, index: number): number {
     let result = 0;
     let f = 1;
     while (index > 0) {

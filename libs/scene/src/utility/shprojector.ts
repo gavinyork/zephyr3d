@@ -34,9 +34,9 @@ export class CubemapSHProjector {
   private static _programInst: GPUProgram = null;
   private static _bindGroupInst: BindGroup = null;
   private static _renderStats: RenderStateSet = null;
-  private _primitive: DRef<Primitive>;
-  private _renderTarget: DRef<FrameBuffer>;
-  private _numSamples: number;
+  private readonly _primitive: DRef<Primitive>;
+  private readonly _renderTarget: DRef<FrameBuffer>;
+  private readonly _numSamples: number;
   /**
    * Creates a new CubemapSHProjector instance.
    *

@@ -67,20 +67,20 @@ import { VFSView } from '../components/vfsview';
 import { ProjectService } from '../core/services/project';
 
 export class SceneView extends BaseView<SceneModel> {
-  private _editor: Editor;
-  private _cmdManager: CommandManager;
+  private readonly _editor: Editor;
+  private readonly _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
-  private _propGrid: PropertyEditor;
-  private _toolbar: ToolBar;
+  private readonly _propGrid: PropertyEditor;
+  private readonly _toolbar: ToolBar;
   private _tab: Tab;
-  private _menubar: MenubarView;
+  private readonly _menubar: MenubarView;
   private _assetView: VFSView;
-  private _statusbar: StatusBar;
-  private _transformNode: DRef<SceneNode>;
+  private readonly _statusbar: StatusBar;
+  private readonly _transformNode: DRef<SceneNode>;
   private _oldTransform: TRS;
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
-  private _nodeToBePlaced: DRef<SceneNode>;
+  private readonly _nodeToBePlaced: DRef<SceneNode>;
   private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
   private _descToBePlaced: string;
@@ -92,18 +92,18 @@ export class SceneView extends BaseView<SceneModel> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
-  private _clipBoardData: DRef<SceneNode>;
+  private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
-  private _currentEditTool: DRef<EditTool>;
-  private _cameraAnimationEyeFrom: Vector3;
-  private _cameraAnimationTargetFrom: Vector3;
-  private _cameraAnimationEyeTo: Vector3;
-  private _cameraAnimationTargetTo: Vector3;
+  private readonly _currentEditTool: DRef<EditTool>;
+  private readonly _cameraAnimationEyeFrom: Vector3;
+  private readonly _cameraAnimationTargetFrom: Vector3;
+  private readonly _cameraAnimationEyeTo: Vector3;
+  private readonly _cameraAnimationTargetTo: Vector3;
   private _cameraAnimationTime: number;
-  private _cameraAnimationDuration: number;
+  private readonly _cameraAnimationDuration: number;
   private _animatedCamera: Camera;
-  private _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
+  private readonly _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
   private _trackId: number;
   constructor(editor: Editor, model: SceneModel) {
     super(model);
@@ -681,7 +681,10 @@ export class SceneView extends BaseView<SceneModel> {
       if (payload || peekPayload) {
         if (!this._workspaceDragging) {
           this._workspaceDragging = true;
-          this.handleWorkspaceDragEnter('ASSET', payload ? payload.Data : peekPayload.Data);
+          const data = (payload ? payload.Data : peekPayload.Data) as { isDir: boolean; path: string }[];
+          if (data.length === 1 && !data[0].isDir) {
+            this.handleWorkspaceDragEnter('ASSET', data[0]);
+          }
         }
         const mousePos = ImGui.GetMousePos();
         const pos = [mousePos.x, mousePos.y];
@@ -1197,13 +1200,9 @@ export class SceneView extends BaseView<SceneModel> {
     this._cmdManager.execute(new NodeDeleteCommand(node));
     eventBus.dispatchEvent('scene_changed');
   }
-  private handleWorkspaceDragEnter(type: string, payload: unknown) {
-    console.log(`Workspace DragEnter: ${type} ${payload}`);
-    if (
-      typeof payload === 'string' &&
-      (payload.toLowerCase().endsWith('glb') || payload.toLowerCase().endsWith('gltf'))
-    ) {
-      this.handleAddAsset(payload);
+  private handleWorkspaceDragEnter(type: string, payload: { isDir: boolean; path: string }) {
+    if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
+      this.handleAddAsset(payload.path);
     }
   }
   private handleWorkspaceDragLeave() {
@@ -1238,7 +1237,7 @@ export class SceneView extends BaseView<SceneModel> {
       }
     }
   }
-  private handleWorkspaceDragDrop(type: string, payload: unknown, x: number, y: number) {
+  private handleWorkspaceDragDrop() {
     this._renderDropZone = false;
     const placeNode = this._nodeToBePlaced?.get();
     if (placeNode) {
@@ -1253,7 +1252,7 @@ export class SceneView extends BaseView<SceneModel> {
         });
     }
   }
-  private handleWorkspaceDragEnd(type: string, payload: unknown) {
+  private handleWorkspaceDragEnd() {
     if (!this._workspaceDragging) {
       this._renderDropZone = false;
       const node = this._nodeToBePlaced?.get();

@@ -15,9 +15,9 @@ export class BlinnMaterial
   implements Clonable<BlinnMaterial>
 {
   /** @internal */
-  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   /** @internal */
-  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /**
    * Creates an instance of BlinnMaterial class
    */

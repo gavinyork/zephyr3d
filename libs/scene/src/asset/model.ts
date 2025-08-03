@@ -264,8 +264,8 @@ export class AssetHierarchyNode extends NamedObject {
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
   private _weights: number[];
-  private _children: AssetHierarchyNode[];
-  private _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
+  private readonly _children: AssetHierarchyNode[];
+  private readonly _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
   /**
    * Creates an instance of AssetHierarchyNode
    * @param name - Name of the node

@@ -51,7 +51,7 @@ export class StructuredBufferData {
    * @param name - Name of the member
    * @param value - Value to set
    */
-  set(name: string, value: StructuredValue) {
+  set(name: string, value: StructuredValue): void {
     if (value !== undefined) {
       const view = this._uniformMap[name];
       if (view) {
@@ -93,7 +93,7 @@ export class StructuredBufferData {
     }
   }
   /** @internal */
-  private setStruct(name: string, value: any) {
+  private setStruct(name: string, value: any): void {
     for (const k in value) {
       this.set(`${name}.${k}`, value[k]);
     }

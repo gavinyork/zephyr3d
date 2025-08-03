@@ -440,7 +440,7 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
 }
 
 export class WebGLRenderStateSet implements RenderStateSet {
-  private _gl: WebGLContext;
+  private readonly _gl: WebGLContext;
   colorState: WebGLColorState;
   blendingState: WebGLBlendingState;
   rasterizerState: WebGLRasterizerState;

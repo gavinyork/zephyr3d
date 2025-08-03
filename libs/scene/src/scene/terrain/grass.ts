@@ -28,9 +28,9 @@ export class GrassClusterBase {
 }
 
 export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) implements Drawable {
-  private _primitive: Primitive;
-  private _numInstances: number;
-  private _material: GrassMaterial;
+  private readonly _primitive: Primitive;
+  private readonly _numInstances: number;
+  private readonly _material: GrassMaterial;
   constructor(
     terrain: Terrain,
     baseVertexBuffer: StructuredBuffer,
@@ -102,7 +102,7 @@ export type GrassLayer = {
 
 export class GrassManager {
   private _clusterSize: number;
-  private _baseVertexBuffer: Map<string, DRef<StructuredBuffer>>;
+  private readonly _baseVertexBuffer: Map<string, DRef<StructuredBuffer>>;
   private _indexBuffer: DRef<IndexBuffer>;
   private _layers: GrassLayer[];
   private _disposed: boolean;

@@ -8,8 +8,8 @@ import type { SceneNode } from '../scene';
  * @public
  */
 export class NodeScaleTrack extends AnimationTrack<Vector3> {
-  private _state: Vector3;
-  private _interpolator: Interpolator;
+  private readonly _state: Vector3;
+  private readonly _interpolator: Interpolator;
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values

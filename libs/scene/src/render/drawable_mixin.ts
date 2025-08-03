@@ -69,17 +69,17 @@ export function mixinDrawable<
   }>
 >(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
-    private _mdRenderQueueRef: RenderQueueRef[];
+    private readonly _mdRenderQueueRef: RenderQueueRef[];
     private _mdDrawableBindGroup: BindGroup;
-    private _mdDrawableBindGroupInstanced: Map<RenderQueue, BindGroup>;
+    private readonly _mdDrawableBindGroupInstanced: Map<RenderQueue, BindGroup>;
     private _mdDrawableBindGroupSkin: BindGroup;
     private _mdDrawableBindGroupMorph: BindGroup;
     private _mdDrawableBindGroupSkinMorph: BindGroup;
-    private _worldMatrixBuffer: Float32Array;
+    private readonly _worldMatrixBuffer: Float32Array;
     private _framestampBuffer: Int32Array;
-    private _currentWorldMatrixBuffer: Float32Array;
-    private _prevWorldMatrixBuffer: Float32Array;
-    private _drawableId: number;
+    private readonly _currentWorldMatrixBuffer: Float32Array;
+    private readonly _prevWorldMatrixBuffer: Float32Array;
+    private readonly _drawableId: number;
     private _objectColor: Vector4;
     constructor(...args: any[]) {
       super(...args);

@@ -18,13 +18,13 @@ export class ImageList extends makeEventTarget(Object)<{
   private _isDragging: boolean;
   private _lastMouseX: number;
   private _selectedIndex: number;
-  private _spacingX: number;
-  private _spacingY: number;
+  private readonly _spacingX: number;
+  private readonly _spacingY: number;
   private _acceptDragDrop: boolean;
-  private _defaultImage: DRef<Texture2D>;
+  private readonly _defaultImage: DRef<Texture2D>;
   private _selectable: boolean;
   private _maxImageCount: number;
-  private _mimeTypes: string[];
+  private readonly _mimeTypes: string[];
   constructor(mimeTypes?: string[]) {
     super();
     this._images = [];

@@ -6,9 +6,9 @@ import { Vector3 } from '@zephyr3d/base';
 import type { Editor } from '../core/editor';
 
 export class SceneModel extends BaseModel {
-  private _editor: Editor;
+  private readonly _editor: Editor;
   private _scene: Scene;
-  private _editorCamera: DRef<Camera>;
+  private readonly _editorCamera: DRef<Camera>;
   constructor(editor: Editor) {
     super();
     this._editor = editor;

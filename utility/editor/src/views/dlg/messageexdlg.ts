@@ -3,7 +3,7 @@ import { DialogRenderer } from '../../components/modal';
 
 export class DlgMessageBoxEx extends DialogRenderer<string> {
   private _text: string;
-  private _buttons: string[];
+  private readonly _buttons: string[];
   public static async messageBoxEx(
     title: string,
     message: string,

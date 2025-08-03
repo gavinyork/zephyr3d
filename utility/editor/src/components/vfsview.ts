@@ -4,7 +4,7 @@ import type { ProjectInfo } from '../core/services/project';
 import { VFSRenderer } from './vfsrenderer';
 
 export class VFSView {
-  private _panel: DockPannel;
+  private readonly _panel: DockPannel;
   private _renderer: VFSRenderer;
 
   constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {

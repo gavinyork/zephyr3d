@@ -34,251 +34,6 @@ export class IndexedDBFS extends VFS {
     this.storeName = storeName;
   }
 
-  private async ensureDB(): Promise<IDBDatabase> {
-    if (this.db) {
-      return this.db;
-    }
-
-    try {
-      // 获取数据库信息
-      const { version, storeExists } = await this.getDatabaseInfo();
-
-      if (storeExists) {
-        // 表已存在，直接打开数据库
-        this.db = await this.openDatabase(version);
-        await this.ensureRootDirectoryAsync();
-        return this.db;
-      } else {
-        // 表不存在，需要升级数据库版本来创建表
-        this.db = await this.createObjectStoreAsync(version + 1);
-        return this.db;
-      }
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * 获取数据库信息
-   */
-  private async getDatabaseInfo(): Promise<{ version: number; storeExists: boolean }> {
-    return new Promise((resolve) => {
-      const request = indexedDB.open(this.dbName);
-
-      request.onsuccess = (event) => {
-        const tempDb = (event.target as IDBOpenDBRequest).result;
-        const version = tempDb.version;
-        const storeExists = tempDb.objectStoreNames.contains(this.storeName);
-        tempDb.close();
-        resolve({ version, storeExists });
-      };
-
-      request.onerror = () => {
-        // 数据库不存在
-        resolve({ version: 0, storeExists: false });
-      };
-      request.onupgradeneeded = (event) => {
-        const tempDb = (event.target as IDBOpenDBRequest).result;
-        const version = tempDb.version;
-        const storeExists = tempDb.objectStoreNames.contains(this.storeName);
-        tempDb.close();
-        resolve({ version, storeExists });
-      };
-    });
-  }
-
-  /**
-   * 打开数据库
-   */
-  private async openDatabase(version: number): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, version);
-
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-
-      request.onerror = () => {
-        reject(new VFSError('Failed to open existing database', 'ENOENT'));
-      };
-
-      request.onblocked = (ev) => {
-        reject(new VFSError('Database open blocked', 'EBUSY'));
-      };
-    });
-  }
-
-  /**
-   * 异步创建 Object Store
-   */
-  private async createObjectStoreAsync(newVersion: number): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, newVersion);
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-
-        try {
-          if (!db.objectStoreNames.contains(this.storeName)) {
-            const store = db.createObjectStore(this.storeName, { keyPath: 'path' });
-            store.createIndex('type', 'type', { unique: false });
-            store.createIndex('parent', 'parent', { unique: false });
-            store.createIndex('name', 'name', { unique: false });
-
-            // 在升级事务中创建根目录
-            const now = new Date();
-            const rootDir = {
-              name: '',
-              path: '/',
-              size: 0,
-              type: 'directory',
-              created: now,
-              modified: now,
-              parent: '',
-              data: null
-            };
-
-            store.add(rootDir);
-          }
-        } catch (error) {
-          console.error(`Failed to create Object Store '${this.storeName}':`, error);
-          reject(new VFSError('Failed to create object store', 'EIO', error?.toString()));
-        }
-      };
-
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-
-      request.onerror = () => {
-        reject(new VFSError('Failed to create database/object store', 'EIO', request.error?.message));
-      };
-
-      request.onblocked = (ev) => {
-        reject(new VFSError('Database creation blocked - close other connections first', 'EBUSY'));
-      };
-    });
-  }
-
-  /**
-   * 异步确保根目录存在
-   */
-  private async ensureRootDirectoryAsync(): Promise<void> {
-    if (!this.db) {
-      throw new VFSError('Database not available', 'EIO');
-    }
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-
-      const checkRequest = store.get('/');
-
-      checkRequest.onsuccess = () => {
-        if (!checkRequest.result) {
-          // 根目录不存在，创建它
-          const now = new Date();
-          const rootDir = {
-            name: '',
-            path: '/',
-            size: 0,
-            type: 'directory',
-            created: now,
-            modified: now,
-            parent: '',
-            data: null
-          };
-
-          const addRequest = store.add(rootDir);
-          addRequest.onsuccess = () => {
-            resolve();
-          };
-          addRequest.onerror = () => {
-            reject(new VFSError('Failed to create root directory', 'EIO'));
-          };
-        } else {
-          resolve();
-        }
-      };
-
-      checkRequest.onerror = () => {
-        reject(new VFSError('Failed to check root directory', 'EIO'));
-      };
-
-      transaction.onerror = () => {
-        reject(new VFSError('Failed to check/create root directory', 'EIO', transaction.error?.message));
-      };
-
-      transaction.onabort = () => {
-        reject(new VFSError('Transaction aborted while checking root directory', 'EIO'));
-      };
-    });
-  }
-  /**
-   * 通用数据库操作方法
-   */
-  private async dbOperation<T>(
-    mode: IDBTransactionMode,
-    operation: (store: IDBObjectStore) => IDBRequest | Promise<T>
-  ): Promise<T> {
-    // 先确保数据库准备好
-    const db = await this.ensureDB();
-
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([this.storeName], mode);
-      const store = transaction.objectStore(this.storeName);
-
-      transaction.onerror = () =>
-        reject(new VFSError('Transaction failed', 'EACCES', transaction.error?.message));
-
-      transaction.onabort = () => reject(new VFSError('Transaction aborted', 'EABORT'));
-
-      // 添加完成监听器确保事务完成
-      transaction.oncomplete = () => {
-        // 如果操作返回的是简单值，在这里resolve
-      };
-
-      const result = operation(store);
-
-      if (result instanceof Promise) {
-        result.then(resolve).catch(reject);
-      } else if (result instanceof IDBRequest) {
-        result.onsuccess = () => {
-          resolve(result.result);
-        };
-        result.onerror = () => reject(new VFSError('Operation failed', 'EIO', result.error?.message));
-      } else {
-        // 同步操作
-        resolve(result);
-      }
-    });
-  }
-
-  /**
-   * 匹配过滤器
-   */
-  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
-    if (!options) {
-      return true;
-    }
-
-    // 隐藏文件过滤
-    if (!options.includeHidden && metadata.name.startsWith('.')) {
-      return false;
-    }
-
-    // 模式匹配
-    if (options.pattern) {
-      if (typeof options.pattern === 'string') {
-        return metadata.name.includes(options.pattern);
-      } else if (options.pattern instanceof RegExp) {
-        return options.pattern.test(metadata.name);
-      }
-    }
-
-    return true;
-  }
-
   protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
     const parent = PathUtils.dirname(path);
 
@@ -672,190 +427,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  /**
-   * 清空整个文件系统
-   */
-  async clear(): Promise<void> {
-    return this.dbOperation('readwrite', (store) => {
-      return new Promise<void>((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(new VFSError('Failed to clear file system', 'EIO'));
-      });
-    });
-  }
-
-  /**
-   * 获取文件系统使用情况统计
-   */
-  async getUsageStats(): Promise<{
-    totalFiles: number;
-    totalDirectories: number;
-    totalSize: number;
-    storageQuota?: number;
-    usedStorage?: number;
-  }> {
-    return this.dbOperation('readonly', (store) => {
-      return new Promise((resolve, reject) => {
-        let totalFiles = 0;
-        let totalDirectories = 0;
-        let totalSize = 0;
-
-        const request = store.openCursor();
-        request.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-          if (cursor) {
-            const record = cursor.value;
-            if (record.type === 'file') {
-              totalFiles++;
-              totalSize += record.size;
-            } else if (record.type === 'directory') {
-              totalDirectories++;
-            }
-            cursor.continue();
-          } else {
-            // 尝试获取存储配额信息
-            if ('storage' in navigator && 'estimate' in navigator.storage) {
-              navigator.storage
-                .estimate()
-                .then((estimate) => {
-                  resolve({
-                    totalFiles,
-                    totalDirectories,
-                    totalSize,
-                    storageQuota: estimate.quota,
-                    usedStorage: estimate.usage
-                  });
-                })
-                .catch(() => {
-                  resolve({
-                    totalFiles,
-                    totalDirectories,
-                    totalSize
-                  });
-                });
-            } else {
-              resolve({
-                totalFiles,
-                totalDirectories,
-                totalSize
-              });
-            }
-          }
-        };
-        request.onerror = () => reject(new VFSError('Failed to calculate usage stats', 'EIO'));
-      });
-    });
-  }
-
-  /**
-   * 导出文件系统数据为 JSON
-   */
-  async exportToJSON(): Promise<string> {
-    return this.dbOperation('readonly', (store) => {
-      return new Promise((resolve, reject) => {
-        const exportData: any[] = [];
-        const request = store.openCursor();
-
-        request.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-          if (cursor) {
-            const record = cursor.value;
-
-            // 对于二进制数据，转换为 base64
-            let data = record.data;
-            if (data instanceof ArrayBuffer) {
-              const bytes = new Uint8Array(data);
-              data = btoa(String.fromCodePoint(...bytes));
-              record.dataType = 'base64';
-            } else {
-              record.dataType = 'string';
-            }
-
-            exportData.push({
-              ...record,
-              data: data,
-              created: record.created.toISOString(),
-              modified: record.modified.toISOString()
-            });
-
-            cursor.continue();
-          } else {
-            resolve(
-              JSON.stringify(
-                {
-                  version: '1.0',
-                  filesystem: 'IndexedDBFS',
-                  exported: new Date().toISOString(),
-                  data: exportData
-                },
-                null,
-                2
-              )
-            );
-          }
-        };
-
-        request.onerror = () => reject(new VFSError('Failed to export data', 'EIO'));
-      });
-    });
-  }
-
-  /**
-   * 从 JSON 导入文件系统数据
-   */
-  async importFromJSON(jsonData: string): Promise<void> {
-    try {
-      const importData = JSON.parse(jsonData);
-
-      if (!importData.data || !Array.isArray(importData.data)) {
-        throw new VFSError('Invalid import data format', 'EINVAL');
-      }
-
-      return this.dbOperation('readwrite', (store) => {
-        return new Promise<void>((resolve, reject) => {
-          let processed = 0;
-          const total = importData.data.length;
-
-          if (total === 0) {
-            resolve();
-            return;
-          }
-
-          for (const record of importData.data) {
-            // 恢复数据格式
-            if (record.dataType === 'base64' && record.data) {
-              const binaryString = atob(record.data);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.codePointAt(i);
-              }
-              record.data = bytes.buffer;
-            }
-
-            // 恢复日期对象
-            record.created = new Date(record.created);
-            record.modified = new Date(record.modified);
-
-            // 移除临时字段
-            delete record.dataType;
-
-            const request = store.put(record);
-            request.onsuccess = () => {
-              processed++;
-              if (processed === total) {
-                resolve();
-              }
-            };
-            request.onerror = () => reject(new VFSError(`Failed to import record: ${record.path}`, 'EIO'));
-          }
-        });
-      });
-    } catch (_error) {
-      throw new VFSError('Failed to parse import data', 'EINVAL');
-    }
-  }
-  async _deleteDatabase(): Promise<void> {
+  protected async _deleteDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.db) {
         this.db.close();
@@ -915,7 +487,7 @@ export class IndexedDBFS extends VFS {
         reject(new VFSError('Failed to upgrade database for store deletion', 'EIO', request.error?.message));
       };
 
-      request.onblocked = (ev) => {
+      request.onblocked = () => {
         reject(new VFSError('Database upgrade blocked - close other connections first', 'EBUSY'));
       };
     });
@@ -1016,7 +588,7 @@ export class IndexedDBFS extends VFS {
     };
 
     // 如果目标存在且允许覆盖，先删除目标
-    const handleUpdate = () => {
+    const handleUpdate = (): void => {
       // 添加新记录
       const addRequest = store.put(newRecord);
       addRequest.onsuccess = () => {
@@ -1122,10 +694,12 @@ export class IndexedDBFS extends VFS {
     let hasError = false;
 
     // 如果目标存在且允许覆盖，先删除目标目录的所有内容
-    const processMove = () => {
+    const processMove = (): void => {
       // 为每个项目创建新记录
       for (const item of itemsToMove) {
-        if (hasError) break;
+        if (hasError) {
+          break;
+        }
 
         const oldPath = item.path;
         let newPath: string;
@@ -1228,7 +802,9 @@ export class IndexedDBFS extends VFS {
         let hasError = false;
 
         for (const pathToDelete of itemsToDelete) {
-          if (hasError) break;
+          if (hasError) {
+            break;
+          }
 
           const deleteRequest = store.delete(pathToDelete);
 
@@ -1269,5 +845,249 @@ export class IndexedDBFS extends VFS {
         reject(new VFSError('Failed to get database version', 'EIO', request.error?.message));
       };
     });
+  }
+  private async ensureDB(): Promise<IDBDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+
+    try {
+      // 获取数据库信息
+      const { version, storeExists } = await this.getDatabaseInfo();
+
+      if (storeExists) {
+        // 表已存在，直接打开数据库
+        this.db = await this.openDatabase(version);
+        await this.ensureRootDirectoryAsync();
+        return this.db;
+      } else {
+        // 表不存在，需要升级数据库版本来创建表
+        this.db = await this.createObjectStoreAsync(version + 1);
+        return this.db;
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 获取数据库信息
+   */
+  private async getDatabaseInfo(): Promise<{ version: number; storeExists: boolean }> {
+    return new Promise((resolve) => {
+      const request = indexedDB.open(this.dbName);
+
+      request.onsuccess = (event) => {
+        const tempDb = (event.target as IDBOpenDBRequest).result;
+        const version = tempDb.version;
+        const storeExists = tempDb.objectStoreNames.contains(this.storeName);
+        tempDb.close();
+        resolve({ version, storeExists });
+      };
+
+      request.onerror = () => {
+        // 数据库不存在
+        resolve({ version: 0, storeExists: false });
+      };
+      request.onupgradeneeded = (event) => {
+        const tempDb = (event.target as IDBOpenDBRequest).result;
+        const version = tempDb.version;
+        const storeExists = tempDb.objectStoreNames.contains(this.storeName);
+        tempDb.close();
+        resolve({ version, storeExists });
+      };
+    });
+  }
+
+  /**
+   * 打开数据库
+   */
+  private async openDatabase(version: number): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, version);
+
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+
+      request.onerror = () => {
+        reject(new VFSError('Failed to open existing database', 'ENOENT'));
+      };
+
+      request.onblocked = () => {
+        reject(new VFSError('Database open blocked', 'EBUSY'));
+      };
+    });
+  }
+
+  /**
+   * 异步创建 Object Store
+   */
+  private async createObjectStoreAsync(newVersion: number): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, newVersion);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+
+        try {
+          if (!db.objectStoreNames.contains(this.storeName)) {
+            const store = db.createObjectStore(this.storeName, { keyPath: 'path' });
+            store.createIndex('type', 'type', { unique: false });
+            store.createIndex('parent', 'parent', { unique: false });
+            store.createIndex('name', 'name', { unique: false });
+
+            // 在升级事务中创建根目录
+            const now = new Date();
+            const rootDir = {
+              name: '',
+              path: '/',
+              size: 0,
+              type: 'directory',
+              created: now,
+              modified: now,
+              parent: '',
+              data: null
+            };
+
+            store.add(rootDir);
+          }
+        } catch (error) {
+          console.error(`Failed to create Object Store '${this.storeName}':`, error);
+          reject(new VFSError('Failed to create object store', 'EIO', error?.toString()));
+        }
+      };
+
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+
+      request.onerror = () => {
+        reject(new VFSError('Failed to create database/object store', 'EIO', request.error?.message));
+      };
+
+      request.onblocked = () => {
+        reject(new VFSError('Database creation blocked - close other connections first', 'EBUSY'));
+      };
+    });
+  }
+
+  /**
+   * 异步确保根目录存在
+   */
+  private async ensureRootDirectoryAsync(): Promise<void> {
+    if (!this.db) {
+      throw new VFSError('Database not available', 'EIO');
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+
+      const checkRequest = store.get('/');
+
+      checkRequest.onsuccess = () => {
+        if (!checkRequest.result) {
+          // 根目录不存在，创建它
+          const now = new Date();
+          const rootDir = {
+            name: '',
+            path: '/',
+            size: 0,
+            type: 'directory',
+            created: now,
+            modified: now,
+            parent: '',
+            data: null
+          };
+
+          const addRequest = store.add(rootDir);
+          addRequest.onsuccess = () => {
+            resolve();
+          };
+          addRequest.onerror = () => {
+            reject(new VFSError('Failed to create root directory', 'EIO'));
+          };
+        } else {
+          resolve();
+        }
+      };
+
+      checkRequest.onerror = () => {
+        reject(new VFSError('Failed to check root directory', 'EIO'));
+      };
+
+      transaction.onerror = () => {
+        reject(new VFSError('Failed to check/create root directory', 'EIO', transaction.error?.message));
+      };
+
+      transaction.onabort = () => {
+        reject(new VFSError('Transaction aborted while checking root directory', 'EIO'));
+      };
+    });
+  }
+  /**
+   * 通用数据库操作方法
+   */
+  private async dbOperation<T>(
+    mode: IDBTransactionMode,
+    operation: (store: IDBObjectStore) => IDBRequest | Promise<T>
+  ): Promise<T> {
+    // 先确保数据库准备好
+    const db = await this.ensureDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([this.storeName], mode);
+      const store = transaction.objectStore(this.storeName);
+
+      transaction.onerror = () =>
+        reject(new VFSError('Transaction failed', 'EACCES', transaction.error?.message));
+
+      transaction.onabort = () => reject(new VFSError('Transaction aborted', 'EABORT'));
+
+      // 添加完成监听器确保事务完成
+      transaction.oncomplete = () => {
+        // 如果操作返回的是简单值，在这里resolve
+      };
+
+      const result = operation(store);
+
+      if (result instanceof Promise) {
+        result.then(resolve).catch(reject);
+      } else if (result instanceof IDBRequest) {
+        result.onsuccess = () => {
+          resolve(result.result);
+        };
+        result.onerror = () => reject(new VFSError('Operation failed', 'EIO', result.error?.message));
+      } else {
+        // 同步操作
+        resolve(result);
+      }
+    });
+  }
+
+  /**
+   * 匹配过滤器
+   */
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+    if (!options) {
+      return true;
+    }
+
+    // 隐藏文件过滤
+    if (!options.includeHidden && metadata.name.startsWith('.')) {
+      return false;
+    }
+
+    // 模式匹配
+    if (options.pattern) {
+      if (typeof options.pattern === 'string') {
+        return metadata.name.includes(options.pattern);
+      } else if (options.pattern instanceof RegExp) {
+        return options.pattern.test(metadata.name);
+      }
+    }
+
+    return true;
   }
 }

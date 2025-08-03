@@ -4,10 +4,10 @@ import { DialogRenderer } from '../../components/modal';
 import { CurveEditor } from '../../components/curveeditor';
 
 export class DlgCurveEditor extends DialogRenderer<boolean> {
-  private labels: string[];
-  private channel: [number];
-  private editor: CurveEditor;
-  private onPreview: (value: number[]) => void;
+  private readonly labels: string[];
+  private readonly channel: [number];
+  private readonly editor: CurveEditor;
+  private readonly onPreview: (value: number[]) => void;
   constructor(
     id: string,
     onPreview: (value: number[]) => void,

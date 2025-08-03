@@ -84,14 +84,14 @@ export class AssetManager {
     [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64)
   };
   /** @internal */
-  private static _textureLoaders: AbstractTextureLoader[] = [
+  private static readonly _textureLoaders: AbstractTextureLoader[] = [
     new WebImageLoader(),
     new DDSLoader(),
     new HDRLoader(),
     new TGALoader()
   ];
   /** @internal */
-  private static _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
+  private static readonly _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
   /** @internal */
   private _textures: {
     [hash: string]: Promise<BaseTexture> | DWeakRef<BaseTexture>;
@@ -113,7 +113,7 @@ export class AssetManager {
     [url: string]: Promise<any>;
   };
   /** @internal */
-  private _vfs: VFS;
+  private readonly _vfs: VFS;
   /**
    * Creates an instance of AssetManager
    */

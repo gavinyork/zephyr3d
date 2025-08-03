@@ -38,7 +38,7 @@ export class Material implements Clonable<Material> {
   /** @internal */
   private _optionTag: number;
   /** @internal */
-  private _id: number;
+  private readonly _id: number;
   /** @internal */
   private _persistentId: string;
   /** @internal */

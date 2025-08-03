@@ -21,7 +21,7 @@ import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 
 export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
-  private _layout: BindGroupLayout;
+  private readonly _layout: BindGroupLayout;
   private _layoutDesc: GPUBindGroupLayoutDescriptor;
   private _entries: GPUBindGroupEntry[];
   private _bindGroup: GPUBindGroup;

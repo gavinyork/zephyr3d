@@ -25,7 +25,7 @@ const VALIDATION_FAILED = 1 << 1;
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 export class WebGPURenderPass {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _renderCommandEncoder: GPUCommandEncoder;
   private _renderPassEncoder: GPURenderPassEncoder;
   private _fbBindFlag: number;

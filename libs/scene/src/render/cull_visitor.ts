@@ -22,7 +22,7 @@ import type { Water } from '../scene/water';
  */
 export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
-  private _primaryCamera: Camera;
+  private readonly _primaryCamera: Camera;
   /** @internal */
   private _camera: Camera;
   /** @internal */
@@ -30,11 +30,11 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private _renderQueue: RenderQueue;
   /** @internal */
-  private _renderPass: RenderPass;
+  private readonly _renderPass: RenderPass;
   /** @internal */
-  private _isGPUPicking: boolean;
+  private readonly _isGPUPicking: boolean;
   /** @internal */
-  private _isShadowMapping: boolean;
+  private readonly _isShadowMapping: boolean;
   /**
    * Creates an instance of CullVisitor
    * @param renderPass - Render pass for the culling task

@@ -52,19 +52,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   mixinLight,
   mixinPBRMetallicRoughness
 ) {
-  private static FEATURE_DETAIL_MAP = this.defineFeature();
-  private static FEATURE_DEBUG_MODE = this.defineFeature();
-  private static _defaultDetailMap: DRef<Texture2D> = new DRef();
-  private static _defaultNormalMap: DRef<Texture2D> = new DRef();
-  private _region: Vector4;
-  private _clipmapGridInfo: Vector4;
-  private _heightMap: DRef<Texture2D>;
-  private _terrainScale: Vector3;
+  private static readonly FEATURE_DETAIL_MAP = this.defineFeature();
+  private static readonly FEATURE_DEBUG_MODE = this.defineFeature();
+  private static readonly _defaultDetailMap: DRef<Texture2D> = new DRef();
+  private static readonly _defaultNormalMap: DRef<Texture2D> = new DRef();
+  private readonly _region: Vector4;
+  private readonly _clipmapGridInfo: Vector4;
+  private readonly _heightMap: DRef<Texture2D>;
+  private readonly _terrainScale: Vector3;
   private _detailMapInfo: ClipmapTerrainDetailMapInfo;
-  private _detailMapSize: number;
-  private _splatMapSize: number;
-  private _heightMapSize: Vector4;
-  private _levelDataBuffer: DRef<GPUDataBuffer>;
+  private readonly _detailMapSize: number;
+  private readonly _splatMapSize: number;
+  private readonly _heightMapSize: Vector4;
+  private readonly _levelDataBuffer: DRef<GPUDataBuffer>;
   constructor(heightMap: Texture2D) {
     super();
     this.metallic = 0;

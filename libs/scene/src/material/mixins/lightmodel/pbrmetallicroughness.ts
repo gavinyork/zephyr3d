@@ -70,7 +70,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     static readonly pbrMetallicRoughnessMixed = true;
     private _metallic: number;
     private _roughness: number;
-    private _specularFactor: Vector4;
+    private readonly _specularFactor: Vector4;
     constructor() {
       super();
       this._metallic = 1;

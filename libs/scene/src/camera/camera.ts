@@ -45,9 +45,9 @@ export type CameraHistoryData = {
  */
 export class Camera extends SceneNode implements NodeClonable<Camera> {
   /** @internal */
-  private static _halton23 = halton23(16);
+  private static readonly _halton23 = halton23(16);
   /** @internal */
-  private static _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
+  private static readonly _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
   /** @internal */
   protected _projMatrix: Matrix4x4;
   /** @internal */

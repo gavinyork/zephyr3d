@@ -24,7 +24,7 @@ import { releaseObject, retainObject, DWeakRef } from '../app';
  */
 export class Primitive implements Clonable<Primitive> {
   /** @internal */
-  private static _registry: Map<string, DWeakRef<Primitive>> = new Map();
+  private static readonly _registry: Map<string, DWeakRef<Primitive>> = new Map();
   /** @internal */
   protected _vertexLayout: VertexLayout;
   /** @internal */

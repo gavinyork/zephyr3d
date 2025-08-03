@@ -8,9 +8,9 @@ import { VFS, VFSError } from './vfs';
  * @public
  */
 export class MemoryFS extends VFS {
-  private files: Map<string, ArrayBuffer | string> = new Map();
-  private directories: Set<string> = new Set(['/']);
-  private metadata: Map<string, FileMetadata> = new Map();
+  private readonly files: Map<string, ArrayBuffer | string> = new Map();
+  private readonly directories: Set<string> = new Set(['/']);
+  private readonly metadata: Map<string, FileMetadata> = new Map();
 
   constructor(readonly = false) {
     super(readonly);
@@ -202,7 +202,7 @@ export class MemoryFS extends VFS {
           bytes[i] = binaryString.charCodeAt(i);
         }
         fileData = bytes.buffer;
-      } catch (error) {
+      } catch (_error) {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
       }
     } else if (options?.encoding === 'utf8') {

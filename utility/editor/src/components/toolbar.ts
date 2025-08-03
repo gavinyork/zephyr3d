@@ -15,17 +15,17 @@ export type ToolBarItem = {
 export class ToolBar extends makeEventTarget(Object)<{
   action: [id: string];
 }>() {
-  private _id: string;
-  private _tools: ToolBarItem[];
-  private _pos: ImGui.ImVec2;
-  private _size: ImGui.ImVec2;
-  private _size2: ImGui.ImVec2;
-  private _spacing: ImGui.ImVec2;
-  private _padding: ImGui.ImVec2;
-  private _buttonSize: ImGui.ImVec2;
-  private _sepColor: ImGui.ImVec4;
-  private _textColorUnselected: ImGui.ImVec4;
-  private _textColorSelected: ImGui.ImVec4;
+  private readonly _id: string;
+  private readonly _tools: ToolBarItem[];
+  private readonly _pos: ImGui.ImVec2;
+  private readonly _size: ImGui.ImVec2;
+  private readonly _size2: ImGui.ImVec2;
+  private readonly _spacing: ImGui.ImVec2;
+  private readonly _padding: ImGui.ImVec2;
+  private readonly _buttonSize: ImGui.ImVec2;
+  private readonly _sepColor: ImGui.ImVec4;
+  private readonly _textColorUnselected: ImGui.ImVec4;
+  private readonly _textColorSelected: ImGui.ImVec4;
   constructor(
     id: string,
     items: ToolBarItem[],

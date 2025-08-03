@@ -23,13 +23,13 @@ export class ClipmapGrassMaterial
   implements Clonable<ClipmapGrassMaterial>
 {
   /** @internal */
-  private _terrain: DWeakRef<ClipmapTerrain>;
+  private readonly _terrain: DWeakRef<ClipmapTerrain>;
   /** @internal */
-  private _terrainPosScale: Vector4;
+  private readonly _terrainPosScale: Vector4;
   /** @internal */
-  private _heightMapSize: Vector2;
+  private readonly _heightMapSize: Vector2;
   /** @internal */
-  private _textureSize: Vector2;
+  private readonly _textureSize: Vector2;
   /**
    * Creates an instance of GrassMaterial class
    * @param terrain - Clipmap terrain object

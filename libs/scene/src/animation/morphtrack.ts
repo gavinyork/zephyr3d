@@ -19,11 +19,11 @@ export type MorphState = {
  * @public
  */
 export class MorphTargetTrack extends AnimationTrack<MorphState> {
-  private _state: MorphState;
-  private _originBox: AABB;
-  private _boundingBox: BoundingBox[];
-  private _defaultWeights: number[];
-  private _interpolator: Interpolator;
+  private readonly _state: MorphState;
+  private readonly _originBox: AABB;
+  private readonly _boundingBox: BoundingBox[];
+  private readonly _defaultWeights: number[];
+  private readonly _interpolator: Interpolator;
   /**
    * Create an instance of MorphTargetTrack
    */

@@ -52,14 +52,14 @@ export class TextureDrawer {
   static readonly ENCODE_NORMAL = 1;
   static readonly ENCODE_NORMALIZED_FLOAT = 2;
 
-  private _rect: Primitive;
-  private _dummyTexture: Texture2D;
-  private _renderStates: RenderStateSet;
+  private readonly _rect: Primitive;
+  private readonly _dummyTexture: Texture2D;
+  private readonly _renderStates: RenderStateSet;
   private _program2D: TextureViewProgramEncodes;
   private _programCube: TextureViewProgramEncodes;
   private _programVideo: TextureViewProgramEncodes;
   private _program2DArray: TextureViewProgramEncodes;
-  private _programBk: GPUProgram;
+  private readonly _programBk: GPUProgram;
   private _enableBlend: boolean;
   private _colorScale: number;
   constructor() {

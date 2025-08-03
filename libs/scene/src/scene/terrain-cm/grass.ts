@@ -32,11 +32,11 @@ const INSTANCE_BYTES = 4 * 4;
  * @internal
  */
 export class GrassInstances implements Disposable {
-  private _instances: GrassInstanceInfo[];
-  private _baseVertexBuffer: DRef<StructuredBuffer>;
-  private _indexBuffer: DRef<IndexBuffer>;
-  private _instanceBuffer: DRef<StructuredBuffer>;
-  private _primitive: DRef<Primitive>;
+  private readonly _instances: GrassInstanceInfo[];
+  private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
+  private readonly _indexBuffer: DRef<IndexBuffer>;
+  private readonly _instanceBuffer: DRef<StructuredBuffer>;
+  private readonly _primitive: DRef<Primitive>;
   private _disposed: boolean;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
     this._instances = [];
@@ -142,12 +142,12 @@ export class GrassInstances implements Disposable {
  * @public
  */
 export class GrassLayer implements Disposable {
-  private static _indexBuffer: DRef<IndexBuffer> = new DRef();
-  private _material: DRef<ClipmapGrassMaterial>;
-  private _quadtree: DRef<GrassQuadtreeNode>;
+  private static readonly _indexBuffer: DRef<IndexBuffer> = new DRef();
+  private readonly _material: DRef<ClipmapGrassMaterial>;
+  private readonly _quadtree: DRef<GrassQuadtreeNode>;
   private _bladeWidth: number;
   private _bladeHeight: number;
-  private _baseVertexBuffer: DRef<StructuredBuffer>;
+  private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
   private _disposed: boolean;
   /**
    * Creates an instance of GrassLayer
@@ -351,7 +351,7 @@ export class GrassLayer implements Disposable {
  * @public
  */
 export class GrassRenderer implements Disposable {
-  private _terrain: DWeakRef<ClipmapTerrain>;
+  private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
   private _disposed: boolean;
   /**
@@ -501,11 +501,11 @@ export class GrassRenderer implements Disposable {
 }
 /** @internal */
 export class GrassQuadtreeNode implements Disposable {
-  private static _cullAABB = new AABB();
-  private _grassInstances: DRef<GrassInstances>;
+  private static readonly _cullAABB = new AABB();
+  private readonly _grassInstances: DRef<GrassInstances>;
   private _children: GrassQuadtreeNode[];
-  private _baseVertexBuffer: DRef<StructuredBuffer>;
-  private _indexBuffer: DRef<IndexBuffer>;
+  private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
+  private readonly _indexBuffer: DRef<IndexBuffer>;
   private _disposed: boolean;
   private _minX: number;
   private _minZ: number;

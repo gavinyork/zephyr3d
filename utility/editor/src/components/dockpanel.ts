@@ -12,7 +12,7 @@ export class DockPannel {
   private _top: number;
   private _width: number;
   private _height: number;
-  private _padding: number;
+  private readonly _padding: number;
   private _minWidth: number;
   private _maxWidth: number;
   private _minHeight: number;
@@ -20,7 +20,7 @@ export class DockPannel {
   private _resizeDirection: ResizeDirection;
   private _initialCursorPos: ImGui.ImVec2;
   private _availableHeight: number;
-  private _buttonId: string;
+  private readonly _buttonId: string;
   private _renderContent: boolean;
   constructor(
     left: number,

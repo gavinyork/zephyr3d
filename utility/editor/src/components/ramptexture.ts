@@ -7,25 +7,25 @@ import { CurveEditor } from './curveeditor';
 export class RampTextureCreator extends makeEventTarget(Object)<{
   preview_position: [{ key: number; value: number[] }];
 }>() {
-  private _textureWidth: number;
+  private readonly _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
-  private _textureData: Uint8ClampedArray;
-  private _keyframes: Array<{ time: number; color: Float32Array }>;
+  private readonly _textureData: Uint8ClampedArray;
+  private readonly _keyframes: Array<{ time: number; color: Float32Array }>;
   private _selectedKeyframe: number;
   private _isDragging: boolean;
   private _hoverKeyframe: number;
-  private _markerWidth: number;
-  private _alphaEditor: CurveEditor;
+  private readonly _markerWidth: number;
+  private readonly _alphaEditor: CurveEditor;
   private _showAlpha: boolean;
   private _dragStartPos: { x: number; time: number };
-  private _hasAlpha: boolean;
+  private readonly _hasAlpha: boolean;
   private _changed: boolean;
 
   // 新增：位置指示器相关属性
   private _positionIndicator: number; // 指示器位置 (0-1)
   private _isDraggingIndicator: boolean; // 是否正在拖拽指示器
-  private _indicatorWidth: number; // 指示器宽度
+  private readonly _indicatorWidth: number; // 指示器宽度
 
   constructor(hasAlpha: boolean, rgbInterpolator?: Interpolator, alphaInterpolator?: Interpolator) {
     super();

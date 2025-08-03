@@ -35,7 +35,7 @@ export type FrameBufferInfo = {
 };
 
 export class PipelineCache {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _renderPipelines: Record<string, GPURenderPipeline>;
   private _computePipelines: Record<string, GPUComputePipeline>;
   constructor(device: WebGPUDevice) {

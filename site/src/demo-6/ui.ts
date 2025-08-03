@@ -12,9 +12,9 @@ interface GUIParams {
 }
 
 export class Panel {
-  private _params: GUIParams;
-  private _camera: Camera;
-  private _gui: GUI;
+  private readonly _params: GUIParams;
+  private readonly _camera: Camera;
+  private readonly _gui: GUI;
   constructor(instanceCount: number, camera: Camera, addFunc: () => number, removeFunc: () => number) {
     this._camera = camera;
     this._params = {

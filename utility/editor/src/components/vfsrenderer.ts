@@ -3,11 +3,12 @@ import { DataTransferVFS, makeEventTarget } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
-import type { ProjectInfo } from '../core/services/project';
+import { ProjectService, type ProjectInfo } from '../core/services/project';
 import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { DlgProgress } from '../views/dlg/progressdlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -54,14 +55,14 @@ type VFSRendererOptions = {
 export class VFSRenderer extends makeEventTarget(Object)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
 }>() {
-  private static baseFlags =
+  private static readonly baseFlags =
     ImGui.TreeNodeFlags.SpanAvailWidth |
     ImGui.TreeNodeFlags.SpanFullWidth |
     ImGui.TreeNodeFlags.OpenOnArrow |
     ImGui.TreeNodeFlags.OpenOnDoubleClick;
-  private _vfs: VFS;
-  private _project: ProjectInfo;
-  private _treePanel: DockPannel;
+  private readonly _vfs: VFS;
+  private readonly _project: ProjectInfo;
+  private readonly _treePanel: DockPannel;
   private _filesystem: DirectoryInfo;
   private _selectedDir: DirectoryInfo;
 
@@ -69,14 +70,14 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private _viewMode: ViewMode = ViewMode.List;
   private _sortBy: SortBy = SortBy.Name;
   private _sortAscending: boolean = true;
-  private _selectedItems: Set<FileInfo | DirectoryInfo> = new Set();
+  private readonly _selectedItems: Set<FileInfo | DirectoryInfo> = new Set();
   private _gridItemSize: number = 80;
   private _hoveredItem: FileInfo | DirectoryInfo | null = null;
   private _navigationBounds: AreaBounds | null = null;
   private _contentBounds: AreaBounds | null = null;
   private _isDragOverNavigation = false;
   private _isDragOverContent = false;
-  private _options: VFSRendererOptions = null;
+  private readonly _options: VFSRendererOptions = null;
 
   constructor(vfs: VFS, project: ProjectInfo, treePanelWidth = 200, options?: VFSRendererOptions) {
     super();
@@ -406,21 +407,45 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const label = convertEmojiString(`${emoji} ${name}##item_${index}`);
 
     const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
 
     if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
-      this.handleItemClick(item);
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
     }
-
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
-
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-
-    if (!isDir) {
-      enableWorkspaceDragging(item, 'ASSET', item.meta.path);
+    if (isDir) {
+      this.acceptFileMoveOrCopy(item.path);
+    }
+    if (this._selectedItems.size > 0) {
+      enableWorkspaceDragging(
+        item,
+        'ASSET',
+        () =>
+          [...this.selectedItems].map((item) => {
+            return {
+              isDir: 'subDir' in item,
+              path: 'subDir' in item ? item.path : item.meta.path
+            };
+          }),
+        () => {
+          const ctrlDown = ImGui.GetIO().KeyCtrl;
+          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
+          if (ctrlDown) {
+            icon += '+';
+          }
+          ImGui.Text(convertEmojiString(icon));
+        }
+      );
     }
   }
 
@@ -430,6 +455,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
     const emoji = isDir ? '📁' : this.getFileEmoji((item as FileInfo).meta);
     const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
 
     ImGui.BeginGroup();
 
@@ -442,19 +468,42 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         new ImGui.ImVec2(iconSize, iconSize)
       )
     ) {
-      this.handleItemClick(item);
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
     }
-
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
-
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-
-    if (!isDir) {
-      enableWorkspaceDragging(item, 'asset', item.meta.path);
+    if (isDir) {
+      this.acceptFileMoveOrCopy(item.path);
+    }
+    if (this._selectedItems.size > 0) {
+      enableWorkspaceDragging(
+        item,
+        'ASSET',
+        () =>
+          [...this.selectedItems].map((item) => {
+            return {
+              isDir: 'subDir' in item,
+              path: 'subDir' in item ? item.path : item.meta.path
+            };
+          }),
+        () => {
+          const ctrlDown = ImGui.GetIO().KeyCtrl;
+          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
+          if (ctrlDown) {
+            icon += '+';
+          }
+          ImGui.Text(convertEmojiString(icon));
+        }
+      );
     }
 
     const drawList = ImGui.GetWindowDrawList();
@@ -483,6 +532,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     const emoji = isDir ? '📁' : this.getFileEmoji(meta);
     const label = convertEmojiString(`${emoji} ${name}##row_${index}`);
     const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
     if (
       ImGui.Selectable(
         label,
@@ -490,19 +540,39 @@ export class VFSRenderer extends makeEventTarget(Object)<{
         ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
       )
     ) {
-      this.handleItemClick(item);
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
     }
-
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
-
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-
-    if (!isDir) {
-      enableWorkspaceDragging(item, 'asset', item.meta.path);
+    if (this._selectedItems.size > 0) {
+      enableWorkspaceDragging(
+        item,
+        'ASSET',
+        () =>
+          [...this.selectedItems].map((item) => {
+            return {
+              isDir: 'subDir' in item,
+              path: 'subDir' in item ? item.path : item.meta.path
+            };
+          }),
+        () => {
+          const ctrlDown = ImGui.GetIO().KeyCtrl;
+          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
+          if (ctrlDown) {
+            icon += '+';
+          }
+          ImGui.Text(convertEmojiString(icon));
+        }
+      );
     }
 
     ImGui.TableSetColumnIndex(1);
@@ -959,6 +1029,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       ImGui.SetNextItemOpen(true);
     }
     dir.open = ImGui.TreeNodeEx(label, flags);
+    this.acceptFileMoveOrCopy(dir.path);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       this.selectDir(dir);
     }
@@ -1119,7 +1190,16 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     if (info.targetDirectory && ev.type === 'drop') {
       const data = ev.dataTransfer;
       const testVFS = new DataTransferVFS(data);
-      await testVFS.copyFileEx('/**/*', info.targetDirectory.path, { overwrite: true, targetVFS: this._vfs });
+      const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
+      dlgProgressBar.showModal();
+      await testVFS.copyFileEx('/**/*', info.targetDirectory.path, {
+        overwrite: true,
+        targetVFS: this._vfs,
+        onProgress: (current, total) => {
+          dlgProgressBar.setProgress(current, total);
+        }
+      });
+      dlgProgressBar.close();
     }
   }
 
@@ -1141,6 +1221,65 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       eventBus.off('external_dragover', this.handleDragEvent, this);
       eventBus.off('external_dragleave', this.handleDragEvent, this);
       eventBus.off('external_drop', this.handleDragEvent, this);
+    }
+  }
+  private acceptFileMoveOrCopy(path: string) {
+    if (ImGui.BeginDragDropTarget()) {
+      const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as { isDir: boolean; path: string }[];
+      if (payload) {
+        this.handleFileMoveOrCopy(path, payload);
+      }
+      ImGui.EndDragDropTarget();
+    }
+  }
+  private async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
+    const copy = ImGui.GetIO().KeyCtrl;
+    const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
+    if (dlg) {
+      dlg.showModal();
+      dlg.setProgress(0, payload.length);
+    }
+    for (let i = 0; i < payload.length; i++) {
+      const asset = payload[i];
+      const vfs = ProjectService.VFS;
+      const sourceDir = asset.path;
+      const parentDir = vfs.dirname(sourceDir);
+      if (vfs.isParentOf(parentDir, targetDir) && vfs.isParentOf(targetDir, parentDir)) {
+        console.log('No need to copy');
+      } else if (!asset.isDir) {
+        const targetPath = vfs.join(targetDir, vfs.basename(sourceDir));
+        if (copy) {
+          await vfs.copyFile(sourceDir, targetPath, {
+            overwrite: true
+          });
+        } else {
+          await vfs.move(sourceDir, targetPath, {
+            overwrite: true
+          });
+        }
+      } else {
+        if (vfs.isParentOf(sourceDir, targetDir)) {
+          console.error(`Cannot ${copy ? 'copy' : 'move'} parent directory to child directory`);
+        } else {
+          const dest = vfs.join(targetDir, vfs.basename(sourceDir));
+          if (copy) {
+            await vfs.copyFileEx(vfs.join(sourceDir, '/**/*'), dest, {
+              overwrite: true,
+              onProgress: (current, total) => {
+                if (dlg) {
+                  dlg.setSubProgress(current, total);
+                }
+              }
+            });
+          } else {
+            await vfs.move(sourceDir, dest);
+          }
+        }
+      }
+      dlg.setProgress(i + 1, payload.length);
+    }
+    if (dlg) {
+      dlg.close();
     }
   }
 }

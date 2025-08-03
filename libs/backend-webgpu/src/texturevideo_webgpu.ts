@@ -8,8 +8,8 @@ export class WebGPUTextureVideo
   extends WebGPUBaseTexture<GPUExternalTexture>
   implements TextureVideo<GPUExternalTexture>
 {
-  private _source: HTMLVideoElement;
-  private _refBindGroups: WebGPUBindGroup[];
+  private readonly _source: HTMLVideoElement;
+  private readonly _refBindGroups: WebGPUBindGroup[];
   constructor(device: WebGPUDevice, element: HTMLVideoElement) {
     super(device, '2d');
     this._source = element;

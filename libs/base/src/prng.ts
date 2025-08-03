@@ -4,7 +4,7 @@
  */
 export class PRNG {
   /** @internal */
-  private _generator: () => number;
+  private readonly _generator: () => number;
   /**
    * Creates an instance of PRNG
    * @param seed - The random seed
@@ -19,7 +19,7 @@ export class PRNG {
     };
   }
   /** Gets next random value between 0 and 1 */
-  get() {
+  get(): number {
     return this._generator();
   }
 }

@@ -12,11 +12,11 @@ type EnvMapInfo = {
 };
 
 export class EnvMaps {
-  private _envMaps: Record<string, EnvMapInfo>;
-  private _assetManager: AssetManager;
-  private _assetManagerEx: AssetManager;
+  private readonly _envMaps: Record<string, EnvMapInfo>;
+  private readonly _assetManager: AssetManager;
+  private readonly _assetManagerEx: AssetManager;
   private _currentId: string;
-  private _shProjector: CubemapSHProjector;
+  private readonly _shProjector: CubemapSHProjector;
   constructor() {
     this._envMaps = {
       tower: {

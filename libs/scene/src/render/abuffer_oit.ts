@@ -26,7 +26,7 @@ export class ABufferOIT implements OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
   public static readonly usePremultipliedAlpha = true;
-  private static MAX_FRAGMENT_LAYERS = 75;
+  private static readonly MAX_FRAGMENT_LAYERS = 75;
   private static _compositeProgram: GPUProgram = null;
   private static _compositeBindGroup: BindGroup = null;
   private static _compositeRenderStates: RenderStateSet = null;
@@ -35,10 +35,10 @@ export class ABufferOIT implements OIT {
   private _headStagingBuffer: GPUDataBuffer;
   private _headBuffer: GPUDataBuffer;
   private _scissorOffsetBuffer: GPUDataBuffer;
-  private _numLayers: number;
+  private readonly _numLayers: number;
   private _screenSize: Uint32Array;
   private _hash: string;
-  private _debug: boolean;
+  private readonly _debug: boolean;
   private _scissorSlices: number;
   private _scissorHeight: number;
   private _currentPass: number;

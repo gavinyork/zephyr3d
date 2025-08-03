@@ -27,7 +27,7 @@ export interface FPSCameraControllerOptions {
  */
 export class FPSCameraController extends BaseCameraController {
   /** @internal */
-  private options: FPSCameraControllerOptions;
+  private readonly options: FPSCameraControllerOptions;
   /** @internal */
   private mouseDown: boolean;
   /** @internal */

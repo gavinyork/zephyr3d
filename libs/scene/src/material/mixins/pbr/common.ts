@@ -136,17 +136,17 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
 
   const cls = class extends S {
     static readonly pbrCommonMixed = true;
-    private _f0: Vector4;
-    private _emissiveColor: Vector3;
+    private readonly _f0: Vector4;
+    private readonly _emissiveColor: Vector3;
     private _emissiveStrength: number;
     private _occlusionStrength: number;
-    private _sheenFactor: Vector4;
-    private _clearcoatFactor: Vector4;
+    private readonly _sheenFactor: Vector4;
+    private readonly _clearcoatFactor: Vector4;
     private _transmissionFactor: number;
     private _thicknessFactor: number;
-    private _attenuationColor: Vector3;
+    private readonly _attenuationColor: Vector3;
     private _attenuationDistance: number;
-    private _iridescenceFactor: Vector4;
+    private readonly _iridescenceFactor: Vector4;
     constructor() {
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);

@@ -14,9 +14,9 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   private _thickness: number;
   private _numLayers: number;
   private _alphaRepeat: number;
-  private _colorStart: Vector4;
-  private _colorEnd: Vector4;
-  private _instancing: boolean;
+  private readonly _colorStart: Vector4;
+  private readonly _colorEnd: Vector4;
+  private readonly _instancing: boolean;
   private _alphaTexture: Texture2D;
   constructor() {
     super();

@@ -5,7 +5,7 @@ import type { WebGPUDevice } from './device';
 const VALIDATION_FAILED = 1 << 0;
 
 export class WebGPUComputePass {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _computeCommandEncoder: GPUCommandEncoder;
   private _computePassEncoder: GPUComputePassEncoder;
   constructor(device: WebGPUDevice) {

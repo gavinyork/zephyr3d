@@ -12,15 +12,15 @@ const tmpV3 = new Vector3();
 /** @internal */
 export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
-  private _ray: Ray;
+  private readonly _ray: Ray;
   /** @internal */
-  private _rayLocal: Ray;
+  private readonly _rayLocal: Ray;
   /** @internal */
   private _intersected: PickTarget;
   /** @internal */
   private _intersectedDist: number;
   /** @internal */
-  private _intersectedPoint: Vector3;
+  private readonly _intersectedPoint: Vector3;
   constructor(ray: Ray, length: number) {
     this._ray = ray;
     this._rayLocal = new Ray();

@@ -56,7 +56,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
   const GLOSSINESS_FACTOR_UNIFORM = S.defineInstanceUniform('glossinessFactor', 'float');
   return class extends S {
     static readonly pbrSpecularGlossnessMixed = true;
-    private _specularFactor: Vector3;
+    private readonly _specularFactor: Vector3;
     private _glossinessFactor: number;
     constructor() {
       super();

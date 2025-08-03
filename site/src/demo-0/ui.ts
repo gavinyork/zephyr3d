@@ -24,14 +24,14 @@ interface GUIParams {
 }
 
 export class Panel {
-  private _viewer: GLTFViewer;
-  private _deviceList: string[];
-  private _oitTypes: string[];
-  private _oitNames: string[];
-  private _taaDebugTypes: number[];
-  private _taaDebugNames: string[];
-  private _params: GUIParams;
-  private _gui: GUI;
+  private readonly _viewer: GLTFViewer;
+  private readonly _deviceList: string[];
+  private readonly _oitTypes: string[];
+  private readonly _oitNames: string[];
+  private readonly _taaDebugTypes: number[];
+  private readonly _taaDebugNames: string[];
+  private readonly _params: GUIParams;
+  private readonly _gui: GUI;
   private _animationController: GUI;
   constructor(viewer: GLTFViewer) {
     this._viewer = viewer;

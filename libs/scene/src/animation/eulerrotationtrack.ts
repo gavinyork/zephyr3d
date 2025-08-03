@@ -10,8 +10,8 @@ const tmpVec3 = new Vector3();
  * @public
  */
 export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
-  private _state: Quaternion;
-  private _interpolator: Interpolator;
+  private readonly _state: Quaternion;
+  private readonly _interpolator: Interpolator;
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains the keyframe values

@@ -31,19 +31,19 @@ export class WebGLFrameBuffer
   extends WebGLGPUObject<WebGLFramebuffer>
   implements FrameBuffer<WebGLFramebuffer>
 {
-  private _options: Options;
+  private readonly _options: Options;
   private _needBindBuffers: boolean;
   private _drawTags: number;
   private _lastDrawTag: number;
   private _status: number;
   private _statusAA: number;
-  private _width: number;
-  private _height: number;
-  private _isMRT: boolean;
+  private readonly _width: number;
+  private readonly _height: number;
+  private readonly _isMRT: boolean;
   private _drawBuffers: number[];
-  private _hash: string;
+  private readonly _hash: string;
   private _needGenerateMipmaps: boolean;
-  private _depthAttachmentTarget: number;
+  private readonly _depthAttachmentTarget: number;
   private _colorAttachmentsAA: WebGLRenderbuffer[];
   private _depthAttachmentAA: WebGLRenderbuffer;
   private _intermediateAttachments: Map<

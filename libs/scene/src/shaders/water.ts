@@ -38,9 +38,9 @@ export type WaterSetupUniformFunc = (this: WaterShaderImpl, scope: PBGlobalScope
 
 /** @internal */
 export class WaterShaderImpl {
-  private _vertexFunc: WaterVertexFunc;
-  private _shadingFunc: WaterShadingFunc;
-  private _setupUniformsFunc: WaterSetupUniformFunc;
+  private readonly _vertexFunc: WaterVertexFunc;
+  private readonly _shadingFunc: WaterShadingFunc;
+  private readonly _setupUniformsFunc: WaterSetupUniformFunc;
   constructor(
     setupUniformsFunc: WaterSetupUniformFunc,
     vertexFunc: WaterVertexFunc,

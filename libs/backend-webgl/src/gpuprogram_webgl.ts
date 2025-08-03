@@ -60,14 +60,14 @@ interface ProgramBlockInfo {
 }
 
 export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPUProgram<WebGLProgram> {
-  private _vs: string;
-  private _fs: string;
+  private readonly _vs: string;
+  private readonly _fs: string;
   private _unitCounter: number;
   private _uniformSetters: Record<string, UniformSetter>;
   private _uniformInfo: ProgramUniformInfo[];
   private _blockInfo: Record<string, ProgramBlockInfo>;
-  private _bindGroupLayouts: BindGroupLayout[];
-  private _vertexAttributes: number[];
+  private readonly _bindGroupLayouts: BindGroupLayout[];
+  private readonly _vertexAttributes: number[];
   private _error: string;
   private _vertexShader: WebGLShader;
   private _fragmentShader: WebGLShader;

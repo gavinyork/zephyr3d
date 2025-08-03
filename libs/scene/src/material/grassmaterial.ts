@@ -17,11 +17,11 @@ export class GrassMaterial
   implements Clonable<GrassMaterial>
 {
   /** @internal */
-  private _terrainSize: Vector2;
+  private readonly _terrainSize: Vector2;
   /** @internal */
-  private _terrainNormalMap: Texture2D;
+  private readonly _terrainNormalMap: Texture2D;
   /** @internal */
-  private _textureSize: Vector2;
+  private readonly _textureSize: Vector2;
   /**
    * Creates an instance of GrassMaterial class
    * @param terrainSize - terrain size

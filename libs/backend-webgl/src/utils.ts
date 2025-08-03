@@ -10,7 +10,7 @@ export function isWebGL2(gl: WebGLRenderingContext | WebGL2RenderingContext): gl
 }
 
 export class WebGLError extends Error {
-  private static errorToString: Record<number, string> = {
+  private static readonly errorToString: Record<number, string> = {
     [WebGLEnum.NO_ERROR]: 'NO_ERROR',
     [WebGLEnum.INVALID_ENUM]: 'INVALID_ENUM',
     [WebGLEnum.INVALID_VALUE]: 'INVALID_VALUE',

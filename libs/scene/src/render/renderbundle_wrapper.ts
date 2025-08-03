@@ -7,10 +7,12 @@ import type { Primitive } from './primitive';
 export class RenderBundleWrapper {
   private _renderBundles: Record<string, RenderBundle>;
   private _disposed: boolean;
-  private static _drawableContainer: WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]> =
-    new WeakMap();
-  private static _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
-  private static _primitiveContainer: WeakMap<Primitive, Set<Drawable>> = new WeakMap();
+  private static readonly _drawableContainer: WeakMap<
+    Drawable,
+    { wrapper: RenderBundleWrapper; hashes: string[] }[]
+  > = new WeakMap();
+  private static readonly _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
+  private static readonly _primitiveContainer: WeakMap<Primitive, Set<Drawable>> = new WeakMap();
   /** @internal */
   static addDrawable(
     drawable: Drawable,

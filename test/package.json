@@ -16,8 +16,8 @@
     "clean": "shx rm -rf dist .tsbuildinfo",
     "build:check": "tsc -p . --noEmit",
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent && npm run copy-assets",
-    "lint": "eslint \"src/**/*.ts\" -f compact",
-    "lint-fix": "eslint --fix \"src/**/*.ts\" -f compact",
+    "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
+    "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {

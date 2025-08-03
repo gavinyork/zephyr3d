@@ -53,7 +53,7 @@ export class Interpolator {
   /** @internal */
   private _stride: number;
   /** @internal */
-  private _maxTime: number;
+  private readonly _maxTime: number;
   /** @internal */
   private _a: number[];
   /** @internal */
@@ -140,10 +140,6 @@ export class Interpolator {
       this._a = null;
       this._h = null;
     }
-  }
-  /** @internal */
-  private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
-    return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
   }
   /**
    * Calculates the interpolated value at a given time
@@ -291,7 +287,7 @@ export class Interpolator {
     }
     return result;
   }
-  private _prepareCubicSplineNatural() {
+  private _prepareCubicSplineNatural(): void {
     const nk = this._inputs.length;
     const sub = new Array<number>(nk - 1);
     const diag = new Array<number>(nk - 1);
@@ -318,7 +314,7 @@ export class Interpolator {
     }
     this.solveTridiag(sub, diag, sup);
   }
-  private solveTridiag(sub: number[], diag: number[], sup: number[]) {
+  private solveTridiag(sub: number[], diag: number[], sup: number[]): void {
     const n = this._inputs.length - 2;
     for (let i = 2; i <= n; ++i) {
       sub[i] /= diag[i - 1];
@@ -335,7 +331,7 @@ export class Interpolator {
       }
     }
   }
-  private _getSegment(x: number) {
+  private _getSegment(x: number): number {
     if (x < this._inputs[0]) {
       return -1;
     }
@@ -352,5 +348,9 @@ export class Interpolator {
       result = this._inputs.length - 1;
     }
     return result;
+  }
+  /** @internal */
+  private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
+    return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
   }
 }

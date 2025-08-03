@@ -164,7 +164,7 @@ export function makeEventTarget<C extends GenericConstructor | ObjectConstructor
         }
       }
       /** @internal */
-      _invokeLocalListeners<K extends keyof I>(type: keyof I, ...args: I[K]) {
+      _invokeLocalListeners<K extends keyof I>(type: keyof I, ...args: I[K]): void {
         if (!this._listeners) {
           return;
         }

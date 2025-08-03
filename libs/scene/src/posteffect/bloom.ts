@@ -20,8 +20,8 @@ export class Bloom extends AbstractPostEffect {
   private static _bindgroupUpsample: BindGroup = null;
   private static _bindgroupFinalCompose: BindGroup = null;
   private static _bindgroupPrefilter: BindGroup = null;
-  private _thresholdValue: Vector4;
-  private _invTexSize: Vector2;
+  private readonly _thresholdValue: Vector4;
+  private readonly _invTexSize: Vector2;
   private _maxDownsampleLevels: number;
   private _downsampleLimit: number;
   private _threshold: number;

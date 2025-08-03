@@ -77,10 +77,10 @@ export class SAO extends AbstractPostEffect {
   private _saoIntensity: number;
   private _saoRadius: number;
   private _saoMinResolution: number;
-  private _saoRandomSeed: number;
+  private readonly _saoRandomSeed: number;
   private _saoBlurDepthCutoff: number;
-  private _blitterH: DepthLimitAOBlurBlitter;
-  private _blitterV: DepthLimitAOBlurBlitter;
+  private readonly _blitterH: DepthLimitAOBlurBlitter;
+  private readonly _blitterV: DepthLimitAOBlurBlitter;
   private _supported: boolean;
   /**
    * Creates an instance of SAO post effect

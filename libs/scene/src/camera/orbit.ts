@@ -55,7 +55,7 @@ enum OperationType {
  */
 export class OrbitCameraController extends BaseCameraController {
   /** @internal */
-  private options: OrbitCameraControllerOptions;
+  private readonly options: OrbitCameraControllerOptions;
   /** @internal */
   private lastMouseX: number;
   /** @internal */
@@ -65,15 +65,15 @@ export class OrbitCameraController extends BaseCameraController {
   /** @internal */
   private rotateY: number;
   /** @internal */
-  private eyePos: Vector3;
+  private readonly eyePos: Vector3;
   /** @internal */
   private upVector: Vector3;
   /** @internal */
-  private xVector: Vector3;
+  private readonly xVector: Vector3;
   /** @internal */
-  private direction: Vector3;
+  private readonly direction: Vector3;
   /** @internal */
-  private quat: Quaternion;
+  private readonly quat: Quaternion;
   /** @internal */
   private currentOp: OperationType;
   /** @internal */

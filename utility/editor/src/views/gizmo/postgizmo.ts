@@ -100,22 +100,22 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   private _allowScale: boolean;
   private _alwaysDrawIndicator: boolean;
   private _gridSteps: Float32Array;
-  private _gridParams: Vector4;
-  private _camera: Camera;
+  private readonly _gridParams: Vector4;
+  private readonly _camera: Camera;
   private _node: SceneNode;
   private _mode: GizmoMode;
-  private _axisLength: number;
-  private _arrowLength: number;
-  private _axisRadius: number;
-  private _arrowRadius: number;
-  private _boxSize: number;
+  private readonly _axisLength: number;
+  private readonly _arrowLength: number;
+  private readonly _axisRadius: number;
+  private readonly _arrowRadius: number;
+  private readonly _boxSize: number;
   private _translatePlaneInfo: TranslatePlaneInfo;
   private _rotateInfo: RotateInfo;
   private _scaleInfo: ScaleInfo;
-  private _screenSize: number;
+  private readonly _screenSize: number;
   private _drawGrid: boolean;
-  private _scaleBox: AABB;
-  private _nodeBox: AABB;
+  private readonly _scaleBox: AABB;
+  private readonly _nodeBox: AABB;
   /**
    * Creates an instance of PostGizmoRenderer.
    */

@@ -15,7 +15,7 @@ export interface ITimer {
  */
 export class CPUTimer implements ITimer {
   /** @internal */
-  private _cpuTimer: Performance | DateConstructor;
+  private readonly _cpuTimer: Performance | DateConstructor;
   /** @internal */
   private _cpuStart: number;
   /** @internal */
@@ -30,12 +30,12 @@ export class CPUTimer implements ITimer {
   now(): number {
     return this._cpuTimer.now();
   }
-  begin() {
+  begin(): void {
     this._cpuStart = this.now();
     this._cpuTime = null;
     this._ended = false;
   }
-  end() {
+  end(): void {
     this._cpuTime = this.now() - this._cpuStart;
     this._ended = true;
   }

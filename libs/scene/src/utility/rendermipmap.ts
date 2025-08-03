@@ -12,8 +12,8 @@ import { fetchSampler } from './misc';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 
 export abstract class RenderMipmap {
-  private _program: DRef<GPUProgram>;
-  private _bindGroup: DRef<BindGroup>;
+  private readonly _program: DRef<GPUProgram>;
+  private readonly _bindGroup: DRef<BindGroup>;
   private _srcSize: Float32Array;
   private _dstSize: Float32Array;
   abstract renderPixel(

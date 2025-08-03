@@ -3,9 +3,9 @@ import { DialogRenderer } from '../../components/modal';
 import { renderEditableCombo } from '../../components/editablecombo';
 
 export class DlgSelectAnimation extends DialogRenderer<{ animationName: string; trackName: string }> {
-  private _animationNames: string[];
-  private _selected: [string];
-  private _trackName: [string];
+  private readonly _animationNames: string[];
+  private readonly _selected: [string];
+  private readonly _trackName: [string];
   constructor(id: string, animations: string[], width: number) {
     super(
       id,

@@ -74,21 +74,21 @@ export interface ShadowConfig {
  */
 export class ShadowMapper {
   /** @internal */
-  private static _snapMatrix = new Matrix4x4();
+  private static readonly _snapMatrix = new Matrix4x4();
   /** @internal */
-  private static _target = new Vector3();
+  private static readonly _target = new Vector3();
   /** @internal */
-  private static _up = new Vector3();
+  private static readonly _up = new Vector3();
   /** @internal */
-  private static _frustumMin = new Vector3();
+  private static readonly _frustumMin = new Vector3();
   /** @internal */
-  private static _frustumMax = new Vector3();
+  private static readonly _frustumMax = new Vector3();
   /** @internal */
-  private static _frustumCenter = new Vector3();
+  private static readonly _frustumCenter = new Vector3();
   /** @internal */
-  private static _lightCameras: WeakMap<Scene, Camera[]> = new WeakMap();
+  private static readonly _lightCameras: WeakMap<Scene, Camera[]> = new WeakMap();
   /** @internal */
-  private static _shadowMapParams: ShadowMapParams[] = [];
+  private static readonly _shadowMapParams: ShadowMapParams[] = [];
   /** @internal */
   protected _light: PunctualLight;
   /** @internal */

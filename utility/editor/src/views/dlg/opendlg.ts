@@ -2,8 +2,8 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 
 export class DlgOpen extends DialogRenderer<string> {
-  private _names: string[];
-  private _ids: string[];
+  private readonly _names: string[];
+  private readonly _ids: string[];
   private _selected: [number];
   public static async openFromList(
     title: string,

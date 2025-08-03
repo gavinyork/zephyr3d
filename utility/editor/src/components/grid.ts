@@ -203,13 +203,13 @@ export class PropertyEditor extends makeEventTarget(Object)<{
   object_property_changed: [object: object, prop: PropertyAccessor];
 }>() {
   private _rootGroup: PropertyGroup;
-  private _top: number;
+  private readonly _top: number;
   private _bottom: number;
   private _width: number;
-  private _maxWidth: number;
-  private _minWidth: number;
-  private _padding: number;
-  private _labelPercent: number;
+  private readonly _maxWidth: number;
+  private readonly _minWidth: number;
+  private readonly _padding: number;
+  private readonly _labelPercent: number;
   private _dragging: boolean;
   private _dirty: boolean;
   constructor(

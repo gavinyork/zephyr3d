@@ -1,5 +1,6 @@
 import { AbstractTextureLoader } from '../loader';
-import { floatToHalf, packFloat3, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
+import { floatToHalf, packFloat3 } from '@zephyr3d/base';
 import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
 

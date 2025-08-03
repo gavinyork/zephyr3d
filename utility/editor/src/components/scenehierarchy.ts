@@ -14,7 +14,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_drag_drop: [from: SceneNode, target: SceneNode];
   request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
 }>() {
-  private static baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
+  private static readonly baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;
   constructor(scene: Scene) {

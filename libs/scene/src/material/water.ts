@@ -18,32 +18,32 @@ import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
-  private static _absorptionGrad = new Interpolator(
+  private static readonly _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
     new Float32Array([0, 0.082, 0.318, 0.665, 1]),
     new Float32Array([1, 1, 1, 0.22, 0.87, 0.87, 0, 0.47, 0.49, 0, 0.275, 0.44, 0, 0, 0])
   );
-  private static _scatterGrad = new Interpolator(
+  private static readonly _scatterGrad = new Interpolator(
     'linear',
     'vec3',
     new Float32Array([0, 0.15, 0.42, 1]),
     new Float32Array([0, 0, 0, 0.08, 0.41, 0.34, 0.13, 0.4, 0.45, 0.21, 0.5, 0.6])
   );
-  private static _defaultScatterRampTexture: DWeakRef<Texture2D> = new DWeakRef();
-  private static _defaultAbsorptionRampTexture: DWeakRef<Texture2D> = new DWeakRef();
-  private static _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
-  private _region: Vector4;
+  private static readonly _defaultScatterRampTexture: DWeakRef<Texture2D> = new DWeakRef();
+  private static readonly _defaultAbsorptionRampTexture: DWeakRef<Texture2D> = new DWeakRef();
+  private static readonly _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
+  private readonly _region: Vector4;
   private _displace: number;
   private _depthMulti: number;
   private _refractionStrength: number;
-  private _scatterRampTexture: DRef<Texture2D>;
-  private _absorptionRampTexture: DRef<Texture2D>;
-  private _waveGenerator: DRef<WaveGenerator>;
+  private readonly _scatterRampTexture: DRef<Texture2D>;
+  private readonly _absorptionRampTexture: DRef<Texture2D>;
+  private readonly _waveGenerator: DRef<WaveGenerator>;
   private _waveVersion: number;
-  private _clipmapInfo: Vector4;
-  private _clipmapGridInfo: Vector4;
-  private _ssrParams: Vector4;
+  private readonly _clipmapInfo: Vector4;
+  private readonly _clipmapGridInfo: Vector4;
+  private readonly _ssrParams: Vector4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);

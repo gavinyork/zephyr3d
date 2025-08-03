@@ -4,14 +4,14 @@ import { RampTextureCreator } from '../../components/ramptexture';
 import type { InterpolateData, Interpolator } from '@zephyr3d/base';
 
 export class DlgEditColorTrack extends DialogRenderer<boolean> {
-  private _creator: RampTextureCreator;
-  private _rgbInterpolator: Interpolator;
-  private _alphaInterpolator: Interpolator;
-  private _savedRGBInputs: InterpolateData;
-  private _savedRGBOutputs: InterpolateData;
-  private _savedAlphaInputs: InterpolateData;
-  private _savedAlphaOutputs: InterpolateData;
-  private _onPreview: (value: number[]) => void;
+  private readonly _creator: RampTextureCreator;
+  private readonly _rgbInterpolator: Interpolator;
+  private readonly _alphaInterpolator: Interpolator;
+  private readonly _savedRGBInputs: InterpolateData;
+  private readonly _savedRGBOutputs: InterpolateData;
+  private readonly _savedAlphaInputs: InterpolateData;
+  private readonly _savedAlphaOutputs: InterpolateData;
+  private readonly _onPreview: (value: number[]) => void;
   constructor(
     id: string,
     useAlpha: boolean,

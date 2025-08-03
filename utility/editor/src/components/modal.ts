@@ -5,12 +5,14 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
   opened: [];
   closed: [];
 }>() {
-  private static _currentModal: DialogRenderer<any>[] = [];
-  private static _modeless: DialogRenderer<any>[] = [];
+  private static readonly _currentModal: DialogRenderer<any>[] = [];
+  private static readonly _modeless: DialogRenderer<any>[] = [];
   private _id: string;
-  private _size: ImGui.ImVec2;
-  private _mask: boolean;
-  private _noResize: boolean;
+  private readonly _size: ImGui.ImVec2;
+  private readonly _mask: boolean;
+  private readonly _noResize: boolean;
+  private readonly _noMove: boolean;
+  private readonly _center: boolean;
   private _promise: Promise<T>;
   private _resolve: (value: T) => void;
   static render() {
@@ -33,12 +35,22 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
       }
     }
   }
-  constructor(id: string, width = 0, height = 0, mask = true, noResize = false) {
+  constructor(
+    id: string,
+    width = 0,
+    height = 0,
+    mask = true,
+    noResize = false,
+    noMove = false,
+    center = true
+  ) {
     super();
     this._id = id;
     this._mask = mask;
     this._size = new ImGui.ImVec2(width, height);
     this._noResize = !!noResize;
+    this._center = !!center;
+    this._noMove = !!noMove;
     this._promise = null;
     this._resolve = null;
   }
@@ -134,8 +146,15 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
     }
   }
   renderModeless() {
-    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.FirstUseEver);
-    if (ImGui.Begin(this._id, null, this._noResize ? ImGui.WindowFlags.NoResize : undefined)) {
+    this.setWindowPlacement();
+    let flags = ImGui.WindowFlags.None;
+    if (this._noResize) {
+      flags |= ImGui.WindowFlags.NoResize;
+    }
+    if (this._noMove) {
+      flags |= ImGui.WindowFlags.NoMove;
+    }
+    if (ImGui.Begin(this._id, null, flags)) {
       ImGui.PushID(this._id);
       this.doRender();
       ImGui.PopID();
@@ -143,12 +162,19 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
     ImGui.End();
   }
   renderModal() {
-    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.FirstUseEver);
+    this.setWindowPlacement();
+    let flags = ImGui.WindowFlags.None;
+    if (this._noResize) {
+      flags |= ImGui.WindowFlags.NoResize;
+    }
+    if (this._noMove) {
+      flags |= ImGui.WindowFlags.NoMove;
+    }
     ImGui.OpenPopup(this._id);
     if (!this._mask) {
       ImGui.PushStyleColor(ImGui.Col.ModalWindowDimBg, new ImGui.ImVec4(0, 0, 0, 0));
     }
-    if (ImGui.BeginPopupModal(this._id, null, this._noResize ? ImGui.WindowFlags.NoResize : undefined)) {
+    if (ImGui.BeginPopupModal(this._id, null, flags)) {
       ImGui.PushID(this._id);
       this.doRender();
       ImGui.PopID();
@@ -156,6 +182,17 @@ export class DialogRenderer<T> extends makeEventTarget(Object)<{
     }
     if (!this._mask) {
       ImGui.PopStyleColor(1);
+    }
+  }
+  private setWindowPlacement() {
+    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.FirstUseEver);
+    if (this._center) {
+      const displaySize = ImGui.GetIO().DisplaySize;
+      ImGui.SetNextWindowPos(
+        new ImGui.ImVec2(displaySize.x * 0.5, displaySize.y * 0.5),
+        ImGui.Cond.Always,
+        new ImGui.ImVec2(0.5, 0.5)
+      );
     }
   }
   doRender() {}

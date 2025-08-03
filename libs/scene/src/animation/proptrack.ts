@@ -7,11 +7,11 @@ import { Interpolator } from '@zephyr3d/base';
  * @public
  */
 export class PropertyTrack extends AnimationTrack<PropertyValue> {
-  private _state: PropertyValue;
+  private readonly _state: PropertyValue;
   private _stateAlpha: PropertyValue;
   private _target: string;
-  private _prop: PropertyAccessor;
-  private _count: number;
+  private readonly _prop: PropertyAccessor;
+  private readonly _count: number;
   private _interpolator: Interpolator;
   private _interpolatorAlpha: Interpolator;
   /**

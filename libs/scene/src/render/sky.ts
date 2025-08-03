@@ -74,7 +74,7 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * @public
  */
 export class SkyRenderer {
-  private static _skyCamera = (() => {
+  private static readonly _skyCamera = (() => {
     const camera = new Camera(null);
     camera.setPerspective(Math.PI / 2, 1, 1, 20);
     return camera;
@@ -83,7 +83,7 @@ export class SkyRenderer {
   private static multiScatteringLutProgram: GPUProgram = null;
   private static skyViewLutProgram: GPUProgram = null;
   private static APLutProgram: GPUProgram = null;
-  private static _programSky: Partial<Record<SkyType, GPUProgram>> = {};
+  private static readonly _programSky: Partial<Record<SkyType, GPUProgram>> = {};
   private static _programDistantLight: GPUProgram = null;
   private static _programFog: GPUProgram = null;
   private static _vertexLayout: VertexLayout = null;
@@ -95,39 +95,39 @@ export class SkyRenderer {
   private static _renderStatesFogScatter: RenderStateSet = null;
   private static _renderStatesDistantLight: RenderStateSet = null;
   private _skyType: SkyType;
-  private _skyColor: Vector4;
+  private readonly _skyColor: Vector4;
   private _bakedSkyboxDirty: boolean;
-  private _scatterSkyboxTextureWidth: number;
-  private _skyboxTexture: DRef<TextureCube>;
-  private _bakedSkyboxTexture: DRef<TextureCube>;
-  private _bakedSkyboxFrameBuffer: DRef<FrameBuffer>;
-  private _radianceMap: DRef<TextureCube>;
-  private _radianceFrameBuffer: DRef<FrameBuffer>;
-  private _irradianceMap: DRef<TextureCube>;
-  private _irradianceSH: DRef<GPUDataBuffer>;
-  private _skyDistantLightLut: DRef<FrameBuffer>;
-  private _irradianceFrameBuffer: DRef<FrameBuffer>;
-  private _radianceMapWidth: number;
-  private _irradianceMapWidth: number;
-  private _atmosphereParams: AtmosphereParams;
+  private readonly _scatterSkyboxTextureWidth: number;
+  private readonly _skyboxTexture: DRef<TextureCube>;
+  private readonly _bakedSkyboxTexture: DRef<TextureCube>;
+  private readonly _bakedSkyboxFrameBuffer: DRef<FrameBuffer>;
+  private readonly _radianceMap: DRef<TextureCube>;
+  private readonly _radianceFrameBuffer: DRef<FrameBuffer>;
+  private readonly _irradianceMap: DRef<TextureCube>;
+  private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _skyDistantLightLut: DRef<FrameBuffer>;
+  private readonly _irradianceFrameBuffer: DRef<FrameBuffer>;
+  private readonly _radianceMapWidth: number;
+  private readonly _irradianceMapWidth: number;
+  private readonly _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
   private _fogType: FogType;
-  private _heightFogParams: HeightFogParams;
+  private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
   private _cloudIntensity: number;
   private _debugAerialPerspective: number;
-  private _wind: Vector2;
+  private readonly _wind: Vector2;
   private _skyWorldMatrix: Matrix4x4;
-  private _lastSunDir: Vector3;
-  private _lastSunColor: Vector4;
+  private readonly _lastSunDir: Vector3;
+  private readonly _lastSunColor: Vector4;
   private _panoramaAsset: string;
-  private _shProjector: CubemapSHProjector;
-  private _shWindowWeights: Vector3;
+  private readonly _shProjector: CubemapSHProjector;
+  private readonly _shWindowWeights: Vector3;
   private _radianceConvSamples: number;
   private _irradianceConvSamples: number;
-  private _bindgroupDistantLight: DRef<BindGroup> = null;
+  private readonly _bindgroupDistantLight: DRef<BindGroup> = null;
   private _bindgroupSky: Partial<Record<SkyType, DRef<BindGroup>>> = {};
-  private _bindgroupFog: DRef<BindGroup> = null;
+  private readonly _bindgroupFog: DRef<BindGroup> = null;
   /**
    * Creates an instance of SkyRenderer
    */

@@ -73,7 +73,7 @@ export class ShaderHelper {
   /** @internal */
   private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
-  private static _lightUniformShadow = {
+  private static readonly _lightUniformShadow = {
     sunDir: new Vector3(),
     envLightStrength: 1,
     shadowCascades: 1,
@@ -87,7 +87,7 @@ export class ShaderHelper {
     shadowMatrices: new Float32Array(16 * 4)
   };
   /** @internal */
-  private static _fogUniforms = {
+  private static readonly _fogUniforms = {
     withAerialPerspective: 0,
     fogType: 0,
     additive: 0,

@@ -9,7 +9,7 @@ const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
  *
  * @public
  */
-export function degree2radian(degree: number) {
+export function degree2radian(degree: number): number {
   return (degree * Math.PI) / 180;
 }
 
@@ -20,7 +20,7 @@ export function degree2radian(degree: number) {
  *
  * @public
  */
-export function radian2degree(radian: number) {
+export function radian2degree(radian: number): number {
   return (radian * 180) / Math.PI;
 }
 
@@ -31,7 +31,7 @@ export function radian2degree(radian: number) {
  *
  * @public
  */
-export function toFloat(val: number) {
+export function toFloat(val: number): number {
   tmpFloatArray[0] = val;
   return tmpFloatArray[0];
 }
@@ -44,7 +44,7 @@ export function toFloat(val: number) {
  *
  * @public
  */
-export function isPowerOf2(value: number) {
+export function isPowerOf2(value: number): boolean {
   return value % 1 === 0 && value >= 0 && (value & (value - 1)) === 0;
 }
 
@@ -56,7 +56,7 @@ export function isPowerOf2(value: number) {
  *
  * @public
  */
-export function nextPowerOf2(value: number) {
+export function nextPowerOf2(value: number): number {
   if (value <= 0) {
     return 1;
   }

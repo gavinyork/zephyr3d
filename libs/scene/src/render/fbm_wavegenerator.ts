@@ -13,12 +13,12 @@ const MAX_NUM_OCTAVES = 16;
  */
 export class FBMWaveGenerator implements WaveGenerator {
   private _version: number;
-  private _windVelocity: Vector2;
+  private readonly _windVelocity: Vector2;
   private _numOctaves: number;
   private _amplitude: number;
   private _frequency: number;
-  private _lacunarity: number;
-  private _gain: number;
+  private readonly _lacunarity: number;
+  private readonly _gain: number;
   private _disposed: boolean;
   /**
    * Creates a new Gerstner wave generator.

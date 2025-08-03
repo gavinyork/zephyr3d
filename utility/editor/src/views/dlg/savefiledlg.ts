@@ -6,7 +6,7 @@ import type { VFS } from '@zephyr3d/base';
 import type { ProjectInfo } from '../../core/services/project';
 
 export class DlgSaveFile extends DialogRenderer<string> {
-  private _renderer: VFSRenderer;
+  private readonly _renderer: VFSRenderer;
   private _name: [string];
   public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
     return new DlgSaveFile(title, vfs, project, width, height).showModal();

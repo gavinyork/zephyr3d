@@ -20,11 +20,11 @@ type WebGPUFrameBufferOptions = {
 };
 
 export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuffer<unknown> {
-  private _options: WebGPUFrameBufferOptions;
-  private _width: number;
-  private _height: number;
+  private readonly _options: WebGPUFrameBufferOptions;
+  private readonly _width: number;
+  private readonly _height: number;
   private _bindFlag: number;
-  private _hash: string;
+  private readonly _hash: string;
   private _msaaColorTextures: GPUTexture[];
   private _msaaDepthTexture: GPUTexture;
   constructor(

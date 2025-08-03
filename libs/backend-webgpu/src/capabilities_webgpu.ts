@@ -82,7 +82,7 @@ export class WebGPUShaderCaps implements ShaderCaps {
   }
 }
 export class WebGPUTextureCaps implements TextureCaps {
-  private _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGPU>;
+  private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGPU>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
   npo2Mipmapping: boolean;

@@ -41,19 +41,19 @@ interface ToonParams {
 }
 
 export class Panel {
-  private _camera: PerspectiveCamera;
-  private _meshes: { node: SceneNode; material: Material; name: string; bbox?: AABB }[];
-  private _materialNames: string[];
+  private readonly _camera: PerspectiveCamera;
+  private readonly _meshes: { node: SceneNode; material: Material; name: string; bbox?: AABB }[];
+  private readonly _materialNames: string[];
   private _index: number;
-  private _parallaxModes: ParallaxMappingMode[];
-  private _deviceList: string[];
+  private readonly _parallaxModes: ParallaxMappingMode[];
+  private readonly _deviceList: string[];
   private _furParams: FurParams;
   private _parallaxMapParams: ParallaxMapParams;
   private _woodParams: WoodParams;
   private _toonParams: ToonParams;
   private _materialGroup: GUI;
-  private _params: GUIParams;
-  private _gui: GUI;
+  private readonly _params: GUIParams;
+  private readonly _gui: GUI;
   constructor(camera: PerspectiveCamera, meshes: { node: SceneNode; material: Material; name: string }[]) {
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];

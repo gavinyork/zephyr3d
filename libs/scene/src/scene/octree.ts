@@ -295,9 +295,9 @@ export class OctreeNodeChunk {
   /** @internal */
   private _next: OctreeNodeChunk;
   /** @internal */
-  private _octree: Octree;
+  private readonly _octree: Octree;
   /** @internal */
-  private _nodeMap: Map<number, OctreeNode>;
+  private readonly _nodeMap: Map<number, OctreeNode>;
   /**
    * Creates an instance of octree chunk
    * @param octree - Octree to which the chunk belongs
@@ -518,13 +518,13 @@ export class OctreeNodeChunk {
  */
 export class Octree {
   /** @internal */
-  private _scene: Scene;
+  private readonly _scene: Scene;
   /** @internal */
   private _chunks: OctreeNodeChunk[];
   /** @internal */
   private _rootSize: number;
   /** @internal */
-  private _maxRootSize: number;
+  private readonly _maxRootSize: number;
   /** @internal */
   private _leafSize: number;
   /** @internal */
@@ -532,7 +532,7 @@ export class Octree {
   /** @internal */
   private _nodeMap: WeakMap<GraphNode, OctreeNode>;
   /** @internal */
-  private _nodes: Set<GraphNode>;
+  private readonly _nodes: Set<GraphNode>;
   /**
    * Creates an instance of octree
    * @param scene - The scene to which the octree belongs

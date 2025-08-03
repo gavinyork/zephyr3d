@@ -57,8 +57,8 @@ export class ParticleSystem
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ParticleSystem>
 {
-  private static updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
-  private _activeParticleList: ParticleNode[];
+  private static readonly updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
+  private readonly _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
   private _emitInterval: number;
   private _emitCount: number;
@@ -66,11 +66,11 @@ export class ParticleSystem
   private _startEmitTime: number;
   private _lastUpdateTime: number;
   private _numEmitCount: number;
-  private _delay: number;
+  private readonly _delay: number;
   private _airResistence: boolean;
   private _flags: number;
-  private _gravity: Vector3;
-  private _wind: Vector3;
+  private readonly _gravity: Vector3;
+  private readonly _wind: Vector3;
   private _scalar: number;
   private _particleRotationMin: number;
   private _particleRotationMax: number;
@@ -89,12 +89,12 @@ export class ParticleSystem
   private _particleSize2Max: number;
   private _particleAccelMin: number;
   private _particleAccelMax: number;
-  private _emitterShapeSizeMin: Vector3;
-  private _emitterShapeSizeMax: Vector3;
-  private _primitive: DRef<Primitive>;
-  private _material: DRef<ParticleMaterial>;
-  private _wsBoundingBox: BoundingBox;
-  private _pickTarget: PickTarget;
+  private readonly _emitterShapeSizeMin: Vector3;
+  private readonly _emitterShapeSizeMax: Vector3;
+  private readonly _primitive: DRef<Primitive>;
+  private readonly _material: DRef<ParticleMaterial>;
+  private readonly _wsBoundingBox: BoundingBox;
+  private readonly _pickTarget: PickTarget;
   private _instanceData: Float32Array;
   /**
    * Creates a new ParticleSystem node

@@ -16,7 +16,7 @@ export class WebGLTextureSampler
   extends WebGLGPUObject<WebGLSampler>
   implements TextureSampler<WebGLSampler>
 {
-  private _options: SamplerOptions;
+  private readonly _options: SamplerOptions;
   constructor(device: WebGLDevice, options: SamplerOptions) {
     super(device);
     this._options = Object.assign(

@@ -15,8 +15,8 @@ import type { WebGPUDevice } from './device';
 
 export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexLayout<unknown> {
   private static _hashCounter = 0;
-  private _vertexData: VertexData;
-  private _hash: string;
+  private readonly _vertexData: VertexData;
+  private readonly _hash: string;
   private _layouts: {
     [hash: string]: { layoutHash: string; buffers: VertexBufferInfo[] };
   };

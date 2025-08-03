@@ -9,12 +9,12 @@ interface GUIParams {
 }
 
 export class Panel {
-  private _deviceList: string[];
-  private _oitTypes: string[];
-  private _oitNames: string[];
-  private _params: GUIParams;
-  private _camera: Camera;
-  private _gui: GUI;
+  private readonly _deviceList: string[];
+  private readonly _oitTypes: string[];
+  private readonly _oitNames: string[];
+  private readonly _params: GUIParams;
+  private readonly _camera: Camera;
+  private readonly _gui: GUI;
   constructor(camera: Camera) {
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];

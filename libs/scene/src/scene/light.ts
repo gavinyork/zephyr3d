@@ -246,7 +246,7 @@ export class PunctualLight extends BaseLight {
  * @public
  */
 export class DirectionalLight extends PunctualLight implements NodeClonable<DirectionalLight> {
-  private static _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
+  private static readonly _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
   /**
    * Creates an instance of directional light
    * @param scene - The scene to which the light belongs

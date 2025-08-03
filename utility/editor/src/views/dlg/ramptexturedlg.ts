@@ -5,7 +5,7 @@ import type { Interpolator } from '@zephyr3d/base';
 
 export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedArray; name: string }> {
   private _name: string;
-  private _creator: RampTextureCreator;
+  private readonly _creator: RampTextureCreator;
   constructor(
     id: string,
     useAlpha: boolean,

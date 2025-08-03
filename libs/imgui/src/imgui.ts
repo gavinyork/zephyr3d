@@ -1673,7 +1673,7 @@ export class ImGuiTableSortSpecs {
     });
   }
 
-  private _Specs: Readonly<ImGuiTableColumnSortSpecs[]>;
+  private readonly _Specs: Readonly<ImGuiTableColumnSortSpecs[]>;
   get Specs(): Readonly<ImGuiTableColumnSortSpecs[]> {
     return this._Specs;
   }
@@ -3233,7 +3233,7 @@ class script_ImGuiStyle implements Bind.interface_ImGuiStyle {
   public AntiAliasedFill = true;
   public CurveTessellationTol = 1.25;
   public CircleSegmentMaxError = 1.6;
-  private Colors: ImVec4[] = [];
+  private readonly Colors: ImVec4[] = [];
   public _getAt_Colors(index: number): Bind.interface_ImVec4 {
     return this.Colors[index];
   }

@@ -1849,11 +1849,11 @@ export function getTextureFormatBlockHeight(format: TextureFormat): number {
   return (textureFormatMap[format] & BLOCK_HEIGHT_MASK) >> BLOCK_HEIGHT_SHIFT;
 }
 
-function normalizeColorComponent(val: number, maxval: number) {
+function normalizeColorComponent(val: number, maxval: number): number {
   return Math.min(maxval, Math.max(Math.floor(val * maxval), 0));
 }
 
-function normalizeColorComponentSigned(val: number, maxval: number) {
+function normalizeColorComponentSigned(val: number, maxval: number): number {
   return normalizeColorComponent(val * 0.5 + 0.5, maxval) - (maxval + 1) / 2;
 }
 

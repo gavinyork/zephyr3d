@@ -68,11 +68,11 @@ export class AnimationSet implements Disposable {
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
-  private _activeTracks: Map<object, Map<unknown, AnimationTrack[]>>;
+  private readonly _activeTracks: Map<object, Map<unknown, AnimationTrack[]>>;
   /** @internal */
-  private _activeSkeletons: Map<Skeleton, number>;
+  private readonly _activeSkeletons: Map<Skeleton, number>;
   /** @internal */
-  private _activeAnimations: Map<
+  private readonly _activeAnimations: Map<
     AnimationClip,
     {
       currentTime: number;

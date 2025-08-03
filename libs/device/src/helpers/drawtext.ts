@@ -31,15 +31,15 @@ export class DrawText {
   /** @internal */
   private static textOffset = 0;
   /** @internal */
-  private static textMatrix = new Matrix4x4();
+  private static readonly textMatrix = new Matrix4x4();
   /** @internal */
   private static font: Font = null;
   /** @internal */
   private static vertexCache: Float32Array = null;
   /** @internal */
-  private static colorValue: Vector4 = new Vector4();
+  private static readonly colorValue: Vector4 = new Vector4();
   /** @internal */
-  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4) {
+  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4): void {
     const viewport = device.getViewport();
     const projectionMatrix = Matrix4x4.ortho(0, viewport.width, 0, viewport.height, 1, 100);
     const flipMatrix = Matrix4x4.translation(new Vector3(0, viewport.height, 0)).scaleRight(
@@ -52,7 +52,7 @@ export class DrawText {
    * @param device - The render device
    * @param name - The font name
    */
-  static setFont(device: AbstractDevice, name: string) {
+  static setFont(device: AbstractDevice, name: string): void {
     this.font = Font.fetchFont(name, device.getScale()) || Font.fetchFont('12px arial', device.getScale());
   }
   /**
@@ -63,7 +63,7 @@ export class DrawText {
    * @param x - X coordinate of the text
    * @param y - Y coordinate of the text
    */
-  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number) {
+  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number): void {
     if (text.length > 0) {
       device.pushDeviceStates();
       this.prepareDrawText(device);
@@ -156,7 +156,7 @@ export class DrawText {
     return x;
   }
   /** @internal */
-  private static prepareDrawText(device: AbstractDevice) {
+  private static prepareDrawText(device: AbstractDevice): void {
     if (!this.prepared) {
       this.prepared = true;
       this.font = this.font || Font.fetchFont('16px arial', device.getScale());

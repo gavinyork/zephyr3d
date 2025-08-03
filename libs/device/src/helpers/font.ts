@@ -2,21 +2,21 @@
 export class FontCanvas {
   private static _canvas: HTMLCanvasElement = null;
   private static _context: CanvasRenderingContext2D = null;
-  static get canvas() {
+  static get canvas(): HTMLCanvasElement {
     this._realize();
     return this._canvas;
   }
-  static get context() {
+  static get context(): CanvasRenderingContext2D {
     this._realize();
     return this._context;
   }
-  static get font() {
+  static get font(): string {
     return this.context.font;
   }
   static set font(font: string) {
     this.context.font = font;
   }
-  private static _realize() {
+  private static _realize(): void {
     if (!this._canvas) {
       this._canvas = document.createElement('canvas');
       this._canvas.width = 512;
@@ -54,7 +54,7 @@ export class Font {
   /** @internal */
   private _nameScaled: string;
   /** @internal */
-  private _scale: number;
+  private readonly _scale: number;
   /** @internal */
   private _size: number;
   /** @internal */
@@ -68,7 +68,7 @@ export class Font {
   /** @internal */
   private _bottomScaled: number;
   /** @internal */
-  private _div: HTMLDivElement;
+  private readonly _div: HTMLDivElement;
   /**
    * Creates a instance of font class from font name and the scale value
    * @param name - The font name

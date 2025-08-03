@@ -19,7 +19,7 @@ import type { WebGLDevice } from './device_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
-  private _layout: BindGroupLayout;
+  private readonly _layout: BindGroupLayout;
   private _dynamicOffsets: number[];
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
   private _createdBuffers: WebGLGPUBuffer[];

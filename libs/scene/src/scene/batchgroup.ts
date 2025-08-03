@@ -13,14 +13,14 @@ const tmpMatrix = new Matrix4x4();
  * @public
  */
 export class BatchGroup extends GraphNode implements NodeClonable<BatchGroup> {
-  private _renderQueueMap: Map<
+  private readonly _renderQueueMap: Map<
     RenderPass,
     {
       queue: RenderQueue;
       tag: number;
     }
   >;
-  private _bindGroupAllocator: InstanceBindGroupAllocator;
+  private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   private _changeTag: number;
   private _staticBV: boolean;
   /**

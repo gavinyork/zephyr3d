@@ -61,9 +61,9 @@ export class TerrainMaterial
 {
   private static _metallicRoughnessGenerationProgram: GPUProgram = null;
   private static _metallicRoughnessGenerationBindGroup: BindGroup = null;
-  private _options: TerrainMaterialOptions;
-  private _uvScales: Float32Array;
-  private _numDetailMaps: number;
+  private readonly _options: TerrainMaterialOptions;
+  private readonly _uvScales: Float32Array;
+  private readonly _numDetailMaps: number;
   private _terrainInfo: Vector4;
   constructor(options?: TerrainMaterialOptions) {
     super();

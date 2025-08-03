@@ -45,13 +45,13 @@ import type { Texture2D, TextureCube } from '@zephyr3d/device';
  * @public
  */
 export class SerializationManager {
-  private _classMap: Map<GenericConstructor, SerializableClass>;
-  private _vfs: VFS;
+  private readonly _classMap: Map<GenericConstructor, SerializableClass>;
+  private readonly _vfs: VFS;
   private _propMap: Record<string, PropertyAccessor>;
-  private _propNameMap: Map<PropertyAccessor, string>;
-  private _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
-  private _assetManager: AssetManager;
-  private _allocated: WeakMap<any, string>;
+  private readonly _propNameMap: Map<PropertyAccessor, string>;
+  private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
+  private readonly _assetManager: AssetManager;
+  private readonly _allocated: WeakMap<any, string>;
   constructor(vfs: VFS) {
     this._vfs = vfs;
     this._allocated = new WeakMap();
@@ -185,7 +185,7 @@ export class SerializationManager {
     }
     return texture;
   }
-  private static _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
+  private static readonly _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {
     const match = str.match(this._pathPattern);
     if (match) {

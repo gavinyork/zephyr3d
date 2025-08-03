@@ -14,8 +14,8 @@ export class LambertMaterial
   extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor)
   implements Clonable<LambertMaterial>
 {
-  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
-  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   constructor() {
     super();
     this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, true);

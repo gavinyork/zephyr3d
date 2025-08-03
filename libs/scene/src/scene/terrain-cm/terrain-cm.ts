@@ -73,10 +73,10 @@ export class ClipmapTerrain
   extends applyMixins(GraphNode, mixinDrawable)
   implements Drawable, NodeClonable<ClipmapTerrain>
 {
-  private static _heightBoundingGenerator = new HeightBoundingGenerator();
-  private static _copyBlitter = new HeightMinMaxBlitter();
-  private static _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
-  private _pickTarget: PickTarget;
+  private static readonly _heightBoundingGenerator = new HeightBoundingGenerator();
+  private static readonly _copyBlitter = new HeightMinMaxBlitter();
+  private static readonly _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
+  private readonly _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _renderData: PrimitiveInstanceInfo[];
   private _gridScale: number;

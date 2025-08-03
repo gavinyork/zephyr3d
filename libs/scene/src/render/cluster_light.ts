@@ -17,10 +17,10 @@ import type { RenderQueue } from './render_queue';
 import { ShaderHelper } from '../material/shader/helper';
 
 export class ClusteredLight {
-  private _tileCountX: number;
-  private _tileCountY: number;
-  private _tileCountZ: number;
-  private _lights: Float32Array;
+  private readonly _tileCountX: number;
+  private readonly _tileCountY: number;
+  private readonly _tileCountZ: number;
+  private readonly _lights: Float32Array;
   private _lightIndexTexture: Texture2D;
   private _lightIndexFramebuffer: FrameBuffer;
   private _lightIndexProgram: GPUProgram;
@@ -28,9 +28,9 @@ export class ClusteredLight {
   private _lightIndexVertexLayout: VertexLayout;
   private _lightIndexRenderStates: RenderStateSet;
   private _lightBuffer: StructuredBuffer;
-  private _sizeParam: Vector4;
+  private readonly _sizeParam: Vector4;
   private _countParam: Int32Array;
-  private _clusterParam: Vector4;
+  private readonly _clusterParam: Vector4;
   constructor() {
     this._tileCountX = 16;
     this._tileCountY = 16;

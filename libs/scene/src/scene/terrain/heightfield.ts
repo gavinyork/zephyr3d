@@ -12,12 +12,12 @@ export interface HeightfieldBBoxTreeNode {
 
 /** @internal */
 export class HeightfieldBBoxTree {
-  private _resX: number;
-  private _resY: number;
-  private _spacingX: number;
-  private _spacingZ: number;
-  private _leafSize: number;
-  private _heights: Float32Array;
+  private readonly _resX: number;
+  private readonly _resY: number;
+  private readonly _spacingX: number;
+  private readonly _spacingZ: number;
+  private readonly _leafSize: number;
+  private readonly _heights: Float32Array;
   private _rootNode: HeightfieldBBoxTreeNode;
   constructor(res_x: number, res_y: number, spacing_x: number, spacing_z: number, vertices: number[]) {
     this._rootNode = null;
@@ -316,8 +316,8 @@ export class HeightfieldBBoxTree {
 
 /** @internal */
 export class HeightField {
-  private m_v4Range: Vector4;
-  private m_scale: Vector3;
+  private readonly m_v4Range: Vector4;
+  private readonly m_scale: Vector3;
   private m_sizeX: number;
   private m_sizeZ: number;
   private m_bboxTree: HeightfieldBBoxTree;

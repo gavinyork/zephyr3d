@@ -16,20 +16,20 @@ declare global {
 
 export class GLTFViewer {
   private _currentAnimation: string;
-  private _modelNode: DRef<SceneNode>;
-  private _animationSet: DRef<AnimationSet>;
-  private _assetManager: AssetManager;
-  private _scene: Scene;
+  private readonly _modelNode: DRef<SceneNode>;
+  private readonly _animationSet: DRef<AnimationSet>;
+  private readonly _assetManager: AssetManager;
+  private readonly _scene: Scene;
   private _oit: OIT;
-  private _camera: PerspectiveCamera;
-  private _light0: DirectionalLight;
-  private _light1: DirectionalLight;
-  private _fov: number;
-  private _nearPlane: number;
-  private _envMaps: EnvMaps;
-  private _batchGroup: BatchGroup;
-  private _floor: Mesh;
-  private _ui: Panel;
+  private readonly _camera: PerspectiveCamera;
+  private readonly _light0: DirectionalLight;
+  private readonly _light1: DirectionalLight;
+  private readonly _fov: number;
+  private readonly _nearPlane: number;
+  private readonly _envMaps: EnvMaps;
+  private readonly _batchGroup: BatchGroup;
+  private readonly _floor: Mesh;
+  private readonly _ui: Panel;
   private _showGUI: boolean;
   private _showFloor: boolean;
   private _useScatter: boolean;

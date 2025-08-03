@@ -19,9 +19,9 @@ import type { NodeClonable, NodeCloneMethod } from '..';
  */
 export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   /** @internal */
-  private _quadtree: DRef<Quadtree>;
+  private readonly _quadtree: DRef<Quadtree>;
   /** @internal */
-  private _grassManager: DRef<GrassManager>;
+  private readonly _grassManager: DRef<GrassManager>;
   /** @internal */
   private _maxPixelError: number;
   /** @internal */
@@ -29,7 +29,7 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   /** @internal */
   private _lodCamera: Camera;
   /** @internal */
-  private _heightFieldScale: Vector3;
+  private readonly _heightFieldScale: Vector3;
   /** @internal */
   private _patchSize: number;
   /** @internal */

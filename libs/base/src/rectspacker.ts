@@ -30,11 +30,11 @@ export class RectsPacker {
   /** @internal */
   private _bins: Bin[];
   /** @internal */
-  private _maxBins: number;
+  private readonly _maxBins: number;
   /** @internal */
-  private _width: number;
+  private readonly _width: number;
   /** @internal */
-  private _height: number;
+  private readonly _height: number;
   /**
    * @param width - width of image bin
    * @param height - height of image bin
@@ -47,7 +47,7 @@ export class RectsPacker {
     this._bins = [new Bin(this._width, this._height)];
   }
   /** Clear all image bins of the packer */
-  clear() {
+  clear(): void {
     this._bins = [new Bin(this._width, this._height)];
   }
   /**
@@ -86,7 +86,7 @@ export class RectsPacker {
 }
 
 class Bin {
-  private freeRects: Rect[];
+  private readonly freeRects: Rect[];
   constructor(width: number, height: number) {
     this.freeRects = [{ x: 0, y: 0, width, height }];
   }
@@ -173,7 +173,7 @@ class Bin {
     }
     return true;
   }
-  private pruneFreeRects() {
+  private pruneFreeRects(): void {
     let i = 0;
     let j = 0;
     let len = this.freeRects.length;

@@ -5,10 +5,10 @@ import { BoundingBox, CylinderShape, Mesh, Primitive, DRef, UnlitMaterial, DWeak
 const PROXY_NAME = '$__PROXY__$';
 
 export class NodeProxy {
-  private _diamondPrimitive: DRef<Primitive>;
-  private _spotLightPrimitive: DRef<Primitive>;
-  private _directionalLightPrimitive: DRef<Primitive>;
-  private _lightProxyMaterial: DRef<UnlitMaterial>;
+  private readonly _diamondPrimitive: DRef<Primitive>;
+  private readonly _spotLightPrimitive: DRef<Primitive>;
+  private readonly _directionalLightPrimitive: DRef<Primitive>;
+  private readonly _lightProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
   private _proxyList: DWeakRef<Mesh>[];
   constructor(scene: Scene) {

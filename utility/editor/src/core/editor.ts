@@ -20,8 +20,8 @@ import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
 
 export class Editor {
-  private _moduleManager: ModuleManager;
-  private _assetImages: {
+  private readonly _moduleManager: ModuleManager;
+  private readonly _assetImages: {
     brushes: { [key: string]: DRef<Texture2D> };
     app: { [key: string]: DRef<Texture2D> };
   };

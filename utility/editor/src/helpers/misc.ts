@@ -23,3 +23,26 @@ export function calcHierarchyBoundingBox(node: SceneNode, bboxOut?: AABB): AABB 
   }
   return bboxOut;
 }
+
+export async function rgbaToPng(
+  name: string,
+  width: number,
+  height: number,
+  rgbaData: Uint8ClampedArray
+): Promise<File> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const imageData = new ImageData(new Uint8ClampedArray(rgbaData), width, height);
+  ctx.putImageData(imageData, 0, 0);
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      const file = new File([blob], name, {
+        type: 'image/png',
+        lastModified: Date.now()
+      });
+      resolve(file);
+    }, 'image/png');
+  });
+}

@@ -10,9 +10,9 @@ import type { WebGPURenderPass } from './renderpass_webgpu';
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
     {};
-  private static _clearBindGroup: WebGPUBindGroup = null;
+  private static readonly _clearBindGroup: WebGPUBindGroup = null;
   private static _clearStateSet: WebGPURenderStateSet = null;
-  private static _defaultClearColor = new Vector4(0, 0, 0, 1);
+  private static readonly _defaultClearColor = new Vector4(0, 0, 0, 1);
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,

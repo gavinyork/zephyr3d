@@ -85,7 +85,7 @@ type WebGPURenderBundle = {
 
 export class WebGPUDevice extends BaseDevice {
   private _context: GPUCanvasContext;
-  private _dpr: number;
+  private readonly _dpr: number;
   private _device: GPUDevice;
   private _adapter: GPUAdapter;
   private _deviceCaps: DeviceCaps;
@@ -100,7 +100,7 @@ export class WebGPUDevice extends BaseDevice {
   private _pipelineCache: PipelineCache;
   private _bindGroupCache: BindGroupCache;
   private _vertexLayoutCache: VertexLayoutCache;
-  private _samplerCache: SamplerCache;
+  private readonly _samplerCache: SamplerCache;
   private _currentProgram: WebGPUProgram;
   private _currentVertexData: WebGPUVertexLayout;
   private _currentStateSet: WebGPURenderStateSet;
@@ -108,9 +108,9 @@ export class WebGPUDevice extends BaseDevice {
   private _currentBindGroupOffsets: Iterable<number>[];
   private _commandQueue: CommandQueueImmediate;
   private _gpuObjectHashCounter: number;
-  private _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
+  private readonly _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
   private _defaultRenderPassDesc: GPURenderPassDescriptor;
-  private _sampleCount: number;
+  private readonly _sampleCount: number;
   private _emptyBindGroup: GPUBindGroup;
   private _captureRenderBundle: WebGPURenderBundle;
   private _adapterInfo: any;

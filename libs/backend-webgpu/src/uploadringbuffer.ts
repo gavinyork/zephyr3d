@@ -42,9 +42,9 @@ export interface UploadTexture {
 }
 
 export class UploadRingBuffer {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _bufferList: MappedBuffer[];
-  private _defaultSize: number;
+  private readonly _defaultSize: number;
   private _unmappedBufferList: MappedBuffer[];
   constructor(device: WebGPUDevice, defaultSize = 64 * 1024) {
     this._device = device;

@@ -38,21 +38,21 @@ export class SceneRenderer {
   private static _skyMotionVectorBindGroup: BindGroup = null;
   private static _box: Primitive = null;
   /** @internal */
-  private static _pickCamera = new Camera(null);
+  private static readonly _pickCamera = new Camera(null);
   /** @internal */
-  private static _scenePass = new LightPass();
+  private static readonly _scenePass = new LightPass();
   /** @internal */
-  private static _depthPass = new DepthPass();
+  private static readonly _depthPass = new DepthPass();
   /** @internal */
-  private static _shadowMapPass = new ShadowMapPass();
+  private static readonly _shadowMapPass = new ShadowMapPass();
   /** @internal */
-  private static _objectColorPass = new ObjectColorPass();
+  private static readonly _objectColorPass = new ObjectColorPass();
   /** @internal */
   private static _frontDepthColorState: ColorState = null;
   /** @internal */
   private static _backDepthColorState: ColorState = null;
   /** @internal */
-  private static _clusters: ClusteredLight[] = [];
+  private static readonly _clusters: ClusteredLight[] = [];
   /** lighting render pass */
   static get sceneRenderPass(): LightPass {
     return this._scenePass;

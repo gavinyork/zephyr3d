@@ -10,10 +10,10 @@ export class PhysicsWorld {
   private _ammo: typeof AmmoType;
   private _tmpTransform: AmmoType.btTransform;
   private _tmpVector3: AmmoType.btVector3;
-  private _bodyMap: Map<Mesh, AmmoType.btRigidBody>;
+  private readonly _bodyMap: Map<Mesh, AmmoType.btRigidBody>;
   private _world: AmmoType.btDiscreteDynamicsWorld;
   private _lastTime: number;
-  private _frameRate: number;
+  private readonly _frameRate: number;
   constructor(frameRate = 60) {
     this._tmpTransform = null;
     this._frameRate = frameRate;

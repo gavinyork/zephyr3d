@@ -10,7 +10,7 @@ import { BaseTerrainBrush } from './base';
 
 export class TerrainTextureBrush extends BaseTerrainBrush {
   private _detailIndex: number;
-  private _sourceSplatMap: DRef<Texture2DArray>;
+  private readonly _sourceSplatMap: DRef<Texture2DArray>;
   constructor() {
     super();
     this._detailIndex = -1;

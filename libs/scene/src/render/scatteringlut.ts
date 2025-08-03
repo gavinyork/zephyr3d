@@ -13,24 +13,24 @@ import { Application } from '../app';
 import { Vector3 } from '@zephyr3d/base';
 
 export class ScatteringLut {
-  private static _groundAlbedo = 1.0;
-  private static _groundRadiusMM = 6.36;
-  private static _atmosphereRadiusMM = 6.46;
-  private static _scatteringSteps = 32;
-  private static _sunTransmittanceSteps = 40;
-  private static _rayleighScatteringBase = [5.802, 13.558, 33.1] as const;
-  private static _rayleighAbsorptionBase = 0;
-  private static _mieScatteringBase = 3.996;
-  private static _mieAbsorptionBase = 4.4;
-  private static _ozoneAbsorptionBase = [0.65, 1.881, 0.085] as const;
-  private static _multiScatteringSteps = 20;
-  private static _sqrtSamples = 8;
-  private static _transmittanceLutWidth = 256;
-  private static _transmittanceLutHeight = 64;
-  private static _multiScatteringLutWidth = 32;
-  private static _multiScatteringLutHeight = 32;
-  private static _skyViewLutWidth = 256;
-  private static _skyViewLutHeight = 256;
+  private static readonly _groundAlbedo = 1.0;
+  private static readonly _groundRadiusMM = 6.36;
+  private static readonly _atmosphereRadiusMM = 6.46;
+  private static readonly _scatteringSteps = 32;
+  private static readonly _sunTransmittanceSteps = 40;
+  private static readonly _rayleighScatteringBase = [5.802, 13.558, 33.1] as const;
+  private static readonly _rayleighAbsorptionBase = 0;
+  private static readonly _mieScatteringBase = 3.996;
+  private static readonly _mieAbsorptionBase = 4.4;
+  private static readonly _ozoneAbsorptionBase = [0.65, 1.881, 0.085] as const;
+  private static readonly _multiScatteringSteps = 20;
+  private static readonly _sqrtSamples = 8;
+  private static readonly _transmittanceLutWidth = 256;
+  private static readonly _transmittanceLutHeight = 64;
+  private static readonly _multiScatteringLutWidth = 32;
+  private static readonly _multiScatteringLutHeight = 32;
+  private static readonly _skyViewLutWidth = 256;
+  private static readonly _skyViewLutHeight = 256;
   private static _vertexLayout: VertexLayout = null;
   private static _renderStates: RenderStateSet = null;
   private static _programTransmittanceLut: GPUProgram = null;
@@ -48,14 +48,14 @@ export class ScatteringLut {
   private static _currentSkyViewSunAltitude = 0;
   private static _currentAerialPerspectiveAltitude = 0;
   private static _currentMaxAerialPerspectiveDistance = 800;
-  private static _aerialPerspectiveSliceX = 32;
-  private static _aerialPerspectiveSliceY = 32;
-  private static _aerialPerspectiveSliceZ = 32;
-  private static _aerialPerspectiveTextureWidth =
+  private static readonly _aerialPerspectiveSliceX = 32;
+  private static readonly _aerialPerspectiveSliceY = 32;
+  private static readonly _aerialPerspectiveSliceZ = 32;
+  private static readonly _aerialPerspectiveTextureWidth =
     this._aerialPerspectiveSliceX * this._aerialPerspectiveSliceZ;
-  private static _aerialPerspectiveTextureHeight = this._aerialPerspectiveSliceY;
+  private static readonly _aerialPerspectiveTextureHeight = this._aerialPerspectiveSliceY;
 
-  private static _viewPos = new Vector3(0.0, this._groundRadiusMM + 0.00005, 0.0);
+  private static readonly _viewPos = new Vector3(0.0, this._groundRadiusMM + 0.00005, 0.0);
   static get aerialPerspectiveSliceZ() {
     return this._aerialPerspectiveSliceZ;
   }

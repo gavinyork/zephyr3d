@@ -153,7 +153,7 @@ export class RenderQueue {
   /** @internal */
   private _itemList: RenderItemList;
   /** @internal */
-  private _renderPass: RenderPass;
+  private readonly _renderPass: RenderPass;
   /** @internal */
   private _shadowedLightList: PunctualLight[];
   /** @internal */
@@ -161,11 +161,11 @@ export class RenderQueue {
   /** @internal */
   private _sunLight: DirectionalLight;
   /** @internal */
-  private _bindGroupAllocator: InstanceBindGroupAllocator;
+  private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
-  private _ref: RenderQueueRef;
+  private readonly _ref: RenderQueueRef;
   /** @internal */
-  private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
+  private readonly _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
   /** @internal */
   private _needSceneColor: boolean;
   private _needSceneDepth: boolean;
@@ -173,7 +173,7 @@ export class RenderQueue {
   /** @internal */
   private _drawTransparent: boolean;
   /** @internal */
-  private _objectColorMaps: Map<number, Drawable>[];
+  private readonly _objectColorMaps: Map<number, Drawable>[];
   /** @internal */
   private _disposed: boolean;
   /**

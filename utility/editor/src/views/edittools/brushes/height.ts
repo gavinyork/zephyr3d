@@ -3,7 +3,7 @@ import { BaseTerrainBrush } from './base';
 import { DRef, fetchSampler } from '@zephyr3d/scene';
 
 export abstract class TerrainHeightBrush extends BaseTerrainBrush {
-  private _sourceHeightMap: DRef<Texture2D>;
+  private readonly _sourceHeightMap: DRef<Texture2D>;
   constructor() {
     super();
     this._sourceHeightMap = new DRef();

@@ -104,7 +104,7 @@ export class TextureAtlasManager {
   /**
    * Removes all created atlases
    */
-  clear() {
+  clear(): void {
     this._packer.clear();
     for (const tex of this._atlasList) {
       tex.dispose();
@@ -200,7 +200,7 @@ export class TextureAtlasManager {
     h: number,
     xOffset: number,
     yOffset: number
-  ) {
+  ): void {
     let textureAtlas: Texture2D = null;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
@@ -211,7 +211,12 @@ export class TextureAtlasManager {
     textureAtlas.updateFromElement(ctx.canvas, x, y, xOffset, yOffset, w, h);
   }
   /** @internal */
-  private _updateAtlasTexture(atlasIndex: number, bitmap: ImageData | ImageBitmap, x: number, y: number) {
+  private _updateAtlasTexture(
+    atlasIndex: number,
+    bitmap: ImageData | ImageBitmap,
+    x: number,
+    y: number
+  ): void {
     let textureAtlas: Texture2D = null;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();

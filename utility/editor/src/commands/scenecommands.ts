@@ -28,10 +28,10 @@ const idNodeMap: Record<string, SceneNode> = {};
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
 export class AddAssetCommand extends Command<SceneNode> {
-  private _scene: Scene;
-  private _asset: string;
+  private readonly _scene: Scene;
+  private readonly _asset: string;
   private _nodeId: string;
-  private _position: Vector3;
+  private readonly _position: Vector3;
   constructor(scene: Scene, asset: string, position: Vector3) {
     super('Add asset');
     this._scene = scene;
@@ -71,10 +71,10 @@ export class AddAssetCommand extends Command<SceneNode> {
   }
 }
 export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T> {
-  private _parentId: string;
-  private _position: Vector3;
+  private readonly _parentId: string;
+  private readonly _position: Vector3;
   private _nodeId: string;
-  private _ctor: { new (scene: Scene): T };
+  private readonly _ctor: { new (scene: Scene): T };
   constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, position?: Vector3) {
     super('Add child node');
     this._parentId = parentNode.persistentId;
@@ -114,9 +114,9 @@ export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T>
   }
 }
 export class AddParticleSystemCommand extends Command<ParticleSystem> {
-  private _scene: Scene;
+  private readonly _scene: Scene;
   private _nodeId: string;
-  private _position: Vector3;
+  private readonly _position: Vector3;
   constructor(scene: Scene, pos: Vector3) {
     super('Add particle system');
     this._scene = scene;
@@ -146,11 +146,11 @@ export class AddParticleSystemCommand extends Command<ParticleSystem> {
   }
 }
 export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
-  private _scene: Scene;
+  private readonly _scene: Scene;
   private _nodeId: string;
-  private _shapeCls: GenericConstructor<T>;
-  private _options: ShapeOptionType<T>;
-  private _position: Vector3;
+  private readonly _shapeCls: GenericConstructor<T>;
+  private readonly _options: ShapeOptionType<T>;
+  private readonly _position: Vector3;
   constructor(scene: Scene, shapeCls: GenericConstructor<T>, pos: Vector3, options?: ShapeOptionType<T>) {
     super();
     this._nodeId = '';
@@ -214,10 +214,10 @@ export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
 }
 
 export class NodeDeleteCommand extends Command {
-  private _scene: any;
+  private readonly _scene: any;
   private _archive: any;
-  private _nodeId: string;
-  private _parentId: string;
+  private readonly _nodeId: string;
+  private readonly _parentId: string;
   constructor(node: SceneNode) {
     super('Delete node');
     this._scene = node.scene;
@@ -261,8 +261,8 @@ export class NodeDeleteCommand extends Command {
   }
 }
 export class NodeReparentCommand extends Command {
-  private _nodeId: string;
-  private _newParentId: string;
+  private readonly _nodeId: string;
+  private readonly _newParentId: string;
   private _oldParentId: string;
   private _oldLocalMatrix: Matrix4x4;
   constructor(node: SceneNode, newParent: SceneNode) {
@@ -297,9 +297,9 @@ export class NodeReparentCommand extends Command {
 }
 
 export class NodeCloneCommand extends Command<SceneNode> {
-  private _nodeId: string;
+  private readonly _nodeId: string;
   private _newNodeId: string;
-  private _method: NodeCloneMethod;
+  private readonly _method: NodeCloneMethod;
   constructor(node: SceneNode, method: NodeCloneMethod) {
     super('Clone node');
     this._nodeId = node.persistentId;
@@ -357,9 +357,9 @@ export class NodeCloneCommand extends Command<SceneNode> {
   }
 }
 export class NodeTransformCommand extends Command {
-  private _nodeId: string;
-  private _oldTransform: TRS;
-  private _newTransform: TRS;
+  private readonly _nodeId: string;
+  private readonly _oldTransform: TRS;
+  private readonly _newTransform: TRS;
   constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
     super(desc);
     this._nodeId = node.persistentId;

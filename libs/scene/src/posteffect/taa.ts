@@ -12,7 +12,7 @@ export class TAA extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram[] = [];
   private static _skyMotionVectorProgram: GPUProgram = null;
   private static _box: Primitive;
-  private static _texSize = new Vector2();
+  private static readonly _texSize = new Vector2();
   private _bindGroup: BindGroup;
   private _skyMotionVectorBindGroup: BindGroup;
   constructor() {

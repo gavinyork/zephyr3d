@@ -1,8 +1,8 @@
 import type { BaseModel } from '../models/basemodel';
 
 export abstract class BaseView<Model extends BaseModel> {
-  private _model: Model;
-  private _shortcuts: Map<string, { handler: (shortcut: string) => void; repeatable: boolean }>;
+  private readonly _model: Model;
+  private readonly _shortcuts: Map<string, { handler: (shortcut: string) => void; repeatable: boolean }>;
   constructor(model: Model) {
     this._model = model;
     this._shortcuts = new Map();

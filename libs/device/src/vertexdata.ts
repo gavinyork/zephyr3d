@@ -52,18 +52,18 @@ export class VertexData {
     return newVertexData;
   }
   /** Vertex buffer information list */
-  get vertexBuffers() {
+  get vertexBuffers(): VertexBufferInfo[] {
     return this._vertexBuffers;
   }
   /** Index buffer */
-  get indexBuffer() {
+  get indexBuffer(): IndexBuffer {
     return this._indexBuffer;
   }
   /** Draw offset */
   getDrawOffset(): number {
     return this._drawOffset;
   }
-  setDrawOffset(offset: number) {
+  setDrawOffset(offset: number): void {
     if (offset !== this._drawOffset) {
       this._drawOffset = offset;
     }

@@ -109,7 +109,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
   protected _defaultPoolKey: symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
-  private _stateStack: DeviceState[];
+  private readonly _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
     super();
     this._backend = backend;

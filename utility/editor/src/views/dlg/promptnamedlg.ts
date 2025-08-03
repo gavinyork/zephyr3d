@@ -3,7 +3,7 @@ import { DialogRenderer } from '../../components/modal';
 
 export class DlgPromptName extends DialogRenderer<string> {
   private _name: string;
-  private _hint: string;
+  private readonly _hint: string;
   public static async promptName(
     title: string,
     hint?: string,

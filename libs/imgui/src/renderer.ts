@@ -27,23 +27,23 @@ export class Renderer {
   /** @internal */
   private _indexPosition: number;
   /** @internal */
-  private _program: GPUProgram;
+  private readonly _program: GPUProgram;
   /** @internal */
-  private _textureSampler: TextureSampler;
+  private readonly _textureSampler: TextureSampler;
   /** @internal */
-  private _programTexture: GPUProgram;
+  private readonly _programTexture: GPUProgram;
   /** @internal */
-  private _bindGroup: BindGroup;
+  private readonly _bindGroup: BindGroup;
   /** @internal */
-  private _bindGroupTexture: BindGroup;
+  private readonly _bindGroupTexture: BindGroup;
   /** @internal */
-  private _renderStateSet: RenderStateSet;
+  private readonly _renderStateSet: RenderStateSet;
   /** @internal */
   private _vertexCache: Uint8Array;
   /** @internal */
-  private _indexCache: Uint16Array;
+  private readonly _indexCache: Uint16Array;
   /** @internal */
-  private _projectionMatrix: Matrix4x4;
+  private readonly _projectionMatrix: Matrix4x4;
   /** @internal */
   private _flipMatrix: Matrix4x4;
   /** @internal */

@@ -21,7 +21,7 @@ export class TreeMaterialMetallicRoughness extends applyMaterialMixins(
   mixinPBRMetallicRoughness,
   mixinFoliage
 ) {
-  private _textureSize: Vector2;
+  private readonly _textureSize: Vector2;
   constructor() {
     super();
     this._textureSize = Vector2.zero();
@@ -104,7 +104,7 @@ export class TreeMaterialSpecularGlossiness extends applyMaterialMixins(
   mixinPBRSpecularGlossness,
   mixinFoliage
 ) {
-  private _textureSize: Vector2;
+  private readonly _textureSize: Vector2;
   constructor() {
     super();
     this._textureSize = Vector2.zero();

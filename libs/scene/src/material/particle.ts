@@ -11,11 +11,11 @@ import { DRef } from '../app';
  * @public
  */
 export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleMaterial> {
-  private static FEATURE_ALPHA_MAP = this.defineFeature();
-  private static FEATURE_RAMP_MAP = this.defineFeature();
-  private _params: Vector4;
-  private _alphaMap: DRef<Texture2D>;
-  private _rampMap: DRef<Texture2D>;
+  private static readonly FEATURE_ALPHA_MAP = this.defineFeature();
+  private static readonly FEATURE_RAMP_MAP = this.defineFeature();
+  private readonly _params: Vector4;
+  private readonly _alphaMap: DRef<Texture2D>;
+  private readonly _rampMap: DRef<Texture2D>;
   constructor() {
     super();
     this.cullMode = 'none';

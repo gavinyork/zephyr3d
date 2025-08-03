@@ -4,7 +4,7 @@ import { textureFormatMap } from './constants_webgpu';
 import type { WebGPUDevice } from './device';
 
 export class BindGroupCache {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _bindGroupLayoutCache: Record<string, [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout]>;
   constructor(device: WebGPUDevice) {
     this._device = device;

@@ -8,8 +8,8 @@ import type { SceneNode } from '../scene';
  * @public
  */
 export class NodeRotationTrack extends AnimationTrack<Quaternion> {
-  private _state: Quaternion;
-  private _interpolator: Interpolator;
+  private readonly _state: Quaternion;
+  private readonly _interpolator: Interpolator;
   /**
    * Create an instance of RotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values

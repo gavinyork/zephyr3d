@@ -13,9 +13,9 @@ import { AnimationClip } from '../../../animation';
 /** @internal */
 export class GatherVisitor implements Visitor<SceneNode> {
   /** @internal */
-  private _primitiveSet: Set<Primitive>;
-  private _materialSet: Set<Material>;
-  private _nodeList: SceneNode[];
+  private readonly _primitiveSet: Set<Primitive>;
+  private readonly _materialSet: Set<Material>;
+  private readonly _nodeList: SceneNode[];
   /**
    * Creates an instance of CullVisitor
    * @param renderPass - Render pass for the culling task
@@ -76,7 +76,7 @@ export class GatherVisitor implements Visitor<SceneNode> {
 
 /** @internal */
 export class NodeHierarchy {
-  private _scene: Scene;
+  private readonly _scene: Scene;
   private _rootNode: SceneNode;
   private _materialList: Material[];
   private _primitiveList: Primitive[];

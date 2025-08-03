@@ -2,7 +2,7 @@ import { eventBus } from '../core/eventbus';
 import type { BaseModel } from '../models/basemodel';
 
 export class BaseController<Model extends BaseModel> {
-  private _model: Model;
+  private readonly _model: Model;
   constructor(model: Model) {
     this._model = model;
   }

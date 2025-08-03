@@ -23,9 +23,9 @@ const editorVFS = new IndexedDBFS(DATABASE_NAME, '$');
 
 export class ProjectService {
   private static _currentProject = '';
-  private static _serializationManager: SerializationManager = new SerializationManager(editorVFS);
+  private static readonly _serializationManager: SerializationManager = new SerializationManager(editorVFS);
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
-  private static _vfs = editorVFS;
+  private static readonly _vfs = editorVFS;
 
   static get VFS() {
     return this._vfs;

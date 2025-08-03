@@ -30,7 +30,11 @@ const genMatrixTypeList = [
   typeinfo.typeMat4
 ];
 
-function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+function matchFunctionOverloadings(
+  pb: ProgramBuilder,
+  name: string,
+  ...args: ExpValueType[]
+): [ASTFunction, ASTExpression[]] {
   const bit =
     pb.getDevice().type === 'webgl'
       ? MASK_WEBGL1
@@ -50,7 +54,7 @@ function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: Ex
   }
   return matchResult;
 }
-function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]) {
+function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]): PBShaderExp {
   return pb.$callFunction(matchResult[0].name, matchResult[1], matchResult[0]);
 }
 function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]): PBShaderExp {

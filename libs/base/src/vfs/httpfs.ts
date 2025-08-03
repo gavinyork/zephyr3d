@@ -15,9 +15,9 @@ export interface HttpFSOptions {
  */
 
 export class HttpFS extends VFS {
-  private baseOrigin: string;
-  private basePath: string;
-  private options: HttpFSOptions;
+  private readonly baseOrigin: string;
+  private readonly basePath: string;
+  private readonly options: HttpFSOptions;
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
     super(true); // 只读
@@ -37,7 +37,7 @@ export class HttpFS extends VFS {
     };
   }
 
-  get urlResolver() {
+  get urlResolver(): (url: string) => string {
     return this.options.urlResolver ?? null;
   }
   set urlResolver(resolver: (url: string) => string) {
@@ -52,26 +52,6 @@ export class HttpFS extends VFS {
       return path;
     }
     return super.normalizePath(path);
-  }
-
-  private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
-    url = new URL(this.join(this.basePath, url), this.baseOrigin).href;
-    try {
-      const response = await fetch(url, {
-        ...init,
-        signal: controller.signal,
-        headers: {
-          ...this.options.headers,
-          ...init?.headers
-        },
-        credentials: this.options.credentials
-      });
-      return response;
-    } finally {
-      clearTimeout(timeoutId);
-    }
   }
 
   protected async _makeDirectory(path: string): Promise<void> {
@@ -127,13 +107,6 @@ export class HttpFS extends VFS {
     }
   }
 
-  guessMIMEType(path: string): string {
-    const dataUriMatchResult = this.parseDataURI(path);
-    if (dataUriMatchResult) {
-      return dataUriMatchResult[1];
-    } else {
-    }
-  }
   protected async _writeFile(
     path: string,
     _data: ArrayBuffer | string,
@@ -202,5 +175,24 @@ export class HttpFS extends VFS {
 
   protected async _move(): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
+  }
+  private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
+    url = new URL(this.join(this.basePath, url), this.baseOrigin).href;
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          ...this.options.headers,
+          ...init?.headers
+        },
+        credentials: this.options.credentials
+      });
+      return response;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }

@@ -4,9 +4,9 @@ import type { DrawContext } from '@zephyr3d/scene';
 import { MeshMaterial, ShaderHelper, applyMaterialMixins, mixinLambert } from '@zephyr3d/scene';
 
 export class WoodMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
-  private _distored: Vector3;
-  private _darkcolor: Vector3;
-  private _lightcolor: Vector3;
+  private readonly _distored: Vector3;
+  private readonly _darkcolor: Vector3;
+  private readonly _lightcolor: Vector3;
   private _density: number;
   constructor() {
     super();

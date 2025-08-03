@@ -4,7 +4,7 @@
  * @returns float32 value
  * @public
  */
-export function half2float(f16: number) {
+export function half2float(f16: number): number {
   const s = (f16 & 0x8000) >> 15; // sign
   const e = (f16 & 0x7c00) >> 10; // exponent
   const f = f16 & 0x03ff; // fraction
@@ -23,7 +23,7 @@ export function half2float(f16: number) {
  * @returns float16 value
  * @public
  */
-export function float2half(f32: number) {
+export function float2half(f32: number): number {
   const buf = new ArrayBuffer(4);
   const view = new DataView(buf);
   view.setFloat32(0, f32, false);

@@ -12,7 +12,7 @@ import type { GrassCluster } from './grass';
 /** @internal */
 export class QuadtreeNode {
   private _patch: TerrainPatch;
-  private _grassClusters: GrassCluster[];
+  private readonly _grassClusters: GrassCluster[];
   private _parent: QuadtreeNode;
   private _children: QuadtreeNode[];
   constructor() {
@@ -145,7 +145,7 @@ export class Quadtree {
   private _primitiveCount: number;
   private _primitiveType: PrimitiveType;
   private _rootNode: QuadtreeNode;
-  private _terrain: Terrain;
+  private readonly _terrain: Terrain;
   private _heightField: HeightField;
   private _disposed: boolean;
   constructor(terrain: Terrain) {

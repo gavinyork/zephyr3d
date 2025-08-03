@@ -4,8 +4,8 @@ import { SceneHierarchy } from './scenehierarchy';
 import type { Scene } from '@zephyr3d/scene';
 
 export class Tab {
-  private _panel: DockPannel;
-  private _sceneHierarchy: SceneHierarchy;
+  private readonly _panel: DockPannel;
+  private readonly _sceneHierarchy: SceneHierarchy;
   constructor(scene: Scene, left: number, top: number, width: number, height: number) {
     this._sceneHierarchy = new SceneHierarchy(scene);
     this._panel = new DockPannel(left, top, width, height, 8, 200, 600, ResizeDirection.Right);

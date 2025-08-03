@@ -29,14 +29,14 @@ export class CurveEditor extends makeEventTarget(Object)<{
   curve_changed: [];
   preview_position: [{ key: number; value: number[] }];
 }>() {
-  private _points: Point[] = [];
+  private readonly _points: Point[] = [];
   private _interpolator: Interpolator = null;
 
   // Settings
-  private _settings: CurveSettings;
-  private _timeRangeStartInput: [number];
+  private readonly _settings: CurveSettings;
+  private readonly _timeRangeStartInput: [number];
   private _timeRangeEndInput: [number];
-  private _valueRangeStartInput: [number];
+  private readonly _valueRangeStartInput: [number];
   private _valueRangeEndInput: [number];
 
   // Status

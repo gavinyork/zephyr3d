@@ -30,23 +30,23 @@ export type InputEventHandler = (ev: Event, type?: string) => boolean;
  * @public
  */
 export class InputManager {
-  private _app: Application;
-  private _target: HTMLElement;
+  private readonly _app: Application;
+  private readonly _target: HTMLElement;
   private _started: boolean;
-  private _clickDistTolerance: number;
-  private _clickTimeTolerance: number;
-  private _dblclickDistTolerance: number;
-  private _dblclickTimeTolerance: number;
-  private _pointerDownHandler: PointerEventHandler;
-  private _pointerUpHandler: PointerEventHandler;
-  private _pointerMoveHandler: PointerEventHandler;
-  private _pointerCancelHandler: PointerEventHandler;
-  private _keyboardHandler: KeyboardEventHandler;
-  private _dragHandler: DragEventHandler;
-  private _wheelHandler: WheelEventHandler;
-  private _compositionHandler: CompositionEventHandler;
+  private readonly _clickDistTolerance: number;
+  private readonly _clickTimeTolerance: number;
+  private readonly _dblclickDistTolerance: number;
+  private readonly _dblclickTimeTolerance: number;
+  private readonly _pointerDownHandler: PointerEventHandler;
+  private readonly _pointerUpHandler: PointerEventHandler;
+  private readonly _pointerMoveHandler: PointerEventHandler;
+  private readonly _pointerCancelHandler: PointerEventHandler;
+  private readonly _keyboardHandler: KeyboardEventHandler;
+  private readonly _dragHandler: DragEventHandler;
+  private readonly _wheelHandler: WheelEventHandler;
+  private readonly _compositionHandler: CompositionEventHandler;
   private _captureId: number;
-  private _middlewares: InputEventHandler[];
+  private readonly _middlewares: InputEventHandler[];
   private _lastEventDatas: PointerEventData[];
   /**
    * Creates an instance of InputManager

@@ -28,13 +28,13 @@ import type { Camera } from '../camera';
  * @public
  */
 export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable, NodeClonable<Water> {
-  private _pickTarget: PickTarget;
+  private readonly _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _renderData: PrimitiveInstanceInfo[];
   private _gridScale: number;
   private _animationSpeed: number;
   private _timeStart: number;
-  private _material: DRef<WaterMaterial>;
+  private readonly _material: DRef<WaterMaterial>;
   /**
    * Creates an instance of Water node
    * @param scene - Scene object

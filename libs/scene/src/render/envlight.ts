@@ -83,9 +83,9 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_WINDOW = 'zIBLIrradianceWindow';
   /** @internal */
-  private _radianceMap: DRef<TextureCube>;
+  private readonly _radianceMap: DRef<TextureCube>;
   /** @internal */
-  private _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _irradianceSH: DRef<GPUDataBuffer>;
   /** @internal */
   private _irraidanceWindow: Vector3;
   /**
@@ -283,9 +283,9 @@ export class EnvIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = 'zIBLIrradianceMap';
   /** @internal */
-  private _radianceMap: DRef<TextureCube>;
+  private readonly _radianceMap: DRef<TextureCube>;
   /** @internal */
-  private _irradianceMap: DRef<TextureCube>;
+  private readonly _irradianceMap: DRef<TextureCube>;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
@@ -399,7 +399,7 @@ export class EnvConstantAmbient extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_CONSTANT_AMBIENT = 'zConstantAmbient';
   /** @internal */
-  private _ambientColor: Vector4;
+  private readonly _ambientColor: Vector4;
   /**
    * Creates an instance of EnvConstantAmbient
    * @param ambientColor - The ambient color
@@ -480,9 +480,9 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_AMBIENT_DOWN = 'zHemisphericAmbientDown';
   /** @internal */
-  private _ambientUp: Vector4;
+  private readonly _ambientUp: Vector4;
   /** @internal */
-  private _ambientDown: Vector4;
+  private readonly _ambientDown: Vector4;
   /**
    * Creates an instance of EnvConstantAmbient
    * @param ambientUp - The upside ambient color

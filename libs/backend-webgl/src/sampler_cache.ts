@@ -2,7 +2,7 @@ import { WebGLTextureSampler } from './sampler_webgl';
 import type { SamplerOptions } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
 export class SamplerCache {
-  private _device: WebGLDevice;
+  private readonly _device: WebGLDevice;
   private _samplers: Record<string, WebGLTextureSampler>;
   constructor(device: WebGLDevice) {
     this._device = device;

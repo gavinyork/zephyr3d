@@ -57,17 +57,17 @@ export interface ClipmapDrawContext extends ClipmapGatherContext {
 
 /** @internal */
 export class Clipmap {
-  private _instanceDataPool: Float32Array[];
+  private readonly _instanceDataPool: Float32Array[];
   private _instanceDataPoolSize: number;
-  private _mipLevelDataPool: Float32Array[];
+  private readonly _mipLevelDataPool: Float32Array[];
   private _mipLevelDataPoolSize: number;
-  private _nonInstanceDataPool: Float32Array[];
+  private readonly _nonInstanceDataPool: Float32Array[];
   private _nonInstanceDataPoolSize: number;
-  private _nonInstanceMipLevelDataPool: Float32Array[];
+  private readonly _nonInstanceMipLevelDataPool: Float32Array[];
   private _nonInstanceMipLevelDataPoolSize: number;
-  private _extraInstanceBuffers: VertexAttribFormat[];
+  private readonly _extraInstanceBuffers: VertexAttribFormat[];
   private _tileResolution: number;
-  private _maxMipLevels: number;
+  private readonly _maxMipLevels: number;
 
   private _tileMesh: Primitive;
   private _tileMeshLines: Primitive;

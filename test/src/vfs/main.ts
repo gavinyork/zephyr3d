@@ -1484,7 +1484,7 @@ export async function runAllVFSTests() {
   for (currentTest = 0; currentTest < 3; currentTest++) {
     console.log(`--------------- 🚀 开始 ${VFSTypes[currentTest]} 文件系统测试 ---------------\n`);
     let passed = 0;
-    let total = testsWithZipFS.length;
+    const total = testsWithZipFS.length;
 
     for (const [name, testFn] of testsWithZipFS) {
       const success = await runTest(name, testFn);

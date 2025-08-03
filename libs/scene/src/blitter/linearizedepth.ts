@@ -9,7 +9,7 @@ import { ShaderHelper } from '../material';
  * @public
  */
 export class LinearizeDepthBlitter extends Blitter {
-  private _nearFar: Vector2;
+  private readonly _nearFar: Vector2;
   constructor() {
     super();
     this._nearFar = new Vector2();

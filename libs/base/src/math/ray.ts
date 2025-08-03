@@ -85,7 +85,7 @@ export class Ray {
    * @param origin - The ray origin point.
    * @param directionNormalized - The normalized direction vector.
    */
-  set(origin: Vector3, directionNormalized: Vector3) {
+  set(origin: Vector3, directionNormalized: Vector3): void {
     this._origin.set(origin);
     this._direction.set(directionNormalized);
     this.prepare();
@@ -1112,7 +1112,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  prepare() {
+  prepare(): void {
     const x = this._origin.x;
     const y = this._origin.y;
     const z = this._origin.z;

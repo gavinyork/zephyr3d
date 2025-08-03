@@ -54,13 +54,13 @@ export class Frustum {
   /**
    * Get the frustum planes.
    */
-  get planes() {
+  get planes(): Plane[] {
     return this._planes;
   }
   /**
    * Get the corner points.
    */
-  get corners() {
+  get corners(): Vector3[] {
     return this._corners;
   }
   /**
@@ -83,7 +83,7 @@ export class Frustum {
    *
    * @returns The point of given corner
    */
-  getCorner(pos: number) {
+  getCorner(pos: number): Vector3 {
     return this.corners[pos];
   }
   /**
@@ -105,7 +105,7 @@ export class Frustum {
    * @param transform - Model-view matrix used to initialize the frustum
    * @returns self
    */
-  initWithMatrix(transform: Matrix4x4) {
+  initWithMatrix(transform: Matrix4x4): this {
     this._planes = this._planes || Array.from({ length: 6 }).map(() => new Plane());
     this._planes[BoxSide.LEFT]
       .setEquation(

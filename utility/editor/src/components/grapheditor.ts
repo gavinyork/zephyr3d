@@ -53,14 +53,14 @@ export class GraphEditor {
   private draggingNode: number | null = null;
   private dragOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
   private isDraggingCanvas = false;
-  private canvasOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
+  private readonly canvasOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
   private canvasScale = 1.0;
   private isCreatingLink = false;
   private linkStartSlot: SlotInfo | null = null;
   private hoveredSlot: SlotInfo | null = null;
   private contextMenuNode: number | null = null;
   private showContextMenu = false;
-  private gridSize = 20;
+  private readonly gridSize = 20;
   private showGrid = true;
 
   constructor() {

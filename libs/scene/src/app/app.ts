@@ -71,9 +71,9 @@ export interface Logger {
  * @public
  */
 export class Application extends makeEventTarget(Object)<appEventMap>() {
-  private _options: AppOptions;
+  private readonly _options: AppOptions;
   private _device: AbstractDevice;
-  private _inputManager: InputManager;
+  private readonly _inputManager: InputManager;
   private _ready: boolean;
   private _logger: Logger;
   private _elapsed: number;

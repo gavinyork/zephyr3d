@@ -8,10 +8,10 @@ export class PostDecalRenderer extends AbstractPostEffect {
   static _defaultDecalTexture: DRef<Texture2D> = new DRef();
   static _decalProgram: GPUProgram = null;
   static _decalBindGroup: BindGroup = null;
-  private _decalTexture: DRef<Texture2D>;
-  private _decalColor: Vector4;
+  private readonly _decalTexture: DRef<Texture2D>;
+  private readonly _decalColor: Vector4;
   private _params: Vector4;
-  private _cameraNearFar: Vector2;
+  private readonly _cameraNearFar: Vector2;
   /**
    * Creates an instance of PostDecalRenderer.
    */

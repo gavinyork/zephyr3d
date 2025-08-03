@@ -20,9 +20,9 @@ import { DRef } from '../app/gc/ref';
  */
 export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, NodeClonable<Mesh> {
   /** @internal */
-  private _primitive: DRef<Primitive>;
+  private readonly _primitive: DRef<Primitive>;
   /** @internal */
-  private _material: DRef<MeshMaterial>;
+  private readonly _material: DRef<MeshMaterial>;
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */

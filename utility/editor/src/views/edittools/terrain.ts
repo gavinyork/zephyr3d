@@ -29,8 +29,8 @@ import { eventBus } from '../../core/eventbus';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool implements EditTool {
-  private static defaultBrush: DRef<Texture2D> = new DRef();
-  private _editor: Editor;
+  private static readonly defaultBrush: DRef<Texture2D> = new DRef();
+  private readonly _editor: Editor;
   private _terrain: DRef<ClipmapTerrain>;
   private _disposed: boolean;
   private _brushSize: number;
@@ -38,19 +38,19 @@ export class TerrainEditTool implements EditTool {
   private _brushStrength: number;
   private _brushImageList: ImageList;
   private _detailAlbedo: ImageList;
-  private _grassAlbedo: ImageList;
+  private readonly _grassAlbedo: ImageList;
   private _detailNormal: ImageList;
-  private _editList: string[];
+  private readonly _editList: string[];
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
-  private _raiseBrush: TerrainRaiseBrush;
-  private _lowerBrush: TerrainLowerBrush;
-  private _smoothBrush: TerrainSmoothBrush;
-  private _flattenBrush: TerrainFlattenBrush;
-  private _textureBrush: TerrainTextureBrush;
-  private _splatMapCopy: DRef<Texture2DArray>;
-  private _heightMapCopy: DRef<Texture2D>;
+  private readonly _raiseBrush: TerrainRaiseBrush;
+  private readonly _lowerBrush: TerrainLowerBrush;
+  private readonly _smoothBrush: TerrainSmoothBrush;
+  private readonly _flattenBrush: TerrainFlattenBrush;
+  private readonly _textureBrush: TerrainTextureBrush;
+  private readonly _splatMapCopy: DRef<Texture2DArray>;
+  private readonly _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
   constructor(editor: Editor, terrain: ClipmapTerrain) {
     this._terrain = new DRef(terrain);

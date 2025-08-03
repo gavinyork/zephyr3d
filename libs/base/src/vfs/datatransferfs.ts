@@ -1,5 +1,5 @@
 import { guessMimeType, PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions } from './vfs';
+import type { FileMetadata, FileStat, ListOptions, ReadOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -49,10 +49,10 @@ export interface DataTransferFileEntry {
  * @public
  */
 export class DataTransferVFS extends VFS {
-  private entries: Map<string, DataTransferFileEntry> = new Map();
-  private directoryStructure: Map<string, Set<string>> = new Map();
+  private readonly entries: Map<string, DataTransferFileEntry> = new Map();
+  private readonly directoryStructure: Map<string, Set<string>> = new Map();
   private initialized = false;
-  private initPromise: Promise<void> = null;
+  private readonly initPromise: Promise<void> = null;
 
   /**
    * Constructs a DataTransfer VFS instance
@@ -64,210 +64,6 @@ export class DataTransferVFS extends VFS {
       data instanceof DataTransfer
         ? this.initializeFromDataTransfer(data)
         : this.initializeFromFileList(data);
-  }
-
-  private async ensureInitialized() {
-    if (this.initialized) {
-      return;
-    }
-    await this.initPromise;
-    this.initialized = true;
-  }
-  /**
-   * Initialize the VFS from a DataTransfer object (from drag and drop)
-   *
-   * @param dataTransfer - The DataTransfer object from a drop event
-   */
-  private async initializeFromDataTransfer(dataTransfer: DataTransfer): Promise<void> {
-    this.entries.clear();
-    this.directoryStructure.clear();
-
-    if (!dataTransfer || !dataTransfer.items) {
-      return;
-    }
-
-    const fileEntries: DataTransferFileEntry[] = [];
-
-    // Process all items in the DataTransfer
-    for (let i = 0; i < dataTransfer.items.length; i++) {
-      const item = dataTransfer.items[i];
-
-      if (item.kind === 'file') {
-        if (item.webkitGetAsEntry) {
-          // Modern browsers with directory support
-          const entry = item.webkitGetAsEntry();
-          if (entry) {
-            await this.processWebKitEntry(entry, '', fileEntries);
-          }
-        } else {
-          // Fallback for browsers without directory support
-          const file = item.getAsFile();
-          if (file) {
-            await this.processFile(file, file.name, fileEntries);
-          }
-        }
-      }
-    }
-
-    // Build internal structure
-    for (const entry of fileEntries) {
-      this.entries.set(entry.path, entry);
-      this.updateDirectoryStructure(entry.path);
-    }
-
-    // Ensure root directory exists
-    if (!this.directoryStructure.has('/')) {
-      this.directoryStructure.set('/', new Set());
-    }
-  }
-
-  /**
-   * Initialize from a FileList (for input[type="file"] with webkitdirectory)
-   *
-   * @param fileList - FileList from an input element
-   */
-  private async initializeFromFileList(fileList: FileList): Promise<void> {
-    this.entries.clear();
-    this.directoryStructure.clear();
-
-    const fileEntries: DataTransferFileEntry[] = [];
-
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      // Use webkitRelativePath if available, otherwise use name
-      const relativePath = (file as any).webkitRelativePath || file.name;
-      await this.processFile(file, relativePath, fileEntries);
-    }
-
-    // Build internal structure
-    for (const entry of fileEntries) {
-      this.entries.set(entry.path, entry);
-      this.updateDirectoryStructure(entry.path);
-    }
-
-    // Ensure root directory exists
-    if (!this.directoryStructure.has('/')) {
-      this.directoryStructure.set('/', new Set());
-    }
-  }
-
-  /**
-   * Process a WebKit file system entry (supports directories)
-   */
-  private async processWebKitEntry(
-    entry: any,
-    parentPath: string,
-    fileEntries: DataTransferFileEntry[]
-  ): Promise<void> {
-    const fullPath = this.normalizePath(parentPath ? `${parentPath}/${entry.name}` : `/${entry.name}`);
-
-    if (entry.isFile) {
-      // It's a file
-      return new Promise((resolve, reject) => {
-        entry.file((file: File) => {
-          this.processFile(file, fullPath.slice(1), fileEntries)
-            .then(() => resolve())
-            .catch(reject);
-        }, reject);
-      });
-    } else if (entry.isDirectory) {
-      // It's a directory
-      return new Promise((resolve, reject) => {
-        const reader = entry.createReader();
-
-        const readEntries = () => {
-          reader.readEntries(async (entries: any[]) => {
-            if (entries.length === 0) {
-              resolve();
-              return;
-            }
-
-            try {
-              for (const childEntry of entries) {
-                await this.processWebKitEntry(childEntry, fullPath, fileEntries);
-              }
-              // Continue reading (directories may have more entries)
-              readEntries();
-            } catch (error) {
-              reject(error);
-            }
-          }, reject);
-        };
-
-        readEntries();
-      });
-    }
-  }
-
-  /**
-   * Process an individual file
-   */
-  private async processFile(
-    file: File,
-    relativePath: string,
-    fileEntries: DataTransferFileEntry[]
-  ): Promise<void> {
-    const normalizedPath = this.normalizePath('/' + relativePath);
-
-    const entry: DataTransferFileEntry = {
-      path: normalizedPath,
-      file,
-      isDirectory: false,
-      size: file.size,
-      lastModified: new Date(file.lastModified)
-    };
-
-    fileEntries.push(entry);
-  }
-
-  /**
-   * Update the directory structure for a given file path
-   */
-  private updateDirectoryStructure(filePath: string): void {
-    const parts = filePath.split('/').filter((p) => p);
-    let currentPath = '';
-
-    // Create all parent directories
-    for (let i = 0; i < parts.length - 1; i++) {
-      const parentPath = currentPath || '/';
-      currentPath = currentPath + '/' + parts[i];
-      const normalizedPath = this.normalizePath(currentPath);
-
-      if (!this.directoryStructure.has(parentPath)) {
-        this.directoryStructure.set(parentPath, new Set());
-      }
-      this.directoryStructure.get(parentPath)!.add(parts[i]);
-
-      if (!this.directoryStructure.has(normalizedPath)) {
-        this.directoryStructure.set(normalizedPath, new Set());
-      }
-    }
-
-    // Add file to its parent directory
-    const parentPath = PathUtils.dirname(filePath);
-    const fileName = PathUtils.basename(filePath);
-
-    if (!this.directoryStructure.has(parentPath)) {
-      this.directoryStructure.set(parentPath, new Set());
-    }
-    this.directoryStructure.get(parentPath)!.add(fileName);
-  }
-
-  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
-    if (!options) {
-      return true;
-    }
-
-    // 模式匹配
-    if (options.pattern) {
-      if (typeof options.pattern === 'string') {
-        return metadata.name.includes(options.pattern);
-      } else if (options.pattern instanceof RegExp) {
-        return options.pattern.test(metadata.name);
-      }
-    }
-
-    return true;
   }
 
   // VFS Implementation
@@ -457,7 +253,7 @@ export class DataTransferVFS extends VFS {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /** {@inheritDoc VFS._deleteDirectory} */
-  protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _deleteDirectory(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /** {@inheritDoc VFS._deleteDatabase} */
@@ -469,7 +265,210 @@ export class DataTransferVFS extends VFS {
     return;
   }
   /** {@inheritDoc VFS._move} */
-  protected _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+  protected _move(): Promise<void> {
     return;
+  }
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+    await this.initPromise;
+    this.initialized = true;
+  }
+  /**
+   * Initialize the VFS from a DataTransfer object (from drag and drop)
+   *
+   * @param dataTransfer - The DataTransfer object from a drop event
+   */
+  private async initializeFromDataTransfer(dataTransfer: DataTransfer): Promise<void> {
+    this.entries.clear();
+    this.directoryStructure.clear();
+
+    if (!dataTransfer || !dataTransfer.items) {
+      return;
+    }
+
+    const fileEntries: DataTransferFileEntry[] = [];
+
+    // Process all items in the DataTransfer
+    for (let i = 0; i < dataTransfer.items.length; i++) {
+      const item = dataTransfer.items[i];
+
+      if (item.kind === 'file') {
+        if (item.webkitGetAsEntry) {
+          // Modern browsers with directory support
+          const entry = item.webkitGetAsEntry();
+          if (entry) {
+            await this.processWebKitEntry(entry, '', fileEntries);
+          }
+        } else {
+          // Fallback for browsers without directory support
+          const file = item.getAsFile();
+          if (file) {
+            await this.processFile(file, file.name, fileEntries);
+          }
+        }
+      }
+    }
+
+    // Build internal structure
+    for (const entry of fileEntries) {
+      this.entries.set(entry.path, entry);
+      this.updateDirectoryStructure(entry.path);
+    }
+
+    // Ensure root directory exists
+    if (!this.directoryStructure.has('/')) {
+      this.directoryStructure.set('/', new Set());
+    }
+  }
+
+  /**
+   * Initialize from a FileList (for input[type="file"] with webkitdirectory)
+   *
+   * @param fileList - FileList from an input element
+   */
+  private async initializeFromFileList(fileList: FileList): Promise<void> {
+    this.entries.clear();
+    this.directoryStructure.clear();
+
+    const fileEntries: DataTransferFileEntry[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      // Use webkitRelativePath if available, otherwise use name
+      const relativePath = (file as any).webkitRelativePath || file.name;
+      await this.processFile(file, relativePath, fileEntries);
+    }
+
+    // Build internal structure
+    for (const entry of fileEntries) {
+      this.entries.set(entry.path, entry);
+      this.updateDirectoryStructure(entry.path);
+    }
+
+    // Ensure root directory exists
+    if (!this.directoryStructure.has('/')) {
+      this.directoryStructure.set('/', new Set());
+    }
+  }
+
+  /**
+   * Process a WebKit file system entry (supports directories)
+   */
+  private async processWebKitEntry(
+    entry: any,
+    parentPath: string,
+    fileEntries: DataTransferFileEntry[]
+  ): Promise<void> {
+    const fullPath = this.normalizePath(parentPath ? `${parentPath}/${entry.name}` : `/${entry.name}`);
+
+    if (entry.isFile) {
+      // It's a file
+      return new Promise((resolve, reject) => {
+        entry.file((file: File) => {
+          this.processFile(file, fullPath.slice(1), fileEntries)
+            .then(() => resolve())
+            .catch(reject);
+        }, reject);
+      });
+    } else if (entry.isDirectory) {
+      // It's a directory
+      return new Promise((resolve, reject) => {
+        const reader = entry.createReader();
+
+        const readEntries = (): void => {
+          reader.readEntries(async (entries: any[]) => {
+            if (entries.length === 0) {
+              resolve();
+              return;
+            }
+
+            try {
+              for (const childEntry of entries) {
+                await this.processWebKitEntry(childEntry, fullPath, fileEntries);
+              }
+              // Continue reading (directories may have more entries)
+              readEntries();
+            } catch (error) {
+              reject(error);
+            }
+          }, reject);
+        };
+
+        readEntries();
+      });
+    }
+  }
+
+  /**
+   * Process an individual file
+   */
+  private async processFile(
+    file: File,
+    relativePath: string,
+    fileEntries: DataTransferFileEntry[]
+  ): Promise<void> {
+    const normalizedPath = this.normalizePath('/' + relativePath);
+
+    const entry: DataTransferFileEntry = {
+      path: normalizedPath,
+      file,
+      isDirectory: false,
+      size: file.size,
+      lastModified: new Date(file.lastModified)
+    };
+
+    fileEntries.push(entry);
+  }
+
+  /**
+   * Update the directory structure for a given file path
+   */
+  private updateDirectoryStructure(filePath: string): void {
+    const parts = filePath.split('/').filter((p) => p);
+    let currentPath = '';
+
+    // Create all parent directories
+    for (let i = 0; i < parts.length - 1; i++) {
+      const parentPath = currentPath || '/';
+      currentPath = currentPath + '/' + parts[i];
+      const normalizedPath = this.normalizePath(currentPath);
+
+      if (!this.directoryStructure.has(parentPath)) {
+        this.directoryStructure.set(parentPath, new Set());
+      }
+      this.directoryStructure.get(parentPath)!.add(parts[i]);
+
+      if (!this.directoryStructure.has(normalizedPath)) {
+        this.directoryStructure.set(normalizedPath, new Set());
+      }
+    }
+
+    // Add file to its parent directory
+    const parentPath = PathUtils.dirname(filePath);
+    const fileName = PathUtils.basename(filePath);
+
+    if (!this.directoryStructure.has(parentPath)) {
+      this.directoryStructure.set(parentPath, new Set());
+    }
+    this.directoryStructure.get(parentPath)!.add(fileName);
+  }
+
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+    if (!options) {
+      return true;
+    }
+
+    // 模式匹配
+    if (options.pattern) {
+      if (typeof options.pattern === 'string') {
+        return metadata.name.includes(options.pattern);
+      } else if (options.pattern instanceof RegExp) {
+        return options.pattern.test(metadata.name);
+      }
+    }
+
+    return true;
   }
 }

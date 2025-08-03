@@ -51,7 +51,7 @@ export abstract class TextureTestCase {
 }
 
 export class TestTexture2D extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -101,9 +101,9 @@ export class TestTexture2D extends TextureTestCase {
 }
 
 export class TestTextureVideo extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   private el: HTMLVideoElement;
-  private videoSrc: string;
+  private readonly videoSrc: string;
   constructor(assetManager: AssetManager, video: string) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -161,7 +161,7 @@ export class TestTextureVideo extends TextureTestCase {
 }
 
 export class TestTexture2DArray extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -292,7 +292,7 @@ export class TestTexture2DArray extends TextureTestCase {
 }
 
 export class TestTexture3D extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -421,7 +421,7 @@ export class TestTexture3D extends TextureTestCase {
 }
 
 export class TestTextureCube extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   private srcTex: TextureCube;
   private prefilteredTex: TextureCube;
   constructor(assetManager: AssetManager) {

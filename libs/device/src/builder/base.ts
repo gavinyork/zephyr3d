@@ -81,7 +81,7 @@ export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBType
             const dim = Number(prop);
             if (Number.isInteger(dim) && dim >= 0) {
               const arrayType = new PBArrayTypeInfo(elementType, dim);
-              const arrayTypeFunc = function arrayCtor(this: ProgramBuilder, ...args: any[]) {
+              const arrayTypeFunc = function arrayCtor(this: ProgramBuilder, ...args: any[]): PBShaderExp {
                 if (args.length === 1 && typeof args[0] === 'string') {
                   return new PBShaderExp(args[0], arrayType);
                 } else {
@@ -113,7 +113,7 @@ export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBType
  */
 export abstract class Proxiable<T> {
   /** @internal */
-  private proxy: Proxiable<T>;
+  private readonly proxy: Proxiable<T>;
   constructor() {
     this.proxy = new Proxy(this, {
       get: function (target, prop) {
@@ -214,7 +214,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
       }
     }
   }
-  get $group() {
+  get $group(): number {
     return this.$_group;
   }
   set $group(val: number) {
@@ -378,7 +378,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param index - index of the element
    * @returns the element variable
    */
-  at(index: number | PBShaderExp) {
+  at(index: number | PBShaderExp): PBShaderExp {
     const varType = this.$ast.getType();
     if (
       !varType.isArrayType() &&
@@ -425,7 +425,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param index - index of the element
    * @param val - value to set
    */
-  setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp) {
+  setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void {
     const varType = this.$ast.getType();
     if (!varType.isArrayType() && !(varType.isPrimitiveType() && varType.isVectorType())) {
       throw new Error('setAt() function must be used with array types');

@@ -99,7 +99,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /** @internal */
   private _taaStrength: number;
   /** @internal */
-  private _objectColor: Vector4;
+  private readonly _objectColor: Vector4;
   /** @internal */
   private _ctx: DrawContext;
   /** @internal */

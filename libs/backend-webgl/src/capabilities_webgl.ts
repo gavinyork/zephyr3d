@@ -172,9 +172,9 @@ export interface TextureFormatInfoWebGL extends TextureFormatInfo {
 }
 
 export class WebGLFramebufferCaps implements FramebufferCaps {
-  private _isWebGL2: boolean;
-  private _extDrawBuffers: WEBGL_draw_buffers;
-  private _extFloatBlending: EXT_float_blend;
+  private readonly _isWebGL2: boolean;
+  private readonly _extDrawBuffers: WEBGL_draw_buffers;
+  private readonly _extFloatBlending: EXT_float_blend;
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
   supportMultisampledFramebuffer: boolean;
@@ -201,9 +201,9 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
 }
 
 export class WebGLMiscCaps implements MiscCaps {
-  private _isWebGL2: boolean;
-  private _extIndexUint32: OES_element_index_uint;
-  private _extBlendMinMax: EXT_blend_minmax;
+  private readonly _isWebGL2: boolean;
+  private readonly _extIndexUint32: OES_element_index_uint;
+  private readonly _extBlendMinMax: EXT_blend_minmax;
   supportOversizedViewport: boolean;
   supportBlendMinMax: boolean;
   support32BitIndex: boolean;
@@ -229,9 +229,9 @@ export class WebGLMiscCaps implements MiscCaps {
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {
-  private _extFragDepth: EXT_frag_depth;
-  private _extStandardDerivatives: OES_standard_derivatives;
-  private _extShaderTextureLod: EXT_shader_texture_lod;
+  private readonly _extFragDepth: EXT_frag_depth;
+  private readonly _extStandardDerivatives: OES_standard_derivatives;
+  private readonly _extShaderTextureLod: EXT_shader_texture_lod;
   supportFragmentDepth: boolean;
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
@@ -270,20 +270,20 @@ export class WebGLShaderCaps implements ShaderCaps {
   }
 }
 export class WebGLTextureCaps implements TextureCaps {
-  private _isWebGL2: boolean;
-  private _extS3TC: WEBGL_compressed_texture_s3tc;
-  private _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
-  private _extBPTC: EXT_texture_compression_bptc;
-  private _extRGTC: EXT_texture_compression_rgtc;
-  private _extASTC: WEBGL_compressed_texture_astc;
-  private _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
-  private _extDepthTexture: WEBGL_depth_texture;
-  private _extSRGB: EXT_sRGB;
-  private _extTextureFloat: OES_texture_float;
-  private _extTextureFloatLinear: OES_texture_float_linear;
-  private _extTextureHalfFloat: OES_texture_half_float;
-  private _extTextureHalfFloatLinear: OES_texture_half_float_linear;
-  private _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
+  private readonly _isWebGL2: boolean;
+  private readonly _extS3TC: WEBGL_compressed_texture_s3tc;
+  private readonly _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
+  private readonly _extBPTC: EXT_texture_compression_bptc;
+  private readonly _extRGTC: EXT_texture_compression_rgtc;
+  private readonly _extASTC: WEBGL_compressed_texture_astc;
+  private readonly _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
+  private readonly _extDepthTexture: WEBGL_depth_texture;
+  private readonly _extSRGB: EXT_sRGB;
+  private readonly _extTextureFloat: OES_texture_float;
+  private readonly _extTextureFloatLinear: OES_texture_float_linear;
+  private readonly _extTextureHalfFloat: OES_texture_half_float;
+  private readonly _extTextureHalfFloatLinear: OES_texture_half_float_linear;
+  private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
   npo2Mipmapping: boolean;
