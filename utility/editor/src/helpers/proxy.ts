@@ -101,6 +101,24 @@ export class NodeProxy {
       }
     }
   }
+  hideProxy(src: SceneNode) {
+    if (src) {
+      const index = src.children.findIndex((val) => this.isProxy(val.get()));
+      if (index >= 0) {
+        const proxy = src.children[index].get() as Mesh;
+        proxy.showState = 'hidden';
+      }
+    }
+  }
+  showProxy(src: SceneNode) {
+    if (src) {
+      const index = src.children.findIndex((val) => this.isProxy(val.get()));
+      if (index >= 0) {
+        const proxy = src.children[index].get() as Mesh;
+        proxy.showState = 'visible';
+      }
+    }
+  }
   private getDirectionalLightProxyMesh() {
     if (!this._directionalLightPrimitive.get()) {
       const bbox = new BoundingBox();

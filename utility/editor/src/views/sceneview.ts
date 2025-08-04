@@ -585,6 +585,21 @@ export class SceneView extends BaseView<SceneModel> {
         this.model.camera.right = (10 * viewportWidth) / viewportHeight;
       }
       this.model.camera.render(this.model.scene);
+
+      // Render selected camera
+      const selectedNode = this._tab.sceneHierarchy.selectedNode;
+      if (selectedNode instanceof PerspectiveCamera && selectedNode !== this.model.camera) {
+        selectedNode.viewport = [
+          this.model.camera.viewport[0] + 20,
+          this.model.camera.viewport[1] + 20,
+          300,
+          200
+        ];
+        selectedNode.scissor = selectedNode.viewport;
+        selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
+        selectedNode.render(this.model.scene);
+      }
+
       if (this._renderDropZone) {
         this.renderDropZone(
           this._tab.width,
@@ -1015,6 +1030,10 @@ export class SceneView extends BaseView<SceneModel> {
     eventBus.dispatchEvent('scene_changed');
   }
   update(dt: number) {
+    const selectedNode = this._tab.sceneHierarchy.selectedNode;
+    if (selectedNode?.isCamera() && selectedNode !== this.model.camera) {
+      this._proxy.updateProxy(selectedNode);
+    }
     const placeNode = this._nodeToBePlaced.get();
     if (this._mousePosX >= 0 && this._mousePosY >= 0) {
       if (placeNode) {
@@ -1230,7 +1249,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleNodeSelected(node: SceneNode) {
-    this._postGizmoRenderer.node = node === node.scene.rootNode ? null : node;
+    this._postGizmoRenderer.node = node === node.scene.rootNode || node === this.model.camera ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
@@ -1383,12 +1402,20 @@ export class SceneView extends BaseView<SceneModel> {
     eventBus.dispatchEvent('action', action);
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
+    if (camera !== this.model.camera) {
+      this._proxy.hideProxy(camera);
+      return;
+    }
     if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
       //compositor.appendPostEffect(this._postDecalRenderer);
       compositor.appendPostEffect(this._postGizmoRenderer);
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
+    if (camera !== this.model.camera) {
+      this._proxy.showProxy(camera);
+      return;
+    }
     if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
       //compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);

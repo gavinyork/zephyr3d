@@ -119,7 +119,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   /**
    * Creates an instance of PostGizmoRenderer.
    */
-  constructor(camera: Camera, binding = null, size = 10) {
+  constructor(camera: Camera, binding = null, size = 15) {
     super();
     this._camera = camera;
     this._node = binding;
@@ -128,15 +128,15 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
     this._allowTranslate = true;
     this._alwaysDrawIndicator = false;
     this._axisLength = size;
-    this._arrowLength = size * 0.4;
+    this._arrowLength = size * 0.8;
     this._axisRadius = size * 0.02;
-    this._arrowRadius = size * 0.04;
-    this._boxSize = size * 0.05;
+    this._arrowRadius = size * 0.06;
+    this._boxSize = size * 0.1;
     this._mode = 'none';
     this._translatePlaneInfo = null;
     this._rotateInfo = null;
     this._scaleInfo = null;
-    this._screenSize = 0.3;
+    this._screenSize = 0.6;
     this._gridParams = new Vector4(1000, 500, 0, 0);
     this._gridSteps = new Float32Array([
       1, 1, 0, 0, 10, 10, 0, 0, 100, 100, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000,
