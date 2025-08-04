@@ -1009,18 +1009,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
             }
           }
 
-          // 根据类型和选项决定是否包含在结果中
-          let shouldIncludeInResults = false;
-
-          if (matched) {
-            if (entry.type === 'file' && includeFiles) {
-              shouldIncludeInResults = true;
-            } else if (entry.type === 'directory' && includeDirs) {
-              shouldIncludeInResults = true;
-            }
-          }
-
-          if (shouldIncludeInResults) {
+          if (entry.type === 'directory' && includeDirs) {
+            const result: GlobResult = {
+              ...entry,
+              relativePath,
+              matchedPattern: matched ? matchedPattern : null
+            };
+            results.push(result);
+          } else if (matched && includeFiles) {
             const result: GlobResult = {
               ...entry,
               relativePath,

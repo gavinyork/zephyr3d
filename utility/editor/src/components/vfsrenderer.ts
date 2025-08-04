@@ -65,7 +65,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private readonly _treePanel: DockPannel;
   private _filesystem: DirectoryInfo;
   private _selectedDir: DirectoryInfo;
-
+  private _fileFilter: string[];
   private _currentDirContent: (FileInfo | DirectoryInfo)[] = [];
   private _viewMode: ViewMode = ViewMode.List;
   private _sortBy: SortBy = SortBy.Name;
@@ -79,7 +79,13 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   private _isDragOverContent = false;
   private readonly _options: VFSRendererOptions = null;
 
-  constructor(vfs: VFS, project: ProjectInfo, treePanelWidth = 200, options?: VFSRendererOptions) {
+  constructor(
+    vfs: VFS,
+    project: ProjectInfo,
+    fileFilter: string[] = [],
+    treePanelWidth = 200,
+    options?: VFSRendererOptions
+  ) {
     super();
     this._vfs = vfs;
     this._vfs.on('changed', this.onVFSChanged, this);
@@ -87,6 +93,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
     this._selectedDir = null;
+    this._fileFilter = fileFilter?.slice() ?? [];
     this._options = { allowDrop: true, multiSelect: true, ...options };
     this.loadFileSystem();
     if (this._options.allowDrop) {
@@ -99,6 +106,15 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   get VFS() {
     return this._vfs;
+  }
+  get fileFilter(): string[] {
+    return this._fileFilter;
+  }
+  set fileFilter(filter: string[]) {
+    this._fileFilter = filter?.slice() ?? [];
+    this.loadFileSystem().then(() => {
+      this.refreshFileView();
+    });
   }
   get selectedDir() {
     return this._selectedDir ?? null;
@@ -1158,10 +1174,13 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       path
     };
 
-    const content = await this._vfs.readDirectory(path, {
-      includeHidden: true,
-      recursive: false
-    });
+    const content: FileMetadata[] =
+      this._fileFilter?.length > 0
+        ? await this._vfs.glob(this._fileFilter, { cwd: path, recursive: false, includeDirs: true })
+        : await this._vfs.readDirectory(path, {
+            includeHidden: true,
+            recursive: false
+          });
 
     for (const entry of content) {
       if (entry.type === 'directory') {

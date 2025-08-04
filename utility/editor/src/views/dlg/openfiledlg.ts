@@ -8,17 +8,44 @@ import type { ProjectInfo } from '../../core/services/project';
 export class DlgOpenFile extends DialogRenderer<string> {
   private readonly _renderer: VFSRenderer;
   private _name: [string];
-  public static async openFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
-    return new DlgOpenFile(title, vfs, project, width, height).showModal();
+  private _filterLabels: string[];
+  private _filterPatterns: string[][];
+  private _selected: [number];
+  public static async openFile(
+    title: string,
+    vfs: VFS,
+    project: ProjectInfo,
+    filter: string,
+    width: number,
+    height: number
+  ) {
+    return new DlgOpenFile(title, vfs, project, filter, width, height).showModal();
   }
-  constructor(id: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
+  constructor(id: string, vfs: VFS, project: ProjectInfo, filter: string, width: number, height: number) {
     super(id, width, height);
-    this._renderer = new VFSRenderer(vfs, project, Math.max(0, Math.min(width / 2, 200)), {
-      multiSelect: false,
-      allowDrop: false
-    });
-    this._renderer.on('selection_changed', this.updateSelection, this);
     this._name = [''];
+    this._filterLabels = [];
+    this._filterPatterns = [];
+    if (filter) {
+      const parts = filter.split('|');
+      const numFilters = parts.length >> 1;
+      for (let i = 0; i < numFilters; i++) {
+        this._filterLabels.push(parts[i * 2]);
+        this._filterPatterns.push(parts[i * 2 + 1].split(';').filter((val) => !!val));
+      }
+    }
+    this._selected = [0];
+    this._renderer = new VFSRenderer(
+      vfs,
+      project,
+      this._filterLabels.length > 0 ? this._filterPatterns[this._selected[0]] : [],
+      Math.max(0, Math.min(width / 2, 200)),
+      {
+        multiSelect: false,
+        allowDrop: false
+      }
+    );
+    this._renderer.on('selection_changed', this.updateSelection, this);
   }
   updateSelection(selectedDir: DirectoryInfo, files: FileInfo[]) {
     if (files.length === 1) {
@@ -31,6 +58,12 @@ export class DlgOpenFile extends DialogRenderer<string> {
     }
     ImGui.EndChild();
     ImGui.InputText('File Name', this._name, undefined);
+    if (this._filterLabels.length > 0) {
+      ImGui.SameLine();
+      if (ImGui.Combo('##FileTypeCombo', this._selected, this._filterLabels)) {
+        this._renderer.fileFilter = this._filterPatterns[this._selected[0]];
+      }
+    }
     if (ImGui.Button('Open')) {
       if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
         const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);

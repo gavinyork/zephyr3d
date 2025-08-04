@@ -109,6 +109,7 @@ export class SceneController extends BaseController<SceneModel> {
           'Save Scene',
           ProjectService.VFS,
           this._editor.currentProject,
+          'Scene (*.zscn)|*.zscn|All files (*)|*',
           500,
           400
         );
@@ -124,6 +125,7 @@ export class SceneController extends BaseController<SceneModel> {
             'Open Scene',
             ProjectService.VFS,
             this._editor.currentProject,
+            'Scene (*.zscn)|*.zscn|All files (*)|*',
             500,
             400
           );

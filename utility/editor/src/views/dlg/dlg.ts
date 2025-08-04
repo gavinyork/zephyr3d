@@ -25,11 +25,25 @@ export class Dialog {
   ) {
     return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height ?? 0);
   }
-  public static async saveFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
-    return DlgSaveFile.saveFile(title, vfs, project, width, height);
+  public static async saveFile(
+    title: string,
+    vfs: VFS,
+    project: ProjectInfo,
+    filter: string,
+    width: number,
+    height: number
+  ) {
+    return DlgSaveFile.saveFile(title, vfs, project, filter, width, height);
   }
-  public static async openFile(title: string, vfs: VFS, project: ProjectInfo, width: number, height: number) {
-    return DlgOpenFile.openFile(title, vfs, project, width, height);
+  public static async openFile(
+    title: string,
+    vfs: VFS,
+    project: ProjectInfo,
+    filter: string,
+    width: number,
+    height: number
+  ) {
+    return DlgOpenFile.openFile(title, vfs, project, filter, width, height);
   }
   public static async openFromList(
     title: string,
