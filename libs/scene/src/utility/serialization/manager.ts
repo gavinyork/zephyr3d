@@ -1,5 +1,5 @@
 import type { GenericConstructor, VFS } from '@zephyr3d/base';
-import type { PropertyAccessor, PropertyValue, SerializableClass } from './types';
+import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass } from './scene/node';
 import { getBatchGroupClass } from './scene/batch';
@@ -39,6 +39,25 @@ import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
+
+const defaultValues: Record<PropertyType, any> = {
+  bool: false,
+  float: 0,
+  int: 0,
+  int2: [0, 0],
+  int3: [0, 0, 0],
+  int4: [0, 0, 0, 0],
+  object: null,
+  object_array: [],
+  embedded: '',
+  rgb: [0, 0, 0],
+  rgba: [0, 0, 0, 0],
+  string: '',
+  vec2: [0, 0],
+  vec3: [0, 0, 0],
+  vec4: [0, 0, 0, 0],
+  command: null
+};
 
 /**
  * Serialization manager class
@@ -159,6 +178,61 @@ export class SerializationManager {
     }
     return data;
   }
+  serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
+    const cls = this.getClasses();
+    const index = cls.findIndex((val) => val.ctor === obj.constructor);
+    if (index < 0) {
+      throw new Error('Serialize object failed: Cannot found serialization meta data');
+    }
+    let info = cls[index];
+    const initParams = info?.getInitParams?.(obj);
+    json = json ?? {};
+    json.ClassName = info.ctor.name;
+    json.Object = {};
+    if (initParams !== undefined && initParams !== null) {
+      json.Init = initParams;
+    }
+    while (info) {
+      this.serializeObjectProps(obj, info, json.Object, asyncTasks);
+      info = this.getClassByConstructor(info.parent);
+    }
+    return json;
+  }
+  async deserializeObject<T extends object>(ctx: any, json: object): Promise<T> {
+    const cls = this.getClasses();
+    const className = json['ClassName'];
+    const index = cls.findIndex((val) => val.ctor.name === className);
+    if (index < 0) {
+      throw new Error('Deserialize object failed: Cannot found serialization meta data');
+    }
+    let info = cls[index];
+    const initParams: { asset?: string } = json['Init'];
+    json = json['Object'];
+    let p: T | Promise<T>;
+    let loadProps = true;
+    if (info.createFunc) {
+      let result = info.createFunc(ctx, initParams);
+      if (result instanceof Promise) {
+        result = await result;
+      }
+      p = result.obj;
+      loadProps = result.loadProps ?? true;
+    } else {
+      p = new info.ctor() as T;
+    }
+    //const p: T | Promise<T> = info.createFunc ? info.createFunc(ctx, initParams) : new info.ctor();
+    if (!p) {
+      return null;
+    }
+    const obj = p instanceof Promise ? await p : p;
+    if (loadProps) {
+      while (info) {
+        await this.deserializeObjectProps(obj, info, json);
+        info = this.getClassByConstructor(info.parent);
+      }
+    }
+    return obj;
+  }
   protected async doFetchBinary(path: string) {
     return await this._assetManager.fetchBinaryData(path, null);
   }
@@ -184,6 +258,20 @@ export class SerializationManager {
       this._allocated.set(texture, id);
     }
     return texture;
+  }
+  async loadScene(filename: string): Promise<Scene> {
+    const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
+    const json = JSON.parse(content);
+    return this.deserializeObject<Scene>(null, json);
+  }
+  async saveScene(scene: Scene, filename: string): Promise<void> {
+    const asyncTasks: Promise<unknown>[] = [];
+    const content = await this.serializeObject(scene, null, asyncTasks);
+    await Promise.all(asyncTasks);
+    await this._vfs.writeFile(filename, JSON.stringify(content), {
+      encoding: 'utf8',
+      create: true
+    });
   }
   private static readonly _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {
@@ -250,6 +338,237 @@ export class SerializationManager {
         }
         this._propMap[path] = prop;
         this._propNameMap.set(prop, path);
+      }
+    }
+  }
+  private getDefaultValue<T>(obj: T, prop: PropertyAccessor<T>) {
+    let v = prop.getDefaultValue?.call(obj) ?? prop.default;
+    if (v === undefined) {
+      v = defaultValues[prop.type];
+      console.warn(`No default value found for property: ${prop.name}, ${v} will be used`);
+    }
+    return v;
+  }
+  private async deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object) {
+    const props = (this.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
+    let currentPhase: number = undefined;
+    const promises: Promise<void>[] = [];
+    for (const prop of props) {
+      const phase = prop.phase ?? 0;
+      if (phase !== currentPhase) {
+        currentPhase = phase;
+        if (promises.length > 0) {
+          await Promise.all(promises);
+        }
+      }
+      if (prop.type === 'command') {
+        continue;
+      }
+      if (!prop.set) {
+        continue;
+      }
+      if (prop.isValid && !prop.isValid.call(obj)) {
+        continue;
+      }
+      const persistent = prop.persistent ?? true;
+      if (!persistent) {
+        continue;
+      }
+      const k = prop.name;
+      const v = json[k] ?? this.getDefaultValue(obj, prop);
+      const tmpVal: PropertyValue = {
+        num: [0, 0, 0, 0],
+        str: [''],
+        bool: [false],
+        object: [null]
+      };
+      switch (prop.type) {
+        case 'object':
+          if (typeof v === 'string' && v) {
+            tmpVal.str[0] = v;
+          } else {
+            tmpVal.object[0] = v ? (await this.deserializeObject<any>(obj, v)) ?? null : null;
+          }
+          break;
+        case 'object_array':
+          tmpVal.object = [];
+          if (Array.isArray(v)) {
+            for (const p of v) {
+              if (typeof p === 'string' && p) {
+                tmpVal.str[0] = p;
+              } else {
+                tmpVal.object.push(p ? (await this.deserializeObject<any>(obj, p)) ?? null : null);
+              }
+            }
+          }
+          break;
+        case 'embedded':
+          if (typeof v === 'string' && v) {
+            tmpVal.str[0] = v;
+          }
+          break;
+        case 'float':
+        case 'int':
+          tmpVal.num[0] = v;
+          break;
+        case 'string':
+          tmpVal.str[0] = v;
+          break;
+        case 'bool':
+          tmpVal.bool[0] = v;
+          break;
+        case 'vec2':
+        case 'int2':
+          tmpVal.num[0] = v[0];
+          tmpVal.num[1] = v[1];
+          break;
+        case 'vec3':
+        case 'int3':
+        case 'rgb':
+          tmpVal.num[0] = v[0];
+          tmpVal.num[1] = v[1];
+          tmpVal.num[2] = v[2];
+          break;
+        case 'vec4':
+        case 'int4':
+        case 'rgba':
+          tmpVal.num[0] = v[0];
+          tmpVal.num[1] = v[1];
+          tmpVal.num[2] = v[2];
+          tmpVal.num[3] = v[3];
+          break;
+      }
+      promises.push(Promise.resolve(prop.set.call(obj, tmpVal, -1)));
+    }
+    if (promises.length > 0) {
+      await Promise.all(promises);
+    }
+  }
+  private serializeObjectProps<T extends object>(
+    obj: T,
+    cls: SerializableClass,
+    json: object,
+    asyncTasks?: Promise<unknown>[]
+  ) {
+    const props = this.getPropertiesByClass(cls) ?? [];
+    for (const prop of props) {
+      if (prop.isValid && !prop.isValid.call(obj)) {
+        continue;
+      }
+      if (prop.type === 'command') {
+        continue;
+      }
+      const persistent = prop.persistent ?? true;
+      if (!persistent) {
+        continue;
+      }
+      const tmpVal: PropertyValue = {
+        num: [0, 0, 0, 0],
+        str: [''],
+        bool: [false],
+        object: [null]
+      };
+      const k = prop.name;
+      prop.get.call(obj, tmpVal);
+      switch (prop.type) {
+        case 'object': {
+          const value =
+            typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
+              ? tmpVal.str[0]
+              : tmpVal.object[0]
+              ? this.serializeObject(tmpVal.object[0], {}, asyncTasks)
+              : null;
+          if (value) {
+            json[k] = value;
+          }
+          break;
+        }
+        case 'object_array':
+          json[k] = [];
+          for (const p of tmpVal.object) {
+            json[k].push(this.serializeObject(p, {}, asyncTasks));
+          }
+          break;
+        case 'embedded': {
+          const relativePath = tmpVal.str[0].startsWith('/') ? tmpVal.str[0].slice(1) : tmpVal.str[0];
+          json[k] = relativePath;
+          if (asyncTasks) {
+            const resource = tmpVal.object[0];
+            asyncTasks.push(
+              (async () => {
+                console.log(k);
+                const buffer = (await resource) as ArrayBuffer;
+                await this.vfs.writeFile(relativePath, buffer, {
+                  encoding: 'binary',
+                  create: true
+                });
+              })()
+            );
+          }
+          break;
+        }
+        case 'float':
+        case 'int':
+          if (
+            (prop.default === undefined && !prop.getDefaultValue) ||
+            this.getDefaultValue(obj, prop) !== tmpVal.num[0]
+          ) {
+            json[k] = tmpVal.num[0];
+          }
+          break;
+        case 'string':
+          if (
+            (prop.default === undefined && !prop.getDefaultValue) ||
+            this.getDefaultValue(obj, prop) !== tmpVal.str[0]
+          ) {
+            json[k] = tmpVal.str[0];
+          }
+          break;
+        case 'bool':
+          if (
+            (prop.default === undefined && !prop.getDefaultValue) ||
+            this.getDefaultValue(obj, prop) !== tmpVal.bool[0]
+          ) {
+            json[k] = tmpVal.bool[0];
+          }
+          break;
+        case 'vec2':
+        case 'int2':
+          if (prop.default !== undefined || !!prop.getDefaultValue) {
+            const v = this.getDefaultValue(obj, prop);
+            if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1]) {
+              break;
+            }
+          }
+          json[k] = [tmpVal.num[0], tmpVal.num[1]];
+          break;
+        case 'vec3':
+        case 'int3':
+        case 'rgb':
+          if (prop.default !== undefined || !!prop.getDefaultValue) {
+            const v = this.getDefaultValue(obj, prop);
+            if (v[0] === tmpVal.num[0] && v[1] === tmpVal.num[1] && v[2] === tmpVal.num[2]) {
+              break;
+            }
+          }
+          json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2]];
+          break;
+        case 'vec4':
+        case 'int4':
+        case 'rgba':
+          if (prop.default !== undefined || !!prop.getDefaultValue) {
+            const v = this.getDefaultValue(obj, prop);
+            if (
+              v[0] === tmpVal.num[0] &&
+              v[1] === tmpVal.num[1] &&
+              v[2] === tmpVal.num[2] &&
+              v[3] === tmpVal.num[3]
+            ) {
+              break;
+            }
+          }
+          json[k] = [tmpVal.num[0], tmpVal.num[1], tmpVal.num[2], tmpVal.num[3]];
+          break;
       }
     }
   }

@@ -1,5 +1,4 @@
 import type { Scene } from '@zephyr3d/scene';
-import { deserializeObject, serializeObject } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import type { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -148,31 +147,14 @@ export class SceneController extends BaseController<SceneModel> {
     // Don't export editor camera
     const parent = this.model.camera.parent;
     this.model.camera.parent = null;
-
-    const asyncTasks: Promise<unknown>[] = [];
-    const content = await serializeObject(
-      this.model.scene,
-      ProjectService.serializationManager,
-      null,
-      asyncTasks
-    );
-    await Promise.all(asyncTasks);
-    await ProjectService.VFS.writeFile(this._scenePath, JSON.stringify(content), {
-      encoding: 'utf8',
-      create: true
-    });
-    console.log(JSON.stringify(content, null, 2));
-    console.log([...asyncTasks]);
-    await Promise.all(asyncTasks);
+    await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
     this._sceneChanged = false;
 
     // Restore editor camera
     this.model.camera.parent = parent;
   }
-  async loadScene(path: string) {
-    const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
-    const json = JSON.parse(content);
-    return deserializeObject<Scene>(null, json, ProjectService.serializationManager);
+  async loadScene(path: string): Promise<Scene> {
+    return ProjectService.serializationManager.loadScene(path);
   }
   async openScene(path: string, resetView: boolean) {
     const scene = await this.loadScene(path);

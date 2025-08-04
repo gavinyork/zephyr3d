@@ -65,6 +65,7 @@ import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { VFSView } from '../components/vfsview';
 import { ProjectService } from '../core/services/project';
+import { GraphEditor } from '../components/graph/grapheditor';
 
 export class SceneView extends BaseView<SceneModel> {
   private readonly _editor: Editor;
@@ -92,6 +93,7 @@ export class SceneView extends BaseView<SceneModel> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
+  private _graphEditor: GraphEditor;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
@@ -126,6 +128,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._graphEditor = null;
     this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
@@ -371,6 +374,12 @@ export class SceneView extends BaseView<SceneModel> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
+            },
+            {
+              label: 'Graph Editor',
+              id: 'SHOW_GRAPH_EDITOR',
+              action: () => (this._graphEditor = this._graphEditor ? null : new GraphEditor()),
+              checked: () => !!this._graphEditor
             }
           ]
         }
@@ -578,6 +587,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._graphEditor = null;
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
@@ -644,6 +654,9 @@ export class SceneView extends BaseView<SceneModel> {
     }
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
+    }
+    if (this._graphEditor) {
+      this._graphEditor.render();
     }
     /*
     if (ImGui.Begin('FontTest')) {
@@ -1202,7 +1215,8 @@ export class SceneView extends BaseView<SceneModel> {
   }
   private handleWorkspaceDragEnter(type: string, payload: { isDir: boolean; path: string }) {
     if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
-      this.handleAddAsset(payload.path);
+      const path = ProjectService.VFS.relative(payload.path);
+      this.handleAddAsset(path);
     }
   }
   private handleWorkspaceDragLeave() {

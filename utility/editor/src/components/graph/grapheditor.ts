@@ -1,29 +1,7 @@
-import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
+import { ImGui } from '@zephyr3d/imgui';
+import { BaseGraphNode } from './node';
 
-type GraphNodeInput = { id: number; name: string; type: string; value?: any };
-type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
-
-const SLOT_HEIGHT = 25;
-const NODE_PADDING_TOP = 30;
-const NODE_PADDING_BOTTOM = 8;
-const NODE_PADDING_LEFT = 8;
-const NODE_PADDING_RIGHT = 8;
-const NODE_SPACING = 20;
-const SLOT_MARGIN = 5;
 const SLOT_RADIUS = 6;
-
-// 节点类型定义
-interface GraphNode {
-  id: number;
-  title: string;
-  position: ImGui.ImVec2;
-  size: ImGui.ImVec2;
-  inputs: GraphNodeInput[];
-  outputs: GraphNodeOutput[];
-  selected: boolean;
-  hovered: boolean;
-  color: ImGui.ImVec4;
-}
 
 // 连接线类型定义
 interface GraphLink {
@@ -45,16 +23,15 @@ interface SlotInfo {
 }
 
 export class GraphEditor {
-  private nodes: GraphNode[] = [];
+  private nodes: Map<number, BaseGraphNode> = new Map();
   private links: GraphLink[] = [];
-  private nextNodeId = 1;
   private nextLinkId = 1;
   private selectedNodes: number[] = [];
   private draggingNode: number | null = null;
   private dragOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
   private isDraggingCanvas = false;
   private readonly canvasOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
-  private canvasScale = 1.0;
+  public canvasScale = 1.0;
   private isCreatingLink = false;
   private linkStartSlot: SlotInfo | null = null;
   private hoveredSlot: SlotInfo | null = null;
@@ -70,69 +47,50 @@ export class GraphEditor {
   private initializeDefaultNodes() {
     // 创建一些示例节点
     this.addNode(
-      'Input',
-      new ImGui.ImVec2(50, 50),
-      [],
-      [{ id: 1, name: 'Out', type: 'float' }],
-      new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
+      new BaseGraphNode(
+        this,
+        'Input',
+        new ImGui.ImVec2(50, 50),
+        [],
+        [{ id: 1, name: 'Out', type: 'float' }],
+        new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
+      )
     );
 
     this.addNode(
-      'Math',
-      new ImGui.ImVec2(250, 50),
-      [
-        { id: 1, name: 'x', type: 'float' },
-        { id: 2, name: 'xxxxxxafeidkfeikakk', type: 'float' },
-        { id: 3, name: 'Cxxxxx', type: 'float' },
-        { id: 4, name: 'D', type: 'float' },
-        { id: 5, name: 'E', type: 'float' },
-        { id: 6, name: 'F', type: 'float' }
-      ],
-      [{ id: 1, name: 'Result', type: 'float' }],
-      new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
+      new BaseGraphNode(
+        this,
+        'Math',
+        new ImGui.ImVec2(250, 50),
+        [
+          { id: 1, name: 'x', type: 'float' },
+          { id: 2, name: 'xxxxxxafeidkfeikakk', type: 'float' },
+          { id: 3, name: 'Cxxxxx', type: 'float' },
+          { id: 4, name: 'D', type: 'float' },
+          { id: 5, name: 'E', type: 'float' },
+          { id: 6, name: 'F', type: 'float' }
+        ],
+        [{ id: 1, name: 'Result', type: 'float' }],
+        new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
+      )
     );
 
     this.addNode(
-      'Output',
-      new ImGui.ImVec2(450, 50),
-      [{ id: 1, name: 'In', type: 'float' }],
-      [],
-      new ImGui.ImVec4(0.8, 0.2, 0.2, 1.0)
+      new BaseGraphNode(
+        this,
+        'Output',
+        new ImGui.ImVec2(450, 50),
+        [{ id: 1, name: 'In', type: 'float' }],
+        [],
+        new ImGui.ImVec4(0.8, 0.2, 0.2, 1.0)
+      )
     );
   }
 
-  private addNode(
-    title: string,
-    position: ImGui.ImVec2,
-    inputs: GraphNodeInput[],
-    outputs: GraphNodeOutput[],
-    color: ImGui.ImVec4
-  ) {
-    let maxInputWidth = 0;
-    let maxOutputWidth = 0;
-    for (const input of inputs) {
-      const size = imGuiCalcTextSize(input.name ?? 'M').x + 2 * (SLOT_RADIUS + SLOT_MARGIN);
-      maxInputWidth = Math.max(size, maxInputWidth);
+  private addNode(node: BaseGraphNode) {
+    if (!this.nodes.get(node.id)) {
+      this.nodes.set(node.id, node);
     }
-    for (const output of outputs) {
-      const size = imGuiCalcTextSize(output.name ?? 'M').x + 2 * (SLOT_RADIUS + SLOT_MARGIN);
-      maxOutputWidth = Math.max(size, maxOutputWidth);
-    }
-    const minWidth = maxInputWidth + maxOutputWidth + NODE_PADDING_LEFT + NODE_PADDING_TOP + NODE_SPACING;
-    const minHeight =
-      NODE_PADDING_TOP + NODE_PADDING_BOTTOM + Math.max(inputs.length, outputs.length) * SLOT_HEIGHT;
-    const node: GraphNode = {
-      id: this.nextNodeId++,
-      title,
-      position: new ImGui.ImVec2(position.x, position.y),
-      size: new ImGui.ImVec2(minWidth, minHeight),
-      inputs,
-      outputs,
-      selected: false,
-      hovered: false,
-      color
-    };
-    this.nodes.push(node);
     return node;
   }
 
@@ -141,7 +99,7 @@ export class GraphEditor {
     this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
 
     // 删除节点
-    this.nodes = this.nodes.filter((node) => node.id !== nodeId);
+    this.nodes.delete(nodeId);
 
     // 清除选择
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
@@ -173,45 +131,29 @@ export class GraphEditor {
     this.links.push(link);
   }
 
-  private worldToCanvas(worldPos: ImGui.ImVec2): ImGui.ImVec2 {
+  worldToCanvas(worldPos: ImGui.ImVec2): ImGui.ImVec2 {
     return new ImGui.ImVec2(
       (worldPos.x + this.canvasOffset.x) * this.canvasScale,
       (worldPos.y + this.canvasOffset.y) * this.canvasScale
     );
   }
 
-  private canvasToWorld(canvasPos: ImGui.ImVec2): ImGui.ImVec2 {
+  canvasToWorld(canvasPos: ImGui.ImVec2): ImGui.ImVec2 {
     return new ImGui.ImVec2(
       canvasPos.x / this.canvasScale - this.canvasOffset.x,
       canvasPos.y / this.canvasScale - this.canvasOffset.y
     );
   }
 
-  private getSlotPosition(node: GraphNode, slotId: number, isOutput: boolean): ImGui.ImVec2 {
-    const slots = isOutput ? node.outputs : node.inputs;
-    const slotIndex = slots.findIndex((slot) => slot.id === slotId);
-
-    if (slotIndex === -1) {
-      return new ImGui.ImVec2(0, 0);
-    }
-
-    const slotY = node.position.y + NODE_PADDING_TOP + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
-    const slotX = isOutput
-      ? node.position.x + node.size.x - NODE_PADDING_RIGHT - SLOT_MARGIN - SLOT_RADIUS
-      : node.position.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
-
-    return new ImGui.ImVec2(slotX, slotY);
-  }
-
   private getSlotAtPosition(pos: ImGui.ImVec2): SlotInfo | null {
     for (const node of this.nodes) {
       // 检查输入插槽
-      for (const input of node.inputs) {
-        const slotPos = this.getSlotPosition(node, input.id, false);
+      for (const input of node[1].inputs) {
+        const slotPos = node[1].getSlotPosition(input.id, false);
         const distance = Math.sqrt(Math.pow(pos.x - slotPos.x, 2) + Math.pow(pos.y - slotPos.y, 2));
         if (distance <= SLOT_RADIUS + 3) {
           return {
-            nodeId: node.id,
+            nodeId: node[1].id,
             slotId: input.id,
             position: slotPos,
             isOutput: false,
@@ -221,12 +163,12 @@ export class GraphEditor {
       }
 
       // 检查输出插槽
-      for (const output of node.outputs) {
-        const slotPos = this.getSlotPosition(node, output.id, true);
+      for (const output of node[1].outputs) {
+        const slotPos = node[1].getSlotPosition(output.id, true);
         const distance = Math.sqrt(Math.pow(pos.x - slotPos.x, 2) + Math.pow(pos.y - slotPos.y, 2));
         if (distance <= SLOT_RADIUS + 3) {
           return {
-            nodeId: node.id,
+            nodeId: node[1].id,
             slotId: output.id,
             position: slotPos,
             isOutput: true,
@@ -247,8 +189,8 @@ export class GraphEditor {
     const gridStep = this.gridSize * this.canvasScale;
 
     // 计算网格起始位置
-    const startX = Math.floor((-this.canvasOffset.x * this.canvasScale) / gridStep) * gridStep;
-    const startY = Math.floor((-this.canvasOffset.y * this.canvasScale) / gridStep) * gridStep;
+    const startX = 0; //Math.floor((-this.canvasOffset.x * this.canvasScale) / gridStep) * gridStep;
+    const startY = 0; //Math.floor((-this.canvasOffset.y * this.canvasScale) / gridStep) * gridStep;
 
     // 绘制垂直线
     for (let x = startX; x < canvasSize.x; x += gridStep) {
@@ -273,110 +215,16 @@ export class GraphEditor {
     }
   }
 
-  private drawNode(drawList: ImGui.DrawList, node: GraphNode, canvasPos: ImGui.ImVec2) {
-    const nodeScreenPos = this.worldToCanvas(node.position);
-    const nodePos = new ImGui.ImVec2(canvasPos.x + nodeScreenPos.x, canvasPos.y + nodeScreenPos.y);
-
-    const nodeSize = new ImGui.ImVec2(node.size.x * this.canvasScale, node.size.y * this.canvasScale);
-
-    // 节点背景
-    const nodeColor = ImGui.ColorConvertFloat4ToU32(
-      new ImGui.ImVec4(node.color.x * 0.7, node.color.y * 0.7, node.color.z * 0.7, 1.0)
-    );
-
-    drawList.AddRectFilled(
-      nodePos,
-      new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y),
-      nodeColor,
-      4.0
-    );
-
-    // 节点边框
-    const borderColor = node.selected
-      ? ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0))
-      : ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
-
-    drawList.AddRect(
-      nodePos,
-      new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y),
-      borderColor,
-      4.0,
-      0,
-      node.selected ? 2.0 : 1.0
-    );
-
-    // 节点标题
-    const titlePos = new ImGui.ImVec2(nodePos.x + 8, nodePos.y + 4);
-    drawList.AddText(
-      titlePos,
-      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0)),
-      node.title
-    );
-
-    // 绘制输入插槽
-    for (let i = 0; i < node.inputs.length; i++) {
-      const input = node.inputs[i];
-      const slotPos = this.getSlotPosition(node, input.id, false);
-      const slotScreenPos = this.worldToCanvas(slotPos);
-      const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
-
-      // 插槽圆圈
-      drawList.AddCircleFilled(
-        slotDrawPos,
-        SLOT_RADIUS * this.canvasScale,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0))
-      );
-
-      // 插槽标签
-      const labelPos = new ImGui.ImVec2(
-        slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS,
-        slotDrawPos.y - SLOT_RADIUS
-      );
-      drawList.AddText(
-        labelPos,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)),
-        input.name
-      );
-    }
-
-    // 绘制输出插槽
-    for (let i = 0; i < node.outputs.length; i++) {
-      const output = node.outputs[i];
-      const slotPos = this.getSlotPosition(node, output.id, true);
-      const slotScreenPos = this.worldToCanvas(slotPos);
-      const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
-
-      // 插槽圆圈
-      drawList.AddCircleFilled(
-        slotDrawPos,
-        SLOT_RADIUS * this.canvasScale,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0))
-      );
-
-      // 插槽标签
-      const textSize = imGuiCalcTextSize(output.name);
-      const labelPos = new ImGui.ImVec2(
-        slotDrawPos.x - textSize.x - SLOT_RADIUS - SLOT_MARGIN,
-        slotDrawPos.y - SLOT_RADIUS
-      );
-      drawList.AddText(
-        labelPos,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)),
-        output.name
-      );
-    }
-  }
-
   private drawLink(drawList: ImGui.DrawList, link: GraphLink, canvasPos: ImGui.ImVec2) {
-    const startNode = this.nodes.find((n) => n.id === link.startNodeId);
-    const endNode = this.nodes.find((n) => n.id === link.endNodeId);
+    const startNode = this.nodes.get(link.startNodeId);
+    const endNode = this.nodes.get(link.endNodeId);
 
     if (!startNode || !endNode) {
       return;
     }
 
-    const startPos = this.getSlotPosition(startNode, link.startSlotId, true);
-    const endPos = this.getSlotPosition(endNode, link.endSlotId, false);
+    const startPos = startNode.getSlotPosition(link.startSlotId, true);
+    const endPos = endNode.getSlotPosition(link.endSlotId, false);
 
     const startScreenPos = this.worldToCanvas(startPos);
     const endScreenPos = this.worldToCanvas(endPos);
@@ -452,15 +300,15 @@ export class GraphEditor {
         }
       } else {
         // 检查是否点击了节点
-        let clickedNode: GraphNode | null = null;
+        let clickedNode: BaseGraphNode | null = null;
         for (const node of this.nodes) {
           if (
-            worldMousePos.x >= node.position.x &&
-            worldMousePos.x <= node.position.x + node.size.x &&
-            worldMousePos.y >= node.position.y &&
-            worldMousePos.y <= node.position.y + node.size.y
+            worldMousePos.x >= node[1].position.x &&
+            worldMousePos.x <= node[1].position.x + node[1].size.x &&
+            worldMousePos.y >= node[1].position.y &&
+            worldMousePos.y <= node[1].position.y + node[1].size.y
           ) {
-            clickedNode = node;
+            clickedNode = node[1];
             break;
           }
         }
@@ -493,15 +341,15 @@ export class GraphEditor {
 
     // 右键点击
     if (ImGui.IsMouseClicked(1)) {
-      let rightClickedNode: GraphNode | null = null;
+      let rightClickedNode: BaseGraphNode | null = null;
       for (const node of this.nodes) {
         if (
-          worldMousePos.x >= node.position.x &&
-          worldMousePos.x <= node.position.x + node.size.x &&
-          worldMousePos.y >= node.position.y &&
-          worldMousePos.y <= node.position.y + node.size.y
+          worldMousePos.x >= node[1].position.x &&
+          worldMousePos.x <= node[1].position.x + node[1].size.x &&
+          worldMousePos.y >= node[1].position.y &&
+          worldMousePos.y <= node[1].position.y + node[1].size.y
         ) {
-          rightClickedNode = node;
+          rightClickedNode = node[1];
           break;
         }
       }
@@ -514,7 +362,7 @@ export class GraphEditor {
 
     // 拖拽处理
     if (this.draggingNode !== null && ImGui.IsMouseDown(0)) {
-      const node = this.nodes.find((n) => n.id === this.draggingNode);
+      const node = this.nodes.get(this.draggingNode);
       if (node) {
         node.position.x = worldMousePos.x - this.dragOffset.x;
         node.position.y = worldMousePos.y - this.dragOffset.y;
@@ -548,18 +396,6 @@ export class GraphEditor {
             this.deleteNode(this.contextMenuNode);
             this.contextMenuNode = null;
           }
-          if (ImGui.MenuItem('Duplicate Node')) {
-            const originalNode = this.nodes.find((n) => n.id === this.contextMenuNode);
-            if (originalNode) {
-              this.addNode(
-                originalNode.title,
-                new ImGui.ImVec2(originalNode.position.x + 20, originalNode.position.y + 20),
-                [...originalNode.inputs],
-                [...originalNode.outputs],
-                originalNode.color
-              );
-            }
-          }
         }
         ImGui.EndPopup();
       } else {
@@ -577,29 +413,35 @@ export class GraphEditor {
       // 工具栏
       if (ImGui.Button('Add Input Node')) {
         this.addNode(
-          'Input',
-          new ImGui.ImVec2(100, 100),
-          [],
-          [{ id: 1, name: 'Out', type: 'float' }],
-          new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
+          new BaseGraphNode(
+            this,
+            'Input',
+            new ImGui.ImVec2(100, 100),
+            [],
+            [{ id: 1, name: 'Out', type: 'float' }],
+            new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
+          )
         );
       }
       ImGui.SameLine();
       if (ImGui.Button('Add Math Node')) {
         this.addNode(
-          'Math',
-          new ImGui.ImVec2(100, 100),
-          [
-            { id: 1, name: 'A', type: 'float' },
-            { id: 2, name: 'B', type: 'float' }
-          ],
-          [{ id: 1, name: 'Result', type: 'float' }],
-          new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
+          new BaseGraphNode(
+            this,
+            'Math',
+            new ImGui.ImVec2(100, 100),
+            [
+              { id: 1, name: 'A', type: 'float' },
+              { id: 2, name: 'B', type: 'float' }
+            ],
+            [{ id: 1, name: 'Result', type: 'float' }],
+            new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
+          )
         );
       }
       ImGui.SameLine();
       if (ImGui.Button('Clear All')) {
-        this.nodes = [];
+        this.nodes.clear();
         this.links = [];
         this.selectedNodes = [];
       }
@@ -635,11 +477,8 @@ export class GraphEditor {
       // 绘制正在创建的连接线
       if (this.isCreatingLink && this.linkStartSlot) {
         const mousePos = ImGui.GetMousePos();
-        const startPos = this.getSlotPosition(
-          this.nodes.find((n) => n.id === this.linkStartSlot!.nodeId)!,
-          this.linkStartSlot.slotId,
-          this.linkStartSlot.isOutput
-        );
+        const node = this.nodes.get(this.linkStartSlot!.nodeId)!;
+        const startPos = node.getSlotPosition(this.linkStartSlot.slotId, this.linkStartSlot.isOutput);
         const startScreenPos = this.worldToCanvas(startPos);
         const startDrawPos = new ImGui.ImVec2(canvasPos.x + startScreenPos.x, canvasPos.y + startScreenPos.y);
 
@@ -658,7 +497,7 @@ export class GraphEditor {
 
       // 绘制节点
       for (const node of this.nodes) {
-        this.drawNode(drawList, node, canvasPos);
+        node[1].draw(drawList, canvasPos);
       }
 
       // 处理输入

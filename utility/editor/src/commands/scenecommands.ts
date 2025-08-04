@@ -6,7 +6,7 @@ import type {
   ShapeOptionType,
   ShapeType
 } from '@zephyr3d/scene';
-import { deserializeObject, NodeHierarchy, serializeObject } from '@zephyr3d/scene';
+import { NodeHierarchy } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
   BoxFrameShape,
@@ -231,7 +231,7 @@ export class NodeDeleteCommand extends Command {
     const node = idNodeMap[this._nodeId];
     if (node) {
       const nodeHierarchy = new NodeHierarchy(node.scene, node);
-      this._archive = await serializeObject(nodeHierarchy, ProjectService.serializationManager, null, null); // await serializeObject(node, this._assetRegistry);
+      this._archive = await ProjectService.serializationManager.serializeObject(nodeHierarchy, null, null);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.persistentId];
@@ -243,13 +243,11 @@ export class NodeDeleteCommand extends Command {
     if (this._archive) {
       const parent = idNodeMap[this._parentId];
       if (parent) {
-        const nodeHierarchy = await deserializeObject<NodeHierarchy>(
+        const nodeHierarchy = await ProjectService.serializationManager.deserializeObject<NodeHierarchy>(
           this._scene,
-          this._archive,
-          ProjectService.serializationManager
+          this._archive
         );
         const node = nodeHierarchy.rootNode;
-        //const node = (await deserializeObject(this._scene, this._archive, this._assetRegistry)) as SceneNode;
         if (node) {
           node.iterate((child) => {
             idNodeMap[child.persistentId] = child;

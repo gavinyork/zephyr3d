@@ -1,5 +1,6 @@
-import { Application } from '@zephyr3d/scene';
+import { Application, FPSCameraController, PerspectiveCamera, SerializationManager } from '@zephyr3d/scene';
 import * as common from '../common';
+import { HttpFS } from '@zephyr3d/base';
 
 const myApp = new Application({
   backend: common.getBackend(),
@@ -7,20 +8,16 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async function () {
-  /*
-  const manager = new SerializationManager(new AssetRegistry('assets/scenes/test1'));
-  await manager.assetRegistry.loadFromURL('assets/scenes/test1/assets/index.json');
-  const { scene, meta } = await deserializeSceneFromURL('assets/scenes/test1/scene.json', manager);
-  const cameraId: string = meta.activeCamera;
-  const camera = scene.findNodeById<PerspectiveCamera>(cameraId) ?? new PerspectiveCamera(scene);
-  camera.controller = new OrbitCameraController();
+  const vfs = new HttpFS('http://localhost:8001/dist/assets');
+  const manager = new SerializationManager(vfs);
+  const scene = await manager.loadScene('/scenes/test.zscn');
+  const camera = new PerspectiveCamera(scene);
+  camera.controller = new FPSCameraController();
   myApp.inputManager.use(camera.handleEvent.bind(camera));
-
   myApp.on('tick', function () {
     camera.updateController();
     camera.aspect = myApp.device.getDrawingBufferWidth() / myApp.device.getDrawingBufferHeight();
     camera.render(scene);
   });
-  */
   myApp.run();
 });
