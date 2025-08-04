@@ -20,7 +20,7 @@ export class HttpFS extends VFS {
   private readonly options: HttpFSOptions;
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
-    super(true); // 只读
+    super(true); // Readonly
     baseURL = baseURL || new URL(window.location.href).origin;
     if (!URL.canParse(baseURL)) {
       throw new Error(`Invalid base URL while contructing HttpFS: ${baseURL}`);
@@ -32,7 +32,7 @@ export class HttpFS extends VFS {
     }
     this.baseOrigin = url.origin;
     this.options = {
-      timeout: 30000, // 默认30秒超时
+      timeout: 30000,
       ...options
     };
   }
@@ -82,9 +82,8 @@ export class HttpFS extends VFS {
         }
       }
 
-      // 处理范围读取（如果支持的话）
       if (options?.offset !== undefined || options?.length !== undefined) {
-        // HTTP Range 请求的实现可以后续添加
+        // TODO: HTTP Range request
       }
 
       let data: ArrayBuffer | string;
@@ -122,7 +121,6 @@ export class HttpFS extends VFS {
   protected async _exists(path: string): Promise<boolean> {
     const normalizedPath = this.normalizePath(path);
 
-    // Try HEAD request
     try {
       const response = await this.fetchWithTimeout(normalizedPath, { method: 'HEAD' });
       return response.ok;
@@ -154,9 +152,9 @@ export class HttpFS extends VFS {
         size,
         isFile: !isDirectory,
         isDirectory,
-        created: modifiedDate, // HTTP 通常没有创建时间
+        created: modifiedDate,
         modified: modifiedDate,
-        accessed: modifiedDate // HTTP 通常没有访问时间
+        accessed: modifiedDate
       };
     } catch (error) {
       if (error instanceof VFSError) {
@@ -165,14 +163,12 @@ export class HttpFS extends VFS {
       throw new VFSError(`Failed to stat file: ${error}`, 'EIO', path);
     }
   }
-  /** 不支持删除 */
   protected async _deleteFileSystem(): Promise<void> {
     return;
   }
   protected async _deleteDatabase(): Promise<void> {
     return;
   }
-
   protected async _move(): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }

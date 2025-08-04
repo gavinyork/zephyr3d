@@ -8,12 +8,15 @@ import { VFS, VFSError } from './vfs';
  * @public
  */
 export class MemoryFS extends VFS {
-  private readonly files: Map<string, ArrayBuffer | string> = new Map();
-  private readonly directories: Set<string> = new Set(['/']);
-  private readonly metadata: Map<string, FileMetadata> = new Map();
+  private readonly files: Map<string, ArrayBuffer | string>;
+  private readonly directories: Set<string>;
+  private readonly metadata: Map<string, FileMetadata>;
 
   constructor(readonly = false) {
     super(readonly);
+    this.files = new Map();
+    this.directories = new Set(['/']);
+    this.metadata = new Map();
     const now = new Date();
     this.metadata.set('/', {
       created: now,
@@ -58,7 +61,6 @@ export class MemoryFS extends VFS {
     const results: FileMetadata[] = [];
     const pathPrefix = path === '/' ? '/' : path + '/';
 
-    // 列出目录
     for (const dir of this.directories) {
       if (dir !== path && dir.startsWith(pathPrefix)) {
         const relativePath = dir.slice(pathPrefix.length);
@@ -73,7 +75,6 @@ export class MemoryFS extends VFS {
       }
     }
 
-    // 列出文件
     for (const [filePath] of this.files) {
       if (filePath.startsWith(pathPrefix)) {
         const relativePath = filePath.slice(pathPrefix.length);
@@ -102,10 +103,8 @@ export class MemoryFS extends VFS {
     }
 
     if (recursive) {
-      // 删除所有子项
       const pathPrefix = path + '/';
 
-      // 删除子文件
       for (const [filePath] of this.files) {
         if (filePath.startsWith(pathPrefix)) {
           this.files.delete(filePath);
@@ -113,7 +112,6 @@ export class MemoryFS extends VFS {
         }
       }
 
-      // 删除子目录
       for (const dir of this.directories) {
         if (dir.startsWith(pathPrefix)) {
           this.directories.delete(dir);
@@ -134,32 +132,26 @@ export class MemoryFS extends VFS {
     let data = this.files.get(path)!;
     const requestedEncoding = options?.encoding;
 
-    // 根据请求的编码格式进行转换
+    // Encoding conversions
     if (requestedEncoding === 'utf8') {
-      // 请求 UTF-8 字符串
       if (data instanceof ArrayBuffer) {
         data = new TextDecoder().decode(data);
       }
-      // 如果已经是 string，直接使用
     } else if (requestedEncoding === 'base64') {
-      // 请求 Base64 字符串
       if (data instanceof ArrayBuffer) {
         const bytes = new Uint8Array(data);
         data = btoa(String.fromCodePoint(...bytes));
       } else if (typeof data === 'string') {
-        // 字符串先转为 ArrayBuffer，再转 Base64
         const bytes = new TextEncoder().encode(data);
         data = btoa(String.fromCodePoint(...bytes));
       }
     } else if (requestedEncoding === 'binary' || !requestedEncoding) {
-      // 请求 ArrayBuffer（binary 或默认）
       if (typeof data === 'string') {
         data = new TextEncoder().encode(data).buffer;
       }
-      // 如果已经是 ArrayBuffer，直接使用
     }
 
-    // 处理范围读取
+    // Range read
     if (options?.offset !== undefined || options?.length !== undefined) {
       const offset = options.offset || 0;
       const length = options.length;
@@ -193,7 +185,6 @@ export class MemoryFS extends VFS {
 
     let fileData: ArrayBuffer | string = data;
 
-    // 处理编码选项
     if (options?.encoding === 'base64' && typeof data === 'string') {
       try {
         const binaryString = atob(data);
@@ -206,32 +197,26 @@ export class MemoryFS extends VFS {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
       }
     } else if (options?.encoding === 'utf8') {
-      // 确保以字符串形式存储UTF-8数据
       if (data instanceof ArrayBuffer) {
         fileData = new TextDecoder().decode(data);
       }
     } else if (options?.encoding === 'binary' || !options?.encoding) {
-      // 默认以二进制（ArrayBuffer）形式存储
       if (typeof data === 'string') {
         fileData = new TextEncoder().encode(data).buffer;
       }
     }
 
-    // 处理追加模式
     if (options?.append && this.files.has(path)) {
       const existingData = this.files.get(path)!;
 
       if (typeof existingData === 'string' && typeof fileData === 'string') {
-        // 字符串 + 字符串
         fileData = existingData + fileData;
       } else if (existingData instanceof ArrayBuffer && fileData instanceof ArrayBuffer) {
-        // ArrayBuffer + ArrayBuffer
         const combined = new Uint8Array(existingData.byteLength + fileData.byteLength);
         combined.set(new Uint8Array(existingData), 0);
         combined.set(new Uint8Array(fileData), existingData.byteLength);
         fileData = combined.buffer;
       } else {
-        // 混合类型：转换为字符串处理
         const existingStr =
           typeof existingData === 'string' ? existingData : new TextDecoder().decode(existingData);
         const newStr = typeof fileData === 'string' ? fileData : new TextDecoder().decode(fileData);
@@ -283,31 +268,22 @@ export class MemoryFS extends VFS {
       modified: metadata.modified
     };
   }
-  /**
-   * 不支持删除
-   */
   protected async _deleteFileSystem(): Promise<void> {
     return;
   }
-  /**
-   * 不支持删除
-   */
   protected async _deleteDatabase(): Promise<void> {
     return;
   }
   protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
-    // 检查源路径是否存在
     if (!this.files.has(sourcePath) && !this.directories.has(sourcePath)) {
       throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);
     }
 
-    // 检查目标是否已存在
     const targetExists = this.files.has(targetPath) || this.directories.has(targetPath);
     if (targetExists && !options?.overwrite) {
       throw new VFSError('Target already exists', 'EEXIST', targetPath);
     }
 
-    // 确保目标父目录存在
     const targetParent = PathUtils.dirname(targetPath);
     if (!this.directories.has(targetParent)) {
       throw new VFSError('Target parent directory does not exist', 'ENOENT', targetParent);
@@ -316,18 +292,15 @@ export class MemoryFS extends VFS {
     const now = new Date();
 
     if (this.files.has(sourcePath)) {
-      // 移动文件
       const fileData = this.files.get(sourcePath)!;
       const sourceMetadata = this.metadata.get(sourcePath)!;
 
-      // 如果目标存在且允许覆盖，先删除目标
       if (targetExists && options?.overwrite) {
         this.files.delete(targetPath);
         this.directories.delete(targetPath);
         this.metadata.delete(targetPath);
       }
 
-      // 移动文件数据和元数据
       this.files.set(targetPath, fileData);
       this.metadata.set(targetPath, {
         ...sourceMetadata,
@@ -336,14 +309,11 @@ export class MemoryFS extends VFS {
         modified: now
       });
 
-      // 删除源文件
       this.files.delete(sourcePath);
       this.metadata.delete(sourcePath);
     } else if (this.directories.has(sourcePath)) {
-      // 移动目录
       const sourceMetadata = this.metadata.get(sourcePath)!;
 
-      // 如果目标存在且允许覆盖，先删除目标（递归删除）
       if (targetExists && options?.overwrite) {
         if (this.directories.has(targetPath)) {
           await this._deleteDirectory(targetPath, true);
@@ -353,30 +323,25 @@ export class MemoryFS extends VFS {
         }
       }
 
-      // 获取所有需要移动的子项（文件和目录）
       const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
       const targetPrefix = targetPath === '/' ? '/' : targetPath + '/';
 
-      // 收集所有需要移动的路径
       const filesToMove: string[] = [];
       const dirsToMove: string[] = [];
 
-      // 收集子文件
       for (const [filePath] of this.files) {
         if (filePath.startsWith(sourcePrefix)) {
           filesToMove.push(filePath);
         }
       }
 
-      // 收集子目录（排序确保父目录在子目录之前处理）
       for (const dirPath of this.directories) {
         if (dirPath !== sourcePath && dirPath.startsWith(sourcePrefix)) {
           dirsToMove.push(dirPath);
         }
       }
-      dirsToMove.sort(); // 确保父目录在前
+      dirsToMove.sort();
 
-      // 移动所有子文件
       for (const oldFilePath of filesToMove) {
         const newFilePath = oldFilePath.replace(sourcePrefix, targetPrefix);
         const fileData = this.files.get(oldFilePath)!;
@@ -394,7 +359,6 @@ export class MemoryFS extends VFS {
         this.metadata.delete(oldFilePath);
       }
 
-      // 移动所有子目录
       for (const oldDirPath of dirsToMove) {
         const newDirPath = oldDirPath.replace(sourcePrefix, targetPrefix);
         const dirMetadata = this.metadata.get(oldDirPath)!;
@@ -411,7 +375,6 @@ export class MemoryFS extends VFS {
         this.metadata.delete(oldDirPath);
       }
 
-      // 最后移动源目录本身
       this.directories.add(targetPath);
       this.metadata.set(targetPath, {
         ...sourceMetadata,

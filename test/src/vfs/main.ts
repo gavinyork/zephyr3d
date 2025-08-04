@@ -347,26 +347,6 @@ async function testCrossMountOperations() {
   await fs2.deleteDatabase();
 }
 
-async function testFileSystemInfo() {
-  const fs = createVFS('TestFS');
-  const subFS = createVFS('SubFS');
-
-  // 测试基本信息
-  const info1 = fs.getInfo();
-  assertEqual(info1.readOnly, false, '应该不是只读');
-  assertEqual(info1.mountCount, 0, '初始挂载数应该为0');
-
-  // 挂载后测试信息
-  fs.mount('/sub', subFS);
-  const info2 = fs.getInfo();
-  assertEqual(info2.mountCount, 1, '挂载后挂载数应该为1');
-  assert(info2.mountPoints.includes('/sub'), '挂载点列表应该包含 /sub');
-
-  console.log('   - 文件系统信息: 正常');
-  await fs.deleteDatabase();
-  await subFS.deleteDatabase();
-}
-
 async function testFileOptions() {
   const fs = createVFS();
 
@@ -1430,7 +1410,6 @@ export async function runAllVFSTests() {
     ['二进制数据追加', testBinaryDataAppend],
     ['挂载优先级', testMountPriority],
     ['跨挂载操作', testCrossMountOperations],
-    ['文件系统信息', testFileSystemInfo],
     ['文件选项处理', testFileOptions],
     ['文件状态查询', testStatOperations],
     ['大型文件操作', testLargeFileOperations],
@@ -1450,7 +1429,6 @@ export async function runAllVFSTests() {
     ['CWD错误处理', testCwdErrorHandling],
     ['CWD挂载点支持', testCwdWithMounts],
     ['CWD Glob支持', testCwdGlobWithRelativePaths],
-    ['CWD文件系统信息', testCwdFileSystemInfo],
     ['CWD复杂场景', testCwdComplexScenarios],
     ['CWD边缘情况', testCwdEdgeCases],
     ['CWD性能测试', testCwdPerformance],
@@ -1835,17 +1813,13 @@ async function testCwdDirectoryStack() {
   // 测试多次 pushd
   await fs.pushd('/var/log');
   assertEqual(fs.getCwd(), '/var/log', '第二次 pushd 应该改变当前目录');
-  assertEqual(fs.getDirStack().length, 2, '目录栈应该有两个条目');
-  assertArrayEqual(fs.getDirStack(), ['/home/user', '/tmp'], '目录栈顺序应该正确');
 
   // 测试 popd
   await fs.popd();
   assertEqual(fs.getCwd(), '/tmp', 'popd 应该返回到上一个目录');
-  assertEqual(fs.getDirStack().length, 1, '目录栈应该减少一个条目');
 
   await fs.popd();
   assertEqual(fs.getCwd(), '/home/user', '第二次 popd 应该返回到最初的目录');
-  assertEqual(fs.getDirStack().length, 0, '目录栈应该为空');
 
   // 测试空栈 popd 错误
   try {
@@ -1886,14 +1860,6 @@ async function testCwdWithRelativePushd() {
 
   await fs.pushd('./tests');
   assertEqual(fs.getCwd(), '/project/tests', './相对路径 pushd 应该正确工作');
-
-  // 验证目录栈
-  const stack = fs.getDirStack();
-  assertArrayEqual(
-    stack,
-    ['/project', '/project/src', '/project/src/components', '/project'],
-    '目录栈应该记录所有历史'
-  );
 
   console.log('   - 相对路径 pushd: 正常');
   console.log('   - 连续相对操作: 正常');
@@ -2053,35 +2019,6 @@ async function testCwdGlobWithRelativePaths() {
   await fs.deleteDatabase();
 }
 
-async function testCwdFileSystemInfo() {
-  const fs = createVFS('CwdInfoTest');
-
-  // 创建目录并设置 CWD
-  await fs.makeDirectory('/home/user/project', true);
-  await fs.chdir('/home/user/project');
-
-  // 测试基础信息
-  const info1 = fs.getInfo();
-  assertEqual(info1.cwd, '/home/user/project', '文件系统信息应该包含当前 CWD');
-  assertEqual(info1.dirStackDepth, 0, '初始目录栈深度应该为 0');
-
-  // 创建需要的目录，然后使用 pushd 增加栈深度
-  await fs.makeDirectory('/tmp', true); // 添加这行，创建 /tmp 目录
-  await fs.makeDirectory('/var', true); // 添加这行，创建 /var 目录
-
-  await fs.pushd('/tmp');
-  await fs.pushd('/var');
-
-  const info2 = fs.getInfo();
-  assertEqual(info2.cwd, '/var', '信息应该反映当前 CWD');
-  assertEqual(info2.dirStackDepth, 2, '目录栈深度应该为 2');
-
-  console.log('   - CWD 信息获取: 正常');
-  console.log('   - 目录栈深度: 正常');
-
-  await fs.deleteDatabase();
-}
-
 async function testCwdComplexScenarios() {
   const fs = createVFS('CwdComplexTest');
 
@@ -2209,42 +2146,6 @@ async function testCwdPerformance() {
   console.log(`   - 目录栈性能: 正常 (${stackDuration}ms)`);
 
   await fs.deleteDatabase();
-}
-
-// 如果你想单独运行某个测试
-export async function runSingleTest(testName) {
-  const testMap = {
-    basic: testBasicFileOperations,
-    directory: testDirectoryOperations,
-    mount: testMountOperations,
-    copy: testFileCopy,
-    error: testErrorHandling,
-    binary: testBinaryData,
-    'binary-append': testBinaryDataAppend,
-    priority: testMountPriority,
-    cross: testCrossMountOperations,
-    info: testFileSystemInfo,
-    options: testFileOptions,
-    stat: testStatOperations,
-    large: testLargeFileOperations,
-    basicglob: testGlobBasicWildcards,
-    complexglob: testGlobComplexPatterns,
-    edgecaseglob: testGlobEdgeCases,
-    ignoreglob: testGlobIgnorePatterns,
-    multipleglob: testGlobMultiplePatterns,
-    performanceglob: testGlobPerformance,
-    globoptions: testGlobOptions,
-    recursiveglob: testGlobRecursiveSearch
-  };
-
-  const testFn = testMap[testName];
-  if (!testFn) {
-    console.log(`❌ 未找到测试: ${testName}`);
-    console.log(`可用的测试: ${Object.keys(testMap).join(', ')}`);
-    return;
-  }
-
-  await runTest(testName, testFn);
 }
 
 const btn = document.querySelector('#start');

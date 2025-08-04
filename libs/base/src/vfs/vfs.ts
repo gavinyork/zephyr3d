@@ -153,20 +153,20 @@ export class GlobMatcher {
   }
 
   /**
-   * 测试路径是否匹配模式
+   * Test if a path is a match pattern
    */
   test(path: string): boolean {
     return this.regex.test(path);
   }
 
   /**
-   * 获取原始模式
+   * Get original match pattern
    */
   getPattern(): string {
     return this.pattern;
   }
   /**
-   * 将通配符模式编译为正则表达式
+   * Compile the match pattern to RegExp
    */
   private compilePattern(str: string, caseSensitive: boolean): RegExp {
     // The regexp we are building, as a string.
@@ -310,13 +310,13 @@ export abstract class VFS extends makeEventTarget(Object)<{
   /** Whether this file system is read-only */
   readonly readOnly: boolean;
 
-  // CWD 支持
+  // CWD support
   private _cwd: string = '/';
-  private readonly _dirStack: string[] = [];
+  private readonly _dirStack: string[];
 
-  // 简单挂载支持（向后兼容）
-  private readonly simpleMounts: Map<string, VFS> = new Map();
-  private sortedMountPaths: string[] = [];
+  // Simple mounting support
+  private readonly simpleMounts: Map<string, VFS>;
+  private sortedMountPaths: string[];
 
   /**
    * Creates a new VFS instance.
@@ -326,6 +326,10 @@ export abstract class VFS extends makeEventTarget(Object)<{
   constructor(readOnly: boolean = false) {
     super();
     this.readOnly = readOnly;
+    this._dirStack = [];
+    this.simpleMounts = new Map();
+    this._cwd = '/';
+    this.sortedMountPaths = [];
   }
 
   /**
@@ -406,12 +410,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
   async chdir(path: string): Promise<void> {
     const normalizedPath = this.normalizePath(path);
 
-    // 检查目录是否存在
+    // Test directory existence
     if (!(await this.exists(normalizedPath))) {
       throw new VFSError(`Directory does not exist: ${normalizedPath}`, 'ENOENT', normalizedPath);
     }
 
-    // 检查是否为目录
+    // Test wether it is a directory
     const stat = await this.stat(normalizedPath);
     if (!stat.isDirectory) {
       throw new VFSError(`Not a directory: ${normalizedPath}`, 'ENOTDIR', normalizedPath);
@@ -458,21 +462,6 @@ export abstract class VFS extends makeEventTarget(Object)<{
   }
 
   /**
-   * Gets the current directory stack.
-   *
-   * @returns Array of directory paths in the stack
-   *
-   * @example
-   * ```typescript
-   * const stack = fs.getDirStack();
-   * console.log(`Stack depth: ${stack.length}`);
-   * ```
-   */
-  getDirStack(): string[] {
-    return [...this._dirStack]; // 返回副本
-  }
-
-  /**
    * Normalizes a path, resolving . and .. components and making it absolute.
    * Supports both absolute and relative paths.
    *
@@ -494,17 +483,17 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return this._cwd;
     }
 
-    // 如果是绝对路径，直接使用 PathUtils.normalize
+    // Use PathUtils.normalize if it is an absolute path
     if (path.startsWith('/')) {
       return PathUtils.normalize(path);
     }
 
     if (this.isObjectURL(path) || this.parseDataURI(path)) {
-      // 是ObjectURL或dataURL，不执行规范化
+      // Do not normalize if it is ObjectURL or dataURL
       return path;
     }
 
-    // 相对路径：先与 CWD 合并，然后规范化
+    // Relative path: merged with CWD and then do normalization
     const absolutePath = PathUtils.join(this._cwd, path);
     return PathUtils.normalize(absolutePath);
   }
@@ -527,12 +516,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return this._cwd;
     }
 
-    // 如果第一个路径是绝对路径，直接使用 PathUtils.join
+    // Use PathUtils.join if the first path is an absolute path
     if (paths[0].startsWith('/')) {
       return PathUtils.normalize(PathUtils.join(...paths));
     }
 
-    // 如果是相对路径，先与 CWD 合并，然后 join 剩余路径
+    // Relative path, merged with CWD first, and join with rest
     const allPaths = [this._cwd, ...paths];
     return PathUtils.normalize(PathUtils.join(...allPaths));
   }
@@ -568,7 +557,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
    */
   relative(path: string, parent?: string): string {
     if (this.isObjectURL(path) || this.parseDataURI(path)) {
-      // ObjectURL和DataURL不支持相对路径
+      // No relative support for ObjectURL and DataURL
       return path;
     }
     const absolutePath = this.normalizePath(path);
@@ -616,15 +605,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const normalizedSource = this.normalizePath(sourcePath);
     const normalizedTarget = this.normalizePath(targetPath);
 
-    // 1. 检查根目录限制
-    this._validateMoveRootRestrictions(normalizedSource, normalizedTarget);
+    // Test for root directory restrictions
+    this._validateRootRestrictions(normalizedSource, normalizedTarget);
 
-    // 2. 检查是否跨 VFS
+    // 2. Test for crossing VFS boundary
     const sourceMount = this.getMountedVFS(normalizedSource);
     const targetMount = this.getMountedVFS(normalizedTarget);
 
     if (sourceMount || targetMount) {
-      // 如果涉及挂载点，检查是否为同一个VFS
       const sourceVFS = sourceMount ? sourceMount.vfs : this;
       const targetVFS = targetMount ? targetMount.vfs : this;
 
@@ -632,16 +620,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
         throw new VFSError('Cross-VFS move is not supported', 'EXDEV', normalizedSource);
       }
 
-      // 如果都在同一个挂载的VFS中，委托给该VFS处理
       if (sourceMount && targetMount && sourceMount.vfs === targetMount.vfs) {
         return sourceMount.vfs.move(sourceMount.relativePath, targetMount.relativePath, options);
       }
     }
 
-    // 3. 检查源和目标类型匹配
-    await this._validateMoveTypeCompatibility(normalizedSource, normalizedTarget, options);
+    // Check for type compatibility
+    await this._validateTypeCompatibility(normalizedSource, normalizedTarget, options);
 
-    // 4. 如果文件系统是只读的，抛出错误
     if (this.readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedSource);
     }
@@ -649,13 +635,17 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const sourceStat = await this.stat(normalizedSource);
     const itemType = sourceStat.isDirectory ? 'directory' : 'file';
 
-    // 5. 执行移动操作
+    // Do moving operation
     await this._move(normalizedSource, normalizedTarget, options);
 
     this.onChange('moved', normalizedTarget, itemType);
   }
 
-  // 修改所有公共方法以使用新的路径规范化
+  /**
+   * Makes new directory
+   * @param path - Directory path
+   * @param recursive - If true, create parent directory if not exists
+   */
   async makeDirectory(path: string, recursive?: boolean): Promise<void> {
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
@@ -696,6 +686,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
     this.onChange('deleted', normalizedPath, 'directory');
   }
 
+  /**
+   * Read from a VFS file
+   * @param path - File path to read
+   * @param options - Read options
+   * @returns The file contents
+   */
   async readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
     // Special case for Object URL and Data URL
     if (this.isObjectURL(path) || this.parseDataURI(path)) {
@@ -728,6 +724,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return this._readFile(normalizedPath, options);
   }
 
+  /**
+   * Write to a VFS file
+   * @param path - File path to write
+   * @param data - Data to be written
+   * @param options - Write options
+   */
   async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void> {
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
@@ -744,6 +746,10 @@ export abstract class VFS extends makeEventTarget(Object)<{
     this.onChange(existed ? 'modified' : 'created', normalizedPath, 'file');
   }
 
+  /**
+   * Deletes a VFS file
+   * @param path - File path to delete
+   */
   async deleteFile(path: string): Promise<void> {
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
@@ -759,6 +765,11 @@ export abstract class VFS extends makeEventTarget(Object)<{
     this.onChange('deleted', normalizedPath, 'file');
   }
 
+  /**
+   * Test whether a VFS file or directory exists for given path
+   * @param path - Path to test
+   * @returns true if exists
+   */
   async exists(path: string): Promise<boolean> {
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
@@ -769,6 +780,11 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return this._exists(normalizedPath);
   }
 
+  /**
+   * Gets the statistics about a given path
+   * @param path - path
+   * @returns Statistics about the path
+   */
   async stat(path: string): Promise<FileStat> {
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
@@ -779,6 +795,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return this._stat(normalizedPath);
   }
 
+  /**
+   * Copies a VFS file
+   * @param src - Source file path
+   * @param dest - Destination file path
+   * @param options - Copy options
+   */
   async copyFile(
     src: string,
     dest: string,
@@ -921,6 +943,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
     }
   }
 
+  /**
+   * Query file list by matching pattern(s)
+   * @param pattern - Matching pattern(s)
+   * @param options - Matching options
+   * @returns Informations of matching files
+   */
   async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
     const {
       recursive = true,
@@ -952,7 +980,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
 
       try {
         const entries = await this._readDirectory(dirPath, {
-          includeHidden: true // 内部总是包含隐藏文件，后面再过滤
+          includeHidden: true
         });
 
         for (const entry of entries) {
@@ -962,7 +990,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
 
           const fullPath = entry.path;
 
-          // 计算相对于搜索根目录的路径
+          // Calculates the relative path about the search directory
           let relativePath: string;
           if (fullPath === normalizedCwd) {
             relativePath = '.';
@@ -971,37 +999,33 @@ export abstract class VFS extends makeEventTarget(Object)<{
           } else if (normalizedCwd === '/' && fullPath.startsWith('/')) {
             relativePath = fullPath.substring(1);
           } else {
-            // 如果不在搜索根目录下，跳过
+            // Skip if it is not under the search path
             continue;
           }
 
-          // 过滤隐藏文件
+          // Filter hidden files
           if (!includeHidden && entry.name.startsWith('.')) {
-            // 如果是目录且需要递归，仍需搜索（隐藏目录下可能有非隐藏文件）
             if (recursive && entry.type === 'directory') {
               await searchDirectory(fullPath, depth + 1);
             }
             continue;
           }
 
-          // 检查忽略模式
+          // Test for ignore patterns
           const shouldIgnore = ignoreMatchers.some(
             (matcher) => matcher.test(relativePath) || matcher.test(fullPath)
           );
           if (shouldIgnore) {
-            // 如果是目录且需要递归，仍需搜索（被忽略的目录下可能有需要的文件）
             if (recursive && entry.type === 'directory') {
               await searchDirectory(fullPath, depth + 1);
             }
             continue;
           }
 
-          // 检查是否匹配任何模式
           let matched = false;
           let matchedPattern = '';
 
           for (const matcher of matchers) {
-            // 同时测试相对路径和绝对路径
             if (matcher.test(relativePath) || matcher.test(fullPath)) {
               matched = true;
               matchedPattern = matcher.getPattern();
@@ -1027,13 +1051,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
             results.push(result);
           }
 
-          // 递归搜索子目录（无论是否匹配都要搜索）
+          // Search sub-directorys recursively
           if (recursive && entry.type === 'directory') {
             await searchDirectory(fullPath, depth + 1);
           }
         }
       } catch (error) {
-        // 只在根级别输出警告，避免过多日志
         if (depth === 0) {
           console.warn(`Cannot access directory: ${dirPath}`, error);
         }
@@ -1050,22 +1073,6 @@ export abstract class VFS extends makeEventTarget(Object)<{
     } else {
       return guessMimeType(this.normalizePath(path));
     }
-  }
-  // 更新 getInfo 方法以包含 CWD 信息
-  getInfo(): {
-    readOnly: boolean;
-    cwd: string;
-    dirStackDepth: number;
-    mountCount: number;
-    mountPoints: string[];
-  } {
-    return {
-      readOnly: this.readOnly,
-      cwd: this._cwd,
-      dirStackDepth: this._dirStack.length,
-      mountCount: this.simpleMounts.size,
-      mountPoints: this.getSimpleMountPoints()
-    };
   }
   /**
    * Mounts another VFS at the specified path.
@@ -1090,7 +1097,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const normalizedPath = PathUtils.normalize(path);
     this.simpleMounts.set(normalizedPath, vfs);
 
-    // 重新排序挂载路径（按长度降序）
+    // Sort mount paths
     this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
   }
 
@@ -1105,7 +1112,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const result = this.simpleMounts.delete(normalizedPath);
 
     if (result) {
-      // 重新排序挂载路径
+      // Sort mount paths
       this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
     }
 
@@ -1125,7 +1132,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
   protected getMountedVFS(path: string): SimpleMountInfo | null {
     const normalizedPath = PathUtils.normalize(path);
 
-    // 使用排序后的路径进行匹配，确保匹配最长的路径
+    // Use sorted mount path so we can matching the longest path
     for (const mountPath of this.sortedMountPaths) {
       if (normalizedPath === mountPath || normalizedPath.startsWith(mountPath + '/')) {
         const relativePath = normalizedPath === mountPath ? '/' : normalizedPath.slice(mountPath.length);
@@ -1141,6 +1148,12 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return null;
   }
 
+  /**
+   * VFS file changing event
+   * @param type - Change type
+   * @param path - File path that causes changing
+   * @param itemType - File type
+   */
   protected onChange(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
@@ -1238,7 +1251,6 @@ export abstract class VFS extends makeEventTarget(Object)<{
     // For glob patterns, preserve relative structure
     const patternDir = this.extractPatternDirectory(sourcePattern);
 
-    // 规范化路径以便比较
     const normalizedPatternDir = this.normalizePath(patternDir);
     const normalizedSourcePath = this.normalizePath(sourcePath);
 
@@ -1263,7 +1275,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
         includeFiles: true,
         includeDirs: false,
         recursive: pattern.includes('**'),
-        cwd: this._cwd // 明确指定搜索根目录
+        cwd: this._cwd
       });
 
       matchedFiles.push(...globResults.map((result) => result.path));
@@ -1285,7 +1297,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
    * Extract the directory part from a glob pattern
    */
   private extractPatternDirectory(pattern: string): string {
-    // 处理以 / 开头的绝对路径模式
+    // Process absolute path
     if (pattern.startsWith('/')) {
       const parts = pattern.substring(1).split('/'); // 移除开头的 /
       const dirParts: string[] = [];
@@ -1297,14 +1309,13 @@ export abstract class VFS extends makeEventTarget(Object)<{
         dirParts.push(part);
       }
 
-      // 如果没有非通配符部分，返回根目录
       if (dirParts.length === 0) {
         return '/';
       }
 
       return '/' + dirParts.join('/');
     } else {
-      // 相对路径模式
+      // Relative path
       const parts = pattern.split('/');
       const dirParts: string[] = [];
 
@@ -1318,40 +1329,36 @@ export abstract class VFS extends makeEventTarget(Object)<{
       return dirParts.length > 0 ? dirParts.join('/') : '.';
     }
   }
-  private _validateMoveRootRestrictions(sourcePath: string, targetPath: string): void {
-    // 不允许移动根目录
+  private _validateRootRestrictions(sourcePath: string, targetPath: string): void {
+    // Can not move root directory
     if (sourcePath === '/') {
       throw new VFSError('Cannot move root directory', 'EINVAL', sourcePath);
     }
 
-    // 不允许移动到根目录（替换根目录）
+    // Can not move to root directory
     if (targetPath === '/') {
       throw new VFSError('Cannot move to root directory', 'EINVAL', targetPath);
     }
 
-    // 不允许移动到自己的子目录
+    // Can not move to sub-directory of source path
     if (targetPath.startsWith(sourcePath + '/')) {
       throw new VFSError('Cannot move directory to its subdirectory', 'EINVAL', sourcePath);
     }
 
     const cwd = this.getCwd();
 
-    // 检查是否尝试移动当前工作目录
+    // Moving CWD is not allowed
     if (sourcePath === cwd) {
       throw new VFSError('Cannot move current working directory', 'EBUSY', sourcePath);
     }
 
-    // 检查是否尝试移动当前工作目录的父目录
-    // 如果CWD在源路径下面，说明源路径是CWD的父目录
+    // Moving parent directory of CWD is not allowed
     if (cwd.startsWith(sourcePath + '/')) {
       throw new VFSError('Cannot move parent directory of current working directory', 'EBUSY', sourcePath);
     }
   }
 
-  /**
-   * 检查源和目标类型兼容性
-   */
-  private async _validateMoveTypeCompatibility(
+  private async _validateTypeCompatibility(
     sourcePath: string,
     targetPath: string,
     options?: MoveOptions
@@ -1363,7 +1370,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
 
     const sourceStat = await this.stat(sourcePath);
 
-    // 检查目标是否存在
+    // Test existence of target path
     const targetExists = await this.exists(targetPath);
     if (targetExists) {
       if (!options?.overwrite) {
@@ -1372,7 +1379,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
 
       const targetStat = await this.stat(targetPath);
 
-      // 只允许相同类型的替换
+      // Must be same type
       if (sourceStat.isFile !== targetStat.isFile || sourceStat.isDirectory !== targetStat.isDirectory) {
         throw new VFSError('Cannot move file to directory or directory to file', 'EISDIR', sourcePath);
       }
