@@ -925,7 +925,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
     const {
       recursive = true,
       includeHidden = false,
-      includeDirs = true,
+      includeDirs = false,
       includeFiles = true,
       caseSensitive = true,
       cwd = this._cwd,
@@ -1009,13 +1009,15 @@ export abstract class VFS extends makeEventTarget(Object)<{
             }
           }
 
-          if (entry.type === 'directory' && includeDirs) {
-            const result: GlobResult = {
-              ...entry,
-              relativePath,
-              matchedPattern: matched ? matchedPattern : null
-            };
-            results.push(result);
+          if (entry.type === 'directory') {
+            if (includeDirs) {
+              const result: GlobResult = {
+                ...entry,
+                relativePath,
+                matchedPattern: matched ? matchedPattern : null
+              };
+              results.push(result);
+            }
           } else if (matched && includeFiles) {
             const result: GlobResult = {
               ...entry,
