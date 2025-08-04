@@ -158,6 +158,8 @@ export class SceneController extends BaseController<SceneModel> {
   }
   async openScene(path: string, resetView: boolean) {
     const scene = await this.loadScene(path);
+    this._editor.currentProject.lastEditScene = path;
+    await this._editor.saveProject();
     this._scenePath = path;
     this._sceneChanged = false;
     this.reset(scene, resetView);

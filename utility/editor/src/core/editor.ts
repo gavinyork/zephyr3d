@@ -90,6 +90,11 @@ export class Editor {
   get currentProject() {
     return this._currentProject;
   }
+  async saveProject() {
+    if (this._currentProject) {
+      ProjectService.saveProject(this._currentProject);
+    }
+  }
   async init() {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');

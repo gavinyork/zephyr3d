@@ -30,7 +30,8 @@ import {
   Water,
   ClipmapTerrain,
   PerspectiveCamera,
-  OrthoCamera
+  OrthoCamera,
+  TetrahedronShape
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { Application, DirectionalLight } from '@zephyr3d/scene';
@@ -143,6 +144,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._trackId = 0;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
+      autoSeparator: true,
       items: [
         {
           label: 'Project',
@@ -152,28 +154,16 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => eventBus.dispatchEvent('action', 'NEW_PROJECT')
             },
             {
-              label: '-'
-            },
-            {
               label: 'Open Project...',
               action: () => eventBus.dispatchEvent('action', 'OPEN_PROJECT')
-            },
-            {
-              label: '-'
             },
             {
               label: 'Close Project',
               action: () => eventBus.dispatchEvent('action', 'CLOSE_PROJECT')
             },
             {
-              label: '-'
-            },
-            {
               label: 'Export Project',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_PROJECT')
-            },
-            {
-              label: '-'
             },
             {
               label: 'Delete Project',
@@ -190,23 +180,14 @@ export class SceneView extends BaseView<SceneModel> {
               action: () => eventBus.dispatchEvent('action', 'NEW_DOC')
             },
             {
-              label: '-'
-            },
-            {
               label: 'Open Scene...',
               shortCut: 'Ctrl+O',
               action: () => eventBus.dispatchEvent('action', 'OPEN_DOC')
             },
             {
-              label: '-'
-            },
-            {
               label: 'Save Scene',
               shortCut: 'Ctrl+S',
               action: () => eventBus.dispatchEvent('action', 'SAVE_DOC')
-            },
-            {
-              label: '-'
             },
             {
               label: 'Save Scene As...',
@@ -226,17 +207,11 @@ export class SceneView extends BaseView<SceneModel> {
               }
             },
             {
-              label: '-'
-            },
-            {
               label: 'Redo',
               shortCut: 'Ctrl+Y',
               action: () => {
                 this._cmdManager.redo();
               }
-            },
-            {
-              label: '-'
             },
             {
               label: 'Copy',
@@ -247,9 +222,6 @@ export class SceneView extends BaseView<SceneModel> {
                   this.handleCopyNode(node);
                 }
               }
-            },
-            {
-              label: '-'
             },
             {
               label: 'Paste',
@@ -271,37 +243,26 @@ export class SceneView extends BaseView<SceneModel> {
                   action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
                 },
                 {
-                  label: '-'
-                },
-                {
                   label: 'Sphere',
                   action: () => this.handleAddShape(SphereShape)
-                },
-                {
-                  label: '-'
                 },
                 {
                   label: 'Plane',
                   action: () => this.handleAddShape(PlaneShape)
                 },
                 {
-                  label: '-'
-                },
-                {
                   label: 'Cylinder',
                   action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
                 },
                 {
-                  label: '-'
-                },
-                {
                   label: 'Torus',
                   action: () => this.handleAddShape(TorusShape)
+                },
+                {
+                  label: 'Tetrahedron',
+                  action: () => this.handleAddShape(TetrahedronShape)
                 }
               ]
-            },
-            {
-              label: '-'
             },
             {
               label: 'Light',
@@ -311,14 +272,8 @@ export class SceneView extends BaseView<SceneModel> {
                   action: () => this.handleAddNode(DirectionalLight, 'Add directional light')
                 },
                 {
-                  label: '-'
-                },
-                {
                   label: 'Point Light',
                   action: () => this.handleAddNode(PointLight, 'Add point light')
-                },
-                {
-                  label: '-'
                 },
                 {
                   label: 'Spot Light',
@@ -327,21 +282,21 @@ export class SceneView extends BaseView<SceneModel> {
               ]
             },
             {
-              label: '-'
+              label: 'Camera',
+              subMenus: [
+                {
+                  label: 'Perspective Camera',
+                  action: () => this.handleAddNode(PerspectiveCamera, 'Add perspective camera')
+                }
+              ]
             },
             {
               label: 'Particle System',
               action: () => this.handleAddNode(ParticleSystem, 'Add particle system')
             },
             {
-              label: '-'
-            },
-            {
               label: 'Water',
               action: () => this.handleAddNode(Water, 'Add water')
-            },
-            {
-              label: '-'
             },
             {
               label: 'Terrain',
@@ -358,16 +313,10 @@ export class SceneView extends BaseView<SceneModel> {
               checked: () => !!this._postGizmoRenderer.drawGrid
             },
             {
-              label: '-'
-            },
-            {
               label: 'Texture viewer',
               id: 'SHOW_TEXTURE_VIEWER',
               action: () => (this._showTextureViewer = !this._showTextureViewer),
               checked: () => this._showTextureViewer
-            },
-            {
-              label: '-'
             },
             {
               label: 'Device Information',
@@ -944,7 +893,11 @@ export class SceneView extends BaseView<SceneModel> {
       this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-      this.model.scene.rootNode.iterate((node) => this._proxy.createProxy(node));
+      this.model.scene.rootNode.iterate((node) => {
+        if (node !== this.model.camera) {
+          this._proxy.createProxy(node);
+        }
+      });
       this.model.scene.on('startrender', this.handleStartRender, this);
       this.model.scene.on('endrender', this.handleEndRender, this);
       this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);

@@ -36,7 +36,9 @@ export class SceneModel extends BaseModel {
       light.intensity = 18;
       light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
     }
-    this._editorCamera.set(new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000));
+    const editorCamera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
+    editorCamera.name = 'EditorCamera';
+    this._editorCamera.set(editorCamera);
     this._editorCamera.get().lookAt(new Vector3(0, 80, 180), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
     this._editorCamera.get().controller = new OrbitCameraController({
       damping: 1,

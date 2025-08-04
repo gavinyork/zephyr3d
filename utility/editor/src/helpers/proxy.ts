@@ -1,6 +1,15 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import type { Scene, SceneNode } from '@zephyr3d/scene';
-import { BoundingBox, CylinderShape, Mesh, Primitive, DRef, UnlitMaterial, DWeakRef } from '@zephyr3d/scene';
+import { Scene, SceneNode, TetrahedronFrameShape } from '@zephyr3d/scene';
+import {
+  BoundingBox,
+  CylinderShape,
+  Mesh,
+  Primitive,
+  DRef,
+  UnlitMaterial,
+  DWeakRef,
+  PerspectiveCamera
+} from '@zephyr3d/scene';
 
 const PROXY_NAME = '$__PROXY__$';
 
@@ -8,6 +17,7 @@ export class NodeProxy {
   private readonly _diamondPrimitive: DRef<Primitive>;
   private readonly _spotLightPrimitive: DRef<Primitive>;
   private readonly _directionalLightPrimitive: DRef<Primitive>;
+  private readonly _perspectiveCameraPrimitive: DRef<TetrahedronFrameShape>;
   private readonly _lightProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
   private _proxyList: DWeakRef<Mesh>[];
@@ -16,6 +26,7 @@ export class NodeProxy {
     this._diamondPrimitive = new DRef();
     this._spotLightPrimitive = new DRef();
     this._directionalLightPrimitive = new DRef();
+    this._perspectiveCameraPrimitive = new DRef();
     this._lightProxyMaterial = new DRef(new UnlitMaterial());
     this._proxyList = [];
   }
@@ -51,6 +62,8 @@ export class NodeProxy {
       proxy = this.getSpotLightProxyMesh();
     } else if (src.isPunctualLight() && src.isPointLight()) {
       proxy = this.getPointLightProxyMesh();
+    } else if (src instanceof PerspectiveCamera) {
+      proxy = this.getPerspectiveCameraProxyMesh();
     }
     if (proxy) {
       proxy.sealed = true;
@@ -80,6 +93,10 @@ export class NodeProxy {
             const s = Math.tan(Math.acos(src.cutoff)) / 0.2;
             proxy.scale.setXYZ(s, s, 1);
           }
+        } else if (src instanceof PerspectiveCamera) {
+          proxy.scale.z = src.getFarPlane();
+          proxy.scale.y = src.getTanHalfFovy() * src.getFarPlane();
+          proxy.scale.x = proxy.scale.y * src.getAspect();
         }
       }
     }
@@ -173,6 +190,24 @@ export class NodeProxy {
     return new Mesh(
       this._scene,
       this._diamondPrimitive.get(),
+      this._lightProxyMaterial.get().createInstance()
+    );
+  }
+  private getPerspectiveCameraProxyMesh() {
+    if (!this._perspectiveCameraPrimitive.get()) {
+      const primitive = new TetrahedronFrameShape({
+        height: 1,
+        sizeX: 1,
+        sizeZ: 1,
+        transform: Matrix4x4.translation(new Vector3(0, 0, -1)).rotateRight(
+          Quaternion.fromAxisAngle(Vector3.axisPX(), Math.PI * 0.5)
+        )
+      });
+      this._perspectiveCameraPrimitive.set(primitive);
+    }
+    return new Mesh(
+      this._scene,
+      this._perspectiveCameraPrimitive.get(),
       this._lightProxyMaterial.get().createInstance()
     );
   }

@@ -13,6 +13,7 @@ export type MenuItemOptions = {
 };
 
 export type MenuBarOptions = {
+  autoSeparator?: boolean;
   items: MenuItemOptions[];
 };
 
@@ -39,7 +40,10 @@ export class MenubarView extends makeEventTarget(Object)<{
   }
   private create(options: MenuBarOptions) {
     this._map = new Map();
-    this._options = { items: (options?.items ?? []).map((val) => this.copyItem(val)) };
+    this._options = {
+      autoSeparator: options?.autoSeparator ?? true,
+      items: (options?.items ?? []).map((val) => this.copyItem(val))
+    };
     if (this._options.items.length > 0) {
       const queue: { item: MenuItemOptions; parent: MenuItemOptions }[] = this._options.items.map((item) => ({
         item,
@@ -142,7 +146,11 @@ export class MenubarView extends makeEventTarget(Object)<{
   private renderItem(item: MenuItemOptions) {
     if (item.subMenus?.length > 0) {
       if (ImGui.BeginMenu(`${item.label}##${item.id}`)) {
-        for (const subItem of item.subMenus) {
+        for (let i = 0; i < item.subMenus.length; i++) {
+          const subItem = item.subMenus[i];
+          if (i > 0 && this._options?.autoSeparator) {
+            ImGui.Separator();
+          }
           this.renderItem(subItem);
         }
         ImGui.EndMenu();

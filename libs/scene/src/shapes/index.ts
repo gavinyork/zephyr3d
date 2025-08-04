@@ -4,6 +4,7 @@ import type { CylinderShape } from './cylinder';
 import type { PlaneShape } from './plane';
 import type { SphereShape } from './sphere';
 import type { TorusShape } from './torus';
+import { TetrahedronFrameShape, TetrahedronShape } from './tetrahedron';
 
 export * from './shape';
 export * from './box';
@@ -11,12 +12,21 @@ export * from './cylinder';
 export * from './torus';
 export * from './plane';
 export * from './sphere';
+export * from './tetrahedron';
 
 /**
  * Shape types
  * @public
  */
-export type ShapeType = BoxShape | BoxFrameShape | SphereShape | CylinderShape | PlaneShape | TorusShape;
+export type ShapeType =
+  | BoxShape
+  | BoxFrameShape
+  | SphereShape
+  | CylinderShape
+  | PlaneShape
+  | TorusShape
+  | TetrahedronShape
+  | TetrahedronFrameShape;
 /**
  * Shape option types
  * @public
