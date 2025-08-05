@@ -137,7 +137,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
     this._rotateInfo = null;
     this._scaleInfo = null;
     this._screenSize = 0.6;
-    this._gridParams = new Vector4(1000, 500, 0, 0);
+    this._gridParams = new Vector4(10000, 500, 0, 0);
     this._gridSteps = new Float32Array([
       1, 1, 0, 0, 10, 10, 0, 0, 100, 100, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000,
       1000, 0, 0, 1000, 1000, 0, 0

@@ -4,6 +4,7 @@ import { DirectionalLight, OrbitCameraController, PerspectiveCamera, Scene } fro
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
 import type { Editor } from '../core/editor';
+import { EditorCameraController } from '../helpers/editocontroller';
 
 export class SceneModel extends BaseModel {
   private readonly _editor: Editor;
@@ -40,33 +41,6 @@ export class SceneModel extends BaseModel {
     editorCamera.name = 'EditorCamera';
     this._editorCamera.set(editorCamera);
     this._editorCamera.get().lookAt(new Vector3(0, 80, 180), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
-    this._editorCamera.get().controller = new OrbitCameraController({
-      damping: 1,
-      center: cameraLookAt ? new Vector3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]) : Vector3.zero(),
-      controls: {
-        rotate: {
-          button: 1,
-          shiftKey: false,
-          altKey: false,
-          ctrlKey: false,
-          metaKey: false
-        },
-        zoom: {
-          button: 1,
-          shiftKey: false,
-          altKey: false,
-          ctrlKey: true,
-          metaKey: false
-        },
-        pan: {
-          button: 1,
-          shiftKey: true,
-          altKey: false,
-          ctrlKey: false,
-          metaKey: false
-        },
-        zoomWheel: true
-      }
-    });
+    this._editorCamera.get().controller = new EditorCameraController();
   }
 }
