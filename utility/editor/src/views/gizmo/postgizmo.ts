@@ -101,7 +101,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   private _alwaysDrawIndicator: boolean;
   private _gridSteps: Float32Array;
   private readonly _gridParams: Vector4;
-  private readonly _camera: Camera;
+  private _camera: Camera;
   private _node: SceneNode;
   private _mode: GizmoMode;
   private readonly _axisLength: number;
@@ -207,6 +207,12 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
       this._alwaysDrawIndicator = false;
     }
   }
+  get camera(): Camera {
+    return this._camera;
+  }
+  set camera(camera: Camera) {
+    this._camera = camera;
+  }
   get drawGrid(): boolean {
     return this._drawGrid;
   }
@@ -287,7 +293,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
     );
     this._calcGizmoMVPMatrix(this._mode, false, PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
-    PostGizmoRenderer._cameraNearFar.setXY(this._camera.getNearPlane(), this._camera.getFarPlane());
+    PostGizmoRenderer._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);

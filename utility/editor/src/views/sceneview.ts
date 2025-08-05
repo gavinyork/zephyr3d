@@ -98,6 +98,7 @@ export class SceneView extends BaseView<SceneModel> {
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
+  private _activeCamera: DRef<Camera>;
   private readonly _currentEditTool: DRef<EditTool>;
   private readonly _cameraAnimationEyeFrom: Vector3;
   private readonly _cameraAnimationTargetFrom: Vector3;
@@ -132,6 +133,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._graphEditor = null;
     this._aabbForEdit = null;
     this._proxy = null;
+    this._activeCamera = new DRef();
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
     this._cameraAnimationTargetFrom = new Vector3();
@@ -416,7 +418,7 @@ export class SceneView extends BaseView<SceneModel> {
           action: () => {
             const node = this._tab.sceneHierarchy.selectedNode;
             if (node) {
-              this.lookAt(this.model.camera, node);
+              this.lookAt(this.activeCamera, node);
             }
           }
         },
@@ -525,6 +527,9 @@ export class SceneView extends BaseView<SceneModel> {
   get cmdManager() {
     return this._cmdManager;
   }
+  get activeCamera() {
+    return this._activeCamera.get();
+  }
   reset() {
     this.sceneFinialize();
     this._cmdManager.clear();
@@ -564,37 +569,33 @@ export class SceneView extends BaseView<SceneModel> {
       this._toolbar.height -
       this._assetView.panel.height;
     if (viewportWidth > 0 && viewportHeight > 0) {
-      this.model.camera.viewport = [
+      const camera = this.activeCamera;
+      camera.viewport = [
         this._tab.width,
         this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       ];
-      this.model.camera.scissor = [
+      camera.scissor = [
         this._tab.width,
         this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       ];
-      if (this.model.camera instanceof PerspectiveCamera) {
-        this.model.camera.aspect = viewportWidth / viewportHeight;
-      } else if (this.model.camera instanceof OrthoCamera) {
-        this.model.camera.bottom = -10;
-        this.model.camera.top = 10;
-        this.model.camera.left = (-10 * viewportWidth) / viewportHeight;
-        this.model.camera.right = (10 * viewportWidth) / viewportHeight;
+      if (camera instanceof PerspectiveCamera) {
+        camera.aspect = viewportWidth / viewportHeight;
+      } else if (camera instanceof OrthoCamera) {
+        camera.bottom = -10;
+        camera.top = 10;
+        camera.left = (-10 * viewportWidth) / viewportHeight;
+        camera.right = (10 * viewportWidth) / viewportHeight;
       }
-      this.model.camera.render(this.model.scene);
+      camera.render(this.model.scene);
 
       // Render selected camera
       const selectedNode = this._tab.sceneHierarchy.selectedNode;
-      if (selectedNode instanceof PerspectiveCamera && selectedNode !== this.model.camera) {
-        selectedNode.viewport = [
-          this.model.camera.viewport[0] + 20,
-          this.model.camera.viewport[1] + 20,
-          300,
-          200
-        ];
+      if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
+        selectedNode.viewport = [camera.viewport[0] + 20, camera.viewport[1] + 20, 300, 200];
         selectedNode.scissor = selectedNode.viewport;
         selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
         selectedNode.render(this.model.scene);
@@ -665,7 +666,7 @@ export class SceneView extends BaseView<SceneModel> {
         }
         const mousePos = ImGui.GetMousePos();
         const pos = [mousePos.x, mousePos.y];
-        if (this.posToViewport(pos, this.model.camera.viewport)) {
+        if (this.posToViewport(pos, this.activeCamera.viewport)) {
           eventBus.dispatchEvent(
             payload ? 'workspace_drag_drop' : 'workspace_dragging',
             'ASSET',
@@ -692,7 +693,7 @@ export class SceneView extends BaseView<SceneModel> {
     if (this._animatedCamera) {
       return true;
     }
-    if (this.model.camera.handleEvent(ev, type)) {
+    if (this.activeCamera.handleEvent(ev, type)) {
       return true;
     }
     if (ev instanceof DragEvent) {
@@ -700,7 +701,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
-      const insideViewport = this.posToViewport(p, this.model.camera.viewport);
+      const insideViewport = this.posToViewport(p, this.activeCamera.viewport);
       if (this._postGizmoCaptured) {
         this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button);
         return true;
@@ -784,7 +785,7 @@ export class SceneView extends BaseView<SceneModel> {
             //console.log(`Fit to scene: ${hitPos.toString()}`);
             placeNode.position.set(hitPos);
           } else {
-            const ray = this.model.camera.constructRay(this._mousePosX, this._mousePosY);
+            const ray = this.activeCamera.constructRay(this._mousePosX, this._mousePosY);
             let hitDistance = -ray.origin.y / ray.direction.y;
             if (Number.isNaN(hitDistance) || hitDistance < 0) {
               hitDistance = 10;
@@ -898,7 +899,7 @@ export class SceneView extends BaseView<SceneModel> {
   private sceneSetup() {
     if (this.model.scene) {
       this._proxy = new NodeProxy(this.model.scene);
-      this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
+      this._postGizmoRenderer = new PostGizmoRenderer(this.activeCamera, null);
       this._postGizmoRenderer.mode = 'select';
       this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
       this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
@@ -909,9 +910,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.model.scene.rootNode.iterate((node) => {
-        if (node !== this.model.camera) {
-          this._proxy.createProxy(node);
-        }
+        this._proxy.createProxy(node);
       });
       this.model.scene.on('startrender', this.handleStartRender, this);
       this.model.scene.on('endrender', this.handleEndRender, this);
@@ -922,6 +921,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
       this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
+      this.activateCamera(this.model.camera);
     }
   }
   private sceneFinialize() {
@@ -954,6 +954,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._proxy.dispose();
       this._proxy = null;
     }
+    this.activateCamera(null);
     this.closeAllTrackEditors();
   }
   private renderDeviceInfo() {
@@ -1031,7 +1032,7 @@ export class SceneView extends BaseView<SceneModel> {
   }
   update(dt: number) {
     const selectedNode = this._tab.sceneHierarchy.selectedNode;
-    if (selectedNode?.isCamera() && selectedNode !== this.model.camera) {
+    if (selectedNode?.isCamera() && selectedNode !== this.activeCamera) {
       this._proxy.updateProxy(selectedNode);
     }
     const placeNode = this._nodeToBePlaced.get();
@@ -1039,9 +1040,12 @@ export class SceneView extends BaseView<SceneModel> {
       if (placeNode) {
         placeNode.parent = this.model.scene.rootNode;
       }
-      this.model.camera.pickAsync(this._mousePosX, this._mousePosY).then((pickResult) => {
-        this._pickResult = pickResult;
-      });
+      this._activeCamera
+        .get()
+        .pickAsync(this._mousePosX, this._mousePosY)
+        .then((pickResult) => {
+          this._pickResult = pickResult;
+        });
     } else if (placeNode) {
       placeNode.parent = null;
     }
@@ -1170,8 +1174,11 @@ export class SceneView extends BaseView<SceneModel> {
       return;
     }
     if (node === this.model.camera) {
-      Dialog.messageBox('Zephyr3d editor', 'Cannot delete active camera');
+      Dialog.messageBox('Zephyr3d editor', 'Cannot delete editor camera');
       return;
+    }
+    if (node === this.activeCamera) {
+      this.activateCamera(this.model.camera);
     }
     if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
       this._tab.sceneHierarchy.selectNode(null);
@@ -1210,7 +1217,7 @@ export class SceneView extends BaseView<SceneModel> {
         if (hitPos) {
           placeNode.position.set(hitPos);
         } else {
-          const ray = this.model.camera.constructRay(p[0], p[1]);
+          const ray = this.activeCamera.constructRay(p[0], p[1]);
           let hitDistance = -ray.origin.y / ray.direction.y;
           if (Number.isNaN(hitDistance) || hitDistance < 0) {
             hitDistance = 10;
@@ -1249,7 +1256,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleNodeSelected(node: SceneNode) {
-    this._postGizmoRenderer.node = node === node.scene.rootNode || node === this.model.camera ? null : node;
+    this._postGizmoRenderer.node = node === node.scene.rootNode || node === this.activeCamera ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
@@ -1266,7 +1273,7 @@ export class SceneView extends BaseView<SceneModel> {
     }
   }
   private handleNodeDoubleClicked(node: SceneNode) {
-    this.lookAt(this.model.camera, node);
+    this.lookAt(this.activeCamera, node);
   }
   private handleAddShape<T extends ShapeType>(shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
     const placeNode = this._nodeToBePlaced.get();
@@ -1402,23 +1409,28 @@ export class SceneView extends BaseView<SceneModel> {
     eventBus.dispatchEvent('action', action);
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
-    if (camera !== this.model.camera) {
-      this._proxy.hideProxy(camera);
-      return;
-    }
     if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
-      //compositor.appendPostEffect(this._postDecalRenderer);
+      this._postGizmoRenderer.camera = camera;
       compositor.appendPostEffect(this._postGizmoRenderer);
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
-    if (camera !== this.model.camera) {
-      this._proxy.showProxy(camera);
-      return;
-    }
     if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
       //compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);
+    }
+  }
+  private activateCamera(camera: Camera) {
+    if (camera !== this.activeCamera) {
+      if (this._activeCamera) {
+        this._proxy.showProxy(this.activeCamera);
+      }
+      if (camera) {
+        this._proxy.hideProxy(camera);
+      }
+      this._activeCamera.set(camera);
+      this._postGizmoRenderer.camera = camera;
+      this._postGizmoRenderer.node = null;
     }
   }
 }
