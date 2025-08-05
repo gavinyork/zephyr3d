@@ -1,21 +1,23 @@
 import type { Scene } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
-import type { SceneModel } from '../models/scenemodel';
+import { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
-import type { SceneView } from '../views/sceneview';
+import { SceneView } from '../views/sceneview';
 import { Dialog } from '../views/dlg/dlg';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
 
-export class SceneController extends BaseController<SceneModel> {
+export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
+  protected _view: SceneView;
+  protected _model: SceneModel;
   protected _scenePath: string;
   protected _sceneChanged: boolean;
-  protected _view: SceneView;
-  constructor(editor: Editor, model: SceneModel, view: SceneView) {
-    super(model);
+  constructor(editor: Editor) {
+    super();
     this._editor = editor;
-    this._view = view;
+    this._model = new SceneModel();
+    this._view = new SceneView(this);
     this._sceneChanged = false;
   }
   get editor() {
@@ -24,8 +26,14 @@ export class SceneController extends BaseController<SceneModel> {
   get sceneChanged() {
     return this._sceneChanged;
   }
+  getModel(): SceneModel {
+    return this._model;
+  }
+  getView(): SceneView {
+    return this._view;
+  }
   handleEvent(ev: Event, type?: string): boolean {
-    return this._view.handleEvent(ev, type);
+    return this.view.handleEvent(ev, type);
   }
   protected async onActivate(scenePath: string): Promise<void> {
     this._scenePath = '';

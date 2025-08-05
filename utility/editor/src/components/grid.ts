@@ -88,10 +88,17 @@ class PropertyGroup {
     } else if (value.type === 'object_array' && value.options?.objectTypes?.length > 0) {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
-        for (let i = 0; i < tmpProperty.object.length; i++) {
-          if (!value.isHidden || !value.isHidden.call(obj, i)) {
-            const propGroup = group.addGroup(`${value.name}[${i}]`);
-            propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
+        if (tmpProperty.object.length === 0) {
+          if (value.add) {
+            const propGroup = group.addGroup(`Add ${value.name}`);
+            propGroup.setObject(null, value, obj, 0, 0);
+          }
+        } else {
+          for (let i = 0; i < tmpProperty.object.length; i++) {
+            if (!value.isHidden || !value.isHidden.call(obj, i)) {
+              const propGroup = group.addGroup(`${value.name}[${i}]`);
+              propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
+            }
           }
         }
       }
@@ -182,7 +189,9 @@ class PropertyGroup {
               .getPropertiesByClass(cls)
               .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0], -1));
             if (props.length > 0) {
-              this.addSeparator(cls.ctor.name);
+              if (!cls.noTitle) {
+                this.addSeparator(cls.ctor.name);
+              }
               for (const prop of props) {
                 this.addProperty(this.value.object[0], prop);
               }
@@ -390,7 +399,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         !!group.prop.set &&
         (group.prop.type === 'object' || group.index < group.count);
       const addable = group.prop.type === 'object_array' && !!group.prop.add;
-      const deletable = group.prop.type === 'object_array' && group.prop.delete;
+      const deletable = group.prop.type === 'object_array' && group.prop.delete && group.index < group.count;
 
       const buttonSize = ImGui.GetFrameHeight();
       const spacing =

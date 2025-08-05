@@ -60,16 +60,15 @@ import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBox } from '../helpers/misc';
-import type { Editor } from '../core/editor';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { VFSView } from '../components/vfsview';
 import { ProjectService } from '../core/services/project';
 import { GraphEditor } from '../components/graph/grapheditor';
+import { SceneController } from '../controllers/scenecontroller';
 
-export class SceneView extends BaseView<SceneModel> {
-  private readonly _editor: Editor;
+export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
   private _postGizmoRenderer: PostGizmoRenderer;
   private readonly _propGrid: PropertyEditor;
@@ -109,9 +108,8 @@ export class SceneView extends BaseView<SceneModel> {
   private _animatedCamera: Camera;
   private readonly _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
   private _trackId: number;
-  constructor(editor: Editor, model: SceneModel) {
-    super(model);
-    this._editor = editor;
+  constructor(controller: SceneController) {
+    super(controller);
     this._cmdManager = new CommandManager();
     this._transformNode = new DRef();
     this._oldTransform = null;
@@ -504,7 +502,7 @@ export class SceneView extends BaseView<SceneModel> {
       16,
       10
     );
-    this._postGizmoRenderer = new PostGizmoRenderer(this.model.camera, null);
+    this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.camera, null);
     this._postGizmoRenderer.mode = 'select';
     this._tab = null;
     this._propGrid = new PropertyEditor(
@@ -519,7 +517,7 @@ export class SceneView extends BaseView<SceneModel> {
     this._assetView = null;
   }
   get editor() {
-    return this._editor;
+    return this.controller.editor;
   }
   get toolbar() {
     return this._toolbar;
@@ -557,7 +555,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._statusbar.height -
       this._assetView.panel.height;
     this._menubar.render();
-    this._tab.render(this._editor.sceneChanged);
+    this._tab.render(this.controller.editor.sceneChanged);
     this._propGrid.render();
     this._toolbar.render();
     this._assetView.render();
@@ -590,7 +588,7 @@ export class SceneView extends BaseView<SceneModel> {
         camera.left = (-10 * viewportWidth) / viewportHeight;
         camera.right = (10 * viewportWidth) / viewportHeight;
       }
-      camera.render(this.model.scene);
+      camera.render(this.controller.model.scene);
 
       // Render selected camera
       const selectedNode = this._tab.sceneHierarchy.selectedNode;
@@ -598,7 +596,7 @@ export class SceneView extends BaseView<SceneModel> {
         selectedNode.viewport = [camera.viewport[0] + 20, camera.viewport[1] + 20, 300, 200];
         selectedNode.scissor = selectedNode.viewport;
         selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
-        selectedNode.render(this.model.scene);
+        selectedNode.render(this.controller.model.scene);
       }
 
       if (this._renderDropZone) {
@@ -725,7 +723,7 @@ export class SceneView extends BaseView<SceneModel> {
             switch (this._typeToBePlaced) {
               case 'asset':
                 this._cmdManager
-                  .execute(new AddAssetCommand(this.model.scene, this._assetToBeAdded, pos))
+                  .execute(new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos))
                   .then((node) => {
                     this._tab.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
@@ -736,7 +734,7 @@ export class SceneView extends BaseView<SceneModel> {
                 this._cmdManager
                   .execute(
                     new AddShapeCommand(
-                      this.model.scene,
+                      this.controller.model.scene,
                       this._shapeToBeAdded.cls,
                       pos,
                       this._shapeToBeAdded.options
@@ -751,9 +749,11 @@ export class SceneView extends BaseView<SceneModel> {
               case 'node':
                 this._cmdManager
                   .execute(
-                    new AddChildCommand(this.model.scene.rootNode, this._ctorToBePlaced, pos).setDesc(
-                      this._descToBePlaced ?? 'Add node'
-                    )
+                    new AddChildCommand(
+                      this.controller.model.scene.rootNode,
+                      this._ctorToBePlaced,
+                      pos
+                    ).setDesc(this._descToBePlaced ?? 'Add node')
                   )
                   .then((node) => {
                     if (node instanceof DirectionalLight) {
@@ -854,7 +854,7 @@ export class SceneView extends BaseView<SceneModel> {
     super.onActivate();
     this._assetView = new VFSView(
       ProjectService.VFS,
-      this._editor.currentProject,
+      this.controller.editor.currentProject,
       0,
       ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
       ImGui.GetIO().DisplaySize.x,
@@ -897,23 +897,29 @@ export class SceneView extends BaseView<SceneModel> {
     this.sceneFinialize();
   }
   private sceneSetup() {
-    if (this.model.scene) {
-      this._proxy = new NodeProxy(this.model.scene);
+    if (this.controller.model.scene) {
+      this._proxy = new NodeProxy(this.controller.model.scene);
       this._postGizmoRenderer = new PostGizmoRenderer(this.activeCamera, null);
       this._postGizmoRenderer.mode = 'select';
-      this._tab = new Tab(this.model.scene, 0, this._menubar.height + this._toolbar.height, 300, 0);
+      this._tab = new Tab(
+        this.controller.model.scene,
+        0,
+        this._menubar.height + this._toolbar.height,
+        300,
+        0
+      );
       this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
       this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
       this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
       this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
       this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
-      this.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-      this.model.scene.rootNode.iterate((node) => {
+      this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
+      this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy.createProxy(node);
       });
-      this.model.scene.on('startrender', this.handleStartRender, this);
-      this.model.scene.on('endrender', this.handleEndRender, this);
+      this.controller.model.scene.on('startrender', this.handleStartRender, this);
+      this.controller.model.scene.on('endrender', this.handleEndRender, this);
       this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
       this._postGizmoRenderer.on('begin_rotate', this.handleBeginTransformNode, this);
       this._postGizmoRenderer.on('begin_scale', this.handleBeginTransformNode, this);
@@ -921,7 +927,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
       this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
-      this.activateCamera(this.model.camera);
+      this.activateCamera(this.controller.model.camera);
     }
   }
   private sceneFinialize() {
@@ -934,10 +940,10 @@ export class SceneView extends BaseView<SceneModel> {
       this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._tab = null;
     }
-    if (this.model.scene) {
-      this.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
-      this.model.scene.off('startrender', this.handleStartRender, this);
-      this.model.scene.off('endrender', this.handleEndRender, this);
+    if (this.controller.model.scene) {
+      this.controller.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
+      this.controller.model.scene.off('startrender', this.handleStartRender, this);
+      this.controller.model.scene.off('endrender', this.handleEndRender, this);
     }
     if (this._postGizmoRenderer) {
       this._postGizmoRenderer.off('begin_translate', this.handleBeginTransformNode, this);
@@ -1038,7 +1044,7 @@ export class SceneView extends BaseView<SceneModel> {
     const placeNode = this._nodeToBePlaced.get();
     if (this._mousePosX >= 0 && this._mousePosY >= 0) {
       if (placeNode) {
-        placeNode.parent = this.model.scene.rootNode;
+        placeNode.parent = this.controller.model.scene.rootNode;
       }
       this._activeCamera
         .get()
@@ -1173,12 +1179,12 @@ export class SceneView extends BaseView<SceneModel> {
     if (!node) {
       return;
     }
-    if (node === this.model.camera) {
+    if (node === this.controller.model.camera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete editor camera');
       return;
     }
     if (node === this.activeCamera) {
-      this.activateCamera(this.model.camera);
+      this.activateCamera(this.controller.model.camera);
     }
     if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
       this._tab.sceneHierarchy.selectNode(null);
@@ -1238,7 +1244,7 @@ export class SceneView extends BaseView<SceneModel> {
       placeNode.parent = null;
       this._nodeToBePlaced.dispose();
       this._cmdManager
-        .execute(new AddAssetCommand(this.model.scene, this._assetToBeAdded, pos))
+        .execute(new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos))
         .then((node) => {
           this._tab.sceneHierarchy.selectNode(node);
           eventBus.dispatchEvent('scene_changed');
@@ -1283,7 +1289,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._typeToBePlaced = 'none';
     }
     const shape = new shapeCls(options);
-    const mesh = new Mesh(this.model.scene, shape, new PBRMetallicRoughnessMaterial());
+    const mesh = new Mesh(this.controller.model.scene, shape, new PBRMetallicRoughnessMaterial());
     mesh.gpuPickable = false;
     this._nodeToBePlaced.set(mesh);
     this._shapeToBeAdded = {
@@ -1300,7 +1306,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    const node = new ctor(this.model.scene);
+    const node = new ctor(this.controller.model.scene);
     node.parent = null;
     node.gpuPickable = false;
     this._proxy.createProxy(node);
@@ -1317,7 +1323,7 @@ export class SceneView extends BaseView<SceneModel> {
       this._typeToBePlaced = 'none';
     }
     ProjectService.serializationManager
-      .fetchModel(asset, this.model.scene)
+      .fetchModel(asset, this.controller.model.scene)
       .then((node) => {
         node.group.parent = null;
         node.group.iterate((node) => {
@@ -1371,7 +1377,7 @@ export class SceneView extends BaseView<SceneModel> {
       );
       this._oldTransform = null;
       this._transformNode.dispose();
-      this.model.scene.octree.prune();
+      this.controller.model.scene.octree.prune();
     }
     this._postGizmoCaptured = false;
   }

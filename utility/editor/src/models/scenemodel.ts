@@ -3,22 +3,16 @@ import { DRef } from '@zephyr3d/scene';
 import { DirectionalLight, PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
-import type { Editor } from '../core/editor';
 import { EditorCameraController } from '../helpers/editocontroller';
 
 export class SceneModel extends BaseModel {
-  private readonly _editor: Editor;
   private _scene: Scene;
   private readonly _editorCamera: DRef<Camera>;
-  constructor(editor: Editor) {
+  constructor() {
     super();
-    this._editor = editor;
     this._scene = null;
     this._editorCamera = new DRef();
     this._scene = null;
-  }
-  get editor() {
-    return this._editor;
   }
   get scene() {
     return this._scene;

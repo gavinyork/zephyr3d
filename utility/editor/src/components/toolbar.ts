@@ -79,7 +79,7 @@ export class ToolBar extends makeEventTarget(Object)<{
   get tools() {
     return this._tools;
   }
-  registerShortcuts(view: BaseView<any>) {
+  registerShortcuts(view: BaseView<any, any>) {
     for (const tool of this._tools) {
       if (tool.shortcut) {
         view.registerShortcut(tool.shortcut, () => {
@@ -92,7 +92,7 @@ export class ToolBar extends makeEventTarget(Object)<{
       }
     }
   }
-  unregisterShortcuts(view: BaseView<any>) {
+  unregisterShortcuts(view: BaseView<any, any>) {
     for (const tool of this._tools) {
       if (tool.shortcut) {
         view.unregisterShortcut(tool.shortcut);

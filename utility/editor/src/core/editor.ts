@@ -2,9 +2,7 @@ import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFram
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
-import { SceneView } from '../views/sceneview';
 import { SceneController } from '../controllers/scenecontroller';
-import { SceneModel } from '../models/scenemodel';
 import { FontGlyph } from './fontglyph';
 import { AssetManager, DRef } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
@@ -118,10 +116,8 @@ export class Editor {
     }
   }
   registerModules() {
-    const sceneModel = new SceneModel(this);
-    const sceneView = new SceneView(this, sceneModel);
-    const sceneController = new SceneController(this, sceneModel, sceneView);
-    this._moduleManager.register('Scene', sceneModel, sceneView, sceneController);
+    const sceneController = new SceneController(this);
+    this._moduleManager.register('Scene', sceneController);
 
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);

@@ -1,14 +1,18 @@
+import type { BaseController } from '../controllers/basecontroller';
 import type { BaseModel } from '../models/basemodel';
 
-export abstract class BaseView<Model extends BaseModel> {
-  private readonly _model: Model;
+export abstract class BaseView<
+  Model extends BaseModel,
+  Controller extends BaseController<Model, BaseView<Model, Controller>>
+> {
+  private readonly _controller: Controller;
   private readonly _shortcuts: Map<string, { handler: (shortcut: string) => void; repeatable: boolean }>;
-  constructor(model: Model) {
-    this._model = model;
+  constructor(controller: Controller) {
+    this._controller = controller;
     this._shortcuts = new Map();
   }
-  get model() {
-    return this._model;
+  get controller() {
+    return this._controller;
   }
   registerShortcut(key: string, handler: (shortcut: string) => void, repeatable?: boolean) {
     this._shortcuts.set(key, { handler, repeatable: !!repeatable });

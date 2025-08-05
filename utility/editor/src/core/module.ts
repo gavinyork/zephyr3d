@@ -8,8 +8,8 @@ export class ModuleManager {
     {
       name: string;
       model: BaseModel;
-      view: BaseView<any>;
-      controller: BaseController<any>;
+      view: BaseView<any, any>;
+      controller: BaseController<any, any>;
     }
   >;
   private _currentModule: string;
@@ -20,14 +20,14 @@ export class ModuleManager {
   get currentModule() {
     return this._modules[this._currentModule] ?? null;
   }
-  register(name: string, model: BaseModel, view: BaseView<any>, controller: BaseController<any>) {
+  register(name: string, controller: BaseController<any, any>) {
     if (!name) {
       throw new Error(`Invalid module name: ${name}`);
     }
     if (this._modules[name]) {
       throw new Error(`Module ${name} already registered`);
     }
-    this._modules[name] = { name, model, view, controller };
+    this._modules[name] = { name, model: controller.model, view: controller.view, controller };
   }
   async activate(name: string, ...args: any[]) {
     const currentModule = this._modules[this._currentModule];

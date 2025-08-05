@@ -83,6 +83,7 @@ export type PropertyAccessor<T = object> = {
 export type SerializableClass = {
   ctor: GenericConstructor;
   parent?: GenericConstructor;
+  noTitle?: boolean;
   createFunc?: (
     ctx?: any,
     init?: any

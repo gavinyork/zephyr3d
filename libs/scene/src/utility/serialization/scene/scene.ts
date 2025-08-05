@@ -8,6 +8,13 @@ import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
+import { JSONData, JSONNumber, JSONString } from '../json/number';
+
+export let testJson: object = {
+  testNumber: 123,
+  testString: 'Hello,world!',
+  testObject: {}
+};
 
 /** @internal */
 export function getSceneClass(manager: SerializationManager): SerializableClass {
@@ -529,6 +536,21 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
             for (const child of nodeHierarchy.rootNode.children.slice()) {
               child.get().parent = this.rootNode;
             }
+          }
+        },
+        {
+          name: 'Metadata',
+          type: 'object',
+          persistent: false,
+          options: { objectTypes: [JSONData] },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.object[0] = JSONData.fromObject(testJson);
+          },
+          set(this: Scene, value, index) {
+            testJson = JSONData.toObject(value.object[0] as JSONData);
           }
         }
       ];

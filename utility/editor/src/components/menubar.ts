@@ -105,7 +105,7 @@ export class MenubarView extends makeEventTarget(Object)<{
     }
     this._map.delete(id);
   }
-  registerShortcuts(view: BaseView<any>) {
+  registerShortcuts(view: BaseView<any, any>) {
     const menuItems = this._options.items.slice();
     while (menuItems.length > 0) {
       const item = menuItems.shift();
@@ -123,7 +123,7 @@ export class MenubarView extends makeEventTarget(Object)<{
       }
     }
   }
-  unregisterShortcuts(view: BaseView<any>) {
+  unregisterShortcuts(view: BaseView<any, any>) {
     const menuItems = this._options.items.slice();
     while (menuItems.length > 0) {
       const item = menuItems.shift();
