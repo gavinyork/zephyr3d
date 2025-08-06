@@ -22,6 +22,7 @@ import { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
+import type { Metadata } from 'draco3d';
 
 /**
  * Node iterate function type
@@ -139,6 +140,8 @@ export class SceneNode
   /** @internal */
   protected _transformChangeCallback: () => void;
   /** @internal */
+  protected _metaData: Metadata;
+  /** @internal */
   private _disableCallback: boolean;
   /**
    * Creates a new scene node
@@ -179,6 +182,7 @@ export class SceneNode
     this._disableCallback = false;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
+    this._metaData = null;
     if (scene && this !== scene.rootNode) {
       this.reparent(scene.rootNode);
     }
@@ -203,6 +207,15 @@ export class SceneNode
   }
   set persistentId(id: string) {
     this._id = id;
+  }
+  /**
+   * Metadata of the scene
+   */
+  get metaData(): Metadata {
+    return this._metaData;
+  }
+  set metaData(val: Metadata) {
+    this._metaData = val;
   }
   /**
    * Name of the node

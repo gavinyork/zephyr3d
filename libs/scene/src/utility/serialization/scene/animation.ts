@@ -222,9 +222,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
             const trackToRemove = trackList[index];
             if (trackToRemove) {
               this.deleteTrack(trackToRemove);
-              return trackToRemove;
             }
-            return null;
           }
         }
       ];

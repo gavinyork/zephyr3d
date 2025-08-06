@@ -2,8 +2,9 @@ import type { VFS } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import type { ProjectInfo } from '../core/services/project';
 import { VFSRenderer } from './vfsrenderer';
+import { ImGui } from '@zephyr3d/imgui';
 
-export class VFSView {
+export class BottomView {
   private readonly _panel: DockPannel;
   private _renderer: VFSRenderer;
 
@@ -16,8 +17,14 @@ export class VFSView {
     return this._panel;
   }
   render() {
-    if (this._panel.begin('##VFSView')) {
-      this._renderer.render();
+    if (this._panel.begin('##BottomPanel')) {
+      if (ImGui.BeginTabBar('##BottomTabBar')) {
+        if (ImGui.BeginTabItem('Content Browser##VFSView')) {
+          this._renderer.render();
+          ImGui.EndTabItem();
+        }
+        ImGui.EndTabBar();
+      }
     }
     this._panel.end();
   }

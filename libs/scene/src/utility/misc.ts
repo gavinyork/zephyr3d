@@ -9,6 +9,20 @@ import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter/copy';
 
 /**
+ * Metadata interface for storing additional information
+ * @public
+ */
+export interface Metadata {
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | null
+    | Metadata
+    | Array<string | number | boolean | null | undefined | Metadata>;
+}
+
+/**
  * Sampler types
  * @public
  */

@@ -148,18 +148,12 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
     }
   }
   private update(dt: number) {
-    this.model.camera.updateController();
+    this.model.scene.mainCamera.updateController();
     this._view.update(dt);
   }
   private async saveScene() {
-    // Don't export editor camera
-    const parent = this.model.camera.parent;
-    this.model.camera.parent = null;
     await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
     this._sceneChanged = false;
-
-    // Restore editor camera
-    this.model.camera.parent = parent;
   }
   async loadScene(path: string): Promise<Scene> {
     return ProjectService.serializationManager.loadScene(path);

@@ -74,6 +74,7 @@ export class NodeProxy {
       this.updateProxy(src);
       this._proxyList.push(new DWeakRef(proxy));
     }
+    return proxy;
   }
   updateProxy(src: SceneNode) {
     if (src) {

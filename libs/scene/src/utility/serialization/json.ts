@@ -1,4 +1,4 @@
-import { SerializableClass } from '../types';
+import { SerializableClass } from './types';
 
 export class JSONProp {
   parent: JSONData;
@@ -109,11 +109,6 @@ export function getJSONPropClass(): SerializableClass {
           name: 'name',
           type: 'string',
           default: '',
-          options: {
-            test(this: JSONProp, value) {
-              return !!value.str[0] && !value.str[0].startsWith('.');
-            }
-          },
           isHidden(this: JSONProp) {
             return !this.parent || this.name.startsWith('.');
           },
@@ -122,7 +117,7 @@ export function getJSONPropClass(): SerializableClass {
           },
           set(this: JSONProp, value) {
             const data = this.parent;
-            if (!data.value.find((p) => p !== this && p.name === value.str[0])) {
+            if (data && value.str[0] && !data.value.find((p) => p !== this && p.name === value.str[0])) {
               this.name = value.str[0];
               this.parent.updateProps();
             }
@@ -253,8 +248,11 @@ export function getJSONClass(): SerializableClass {
           set(this: JSONData, value, index) {
             if (value === null) {
               this.isnull = true;
-            } else {
+            } else if (index >= 0) {
               this.value[index] = value.object[0] as JSONString | JSONNumber | JSONBool | JSONData;
+              this.updateProps();
+            } else {
+              this.value = value.object.slice() as (JSONString | JSONNumber | JSONBool | JSONData)[];
               this.updateProps();
             }
           },

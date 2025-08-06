@@ -63,10 +63,11 @@ import { calcHierarchyBoundingBox } from '../helpers/misc';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
-import { VFSView } from '../components/vfsview';
+import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
 import { GraphEditor } from '../components/graph/grapheditor';
 import { SceneController } from '../controllers/scenecontroller';
+import { EditorCameraController } from '../helpers/editocontroller';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -75,7 +76,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _toolbar: ToolBar;
   private _tab: Tab;
   private readonly _menubar: MenubarView;
-  private _assetView: VFSView;
+  private _assetView: BottomView;
   private readonly _statusbar: StatusBar;
   private readonly _transformNode: DRef<SceneNode>;
   private _oldTransform: TRS;
@@ -97,7 +98,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
-  private _activeCamera: DRef<Camera>;
   private readonly _currentEditTool: DRef<EditTool>;
   private readonly _cameraAnimationEyeFrom: Vector3;
   private readonly _cameraAnimationTargetFrom: Vector3;
@@ -131,7 +131,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._graphEditor = null;
     this._aabbForEdit = null;
     this._proxy = null;
-    this._activeCamera = new DRef();
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
     this._cameraAnimationTargetFrom = new Vector3();
@@ -416,7 +415,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           action: () => {
             const node = this._tab.sceneHierarchy.selectedNode;
             if (node) {
-              this.lookAt(this.activeCamera, node);
+              this.lookAt(this.controller.model.scene.mainCamera, node);
             }
           }
         },
@@ -502,9 +501,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       16,
       10
     );
-    this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.camera, null);
-    this._postGizmoRenderer.mode = 'select';
-    this._tab = null;
     this._propGrid = new PropertyEditor(
       this._menubar.height + this._toolbar.height,
       this._statusbar.height,
@@ -514,6 +510,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       200,
       0.4
     );
+    this._postGizmoRenderer = null;
+    this._tab = null;
     this._assetView = null;
   }
   get editor() {
@@ -524,9 +522,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   get cmdManager() {
     return this._cmdManager;
-  }
-  get activeCamera() {
-    return this._activeCamera.get();
   }
   reset() {
     this.sceneFinialize();
@@ -567,7 +562,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._toolbar.height -
       this._assetView.panel.height;
     if (viewportWidth > 0 && viewportHeight > 0) {
-      const camera = this.activeCamera;
+      const camera = this.controller.model.scene.mainCamera;
       camera.viewport = [
         this._tab.width,
         this._statusbar.height + this._assetView.panel.height,
@@ -664,7 +659,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         }
         const mousePos = ImGui.GetMousePos();
         const pos = [mousePos.x, mousePos.y];
-        if (this.posToViewport(pos, this.activeCamera.viewport)) {
+        if (this.posToViewport(pos, this.controller.model.scene.mainCamera.viewport)) {
           eventBus.dispatchEvent(
             payload ? 'workspace_drag_drop' : 'workspace_dragging',
             'ASSET',
@@ -691,7 +686,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._animatedCamera) {
       return true;
     }
-    if (this.activeCamera.handleEvent(ev, type)) {
+    if (this.controller.model.scene.mainCamera.handleEvent(ev, type)) {
       return true;
     }
     if (ev instanceof DragEvent) {
@@ -699,7 +694,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
-      const insideViewport = this.posToViewport(p, this.activeCamera.viewport);
+      const insideViewport = this.posToViewport(p, this.controller.model.scene.mainCamera.viewport);
       if (this._postGizmoCaptured) {
         this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button);
         return true;
@@ -785,7 +780,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             //console.log(`Fit to scene: ${hitPos.toString()}`);
             placeNode.position.set(hitPos);
           } else {
-            const ray = this.activeCamera.constructRay(this._mousePosX, this._mousePosY);
+            const ray = this.controller.model.scene.mainCamera.constructRay(this._mousePosX, this._mousePosY);
             let hitDistance = -ray.origin.y / ray.direction.y;
             if (Number.isNaN(hitDistance) || hitDistance < 0) {
               hitDistance = 10;
@@ -852,7 +847,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   protected onActivate(): void {
     super.onActivate();
-    this._assetView = new VFSView(
+    this._assetView = new BottomView(
       ProjectService.VFS,
       this.controller.editor.currentProject,
       0,
@@ -899,7 +894,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private sceneSetup() {
     if (this.controller.model.scene) {
       this._proxy = new NodeProxy(this.controller.model.scene);
-      this._postGizmoRenderer = new PostGizmoRenderer(this.activeCamera, null);
+      this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera, null);
       this._postGizmoRenderer.mode = 'select';
       this._tab = new Tab(
         this.controller.model.scene,
@@ -913,10 +908,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
       this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
       this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._tab.sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy.createProxy(node);
+        if (node === this.controller.model.scene.mainCamera) {
+          this._proxy.hideProxy(node);
+        }
       });
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
       this.controller.model.scene.on('endrender', this.handleEndRender, this);
@@ -927,7 +926,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
       this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
-      this.activateCamera(this.controller.model.camera);
     }
   }
   private sceneFinialize() {
@@ -937,6 +935,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
       this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
       this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._tab.sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._tab = null;
     }
@@ -960,7 +959,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy.dispose();
       this._proxy = null;
     }
-    this.activateCamera(null);
     this.closeAllTrackEditors();
   }
   private renderDeviceInfo() {
@@ -1038,7 +1036,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   update(dt: number) {
     const selectedNode = this._tab.sceneHierarchy.selectedNode;
-    if (selectedNode?.isCamera() && selectedNode !== this.activeCamera) {
+    if (selectedNode?.isCamera() && selectedNode !== this.controller.model.scene.mainCamera) {
       this._proxy.updateProxy(selectedNode);
     }
     const placeNode = this._nodeToBePlaced.get();
@@ -1046,8 +1044,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (placeNode) {
         placeNode.parent = this.controller.model.scene.rootNode;
       }
-      this._activeCamera
-        .get()
+      this.controller.model.scene.mainCamera
         .pickAsync(this._mousePosX, this._mousePosY)
         .then((pickResult) => {
           this._pickResult = pickResult;
@@ -1179,12 +1176,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (!node) {
       return;
     }
-    if (node === this.controller.model.camera) {
-      Dialog.messageBox('Zephyr3d editor', 'Cannot delete editor camera');
+    if (node === this.controller.model.scene.mainCamera) {
+      Dialog.messageBox('Zephyr3d editor', 'Cannot delete main camera');
       return;
-    }
-    if (node === this.activeCamera) {
-      this.activateCamera(this.controller.model.camera);
     }
     if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
       this._tab.sceneHierarchy.selectNode(null);
@@ -1223,7 +1217,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         if (hitPos) {
           placeNode.position.set(hitPos);
         } else {
-          const ray = this.activeCamera.constructRay(p[0], p[1]);
+          const ray = this.controller.model.scene.mainCamera.constructRay(p[0], p[1]);
           let hitDistance = -ray.origin.y / ray.direction.y;
           if (Number.isNaN(hitDistance) || hitDistance < 0) {
             hitDistance = 10;
@@ -1262,7 +1256,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleNodeSelected(node: SceneNode) {
-    this._postGizmoRenderer.node = node === node.scene.rootNode || node === this.activeCamera ? null : node;
+    this._postGizmoRenderer.node =
+      node === node.scene.rootNode || node === this.controller.model.scene.mainCamera ? null : node;
     this._propGrid.object = node === node.scene.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
@@ -1279,7 +1274,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleNodeDoubleClicked(node: SceneNode) {
-    this.lookAt(this.activeCamera, node);
+    this.lookAt(this.controller.model.scene.mainCamera, node);
   }
   private handleAddShape<T extends ShapeType>(shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
     const placeNode = this._nodeToBePlaced.get();
@@ -1426,15 +1421,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       compositor.removePostEffect(this._postGizmoRenderer);
     }
   }
-  private activateCamera(camera: Camera) {
-    if (camera !== this.activeCamera) {
-      if (this._activeCamera) {
-        this._proxy.showProxy(this.activeCamera);
-      }
-      if (camera) {
-        this._proxy.hideProxy(camera);
-      }
-      this._activeCamera.set(camera);
+  private handleSetMainCamera(camera: Camera) {
+    if (camera !== this.controller.model.scene.mainCamera) {
+      this._proxy.showProxy(this.controller.model.scene.mainCamera);
+      this.controller.model.scene.mainCamera.controller = null;
+      this._proxy.hideProxy(camera);
+      this.controller.model.scene.mainCamera = camera;
+      this.controller.model.scene.mainCamera.controller = new EditorCameraController();
       this._postGizmoRenderer.camera = camera;
       this._postGizmoRenderer.node = null;
     }

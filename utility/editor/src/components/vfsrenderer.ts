@@ -126,30 +126,34 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     return this._selectedItems;
   }
   render() {
-    if (this._treePanel.beginChild('##VFSViewTree')) {
-      const contentMin = ImGui.GetWindowPos();
-      const contentMax = new ImGui.ImVec2(
-        contentMin.x + ImGui.GetWindowSize().x,
-        contentMin.y + ImGui.GetWindowSize().y
-      );
+    if (ImGui.BeginChild('##VFSViewContainer', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
+      const pos = ImGui.GetCursorPos();
+      if (this._treePanel.beginChild('##VFSViewTree')) {
+        const contentMin = ImGui.GetWindowPos();
+        const contentMax = new ImGui.ImVec2(
+          contentMin.x + ImGui.GetWindowSize().x,
+          contentMin.y + ImGui.GetWindowSize().y
+        );
 
-      this._navigationBounds = {
-        min: contentMin,
-        max: contentMax
-      };
+        this._navigationBounds = {
+          min: contentMin,
+          max: contentMax
+        };
 
-      if (this._isDragOverNavigation) {
-        this.renderNavigationDropHighlight();
+        if (this._isDragOverNavigation) {
+          this.renderNavigationDropHighlight();
+        }
+        if (this._filesystem) {
+          this.renderDir(this._filesystem);
+        }
       }
-      if (this._filesystem) {
-        this.renderDir(this._filesystem);
-      }
-    }
-    this._treePanel.endChild();
+      this._treePanel.endChild();
 
-    ImGui.SetCursorPos(new ImGui.ImVec2(this._treePanel.width + 8, 0));
-    if (ImGui.BeginChild('##VFSViewContent', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
-      this.renderContentArea();
+      ImGui.SetCursorPos(new ImGui.ImVec2(this._treePanel.width + 8, pos.y));
+      if (ImGui.BeginChild('##VFSViewContent', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
+        this.renderContentArea();
+      }
+      ImGui.EndChild();
     }
     ImGui.EndChild();
   }
@@ -194,7 +198,7 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     this._hoveredItem = null;
     ImGui.BeginChild(
       '##VFSContentToolBar',
-      new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + 2 * ImGui.GetStyle().WindowPadding.y),
+      new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y),
       false
     );
     this.renderToolbar();

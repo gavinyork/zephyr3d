@@ -7,7 +7,7 @@ export abstract class BaseController<
   View extends BaseView<Model, BaseController<Model, View>>
 > {
   constructor() {}
-  get model() {
+  get model(): Model {
     return this.getModel();
   }
   get view() {

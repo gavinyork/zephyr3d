@@ -50,7 +50,6 @@ export type PropertyAccessorOptions = {
   mimeTypes?: string[];
   objectTypes?: GenericConstructor[];
   enum?: { labels: string[]; values: unknown[] };
-  test?: (value: PropertyValue) => boolean;
 };
 
 /**

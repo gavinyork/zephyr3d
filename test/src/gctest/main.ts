@@ -11,13 +11,13 @@ myApp.ready().then(async function () {
   const vfs = new HttpFS('http://localhost:8001/dist/assets');
   const manager = new SerializationManager(vfs);
   const scene = await manager.loadScene('/scenes/test.zscn');
-  const camera = new PerspectiveCamera(scene);
-  camera.controller = new FPSCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera.controller = new FPSCameraController();
+  myApp.inputManager.use(scene.mainCamera.handleEvent.bind(scene.mainCamera));
   myApp.on('tick', function () {
-    camera.updateController();
-    camera.aspect = myApp.device.getDrawingBufferWidth() / myApp.device.getDrawingBufferHeight();
-    camera.render(scene);
+    scene.mainCamera.updateController();
+    (scene.mainCamera as PerspectiveCamera).aspect =
+      myApp.device.getDrawingBufferWidth() / myApp.device.getDrawingBufferHeight();
+    scene.render();
   });
   myApp.run();
 });

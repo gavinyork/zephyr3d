@@ -1,7 +1,7 @@
 import type { GenericConstructor } from '@zephyr3d/base';
 import { makeEventTarget } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { Scene, SerializableClass } from '@zephyr3d/scene';
+import type { Camera, Scene, SerializableClass } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { BatchGroup } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
@@ -12,6 +12,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_request_delete: [node: SceneNode];
   node_double_clicked: [node: SceneNode];
   node_drag_drop: [from: SceneNode, target: SceneNode];
+  set_main_camera: [camea: Camera];
   request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
 }>() {
   private static readonly baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
@@ -134,6 +135,12 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
           }
           ImGui.PopID();
           ImGui.EndMenu();
+        }
+      }
+      if (node.isCamera() && node !== node.scene.mainCamera) {
+        ImGui.Separator();
+        if (ImGui.MenuItem('Make Active')) {
+          this.dispatchEvent('set_main_camera', node);
         }
       }
       ImGui.EndPopup();

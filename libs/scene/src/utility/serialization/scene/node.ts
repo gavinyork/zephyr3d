@@ -9,6 +9,7 @@ import type { Material } from '../../../material';
 import type { Primitive } from '../../../render';
 import type { SerializationManager } from '../manager';
 import { AnimationClip } from '../../../animation';
+import { JSONData } from '../json';
 
 /** @internal */
 export class GatherVisitor implements Visitor<SceneNode> {
@@ -352,6 +353,20 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             if (animation) {
               animationSet.deleteAnimation(name);
             }
+          }
+        },
+        {
+          name: 'Metadata',
+          type: 'object',
+          options: { objectTypes: [JSONData] },
+          isNullable() {
+            return true;
+          },
+          get(this: SceneNode, value) {
+            value.object[0] = this.metaData ? new JSONData(null, this.metaData) : null;
+          },
+          set(this: SceneNode, value) {
+            this.metaData = (value?.object[0] as JSONData)?.data ?? null;
           }
         }
       ];

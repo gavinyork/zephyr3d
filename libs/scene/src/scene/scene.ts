@@ -11,6 +11,7 @@ import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import { DRef, DWeakRef } from '../app';
+import { Metadata } from 'draco3d';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered
@@ -41,6 +42,10 @@ export class Scene extends makeEventTarget(Object)<{
   protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
   /** @internal */
   protected _perCameraUpdateQueue: DWeakRef<SceneNode>[];
+  /** @internal */
+  protected _mainCamera: DRef<Camera>;
+  /** @internal */
+  protected _metaData: Metadata;
   /**
    * Creates an instance of scene
    */
@@ -56,6 +61,8 @@ export class Scene extends makeEventTarget(Object)<{
     this._updateFrame = -1;
     this._rootNode = new DRef(new SceneNode(this));
     this._rootNode.get().name = 'Root';
+    this._metaData = null;
+    this._mainCamera = new DRef();
   }
   /**
    * Gets the unique identifier of the scene
@@ -71,6 +78,15 @@ export class Scene extends makeEventTarget(Object)<{
   }
   set name(val: string) {
     this._name = val ?? '';
+  }
+  /**
+   * Main camera
+   */
+  get mainCamera() {
+    return this._mainCamera.get();
+  }
+  set mainCamera(camera: Camera) {
+    this._mainCamera.set(camera);
   }
   /**
    * Gets the root scene node of the scene
@@ -101,11 +117,21 @@ export class Scene extends makeEventTarget(Object)<{
     return this._env;
   }
   /**
+   * Metadata of the scene
+   */
+  get metaData(): Metadata {
+    return this._metaData;
+  }
+  set metaData(val: Metadata) {
+    this._metaData = val;
+  }
+  /**
    * Disposes the scene
    */
   dispose() {
     this._env.dispose();
     this._rootNode.dispose();
+    this._mainCamera.dispose();
   }
   /**
    * Find scene node by id
@@ -191,6 +217,14 @@ export class Scene extends makeEventTarget(Object)<{
   queuePerCameraUpdateNode(node: SceneNode) {
     if (node && this._perCameraUpdateQueue.findIndex((val) => val.get() === node) < 0) {
       this._perCameraUpdateQueue.push(new DWeakRef(node));
+    }
+  }
+  /**
+   * Render this scene using main camera of the scene
+   */
+  render() {
+    if (this.mainCamera) {
+      this.mainCamera.render(this);
     }
   }
   /** @internal */

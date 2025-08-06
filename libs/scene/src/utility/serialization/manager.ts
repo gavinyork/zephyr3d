@@ -45,7 +45,7 @@ import {
   getJSONNumberClass,
   getJSONPropClass,
   getJSONStringClass
-} from './json/number';
+} from './json';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
