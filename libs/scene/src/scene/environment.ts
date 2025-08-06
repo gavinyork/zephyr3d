@@ -5,7 +5,7 @@ import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
-import type { GPUDataBuffer, TextureCube } from '@zephyr3d/device';
+import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
 import { DRef } from '../app';
 
 /**
@@ -20,6 +20,7 @@ export class EnvLightWrapper {
   private readonly _radianceMap: DRef<TextureCube>;
   private readonly _irradianceMap: DRef<TextureCube>;
   private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _irradianceSHFB: DRef<FrameBuffer>;
   private readonly _irradianceWindow: Vector3;
   private _strength: number;
   /** @internal */
@@ -46,6 +47,7 @@ export class EnvLightWrapper {
     this._radianceMap = new DRef();
     this._irradianceMap = new DRef();
     this._irradianceSH = new DRef();
+    this._irradianceSHFB = new DRef();
     this._irradianceWindow = new Vector3();
     this._strength = 1;
   }
@@ -54,6 +56,7 @@ export class EnvLightWrapper {
     this._envLight?.dispose();
     this._radianceMap.dispose();
     this._irradianceMap.dispose();
+    this._irradianceSHFB.dispose();
     this._irradianceSH.dispose();
   }
   /** @internal */
@@ -116,7 +119,7 @@ export class EnvLightWrapper {
       (this._envLight as EnvIBL).irradianceMap = this.irradianceMap;
     }
   }
-  /** Irradiance SH for environment light type ibl-sh */
+  /** Irradiance SH buffer for environment light type ibl-sh */
   get irradianceSH(): GPUDataBuffer {
     return this._irradianceSH.get();
   }
@@ -124,6 +127,16 @@ export class EnvLightWrapper {
     this._irradianceSH.set(value);
     if (this.type === 'ibl-sh') {
       (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
+    }
+  }
+  /** Irradiance SH texture for environment light type ibl-sh */
+  get irradianceSHFB(): FrameBuffer {
+    return this._irradianceSHFB.get();
+  }
+  set irradianceSHFB(value: FrameBuffer) {
+    this._irradianceSHFB.set(value);
+    if (this.type === 'ibl-sh') {
+      (this._envLight as EnvShIBL).irradianceSHFB = this.irradianceSHFB;
     }
   }
   /** Irradiance SH window for environment light type ibl-sh */

@@ -257,7 +257,7 @@ export class DataTransferVFS extends VFS {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /** {@inheritDoc VFS._deleteDatabase} */
-  protected async _deleteDatabase(): Promise<void> {
+  protected async _wipe(): Promise<void> {
     return;
   }
   /** {@inheritDoc VFS._deleteFileSystem} */

@@ -234,13 +234,17 @@ export class Scene extends makeEventTarget(Object)<{
   /** @internal */
   private updateEnvLight() {
     if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
+      const isWebGL1 = Application.instance.device.type === 'webgl';
       if (!this.env.light.radianceMap) {
         this.env.light.radianceMap = this.env.sky.radianceMap;
       }
       if (!this.env.light.irradianceMap) {
         this.env.light.irradianceMap = this.env.sky.irradianceMap;
       }
-      if (!this.env.light.irradianceSH) {
+      if (isWebGL1 && !this.env.light.irradianceSHFB) {
+        this.env.light.irradianceSHFB = this.env.sky.irradianceSHFB;
+      }
+      if (!isWebGL1 && !this.env.light.irradianceSH) {
         this.env.light.irradianceSH = this.env.sky.irradianceSH;
       }
     }

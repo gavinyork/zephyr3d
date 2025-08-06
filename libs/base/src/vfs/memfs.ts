@@ -271,7 +271,7 @@ export class MemoryFS extends VFS {
   protected async _deleteFileSystem(): Promise<void> {
     return;
   }
-  protected async _deleteDatabase(): Promise<void> {
+  protected async _wipe(): Promise<void> {
     return;
   }
   protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {

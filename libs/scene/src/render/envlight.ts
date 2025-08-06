@@ -2,6 +2,7 @@ import { Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
+  FrameBuffer,
   GPUDataBuffer,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -9,7 +10,8 @@ import type {
   TextureCube
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
-import { DRef } from '../app';
+import { DRef } from '../app/gc/ref';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * Environment light type
@@ -87,16 +89,19 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   private readonly _irradianceSH: DRef<GPUDataBuffer>;
   /** @internal */
+  private readonly _irradianceSHFB: DRef<FrameBuffer>;
+  /** @internal */
   private _irraidanceWindow: Vector3;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
    * @param irradianceSH - The irradiance SH
    */
-  constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer) {
+  constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer, irradianceSHFB?: FrameBuffer) {
     super();
     this._radianceMap = new DRef(radianceMap || null);
     this._irradianceSH = new DRef(irradianceSH || null);
+    this._irradianceSHFB = new DRef(irradianceSHFB || null);
     this._irraidanceWindow = new Vector3();
   }
   /**
@@ -113,6 +118,7 @@ export class EnvShIBL extends EnvironmentLighting {
   dispose() {
     this._radianceMap.dispose();
     this._irradianceSH.dispose();
+    this._irradianceSHFB.dispose();
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
@@ -127,6 +133,13 @@ export class EnvShIBL extends EnvironmentLighting {
   }
   set irradianceSH(value: GPUDataBuffer) {
     this._irradianceSH.set(value);
+  }
+  /** The irradiance sh coeffecients */
+  get irradianceSHFB(): FrameBuffer {
+    return this._irradianceSHFB.get();
+  }
+  set irradianceSHFB(value: FrameBuffer) {
+    this._irradianceSHFB.set(value);
   }
   /** The irradiance sh window */
   get irradianceWindow(): Vector3 {
@@ -145,9 +158,16 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (this.irradianceSH) {
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+      if (Application.instance.device.type === 'webgl') {
+        if (this.irradianceSHFB) {
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.tex2D().uniform(0);
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+        }
+      } else {
+        if (this.irradianceSH) {
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+        }
       }
     }
   }
@@ -160,9 +180,20 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (this.irradianceSH) {
-      bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
-      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+    if (Application.instance.device.type === 'webgl') {
+      if (this.irradianceSHFB) {
+        bg.setTexture(
+          EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH,
+          this.irradianceSHFB.getColorAttachments()[0],
+          fetchSampler('clamp_nearest_nomip')
+        );
+        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+      }
+    } else {
+      if (this.irradianceSH) {
+        bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
+        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+      }
     }
   }
   /**
@@ -214,43 +245,124 @@ export class EnvShIBL extends EnvironmentLighting {
     });
     pb.func('Z_sh_eval', [pb.vec3('v')], function () {
       this.$l.window = this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW];
-      this.$l.c = pb.mul(
-        this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz,
-        this.Z_sh_Y0(this.v),
-        this.window.x
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v), this.window.y)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v), this.window.y)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v), this.window.y)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v), this.window.z)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v), this.window.z)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v), this.window.z)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v), this.window.z)
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v), this.window.z)
-      );
+      if (Application.instance.device.type === 'webgl') {
+        this.$l.c = pb.mul(
+          pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 0.5 / 3), 0)
+            .rgb,
+          this.Z_sh_Y0(this.v),
+          this.window.x
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 0.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y1(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 0.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y2(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y3(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y4(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y5(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y6(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y7(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y8(this.v),
+            this.window.z
+          )
+        );
+      } else {
+        this.$l.c = pb.mul(
+          this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz,
+          this.Z_sh_Y0(this.v),
+          this.window.x
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v), this.window.z)
+        );
+      }
       this.$return(this.c);
     });
     return pb.getGlobalScope().Z_sh_eval(normal);

@@ -61,7 +61,7 @@ export class CubemapSHProjector {
     }
   }
   /**
-   * Projects a cubemap texture into spherical harmonics coefficients.
+   * Projects a cubemap texture into spherical harmonics coefficients and stores them in a GPUBuffer.
    *
    * The method performs Monte Carlo integration over the sphere to compute the first 9 SH coefficients.
    * The results are written to a 3x3 render target where each pixel contains RGB values for one SH coefficient.
@@ -81,20 +81,43 @@ export class CubemapSHProjector {
    * ```
    */
   projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
+    this.projectCubemapToTexture(cubemap, this._renderTarget.get());
+    this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
+  }
+  /**
+   * Projects a cubemap texture into spherical harmonics coefficients and stores them in a 3x3 texture.
+   *
+   * The method performs Monte Carlo integration over the sphere to compute the first 9 SH coefficients.
+   * The results are written to a 3x3 render target where each pixel contains RGB values for one SH coefficient.
+   * The layout is:
+   * - (0,0): Y₀₀  (0,1): Y₁₋₁  (0,2): Y₁₀
+   * - (1,0): Y₁₁  (1,1): Y₂₋₂  (1,2): Y₂₋₁
+   * - (2,0): Y₂₀  (2,1): Y₂₁   (2,2): Y₂₂
+   *
+   * @param cubemap - The input cubemap texture to project
+   * @param outFramebuffer - Framebuffer that contains the 3x3 texture to receive the computed SH coefficients in color attachment slot 0.
+   *
+   * @example
+   * ```typescript
+   * const shTexture = device.createTexture2D('rgba32f', 3, 3); // 9 coefficients * 4 components * 4 bytes
+   * const shFramebuffer = device.createFrameBuffer([shTexture], null);
+   * projector.projectCubemapToTexture(environmentMap, shFramebuffer);
+   * ```
+   */
+  projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer) {
     const device = Application.instance.device;
     const clearColor = new Vector4(0, 0, 0, 1);
     this.init(device);
     device.pushDeviceStates();
     device.setRenderStates(CubemapSHProjector._renderStats);
     device.setProgram(CubemapSHProjector._programInst);
-    device.setFramebuffer(this._renderTarget.get());
+    device.setFramebuffer(framebuffer);
     device.clearFrameBuffer(clearColor, null, null);
     const bindGroup = CubemapSHProjector._bindGroupInst;
     bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
     device.setBindGroup(0, bindGroup);
     this._primitive.get().drawInstanced(9);
     device.popDeviceStates();
-    this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
   /**
    * Initializes the GPU resources needed for SH projection.
@@ -191,11 +214,10 @@ export class CubemapSHProjector {
           if (pb.getDevice().type !== 'webgpu') {
             this.$builtins.pointSize = 1;
           }
-          this.$outputs.shIndex = pb.int(
-            device.type === 'webgl' ? this.$inputs.instanceId : this.$builtins.instanceIndex
-          );
-          this.$l.x = pb.mod(this.$builtins.instanceIndex, 3);
-          this.$l.y = pb.div(this.$builtins.instanceIndex, 3);
+          this.$outputs.shIndex =
+            device.type === 'webgl' ? this.$inputs.instanceId : pb.int(this.$builtins.instanceIndex);
+          this.$l.x = pb.mod(this.$outputs.shIndex, 3);
+          this.$l.y = pb.div(this.$outputs.shIndex, 3);
           this.$l.ndcX = pb.sub(pb.div(pb.add(pb.float(this.x), 0.5), 1.5), 1);
           this.$l.ndcY = pb.sub(pb.div(pb.add(pb.float(this.y), 0.5), 1.5), 1);
           this.$l.$builtins.position = pb.vec4(this.ndcX, this.ndcY, 0, 1);
@@ -268,7 +290,10 @@ export class CubemapSHProjector {
         });
         pb.main(function () {
           this.$l.radiance = pb.textureSampleLevel(this.cubemap, this.$inputs.direction, 0).rgb;
-          this.$l.sh = this.evalBasis(this.$inputs.direction, this.$inputs.shIndex);
+          this.$l.sh = this.evalBasis(
+            this.$inputs.direction,
+            pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
+          );
           this.$outputs.color = pb.vec4(pb.mul(this.radiance, this.sh, this.$inputs.weight), 1);
         });
       }

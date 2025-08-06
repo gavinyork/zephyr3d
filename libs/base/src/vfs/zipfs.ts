@@ -905,7 +905,7 @@ export class ZipFS extends VFS {
   /**
    * No support for deleting database
    */
-  protected async _deleteDatabase(): Promise<void> {
+  protected async _wipe(): Promise<void> {
     return;
   }
   protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {

@@ -2871,6 +2871,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param f - The function to be scheduled
    */
   runNextFrame(f: () => void): void;
+  /**
+   * Asyncronized version of scheduling a function to be executed at the beginning of the next frame
+   *
+   * @param f - The function to be scheduled
+   */
+  runNextFrameAsync(f: () => void): Promise<void>;
   /** Exits from current rendering loop */
   exitLoop(): void;
   /**

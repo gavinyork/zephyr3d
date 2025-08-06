@@ -402,7 +402,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _deleteDatabase(): Promise<void> {
+  protected async _wipe(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.db) {
         this.db.close();

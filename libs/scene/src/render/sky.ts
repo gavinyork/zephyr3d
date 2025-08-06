@@ -105,6 +105,7 @@ export class SkyRenderer {
   private readonly _radianceFrameBuffer: DRef<FrameBuffer>;
   private readonly _irradianceMap: DRef<TextureCube>;
   private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _irradianceSHFB: DRef<FrameBuffer>;
   private readonly _skyDistantLightLut: DRef<FrameBuffer>;
   private readonly _irradianceFrameBuffer: DRef<FrameBuffer>;
   private readonly _radianceMapWidth: number;
@@ -144,6 +145,7 @@ export class SkyRenderer {
     this._radianceMapWidth = 128;
     this._irradianceMap = new DRef();
     this._irradianceSH = new DRef();
+    this._irradianceSHFB = new DRef();
     this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
     this._irradianceMapWidth = 64;
@@ -176,6 +178,7 @@ export class SkyRenderer {
     this._radianceFrameBuffer.dispose();
     this._irradianceMap.dispose();
     this._irradianceSH.dispose();
+    this._irradianceSHFB.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
     if (this._skyDistantLightLut.get()) {
@@ -434,10 +437,27 @@ export class SkyRenderer {
     return this._irradianceMap.get();
   }
   /**
-   * Irradiance SH coeffecients
+   * Irradiance SH coeffecients buffer
    */
   get irradianceSH(): GPUDataBuffer {
+    if (!this._irradianceSH.get()) {
+      const buffer = Application.instance.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
+      this._irradianceSH.set(buffer);
+    }
     return this._irradianceSH.get();
+  }
+  /**
+   * Irradiance SH coeffecients texture
+   */
+  get irradianceSHFB(): FrameBuffer {
+    if (!this._irradianceSHFB.get()) {
+      const device = Application.instance.device;
+      const texture = device.createTexture2D('rgba32f', 3, 3, {
+        samplerOptions: { mipFilter: 'none' }
+      });
+      this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
+    }
+    return this._irradianceSHFB.get();
   }
   /** @internal */
   get irradianceFramebuffer() {
@@ -543,7 +563,8 @@ export class SkyRenderer {
         ctx.scene.env.light.radianceMap &&
         (ctx.scene.env.light.radianceMap === this.radianceMap ||
           ctx.scene.env.light.irradianceMap === this.irradianceMap ||
-          ctx.scene.env.light.irradianceSH === this.irradianceSH)
+          (this._irradianceSH.get() && ctx.scene.env.light.irradianceSH === this.irradianceSH) ||
+          (this._irradianceSHFB.get() && ctx.scene.env.light.irradianceSHFB === this.irradianceSHFB))
       ) {
         prefilterCubemap(
           this._bakedSkyboxTexture.get(),
@@ -557,14 +578,17 @@ export class SkyRenderer {
           this.irradianceFramebuffer,
           this._irradianceConvSamples
         );
-        if (!this.irradianceSH) {
-          const buffer = ctx.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
-          this._irradianceSH.set(buffer);
+        if (ctx.device.type === 'webgl') {
+          this._shProjector.projectCubemapToTexture(
+            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
+            this.irradianceSHFB
+          );
+        } else {
+          this._shProjector.projectCubemap(
+            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
+            this.irradianceSH
+          );
         }
-        this._shProjector.projectCubemap(
-          this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
-          this.irradianceSH
-        );
         ctx.scene.env.light.irradianceSH = this.irradianceSH;
         ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
       }

@@ -5169,6 +5169,21 @@ export class Matrix4x4 extends VectorBase {
     );
   }
   /**
+   * Transform a point by this matrix to homogeneous space.
+   * @param point - The point to be transformed.
+   * @param result - The output vector, if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  transformPointH(point: Vector3, result?: Vector3): Vector3 {
+    result = result || new Vector3();
+    const w = this[3] * point[0] + this[7] * point[1] + this[11] * point[2] + this[15];
+    return result.setXYZ(
+      (this[0] * point[0] + this[4] * point[1] + this[8] * point[2] + this[12]) / w,
+      (this[1] * point[0] + this[5] * point[1] + this[9] * point[2] + this[13]) / w,
+      (this[2] * point[0] + this[6] * point[1] + this[10] * point[2] + this[14]) / w
+    );
+  }
+  /**
    * Transform a point by this matrix and then do a perspective divide.
    * @param point - The point to be transformed.
    * @param result - The output vector, if not specified, a new vector will be created.

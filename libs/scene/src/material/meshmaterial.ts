@@ -702,6 +702,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           }
           if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
+            if (ctx.device.type === 'webgl') {
+              this.$outputs.zDistance2 = pb.vec4();
+              this.$outputs.zDistance3 = pb.vec4();
+            }
           }
         }
         pb.main(function () {
@@ -811,10 +815,19 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
             ? scope.$inputs.zObjectColor
             : scope.zObjectColor;
-        this.$outputs.zDistance = pb.vec4(
-          this.worldPos,
-          pb.distance(ShaderHelper.getCameraPosition(this), this.worldPos)
-        );
+        if (that.drawContext.device.type === 'webgl') {
+          this.$l.ndcPos = pb.mul(ShaderHelper.getViewProjectionMatrix(this), pb.vec4(this.worldPos, 1));
+          this.ndcPos = pb.div(this.ndcPos, this.ndcPos.w);
+          this.$l.normPos = pb.add(pb.mul(this.ndcPos.xyz, 0.5), pb.vec3(0.5));
+          this.$outputs.zDistance = encodeNormalizedFloatToRGBA(this, this.normPos.x);
+          this.$outputs.zDistance2 = encodeNormalizedFloatToRGBA(this, this.normPos.y);
+          this.$outputs.zDistance3 = encodeNormalizedFloatToRGBA(this, this.normPos.z);
+        } else {
+          this.$outputs.zDistance = pb.vec4(
+            this.worldPos,
+            pb.distance(ShaderHelper.getCameraPosition(this), this.worldPos)
+          );
+        }
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {

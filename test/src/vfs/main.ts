@@ -128,7 +128,7 @@ async function testBasicFileOperations() {
   console.log('   - 文件写入/读取: 正常');
   console.log('   - 文件存在检查: 正常');
 */
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testDirectoryOperations() {
@@ -147,7 +147,7 @@ async function testDirectoryOperations() {
   console.log('   - 目录创建: 正常');
   console.log('   - 目录列举: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMountOperations() {
@@ -173,8 +173,8 @@ async function testMountOperations() {
   console.log('   - 文件系统挂载: 正常');
   console.log('   - 文件系统卸载: 正常');
 
-  await rootFS.deleteDatabase();
-  await subFS.deleteDatabase();
+  await rootFS.wipe();
+  await subFS.wipe();
 }
 
 async function testFileCopy() {
@@ -191,7 +191,7 @@ async function testFileCopy() {
 
   console.log('   - 文件复制: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testErrorHandling() {
@@ -216,7 +216,7 @@ async function testErrorHandling() {
 
   console.log('   - 错误处理: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testBinaryData() {
@@ -245,7 +245,7 @@ async function testBinaryData() {
   }
 
   console.log('   - 二进制数据处理: 正常');
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testBinaryDataAppend() {
@@ -294,7 +294,7 @@ async function testBinaryDataAppend() {
   console.log('   - 二进制数据追加: 正常');
   console.log('   - 混合类型追加: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMountPriority() {
@@ -318,9 +318,9 @@ async function testMountPriority() {
   assertEqual(shallowContent, 'from fs1', '应该访问较浅的挂载点');
 
   console.log('   - 挂载优先级: 正常');
-  await rootFS.deleteDatabase();
-  await fs1.deleteDatabase();
-  await fs2.deleteDatabase();
+  await rootFS.wipe();
+  await fs1.wipe();
+  await fs2.wipe();
 }
 
 async function testCrossMountOperations() {
@@ -342,9 +342,9 @@ async function testCrossMountOperations() {
   assertEqual(content, 'cross mount data', '跨挂载复制应该成功');
 
   console.log('   - 跨挂载操作: 正常');
-  await rootFS.deleteDatabase();
-  await fs1.deleteDatabase();
-  await fs2.deleteDatabase();
+  await rootFS.wipe();
+  await fs1.wipe();
+  await fs2.wipe();
 }
 
 async function testFileOptions() {
@@ -372,7 +372,7 @@ async function testFileOptions() {
   assertEqual(appendedContent, 'Hello World', '追加内容应该正确');
 
   console.log('   - 文件选项处理: 正常');
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testStatOperations() {
@@ -396,7 +396,7 @@ async function testStatOperations() {
   assert(dirStat.isDirectory, '应该识别为目录');
 
   console.log('   - 文件状态查询: 正常');
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testLargeFileOperations() {
@@ -447,7 +447,7 @@ async function testLargeFileOperations() {
 
   console.log('   - 大型文件追加: 正常');
   console.log(`   - 处理了 ${numChunks} 个 ${chunkSize} 字节的块`);
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveBasicOperations() {
@@ -476,7 +476,7 @@ async function testMoveBasicOperations() {
   console.log('   - 目录重命名: 正常');
   console.log('   - 内容保持: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveToDirectory() {
@@ -503,7 +503,7 @@ async function testMoveToDirectory() {
   console.log('   - 文件移动到目录: 正常');
   console.log('   - 目录移动到目录: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveComplexDirectory() {
@@ -543,7 +543,7 @@ async function testMoveComplexDirectory() {
   console.log('   - 深层嵌套文件保持: 正常');
   console.log('   - 移动后内容完整: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveOverwrite() {
@@ -588,7 +588,7 @@ async function testMoveOverwrite() {
   console.log('   - 文件覆盖: 正常');
   console.log('   - 目录覆盖: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveErrorHandling() {
@@ -659,7 +659,7 @@ async function testMoveErrorHandling() {
   console.log('   - 类型匹配检查: 正常');
   console.log('   - 父目录检查: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveCrossVFSRestriction() {
@@ -701,9 +701,9 @@ async function testMoveCrossVFSRestriction() {
   console.log('   - 跨VFS移动限制: 正常');
   console.log('   - 同VFS内移动: 正常');
 
-  await rootFS.deleteDatabase();
-  await subFS1.deleteDatabase();
-  await subFS2.deleteDatabase();
+  await rootFS.wipe();
+  await subFS1.wipe();
+  await subFS2.wipe();
 }
 
 async function testMoveWithRelativePaths() {
@@ -738,7 +738,7 @@ async function testMoveWithRelativePaths() {
   console.log('   - 混合路径移动: 正常');
   console.log('   - .. 路径移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMovePreservesMetadata() {
@@ -778,7 +778,7 @@ async function testMovePreservesMetadata() {
   console.log('   - 目录元数据保持: 正常');
   console.log('   - 修改时间更新: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveLargeFiles() {
@@ -808,7 +808,7 @@ async function testMoveLargeFiles() {
   console.log('   - 内容完整性: 正常');
   console.log('   - 性能表现: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveBinaryFiles() {
@@ -839,7 +839,7 @@ async function testMoveBinaryFiles() {
   console.log('   - 二进制文件移动: 正常');
   console.log('   - 二进制数据完整: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveEmptyDirectories() {
@@ -871,7 +871,7 @@ async function testMoveEmptyDirectories() {
   console.log('   - 空目录移动: 正常');
   console.log('   - 空目录到子目录: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveNestedDirectories() {
@@ -914,7 +914,7 @@ async function testMoveNestedDirectories() {
   console.log('   - 结构完整性: 正常');
   console.log(`   - ${depth}层深度处理: 正常`);
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveSpecialCharacters() {
@@ -963,7 +963,7 @@ async function testMoveSpecialCharacters() {
   console.log('   - 多语言字符: 正常');
   console.log('   - 特殊字符目录: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 /*
@@ -1000,7 +1000,7 @@ async function testMoveConcurrentOperations() {
   console.log(`   - ${fileCount}个文件并发移动: 正常`);
   console.log('   - 数据完整性: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 */
 
@@ -1052,7 +1052,7 @@ async function testMoveWithCWD() {
   console.log('   - 上级目录移动: 正常');
   console.log('   - 当前目录相对移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveWithDotPaths() {
@@ -1095,7 +1095,7 @@ async function testMoveWithDotPaths() {
   console.log('   - ../../ 路径移动: 正常');
   console.log('   - 混合路径移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveDirectoryWithCWD() {
@@ -1137,7 +1137,7 @@ async function testMoveDirectoryWithCWD() {
   console.log('   - CWD目录重命名: 正常');
   console.log('   - CWD子目录移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveWithPushdPopd() {
@@ -1184,7 +1184,7 @@ async function testMoveWithPushdPopd() {
   console.log('   - 目录栈状态: 正常');
   console.log('   - popd后移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveCWDValidation() {
@@ -1240,7 +1240,7 @@ async function testMoveCWDValidation() {
   console.log('   - 兄弟目录移动: 正常');
   console.log('   - 不相关目录移动: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveComplexRelativePaths() {
@@ -1313,7 +1313,7 @@ async function testMoveComplexRelativePaths() {
   console.log('   - . 和 .. 组合: 正常');
   console.log('   - 多重..路径: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testMoveCWDPathNormalization() {
@@ -1358,7 +1358,7 @@ async function testMoveCWDPathNormalization() {
   console.log('   - 复杂路径规范化: 正常');
   console.log('   - 目录路径规范化: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testFSEncoding() {
@@ -1395,7 +1395,7 @@ async function testFSEncoding() {
   console.log('\nBase64 write test:');
   console.log('- Decoded:', b64AsString);
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 // 主测试函数
@@ -1507,7 +1507,7 @@ async function testGlobBasicWildcards() {
   console.log('   - 花括号展开: 正常');
   console.log('   - 字符类匹配: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobRecursiveSearch() {
@@ -1544,7 +1544,7 @@ async function testGlobRecursiveSearch() {
   console.log('   - 特定目录搜索: 正常');
   console.log('   - 多级深度搜索: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobOptions() {
@@ -1604,7 +1604,7 @@ async function testGlobOptions() {
   console.log('   - 工作目录控制: 正常');
   console.log('   - 递归控制: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobIgnorePatterns() {
@@ -1629,7 +1629,7 @@ async function testGlobIgnorePatterns() {
   console.log('   - 单个忽略模式: 正常');
   console.log('   - 多个忽略模式: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobMultiplePatterns() {
@@ -1653,7 +1653,7 @@ async function testGlobMultiplePatterns() {
   console.log('   - 多模式匹配: 正常');
   console.log('   - 匹配模式标记: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobComplexPatterns() {
@@ -1680,7 +1680,7 @@ async function testGlobComplexPatterns() {
   console.log('   - 测试文件排除: 正常');
   console.log('   - 组件文件匹配: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobEdgeCases() {
@@ -1698,7 +1698,7 @@ async function testGlobEdgeCases() {
   console.log('   - 空模式处理: 正常');
   console.log('   - 无匹配处理: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testGlobPerformance() {
@@ -1724,7 +1724,7 @@ async function testGlobPerformance() {
   console.log(`   - 大量文件处理: 正常 (${duration}ms)`);
   console.log('   - 限制功能: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 // 在现有测试函数之后添加以下新的测试函数
@@ -1756,7 +1756,7 @@ async function testCwdBasicOperations() {
   console.log('   - chdir 操作: 正常');
   console.log('   - 相对路径操作: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdRelativePathResolution() {
@@ -1794,7 +1794,7 @@ async function testCwdRelativePathResolution() {
   console.log('   - 复杂相对路径: 正常');
   console.log('   - 相对路径文件操作: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdDirectoryStack() {
@@ -1834,7 +1834,7 @@ async function testCwdDirectoryStack() {
   console.log('   - 目录栈管理: 正常');
   console.log('   - 空栈错误处理: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdWithRelativePushd() {
@@ -1865,7 +1865,7 @@ async function testCwdWithRelativePushd() {
   console.log('   - 连续相对操作: 正常');
   console.log('   - .. 路径 pushd: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdJoinAndRelative() {
@@ -1909,7 +1909,7 @@ async function testCwdJoinAndRelative() {
   console.log('   - relative 方法: 正常');
   console.log('   - 路径计算: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdErrorHandling() {
@@ -1947,7 +1947,7 @@ async function testCwdErrorHandling() {
   console.log('   - chdir 错误处理: 正常');
   console.log('   - pushd 错误处理: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdWithMounts() {
@@ -1980,8 +1980,8 @@ async function testCwdWithMounts() {
   console.log('   - 挂载点相对路径: 正常');
   console.log('   - 挂载点目录栈: 正常');
 
-  await rootFS.deleteDatabase();
-  await subFS.deleteDatabase();
+  await rootFS.wipe();
+  await subFS.wipe();
 }
 
 async function testCwdGlobWithRelativePaths() {
@@ -2016,7 +2016,7 @@ async function testCwdGlobWithRelativePaths() {
   console.log('   - 相对路径 glob: 正常');
   console.log('   - 自定义 cwd glob: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdComplexScenarios() {
@@ -2064,7 +2064,7 @@ async function testCwdComplexScenarios() {
   console.log('   - 跨模块文件访问: 正常');
   console.log('   - 相对路径文件创建: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdEdgeCases() {
@@ -2097,7 +2097,7 @@ async function testCwdEdgeCases() {
   console.log('   - 混合路径处理: 正常');
   console.log('   - 根目录边缘情况: 正常');
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 async function testCwdPerformance() {
@@ -2145,7 +2145,7 @@ async function testCwdPerformance() {
   console.log(`   - 路径规范化性能: 正常 (${duration}ms)`);
   console.log(`   - 目录栈性能: 正常 (${stackDuration}ms)`);
 
-  await fs.deleteDatabase();
+  await fs.wipe();
 }
 
 const btn = document.querySelector('#start');

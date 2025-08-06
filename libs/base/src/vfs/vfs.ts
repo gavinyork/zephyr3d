@@ -376,8 +376,8 @@ export abstract class VFS extends makeEventTarget(Object)<{
   /**
    * Delete entire database (for IndexedDB only).
    */
-  async deleteDatabase(): Promise<void> {
-    await this._deleteDatabase();
+  async wipe(): Promise<void> {
+    await this._wipe();
   }
 
   /**
@@ -1224,7 +1224,7 @@ export abstract class VFS extends makeEventTarget(Object)<{
    */
   protected abstract _stat(path: string): Promise<FileStat>;
   protected abstract _deleteFileSystem(): Promise<void>;
-  protected abstract _deleteDatabase(): Promise<void>;
+  protected abstract _wipe(): Promise<void>;
   /**
    * Moves/renames a file or directory within the same VFS.
    * Implementation should avoid file copying and use metadata operations only.

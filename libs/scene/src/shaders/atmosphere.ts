@@ -2,6 +2,7 @@ import type {
   AbstractDevice,
   BindGroup,
   FrameBuffer,
+  GPUDataBuffer,
   GPUProgram,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -391,13 +392,12 @@ export function integralMultiScattering(
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_integralMultiScattering';
   pb.func(funcName, [Params('params'), pb.vec3('lightDir'), pb.vec3('samplePoint')], function () {
-    this.$l.sphereSamples = uniformSphereSamples.map((val) => pb.vec3(val.x, val.y, val.z));
     const uniformPhase = 1 / (4 * Math.PI);
     const sphereSolidAngle = (4 * Math.PI) / N_DIRECTION;
     this.$l.G_2 = pb.vec3(0);
     this.$l.f_ms = pb.vec3(0);
     this.$for(pb.int('i'), 0, N_DIRECTION, function () {
-      this.$l.viewDir = this.sphereSamples.at(this.i);
+      this.$l.viewDir = this.uniformSphereSamples.at(this.i).xyz;
       this.$l.dis = rayIntersectSphere(
         this,
         pb.vec3(0),
@@ -804,98 +804,47 @@ export function aerialPerspectiveLut(
   );
   const funcName = 'z_aerialPerspectiveLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim'), pb.float('cameraPosY')], function () {
-    if (1) {
-      this.$l.uvw = pb.vec3(this.uv, 0);
-      this.uvw.x = pb.mul(this.uvw.x, this.dim.x, this.dim.z);
-      this.uvw.z = pb.div(pb.floor(pb.div(this.uvw.x, this.dim.z)), this.dim.x);
-      this.uvw.x = pb.div(pb.mod(this.uvw.x, this.dim.z), this.dim.x);
-      this.uvw = pb.add(this.uvw, pb.div(pb.vec3(0.5), this.dim));
-      this.$l.slice = this.uvw.z; //pb.mul(this.uvw.z, this.uvw.z);
-      this.$l.viewDir = pb.normalize(
-        pb.mul(
-          this.params.cameraWorldMatrix,
-          pb.vec4(
-            pb.sub(pb.mul(this.uvw.x, 2), 1),
-            pb.div(pb.sub(pb.mul(this.uvw.y, 2), 1), this.params.cameraAspect),
-            -1,
-            0
-          )
-        ).xyz
-      );
-      this.$l.eyePos = pb.vec3(
-        0,
-        pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
-        0
-      );
-      this.$l.maxDis = pb.mul(this.slice, this.params.apDistance);
-      /*
-      this.$l.adjustedMaxDis = this.maxDis;
-      this.eyePos = this[funcNameFixVoxel](
-        this.params,
-        this.eyePos,
-        this.viewDir,
-        this.maxDis,
-        this.adjustedMaxDis
-      );
-      */
-      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
-      this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
-        this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
-        this.maxDis = pb.length(pb.sub(this.eyePos, this.voxelPos));
-        /*
-        this.maxDis = pb.div(
-          pb.mul(this.maxDis, pb.sub(this.eyePos.y, this.params.plantRadius)),
-          pb.sub(this.eyePos.y, this.voxelPos.y)
-        );
-        this.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
-        */
-      });
-      this.$l.color = getSkyView(
-        this,
-        this.params,
-        this.eyePos,
-        this.viewDir,
-        this.maxDis,
-        texTransmittanceLut,
-        texMultiScatteringLut
-      );
-      this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
-      this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
-      this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
-      //this.$l.t = transmittance(this, this.params, this.eyePos, this.voxelPos);
-      this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
-    } else {
-      this.$l.slice = pb.clamp(pb.floor(pb.mul(this.uv.x, this.dim.z)), 0, pb.sub(this.dim.z, 1));
-      this.$l.sliceU = pb.clamp(pb.mul(pb.sub(this.uv.x, pb.div(this.slice, this.dim.z)), this.dim.z), 0, 1);
-      this.$l.sliceDist = pb.div(this.slice, this.dim.z);
-      this.$l.horizonAngle = pb.sub(pb.mul(this.sliceU, Math.PI * 2), Math.PI);
-      this.$l.zenithAngle = pb.mul(this.uv.y, Math.PI / 2);
-      this.$l.rayDir = pb.vec3(
-        pb.mul(pb.cos(this.zenithAngle), pb.sin(this.horizonAngle)),
-        pb.sin(this.zenithAngle),
-        pb.mul(pb.neg(pb.cos(this.zenithAngle)), pb.cos(this.horizonAngle))
-      );
-      this.$l.eyePos = pb.vec3(
-        0,
-        pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
-        0
-      );
-      this.$l.maxDis = pb.mul(this.params.apDistance, this.sliceDist);
-      this.$l.color = getSkyView(
-        this,
-        this.params,
-        this.eyePos,
-        this.rayDir,
-        this.maxDis,
-        texTransmittanceLut,
-        texMultiScatteringLut
-      );
-      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.rayDir, this.maxDis));
-      this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.rayDir, texTransmittanceLut);
-      this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.rayDir, texTransmittanceLut);
-      this.$l.t = pb.div(this.t1, this.t2);
-      this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
-    }
+    this.$l.uvw = pb.vec3(this.uv, 0);
+    this.uvw.x = pb.mul(this.uvw.x, this.dim.x, this.dim.z);
+    this.uvw.z = pb.div(pb.floor(pb.div(this.uvw.x, this.dim.z)), this.dim.x);
+    this.uvw.x = pb.div(pb.mod(this.uvw.x, this.dim.z), this.dim.x);
+    this.uvw = pb.add(this.uvw, pb.div(pb.vec3(0.5), this.dim));
+    this.$l.slice = this.uvw.z; //pb.mul(this.uvw.z, this.uvw.z);
+    this.$l.viewDir = pb.normalize(
+      pb.mul(
+        this.params.cameraWorldMatrix,
+        pb.vec4(
+          pb.sub(pb.mul(this.uvw.x, 2), 1),
+          pb.div(pb.sub(pb.mul(this.uvw.y, 2), 1), this.params.cameraAspect),
+          -1,
+          0
+        )
+      ).xyz
+    );
+    this.$l.eyePos = pb.vec3(
+      0,
+      pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
+      0
+    );
+    this.$l.maxDis = pb.mul(this.slice, this.params.apDistance);
+    this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
+    this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
+      this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
+      this.maxDis = pb.length(pb.sub(this.eyePos, this.voxelPos));
+    });
+    this.$l.color = getSkyView(
+      this,
+      this.params,
+      this.eyePos,
+      this.viewDir,
+      this.maxDis,
+      texTransmittanceLut,
+      texMultiScatteringLut
+    );
+    this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
+    this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
+    this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
+    this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
   });
   return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y);
 }
@@ -1007,6 +956,7 @@ let transmittanceFramebuffer: FrameBuffer = undefined;
 
 let multiScatteringLutBindGroup: BindGroup = undefined;
 let multiScatteringLUT: Texture2D = undefined;
+let uniformSphereSampleBuffer: GPUDataBuffer = undefined;
 let multiScatteringFramebuffer: FrameBuffer = undefined;
 
 let skyViewLutBindGroup: BindGroup = undefined;
@@ -1131,6 +1081,7 @@ export function createMultiScatteringLutProgram(device: AbstractDevice) {
     fragment(pb) {
       const Params = getAtmosphereParamsStruct(pb);
       this.params = Params().uniform(0);
+      this.uniformSphereSamples = pb.vec4[64]().uniformBuffer(0);
       this.transmittanceLut = pb.tex2D().uniform(0);
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
@@ -1157,6 +1108,15 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
       });
       multiScatteringLUT.name = 'DebugMultiScatteringLut';
       multiScatteringFramebuffer = device.createFrameBuffer([multiScatteringLUT], null);
+      uniformSphereSampleBuffer = device.createBuffer(64 * 4 * 4, { usage: 'uniform' });
+      const sphereSamples = new Float32Array(64 * 4);
+      for (let i = 0; i < 64; i++) {
+        sphereSamples[i * 4 + 0] = uniformSphereSamples[i].x;
+        sphereSamples[i * 4 + 1] = uniformSphereSamples[i].y;
+        sphereSamples[i * 4 + 2] = uniformSphereSamples[i].z;
+        sphereSamples[i * 4 + 3] = 0;
+      }
+      uniformSphereSampleBuffer.bufferSubData(0, sphereSamples);
     } catch (err) {
       console.error(err);
       multiScatteringLutProgram = null;
@@ -1167,6 +1127,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
   if (multiScatteringLutProgram) {
     multiScatteringLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     multiScatteringLutBindGroup.setValue('params', params);
+    multiScatteringLutBindGroup.setBuffer('uniformSphereSamples', uniformSphereSampleBuffer);
     multiScatteringLutBindGroup.setTexture(
       'transmittanceLut',
       transmittanceLUT,
