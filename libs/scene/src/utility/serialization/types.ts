@@ -50,6 +50,7 @@ export type PropertyAccessorOptions = {
   mimeTypes?: string[];
   objectTypes?: GenericConstructor[];
   enum?: { labels: string[]; values: unknown[] };
+  test?: (value: PropertyValue) => boolean;
 };
 
 /**
@@ -67,7 +68,7 @@ export type PropertyAccessor<T = object> = {
   get: (this: T, value: PropertyValue) => void;
   set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   create?: (this: T, ctor: GenericConstructor, index: number) => object;
-  delete?: (this: T, index: number) => object;
+  delete?: (this: T, index: number) => void | Promise<void>;
   add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
   isValid?: (this: T) => boolean;
   isNullable?: (this: T, index: number) => boolean;

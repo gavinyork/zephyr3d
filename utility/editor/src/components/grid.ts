@@ -375,6 +375,9 @@ export class PropertyEditor extends makeEventTarget(Object)<{
     if (group.prop?.isValid && group.object && !group.prop.isValid.call(group.object)) {
       return;
     }
+    if (group.prop?.options?.test && !group.prop.options.test.call(group.object, group.value)) {
+      return;
+    }
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     ImGui.TableNextColumn();
@@ -426,9 +429,12 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 ? group.prop.create.call(group.object, ctor, group.index)
                 : new ctor()
               : null;
-            group.prop.set.call(group.object, { object: [newObj] }, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop);
-            this.refresh();
+            const value = { object: [newObj] };
+            if (!group.prop.options?.test || group.prop.options.test.call(group.object, value)) {
+              group.prop.set.call(group.object, value, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+            }
           }
         }
         if (addable) {
@@ -752,10 +758,12 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 const payload = ImGui.AcceptDragDropPayload('ASSET');
                 if (payload) {
                   tmpProperty.str[0] = ProjectService.VFS.relative(payload.Data as string);
-                  Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
-                    this.refresh();
-                  });
-                  this.dispatchEvent('object_property_changed', object, value);
+                  if (!value.options?.test || value.options.test.call(object, tmpProperty)) {
+                    Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                      this.refresh();
+                    });
+                    this.dispatchEvent('object_property_changed', object, value);
+                  }
                 }
               }
             }
@@ -784,7 +792,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
           }
         }
       }
-      if (changed && value.set) {
+      if (changed && value.set && (!value.options?.test || value.options.test.call(object, tmpProperty))) {
         value.set.call(object, tmpProperty);
         this.refresh();
         this.dispatchEvent('object_property_changed', object, value);

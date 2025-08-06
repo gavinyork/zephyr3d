@@ -39,7 +39,13 @@ import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
-import { getJSONClass, getJSONNumberClass, getJSONPropClass, getJSONStringClass } from './json/number';
+import {
+  getJSONBoolClass,
+  getJSONClass,
+  getJSONNumberClass,
+  getJSONPropClass,
+  getJSONStringClass
+} from './json/number';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -84,6 +90,7 @@ export class SerializationManager {
         getJSONPropClass(),
         getJSONNumberClass(),
         getJSONStringClass(),
+        getJSONBoolClass(),
         getJSONClass(),
         getAABBClass(),
         getInterpolatorClass(),

@@ -351,9 +351,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             const animation = animationSet.getAnimationClip(name);
             if (animation) {
               animationSet.deleteAnimation(name);
-              return animation;
             }
-            return null;
           }
         }
       ];

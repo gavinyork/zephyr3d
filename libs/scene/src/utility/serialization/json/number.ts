@@ -6,13 +6,13 @@ export class JSONProp {
   constructor(data: JSONData) {
     this.parent = data;
     if (this.parent) {
-      let i = 1;
-      while (true) {
-        if (!data.value.find((p) => p.name === `prop${i}`)) {
+      for (let i = 1; ; i++) {
+        const name = `field${i}`;
+        if (!this.parent.value.find((p) => p.name === name)) {
+          this.name = name;
           break;
         }
       }
-      this.name = `field${i}`;
     } else {
       this.name = '';
     }
@@ -35,51 +35,64 @@ export class JSONNumber extends JSONProp {
   }
 }
 
-export class JSONData extends JSONProp {
-  value: JSONProp[];
-  data: object;
-  constructor(parent: JSONData) {
-    super(parent);
-    this.value = [];
+export class JSONBool extends JSONProp {
+  value: boolean;
+  constructor(data: JSONData, value = false) {
+    super(data);
+    this.value = value;
   }
-  static fromObject(obj: object): JSONData {
-    if (!obj) {
-      return null;
+}
+
+export class JSONArray extends JSONProp {}
+
+export class JSONData extends JSONProp {
+  value: (JSONNumber | JSONString | JSONBool | JSONData)[];
+  data: object;
+  isnull: boolean;
+  isundefined: boolean;
+  constructor(parent: JSONData, data: object = {}) {
+    super(parent);
+    this.updateObject(data);
+  }
+  updateObject(data: object) {
+    this.value = [];
+    this.data = data;
+    this.isnull = this.data === null;
+    if (this.data) {
+      this.parseObject();
     }
-    const data = new JSONData(null);
-    for (const key of Object.keys(obj)) {
-      const val = obj[key];
-      let prop: JSONProp;
+  }
+  parseObject() {
+    for (const key of Object.keys(this.data)) {
+      const val = this.data[key];
+      let prop: JSONString | JSONNumber | JSONBool | JSONData;
       if (typeof val === 'string') {
-        prop = new JSONString(data, val);
+        prop = new JSONString(this, val);
       } else if (typeof val === 'number') {
-        prop = new JSONNumber(data, val);
-      } else if (typeof val === 'object' && val !== null) {
-        prop = JSONData.fromObject(val);
-        (prop as JSONData).parent = data;
+        prop = new JSONNumber(this, val);
+      } else if (typeof val === 'boolean') {
+        prop = new JSONBool(this, val);
+      } else if (typeof val === 'object') {
+        prop = new JSONData(this, val);
       } else {
         continue;
       }
       prop.name = key;
-      data.value.push(prop);
+      this.value.push(prop);
     }
-    return data;
   }
-  static toObject(data: JSONData): object {
-    if (!data) {
-      return null;
+  updateProps(): object {
+    for (const key of Object.keys(this.data)) {
+      delete this.data[key];
     }
-    const obj = {};
-    for (const prop of data.value) {
-      if (prop instanceof JSONString) {
-        obj[prop.name] = prop.value;
-      } else if (prop instanceof JSONNumber) {
-        obj[prop.name] = prop.value;
-      } else if (prop instanceof JSONData) {
-        obj[prop.name] = JSONData.toObject(prop);
+    for (const prop of this.value) {
+      if (prop instanceof JSONData) {
+        this.data[prop.name] = prop.data;
+      } else {
+        this.data[prop.name] = prop.value;
       }
     }
-    return obj;
+    return this.data;
   }
 }
 
@@ -96,6 +109,14 @@ export function getJSONPropClass(): SerializableClass {
           name: 'name',
           type: 'string',
           default: '',
+          options: {
+            test(this: JSONProp, value) {
+              return !!value.str[0] && !value.str[0].startsWith('.');
+            }
+          },
+          isHidden(this: JSONProp) {
+            return !this.parent || this.name.startsWith('.');
+          },
           get(this: JSONProp, value) {
             value.str[0] = this.name;
           },
@@ -103,6 +124,7 @@ export function getJSONPropClass(): SerializableClass {
             const data = this.parent;
             if (!data.value.find((p) => p !== this && p.name === value.str[0])) {
               this.name = value.str[0];
+              this.parent.updateProps();
             }
           }
         }
@@ -124,11 +146,17 @@ export function getJSONStringClass(): SerializableClass {
         {
           name: 'value',
           type: 'string',
+          isHidden() {
+            return this.name.startsWith('.');
+          },
           get(this: JSONString, value) {
             value.str[0] = this.value;
           },
           set(this: JSONString, value) {
-            this.value = value.str[0];
+            if (this.value !== value.str[0]) {
+              this.value = value.str[0];
+              this.parent.updateProps();
+            }
           }
         }
       ];
@@ -149,11 +177,48 @@ export function getJSONNumberClass(): SerializableClass {
         {
           name: 'value',
           type: 'float',
+          isHidden() {
+            return this.name.startsWith('.');
+          },
           get(this: JSONNumber, value) {
             value.num[0] = this.value;
           },
           set(this: JSONNumber, value) {
-            this.value = value.num[0];
+            if (this.value !== value.num[0]) {
+              this.value = value.num[0];
+              this.parent.updateProps();
+            }
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getJSONBoolClass(): SerializableClass {
+  return {
+    ctor: JSONBool,
+    parent: JSONProp,
+    noTitle: true,
+    createFunc(ctx: JSONData) {
+      return { obj: new JSONBool(ctx) };
+    },
+    getProps() {
+      return [
+        {
+          name: 'value',
+          type: 'bool',
+          isHidden() {
+            return this.name.startsWith('.');
+          },
+          get(this: JSONBool, value) {
+            value.bool[0] = this.value;
+          },
+          set(this: JSONBool, value) {
+            if (this.value !== value.bool[0]) {
+              this.value = value.bool[0];
+              this.parent.updateProps();
+            }
           }
         }
       ];
@@ -164,6 +229,8 @@ export function getJSONNumberClass(): SerializableClass {
 export function getJSONClass(): SerializableClass {
   return {
     ctor: JSONData,
+    parent: JSONProp,
+    noTitle: true,
     createFunc(ctx) {
       return { obj: new JSONData(ctx instanceof JSONData ? ctx : null) };
     },
@@ -172,26 +239,36 @@ export function getJSONClass(): SerializableClass {
         {
           name: 'JSONData',
           type: 'object_array',
-          options: { objectTypes: [JSONString, JSONNumber, JSONData] },
+          options: { objectTypes: [JSONString, JSONNumber, JSONBool, JSONData] },
           default: [],
           isNullable() {
             return true;
+          },
+          isHidden() {
+            return this.name.startsWith('.');
           },
           get(this: JSONData, value) {
             value.object = this.value.slice();
           },
           set(this: JSONData, value, index) {
-            this.value = value.object.slice() as JSONProp[];
+            if (value === null) {
+              this.isnull = true;
+            } else {
+              this.value[index] = value.object[0] as JSONString | JSONNumber | JSONBool | JSONData;
+              this.updateProps();
+            }
           },
           create(this: JSONData, ctor) {
-            const c = ctor as typeof JSONString | typeof JSONNumber | typeof JSONData;
+            const c = ctor as typeof JSONString | typeof JSONNumber | typeof JSONBool | typeof JSONData;
             return c ? new c(this) : null;
           },
           add(this: JSONData, value, index) {
-            this.value.splice(index, 0, value.object[0] as JSONString | JSONNumber | JSONData);
+            this.value.splice(index, 0, value.object[0] as JSONString | JSONNumber | JSONBool | JSONData);
+            this.updateProps();
           },
           delete(this: JSONData, index) {
-            return this.value.splice(index, 1)[0];
+            this.value.splice(index, 1);
+            this.updateProps();
           }
         }
       ];
