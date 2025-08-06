@@ -541,7 +541,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
-    this._assetView.panel.top = ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300;
+    this._assetView.panel.top =
+      ImGui.GetIO().DisplaySize.y - this._statusbar.height - this._assetView.panel.height;
     this._assetView.panel.width = Math.max(0, displaySize.x - this._propGrid.width);
     this._tab.height =
       displaySize.y -
@@ -870,6 +871,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.on('workspace_dragging', this.handleWorkspaceDragging, this);
     eventBus.on('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
     this.reset();
+    this._tab.sceneHierarchy.selectNode(this.controller.model.scene.rootNode);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
