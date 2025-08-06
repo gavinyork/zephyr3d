@@ -98,8 +98,12 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   getDynamicOffsets(): number[] {
     return this._dynamicOffsets;
   }
-  getBuffer(name: string): GPUDataBuffer {
-    return this._getBuffer(name, GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE, true);
+  getBuffer(name: string, nocreate = true): GPUDataBuffer {
+    return this._getBuffer(
+      name,
+      GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE,
+      nocreate
+    );
   }
   setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;

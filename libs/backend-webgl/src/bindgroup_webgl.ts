@@ -46,8 +46,8 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getLayout(): BindGroupLayout {
     return this._layout;
   }
-  getBuffer(name: string): GPUDataBuffer {
-    return this._getBuffer(name, true);
+  getBuffer(name: string, nocreate = true): GPUDataBuffer {
+    return this._getBuffer(name, nocreate);
   }
   getDynamicOffsets(): number[] {
     return this._dynamicOffsets;

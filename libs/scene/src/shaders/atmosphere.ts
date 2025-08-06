@@ -934,7 +934,7 @@ export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
   if (checkResult.transmittance || !transmittanceLUT) {
     renderTransmittanceLut(currentAtmosphereParams);
   }
-  if (checkResult.multiScattering || !multiScatteringLUT) {
+  if (true || checkResult.multiScattering || !multiScatteringLUT) {
     renderMultiScatteringLut(currentAtmosphereParams);
   }
   if (checkResult.skyView || !skyViewLUT) {
@@ -1108,7 +1108,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
       });
       multiScatteringLUT.name = 'DebugMultiScatteringLut';
       multiScatteringFramebuffer = device.createFrameBuffer([multiScatteringLUT], null);
-      uniformSphereSampleBuffer = device.createBuffer(64 * 4 * 4, { usage: 'uniform' });
+      uniformSphereSampleBuffer = multiScatteringLutBindGroup.getBuffer('uniformSphereSamples', false);
       const sphereSamples = new Float32Array(64 * 4);
       for (let i = 0; i < 64; i++) {
         sphereSamples[i * 4 + 0] = uniformSphereSamples[i].x;
@@ -1127,7 +1127,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
   if (multiScatteringLutProgram) {
     multiScatteringLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     multiScatteringLutBindGroup.setValue('params', params);
-    multiScatteringLutBindGroup.setBuffer('uniformSphereSamples', uniformSphereSampleBuffer);
+    //multiScatteringLutBindGroup.setBuffer('uniformSphereSamples', uniformSphereSampleBuffer);
     multiScatteringLutBindGroup.setTexture(
       'transmittanceLut',
       transmittanceLUT,

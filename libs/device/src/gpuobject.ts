@@ -1545,7 +1545,7 @@ export interface BindGroup extends GPUObject<unknown> {
   getLayout(): BindGroupLayout;
   getDynamicOffsets(): number[];
   getGPUId(): string;
-  getBuffer(name: string): GPUDataBuffer;
+  getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
   getTexture(name: string): BaseTexture;
   setBuffer(
     name: string,
