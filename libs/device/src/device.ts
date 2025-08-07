@@ -505,7 +505,7 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
       this._frameInfo.nextFrameCall.push(f);
     }
   }
-  runNextFrameAsync(f: () => void): Promise<void> {
+  async runNextFrameAsync(f: () => void): Promise<void> {
     return new Promise((resolve) => {
       if (f) {
         this._frameInfo.nextFrameCall.push(() => {

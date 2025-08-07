@@ -506,7 +506,7 @@ export class SceneRenderer {
       false,
       1,
       1,
-      isWebGL1 ? ['rgba8unorm', 'rgba8unorm', 'rgba8unorm', 'rgba8unorm'] : ['rgba8unorm', 'rgba32f'],
+      isWebGL1 ? ['rgba8unorm', 'rgba8unorm'] : ['rgba8unorm', 'rgba32f'],
       ctx.depthFormat,
       false
     );
@@ -521,8 +521,6 @@ export class SceneRenderer {
       this._pickCamera.rotation,
       this._pickCamera.position
     );
-    const cameraPos = isWebGL1 ? new Vector3(this._pickCamera.position) : null;
-    const invViewProjMatrix = isWebGL1 ? new Matrix4x4(camera.getInvProjectionMatrix()) : null;
     let left = camera.getProjectionMatrix().getLeftPlane();
     let right = camera.getProjectionMatrix().getRightPlane();
     let bottom = camera.getProjectionMatrix().getBottomPlane();
@@ -540,6 +538,8 @@ export class SceneRenderer {
         ? Matrix4x4.frustum(left, right, bottom, top, near, far)
         : Matrix4x4.ortho(left, right, bottom, top, near, far)
     );
+    const cameraPos = isWebGL1 ? new Vector3(this._pickCamera.position) : null;
+    const ray = isWebGL1 ? camera.constructRay(camera.getPickPosX(), camera.getPickPosY()) : null;
     ctx.device.setFramebuffer(fb);
     this._objectColorPass.clearColor = Vector4.zero();
     this._objectColorPass.clearDepth = 1;
@@ -550,20 +550,14 @@ export class SceneRenderer {
     ctx.device.popDeviceStates();
     const colorTex = fb.getColorAttachments()[0];
     const distanceTex = fb.getColorAttachments()[1];
-    const distanceTex2 = isWebGL1 ? fb.getColorAttachments()[2] : null;
-    const distanceTex3 = isWebGL1 ? fb.getColorAttachments()[3] : null;
     const colorPixels = new Uint8Array(4);
     const distancePixels = isWebGL1 ? new Uint8Array(4) : new Float32Array(4);
-    const distancePixels2 = isWebGL1 ? new Uint8Array(4) : null;
-    const distancePixels3 = isWebGL1 ? new Uint8Array(4) : null;
     const device = ctx.device;
     let fence: Promise<void[]>;
     if (ctx.device.type === 'webgl') {
       fence = Promise.all([
         ctx.device.runNextFrameAsync(() => colorTex.readPixels(0, 0, 1, 1, 0, 0, colorPixels)),
-        ctx.device.runNextFrameAsync(() => distanceTex.readPixels(0, 0, 1, 1, 0, 0, distancePixels)),
-        ctx.device.runNextFrameAsync(() => distanceTex2.readPixels(0, 0, 1, 1, 0, 0, distancePixels2)),
-        ctx.device.runNextFrameAsync(() => distanceTex3.readPixels(0, 0, 1, 1, 0, 0, distancePixels3))
+        ctx.device.runNextFrameAsync(() => distanceTex.readPixels(0, 0, 1, 1, 0, 0, distancePixels))
       ]);
     } else {
       fence = Promise.all([
@@ -574,16 +568,12 @@ export class SceneRenderer {
     fence
       .then(() => {
         const drawable = renderQueue.getDrawableByColor(colorPixels);
-        let x = isWebGL1 ? this.decodeNormalizedFloat(distancePixels as Uint8Array) : distancePixels[0];
-        let y = isWebGL1 ? this.decodeNormalizedFloat(distancePixels2 as Uint8Array) : distancePixels[1];
-        let z = isWebGL1 ? this.decodeNormalizedFloat(distancePixels3 as Uint8Array) : distancePixels[2];
-        let d = distancePixels[3];
-        const intersectedPoint = new Vector3(x, y, z);
+        let d = isWebGL1 ? this.decodeNormalizedFloat(distancePixels as Uint8Array) * far : distancePixels[0];
+        const intersectedPoint = new Vector3(distancePixels[0], distancePixels[1], distancePixels[2]);
         if (isWebGL1) {
-          intersectedPoint.x = x * 2 - 1;
-          intersectedPoint.y = y * 2 - 1;
-          intersectedPoint.z = z * 2 - 1;
-          invViewProjMatrix.transformPointH(intersectedPoint, intersectedPoint);
+          intersectedPoint.x = cameraPos.x + ray.direction.x * d;
+          intersectedPoint.y = cameraPos.y + ray.direction.y * d;
+          intersectedPoint.z = cameraPos.z + ray.direction.z * d;
           d = Vector3.distance(intersectedPoint, cameraPos);
         }
         pickResolveFunc(

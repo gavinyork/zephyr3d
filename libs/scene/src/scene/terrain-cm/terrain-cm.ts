@@ -90,6 +90,7 @@ export class ClipmapTerrain
   private _grassAssetId: string;
   private _minHeight: number;
   private _maxHeight: number;
+  private _tmpTexture: DRef<Texture2D>;
   /**
    * Creates a new clipmap terrain instance.
    *
@@ -118,6 +119,7 @@ export class ClipmapTerrain
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
     );
+    this._tmpTexture = new DRef();
     this.updateRegion();
     scene.queuePerCameraUpdateNode(this);
   }
@@ -399,17 +401,25 @@ export class ClipmapTerrain
    * terrain.updateBoundingBox();
    * ```
    */
-  updateBoundingBox(tmpTexture?: Texture2D) {
+  updateBoundingBox() {
     const heightMap = this.heightMap;
     const device = Application.instance.device;
-    const tmp =
-      tmpTexture && tmpTexture.width === heightMap.width && tmpTexture.height === heightMap.height
-        ? tmpTexture
-        : Application.instance.device.createTexture2D(
-            device.type === 'webgl' ? 'rgba32f' : 'rg32f',
-            heightMap.width,
-            heightMap.height
-          );
+    let tmp = this._tmpTexture.get();
+    if (
+      tmp &&
+      (tmp.width !== heightMap.width || tmp.height !== heightMap.height || tmp.format !== heightMap.format)
+    ) {
+      this._tmpTexture.dispose();
+    }
+    if (!this._tmpTexture.get()) {
+      tmp = Application.instance.device.createTexture2D(
+        device.type === 'webgl' ? 'rgba32f' : 'rg32f',
+        heightMap.width,
+        heightMap.height
+      );
+      tmp.name = 'TerrainBoundingBoxTexture';
+      this._tmpTexture.set(tmp);
+    }
     const tmpFB = device.createFrameBuffer([tmp], null);
     ClipmapTerrain._copyBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
     tmpFB.dispose();
@@ -424,11 +434,6 @@ export class ClipmapTerrain
       })
       .catch((_err) => {
         console.error('Read pixels failed');
-      })
-      .finally(() => {
-        if (tmp !== tmpTexture) {
-          tmp.dispose();
-        }
       });
   }
   /** @internal */

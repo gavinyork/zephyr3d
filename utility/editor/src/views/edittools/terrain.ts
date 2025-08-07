@@ -167,7 +167,7 @@ export class TerrainEditTool implements EditTool {
       }
     );
     heightMapCopy.name = 'heightMapCopy';
-    blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_linear_nomip'));
+    blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._heightMapCopy = new DRef(heightMapCopy);
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {

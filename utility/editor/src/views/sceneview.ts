@@ -693,6 +693,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (ev instanceof DragEvent) {
       console.log(ev.type);
     }
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode && ev instanceof KeyboardEvent && ev.type === 'keydown' && ev.key === 'Escape') {
+      placeNode.parent = null;
+      this._nodeToBePlaced.dispose();
+    }
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
       const insideViewport = this.posToViewport(p, this.controller.model.scene.mainCamera.viewport);
@@ -707,13 +712,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
       this._mousePosX = p[0];
       this._mousePosY = p[1];
-      const placeNode = this._nodeToBePlaced.get();
       if (placeNode) {
         if (ev.type === 'pointerdown') {
-          if (ev.button === 2) {
-            placeNode.parent = null;
-            this._nodeToBePlaced.dispose();
-          } else if (ev.button === 0) {
+          if (ev.button === 0) {
             const pos = placeNode.position.clone();
             this._nodeToBePlaced.dispose();
             switch (this._typeToBePlaced) {

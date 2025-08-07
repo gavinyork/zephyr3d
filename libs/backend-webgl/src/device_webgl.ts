@@ -432,6 +432,7 @@ export class WebGLDevice extends BaseDevice {
         gl.clear(colorFlag | depthFlag | stencilFlag);
       }
       (gl._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+      (gl._currentFramebuffer as WebGLFrameBuffer)?.invalidateMipmaps();
     }
   }
   // factory
