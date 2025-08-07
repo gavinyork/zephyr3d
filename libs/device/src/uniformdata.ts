@@ -61,7 +61,11 @@ export class StructuredBufferData {
           } else if ((value as any)?._v) {
             view.set((value as any)._v);
           } else if (typeof (value as any)?.length === 'number') {
-            view.set(value as any);
+            view.set(
+              (value as TypedArray).length > view.length
+                ? (value as TypedArray).subarray(0, view.length)
+                : (value as TypedArray)
+            );
           } else {
             throw new Error('invalid uniform value');
           }

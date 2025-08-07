@@ -147,7 +147,11 @@ export class ImageList extends makeEventTarget(Object)<{
     if (this._acceptDragDrop && ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('ASSET');
       if (payload) {
-        const assetId = payload.Data as string;
+        const data = payload.Data as { isDir: boolean; path: string }[];
+        if (data.length !== 1 || data[0].isDir) {
+          return;
+        }
+        const assetId = data[0].path;
         const mimeType = ProjectService.VFS.guessMIMEType(assetId);
         if (this._mimeTypes.includes(mimeType)) {
           const path = ProjectService.VFS.relative(assetId);
