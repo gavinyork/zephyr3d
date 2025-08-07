@@ -49,7 +49,7 @@ export class TerrainEditTool implements EditTool {
   private readonly _smoothBrush: TerrainSmoothBrush;
   private readonly _flattenBrush: TerrainFlattenBrush;
   private readonly _textureBrush: TerrainTextureBrush;
-  private readonly _splatMapCopy: DRef<Texture2DArray>;
+  private readonly _splatMapCopy: DRef<Texture2DArray | Texture2D>;
   private readonly _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
   constructor(editor: Editor, terrain: ClipmapTerrain) {
@@ -141,12 +141,15 @@ export class TerrainEditTool implements EditTool {
     this._textureBrush = new TerrainTextureBrush();
     this._heightDirty = false;
     const splatMap = this._terrain.get().material.getSplatMap();
-    const splatMapCopy = Application.instance.device.createTexture2DArray(
-      splatMap.format,
-      splatMap.width,
-      splatMap.height,
-      splatMap.depth
-    );
+    const splatMapCopy =
+      Application.instance.device.type === 'webgl'
+        ? Application.instance.device.createTexture2D(splatMap.format, splatMap.width, splatMap.height)
+        : Application.instance.device.createTexture2DArray(
+            splatMap.format,
+            splatMap.width,
+            splatMap.height,
+            splatMap.depth
+          );
     splatMapCopy.name = 'SplatMapCopy';
     blitter.blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._splatMapCopy = new DRef(splatMapCopy);
@@ -368,7 +371,7 @@ export class TerrainEditTool implements EditTool {
     blitter.blit(splatMap, this._splatMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
 
     const device = Application.instance.device;
-    const fb = device.pool.fetchTemporalFramebuffer<Texture2DArray>(
+    const fb = device.pool.fetchTemporalFramebuffer<Texture2DArray | Texture2D>(
       false,
       0,
       0,

@@ -23,7 +23,7 @@ type ClipmapTerrainDetailMapInfo = {
   detailNormalMap?: DRef<Texture2DArray>;
   detailMapList: DRef<Texture2D>[];
   detailNormalMapList: DRef<Texture2D>[];
-  splatMap: DRef<Texture2DArray>;
+  splatMap: DRef<Texture2DArray | Texture2D>;
   detailMapParams: Float32Array;
   numDetailMaps: number;
 };
@@ -233,17 +233,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailMapList[index].set(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
-    const blitter = new CopyBlitter();
-    const fb = Application.instance.device.createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
-    blitter.blit(
-      albedoMap,
-      fb,
-      index,
-      albedoMap.width === this._detailMapSize && albedoMap.height === this._detailMapSize
-        ? fetchSampler('clamp_nearest_nomip')
-        : fetchSampler('clamp_linear_nomip')
-    );
-    fb.dispose();
+    if (Application.instance.device.type !== 'webgl') {
+      const blitter = new CopyBlitter();
+      const fb = Application.instance.device.createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
+      blitter.blit(
+        albedoMap,
+        fb,
+        index,
+        albedoMap.width === this._detailMapSize && albedoMap.height === this._detailMapSize
+          ? fetchSampler('clamp_nearest_nomip')
+          : fetchSampler('clamp_linear_nomip')
+      );
+      fb.dispose();
+    }
   }
   getDetailNormalMap(index: number): Texture2D {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
@@ -264,20 +266,22 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailNormalMapList[index].set(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
-    const blitter = new CopyBlitter();
-    const fb = Application.instance.device.createFrameBuffer(
-      [this._detailMapInfo.detailNormalMap.get()],
-      null
-    );
-    blitter.blit(
-      normalMap,
-      fb,
-      index,
-      normalMap.width === this._detailMapSize && normalMap.height === this._detailMapSize
-        ? fetchSampler('clamp_nearest_nomip')
-        : fetchSampler('clamp_linear_nomip')
-    );
-    fb.dispose();
+    if (Application.instance.device.type !== 'webgl') {
+      const blitter = new CopyBlitter();
+      const fb = Application.instance.device.createFrameBuffer(
+        [this._detailMapInfo.detailNormalMap.get()],
+        null
+      );
+      blitter.blit(
+        normalMap,
+        fb,
+        index,
+        normalMap.width === this._detailMapSize && normalMap.height === this._detailMapSize
+          ? fetchSampler('clamp_nearest_nomip')
+          : fetchSampler('clamp_linear_nomip')
+      );
+      fb.dispose();
+    }
   }
   /** @internal */
   update(region: Vector4, terrainScale: Vector3) {
@@ -319,7 +323,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   };
   sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    const sample = pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
+    const sample =
+      this.drawContext.device.type === 'webgl'
+        ? pb.textureSample(scope[`detailNormalMap${index}`], texCoord).rgb
+        : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
     const normal = pb.sub(pb.mul(sample, 2), pb.vec3(1));
     return pb.normalize(normal);
   }
@@ -331,7 +338,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       this.$l.detailNormal = pb.vec3(0);
       for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
-        this.$l[`mask${i}`] = pb.textureArraySample(this.splatMap, this.$inputs.uv, i);
+        this.$l[`mask${i}`] =
+          that.drawContext.device.type === 'webgl'
+            ? pb.textureSample(this.splatMap, this.$inputs.uv)
+            : pb.textureArraySample(this.splatMap, this.$inputs.uv, i);
       }
       for (let i = 0; i < numDetailMaps; i++) {
         const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
@@ -378,11 +388,17 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       } else {
         this.$l.color = pb.vec3(0);
         for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
-          this.$l[`mask${i}`] = pb.textureArraySample(this.splatMap, this.$inputs.uv, i);
+          this.$l[`mask${i}`] =
+            that.drawContext.device.type === 'webgl'
+              ? pb.textureSample(this.splatMap, this.$inputs.uv)
+              : pb.textureArraySample(this.splatMap, this.$inputs.uv, i);
         }
         for (let i = 0; i < numDetailMaps; i++) {
           const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
-          const sample = pb.textureArraySample(this.detailAlbedoMap, uv, i).rgb;
+          const sample =
+            that.drawContext.device.type === 'webgl'
+              ? pb.textureSample(this[`detailAlbedoMap${i}`], uv).rgb
+              : pb.textureArraySample(this.detailAlbedoMap, uv, i).rgb;
           this.color = pb.add(this.color, pb.mul(sample, this[`mask${i >> 2}`][i & 3]));
         }
         this.$return(pb.vec4(this.color, 1));
@@ -559,8 +575,21 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       pb.sub(scope.region.zw, scope.region.xy)
     );
 
-    scope.$l.levelStart = scope.levelData.at(pb.mul(pb.int(scope.$inputs.miplevel), 2));
-    scope.$l.levelDiff = scope.levelData.at(pb.add(pb.mul(pb.int(scope.$inputs.miplevel), 2), 1));
+    if (this.drawContext.device.type === 'webgl') {
+      scope.$l.levelStart = pb.vec4();
+      scope.$l.levelDiff = pb.vec4();
+      scope.$l.index = pb.mul(pb.int(scope.$inputs.miplevel), 2);
+      scope.$for(pb.int('i'), 0, 32, function () {
+        this.$if(pb.equal(this.i, this.index), function () {
+          this.levelStart = this.levelData.at(this.i);
+          this.levelDiff = this.levelData.at(pb.add(this.i, 1));
+          this.$break();
+        });
+      });
+    } else {
+      scope.$l.levelStart = scope.levelData.at(pb.mul(pb.int(scope.$inputs.miplevel), 2));
+      scope.$l.levelDiff = scope.levelData.at(pb.add(pb.mul(pb.int(scope.$inputs.miplevel), 2), 1));
+    }
 
     scope.$l.height = this.sampleHeightMap(
       scope,
@@ -614,9 +643,17 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       const numDetailMaps = this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       if (numDetailMaps > 0) {
         scope.detailParams = pb.vec4[numDetailMaps]().uniform(2);
-        scope.splatMap = pb.tex2DArray().uniform(2);
-        scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
-        scope.detailNormalMap = pb.tex2DArray().uniform(2);
+        if (this.drawContext.device.type === 'webgl') {
+          scope.splatMap = pb.tex2D().uniform(2);
+          for (let i = 0; i < numDetailMaps; i++) {
+            scope[`detailAlbedoMap${i}`] = pb.tex2D().uniform(2);
+            scope[`detailNormalMap${i}`] = pb.tex2D().uniform(2);
+          }
+        } else {
+          scope.splatMap = pb.tex2DArray().uniform(2);
+          scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
+          scope.detailNormalMap = pb.tex2DArray().uniform(2);
+        }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.worldNormal = pb.normalize(scope.$inputs.worldNormal);
@@ -690,62 +727,77 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
         bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get());
-        bindGroup.setTexture(
-          'detailAlbedoMap',
-          this._detailMapInfo.detailMap.get(),
-          fetchSampler('repeat_linear')
-        );
-        bindGroup.setTexture(
-          'detailNormalMap',
-          this._detailMapInfo.detailNormalMap.get(),
-          fetchSampler('repeat_linear')
-        );
+        if (ctx.device.type === 'webgl') {
+          for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
+            bindGroup.setTexture(
+              `detailAlbedoMap${i}`,
+              this._detailMapInfo.detailMapList[i]?.get() ?? ClipmapTerrainMaterial.getDefaultDetailMap(),
+              fetchSampler('repeat_linear')
+            );
+            bindGroup.setTexture(
+              `detailNormalMap${i}`,
+              this._detailMapInfo.detailNormalMapList[i]?.get() ??
+                ClipmapTerrainMaterial.getDefaultNormalMap(),
+              fetchSampler('repeat_linear')
+            );
+          }
+        } else {
+          bindGroup.setTexture(
+            'detailAlbedoMap',
+            this._detailMapInfo.detailMap.get(),
+            fetchSampler('repeat_linear')
+          );
+          bindGroup.setTexture(
+            'detailNormalMap',
+            this._detailMapInfo.detailNormalMap.get(),
+            fetchSampler('repeat_linear')
+          );
+        }
         bindGroup.setValue('detailParams', this._detailMapInfo.detailMapParams);
       }
     }
   }
   private createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
     const device = Application.instance.device;
-    const detailMap = device.createTexture2DArray(
-      'rgba8unorm',
-      this._detailMapSize,
-      this._detailMapSize,
-      MAX_DETAIL_MAPS
-    );
-    const detailNormalMap = device.createTexture2DArray(
-      'rgba8unorm',
-      this._detailMapSize,
-      this._detailMapSize,
-      MAX_DETAIL_MAPS
-    );
-    const splatMap = device.createTexture2DArray(
-      'rgba8unorm',
-      this._splatMapSize,
-      this._splatMapSize,
-      MAX_DETAIL_MAPS >> 2
-    );
-    const fbDetail = device.createFrameBuffer([detailMap], null);
-    const fbNormal = device.createFrameBuffer([detailNormalMap], null);
-    const fbSplat = device.createFrameBuffer([splatMap], null);
+    const isWebGL1 = device.type === 'webgl';
+    const detailMap = isWebGL1
+      ? null
+      : device.createTexture2DArray('rgba8unorm', this._detailMapSize, this._detailMapSize, MAX_DETAIL_MAPS);
+    const detailNormalMap = isWebGL1
+      ? null
+      : device.createTexture2DArray('rgba8unorm', this._detailMapSize, this._detailMapSize, MAX_DETAIL_MAPS);
+    const splatMap = isWebGL1
+      ? device.createTexture2D('rgba8unorm', this._splatMapSize, this._splatMapSize)
+      : device.createTexture2DArray(
+          'rgba8unorm',
+          this._splatMapSize,
+          this._splatMapSize,
+          MAX_DETAIL_MAPS >> 2
+        );
     device.pushDeviceStates();
-    device.setFramebuffer(fbDetail);
-    for (let i = 0; i < detailMap.depth; i++) {
-      fbDetail.setColorAttachmentLayer(0, i);
-      device.clearFrameBuffer(Vector4.zero(), 1, 0);
+    if (!isWebGL1) {
+      const fbDetail = device.createFrameBuffer([detailMap], null);
+      device.setFramebuffer(fbDetail);
+      for (let i = 0; i < detailMap.depth; i++) {
+        fbDetail.setColorAttachmentLayer(0, i);
+        device.clearFrameBuffer(Vector4.zero(), 1, 0);
+      }
+      fbDetail.dispose();
+      const fbNormal = device.createFrameBuffer([detailNormalMap], null);
+      device.setFramebuffer(fbNormal);
+      for (let i = 0; i < detailNormalMap.depth; i++) {
+        fbNormal.setColorAttachmentLayer(0, i);
+        device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), 1, 0);
+      }
+      fbNormal.dispose();
     }
-    device.setFramebuffer(fbNormal);
-    for (let i = 0; i < detailNormalMap.depth; i++) {
-      fbNormal.setColorAttachmentLayer(0, i);
-      device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), 1, 0);
-    }
+    const fbSplat = device.createFrameBuffer([splatMap], null);
     device.setFramebuffer(fbSplat);
     for (let i = 0; i < splatMap.depth; i++) {
       fbSplat.setColorAttachmentLayer(0, i);
       device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), 1, 0);
     }
     device.popDeviceStates();
-    fbDetail.dispose();
-    fbNormal.dispose();
     fbSplat.dispose();
     return {
       detailMap: new DRef(detailMap),

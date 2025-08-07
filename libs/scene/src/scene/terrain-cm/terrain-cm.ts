@@ -265,7 +265,7 @@ export class ClipmapTerrain
     }
   }
   /** The splat map texture */
-  get splatMap(): Texture2DArray {
+  get splatMap(): Texture2DArray | Texture2D {
     return this.material.getSplatMap();
   }
   /** Material instance of the terrain */
@@ -406,7 +406,7 @@ export class ClipmapTerrain
       tmpTexture && tmpTexture.width === heightMap.width && tmpTexture.height === heightMap.height
         ? tmpTexture
         : Application.instance.device.createTexture2D(
-            device.type === 'webgl' ? 'rgba16f' : 'rg32f',
+            device.type === 'webgl' ? 'rgba32f' : 'rg32f',
             heightMap.width,
             heightMap.height
           );
@@ -414,7 +414,7 @@ export class ClipmapTerrain
     ClipmapTerrain._copyBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
     tmpFB.dispose();
     ClipmapTerrain._heightBoundingGenerator.render(tmp);
-    const data = new Float32Array(2);
+    const data = new Float32Array(4);
     tmp
       .readPixels(0, 0, 1, 1, 0, tmp.mipLevelCount - 1, data)
       .then(() => {
@@ -433,7 +433,11 @@ export class ClipmapTerrain
   }
   /** @internal */
   createHeightMapTexture(width: number, height: number) {
-    return Application.instance.device.createTexture2D('r16f', width, height);
+    return Application.instance.device.createTexture2D(
+      Application.instance.device.type === 'webgl' ? 'rgba16f' : 'r16f',
+      width,
+      height
+    );
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean): void {
@@ -527,7 +531,7 @@ export class ClipmapTerrain
     sizeX = Math.min(Math.max(sizeX, 1), maxTextureSize) >> 0;
     sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
     if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
-      const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ);
+      const newHeightMap = device.createTexture2D(device.type === 'webgl' ? 'rgba16f' : 'r16f', sizeX, sizeZ);
       const fb = device.createFrameBuffer([newHeightMap], null);
       ClipmapTerrain._copyBlitter.blit(oldHeightMap, fb, fetchSampler('clamp_linear_nomip'));
       fb.dispose();

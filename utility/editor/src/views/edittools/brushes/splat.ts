@@ -3,6 +3,7 @@ import type {
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
+  Texture2D,
   Texture2DArray
 } from '@zephyr3d/device';
 import { DRef, fetchSampler } from '@zephyr3d/scene';
@@ -10,7 +11,7 @@ import { BaseTerrainBrush } from './base';
 
 export class TerrainTextureBrush extends BaseTerrainBrush {
   private _detailIndex: number;
-  private readonly _sourceSplatMap: DRef<Texture2DArray>;
+  private readonly _sourceSplatMap: DRef<Texture2DArray | Texture2D>;
   constructor() {
     super();
     this._detailIndex = -1;
@@ -25,7 +26,7 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
   get sourceSplatMap() {
     return this._sourceSplatMap.get();
   }
-  set sourceSplatMap(tex: Texture2DArray) {
+  set sourceSplatMap(tex: Texture2DArray | Texture2D) {
     this._sourceSplatMap.set(tex);
   }
   protected brushFragment(

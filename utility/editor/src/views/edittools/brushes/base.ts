@@ -57,7 +57,22 @@ export abstract class BaseTerrainBrush {
         this.region = pb.vec4().uniform(0);
         that.setupBrushUniforms(this);
         this.$inputs.position = pb.float().attrib('position');
-        this.axis = [pb.vec2(-1, -1), pb.vec2(1, -1), pb.vec2(-1, 1), pb.vec2(1, 1)];
+        if (device.type !== 'webgl') {
+          this.axis = [pb.vec2(-1, -1), pb.vec2(1, -1), pb.vec2(-1, 1), pb.vec2(1, 1)];
+        } else {
+          pb.func('getAxis', [pb.int('index')], function () {
+            this.$if(pb.equal(this.index, 0), function () {
+              this.$return(pb.vec2(-1, -1));
+            });
+            this.$if(pb.equal(this.index, 1), function () {
+              this.$return(pb.vec2(1, -1));
+            });
+            this.$if(pb.equal(this.index, 2), function () {
+              this.$return(pb.vec2(-1, 1));
+            });
+            this.$return(pb.vec2(1, 1));
+          });
+        }
         pb.main(function () {
           this.$l.worldPos = this.params.xy;
           this.$l.size = this.params.z;
@@ -65,7 +80,10 @@ export abstract class BaseTerrainBrush {
           this.$l.s = pb.sin(this.angle);
           this.$l.c = pb.cos(this.angle);
           this.$l.rotMat = pb.mat2(this.c, this.s, pb.neg(this.s), this.c);
-          this.$l.vertexAxis = this.axis.at(this.$builtins.vertexIndex);
+          this.$l.vertexAxis =
+            device.type === 'webgl'
+              ? this.getAxis(pb.int(this.$inputs.position))
+              : this.axis.at(this.$builtins.vertexIndex);
           this.$l.axisRot = pb.mul(this.rotMat, this.vertexAxis);
           this.$l.pos = pb.add(this.worldPos, pb.mul(pb.normalize(this.axisRot), this.size));
           this.$l.uv = pb.div(pb.sub(this.pos, this.region.xy), pb.sub(this.region.zw, this.region.xy));
