@@ -1,13 +1,14 @@
 import { Application } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
-import { backendWebGL1 } from '@zephyr3d/backend-webgl';
-//import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 
+const deviceType = new URL(window.location.href).searchParams.get('device');
 const studioApp = new Application({
-  backend: backendWebGL1,
+  backend: deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU,
   canvas: document.querySelector('#canvas')
 });
 
