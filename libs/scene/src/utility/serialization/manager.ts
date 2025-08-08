@@ -357,7 +357,6 @@ export class SerializationManager {
     let v = prop.getDefaultValue?.call(obj) ?? prop.default;
     if (v === undefined) {
       v = defaultValues[prop.type];
-      console.warn(`No default value found for property: ${prop.name}, ${v} will be used`);
     }
     return v;
   }

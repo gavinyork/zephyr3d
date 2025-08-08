@@ -872,7 +872,10 @@ export class WebGLDevice extends BaseDevice {
     const glType = formatInfo.type;
     const pixelSize = getTextureFormatBlockSize(format);
     if (
-      (glFormat !== WebGLEnum.RGBA || (glType !== WebGLEnum.UNSIGNED_BYTE && glType !== WebGLEnum.FLOAT)) &&
+      (glFormat !== WebGLEnum.RGBA ||
+        (glType !== WebGLEnum.UNSIGNED_BYTE &&
+          glType !== WebGLEnum.FLOAT &&
+          glType !== WebGLEnum.HALF_FLOAT)) &&
       !isWebGL2(this.context)
     ) {
       throw new Error(`readPixels() failed: invalid format: ${format}`);

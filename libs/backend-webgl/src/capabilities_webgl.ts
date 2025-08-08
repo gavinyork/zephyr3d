@@ -175,8 +175,10 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
   private readonly _isWebGL2: boolean;
   private readonly _extDrawBuffers: WEBGL_draw_buffers;
   private readonly _extFloatBlending: EXT_float_blend;
+  private readonly _extRenderMipmap: OES_fbo_render_mipmap;
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
+  supportRenderMipmap: boolean;
   supportMultisampledFramebuffer: boolean;
   supportFloatBlending: boolean;
   supportDepth32float: boolean;
@@ -185,6 +187,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
     this._isWebGL2 = isWebGL2(gl);
     this._extDrawBuffers = this._isWebGL2 ? null : gl.getExtension('WEBGL_draw_buffers');
     this._extFloatBlending = gl.getExtension('EXT_float_blend');
+    this._extRenderMipmap = this._isWebGL2 ? null : gl.getExtension('OES_fbo_render_mipmap');
     this.maxDrawBuffers =
       this._isWebGL2 || this._extDrawBuffers
         ? Math.min(
@@ -193,6 +196,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
           )
         : 1;
     this.maxColorAttachmentBytesPerSample = this.maxDrawBuffers * 16;
+    this.supportRenderMipmap = isWebGL2(gl) || !!this._extRenderMipmap;
     this.supportMultisampledFramebuffer = isWebGL2(gl);
     this.supportFloatBlending = !!this._extFloatBlending;
     this.supportDepth32float = this._isWebGL2;

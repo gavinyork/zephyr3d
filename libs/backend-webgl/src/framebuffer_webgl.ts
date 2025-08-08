@@ -470,7 +470,11 @@ export class WebGLFrameBuffer
   private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment): boolean {
     if (info.texture) {
       let intermediateTexture: WebGLTexture = null;
-      if (this.device.type === 'webgl' && info.level > 0) {
+      if (
+        this.device.type === 'webgl' &&
+        !this.device.getDeviceCaps().framebufferCaps.supportRenderMipmap &&
+        info.level > 0
+      ) {
         if (!this._intermediateAttachments) {
           this._intermediateAttachments = new Map();
         }
@@ -520,22 +524,13 @@ export class WebGLFrameBuffer
         );
       } else {
         if (info.texture.isTexture2D()) {
-          if (intermediateTexture) {
-            this._device.context.framebufferRenderbuffer(
-              WebGLEnum.FRAMEBUFFER,
-              attachment,
-              WebGLEnum.RENDERBUFFER,
-              intermediateTexture
-            );
-          } else {
-            this._device.context.framebufferTexture2D(
-              WebGLEnum.FRAMEBUFFER,
-              attachment,
-              WebGLEnum.TEXTURE_2D,
-              info.texture.object,
-              info.level ?? 0
-            );
-          }
+          this._device.context.framebufferTexture2D(
+            WebGLEnum.FRAMEBUFFER,
+            attachment,
+            WebGLEnum.TEXTURE_2D,
+            info.texture.object,
+            info.level ?? 0
+          );
         } else if (info.texture.isTextureCube()) {
           this._device.context.framebufferTexture2D(
             WebGLEnum.FRAMEBUFFER,

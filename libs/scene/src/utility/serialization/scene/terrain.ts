@@ -94,17 +94,22 @@ async function getTerrainGrassContent(
 }
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
-  const device = Application.instance.device;
   const heightmap = terrain.heightMap;
-  const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(heightmap.format);
-  const buffer = new ArrayBuffer(
-    2 * 4 + heightmap.width * heightmap.height * info.blockWidth * info.blockHeight * info.size
-  );
+  const buffer = new ArrayBuffer(2 * 4 + heightmap.width * heightmap.height * 2);
   const head = new DataView(buffer);
   head.setUint32(0, heightmap.width, true);
   head.setUint32(4, heightmap.height, true);
-  const data = new Uint8Array(buffer, 2 * 4);
-  await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, data);
+  const data = new Uint16Array(buffer, 2 * 4);
+  if (heightmap.format === 'r16f') {
+    await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, data);
+  } else if (heightmap.format === 'rgba16f') {
+    // WebGL1 uses rgba16f for height map, so we need to convert
+    const tmpData = new Uint16Array(heightmap.width * heightmap.height * 4);
+    await heightmap.readPixels(0, 0, heightmap.width, heightmap.height, 0, 0, tmpData);
+    for (let i = 0; i < heightmap.width * heightmap.height; i++) {
+      data[i] = tmpData[i * 4 + 0]; // Use the red channel as height
+    }
+  }
   return buffer;
 }
 
@@ -445,7 +450,21 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
               const width = dataView.getUint32(0, true);
               const height = dataView.getUint32(4, true);
               const heightMap = this.createHeightMapTexture(width, height);
-              heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
+              if (heightMap.format !== 'r16f') {
+                if (heightMap.format === 'rgba16f') {
+                  // WebGL1 uses rgba16f for height map, so we need to convert
+                  const rgbaData = new Uint16Array(width * height * 4);
+                  const rData = new Uint16Array(data, 8);
+                  for (let i = 0; i < width * height; i++) {
+                    rgbaData[i * 4 + 0] = rData[i];
+                  }
+                  heightMap.update(rgbaData, 0, 0, width, height);
+                } else {
+                  throw new Error(`Unsupported height map format: ${heightMap.format}`);
+                }
+              } else {
+                heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
+              }
               this.heightMap = heightMap;
               this.heightMapAssetId = value.str[0];
               this.updateBoundingBox();

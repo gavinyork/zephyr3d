@@ -30,6 +30,7 @@ export interface TextureFormatInfoWebGPU extends TextureFormatInfo {
 export class WebGPUFramebufferCaps implements FramebufferCaps {
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
+  supportRenderMipmap: boolean;
   supportMultisampledFramebuffer: boolean;
   supportFloatBlending: boolean;
   supportDepth32float: boolean;
@@ -37,6 +38,7 @@ export class WebGPUFramebufferCaps implements FramebufferCaps {
   constructor(device: WebGPUDevice) {
     this.maxDrawBuffers = device.device.limits.maxColorAttachments;
     this.maxColorAttachmentBytesPerSample = device.device.limits.maxColorAttachmentBytesPerSample;
+    this.supportRenderMipmap = true;
     this.supportMultisampledFramebuffer = true;
     this.supportFloatBlending = true;
     this.supportDepth32float = true;

@@ -141,6 +141,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       console.error('Invalid number of detail maps');
       return;
     }
+    if (Application.instance.device.type === 'webgl' && val > 4) {
+      console.error('Only 4 detail map layers is supported for WebGL1');
+      return;
+    }
     const n = this._detailMapInfo.numDetailMaps;
     const defaultDetailMap = ClipmapTerrainMaterial.getDefaultDetailMap();
     const defaultNormalMap = ClipmapTerrainMaterial.getDefaultNormalMap();
