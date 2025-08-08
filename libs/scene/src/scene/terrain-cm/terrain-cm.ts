@@ -405,10 +405,7 @@ export class ClipmapTerrain
     const heightMap = this.heightMap;
     const device = Application.instance.device;
     let tmp = this._tmpTexture.get();
-    if (
-      tmp &&
-      (tmp.width !== heightMap.width || tmp.height !== heightMap.height || tmp.format !== heightMap.format)
-    ) {
+    if (tmp && (tmp.width !== heightMap.width || tmp.height !== heightMap.height)) {
       this._tmpTexture.dispose();
     }
     if (!this._tmpTexture.get()) {

@@ -58,7 +58,7 @@ export abstract class RenderMipmap {
     srcTexture: Texture2D,
     dstTexture: Texture2D
   ): void {
-    const sampler = fetchSampler('clamp_nearest_nomip');
+    const sampler = fetchSampler('clamp_nearest');
     const framebuffer = device.createFrameBuffer([dstTexture], null);
     framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
     const bindGroup = this._bindGroup.get();

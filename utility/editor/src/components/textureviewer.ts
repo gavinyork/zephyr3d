@@ -111,7 +111,7 @@ export function renderTextureViewer() {
         textureRepeat = repeat[0];
       }
       const colorScale = [textureDrawer.colorScale] as [number];
-      if (ImGui.SliderFloat('ColorScale', colorScale, 1, 800)) {
+      if (ImGui.DragFloat('ColorScale', colorScale, 0.1, 0, 800)) {
         textureDrawer.colorScale = colorScale[0];
       }
       ImGui.Checkbox('Vertical flip', (val?: boolean) => {
