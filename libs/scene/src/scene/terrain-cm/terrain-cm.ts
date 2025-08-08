@@ -18,7 +18,11 @@ import { Application, DRef } from '../../app';
 import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
-import { MAX_TERRAIN_MIPMAP_LEVELS, RENDER_PASS_TYPE_OBJECT_COLOR } from '../../values';
+import {
+  MAX_TERRAIN_MIPMAP_LEVELS,
+  RENDER_PASS_TYPE_OBJECT_COLOR,
+  RENDER_PASS_TYPE_SHADOWMAP
+} from '../../values';
 import type { BlitType } from '../../blitter';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
@@ -521,7 +525,10 @@ export class ClipmapTerrain
     for (const info of this._renderData) {
       mat.draw(info.primitive, ctx, info.numInstances);
     }
-    if (ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR) {
+    if (
+      ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
+      ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP
+    ) {
       this._grassRenderer.get().draw(ctx);
     }
   }

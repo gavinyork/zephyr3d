@@ -22,41 +22,19 @@ export interface DataTransferFileEntry {
 /**
  * DataTransfer-based virtual file system for handling dropped files and directories.
  *
- * This VFS implementation provides read-only access to files dropped into the browser
- * from the operating system. It supports both individual files and directory structures
- * when supported by the browser.
+ * Read-only VFS populated from DataTransfer (drag-and-drop) or FileList (input with webkitdirectory).
  *
- * @remarks
- * - This is a read-only file system - write operations will throw errors
- * - Directory structure support depends on browser capabilities
- * - File access is asynchronous and may involve reading from disk
- * - All files are included regardless of size, type, or hidden status
- *
- * @example
- * ```typescript
- * // Handle drop event
- * element.addEventListener('drop', async (event) => {
- *   event.preventDefault();
- *
- *   const dtVFS = new DataTransferVFS('dropped-files');
- *   await dtVFS.initializeFromDataTransfer(event.dataTransfer);
- *
- *   const files = await dtVFS.readDirectory('/');
- *   console.log('Dropped files:', files);
- * });
- * ```
- *
- * @public
+ * 关键点：
+ * - 在 DataTransfer 初始化时，同步“启动”所有 entry.file() / reader.readEntries() 调用，
+ *   避免 FileSystemEntry 生命周期过期导致的 NotFoundError。
+ * - 将这些启动后的回调转为 Promise 收集，最后统一等待完成。
  */
 export class DataTransferVFS extends VFS {
   private readonly entries: Map<string, DataTransferFileEntry> = new Map();
   private readonly directoryStructure: Map<string, Set<string>> = new Map();
   private initialized = false;
-  private readonly initPromise: Promise<void> = null;
+  private readonly initPromise: Promise<void>;
 
-  /**
-   * Constructs a DataTransfer VFS instance
-   */
   constructor(data: DataTransfer | FileList) {
     super(true); // Always read-only
     this.initialized = false;
@@ -66,11 +44,10 @@ export class DataTransferVFS extends VFS {
         : this.initializeFromFileList(data);
   }
 
-  // VFS Implementation
+  // ============== VFS Implementation ==============
 
   /** {@inheritDoc VFS._readDirectory} */
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
-    // Make sure filesystem was initialized
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -89,7 +66,6 @@ export class DataTransferVFS extends VFS {
       let metadata: FileMetadata;
 
       if (entry) {
-        // It's a file
         metadata = {
           name: childName,
           path: childPath,
@@ -100,7 +76,6 @@ export class DataTransferVFS extends VFS {
           mimeType: entry.file.type || guessMimeType(childPath)
         };
       } else {
-        // It's a directory
         metadata = {
           name: childName,
           path: childPath,
@@ -112,12 +87,10 @@ export class DataTransferVFS extends VFS {
         };
       }
 
-      // Apply filters
       if (this.matchesFilter(metadata, options)) {
         results.push(metadata);
       }
 
-      // Handle recursive listing
       if (options?.recursive && metadata.type === 'directory') {
         const subResults = await this._readDirectory(childPath, options);
         results.push(...subResults);
@@ -129,7 +102,6 @@ export class DataTransferVFS extends VFS {
 
   /** {@inheritDoc VFS._readFile} */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
-    // Make sure filesystem was initialized
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -139,21 +111,17 @@ export class DataTransferVFS extends VFS {
       throw new VFSError('File does not exist', 'ENOENT', path);
     }
 
-    // Read the file
     let arrayBuffer: ArrayBuffer;
 
     if (options?.offset !== undefined || options?.length !== undefined) {
-      // Range reading
-      const offset = options.offset || 0;
-      const length = options.length || entry.file.size - offset;
+      const offset = options.offset ?? 0;
+      const length = options.length ?? entry.file.size - offset;
       const blob = entry.file.slice(offset, offset + length);
       arrayBuffer = await blob.arrayBuffer();
     } else {
-      // Full file reading
       arrayBuffer = await entry.file.arrayBuffer();
     }
 
-    // Handle encoding
     if (options?.encoding === 'utf8') {
       return new TextDecoder().decode(arrayBuffer);
     } else if (options?.encoding === 'base64') {
@@ -166,49 +134,25 @@ export class DataTransferVFS extends VFS {
 
   /** {@inheritDoc VFS._exists} */
   protected async _exists(path: string): Promise<boolean> {
-    // Make sure filesystem was initialized
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
+    if (normalizedPath === '/') return true;
 
-    // Root always exists
-    if (normalizedPath === '/') {
-      return true;
-    }
-
-    // Check if it's a file
-    if (this.entries.has(normalizedPath)) {
-      return true;
-    }
-
-    // Check if it's a directory
-    if (this.directoryStructure.has(normalizedPath)) {
-      return true;
-    }
-
-    return false;
+    return this.entries.has(normalizedPath) || this.directoryStructure.has(normalizedPath);
   }
 
   /** {@inheritDoc VFS._stat} */
   protected async _stat(path: string): Promise<FileStat> {
-    // Make sure filesystem was initialized
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
 
-    // Root directory
     if (normalizedPath === '/') {
-      return {
-        size: 0,
-        isFile: false,
-        isDirectory: true,
-        created: new Date(),
-        modified: new Date(),
-        accessed: new Date()
-      };
+      const now = new Date();
+      return { size: 0, isFile: false, isDirectory: true, created: now, modified: now, accessed: now };
     }
 
-    // Check if it's a file
     const entry = this.entries.get(normalizedPath);
     if (entry) {
       return {
@@ -221,103 +165,99 @@ export class DataTransferVFS extends VFS {
       };
     }
 
-    // Check if it's a directory
     if (this.directoryStructure.has(normalizedPath)) {
-      return {
-        size: 0,
-        isFile: false,
-        isDirectory: true,
-        created: new Date(),
-        modified: new Date(),
-        accessed: new Date()
-      };
+      const now = new Date();
+      return { size: 0, isFile: false, isDirectory: true, created: now, modified: now, accessed: now };
     }
 
     throw new VFSError('Path does not exist', 'ENOENT', path);
   }
 
   // Read-only file system - throw errors for write operations
-
-  /** {@inheritDoc VFS._writeFile} */
   protected async _writeFile(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
-
-  /** {@inheritDoc VFS._makeDirectory} */
   protected async _makeDirectory(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
-
-  /** {@inheritDoc VFS._deleteFile} */
   protected async _deleteFile(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
-  /** {@inheritDoc VFS._deleteDirectory} */
   protected async _deleteDirectory(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
-  /** {@inheritDoc VFS._deleteDatabase} */
   protected async _wipe(): Promise<void> {
     return;
   }
-  /** {@inheritDoc VFS._deleteFileSystem} */
   protected _deleteFileSystem(): Promise<void> {
-    return;
+    return Promise.resolve();
   }
-  /** {@inheritDoc VFS._move} */
   protected _move(): Promise<void> {
-    return;
+    return Promise.resolve();
   }
+
   private async ensureInitialized(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
     await this.initPromise;
     this.initialized = true;
   }
+
+  // ============== Initialization ==============
+
   /**
-   * Initialize the VFS from a DataTransfer object (from drag and drop)
+   * Initialize the VFS from a DataTransfer object (from drag and drop).
    *
-   * @param dataTransfer - The DataTransfer object from a drop event
+   * 核心策略：
+   * - 同步遍历 items，立即启动 entry.file()/readEntries()；
+   * - 将每个启动后的回调包装成 Promise 收集；
+   * - 最后统一 Promise.all 等待；
+   * - 避免保存 FileSystemEntry 到后续再访问。
    */
   private async initializeFromDataTransfer(dataTransfer: DataTransfer): Promise<void> {
     this.entries.clear();
     this.directoryStructure.clear();
 
-    if (!dataTransfer || !dataTransfer.items) {
-      return;
-    }
+    if (!dataTransfer || !dataTransfer.items) return;
 
-    const fileEntries: DataTransferFileEntry[] = [];
+    const filePromises: Array<Promise<{ file: File; path: string } | Array<{ file: File; path: string }>>> =
+      [];
 
-    // Process all items in the DataTransfer
     for (let i = 0; i < dataTransfer.items.length; i++) {
       const item = dataTransfer.items[i];
+      if (item.kind !== 'file') continue;
 
-      if (item.kind === 'file') {
-        if (item.webkitGetAsEntry) {
-          // Modern browsers with directory support
-          const entry = item.webkitGetAsEntry();
-          if (entry) {
-            await this.processWebKitEntry(entry, '', fileEntries);
-          }
-        } else {
-          // Fallback for browsers without directory support
-          const file = item.getAsFile();
-          if (file) {
-            await this.processFile(file, file.name, fileEntries);
-          }
+      // 优先使用支持目录的 entry
+      const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+      if (entry) {
+        const rootPath = this.normalizePath(`/${entry.name}`);
+        if ((entry as any).isFile) {
+          filePromises.push(this.collectFileOperation(entry as FileSystemFileEntry, rootPath.slice(1)));
+        } else if ((entry as any).isDirectory) {
+          filePromises.push(this.collectDirectoryOperation(entry as FileSystemDirectoryEntry, rootPath));
         }
+        continue;
+      }
+
+      // 回退：直接文件
+      const file = item.getAsFile && item.getAsFile();
+      if (file) {
+        filePromises.push(Promise.resolve({ file, path: file.name }));
       }
     }
 
-    // Build internal structure
-    for (const entry of fileEntries) {
-      this.entries.set(entry.path, entry);
-      this.updateDirectoryStructure(entry.path);
-    }
+    // 统一等待所有已启动的操作
+    const results = await Promise.all(filePromises);
+    const flattened = results.flat() as Array<{ file: File; path: string }>;
 
-    // Ensure root directory exists
+    // 构建内部结构
+    const fileEntries: DataTransferFileEntry[] = [];
+    for (const { file, path } of flattened) {
+      await this.processFile(file, path, fileEntries);
+    }
+    for (const e of fileEntries) {
+      this.entries.set(e.path, e);
+      this.updateDirectoryStructure(e.path);
+    }
     if (!this.directoryStructure.has('/')) {
       this.directoryStructure.set('/', new Set());
     }
@@ -325,8 +265,6 @@ export class DataTransferVFS extends VFS {
 
   /**
    * Initialize from a FileList (for input[type="file"] with webkitdirectory)
-   *
-   * @param fileList - FileList from an input element
    */
   private async initializeFromFileList(fileList: FileList): Promise<void> {
     this.entries.clear();
@@ -336,73 +274,114 @@ export class DataTransferVFS extends VFS {
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      // Use webkitRelativePath if available, otherwise use name
       const relativePath = (file as any).webkitRelativePath || file.name;
       await this.processFile(file, relativePath, fileEntries);
     }
 
-    // Build internal structure
     for (const entry of fileEntries) {
       this.entries.set(entry.path, entry);
       this.updateDirectoryStructure(entry.path);
     }
 
-    // Ensure root directory exists
     if (!this.directoryStructure.has('/')) {
       this.directoryStructure.set('/', new Set());
     }
   }
 
+  // ============== Helpers: synchronous start, promise collection ==============
+
   /**
-   * Process a WebKit file system entry (supports directories)
+   * 同步启动文件读取（entry.file），返回在回调触发时 resolve 的 Promise。
    */
-  private async processWebKitEntry(
-    entry: any,
-    parentPath: string,
-    fileEntries: DataTransferFileEntry[]
-  ): Promise<void> {
-    const fullPath = this.normalizePath(parentPath ? `${parentPath}/${entry.name}` : `/${entry.name}`);
-
-    if (entry.isFile) {
-      // It's a file
-      return new Promise((resolve, reject) => {
-        entry.file((file: File) => {
-          this.processFile(file, fullPath.slice(1), fileEntries)
-            .then(() => resolve())
-            .catch(reject);
-        }, reject);
-      });
-    } else if (entry.isDirectory) {
-      // It's a directory
-      return new Promise((resolve, reject) => {
-        const reader = entry.createReader();
-
-        const readEntries = (): void => {
-          reader.readEntries(async (entries: any[]) => {
-            if (entries.length === 0) {
-              resolve();
-              return;
-            }
-
-            try {
-              for (const childEntry of entries) {
-                await this.processWebKitEntry(childEntry, fullPath, fileEntries);
-              }
-              // Continue reading (directories may have more entries)
-              readEntries();
-            } catch (error) {
-              reject(error);
-            }
-          }, reject);
-        };
-
-        readEntries();
-      });
-    }
+  private collectFileOperation(
+    fileEntry: FileSystemFileEntry,
+    relativePath: string
+  ): Promise<{ file: File; path: string }> {
+    return new Promise((resolve, reject) => {
+      try {
+        // 同步触发 entry.file(...)
+        fileEntry.file(
+          (file: File) => resolve({ file, path: relativePath }),
+          (err: any) => {
+            console.warn('collectFileOperation error:', err);
+            reject(err);
+          }
+        );
+      } catch (e) {
+        console.warn('collectFileOperation exception:', e);
+        reject(e);
+      }
+    });
   }
 
   /**
-   * Process an individual file
+   * 同步启动目录读取（createReader + 连续 readEntries），
+   * 目录完全读取后，递归对子项同步启动收集，返回扁平化文件列表。
+   */
+  private collectDirectoryOperation(
+    dirEntry: FileSystemDirectoryEntry,
+    basePath: string
+  ): Promise<Array<{ file: File; path: string }>> {
+    return new Promise((resolve, reject) => {
+      const reader = dirEntry.createReader();
+      const batchEntries: FileSystemEntry[] = [];
+
+      const readBatch = () => {
+        try {
+          reader.readEntries(
+            (entries: FileSystemEntry[]) => {
+              if (entries.length === 0) {
+                // 目录读完，递归处理所有子项
+                const promises: Array<
+                  Promise<{ file: File; path: string } | Array<{ file: File; path: string }>>
+                > = [];
+
+                for (const child of batchEntries) {
+                  const childFullPath = this.normalizePath(`${basePath}/${child.name}`);
+                  if ((child as any).isFile) {
+                    promises.push(
+                      this.collectFileOperation(child as FileSystemFileEntry, childFullPath.slice(1))
+                    );
+                  } else if ((child as any).isDirectory) {
+                    promises.push(
+                      this.collectDirectoryOperation(child as FileSystemDirectoryEntry, childFullPath)
+                    );
+                  }
+                }
+
+                Promise.all(promises)
+                  .then((res) => resolve(res.flat() as Array<{ file: File; path: string }>))
+                  .catch((err) => {
+                    console.warn('collectDirectoryOperation child error:', err);
+                    reject(err);
+                  });
+                return;
+              }
+
+              // 累积条目并继续读取下一批
+              batchEntries.push(...entries);
+              readBatch();
+            },
+            (err: any) => {
+              console.warn('collectDirectoryOperation readEntries error:', err);
+              reject(err);
+            }
+          );
+        } catch (e) {
+          console.warn('collectDirectoryOperation exception:', e);
+          reject(e);
+        }
+      };
+
+      // 立即开始读取
+      readBatch();
+    });
+  }
+
+  // ============== Internal builders ==============
+
+  /**
+   * Process an individual file into VFS entry structures (no disk I/O here).
    */
   private async processFile(
     file: File,
@@ -423,7 +402,7 @@ export class DataTransferVFS extends VFS {
   }
 
   /**
-   * Update the directory structure for a given file path
+   * Update the directory structure for a given file path.
    */
   private updateDirectoryStructure(filePath: string): void {
     const parts = filePath.split('/').filter((p) => p);
@@ -456,11 +435,8 @@ export class DataTransferVFS extends VFS {
   }
 
   private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
-    if (!options) {
-      return true;
-    }
+    if (!options) return true;
 
-    // 模式匹配
     if (options.pattern) {
       if (typeof options.pattern === 'string') {
         return metadata.name.includes(options.pattern);

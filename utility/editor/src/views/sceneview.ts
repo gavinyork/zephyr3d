@@ -690,9 +690,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this.controller.model.scene.mainCamera.handleEvent(ev, type)) {
       return true;
     }
-    if (ev instanceof DragEvent) {
-      console.log(ev.type);
-    }
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode && ev instanceof KeyboardEvent && ev.type === 'keydown' && ev.key === 'Escape') {
       placeNode.parent = null;
@@ -779,7 +776,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         const hitPos = pickResult?.intersectedPoint ?? null;
         if (placeNode?.parent) {
           if (hitPos) {
-            //console.log(`Fit to scene: ${hitPos.toString()}`);
             placeNode.position.set(hitPos);
           } else {
             const ray = this.controller.model.scene.mainCamera.constructRay(this._mousePosX, this._mousePosY);
@@ -790,7 +786,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             const x = ray.origin.x + ray.direction.x * hitDistance;
             const y = ray.origin.y + ray.direction.y * hitDistance;
             const z = ray.origin.z + ray.direction.z * hitDistance;
-            //console.log(`No fit: ${x}, ${y}, ${z}`);
             placeNode.position.setXYZ(x, y, z);
           }
         }
@@ -1201,11 +1196,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.handleAddAsset(path);
     }
   }
-  private handleWorkspaceDragLeave() {
-    console.log('Workspace DragLeave');
-  }
+  private handleWorkspaceDragLeave() {}
   private handleWorkspaceDragStart(type: string, payload: unknown) {
-    console.log(`Workspace DragStart: ${type} ${payload}`);
     this._renderDropZone = true;
   }
   private handleWorkspaceDragging(type: string, payload: unknown, x: number, y: number) {

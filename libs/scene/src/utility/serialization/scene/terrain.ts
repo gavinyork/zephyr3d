@@ -1,32 +1,14 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, SceneNode } from '../../../scene';
-import type { PropertyAccessor, SerializableClass } from '../types';
+import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
-import { MAX_TERRAIN_MIPMAP_LEVELS } from '../../../values';
 import type { SerializationManager } from '../manager';
-
-function writeUUID(dataView: DataView, offset: number, str: string) {
-  if (str && str.length === 36) {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    for (let i = 0; i < bytes.length; i++) {
-      dataView.setUint8(offset + i, bytes[i]);
-    }
-  }
-}
-
-function readUUID(dataView: DataView, offset: number) {
-  const bytes = new Uint8Array(36);
-  for (let i = 0; i < 36; i++) {
-    bytes[i] = dataView.getUint8(offset + i);
-  }
-  return bytes[0] ? new TextDecoder().decode(bytes) : '';
-}
+import { JSONArray } from '../json';
 
 function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, arrays: T[]): T {
   const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
@@ -39,13 +21,10 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
   return result;
 }
 
-async function getTerrainGrassContent(
-  terrain: ClipmapTerrain,
-  manager: SerializationManager
-): Promise<ArrayBuffer> {
+async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array[] = [];
-  let dataSize = 4 + (4 * 3 + 36) * grassRenderer.numLayers;
+  let dataSize = 4 + 4 * grassRenderer.numLayers;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
     const promises: Promise<Uint8Array>[] = [];
     const layer = grassRenderer.getLayer(i);
@@ -77,15 +56,7 @@ async function getTerrainGrassContent(
   data.setUint32(offset, grassRenderer.numLayers, true);
   offset += 4;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
-    const grassTexture = grassRenderer.getGrassTexture(i);
-    const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
-    writeUUID(data, offset, assetId);
-    offset += 36;
     data.setUint32(offset, layerDatas[i].length, true);
-    offset += 4;
-    data.setFloat32(offset, grassRenderer.getBladeWidth(i), true);
-    offset += 4;
-    data.setFloat32(offset, grassRenderer.getBladeHeight(i), true);
     offset += 4;
     view.set(layerDatas[i], offset);
     offset += layerDatas[i].length;
@@ -135,125 +106,6 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Array
   return buffer;
 }
 
-function getDetailMapProps(manager: SerializationManager) {
-  const props: PropertyAccessor<ClipmapTerrain>[] = [];
-  for (let i = 0; i < MAX_TERRAIN_MIPMAP_LEVELS; i++) {
-    const accessorDetailAlbedo: PropertyAccessor<ClipmapTerrain> = {
-      name: `DetailAlbedoMap${i}`,
-      type: 'object',
-      isHidden() {
-        return true;
-      },
-      default: null,
-      isValid(this: ClipmapTerrain) {
-        return this.numDetailMaps > i;
-      },
-      isNullable() {
-        return true;
-      },
-      get(this: ClipmapTerrain, value) {
-        value.str[0] = manager.getAssetId(this.material.getDetailMap(i)) ?? '';
-      },
-      async set(value) {
-        if (!value) {
-          this.material.setDetailMap(i, null);
-        } else {
-          if (value.str[0]) {
-            const assetId = value.str[0];
-            let tex: Texture2D;
-            try {
-              tex = await manager.fetchTexture<Texture2D>(assetId);
-            } catch (err) {
-              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-              tex = null;
-            }
-            if (tex?.isTexture2D()) {
-              this.material.setDetailMap(i, tex);
-            } else {
-              console.error('Invalid texture type');
-            }
-          }
-        }
-      }
-    };
-    const accessorDetailNormal: PropertyAccessor<ClipmapTerrain> = {
-      name: `DetailNormalMap${i}`,
-      type: 'object',
-      default: null,
-      isNullable() {
-        return true;
-      },
-      isHidden() {
-        return true;
-      },
-      isValid() {
-        return this.numDetailMaps > i;
-      },
-      get(this: ClipmapTerrain, value) {
-        value.str[0] = manager.getAssetId(this.material.getDetailNormalMap(i)) ?? '';
-      },
-      async set(value) {
-        if (!value) {
-          this.material.setDetailNormalMap(i, null);
-        } else {
-          if (value.str[0]) {
-            const assetId = value.str[0];
-            let tex: Texture2D;
-            try {
-              tex = await manager.fetchTexture<Texture2D>(assetId, {
-                linearColorSpace: true
-              });
-            } catch (err) {
-              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-              tex = null;
-            }
-            if (tex?.isTexture2D()) {
-              this.material.setDetailNormalMap(i, tex);
-            } else {
-              console.error('Invalid texture type');
-            }
-          }
-        }
-      }
-    };
-    const accessorDetailUVScale: PropertyAccessor<ClipmapTerrain> = {
-      name: `DetailUVScale${i}`,
-      type: 'float',
-      default: 80,
-      isHidden() {
-        return true;
-      },
-      isValid() {
-        return this.numDetailMaps > i;
-      },
-      get(this: ClipmapTerrain, value) {
-        value.num[0] = this.material.getDetailMapUVScale(i);
-      },
-      async set(this: ClipmapTerrain, value) {
-        this.material.setDetailMapUVScale(i, value.num[0]);
-      }
-    };
-    const accessorDetailRoughness: PropertyAccessor<ClipmapTerrain> = {
-      name: `DetailRoughness${i}`,
-      type: 'float',
-      default: 80,
-      isHidden() {
-        return true;
-      },
-      isValid() {
-        return this.numDetailMaps > i;
-      },
-      get(this: ClipmapTerrain, value) {
-        value.num[0] = this.material.getDetailMapRoughness(i);
-      },
-      async set(this: ClipmapTerrain, value) {
-        this.material.setDetailMapRoughness(i, value.num[0]);
-      }
-    };
-    props.push(accessorDetailAlbedo, accessorDetailNormal, accessorDetailUVScale, accessorDetailRoughness);
-  }
-  return props;
-}
 /** @internal */
 export function getTerrainClass(manager: SerializationManager): SerializableClass {
   return {
@@ -324,7 +176,135 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
             this.material.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
-        ...getDetailMapProps(manager),
+        {
+          name: 'GrassMaps',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [JSONArray] },
+          phase: 0,
+          isNullable() {
+            return true;
+          },
+          isHidden() {
+            return false;
+          },
+          get(this: ClipmapTerrain, value) {
+            const data: { texture: string; bladeWidth: number; bladeHeight: number }[] = [];
+            const numLayers = this.grassRenderer.numLayers;
+            for (let i = 0; i < numLayers; i++) {
+              const grassTexture = this.grassRenderer.getGrassTexture(i);
+              const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
+              data.push({
+                texture: assetId,
+                bladeWidth: this.grassRenderer.getBladeWidth(i),
+                bladeHeight: this.grassRenderer.getBladeHeight(i)
+              });
+            }
+            value.object[0] = new JSONArray(null, data);
+          },
+          async set(this: ClipmapTerrain, value) {
+            const json = value.object[0] as JSONArray;
+            const data =
+              (json?.data as {
+                texture: string;
+                bladeWidth: number;
+                bladeHeight: number;
+              }[]) ?? [];
+            for (let i = 0; i < data.length; i++) {
+              const info = data[i];
+              const assetId = info.texture;
+              let texture: Texture2D = null;
+              if (assetId) {
+                try {
+                  texture = await manager.fetchTexture<Texture2D>(assetId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  texture = null;
+                }
+                if (!texture?.isTexture2D()) {
+                  console.error('Invalid texture type');
+                  texture?.dispose();
+                  texture = null;
+                }
+              }
+              this.grassRenderer.addLayer(info.bladeWidth ?? 1, info.bladeHeight ?? 1, texture);
+            }
+          }
+        },
+        {
+          name: 'DetailMaps',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [JSONArray] },
+          isNullable() {
+            return true;
+          },
+          isHidden() {
+            return false;
+          },
+          get(this: ClipmapTerrain, value) {
+            const data: { albedo: string; normal: string; roughness: number; uvscale: number }[] = [];
+            const material = this.material;
+            for (let i = 0; i < material.numDetailMaps; i++) {
+              data.push({
+                albedo: manager.getAssetId(material.getDetailMap(i)) ?? '',
+                normal: manager.getAssetId(material.getDetailNormalMap(i)) ?? '',
+                roughness: material.getDetailMapRoughness(i),
+                uvscale: material.getDetailMapUVScale(i)
+              });
+            }
+            value.object[0] = new JSONArray(null, data);
+          },
+          async set(this: ClipmapTerrain, value) {
+            const json = value.object[0] as JSONArray;
+            const data =
+              (json.data as {
+                albedo: string;
+                normal: string;
+                roughness: number;
+                uvscale: number;
+              }[]) ?? [];
+            const material = this.material;
+            material.numDetailMaps = data.length;
+            for (let i = 0; i < this.numDetailMaps; i++) {
+              const info = data[i];
+              if (!info?.albedo) {
+                material.setDetailMap(i, null);
+              } else {
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(info.albedo);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  material.setDetailMap(i, tex);
+                } else {
+                  console.error('Invalid texture type');
+                }
+              }
+              if (!info?.normal) {
+                material.setDetailNormalMap(i, null);
+              } else {
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(info.normal);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  material.setDetailMap(i, tex);
+                } else {
+                  console.error('Invalid texture type');
+                }
+              }
+              material.setDetailMapRoughness(i, info.roughness ?? 1);
+              material.setDetailMapUVScale(i, info.uvscale ?? 100);
+            }
+          }
+        },
         {
           name: 'SplatMap',
           type: 'embedded',
@@ -370,7 +350,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           },
           get(this: ClipmapTerrain, value) {
             value.str[0] = this.grassAssetId;
-            value.object[0] = getTerrainGrassContent(this, manager);
+            value.object[0] = getTerrainGrassContent(this);
           },
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
@@ -383,31 +363,14 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
               const dataView = new DataView(data);
               let offset = 0;
               const numLayers = dataView.getUint32(offset, true);
+              if (numLayers !== this.grassRenderer.numLayers) {
+                console.error('Number of grass layers mismatch');
+                return;
+              }
               offset += 4;
               for (let i = 0; i < numLayers; i++) {
-                const assetId = readUUID(dataView, offset);
-                offset += 36;
-                let texture: Texture2D = null;
-                if (assetId) {
-                  try {
-                    texture = await manager.fetchTexture<Texture2D>(assetId);
-                  } catch (err) {
-                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    texture = null;
-                  }
-                  if (!texture?.isTexture2D()) {
-                    console.error('Invalid texture type');
-                    texture?.dispose();
-                    texture = null;
-                  }
-                }
                 const dataSize = dataView.getUint32(offset, true);
                 offset += 4;
-                const bladeWidth = dataView.getFloat32(offset, true);
-                offset += 4;
-                const bladeHeight = dataView.getFloat32(offset, true);
-                offset += 4;
-                this.grassRenderer.addLayer(bladeWidth, bladeHeight, texture);
                 if (dataSize > 0) {
                   const data = new Float32Array(dataView.buffer, dataView.byteOffset + offset, dataSize >> 2);
                   const numInstances = data.length >> 2;

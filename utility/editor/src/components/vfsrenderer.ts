@@ -1100,7 +1100,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
             .catch((err) => {
               DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
             });
-          console.log('Delete folder');
         }
         if (ImGui.MenuItem('Rename##VFSRenameFolder')) {
           this.renameItem(dir);
@@ -1268,7 +1267,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
       const sourceDir = asset.path;
       const parentDir = vfs.dirname(sourceDir);
       if (vfs.isParentOf(parentDir, targetDir) && vfs.isParentOf(targetDir, parentDir)) {
-        console.log('No need to copy');
       } else if (!asset.isDir) {
         const targetPath = vfs.join(targetDir, vfs.basename(sourceDir));
         if (copy) {

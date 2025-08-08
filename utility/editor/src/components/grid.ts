@@ -90,7 +90,7 @@ class PropertyGroup {
       if (tmpProperty.object) {
         if (tmpProperty.object.length === 0) {
           if (value.add) {
-            const propGroup = group.addGroup(`Add ${value.name}`);
+            const propGroup = group.addGroup('<Add Element>');
             propGroup.setObject(null, value, obj, 0, 0);
           }
         } else {
@@ -197,7 +197,7 @@ class PropertyGroup {
               }
             }
           }
-          ctor = Object.getPrototypeOf(ctor);
+          ctor = cls ? cls.parent : Object.getPrototypeOf(ctor);
         }
       }
     }
@@ -434,7 +434,10 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         }
         if (addable) {
           ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0))) {
+          if (
+            ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0)) &&
+            group.selected[0] >= 0
+          ) {
             const ctor = group.objectTypes[group.selected[0]]?.ctor;
             const newObj = ctor
               ? group.prop.create

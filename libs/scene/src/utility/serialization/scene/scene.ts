@@ -8,7 +8,7 @@ import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
-import { JSONData } from '../json';
+import { JSONArray, JSONData } from '../json';
 import { Camera } from '../../../camera';
 
 export let testJson: object = {
@@ -563,15 +563,19 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           name: 'Metadata',
           type: 'object',
           default: null,
-          options: { objectTypes: [JSONData] },
+          options: { objectTypes: [JSONData, JSONArray] },
           isNullable() {
             return true;
           },
           get(this: Scene, value) {
-            value.object[0] = this.metaData ? new JSONData(null, this.metaData) : null;
+            value.object[0] = this.metaData
+              ? Array.isArray(this.metaData)
+                ? new JSONArray(null, this.metaData)
+                : new JSONData(null, this.metaData)
+              : null;
           },
           set(this: Scene, value) {
-            this.metaData = (value?.object[0] as JSONData)?.data ?? null;
+            this.metaData = (value?.object[0] as JSONData | JSONArray)?.data ?? null;
           }
         }
       ];

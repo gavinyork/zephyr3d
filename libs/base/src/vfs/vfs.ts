@@ -909,14 +909,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
             continue;
           }
 
-          const sourceStat = await this.stat(sourcePath);
-          if (!sourceStat.isFile) {
-            console.error(`Source file is not a file: ${sourcePath}`);
-            continue;
-          }
-
           // Determine target file path - preserve relative directory structure
           const targetFilePath = this.calculateTargetPath(sourcePattern, sourcePath, normalizedTargetDir);
+
+          const sourceStat = await this.stat(sourcePath);
+          if (!sourceStat.isFile) {
+            await targetVFS.makeDirectory(targetFilePath, true);
+            continue;
+          }
 
           // Check if target already exists
           const targetExists = await targetVFS.exists(targetFilePath);
@@ -1273,7 +1273,8 @@ export abstract class VFS extends makeEventTarget(Object)<{
       // It's a glob pattern - use existing glob method
       const globResults = await this.glob(pattern, {
         includeFiles: true,
-        includeDirs: false,
+        includeDirs: true,
+        includeHidden: true,
         recursive: pattern.includes('**'),
         cwd: this._cwd
       });

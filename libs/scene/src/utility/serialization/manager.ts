@@ -41,10 +41,11 @@ import { AssetManager } from '../../asset';
 import type { Texture2D, TextureCube } from '@zephyr3d/device';
 import {
   getJSONBoolClass,
-  getJSONClass,
+  getJSONObjectClass,
   getJSONNumberClass,
   getJSONPropClass,
-  getJSONStringClass
+  getJSONStringClass,
+  getJSONArrayClass
 } from './json';
 
 const defaultValues: Record<PropertyType, any> = {
@@ -91,7 +92,8 @@ export class SerializationManager {
         getJSONNumberClass(),
         getJSONStringClass(),
         getJSONBoolClass(),
-        getJSONClass(),
+        getJSONObjectClass(),
+        getJSONArrayClass(),
         getAABBClass(),
         getInterpolatorClass(),
         getNodeHierarchyClass(),
@@ -191,6 +193,9 @@ export class SerializationManager {
     return data;
   }
   serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
     const cls = this.getClasses();
     const index = cls.findIndex((val) => val.ctor === obj.constructor);
     if (index < 0) {

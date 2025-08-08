@@ -5,10 +5,10 @@ export class JSONProp {
   name: string;
   constructor(data: JSONData) {
     this.parent = data;
-    if (this.parent) {
+    if (this.parent && !(this.parent instanceof JSONArray)) {
       for (let i = 1; ; i++) {
         const name = `field${i}`;
-        if (!this.parent.value.find((p) => p.name === name)) {
+        if (!this.parent.value.find((p) => p?.name === name)) {
           this.name = name;
           break;
         }
@@ -43,8 +43,6 @@ export class JSONBool extends JSONProp {
   }
 }
 
-export class JSONArray extends JSONProp {}
-
 export class JSONData extends JSONProp {
   value: (JSONNumber | JSONString | JSONBool | JSONData)[];
   data: object;
@@ -73,7 +71,7 @@ export class JSONData extends JSONProp {
       } else if (typeof val === 'boolean') {
         prop = new JSONBool(this, val);
       } else if (typeof val === 'object') {
-        prop = new JSONData(this, val);
+        prop = Array.isArray(val) ? new JSONArray(this, val) : new JSONData(this, val);
       } else {
         continue;
       }
@@ -96,6 +94,57 @@ export class JSONData extends JSONProp {
   }
 }
 
+export class JSONArray extends JSONData {
+  constructor(parent: JSONData, data: unknown[] = []) {
+    super(parent);
+    this.updateObject(data);
+  }
+  updateObject(data: object) {
+    this.value = [];
+    this.data = data;
+    this.isnull = this.data === null;
+    if (this.data) {
+      this.parseObject();
+    }
+  }
+  parseObject() {
+    const data = this.data as unknown[];
+    if (data?.length > 0) {
+      for (let i = 0; i < data.length; i++) {
+        const val = data[i];
+        let prop: JSONString | JSONNumber | JSONBool | JSONData;
+        if (typeof val === 'string') {
+          prop = new JSONString(this, val);
+        } else if (typeof val === 'number') {
+          prop = new JSONNumber(this, val);
+        } else if (typeof val === 'boolean') {
+          prop = new JSONBool(this, val);
+        } else if (typeof val === 'object') {
+          prop = !val ? null : Array.isArray(val) ? new JSONArray(this, val) : new JSONData(this, val);
+        } else {
+          continue;
+        }
+        this.value.push(prop);
+      }
+    }
+  }
+  updateProps(): object {
+    const data = this.data as unknown[];
+    data.splice(0, data.length);
+    for (let i = 0; i < this.value.length; i++) {
+      const prop = this.value[i];
+      if (prop instanceof JSONArray) {
+        this.data[i] = prop.data;
+      } else if (prop instanceof JSONData) {
+        this.data[i] = prop.data;
+      } else {
+        this.data[i] = prop?.value ?? null;
+      }
+    }
+    return this.data;
+  }
+}
+
 export function getJSONPropClass(): SerializableClass {
   return {
     ctor: JSONProp,
@@ -110,7 +159,7 @@ export function getJSONPropClass(): SerializableClass {
           type: 'string',
           default: '',
           isHidden(this: JSONProp) {
-            return !this.parent || this.name.startsWith('.');
+            return !this.parent || this.parent instanceof JSONArray;
           },
           get(this: JSONProp, value) {
             value.str[0] = this.name;
@@ -221,7 +270,7 @@ export function getJSONBoolClass(): SerializableClass {
   };
 }
 
-export function getJSONClass(): SerializableClass {
+export function getJSONObjectClass(): SerializableClass {
   return {
     ctor: JSONData,
     parent: JSONProp,
@@ -234,10 +283,10 @@ export function getJSONClass(): SerializableClass {
         {
           name: 'JSONData',
           type: 'object_array',
-          options: { objectTypes: [JSONString, JSONNumber, JSONBool, JSONData] },
+          options: { objectTypes: [JSONString, JSONNumber, JSONBool, JSONData, JSONArray] },
           default: [],
           isNullable() {
-            return true;
+            return false;
           },
           isHidden() {
             return this.name.startsWith('.');
@@ -265,6 +314,80 @@ export function getJSONClass(): SerializableClass {
             this.updateProps();
           },
           delete(this: JSONData, index) {
+            this.value.splice(index, 1);
+            this.updateProps();
+          }
+        }
+      ];
+    }
+  };
+}
+
+export function getJSONArrayClass(): SerializableClass {
+  return {
+    ctor: JSONArray,
+    parent: JSONProp,
+    noTitle: true,
+    createFunc(ctx) {
+      return { obj: new JSONArray(ctx instanceof JSONData || ctx instanceof JSONArray ? ctx : null) };
+    },
+    getProps() {
+      return [
+        {
+          name: 'JSONArray',
+          type: 'object_array',
+          options: { objectTypes: [JSONString, JSONNumber, JSONBool, JSONData, JSONArray] },
+          default: [],
+          isNullable() {
+            return true;
+          },
+          get(this: JSONArray, value) {
+            value.object = this.value.slice();
+          },
+          set(this: JSONArray, value, index) {
+            if (value === null) {
+              this.isnull = true;
+            } else if (index >= 0) {
+              this.value[index] = value.object[0] as
+                | JSONString
+                | JSONNumber
+                | JSONBool
+                | JSONData
+                | JSONArray;
+              this.updateProps();
+            } else {
+              this.value = value.object.slice() as (
+                | JSONString
+                | JSONNumber
+                | JSONBool
+                | JSONData
+                | JSONArray
+              )[];
+              this.updateProps();
+            }
+          },
+          create(this: JSONArray, ctor, index) {
+            const c = ctor as
+              | typeof JSONString
+              | typeof JSONNumber
+              | typeof JSONBool
+              | typeof JSONData
+              | typeof JSONArray;
+            const prop = c ? new c(this) : null;
+            if (prop) {
+              prop.name = String(index);
+            }
+            return prop;
+          },
+          add(this: JSONArray, value, index) {
+            this.value.splice(
+              index,
+              0,
+              value.object[0] as JSONString | JSONNumber | JSONBool | JSONData | JSONArray
+            );
+            this.updateProps();
+          },
+          delete(this: JSONArray, index) {
             this.value.splice(index, 1);
             this.updateProps();
           }

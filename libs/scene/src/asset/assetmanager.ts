@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
-import { guessMimeType, HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
+import { HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -351,26 +351,6 @@ export class AssetManager {
     return data;
   }
   /**
-   * Guesses the MIME type by image filename
-   * @param name - Filename of the image
-   * @returns MIME type
-   */
-  async guessMIMEByName(name: string) {
-    let filename = '';
-    let mimeType = '';
-    const dataUriMatchResult = name.match(/^data:([^;]+)/);
-    if (dataUriMatchResult) {
-      mimeType = dataUriMatchResult[1];
-    } else {
-      filename = name
-        .split('/')
-        .filter((val) => !!val)
-        .slice(-1)[0];
-      return guessMimeType(filename);
-    }
-    return mimeType;
-  }
-  /**
    * Load a texture resource from ArrayBuffer
    * @param arrayBuffer - ArrayBuffer that contains the texture data
    * @param byteOffset - Byte offset of the ArrayBuffer to read
@@ -407,32 +387,13 @@ export class AssetManager {
     texture?: BaseTexture
   ): Promise<BaseTexture> {
     const data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
-    let ext = '';
-    let filename = '';
-    const dataUriMatchResult = url.match(/^data:([^;]+)/);
-    if (dataUriMatchResult) {
-      mimeType = mimeType || dataUriMatchResult[1];
-    } else {
-      filename = new URL(url, new URL(location.href).origin).pathname
-        .split('/')
-        .filter((val) => !!val)
-        .slice(-1)[0];
-      const p = filename ? filename.lastIndexOf('.') : -1;
-      ext = p >= 0 ? filename.substring(p).toLowerCase() : null;
-      if (!mimeType) {
-        if (ext === '.jpg' || ext === '.jpeg') {
-          mimeType = 'image/jpg';
-        } else if (ext === '.png') {
-          mimeType = 'image/png';
-        }
-      }
-    }
+    mimeType = mimeType ?? this._vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
       if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
-      tex.name = filename;
+      tex.name = this._vfs.basename(url);
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
