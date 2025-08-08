@@ -23,11 +23,6 @@ export interface DataTransferFileEntry {
  * DataTransfer-based virtual file system for handling dropped files and directories.
  *
  * Read-only VFS populated from DataTransfer (drag-and-drop) or FileList (input with webkitdirectory).
- *
- * 关键点：
- * - 在 DataTransfer 初始化时，同步“启动”所有 entry.file() / reader.readEntries() 调用，
- *   避免 FileSystemEntry 生命周期过期导致的 NotFoundError。
- * - 将这些启动后的回调转为 Promise 收集，最后统一等待完成。
  */
 export class DataTransferVFS extends VFS {
   private readonly entries: Map<string, DataTransferFileEntry> = new Map();
