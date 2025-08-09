@@ -5,7 +5,7 @@ import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type {
+import {
   Drawable,
   DrawContext,
   PickTarget,
@@ -15,8 +15,15 @@ import type {
 } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import { DRef } from '../app';
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUDataBuffer,
+  GPUProgram,
+  Texture2D
+} from '@zephyr3d/device';
+import { Application, DRef } from '../app';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
@@ -34,6 +41,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _gridScale: number;
   private _animationSpeed: number;
   private _timeStart: number;
+  private _feedbackProgram: DRef<GPUProgram>;
+  private _feedbackBindGroup: DRef<BindGroup>;
+  private _feedbackPrimitive: DRef<Primitive>;
+  private _feedbackRenderTarget: DRef<FrameBuffer>;
   private readonly _material: DRef<WaterMaterial>;
   /**
    * Creates an instance of Water node
@@ -51,6 +62,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._material.get().region = new Vector4(-1, -1, 1, 1);
     this._material.get().TAAStrength = 0.4;
     this.waveGenerator = new FBMWaveGenerator();
+    this._feedbackProgram = new DRef();
+    this._feedbackBindGroup = new DRef();
+    this._feedbackPrimitive = new DRef();
+    this._feedbackRenderTarget = new DRef();
     scene.queuePerCameraUpdateNode(this);
   }
   /** Disposes the water node */
@@ -59,6 +74,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._clipmap.dispose();
     this._clipmap = null;
     this._renderData = null;
+    this._feedbackBindGroup.dispose();
+    this._feedbackPrimitive.dispose();
+    this._feedbackProgram.dispose();
+    if (this._feedbackRenderTarget.get()) {
+      this._feedbackRenderTarget.get().getColorAttachment(0).dispose();
+      this._feedbackRenderTarget.get().getColorAttachment(1).dispose();
+      this._feedbackRenderTarget.dispose();
+    }
     this._material.dispose();
   }
   /** {@inheritDoc SceneNode.clone} */
@@ -275,45 +298,110 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     for (const info of this._renderData) {
       mat.draw(info.primitive, ctx, info.numInstances);
     }
-    /*
-    const that = this;
-    this._clipmap.draw({
-      camera: ctx.camera,
-      minMaxWorldPos: mat.region,
-      gridScale: Math.max(0.01, this._gridScale),
-      userData: this,
-      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-        if (that.waveGenerator) {
-          that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
-        } else {
-          outAABB.minPoint.setXYZ(minX, p.y, minZ);
-          outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
+  }
+  /**
+   * Retreive the disturbed world position and normal at water surface
+   */
+  async getSurfacePoint(points: Vector3[], outPos?: Vector3[], outNorm?: Vector3[]) {
+    const device = Application.instance.device;
+    await device.runNextFrameAsync(async () => {
+      if (!points || points.length === 0) {
+        return;
+      }
+      if (!this._feedbackProgram.get()) {
+        this._feedbackProgram.set(this._createFeedbackProgram(device));
+        this._feedbackBindGroup.set(device.createBindGroup(this._feedbackProgram.get().bindGroupLayouts[0]));
+      }
+      if (!this._feedbackPrimitive.get()) {
+        this._feedbackPrimitive.set(new Primitive());
+        this._feedbackPrimitive.get().primitiveType = 'point-list';
+      }
+      const primitive = this._feedbackPrimitive.get();
+      const vertices = new Float32Array(points.length * 3);
+      for (let i = 0; i < points.length; i++) {
+        vertices[i * 3 + 0] = points[i].x;
+        vertices[i * 3 + 1] = points[i].y;
+        vertices[i * 3 + 2] = points[i].z;
+      }
+      if (primitive.indexCount < points.length) {
+        const positionBuffer = device.createVertexBuffer('position_f32x3', vertices, { dynamic: true });
+        primitive.setVertexBuffer(positionBuffer);
+      } else {
+        const vb = primitive.getVertexBuffer('position');
+        vb.bufferSubData(0, vertices);
+      }
+      let fb = this._feedbackRenderTarget.get();
+      if (!fb || fb.getColorAttachment(0).width < points.length) {
+        const rt0 = device.createTexture2D('rgba32f', points.length, 0, {
+          samplerOptions: { mipFilter: 'none' }
+        });
+        const rt1 = device.createTexture2D('rgba32f', points.length, 0, {
+          samplerOptions: { mipFilter: 'none' }
+        });
+        if (fb) {
+          fb.getColorAttachment(0).dispose();
+          fb.getColorAttachment(1).dispose();
+          this._feedbackRenderTarget.dispose();
         }
-      },
-      drawPrimitive(prim, rotation, offset, scale, gridScale) {
-        const clipmapMatrix = Matrix4x4.rotationZ(rotation);
-        const scale2 = scale * gridScale;
-        clipmapMatrix[0] *= scale2;
-        clipmapMatrix[1] *= scale2;
-        clipmapMatrix[4] *= scale2;
-        clipmapMatrix[5] *= scale2;
-        clipmapMatrix[8] *= scale2;
-        clipmapMatrix[9] *= scale2;
-        clipmapMatrix[12] = offset.x * gridScale;
-        clipmapMatrix[13] = offset.y * gridScale;
-        const clipmapMatrix = new Matrix4x4(modelMatrix)
-          .scaleLeft(new Vector3(scale, scale, 1))
-          .translateLeft(new Vector3(offset.x, offset.y, 0))
-          .scaleLeft(new Vector3(gridScale, gridScale, 1));
-        clipmapMatrix.m03 -= that.worldMatrix.m03;
-        clipmapMatrix.m13 -= that.worldMatrix.m23;
-        mat.setClipmapInfo(rotation, scale, offset.x, offset.y);
-        mat.setClipmapGridInfo(gridScale, that.worldMatrix.m03, that.worldMatrix.m23);
-        mat.apply(ctx);
-        mat.draw(prim, ctx);
+        this._feedbackRenderTarget.set(device.createFrameBuffer([rt0, rt1], null));
+      }
+      primitive.indexCount = points.length;
+      device.pushDeviceStates();
+      device.setProgram(this._feedbackProgram.get());
+      device.setBindGroup(0, this._feedbackBindGroup.get());
+      device.setFramebuffer(this._feedbackRenderTarget.get());
+      this._feedbackPrimitive.get().draw();
+      device.popDeviceStates();
+      const pos = new Float32Array(points.length * 4);
+      const norm = new Float32Array(points.length * 4);
+      await Promise.all([
+        this._feedbackRenderTarget.get().getColorAttachment(0).readPixels(0, 0, points.length, 1, 0, 0, pos),
+        this._feedbackRenderTarget.get().getColorAttachment(1).readPixels(0, 0, points.length, 1, 0, 0, norm)
+      ]);
+      for (let i = 0; i < points.length; i++) {
+        if (outPos) {
+          outPos[i].setXYZ(pos[i * 3 + 0], pos[i * 3 + 1], pos[i * 3 + 2]);
+        }
+        if (outNorm) {
+          outNorm[i].setXYZ(norm[i * 3 + 0], norm[i * 3 + 1], norm[i * 3 + 2]);
+        }
       }
     });
-    */
+  }
+  /** @internal */
+  private _createFeedbackProgram(device: AbstractDevice) {
+    const that = this;
+    return device.buildRenderProgram({
+      vertex(pb) {
+        this.$inputs.position = pb.vec3().attrib('position');
+        this.numPoints = pb.float().uniform(0);
+        this.textureWidth = pb.float().uniform(0);
+        that.waveGenerator.setupUniforms(this, 0);
+        pb.main(function () {
+          this.$l.worldPos = pb.vec3();
+          this.$l.worldNorm = pb.vec3();
+          that.waveGenerator.calcVertexPositionAndNormal(
+            this,
+            this.$inputs.position,
+            this.worldPos,
+            this.worldNorm
+          );
+          this.$outputs.worldPos = this.worldPos;
+          this.$outputs.worldNorm = this.worldNorm;
+          this.$l.index =
+            device.type === 'webgl' ? this.$inputs.instanceId : pb.float(this.$builtins.instanceIndex);
+          this.$l.ndcX = pb.sub(pb.mul(pb.div(pb.add(this.index, 0.5), this.textureWidth), 2), 1);
+          this.$l.$builtins.position = pb.vec4(this.ndcX, 0.5, 0, 1);
+        });
+      },
+      fragment(pb) {
+        this.$outputs.worldPos = pb.vec4();
+        this.$outputs.worldNorm = pb.vec4();
+        pb.main(function () {
+          this.$outputs.worldPos = pb.vec4(this.$inputs.worldPos, 1);
+          this.$outputs.worldNorm = pb.vec4(this.$inputs.worldNorm, 1);
+        });
+      }
+    });
   }
 }

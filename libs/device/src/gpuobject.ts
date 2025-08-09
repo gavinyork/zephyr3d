@@ -1513,6 +1513,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
   getDepthAttachmentLayer(): number;
   getColorAttachments(): BaseTexture[];
   getDepthAttachment(): BaseTexture;
+  getColorAttachment<T extends BaseTexture = BaseTexture>(index: number): T;
   bind(): boolean;
   unbind(): void;
 }

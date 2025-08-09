@@ -200,6 +200,9 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   getColorAttachments(): BaseTexture[] {
     return this._options?.colorAttachments?.map((val) => val?.texture || null) || [];
   }
+  getColorAttachment<T extends BaseTexture>(index: number): T {
+    return (this.getColorAttachments()[index] as unknown as T) ?? null;
+  }
   getMSAADepthAttachment(): GPUTexture {
     return this._msaaDepthTexture;
   }

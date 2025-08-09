@@ -294,6 +294,9 @@ export class WebGLFrameBuffer
   getColorAttachments(): BaseTexture[] {
     return this._options.colorAttachments?.map((val) => val.texture || null) || [];
   }
+  getColorAttachment<T extends BaseTexture>(index: number): T {
+    return (this.getColorAttachments()[index] as unknown as T) ?? null;
+  }
   bind(): boolean {
     if (!this._initialized) {
       this._init();
