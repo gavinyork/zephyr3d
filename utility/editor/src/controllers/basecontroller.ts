@@ -1,6 +1,6 @@
 import { eventBus } from '../core/eventbus';
 import type { BaseModel } from '../models/basemodel';
-import { BaseView } from '../views/baseview';
+import type { BaseView } from '../views/baseview';
 
 export abstract class BaseController<
   Model extends BaseModel,

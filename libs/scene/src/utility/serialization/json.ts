@@ -1,4 +1,4 @@
-import { SerializableClass } from './types';
+import type { SerializableClass } from './types';
 
 export class JSONProp {
   parent: JSONData;

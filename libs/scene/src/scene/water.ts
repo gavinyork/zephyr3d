@@ -5,14 +5,8 @@ import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import {
-  Drawable,
-  DrawContext,
-  PickTarget,
-  Primitive,
-  PrimitiveInstanceInfo,
-  WaveGenerator
-} from '../render';
+import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, WaveGenerator } from '../render';
+import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
 import type {
@@ -330,7 +324,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         const vb = primitive.getVertexBuffer('position');
         vb.bufferSubData(0, vertices);
       }
-      let fb = this._feedbackRenderTarget.get();
+      const fb = this._feedbackRenderTarget.get();
       if (!fb || fb.getColorAttachment(0).width < points.length) {
         const rt0 = device.createTexture2D('rgba32f', points.length, 0, {
           samplerOptions: { mipFilter: 'none' }

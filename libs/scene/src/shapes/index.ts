@@ -4,7 +4,7 @@ import type { CylinderShape } from './cylinder';
 import type { PlaneShape } from './plane';
 import type { SphereShape } from './sphere';
 import type { TorusShape } from './torus';
-import { TetrahedronFrameShape, TetrahedronShape } from './tetrahedron';
+import type { TetrahedronFrameShape, TetrahedronShape } from './tetrahedron';
 
 export * from './shape';
 export * from './box';

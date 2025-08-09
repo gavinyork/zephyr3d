@@ -1,5 +1,5 @@
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
-import { GraphEditor } from './grapheditor';
+import type { GraphEditor } from './grapheditor';
 
 export type GraphNodeInput = { id: number; name: string; type: string; value?: any };
 export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };

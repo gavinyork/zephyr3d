@@ -9,9 +9,9 @@ import { NodeHierarchy } from './node';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
-import { Camera } from '../../../camera';
+import type { Camera } from '../../../camera';
 
-export let testJson: object = {
+export const testJson: object = {
   testNumber: 123,
   testString: 'Hello,world!',
   '.testHiddenString': "You can't see me",

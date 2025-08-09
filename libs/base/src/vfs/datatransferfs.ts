@@ -132,7 +132,9 @@ export class DataTransferVFS extends VFS {
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
-    if (normalizedPath === '/') return true;
+    if (normalizedPath === '/') {
+      return true;
+    }
 
     return this.entries.has(normalizedPath) || this.directoryStructure.has(normalizedPath);
   }
@@ -192,7 +194,9 @@ export class DataTransferVFS extends VFS {
   }
 
   private async ensureInitialized(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {
+      return;
+    }
     await this.initPromise;
     this.initialized = true;
   }
@@ -212,14 +216,18 @@ export class DataTransferVFS extends VFS {
     this.entries.clear();
     this.directoryStructure.clear();
 
-    if (!dataTransfer || !dataTransfer.items) return;
+    if (!dataTransfer || !dataTransfer.items) {
+      return;
+    }
 
     const filePromises: Array<Promise<{ file: File; path: string } | Array<{ file: File; path: string }>>> =
       [];
 
     for (let i = 0; i < dataTransfer.items.length; i++) {
       const item = dataTransfer.items[i];
-      if (item.kind !== 'file') continue;
+      if (item.kind !== 'file') {
+        continue;
+      }
 
       // 优先使用支持目录的 entry
       const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
@@ -430,7 +438,9 @@ export class DataTransferVFS extends VFS {
   }
 
   private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
-    if (!options) return true;
+    if (!options) {
+      return true;
+    }
 
     if (options.pattern) {
       if (typeof options.pattern === 'string') {

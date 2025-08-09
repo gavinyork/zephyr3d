@@ -11,7 +11,7 @@ import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import { DRef, DWeakRef } from '../app';
-import { Metadata } from 'draco3d';
+import type { Metadata } from 'draco3d';
 
 /**
  * Presents a world that manages a couple of objects that will be rendered

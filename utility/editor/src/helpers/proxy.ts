@@ -1,5 +1,6 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, SceneNode, TetrahedronFrameShape } from '@zephyr3d/scene';
+import type { Scene, SceneNode } from '@zephyr3d/scene';
+import { TetrahedronFrameShape } from '@zephyr3d/scene';
 import {
   BoundingBox,
   CylinderShape,

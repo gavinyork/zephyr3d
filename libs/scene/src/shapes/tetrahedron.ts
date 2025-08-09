@@ -111,10 +111,10 @@ export class TetrahedronShape
       new Vector3(-sizeX, 0, sizeZ) // nxpz
     ];
 
-    let currentVertexIndex = 0;
+    let _currentVertexIndex = 0;
 
     // Right plane (top -> pxpz -> pxnz)
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       topVertex,
       bottomVertices[0], // pxpz
       bottomVertices[1], // pxnz
@@ -123,11 +123,11 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Back plane (top -> pxnz -> nxnz)
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       topVertex,
       bottomVertices[1], // pxnz
       bottomVertices[2], // nxnz
@@ -136,11 +136,11 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Left plane (top -> nxnz -> nxpz)
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       topVertex,
       bottomVertices[2], // nxnz
       bottomVertices[3], // nxpz
@@ -149,11 +149,11 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Front plane (top -> nxpz -> pxpz)
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       topVertex,
       bottomVertices[3], // nxpz
       bottomVertices[0], // pxpz
@@ -162,12 +162,12 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Bottom: split into two triangles
     // triangle 1: pxpz -> nxpz -> pxnz
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       bottomVertices[0], // pxpz
       bottomVertices[3], // nxpz
       bottomVertices[1], // pxnz
@@ -176,11 +176,11 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // triangle 2: pxnz -> nxpz -> nxnz
-    currentVertexIndex = this.addTriangle(
+    _currentVertexIndex = this.addTriangle(
       bottomVertices[1], // pxnz
       bottomVertices[3], // nxpz
       bottomVertices[2], // nxnz
@@ -189,7 +189,7 @@ export class TetrahedronShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     Shape._transform(options.transform, vertices, normals, start);
@@ -312,10 +312,10 @@ export class TetrahedronFrameShape
       new Vector3(-sizeX, 0, sizeZ) // nxpz
     ];
 
-    let currentVertexIndex = 0;
+    let _currentVertexIndex = 0;
 
     // Right plane (top -> pxpz -> pxnz)
-    currentVertexIndex = this.addLines(
+    _currentVertexIndex = this.addLines(
       topVertex,
       bottomVertices[0], // pxpz
       bottomVertices[1], // pxnz
@@ -324,11 +324,11 @@ export class TetrahedronFrameShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Back plane (top -> pxnz -> nxnz)
-    currentVertexIndex = this.addLines(
+    _currentVertexIndex = this.addLines(
       topVertex,
       bottomVertices[1], // pxnz
       bottomVertices[2], // nxnz
@@ -337,11 +337,11 @@ export class TetrahedronFrameShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Left plane (top -> nxnz -> nxpz)
-    currentVertexIndex = this.addLines(
+    _currentVertexIndex = this.addLines(
       topVertex,
       bottomVertices[2], // nxnz
       bottomVertices[3], // nxpz
@@ -350,11 +350,11 @@ export class TetrahedronFrameShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     // Front plane (top -> nxpz -> pxpz)
-    currentVertexIndex = this.addLines(
+    _currentVertexIndex = this.addLines(
       topVertex,
       bottomVertices[3], // nxpz
       bottomVertices[0], // pxpz
@@ -363,7 +363,7 @@ export class TetrahedronFrameShape
       uvs,
       indices,
       indexOffset,
-      currentVertexIndex
+      _currentVertexIndex
     );
 
     Shape._transform(options.transform, vertices, normals, start);

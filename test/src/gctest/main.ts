@@ -1,4 +1,5 @@
-import { Application, FPSCameraController, PerspectiveCamera, SerializationManager } from '@zephyr3d/scene';
+import type { PerspectiveCamera } from '@zephyr3d/scene';
+import { Application, FPSCameraController, SerializationManager } from '@zephyr3d/scene';
 import * as common from '../common';
 import { HttpFS } from '@zephyr3d/base';
 

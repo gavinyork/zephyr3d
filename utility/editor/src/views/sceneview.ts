@@ -66,7 +66,7 @@ import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
 import { GraphEditor } from '../components/graph/grapheditor';
-import { SceneController } from '../controllers/scenecontroller';
+import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editocontroller';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
@@ -1190,17 +1190,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._cmdManager.execute(new NodeDeleteCommand(node));
     eventBus.dispatchEvent('scene_changed');
   }
-  private handleWorkspaceDragEnter(type: string, payload: { isDir: boolean; path: string }) {
+  private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
     if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
       const path = ProjectService.VFS.relative(payload.path);
       this.handleAddAsset(path);
     }
   }
   private handleWorkspaceDragLeave() {}
-  private handleWorkspaceDragStart(type: string, payload: unknown) {
+  private handleWorkspaceDragStart(_type: string, _payload: unknown) {
     this._renderDropZone = true;
   }
-  private handleWorkspaceDragging(type: string, payload: unknown, x: number, y: number) {
+  private handleWorkspaceDragging(_type: string, _payload: unknown, x: number, y: number) {
     this._mousePosX = x;
     this._mousePosY = y;
     const placeNode = this._nodeToBePlaced?.get();
