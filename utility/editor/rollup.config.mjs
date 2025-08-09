@@ -39,6 +39,17 @@ function getTargetWeb() {
       format: 'esm',
       sourcemap: true
     },
+    treeshake: {
+      moduleSideEffects: (id, external) => {
+        if (id.includes('@zephyr3d/')) {
+          console.log('Preserving all exports for:', id);
+          return true;
+        }
+        return false;
+      },
+      propertyReadSideEffects: true,
+      unknownGlobalSideEffects: true
+    },
     onwarn(warning, warn) {
       if (warning.code === 'CIRCULAR_DEPENDENCY') {
         console.error(warning.message);

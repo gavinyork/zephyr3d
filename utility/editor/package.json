@@ -58,6 +58,7 @@
     "@types/node": "^18.13.0",
     "@types/upng-js": "^2.1.5",
     "@types/streamsaver": "^2.0.5",
+    "@types/systemjs": "^6.15.3",
     "@webgpu/types": "^0.1.62",
     "idb": "^8.0.1",
     "@zip.js/zip.js": "^2.7.54",
@@ -70,6 +71,9 @@
     "@zephyr3d/imgui": "workspace:*",
     "@zephyr3d/backend-webgl": "workspace:*",
     "@zephyr3d/backend-webgpu": "workspace:*",
+    "@zephyr3d/runtime": "workspace:*",
+    "typescript": "^5.7.3",
+    "systemjs": "^6.15.1",
     "rollup-plugin-import-css": "~3.5.8"
   }
 }

@@ -16,6 +16,31 @@ import type { ProjectInfo } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
+import { ScriptingSystem } from '@zephyr3d/runtime';
+import { VFSScriptRegistry } from './scripting';
+import { moduleSharing } from './moduleshare';
+
+import * as zephyr3d_base from '@zephyr3d/base';
+import * as zephyr3d_device from '@zephyr3d/device';
+import * as zephyr3d_scene from '@zephyr3d/scene';
+import * as zephyr3d_runtime from '@zephyr3d/runtime';
+
+const testScript = `
+import { Vector3 } from "@zephyr3d/base";
+
+export default function (host: any, props: any) {
+  console.log(host, props);
+  return {
+    v: new Vector3(1, 2, 3),
+    init() {
+      console.log('init: ' + this.v.toString());
+    },
+    update() {
+      console.log('update: ' + this.v.toString());
+    }
+  };
+}
+`;
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -25,11 +50,21 @@ export class Editor {
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
+  private _scriptRoot: string;
+  private _registry: VFSScriptRegistry;
+  private _scriptingSystem: ScriptingSystem;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
+    this._scriptRoot = '/scripts';
+    this._registry = new VFSScriptRegistry({ mode: 'editor' }, ProjectService.VFS, this._scriptRoot);
+    this._scriptingSystem = new ScriptingSystem(this._registry, {
+      onLoadError(e) {
+        console.error(e);
+      }
+    });
   }
   get sceneChanged() {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
@@ -80,6 +115,7 @@ export class Editor {
     eventBus.dispatchEvent('resize', w, h);
   }
   update(dt: number) {
+    this._scriptingSystem.update(dt);
     eventBus.dispatchEvent('update', dt);
   }
   getBrushes() {
@@ -97,6 +133,24 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
+    moduleSharing.shareModules({
+      '@zephyr3d/base': zephyr3d_base
+    });
+    await (async () => {
+      try {
+        const ns = await import('@zephyr3d/base');
+        console.log('[check] import @zephyr3d/base OK:', !!ns, Object.keys(ns).slice(0, 8));
+      } catch (err) {
+        console.error('[check] import @zephyr3d/base FAILED:', err);
+      }
+    })();
+    await ProjectService.VFS.makeDirectory(this._scriptRoot, true);
+    await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'hello.ts'), testScript, {
+      encoding: 'utf8'
+    });
+    await this._scriptingSystem.attachScript(this, {
+      module: '#/hello'
+    });
   }
   async loadAssets() {
     const assetManager = new AssetManager(
