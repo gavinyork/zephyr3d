@@ -181,7 +181,11 @@ export function getGPUObjectStatistics() {
 
 export async function initLeakDetector() {
   const jsmap = await (await fetch('js/index.js.map')).text();
-  traceMap = new TraceMap(jsmap);
+  try {
+    traceMap = new TraceMap(jsmap);
+  } catch (_err) {
+    traceMap = null;
+  }
 
   const device = Application.instance.device;
   device.on('gpuobject_added', function (obj) {
@@ -216,10 +220,6 @@ export async function initLeakDetector() {
   Error['stackTraceLimit'] = 50;
 }
 
-export function sourceMapToOrigin(line: number, column: number) {
-  return originalPositionFor(traceMap, { line, column });
-}
-
 const LINE_RE = /^\s*at\s+(.*?)\s+\((.*?):(\d+):(\d+)\)$|^\s*at\s+(.*?):(\d+):(\d+)$/;
 
 export function getMappedStack(): string {
@@ -234,6 +234,10 @@ export function getMappedStack(): string {
     const column = Number(m[4] || m[7]);
 
     if (!file.endsWith('index.js')) {
+      return frame;
+    }
+
+    if (!traceMap) {
       return frame;
     }
 

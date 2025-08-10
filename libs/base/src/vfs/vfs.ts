@@ -534,6 +534,14 @@ export abstract class VFS extends makeEventTarget(Object)<{
     return PathUtils.dirname(path);
   }
   /**
+   * Returns whether a path is absolute or not
+   * @param path - path to check
+   * @returns true if the path is an absolute path
+   */
+  isAbsolute(path: string): boolean {
+    return PathUtils.isAbsolute(path);
+  }
+  /**
    * Extract base file name part for a path
    * @param path - path
    * @returns Base file name part of the path

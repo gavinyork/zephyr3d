@@ -20,6 +20,7 @@
     "rootDir": "./src",
     "declaration": true,
     "importHelpers": false,
+    "types": [],
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["./src"],

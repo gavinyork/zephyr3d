@@ -7,6 +7,7 @@
   "files": [
     "dist"
   ],
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gavinyork/zephyr3d.git"
@@ -16,7 +17,7 @@
     "build:check": "tsc -p . --noEmit",
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
+    "build": "cross-env vite build",
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {
@@ -42,6 +43,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "rollup-plugin-sourcemaps2": "^0.5.2",
     "rollup-plugin-typescript2": "^0.34.1",
+    "rollup-plugin-css-only": "^4.5.2",
     "@rollup/pluginutils": "~5.1.4",
     "rollup": "~4.30.1",
     "rollup-plugin-dts": "~6.1.1",
@@ -52,10 +54,14 @@
     "shx": "^0.3.4",
     "cross-env": "^7.0.3",
     "typescript": "^5.7.3",
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "vite": "^7.1.1",
+    "terser": "^5.16.0",
+    "@vitejs/plugin-legacy": "^7.2.1",
+    "vite-plugin-monaco-editor-esm": "^2.0.2"
   },
   "dependencies": {
-    "@types/node": "^18.13.0",
+    "@types/node": "^22.12.0",
     "@types/upng-js": "^2.1.5",
     "@types/streamsaver": "^2.0.5",
     "@types/systemjs": "^6.15.3",
@@ -73,7 +79,8 @@
     "@zephyr3d/backend-webgpu": "workspace:*",
     "@zephyr3d/runtime": "workspace:*",
     "typescript": "^5.7.3",
-    "systemjs": "^6.15.1",
+    "monaco-editor": "^0.50.0",
+    "@monaco-editor/loader": "^1.5.0",
     "rollup-plugin-import-css": "~3.5.8"
   }
 }

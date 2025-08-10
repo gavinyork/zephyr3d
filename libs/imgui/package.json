@@ -70,7 +70,7 @@
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
     "@webgpu/types": "^0.1.62",
-    "@types/node": "^18.13.0",
+    "@types/node": "^22.12.0",
     "@types/emscripten": "^1.39.6",
     "rollup-plugin-import-css": "~3.5.8"
   }

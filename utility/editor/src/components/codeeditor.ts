@@ -1,0 +1,688 @@
+import * as monaco from 'monaco-editor';
+/** @ts-ignore */
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+/** @ts-ignore */
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+/** @ts-ignore */
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+/** @ts-ignore */
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+/** @ts-ignore */
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+
+export class CodeEditor {
+  private isMinimized: boolean;
+  private editor: monaco.editor.IStandaloneCodeEditor;
+
+  constructor() {
+    this.isMinimized = false;
+    this.editor = null;
+  }
+
+  close() {
+    const overlay = document.getElementById('monaco-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+  }
+
+  show() {
+    const overlay = document.getElementById('monaco-overlay');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+    } else {
+      this.createResizableEditorContainer();
+      setTimeout(async () => {
+        const editorContainer = document.getElementById('monaco-editor-container');
+        if (editorContainer) {
+          await this.initMonacoEditor(editorContainer, '');
+        }
+      }, 100);
+    }
+  }
+
+  minimize() {
+    const overlay = document.getElementById('monaco-overlay');
+    if (overlay) {
+      this.isMinimized = true;
+      overlay.classList.add('minimized');
+
+      // 修改标题栏提示用户可以点击恢复
+      const titleSpan = overlay.querySelector('.editor-title') as HTMLSpanElement;
+      if (titleSpan) {
+        titleSpan.textContent = '📝 代码编辑器 (点击恢复)';
+        titleSpan.style.cursor = 'pointer';
+      }
+
+      // 修改最小化按钮为恢复按钮
+      const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
+      if (minimizeBtn) {
+        minimizeBtn.innerHTML = '□';
+        minimizeBtn.title = '恢复';
+      }
+    }
+  }
+
+  restore() {
+    const overlay = document.getElementById('monaco-overlay');
+    if (overlay) {
+      this.isMinimized = false;
+      overlay.classList.remove('minimized');
+
+      // 恢复标题栏
+      const titleSpan = overlay.querySelector('.editor-title') as HTMLSpanElement;
+      if (titleSpan) {
+        titleSpan.textContent = '📝 代码编辑器';
+        titleSpan.style.cursor = 'default';
+      }
+
+      // 恢复最小化按钮
+      const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
+      if (minimizeBtn) {
+        minimizeBtn.innerHTML = '−';
+        minimizeBtn.title = '最小化';
+      }
+
+      // 恢复后重新布局编辑器
+      setTimeout(() => {
+        if (this.editor) {
+          this.editor.layout();
+        }
+      }, 100);
+    }
+  }
+
+  toggleMinimize() {
+    if (this.isMinimized) {
+      this.restore();
+    } else {
+      this.minimize();
+    }
+  }
+
+  saveCode() {
+    if (this.editor) {
+      const code = this.editor.getValue();
+      localStorage.setItem('monaco-editor-content', code);
+      console.log('代码已保存到本地存储');
+    }
+  }
+
+  private addEditorStyles() {
+    if (document.querySelector('#monaco-editor-styles')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'monaco-editor-styles';
+    style.textContent = `
+        .monaco-editor-overlay {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 60vw; /* 增加默认宽度 */
+            height: 100vh;
+            background-color: #1e1e1e;
+            border-left: 2px solid #333;
+            z-index: 9999;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column; /* 关键：使用flex布局 */
+        }
+
+        .monaco-editor-overlay.hidden {
+            transform: translateX(100%);
+        }
+
+        .monaco-editor-overlay.minimized {
+            height: 40px;
+            border-left-color: #007acc;
+        }
+
+        .monaco-editor-overlay .editor-header {
+            height: 40px;
+            background-color: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            color: #cccccc;
+            font-size: 14px;
+            flex-shrink: 0; /* 防止头部被压缩 */
+            box-sizing: border-box;
+        }
+
+        .monaco-editor-overlay.minimized .editor-header {
+            border-bottom: none;
+        }
+
+        .monaco-editor-overlay .editor-content {
+            flex: 1; /* 关键：占满剩余空间 */
+            overflow: hidden;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .monaco-editor-overlay.minimized .editor-content {
+            display: none;
+        }
+
+        /* Monaco编辑器容器 */
+        #monaco-editor-container {
+            flex: 1; /* 关键：占满除状态栏外的空间 */
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 状态栏样式 */
+        .editor-status-bar {
+            height: 24px;
+            background-color: #007acc;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-size: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            flex-shrink: 0; /* 防止状态栏被压缩 */
+            border-top: 1px solid #005a9e;
+        }
+
+        /* 标题样式 */
+        .editor-title {
+            transition: color 0.2s ease;
+            user-select: none;
+        }
+
+        .editor-title:hover {
+            color: #007acc;
+        }
+
+        /* 按钮容器样式 */
+        .button-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 2px;
+            height: 100%;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #cccccc;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .minimize-btn:hover {
+            background-color: #ffaa00 !important;
+            color: white !important;
+        }
+
+        .close-btn-red:hover {
+            background-color: #e81123 !important;
+            color: white !important;
+        }
+
+        .resizable-editor {
+            resize: none; /* 禁用默认resize，使用自定义 */
+            overflow: hidden; /* 修复：改为hidden */
+            min-width: 400px; /* 增加最小宽度 */
+            max-width: 80vw;
+        }
+
+        .resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 5px;
+            height: 100%;
+            background: transparent;
+            cursor: col-resize;
+            z-index: 10;
+            transition: background-color 0.2s;
+        }
+
+        .resize-handle:hover,
+        .monaco-editor-overlay:hover .resize-handle {
+            background-color: #007acc;
+            opacity: 0.6;
+        }
+
+        /* 最小化状态下隐藏调整手柄 */
+        .monaco-editor-overlay.minimized .resize-handle {
+            display: none;
+        }
+
+        /* 确保Monaco编辑器正确渲染 */
+        .monaco-editor {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .monaco-editor .monaco-editor-background {
+            background-color: #1e1e1e !important;
+        }
+
+        /* 滚动条样式优化 */
+        .monaco-scrollable-element > .scrollbar > .slider {
+            background: rgba(121, 121, 121, 0.4) !important;
+        }
+
+        .monaco-scrollable-element > .scrollbar > .slider:hover {
+            background: rgba(121, 121, 121, 0.7) !important;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .monaco-editor-overlay {
+                width: 70vw;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .monaco-editor-overlay {
+                width: 100vw;
+                left: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+  }
+
+  private createResizableEditorContainer() {
+    this.addEditorStyles();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'monaco-editor-overlay resizable-editor';
+    overlay.id = 'monaco-overlay';
+
+    // 添加拖拽调整大小的手柄
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+
+    // 实现拖拽调整大小
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = overlay.offsetWidth;
+
+      document.addEventListener('mousemove', handleResize);
+      document.addEventListener('mouseup', stopResize);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    const handleResize = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const deltaX = startX - e.clientX; // 注意：向左拖动应该增加宽度
+      const newWidth = startWidth + deltaX;
+      const minWidth = 400;
+      const maxWidth = window.innerWidth * 0.9;
+
+      const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+      overlay.style.width = constrainedWidth + 'px';
+
+      // 强制Monaco编辑器重新布局
+      if (this.editor) {
+        setTimeout(() => this.editor.layout(), 0);
+      }
+    };
+
+    const stopResize = () => {
+      isResizing = false;
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', stopResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    const header = document.createElement('div');
+    header.className = 'editor-header';
+
+    // 创建标题
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'editor-title';
+    titleSpan.textContent = '📝 代码编辑器';
+
+    // 双击标题栏恢复
+    titleSpan.addEventListener('dblclick', () => {
+      if (this.isMinimized) {
+        this.restore();
+      }
+    });
+
+    // 点击标题栏恢复（当最小化时）
+    titleSpan.addEventListener('click', () => {
+      if (this.isMinimized) {
+        this.restore();
+      }
+    });
+
+    // 创建按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+
+    // 创建最小化/恢复按钮
+    const minimizeBtn = document.createElement('button');
+    minimizeBtn.className = 'close-btn minimize-btn';
+    minimizeBtn.innerHTML = '−';
+    minimizeBtn.title = '最小化';
+    minimizeBtn.onclick = () => this.toggleMinimize();
+
+    // 创建关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-btn close-btn-red';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = '关闭';
+    closeBtn.onclick = () => this.close();
+
+    // 组装按钮
+    buttonContainer.appendChild(minimizeBtn);
+    buttonContainer.appendChild(closeBtn);
+
+    // 组装头部
+    header.appendChild(titleSpan);
+    header.appendChild(buttonContainer);
+
+    // 创建内容区域
+    const content = document.createElement('div');
+    content.className = 'editor-content';
+
+    // 创建编辑器容器
+    const editorContainer = document.createElement('div');
+    editorContainer.id = 'monaco-editor-container';
+
+    // 创建状态栏
+    const statusBar = document.createElement('div');
+    statusBar.className = 'editor-status-bar';
+    statusBar.innerHTML = `
+      <span>准备就绪</span>
+      <span>JavaScript | UTF-8</span>
+    `;
+
+    // 组装内容区域
+    content.appendChild(editorContainer);
+    content.appendChild(statusBar);
+
+    // 组装整个overlay
+    overlay.appendChild(resizeHandle);
+    overlay.appendChild(header);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    // 键盘快捷键支持
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay && !overlay.classList.contains('hidden')) {
+        this.close();
+      }
+    });
+
+    return editorContainer;
+  }
+
+  private async initMonacoEditor(container: HTMLElement, initialCode?: string): Promise<void> {
+    try {
+      if (!(window as any).MonacoEnvironment) {
+        (window as any).MonacoEnvironment = {
+          getWorker: function (moduleId, label) {
+            if (label === 'json') {
+              return new JsonWorker();
+            }
+            if (label === 'css' || label === 'scss' || label === 'less') {
+              return new CssWorker();
+            }
+            if (label === 'html' || label === 'handlebars' || label === 'razor') {
+              return new HtmlWorker();
+            }
+            if (label === 'typescript' || label === 'javascript') {
+              return new TsWorker();
+            }
+            return new EditorWorker();
+          }
+        };
+      }
+      // 获取保存的代码或使用默认代码
+      const savedCode = localStorage.getItem('monaco-editor-content');
+      const codeToUse = initialCode || savedCode || 'console.log("Hello, Monaco Editor!");';
+
+      this.editor = monaco.editor.create(container, {
+        value: codeToUse,
+        language: 'javascript',
+        theme: 'vs-dark',
+        lineNumbersMinChars: 3,
+        showFoldingControls: 'never',
+        automaticLayout: true, // 重要：自动布局
+        fontSize: 14,
+        lineHeight: 20,
+        wordWrap: 'on',
+        wrappingStrategy: 'simple',
+        fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, "source-code-pro", monospace',
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        readOnly: false,
+        cursorStyle: 'line',
+        glyphMargin: false,
+        folding: false,
+        lineNumbers: 'on',
+        selectOnLineNumbers: false,
+        matchBrackets: 'always',
+        autoIndent: 'full',
+        formatOnPaste: true,
+        formatOnType: true,
+        suggestOnTriggerCharacters: true,
+        acceptSuggestionOnEnter: 'on',
+        tabCompletion: 'on',
+        wordBasedSuggestions: 'currentDocument',
+        contextmenu: true,
+        mouseWheelZoom: true,
+        hover: {
+          enabled: true,
+          delay: 300
+        },
+        quickSuggestions: {
+          other: true,
+          comments: true,
+          strings: true
+        },
+        parameterHints: {
+          enabled: true,
+          cycle: true
+        },
+        scrollbar: {
+          vertical: 'visible',
+          horizontal: 'visible',
+          useShadows: false,
+          verticalHasArrows: false,
+          horizontalHasArrows: false,
+          verticalScrollbarSize: 14,
+          horizontalScrollbarSize: 14
+        }
+      });
+
+      // 强制重新计算布局
+      setTimeout(() => {
+        if (this.editor) {
+          this.editor.layout();
+        }
+      }, 100);
+
+      // 监听窗口大小变化
+      window.addEventListener('resize', () => {
+        if (this.editor) {
+          this.editor.layout();
+        }
+      });
+
+      this.setupEditorFeatures();
+      console.log('✅ Monaco编辑器初始化完成');
+    } catch (error) {
+      console.error('❌ Monaco编辑器初始化失败:', error);
+    }
+  }
+
+  private setupEditorFeatures(): void {
+    if (!this.editor) return;
+
+    // 自定义快捷键
+    this.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      this.saveCode();
+    });
+
+    // 监听光标位置变化
+    this.editor.onDidChangeCursorPosition(() => {
+      this.updateStatusBar();
+    });
+
+    // 监听选择变化
+    this.editor.onDidChangeCursorSelection(() => {
+      this.updateStatusBar();
+    });
+
+    // 监听内容变化
+    this.editor.onDidChangeModelContent(() => {
+      // 自动保存到本地存储
+      const code = this.editor.getValue();
+      localStorage.setItem('monaco-editor-content', code);
+      this.updateStatusBar();
+    });
+
+    // 注册自定义代码片段提供程序
+    monaco.languages.registerCompletionItemProvider('javascript', {
+      provideCompletionItems: (model, position) => {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn
+        };
+
+        const suggestions: monaco.languages.CompletionItem[] = [
+          {
+            label: 'cl',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: 'console.log(${1:message});',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: '快速插入console.log',
+            range: range
+          },
+          {
+            label: 'fn',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText:
+              'function ${1:functionName}(${2:params}) {\n\t${3:// 函数体}\n\treturn ${4:result};\n}',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: '创建函数模板',
+            range: range
+          }
+        ];
+
+        return { suggestions };
+      }
+    });
+
+    // 初始状态栏
+    setTimeout(() => this.updateStatusBar(), 100);
+  }
+
+  private updateStatusBar(): void {
+    const statusBar = document.querySelector('.editor-status-bar') as HTMLElement;
+    if (!statusBar) return;
+
+    let statusText = '准备就绪';
+    let languageInfo = 'JavaScript | UTF-8';
+
+    if (this.editor) {
+      const model = this.editor.getModel();
+      const position = this.editor.getPosition();
+
+      if (model && position) {
+        const lineCount = model.getLineCount();
+        const selection = this.editor.getSelection();
+
+        statusText = `行 ${position.lineNumber}, 列 ${position.column} | 共 ${lineCount} 行`;
+
+        if (selection && !selection.isEmpty()) {
+          const selectedText = model.getValueInRange(selection);
+          const lines = selectedText.split('\n').length;
+          statusText += ` | 选中 ${selectedText.length} 字符${lines > 1 ? `, ${lines} 行` : ''}`;
+        }
+
+        languageInfo = `${model.getLanguageId().toUpperCase()} | UTF-8`;
+      }
+    }
+
+    statusBar.innerHTML = `
+      <span>${statusText}</span>
+      <span>${languageInfo}</span>
+    `;
+  }
+
+  private getTextareaPosition(textarea: HTMLTextAreaElement): { line: number; column: number } {
+    const text = textarea.value.substring(0, textarea.selectionStart);
+    const lines = text.split('\n');
+    return {
+      line: lines.length,
+      column: lines[lines.length - 1].length + 1
+    };
+  }
+
+  // 公共方法：手动更新布局
+  public updateLayout(): void {
+    if (this.editor) {
+      this.editor.layout();
+    }
+  }
+
+  // 公共方法：设置编程语言
+  public setLanguage(language: string): void {
+    if (this.editor) {
+      const model = this.editor.getModel();
+      if (model) {
+        monaco.editor.setModelLanguage(model, language);
+        this.updateStatusBar();
+      }
+    }
+  }
+
+  // 公共方法：获取编辑器内容
+  public getValue(): string {
+    return this.editor ? this.editor.getValue() : '';
+  }
+
+  // 公共方法：设置编辑器内容
+  public setValue(code: string): void {
+    if (this.editor) {
+      this.editor.setValue(code);
+    }
+  }
+}

@@ -34,9 +34,9 @@ export class Skeleton {
   /** @internal */
   protected _jointMatrices: Matrix4x4[];
   /** @internal */
-  protected _jointOffsets: Float32Array;
+  protected _jointOffsets: Float32Array<ArrayBuffer>;
   /** @internal */
-  protected _jointMatrixArray: Float32Array;
+  protected _jointMatrixArray: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _jointTexture: Texture2D;
   /**

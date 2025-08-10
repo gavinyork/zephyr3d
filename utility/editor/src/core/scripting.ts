@@ -1,21 +1,9 @@
-/**
- * VFSScriptRegistry
- * - 面向 editor 模式，使用 SystemJS 动态加载与执行
- * - 从 VFS 读取 .ts 或 .js 源码，优先 .ts
- * - 递归重写内部依赖为 data URL；裸模块（如 @zephyr3d/scene）保持原样，交给 SystemJS
- * - 将 TS 转译为 ESNext 模块，内联 sourcemap，追加 sourceURL 便于调试
- *
- * 依赖：
- * - VFS: 需提供 exists/stat/readFile/dirname/join/normalizePath 等接口
- * - 在应用启动阶段，需把 @zephyr3d/* 等运行时模块注册进 SystemJS（见下方 register 示例）
- */
-
-import { VFS } from '@zephyr3d/base';
+import { textToBase64, VFS } from '@zephyr3d/base';
 import { ScriptRegistry } from '@zephyr3d/runtime';
 import type { ModuleId, RegistryOptions } from '@zephyr3d/runtime';
 
 function toDataUrl(js: string, id: string): string {
-  const b64 = btoa(unescape(encodeURIComponent(js)));
+  const b64 = textToBase64(js);
   return `data:text/javascript;base64,${b64}#${encodeURIComponent(String(id))}`;
 }
 
@@ -46,7 +34,7 @@ export class VFSScriptRegistry extends ScriptRegistry {
   ): Promise<{ code: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
     for (const type of ['ts', 'js']) {
       const pathWithExt = `${_id}.${type}`;
-      const exists = await this._vfs.exists(pathWithExt);
+      let exists = await this._vfs.exists(pathWithExt);
       if (exists) {
         const stats = await this._vfs.stat(pathWithExt);
         if (stats.isFile) {
@@ -132,7 +120,7 @@ export class VFSScriptRegistry extends ScriptRegistry {
         let replacement = spec;
 
         if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
-          replacement = spec; // 交给 SystemJS/浏览器
+          replacement = spec;
         } else {
           const depId = this.resolveLogicalId(spec, String(fromId));
           replacement = await this.build(depId); // 递归构建为 data URL

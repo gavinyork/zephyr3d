@@ -13,9 +13,7 @@ import type { ModuleId } from './types';
 import { ScriptRegistry } from './scriptregistry';
 
 // 你项目中的宿主接口（实体/节点等），至少需要一个 id 或可作为 Map 键
-export interface Host {
-  id?: string | number;
-}
+export type Host = unknown;
 
 // 外部传入的脚本描述（要附加哪个模块、初始属性）
 export interface ScriptDescriptor {

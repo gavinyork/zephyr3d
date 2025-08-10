@@ -356,6 +356,40 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
 }
 
 /**
+ * Converts a string to Base64 (Supports emoji character)
+ * @param text - String to convert
+ * @returns Base64 string
+ * @public
+ */
+export function textToBase64(text: string): string {
+  const encoder = new TextEncoder();
+  const uint8Array = encoder.encode(text);
+
+  let binaryString = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binaryString += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binaryString);
+}
+
+/**
+ * Converts a base64 string to text (Supports emoji character)
+ * @param base64 - Base64 string to convert
+ * @returns Original text
+ * @public
+ */
+export function base64ToText(base64: string): string {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/**
  * Check if a value is an instance of a specific constructor.
  * @param value - The value to check.
  * @param constructor - The constructor to check against.

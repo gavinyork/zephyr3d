@@ -31,7 +31,7 @@ studioApp.ready().then(async () => {
   });
 
   studioApp.on('tick', () => {
-    editor.update(device.frameInfo.elapsedFrame);
+    editor.update(device.frameInfo.elapsedFrame, device.frameInfo.elapsedOverall);
     editor.render();
   });
   studioApp.run();

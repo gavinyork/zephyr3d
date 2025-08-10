@@ -306,7 +306,7 @@ export class IndexedDBFS extends VFS {
               const binaryString = atob(fileData);
               const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.codePointAt(i);
+                bytes[i] = binaryString.charCodeAt(i);
               }
               fileData = bytes.buffer;
             } catch (_error) {

@@ -25,20 +25,41 @@ import * as zephyr3d_device from '@zephyr3d/device';
 import * as zephyr3d_scene from '@zephyr3d/scene';
 import * as zephyr3d_runtime from '@zephyr3d/runtime';
 
+import { CodeEditor } from '../components/codeeditor';
+
+const testScript2 = `
+import { Foo } from './hello';
+
+export default function(host, props) {
+  return {
+    init() {
+      this.foo = new Foo();
+      this.foo.init();
+    },
+    update() {
+      this.foo.update();
+    }
+  };
+}
+
+`;
+
 const testScript = `
 import { Vector3 } from "@zephyr3d/base";
 
-export default function (host: any, props: any) {
-  console.log(host, props);
-  return {
-    v: new Vector3(1, 2, 3),
-    init() {
-      console.log('init: ' + this.v.toString());
-    },
-    update() {
-      console.log('update: ' + this.v.toString());
-    }
-  };
+console.log('Test script imported');
+
+export class Foo {
+  private v: Vector3;
+  constructor() {
+    this.v = new Vector3(1, 2, 3);
+  }
+  init() {
+    console.log('init: ' + this.v.toString());
+  },
+  update() {
+    console.log('update: ' + this.v.toString());
+  }
 }
 `;
 
@@ -114,8 +135,8 @@ export class Editor {
   resize(w: number, h: number) {
     eventBus.dispatchEvent('resize', w, h);
   }
-  update(dt: number) {
-    this._scriptingSystem.update(dt);
+  update(dt: number, elapsed: number) {
+    this._scriptingSystem.update(dt, elapsed);
     eventBus.dispatchEvent('update', dt);
   }
   getBrushes() {
@@ -136,21 +157,26 @@ export class Editor {
     moduleSharing.shareModules({
       '@zephyr3d/base': zephyr3d_base
     });
-    await (async () => {
-      try {
-        const ns = await import('@zephyr3d/base');
-        console.log('[check] import @zephyr3d/base OK:', !!ns, Object.keys(ns).slice(0, 8));
-      } catch (err) {
-        console.error('[check] import @zephyr3d/base FAILED:', err);
-      }
-    })();
+    moduleSharing.shareModules({
+      '@zephyr3d/device': zephyr3d_device
+    });
+    moduleSharing.shareModules({
+      '@zephyr3d/scene': zephyr3d_scene
+    });
+    moduleSharing.shareModules({
+      '@zephyr3d/runtime': zephyr3d_runtime
+    });
     await ProjectService.VFS.makeDirectory(this._scriptRoot, true);
     await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'hello.ts'), testScript, {
       encoding: 'utf8'
     });
-    await this._scriptingSystem.attachScript(this, {
-      module: '#/hello'
+    await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'main.ts'), testScript2, {
+      encoding: 'utf8'
     });
+    await this._scriptingSystem.attachScript(this, {
+      module: '#/main'
+    });
+    new CodeEditor().show();
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -308,5 +334,49 @@ export class Editor {
   }
   async deleteProject(uuid: string) {
     await ProjectService.deleteProject(uuid);
+  }
+  protected async createMonacoLoader() {
+    return new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = './js/vs/loader.js';
+      document.head.appendChild(script);
+      script.onload = () => {
+        const require = (window as any).require;
+        require.config({
+          paths: {
+            vs: './js/vs'
+          }
+        });
+        resolve();
+      };
+      script.onerror = (err) => {
+        reject(err);
+      };
+    });
+  }
+  protected setupMonacoEnvironment(): void {
+    /*
+    (window as any).MonacoEnvironment = {
+      // 改用 getWorker 而不是 getWorkerUrl
+      getWorker: function (_moduleId: string, label: string) {
+        switch (label) {
+          case 'css':
+          case 'scss':
+          case 'less':
+            return new CSSWorker();
+          case 'html':
+          case 'handlebars':
+          case 'razor':
+            return new HTMLWorker();
+          case 'typescript':
+          case 'javascript':
+            return new TSWorker();
+          default:
+            // 对于默认的 editor worker，使用 workerMain.js
+            return new EditorWorker();
+        }
+      }
+    };
+    */
   }
 }

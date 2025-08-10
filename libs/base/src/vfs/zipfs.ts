@@ -177,7 +177,7 @@ export class ZipFS extends VFS {
    *
    * @returns ZIP file contents as a Uint8Array
    */
-  async getZipData(): Promise<Uint8Array> {
+  async getZipData(): Promise<Uint8Array<ArrayBuffer>> {
     await this.applyVirtualFiles();
 
     if (this.zipWriter && this.isModified) {
@@ -189,7 +189,7 @@ export class ZipFS extends VFS {
     }
 
     if (this.zipData instanceof Uint8Array) {
-      return this.zipData;
+      return this.zipData as Uint8Array<ArrayBuffer>;
     } else if (this.zipData instanceof Blob) {
       return new Uint8Array(await this.zipData.arrayBuffer());
     } else if (this.zipData instanceof ArrayBuffer) {
