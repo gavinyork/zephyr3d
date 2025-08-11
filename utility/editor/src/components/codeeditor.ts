@@ -1,22 +1,11 @@
-import * as monaco from 'monaco-editor';
-/** @ts-ignore */
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-/** @ts-ignore */
-import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
-/** @ts-ignore */
-import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
-/** @ts-ignore */
-import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
-/** @ts-ignore */
-import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import type * as monaco from 'monaco-editor';
 
 export class CodeEditor {
   private isMinimized: boolean;
   private editor: monaco.editor.IStandaloneCodeEditor;
-
   constructor() {
     this.isMinimized = false;
-    this.editor = null;
+    this.editor = (window as any).monaco.editor;
   }
 
   close() {
@@ -451,32 +440,13 @@ export class CodeEditor {
 
   private async initMonacoEditor(container: HTMLElement, initialCode?: string): Promise<void> {
     try {
-      if (!(window as any).MonacoEnvironment) {
-        (window as any).MonacoEnvironment = {
-          getWorker: function (moduleId, label) {
-            if (label === 'json') {
-              return new JsonWorker();
-            }
-            if (label === 'css' || label === 'scss' || label === 'less') {
-              return new CssWorker();
-            }
-            if (label === 'html' || label === 'handlebars' || label === 'razor') {
-              return new HtmlWorker();
-            }
-            if (label === 'typescript' || label === 'javascript') {
-              return new TsWorker();
-            }
-            return new EditorWorker();
-          }
-        };
-      }
       // 获取保存的代码或使用默认代码
       const savedCode = localStorage.getItem('monaco-editor-content');
       const codeToUse = initialCode || savedCode || 'console.log("Hello, Monaco Editor!");';
 
-      this.editor = monaco.editor.create(container, {
+      this.editor = (window as any).monaco.editor.create(container, {
         value: codeToUse,
-        language: 'javascript',
+        language: 'typescript',
         theme: 'vs-dark',
         renderLineHighlight: 'line',
         renderLineHighlightOnlyWhenFocus: false,
@@ -558,9 +528,12 @@ export class CodeEditor {
     if (!this.editor) return;
 
     // 自定义快捷键
-    this.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      this.saveCode();
-    });
+    this.editor.addCommand(
+      (window as any).monaco.KeyMod.CtrlCmd | (window as any).monaco.KeyCode.KeyS,
+      () => {
+        this.saveCode();
+      }
+    );
 
     // 监听光标位置变化
     this.editor.onDidChangeCursorPosition(() => {
@@ -581,7 +554,7 @@ export class CodeEditor {
     });
 
     // 注册自定义代码片段提供程序
-    monaco.languages.registerCompletionItemProvider('javascript', {
+    (window as any).monaco.languages.registerCompletionItemProvider('javascript', {
       provideCompletionItems: (model, position) => {
         const word = model.getWordUntilPosition(position);
         const range = {
@@ -594,18 +567,18 @@ export class CodeEditor {
         const suggestions: monaco.languages.CompletionItem[] = [
           {
             label: 'cl',
-            kind: monaco.languages.CompletionItemKind.Snippet,
+            kind: (window as any).monaco.languages.CompletionItemKind.Snippet,
             insertText: 'console.log(${1:message});',
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            insertTextRules: (window as any).monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
             documentation: '快速插入console.log',
             range: range
           },
           {
             label: 'fn',
-            kind: monaco.languages.CompletionItemKind.Snippet,
+            kind: (window as any).monaco.languages.CompletionItemKind.Snippet,
             insertText:
               'function ${1:functionName}(${2:params}) {\n\t${3:// 函数体}\n\treturn ${4:result};\n}',
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            insertTextRules: (window as any).monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
             documentation: '创建函数模板',
             range: range
           }
@@ -652,16 +625,6 @@ export class CodeEditor {
     `;
   }
 
-  private getTextareaPosition(textarea: HTMLTextAreaElement): { line: number; column: number } {
-    const text = textarea.value.substring(0, textarea.selectionStart);
-    const lines = text.split('\n');
-    return {
-      line: lines.length,
-      column: lines[lines.length - 1].length + 1
-    };
-  }
-
-  // 公共方法：手动更新布局
   public updateLayout(): void {
     if (this.editor) {
       this.editor.layout();
@@ -673,7 +636,7 @@ export class CodeEditor {
     if (this.editor) {
       const model = this.editor.getModel();
       if (model) {
-        monaco.editor.setModelLanguage(model, language);
+        (window as any).monaco.editor.setModelLanguage(model, language);
         this.updateStatusBar();
       }
     }

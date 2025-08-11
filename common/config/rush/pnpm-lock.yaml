@@ -740,7 +740,6 @@ importers:
       '@types/upng-js': ^2.1.5
       '@typescript-eslint/eslint-plugin': ^8.17.0
       '@typescript-eslint/parser': ^8.17.0
-      '@vitejs/plugin-legacy': ^7.2.1
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.62
       '@zephyr3d/backend-webgl': workspace:*
@@ -759,7 +758,7 @@ importers:
       eslint-plugin-prettier: ^4.2.1
       eslint-plugin-tsdoc: ^0.2.17
       idb: ^8.0.1
-      monaco-editor: ^0.52.2
+      monaco-editor: ^0.50.0
       prettier: ^2.8.4
       rollup: ~4.30.1
       rollup-plugin-copy: ^3.4.0
@@ -778,6 +777,7 @@ importers:
       upng-js: ^2.1.0
       vite: ^7.1.1
       vite-plugin-monaco-editor-esm: ^2.0.2
+      vite-plugin-static-copy: ^3.1.1
     dependencies:
       '@jridgewell/trace-mapping': 0.3.29
       '@monaco-editor/loader': 1.5.0
@@ -795,7 +795,7 @@ importers:
       '@zephyr3d/scene': link:../../libs/scene
       '@zip.js/zip.js': 2.7.72
       idb: 8.0.3
-      monaco-editor: 0.52.2
+      monaco-editor: 0.50.0
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
       streamsaver: 2.0.6
       typescript: 5.9.2
@@ -812,7 +812,6 @@ importers:
       '@swc/core': 1.13.3
       '@typescript-eslint/eslint-plugin': 8.39.0_5ac9b54f4e64b068561b5ba4fd8d3116
       '@typescript-eslint/parser': 8.39.0_eslint@8.57.1+typescript@5.9.2
-      '@vitejs/plugin-legacy': 7.2.1_terser@5.43.1+vite@7.1.1
       '@web/dev-server': 0.1.38
       cross-env: 7.0.3
       eslint: 8.57.1
@@ -834,7 +833,8 @@ importers:
       terser: 5.43.1
       tslib: 2.8.1
       vite: 7.1.1_774e41af535853c07cdca16c8f7a0f22
-      vite-plugin-monaco-editor-esm: 2.0.2_monaco-editor@0.52.2
+      vite-plugin-monaco-editor-esm: 2.0.2_monaco-editor@0.50.0
+      vite-plugin-static-copy: 3.1.1_vite@7.1.1
 
 packages:
 
@@ -3760,31 +3760,6 @@ packages:
     dev: true
     optional: true
 
-  /@vitejs/plugin-legacy/7.2.1_terser@5.43.1+vite@7.1.1:
-    resolution: {integrity: sha512-CaXb/y0mlfu7jQRELEJJc2/5w2bX2m1JraARgFnvSB2yfvnCNJVWWlqAo6WjnKoepOwKx8gs0ugJThPLKCOXIg==}
-    engines: {node: ^20.19.0 || >=22.12.0}
-    peerDependencies:
-      terser: ^5.16.0
-      vite: ^7.0.0
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/plugin-transform-dynamic-import': 7.27.1_@babel+core@7.28.0
-      '@babel/plugin-transform-modules-systemjs': 7.27.1_@babel+core@7.28.0
-      '@babel/preset-env': 7.28.0_@babel+core@7.28.0
-      babel-plugin-polyfill-corejs3: 0.13.0_@babel+core@7.28.0
-      babel-plugin-polyfill-regenerator: 0.6.5_@babel+core@7.28.0
-      browserslist: 4.25.2
-      browserslist-to-esbuild: 2.1.1_browserslist@4.25.2
-      core-js: 3.45.0
-      magic-string: 0.30.17
-      regenerator-runtime: 0.14.1
-      systemjs: 6.15.1
-      terser: 5.43.1
-      vite: 7.1.1_774e41af535853c07cdca16c8f7a0f22
-    transitivePeerDependencies:
-      - supports-color
-    dev: true
-
   /@web/config-loader/0.1.3:
     resolution: {integrity: sha512-XVKH79pk4d3EHRhofete8eAnqto1e8mCRAqPV00KLNFzCWSe8sWmLnqKCqkPNARC6nksMaGrATnA5sPDRllMpQ==}
     engines: {node: '>=10.0.0'}
@@ -4197,23 +4172,12 @@ packages:
       fill-range: 7.1.1
     dev: true
 
-  /browserslist-to-esbuild/2.1.1_browserslist@4.25.2:
-    resolution: {integrity: sha512-KN+mty6C3e9AN8Z5dI1xeN15ExcRNeISoC3g7V0Kax/MMF9MSoYA2G7lkTTcVUFntiEjkpI0HNgqJC1NjdyNUw==}
-    engines: {node: '>=18'}
-    hasBin: true
-    peerDependencies:
-      browserslist: '*'
-    dependencies:
-      browserslist: 4.25.2
-      meow: 13.2.0
-    dev: true
-
   /browserslist/4.25.2:
     resolution: {integrity: sha512-0si2SJK3ooGzIawRu61ZdPCO1IncZwS8IzuX73sPZsXW6EQ/w/DAfPyKI8l1ETTCr2MnvqWitmlCUxgdul45jA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
     dependencies:
-      caniuse-lite: 1.0.30001733
+      caniuse-lite: 1.0.30001734
       electron-to-chromium: 1.5.199
       node-releases: 2.0.19
       update-browserslist-db: 1.1.3_browserslist@4.25.2
@@ -4283,8 +4247,8 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /caniuse-lite/1.0.30001733:
-    resolution: {integrity: sha512-e4QKw/O2Kavj2VQTKZWrwzkt3IxOmIlU6ajRb6LP64LHpBo1J67k2Hi4Vu/TgJWsNtynurfS0uK3MaUTCPfu5Q==}
+  /caniuse-lite/1.0.30001734:
+    resolution: {integrity: sha512-uhE1Ye5vgqju6OI71HTQqcBCZrvHugk0MjLak7Q+HfoBgoq5Bi+5YnwjP4fjDgrtYr/l8MVRBvzz9dPD4KyK0A==}
     dev: true
 
   /chalk-template/0.4.0:
@@ -4447,11 +4411,6 @@ packages:
     resolution: {integrity: sha512-gRoVMBawZg0OnxaVv3zpqLLxaHmsubEGyTnqdpI/CEBvX4JadI1dMSHxagThprYRtSVbuQxvi6iUatdPxohHpA==}
     dependencies:
       browserslist: 4.25.2
-    dev: true
-
-  /core-js/3.45.0:
-    resolution: {integrity: sha512-c2KZL9lP4DjkN3hk/an4pWn5b5ZefhRJnAc42n6LJ19kSnbeRbdQZE5dSeE2LBol1OwJD3X1BQvFTAsa8ReeDA==}
-    requiresBuild: true
     dev: true
 
   /cross-env/7.0.3:
@@ -6136,11 +6095,6 @@ packages:
     engines: {node: '>= 0.6'}
     dev: true
 
-  /meow/13.2.0:
-    resolution: {integrity: sha512-pxQJQzB6djGPXh08dacEloMFopsOqGVRKFPYvPOt9XDZ1HasbgDZA74CJGreSU4G3Ak7EFJGoiH2auq+yXISgA==}
-    engines: {node: '>=18'}
-    dev: true
-
   /merge-stream/2.0.0:
     resolution: {integrity: sha512-abv/qOcuPfk3URPfDzmZU1LKmuw8kT+0nIHvKrKgFrwifol/doWcdA4ZqsWQ8ENrFKkd67Mfpo/LovbIUsbt3w==}
     dev: true
@@ -6200,8 +6154,8 @@ packages:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
     dev: true
 
-  /monaco-editor/0.52.2:
-    resolution: {integrity: sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ==}
+  /monaco-editor/0.50.0:
+    resolution: {integrity: sha512-8CclLCmrRRh+sul7C08BmPBP3P8wVWfBHomsTcndxg5NRCEPfu/mc2AGU8k37ajjDVXcXFc12ORAMUkmk+lkFA==}
     dev: false
 
   /ms/2.1.3:
@@ -6370,6 +6324,11 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       p-limit: 3.1.0
+    dev: true
+
+  /p-map/7.0.3:
+    resolution: {integrity: sha512-VkndIv2fIB99swvQoA65bm+fsmt6UNdGeIB0oxBs+WhAhdh08QA04JXpI7rbB9r08/nkbysKoya9rtDERYOYMA==}
+    engines: {node: '>=18'}
     dev: true
 
   /p-try/2.2.0:
@@ -6553,10 +6512,6 @@ packages:
 
   /regenerate/1.4.2:
     resolution: {integrity: sha512-zrceR/XhGYU/d/opr2EKO7aRHUeiBI8qjtfHqADTwZd6Szfy16la6kqD0MIUs5z5hx6AaKa+PixpPrR289+I0A==}
-    dev: true
-
-  /regenerator-runtime/0.14.1:
-    resolution: {integrity: sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==}
     dev: true
 
   /regexp.prototype.flags/1.5.4:
@@ -7181,10 +7136,6 @@ packages:
       '@pkgr/core': 0.2.9
     dev: true
 
-  /systemjs/6.15.1:
-    resolution: {integrity: sha512-Nk8c4lXvMB98MtbmjX7JwJRgJOL8fluecYCfCeYBznwmpOs8Bf15hLM6z4z71EDAhQVrQrI+wt1aLWSXZq+hXA==}
-    dev: true
-
   /table-layout/4.1.1:
     resolution: {integrity: sha512-iK5/YhZxq5GO5z8wb0bY1317uDF3Zjpha0QFFLA8/trAoiLbQD0HUbMesEaxyzUgDxi2QlcbM8IvqOlEjgoXBA==}
     engines: {node: '>=12.17'}
@@ -7467,12 +7418,26 @@ packages:
     engines: {node: '>= 0.8'}
     dev: true
 
-  /vite-plugin-monaco-editor-esm/2.0.2_monaco-editor@0.52.2:
+  /vite-plugin-monaco-editor-esm/2.0.2_monaco-editor@0.50.0:
     resolution: {integrity: sha512-XVkOpL/r0rw1NpbO30vUwG4S0THkC9KB1vjjV8olGd49h4/EQsKl3DrxB6KRDwyZNC9mKiiZgk2L6njUYj3oKQ==}
     peerDependencies:
       monaco-editor: '>=0.33.0'
     dependencies:
-      monaco-editor: 0.52.2
+      monaco-editor: 0.50.0
+    dev: true
+
+  /vite-plugin-static-copy/3.1.1_vite@7.1.1:
+    resolution: {integrity: sha512-oR53SkL5cX4KT1t18E/xU50vJDo0N8oaHza4EMk0Fm+2/u6nQivxavOfrDk3udWj+dizRizB/QnBvJOOQrTTAQ==}
+    engines: {node: ^18.0.0 || >=20.0.0}
+    peerDependencies:
+      vite: ^5.0.0 || ^6.0.0 || ^7.0.0
+    dependencies:
+      chokidar: 3.6.0
+      fs-extra: 11.3.1
+      p-map: 7.0.3
+      picocolors: 1.1.1
+      tinyglobby: 0.2.14
+      vite: 7.1.1_774e41af535853c07cdca16c8f7a0f22
     dev: true
 
   /vite/7.1.1_774e41af535853c07cdca16c8f7a0f22:

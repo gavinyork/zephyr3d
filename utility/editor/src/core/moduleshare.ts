@@ -140,6 +140,7 @@ export class RuntimeModuleSharing {
     }
 
     try {
+      /* @vite-ignore */
       return await import(this.moduleUrls.get(name)!);
     } catch (e) {
       console.error(`Failed to import shared module ${name}:`, e);
