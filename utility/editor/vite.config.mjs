@@ -4,6 +4,8 @@ import monacoEditorEsmPlugin from 'vite-plugin-monaco-editor-esm';
 
 export default defineConfig({
   root: '.', // 项目根目录
+  publicDir: 'public',
+  base: './',
 
   // 入口文件配置
   build: {
@@ -12,6 +14,8 @@ export default defineConfig({
 
     // 静态资源目录
     assetsDir: 'assets',
+
+    copyPublicDir: true,
 
     // 入口文件
     rollupOptions: {
@@ -25,32 +29,7 @@ export default defineConfig({
         // chunk 文件命名
         chunkFileNames: 'chunks/[name]-[hash].js',
         // 入口文件命名
-        entryFileNames: '[name]-[hash].js',
-
-        // 手动 chunk 分割（类似你的 manualChunks）
-        manualChunks: (id) => {
-          if (id.includes('monaco-editor')) {
-            if (id.includes('editor.all') || id.includes('editor.api')) {
-              return 'monaco-core';
-            }
-            if (id.includes('/language/')) {
-              return 'monaco-languages';
-            }
-            if (id.includes('standalone')) {
-              return 'monaco-standalone';
-            }
-            return 'monaco-misc';
-          }
-
-          // 对应你的 zephyr3d 配置
-          if (id.includes('zephyr3d')) {
-            return 'zephyr3d';
-          }
-
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        }
+        entryFileNames: '[name]-[hash].js'
       },
 
       // 对应你的 treeshake 配置
@@ -111,9 +90,20 @@ export default defineConfig({
           label: 'typescript',
           entry: 'monaco-editor/esm/vs/language/typescript/ts.worker.js'
         }
-      ]
+      ],
+      customDistPath: () => resolve(__dirname, '../dist/monaco-editor'),
+      publicPath: 'monaco-editor'
     })
   ],
+  optimizeDeps: {
+    include: [
+      'monaco-editor/esm/vs/language/json/json.worker',
+      'monaco-editor/esm/vs/language/css/css.worker',
+      'monaco-editor/esm/vs/language/html/html.worker',
+      'monaco-editor/esm/vs/language/typescript/typescript.worker',
+      'monaco-editor/esm/vs/editor/editor.worker'
+    ]
+  },
 
   // 解析配置
   resolve: {
@@ -146,25 +136,5 @@ export default defineConfig({
       // 类名生成模式
       generateScopedName: '[name]__[local]___[hash:base64:5]'
     }
-  },
-
-  // 优化配置
-  optimizeDeps: {
-    // 预构建包含的依赖
-    include: ['monaco-editor/esm/vs/editor/editor.api', 'monaco-editor/esm/vs/editor/editor.main'],
-
-    // 排除预构建的依赖
-    exclude: [
-      // 如果有需要排除的
-    ]
-  },
-
-  // 实验性功能
-  experimental: {
-    // renderBuiltUrl: (filename, { hostType }) => {
-    //   if (hostType === 'js') {
-    //     return `https://cdn.example.com/${filename}`
-    //   }
-    // }
   }
 });

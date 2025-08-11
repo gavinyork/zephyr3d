@@ -12,8 +12,8 @@ export class FontGlyph {
   static allGlyphs: string = '';
   static async loadFontGlyphs(name: string) {
     try {
-      const config = (await (await fetch(`assets/fonts/${name}.json`)).json()) as FontConfig;
-      const fontData = await (await fetch(`assets/fonts/${name}.woff2`)).arrayBuffer();
+      const config = (await (await fetch(`fonts/${name}.json`)).json()) as FontConfig;
+      const fontData = await (await fetch(`fonts/${name}.woff2`)).arrayBuffer();
       const font = new FontFace(config.name, fontData);
       const loadedFont = await font.load();
       document.fonts.add(loadedFont);

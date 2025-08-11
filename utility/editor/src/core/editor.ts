@@ -182,12 +182,12 @@ export class Editor {
     const assetManager = new AssetManager(
       new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
     );
-    const brushConfig = await assetManager.fetchJsonData('assets/conf/brushes.json');
+    const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
     for (const name in brushConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
       this._assetImages.brushes[name] = new DRef(tex);
     }
-    const appConfig = await assetManager.fetchJsonData('assets/conf/app.json');
+    const appConfig = await assetManager.fetchJsonData('conf/app.json');
     for (const name in appConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(appConfig[name], {
         samplerOptions: { mipFilter: 'none' }
