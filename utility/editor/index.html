@@ -21,6 +21,7 @@
         height: 100%;
       }
     </style>
+    <link rel="stylesheet" href="./vendor/monaco/vs/editor/editor.main.css" />
   </head>
   <body>
     <canvas id="canvas"></canvas>
@@ -28,27 +29,17 @@
     <script src="./vendor/monaco/vs/loader.js"></script>
     <script>
       const a = document.createElement('a');
-      a.href = "./vendor/monaco/vs/";
-      require.config({ paths: { "vs": a.href }});
+      a.href = './vendor/monaco/vs';
+      console.log(`[main] vs path -> ${a.href}`);
+      require.config({ paths: { vs: a.href } });
       window.MonacoEnvironment = {
-        getWorkerUrl: function(workerId, label) {
-          switch(label) {
-            case 'typescript':
-            case 'javascript':
-              return 'vs/language/typescript/tsWorker.js';
-            case 'json':
-              return 'vs/language/json/jsonWorker.js';
-            case 'css':
-              return 'vs/language/css/cssWorker.js';
-            case 'html':
-              return 'vs/language/html/htmlWorker.js';
-            default:
-              return 'vs/base/worker/workerMain.js';
-          }
+        getWorkerUrl: function (workerId, label) {
+          return './vendor/monaco/vs/base/worker/workerMain.js';
         }
       };
       require(['vs/editor/editor.main'], () => {
-        console.log(window.monaco);
+        monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+        console.log('models count:', monaco.editor.getModels().length);
       });
     </script>
     <script type="module" src="/src/app.ts"></script>

@@ -443,8 +443,8 @@ export class CodeEditor {
       // 获取保存的代码或使用默认代码
       const savedCode = localStorage.getItem('monaco-editor-content');
       const codeToUse = initialCode || savedCode || 'console.log("Hello, Monaco Editor!");';
-
-      this.editor = (window as any).monaco.editor.create(container, {
+      const monaco = (window as any).monaco as typeof import('monaco-editor');
+      this.editor = monaco.editor.create(container, {
         value: codeToUse,
         language: 'typescript',
         theme: 'vs-dark',
@@ -502,7 +502,15 @@ export class CodeEditor {
           horizontalScrollbarSize: 14
         }
       });
-
+      const model = this.editor.getModel();
+      console.log(
+        'model exists:',
+        !!model,
+        'uri:',
+        model && model.uri.toString(),
+        'lang:',
+        model && model.getLanguageId()
+      );
       // 强制重新计算布局
       setTimeout(() => {
         if (this.editor) {
