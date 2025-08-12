@@ -5,7 +5,7 @@ export class DracoMeshDecoder {
   private readonly _module: DecoderModule;
   private readonly _decoder: Decoder;
   private readonly _mesh: Mesh;
-  constructor(data: Int8Array, decoderModule: DecoderModule) {
+  constructor(data: Int8Array<ArrayBuffer>, decoderModule: DecoderModule) {
     this._module = decoderModule;
     this._decoder = new this._module.Decoder();
     const buffer = new this._module.DecoderBuffer();
@@ -101,25 +101,25 @@ export class DracoMeshDecoder {
   }
   private getDracoHeap(buffer: TypedArray): TypedArray {
     if (buffer instanceof Float32Array) {
-      return this._module.HEAPF32;
+      return this._module.HEAPF32 as TypedArray;
     }
     if (buffer instanceof Int8Array) {
-      return this._module.HEAP8;
+      return this._module.HEAP8 as TypedArray;
     }
     if (buffer instanceof Int16Array) {
-      return this._module.HEAP16;
+      return this._module.HEAP16 as TypedArray;
     }
     if (buffer instanceof Int32Array) {
-      return this._module.HEAP32;
+      return this._module.HEAP32 as TypedArray;
     }
     if (buffer instanceof Uint8Array) {
-      return this._module.HEAPU8;
+      return this._module.HEAPU8 as TypedArray;
     }
     if (buffer instanceof Uint16Array) {
-      return this._module.HEAPU16;
+      return this._module.HEAPU16 as TypedArray;
     }
     if (buffer instanceof Uint32Array) {
-      return this._module.HEAPU32;
+      return this._module.HEAPU32 as TypedArray;
     }
     throw new Error(`getDracoHeap(): invalid buffer type`);
   }

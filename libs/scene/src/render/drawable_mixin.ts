@@ -75,10 +75,10 @@ export function mixinDrawable<
     private _mdDrawableBindGroupSkin: BindGroup;
     private _mdDrawableBindGroupMorph: BindGroup;
     private _mdDrawableBindGroupSkinMorph: BindGroup;
-    private readonly _worldMatrixBuffer: Float32Array;
-    private _framestampBuffer: Int32Array;
-    private readonly _currentWorldMatrixBuffer: Float32Array;
-    private readonly _prevWorldMatrixBuffer: Float32Array;
+    private readonly _worldMatrixBuffer: Float32Array<ArrayBuffer>;
+    private _framestampBuffer: Int32Array<ArrayBuffer>;
+    private readonly _currentWorldMatrixBuffer: Float32Array<ArrayBuffer>;
+    private readonly _prevWorldMatrixBuffer: Float32Array<ArrayBuffer>;
     private readonly _drawableId: number;
     private _objectColor: Vector4;
     constructor(...args: any[]) {

@@ -4,7 +4,9 @@ export function simpleImportRewriter(resolveToUrl: (spec: string, fromId: string
   return (code: string, fromId: string) => {
     return code.replace(re, (m, kw, q, spec) => {
       const url = resolveToUrl(spec, fromId);
-      if (!url) return m;
+      if (!url) {
+        return m;
+      }
       return m.replace(spec, url);
     });
   };

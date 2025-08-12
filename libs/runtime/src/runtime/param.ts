@@ -1,5 +1,5 @@
 import type { ParamSchema } from './types';
-import { NodeScript } from './nodescript';
+import type { NodeScript } from './nodescript';
 
 // Decorators for property metadata collection
 type ClassWithParams = typeof NodeScript & { params?: Record<string, ParamSchema> };

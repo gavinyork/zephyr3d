@@ -9,7 +9,7 @@ export class DlgSaveFile extends DialogRenderer<string> {
   private readonly _renderer: VFSRenderer;
   private _name: [string];
   private _filterLabels: string[];
-  private _filterPatterns: string[][];
+  private _filterPatterns: string[];
   private _selected: [number];
   public static async saveFile(
     title: string,
@@ -23,28 +23,34 @@ export class DlgSaveFile extends DialogRenderer<string> {
   }
   constructor(id: string, vfs: VFS, project: ProjectInfo, filter: string, width: number, height: number) {
     super(id, width, height);
-    this._name = [''];
     this._filterLabels = [];
     this._filterPatterns = [];
     if (filter) {
       const parts = filter.split('|');
       const numFilters = parts.length >> 1;
       for (let i = 0; i < numFilters; i++) {
-        this._filterLabels.push(parts[i * 2]);
-        this._filterPatterns.push(parts[i * 2 + 1].split(';').filter((val) => !!val));
+        if (parts[i * 2 + 1].startsWith('*')) {
+          this._filterLabels.push(parts[i * 2]);
+          this._filterPatterns.push(parts[i * 2 + 1]);
+        }
       }
+    }
+    if (this._filterLabels.length === 0) {
+      this._filterLabels.push('All files (*)');
+      this._filterPatterns.push('*');
     }
     this._selected = [0];
     this._renderer = new VFSRenderer(
       vfs,
       project,
-      this._filterLabels.length > 0 ? this._filterPatterns[this._selected[0]] : [],
+      [this._filterPatterns[this._selected[0]]],
       Math.max(0, Math.min(width / 2, 200)),
       {
         multiSelect: false,
         allowDrop: false
       }
     );
+    this._name = [this._filterPatterns[this._selected[0]]];
     this._renderer.on('selection_changed', this.updateSelection, this);
   }
   updateSelection(selectedDir: DirectoryInfo, files: FileInfo[]) {
@@ -57,12 +63,10 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._renderer.render();
     }
     ImGui.EndChild();
-    ImGui.InputText('File Name', this._name, undefined);
-    if (this._filterLabels.length > 0) {
-      ImGui.SameLine();
-      if (ImGui.Combo('##FileTypeCombo', this._selected, this._filterLabels)) {
-        this._renderer.fileFilter = this._filterPatterns[this._selected[0]];
-      }
+    ImGui.InputText('File Name', this._name, undefined, ImGui.InputTextFlags.AutoSelectAll);
+    ImGui.SameLine();
+    if (ImGui.Combo('##FileTypeCombo', this._selected, this._filterLabels)) {
+      this._renderer.fileFilter = [this._filterPatterns[this._selected[0]]];
     }
     if (ImGui.Button('Save')) {
       if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {

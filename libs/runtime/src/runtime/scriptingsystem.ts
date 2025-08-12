@@ -10,7 +10,7 @@
  */
 
 import type { ModuleId } from './types';
-import { ScriptRegistry } from './scriptregistry';
+import type { ScriptRegistry } from './scriptregistry';
 
 // 你项目中的宿主接口（实体/节点等），至少需要一个 id 或可作为 Map 键
 export type Host = unknown;
@@ -58,11 +58,8 @@ export class ScriptingSystem {
   async attachScript(host: Host, desc: ScriptDescriptor): Promise<AttachedScript | undefined> {
     const { module, props } = desc;
     try {
-      let mod: any;
-      let url: string;
-
-      url = await this.registry.resolveUrl(module);
-      mod = await import(/* @vite-ignore */ url + (this.importComment ?? ''));
+      const url = await this.registry.resolveUrl(module);
+      const mod = await import(/* @vite-ignore */ url + (this.importComment ?? ''));
 
       let instance: any;
       let disposer: undefined | (() => void);
@@ -71,19 +68,33 @@ export class ScriptingSystem {
       if (typeof mod?.default === 'function') {
         // 默认导出类
         instance = new mod.default(host, props);
-        if (typeof instance.init === 'function') await instance.init();
-        if (typeof instance.dispose === 'function') disposer = () => instance.dispose();
-        if (typeof instance.update === 'function') updater = (dt, t) => instance.update(dt, t);
+        if (typeof instance.init === 'function') {
+          await instance.init();
+        }
+        if (typeof instance.dispose === 'function') {
+          disposer = () => instance.dispose();
+        }
+        if (typeof instance.update === 'function') {
+          updater = (dt, t) => instance.update(dt, t);
+        }
       } else if (typeof mod?.create === 'function') {
         // 工厂函数
         instance = await mod.create(host, props);
-        if (instance && typeof instance.dispose === 'function') disposer = () => instance.dispose();
-        if (instance && typeof instance.update === 'function') updater = (dt, t) => instance.update(dt, t);
+        if (instance && typeof instance.dispose === 'function') {
+          disposer = () => instance.dispose();
+        }
+        if (instance && typeof instance.update === 'function') {
+          updater = (dt, t) => instance.update(dt, t);
+        }
       } else {
         // 模块命名空间
         instance = mod;
-        if (typeof mod?.dispose === 'function') disposer = () => mod.dispose(host);
-        if (typeof mod?.update === 'function') updater = (dt, t) => mod.update(host, dt, t);
+        if (typeof mod?.dispose === 'function') {
+          disposer = () => mod.dispose(host);
+        }
+        if (typeof mod?.update === 'function') {
+          updater = (dt, t) => mod.update(host, dt, t);
+        }
       }
 
       const attached: AttachedScript = {
@@ -112,7 +123,9 @@ export class ScriptingSystem {
   // 将模块从宿主解绑；idOrInstance 可为 ModuleId 或实际实例对象
   detachScript(host: Host, idOrInstance: ModuleId | any): boolean {
     const list = this.hostScripts.get(host);
-    if (!list || list.length === 0) return false;
+    if (!list || list.length === 0) {
+      return false;
+    }
 
     let removed = false;
     for (let i = list.length - 1; i >= 0; i--) {
@@ -140,7 +153,9 @@ export class ScriptingSystem {
 
   // 每帧更新：遍历每个宿主的脚本实例，调用其 update
   update(deltaTime: number, elapsedTime: number): void {
-    if (this.hostScripts.size === 0) return;
+    if (this.hostScripts.size === 0) {
+      return;
+    }
     for (const list of this.hostScripts.values()) {
       for (const s of list) {
         try {

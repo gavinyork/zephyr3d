@@ -10,7 +10,7 @@ import { Vector3 } from '@zephyr3d/base';
 /** Morph animation state */
 export type MorphState = {
   numTargets: number;
-  weights: Float32Array;
+  weights: Float32Array<ArrayBuffer>;
   boundingBox: BoundingBox;
 };
 

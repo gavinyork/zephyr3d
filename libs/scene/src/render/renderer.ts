@@ -485,7 +485,7 @@ export class SceneRenderer {
     ctx.device.popDeviceStates();
   }
   /** @internal */
-  private static decodeNormalizedFloat(rgba: Uint8Array): number {
+  private static decodeNormalizedFloat(rgba: Uint8Array<ArrayBuffer>): number {
     const a = rgba[0] / 255;
     const b = rgba[1] / 255;
     const c = rgba[2] / 255;
@@ -568,7 +568,9 @@ export class SceneRenderer {
     fence
       .then(() => {
         const drawable = renderQueue.getDrawableByColor(colorPixels);
-        let d = isWebGL1 ? this.decodeNormalizedFloat(distancePixels as Uint8Array) * far : distancePixels[0];
+        let d = isWebGL1
+          ? this.decodeNormalizedFloat(distancePixels as Uint8Array<ArrayBuffer>) * far
+          : distancePixels[0];
         const intersectedPoint = new Vector3(distancePixels[0], distancePixels[1], distancePixels[2]);
         if (isWebGL1) {
           intersectedPoint.x = cameraPos.x + ray.direction.x * d;

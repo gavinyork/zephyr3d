@@ -52,7 +52,7 @@ async function fetchAssetArchive(url: string, progressCallback: (percent: number
   const contentLength = response.headers.get('content-length');
   const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
   let receivedBytes = 0;
-  let data: Uint8Array = new Uint8Array(totalBytes || 1024 * 1024);
+  let data: Uint8Array<ArrayBuffer> = new Uint8Array(totalBytes || 1024 * 1024);
   const reader = response.body.getReader();
   if (!reader) {
     throw new Error('Download data is empty');

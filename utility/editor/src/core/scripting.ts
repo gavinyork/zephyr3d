@@ -1,4 +1,5 @@
-import { textToBase64, VFS } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
+import { textToBase64 } from '@zephyr3d/base';
 import { ScriptRegistry } from '@zephyr3d/runtime';
 import type { ModuleId, RegistryOptions } from '@zephyr3d/runtime';
 
@@ -34,7 +35,7 @@ export class VFSScriptRegistry extends ScriptRegistry {
   ): Promise<{ code: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
     for (const type of ['ts', 'js']) {
       const pathWithExt = `${_id}.${type}`;
-      let exists = await this._vfs.exists(pathWithExt);
+      const exists = await this._vfs.exists(pathWithExt);
       if (exists) {
         const stats = await this._vfs.stat(pathWithExt);
         if (stats.isFile) {
@@ -54,10 +55,14 @@ export class VFSScriptRegistry extends ScriptRegistry {
   private async build(id: string): Promise<string> {
     const key = String(id);
     const cached = this._built.get(key);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const src = await this.fetchSource(key);
-    if (!src) throw new Error(`Module not found: ${key}`);
+    if (!src) {
+      throw new Error(`Module not found: ${key}`);
+    }
 
     const rewritten = await this.rewriteImports(src.code, key);
     const js = await this.transpile(rewritten, key, src.type);
@@ -102,7 +107,9 @@ export class VFSScriptRegistry extends ScriptRegistry {
 
   // 重写 import：内部依赖 -> data URL；裸模块/绝对/data/blob 保持
   protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
-    if (this.opts.mode !== 'editor') return code;
+    if (this.opts.mode !== 'editor') {
+      return code;
+    }
 
     const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
     const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
@@ -112,7 +119,9 @@ export class VFSScriptRegistry extends ScriptRegistry {
       let last = 0;
       for (;;) {
         const m = re.exec(input);
-        if (!m) break;
+        if (!m) {
+          break;
+        }
         out += input.slice(last, m.index);
 
         const quote = m[1];
@@ -146,7 +155,9 @@ export class VFSScriptRegistry extends ScriptRegistry {
     if (spec.startsWith('#/')) {
       path = this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, spec.slice(2)));
     } else if (spec.startsWith('./') || spec.startsWith('../')) {
-      if (!fromId) throw new Error(`Relative import "${spec}" requires fromId`);
+      if (!fromId) {
+        throw new Error(`Relative import "${spec}" requires fromId`);
+      }
       path = this._vfs.normalizePath(
         this._vfs.join(this._vfs.dirname(this._vfs.normalizePath(fromId)), spec)
       );

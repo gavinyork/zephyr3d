@@ -3,7 +3,7 @@ import type * as monaco from 'monaco-editor';
 export class CodeEditor {
   private isMinimized: boolean;
   private editor: monaco.editor.IStandaloneCodeEditor;
-  private fileName: string;
+  protected fileName: string;
   constructor(fileName: string) {
     this.isMinimized = false;
     this.fileName = fileName;
@@ -41,11 +41,6 @@ export class CodeEditor {
     }
   }
 
-  formatDocument() {
-    if (this.editor) {
-      this.editor.getAction('editor.action.formatDocument').run(); //自动格式化代码
-    }
-  }
   minimize() {
     const overlay = document.getElementById('monaco-overlay');
     if (overlay) {
@@ -346,7 +341,9 @@ export class CodeEditor {
     });
 
     const handleResize = (e: MouseEvent) => {
-      if (!isResizing) return;
+      if (!isResizing) {
+        return;
+      }
 
       const deltaX = startX - e.clientX; // 注意：向左拖动应该增加宽度
       const newWidth = startWidth + deltaX;
@@ -456,7 +453,7 @@ export class CodeEditor {
       // 获取保存的代码或使用默认代码
       const savedCode = localStorage.getItem('monaco-editor-content');
       const codeToUse = initialCode || savedCode || 'console.log("Hello, Monaco Editor!");';
-      const monaco = (window as any).monaco as typeof import('monaco-editor');
+      const monaco = (window as any).monaco as typeof monaco;
       this.editor = monaco.editor.create(container, {
         value: codeToUse,
         language: language,
@@ -546,7 +543,9 @@ export class CodeEditor {
   }
 
   private setupEditorFeatures(): void {
-    if (!this.editor) return;
+    if (!this.editor) {
+      return;
+    }
 
     // 自定义快捷键
     this.editor.addCommand(
@@ -615,7 +614,9 @@ export class CodeEditor {
 
   private updateStatusBar(): void {
     const statusBar = document.querySelector('.editor-status-bar') as HTMLElement;
-    if (!statusBar) return;
+    if (!statusBar) {
+      return;
+    }
 
     let statusText = '准备就绪';
     let languageInfo = 'JavaScript | UTF-8';

@@ -9,6 +9,7 @@ import { ParticleMaterial } from '../../../material';
 export function getParticleNodeClass(): SerializableClass {
   return {
     ctor: ParticleSystem,
+    name: 'ParticleSystem',
     parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new ParticleSystem(ctx.scene);

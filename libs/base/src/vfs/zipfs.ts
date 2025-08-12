@@ -60,7 +60,7 @@ export interface ZipJSDependencies {
 
   // Readers
   BlobReader: new (blob: Blob) => any;
-  Uint8ArrayReader: new (array: Uint8Array) => any;
+  Uint8ArrayReader: new (array: Uint8Array<ArrayBuffer>) => any;
   TextReader: new (text: string) => any;
 
   // Writers
@@ -113,7 +113,7 @@ export class ZipFS extends VFS {
   private zipWriter: ZipJSWriter;
   private readonly entries: Map<string, ZipJSEntry>;
   private readonly virtualFiles: Map<string, { data: ArrayBuffer | string; modified: Date }>;
-  private zipData: Blob | Uint8Array | ArrayBuffer;
+  private zipData: Blob | Uint8Array<ArrayBuffer> | ArrayBuffer;
   private isModified: boolean;
   private readonly zipJS: ZipJSDependencies;
 
@@ -143,13 +143,13 @@ export class ZipFS extends VFS {
    *
    * @param data - ZIP file as Blob, ArrayBuffer, or Uint8Array
    */
-  async initializeFromData(data: Blob | Uint8Array | ArrayBuffer): Promise<void> {
+  async initializeFromData(data: Blob | Uint8Array<ArrayBuffer> | ArrayBuffer): Promise<void> {
     try {
       let reader: any;
 
       if (data instanceof ArrayBuffer) {
         this.zipData = new Uint8Array(data);
-        reader = new this.zipJS.Uint8ArrayReader(this.zipData as Uint8Array);
+        reader = new this.zipJS.Uint8ArrayReader(this.zipData as Uint8Array<ArrayBuffer>);
       } else if (data instanceof Uint8Array) {
         this.zipData = data;
         reader = new this.zipJS.Uint8ArrayReader(data);

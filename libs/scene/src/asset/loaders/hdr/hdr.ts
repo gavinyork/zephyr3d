@@ -44,7 +44,7 @@ export class HDRLoader extends AbstractTextureLoader {
     tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);
     return tex;
   }
-  private _rgbeToFloat32(buffer: Uint8Array): Float32Array {
+  private _rgbeToFloat32(buffer: Uint8Array<ArrayBuffer>): Float32Array<ArrayBuffer> {
     const length = buffer.byteLength >> 2;
     const result = new Float32Array(length * 4);
 
@@ -58,7 +58,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private _rgbeToFloat16(buffer: Uint8Array): Uint16Array {
+  private _rgbeToFloat16(buffer: Uint8Array<ArrayBuffer>): Uint16Array<ArrayBuffer> {
     const length = buffer.byteLength >> 2;
     const result = new Uint16Array(length * 4);
     for (let i = 0; i < length; i++) {
@@ -70,7 +70,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private _rgbeToR11G11B10(buffer: Uint8Array): Uint32Array {
+  private _rgbeToR11G11B10(buffer: Uint8Array<ArrayBuffer>): Uint32Array<ArrayBuffer> {
     const length = buffer.byteLength >> 2;
     const result = new Uint32Array(length);
 
@@ -86,7 +86,7 @@ export class HDRLoader extends AbstractTextureLoader {
   /*
     Decode: rgb = pow(6 * rgbm.rgb * rgbm.a, 2.2);
    */
-  private _rgbeToRGBM(buffer: Uint8Array): Uint8Array {
+  private _rgbeToRGBM(buffer: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
     const length = buffer.byteLength >> 2;
     const result = new Uint8Array(length * 4);
 
@@ -105,7 +105,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private async loadHDR(buffer: Uint8Array, dstFormat: TextureFormat) {
+  private async loadHDR(buffer: Uint8Array<ArrayBuffer>, dstFormat: TextureFormat) {
     let header = '';
     let pos = 0;
     const d8 = buffer;

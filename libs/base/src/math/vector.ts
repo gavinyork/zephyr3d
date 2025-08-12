@@ -27,7 +27,7 @@ export class VectorBase extends Float32Array {
    * @param epsilon - The minimal error allowd.
    * @returns true if close enough, otherwise false.
    */
-  equalsTo(other: Float32Array, epsl?: number): boolean {
+  equalsTo(other: Float32Array<ArrayBuffer>, epsl?: number): boolean {
     if (!other || this.length !== other.length) {
       return false;
     }
@@ -97,7 +97,7 @@ export class Vector2 extends VectorBase {
    * Creates a new Vector2 initialized with values in a Float32Array.
    * @param array - Float32Array object that contains the x, y values.
    */
-  constructor(array: Float32Array);
+  constructor(array: Float32Array<ArrayBuffer>);
   /**
    * Creates a new Vector2 placed on a given ArrayBuffer object.
    * @param buffer - The array buffer object.
@@ -108,7 +108,7 @@ export class Vector2 extends VectorBase {
    * Creates a new Vector2 filled with zero values.
    */
   constructor();
-  constructor(arg0?: number | number[] | Float32Array | ArrayBuffer, arg1?: number) {
+  constructor(arg0?: number | number[] | Float32Array<ArrayBuffer> | ArrayBuffer, arg1?: number) {
     if (arg0 instanceof ArrayBuffer && typeof arg1 === 'number') {
       super(arg0, arg1, 2);
     } else {
@@ -591,7 +591,7 @@ export class Vector3 extends VectorBase {
    * Creates a new Vector3 initialized with values in a Float32Array.
    * @param array - Float32Array object that contains the x, y, z values.
    */
-  constructor(array: Float32Array);
+  constructor(array: Float32Array<ArrayBuffer>);
   /**
    * Creates a new Vector3 placed on a given ArrayBuffer object.
    * @param buffer - The array buffer object.
@@ -602,7 +602,11 @@ export class Vector3 extends VectorBase {
    * Creates a new Vector3 filled with zero values.
    */
   constructor();
-  constructor(arg0?: number | number[] | Float32Array | ArrayBuffer, arg1?: number, arg2?: number) {
+  constructor(
+    arg0?: number | number[] | Float32Array<ArrayBuffer> | ArrayBuffer,
+    arg1?: number,
+    arg2?: number
+  ) {
     if (arg0 instanceof ArrayBuffer && typeof arg1 === 'number') {
       super(arg0, arg1, 3);
     } else {

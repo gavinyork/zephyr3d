@@ -396,7 +396,7 @@ export class RenderQueue {
     }
   }
   /** @internal */
-  getDrawableByColor(c: Uint8Array) {
+  getDrawableByColor(c: Uint8Array<ArrayBuffer>) {
     const id = (c[0] << 24) + (c[1] << 16) + (c[2] << 8) + c[3];
     for (const m of this._objectColorMaps) {
       const drawable = m.get(id);

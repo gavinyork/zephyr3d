@@ -16,7 +16,7 @@ export class WebGPUClearQuad {
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,
-    clearColor: Float32Array,
+    clearColor: Float32Array<ArrayBuffer>,
     clearDepth: number,
     clearStencil: number
   ) {

@@ -158,9 +158,7 @@ export class RuntimeModuleSharing {
       const globalVarName = this.getGlobalVarName(moduleName);
       try {
         delete (window as any)[globalVarName];
-      } catch (e) {
-        // 忽略删除失败
-      }
+      } catch (_e) {}
     }
 
     // 清理 import map

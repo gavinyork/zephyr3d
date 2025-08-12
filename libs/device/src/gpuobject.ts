@@ -1451,7 +1451,11 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
   readonly byteLength: number;
   readonly usage: number;
   bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void;
-  getBufferSubData(dstBuffer?: Uint8Array, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array>;
+  getBufferSubData(
+    dstBuffer?: Uint8Array<ArrayBuffer>,
+    offsetInBytes?: number,
+    sizeInBytes?: number
+  ): Promise<Uint8Array<ArrayBuffer>>;
 }
 
 /**

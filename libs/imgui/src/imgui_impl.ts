@@ -941,7 +941,7 @@ export class Texture {
     }
   }
   public Update(
-    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array | Uint16Array,
+    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
     param?: any
   ): void {
     let w, h;

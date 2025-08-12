@@ -1377,7 +1377,7 @@ async function testFSEncoding() {
   console.log('- Base64:', asBase64);
 
   // 测试2：二进制写入，不同方式读取
-  const binaryData = new TextEncoder().encode('Binary test 二进制');
+  const binaryData = new TextEncoder().encode('Binary test 二进制').buffer;
   await fs.writeFile('/test2.bin', binaryData, { encoding: 'binary' });
 
   const binaryAsString = await fs.readFile('/test2.bin', { encoding: 'utf8' });

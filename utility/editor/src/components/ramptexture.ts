@@ -10,7 +10,7 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
   private readonly _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
-  private readonly _textureData: Uint8ClampedArray;
+  private readonly _textureData: Uint8ClampedArray<ArrayBuffer>;
   private readonly _keyframes: Array<{ time: number; color: Float32Array }>;
   private _selectedKeyframe: number;
   private _isDragging: boolean;
@@ -21,11 +21,9 @@ export class RampTextureCreator extends makeEventTarget(Object)<{
   private _dragStartPos: { x: number; time: number };
   private readonly _hasAlpha: boolean;
   private _changed: boolean;
-
-  // 新增：位置指示器相关属性
-  private _positionIndicator: number; // 指示器位置 (0-1)
-  private _isDraggingIndicator: boolean; // 是否正在拖拽指示器
-  private readonly _indicatorWidth: number; // 指示器宽度
+  private _positionIndicator: number;
+  private _isDraggingIndicator: boolean;
+  private readonly _indicatorWidth: number;
 
   constructor(hasAlpha: boolean, rgbInterpolator?: Interpolator, alphaInterpolator?: Interpolator) {
     super();

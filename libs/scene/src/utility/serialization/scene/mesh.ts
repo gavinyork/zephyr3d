@@ -17,6 +17,7 @@ import type { NodeHierarchy } from './node';
 export function getMeshClass(): SerializableClass {
   return {
     ctor: Mesh,
+    name: 'Mesh',
     parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Mesh(ctx.scene);

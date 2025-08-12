@@ -12,6 +12,7 @@ import type { SerializationManager } from '../manager';
 export function getFBMWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FBMWaveGenerator,
+    name: 'FBMWaveGenerator',
     getProps() {
       return [
         {
@@ -74,6 +75,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
 export function getFFTWaveGeneratorClass(): SerializableClass {
   return {
     ctor: FFTWaveGenerator,
+    name: 'FFTWaveGenerator',
     getProps() {
       return [
         {
@@ -182,6 +184,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
 export function getWaterClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Water,
+    name: 'Water',
     parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Water(ctx.scene);

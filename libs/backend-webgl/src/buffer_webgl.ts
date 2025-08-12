@@ -9,7 +9,7 @@ import type { WebGLDevice } from './device_webgl';
 export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDataBuffer<WebGLBuffer> {
   protected _size: number;
   protected _usage: number;
-  protected _systemMemoryBuffer: Uint8Array;
+  protected _systemMemoryBuffer: Uint8Array<ArrayBuffer>;
   protected _systemMemory: boolean;
   protected _memCost: number;
   constructor(device: WebGLDevice, usage: number, data: TypedArray | number, systemMemory = false) {
@@ -121,20 +121,20 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array,
+    dstBuffer?: Uint8Array<ArrayBuffer>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     if (this.disposed) {
       this.reload();
     }
     return this._getBufferData(dstBuffer, offsetInBytes, sizeInBytes);
   }
   protected async _getBufferData(
-    dstBuffer?: Uint8Array,
+    dstBuffer?: Uint8Array<ArrayBuffer>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
     if (offsetInBytes < 0 || offsetInBytes + sizeInBytes > this.byteLength) {
@@ -145,7 +145,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
     if (this._systemMemoryBuffer) {
-      dstBuffer.set(new Uint8Array(this._systemMemoryBuffer, offsetInBytes, sizeInBytes));
+      dstBuffer.set(new Uint8Array(this._systemMemoryBuffer.buffer, offsetInBytes, sizeInBytes));
     } else {
       const gl = this._device.context as WebGL2RenderingContext;
       if (isWebGL2(gl)) {

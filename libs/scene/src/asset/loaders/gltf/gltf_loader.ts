@@ -1416,7 +1416,9 @@ export class GLTFLoader extends AbstractModelLoader {
         }
       }
       if (!semantic) {
-        buffer = gltf._device.createIndexBuffer(data as Uint16Array | Uint32Array, { managed: true });
+        buffer = gltf._device.createIndexBuffer(data as Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, {
+          managed: true
+        });
       } else {
         const attribFormat = device.getVertexAttribFormat(semantic, 'f32', componentCount);
         buffer = gltf._device.createVertexBuffer(attribFormat, data);

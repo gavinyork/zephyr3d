@@ -11,23 +11,11 @@ import type { SerializationManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
 
-export const testJson: object = {
-  testNumber: 123,
-  testString: 'Hello,world!',
-  '.testHiddenString': "You can't see me",
-  testObject: {
-    '.testHiddenField': 'Hidden',
-    testField: 'Field'
-  },
-  '.testHiddenObject': {
-    testField: 'You can not see me'
-  }
-};
-
 /** @internal */
 export function getSceneClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: Scene,
+    name: 'Scene',
     createFunc() {
       return { obj: new Scene() };
     },

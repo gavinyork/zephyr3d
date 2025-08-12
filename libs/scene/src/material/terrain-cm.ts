@@ -24,7 +24,7 @@ type ClipmapTerrainDetailMapInfo = {
   detailMapList: DRef<Texture2D>[];
   detailNormalMapList: DRef<Texture2D>[];
   splatMap: DRef<Texture2DArray | Texture2D>;
-  detailMapParams: Float32Array;
+  detailMapParams: Float32Array<ArrayBuffer>;
   numDetailMaps: number;
 };
 
@@ -100,7 +100,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, mode);
   }
   /** @internal */
-  setLevelData(data: Float32Array, length: number) {
+  setLevelData(data: Float32Array<ArrayBuffer>, length: number) {
     this._levelDataBuffer.get().bufferSubData(0, data, 0, length);
   }
   /** @internal */

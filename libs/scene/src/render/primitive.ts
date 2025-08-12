@@ -293,7 +293,10 @@ export class Primitive implements Clonable<Primitive> {
    * @param dynamic - true if the index buffer is dynamic
    * @returns The created index buffer
    */
-  createAndSetIndexBuffer(data: Uint16Array | Uint32Array, dynamic?: boolean): IndexBuffer {
+  createAndSetIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    dynamic?: boolean
+  ): IndexBuffer {
     const device = Application.instance.device;
     const buffer = device.createIndexBuffer(data, {
       dynamic: !!dynamic,

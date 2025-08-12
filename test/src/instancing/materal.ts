@@ -3,7 +3,7 @@ import type { DrawContext } from '@zephyr3d/scene';
 import { Application, MeshMaterial, ShaderHelper } from '@zephyr3d/scene';
 
 export class LinearDepthMaterial extends MeshMaterial {
-  private _screenSize: Int32Array;
+  private _screenSize: Int32Array<ArrayBuffer>;
   constructor() {
     super();
     this._screenSize = new Int32Array(2);

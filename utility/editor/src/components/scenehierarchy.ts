@@ -64,7 +64,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
       cls = ProjectService.serializationManager.getClassByConstructor(ctor);
       ctor = Object.getPrototypeOf(ctor);
     }
-    return cls.ctor.name;
+    return cls.name;
   }
   private renderSceneNode(node: SceneNode, sceneChanged: boolean) {
     let cls: SerializableClass = null;

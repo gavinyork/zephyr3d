@@ -36,7 +36,7 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
     baseVertexBuffer: StructuredBuffer,
     indexBuffer: IndexBuffer,
     material: GrassMaterial,
-    grassData: Float32Array
+    grassData: Float32Array<ArrayBuffer>
   ) {
     super(terrain);
     this._primitive = new Primitive();

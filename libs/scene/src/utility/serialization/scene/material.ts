@@ -504,6 +504,7 @@ function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<
 export function getMeshMaterialClass(): SerializableClass {
   return {
     ctor: MeshMaterial,
+    name: 'MeshMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -643,6 +644,7 @@ export function getMeshMaterialClass(): SerializableClass {
 export function getParticleMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ParticleMaterial,
+    name: 'ParticleMaterial',
     parent: MeshMaterial,
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
@@ -725,6 +727,7 @@ export function getUnlitMaterialClass(manager: SerializationManager): Serializab
   return {
     ctor: UnlitMaterial,
     parent: MeshMaterial,
+    name: 'UnlitMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -760,6 +763,7 @@ export function getLambertMaterialClass(manager: SerializationManager): Serializ
   return {
     ctor: LambertMaterial,
     parent: MeshMaterial,
+    name: 'LambertMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -795,6 +799,7 @@ export function getBlinnMaterialClass(manager: SerializationManager): Serializab
   return {
     ctor: BlinnMaterial,
     parent: MeshMaterial,
+    name: 'BlinnMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -850,6 +855,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
   return {
     ctor: PBRMetallicRoughnessMaterial,
     parent: MeshMaterial,
+    name: 'PBRMetallicRoughnessMaterial',
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);
       if (mat) {
@@ -943,6 +949,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
 export function getPBRSpecularGlossinessMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRSpecularGlossinessMaterial,
+    name: 'PBRSpecularGlossinessMaterial',
     parent: MeshMaterial,
     createFunc(ctx, initParams) {
       let mat = Material.findMaterialById(initParams.persistentId);

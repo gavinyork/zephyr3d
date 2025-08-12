@@ -721,7 +721,10 @@ export class WebGLDevice extends BaseDevice {
     gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object);
     gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
   }
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer {
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer {
     return new WebGLIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
   createStructuredBuffer(

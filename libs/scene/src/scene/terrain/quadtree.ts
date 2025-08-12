@@ -305,7 +305,7 @@ export class Quadtree {
       .update(normalMapBytes, 0, 0, this._normalMap.get().width, this._normalMap.get().height);
     return this._rootNode.initialize(this, null, 0, 0, this._baseVertices, normals, scale.y, elevations);
   }
-  strip(vertexCacheSize: number): Uint16Array {
+  strip(vertexCacheSize: number): Uint16Array<ArrayBuffer> {
     const dimension = this._patchSize + 2;
     const step = (vertexCacheSize >> 1) - 1;
     const indices: number[] = [];
@@ -326,7 +326,7 @@ export class Quadtree {
     indices.length = indices.length - 2;
     return new Uint16Array(indices);
   }
-  line(strip: Uint16Array): Uint16Array {
+  line(strip: Uint16Array<ArrayBuffer>): Uint16Array<ArrayBuffer> {
     const numTris = strip.length - 2;
     const lineIndices: number[] = [];
     let lastSkipped = true;

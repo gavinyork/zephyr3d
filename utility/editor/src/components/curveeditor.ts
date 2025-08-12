@@ -47,7 +47,7 @@ export class CurveEditor extends makeEventTarget(Object)<{
   private _cachedCurvePoints: Array<{ x: number; y: number }>;
   private _curveDirty: boolean;
   private _currentChannel: number;
-  private _resultBuffer: Float32Array;
+  private _resultBuffer: Float32Array<ArrayBuffer>;
   private _positionIndicatorTime: number;
   private _isDraggingIndicator: boolean;
   private _showPositionIndicator: boolean;

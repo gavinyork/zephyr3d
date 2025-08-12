@@ -10,6 +10,7 @@ import type { SceneNode } from '../../../scene';
 export function getInterpolatorClass(): SerializableClass {
   return {
     ctor: Interpolator,
+    name: 'Interpolator',
     createFunc(
       ctx,
       init: { mode: InterpolationMode; target: InterpolationTarget; inputs: number[]; outputs: number[] }
@@ -73,6 +74,7 @@ export function getInterpolatorClass(): SerializableClass {
 export function getPropTrackClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PropertyTrack,
+    name: 'PropertyTrack',
     createFunc(ctx, init) {
       return { obj: new PropertyTrack(manager.getPropertyByName(init)) };
     },
@@ -142,6 +144,7 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
 export function getAnimationClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: AnimationClip,
+    name: 'AnimationClip',
     createFunc(ctx: SceneNode, init: string) {
       return { obj: ctx.animationSet.createAnimation(init, false) };
     },

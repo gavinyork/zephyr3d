@@ -95,7 +95,7 @@ export class ParticleSystem
   private readonly _material: DRef<ParticleMaterial>;
   private readonly _wsBoundingBox: BoundingBox;
   private readonly _pickTarget: PickTarget;
-  private _instanceData: Float32Array;
+  private _instanceData: Float32Array<ArrayBuffer>;
   /**
    * Creates a new ParticleSystem node
    * @param scene - Which scene the node belongs to

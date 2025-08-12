@@ -256,7 +256,7 @@ export function packFloat3(a: number, b: number, c: number): number {
  *
  * @public
  */
-export function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void {
+export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T): void {
   /*
   result[0] = halfToFloat((pk & 0x7ff) << 4);
   result[1] = halfToFloat((pk & 0x3ff800) >> 7);

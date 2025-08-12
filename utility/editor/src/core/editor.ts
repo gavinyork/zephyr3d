@@ -25,8 +25,6 @@ import * as zephyr3d_device from '@zephyr3d/device';
 import * as zephyr3d_scene from '@zephyr3d/scene';
 import * as zephyr3d_runtime from '@zephyr3d/runtime';
 
-import { CodeEditor } from '../components/codeeditor';
-
 const testScript2 = `
 import { Foo } from './hello';
 
@@ -176,15 +174,6 @@ export class Editor {
     await this._scriptingSystem.attachScript(this, {
       module: '#/main'
     });
-    const editor = new CodeEditor('test.ts');
-    editor.show(
-      `
-      export default class {
-      }
-    `,
-      'typescript'
-    );
-    editor.formatDocument();
   }
   async loadAssets() {
     const assetManager = new AssetManager(

@@ -191,7 +191,7 @@ export interface BatchDrawable extends Drawable {
    * Gets the instance uniforms
    * @internal
    */
-  getInstanceUniforms(): Float32Array;
+  getInstanceUniforms(): Float32Array<ArrayBuffer>;
   /**
    * Apply instance offset and stride to bind group
    * @param renderQueue - The render queue to which the bind group belongs.

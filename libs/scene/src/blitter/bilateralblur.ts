@@ -30,7 +30,7 @@ export class BilateralBlurBlitter extends Blitter {
   protected _uvStep: Vector2;
   protected _size: Vector2;
   protected _stdDev: number;
-  protected _offsetsAndWeights: Float32Array;
+  protected _offsetsAndWeights: Float32Array<ArrayBuffer>;
   protected _finalPhase: boolean;
   constructor(finalPhase: boolean) {
     super();

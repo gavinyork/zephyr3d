@@ -99,7 +99,7 @@ export class PostGizmoRenderer extends makeEventTarget(AbstractPostEffect)<{
   private _allowRotate: boolean;
   private _allowScale: boolean;
   private _alwaysDrawIndicator: boolean;
-  private _gridSteps: Float32Array;
+  private _gridSteps: Float32Array<ArrayBuffer>;
   private readonly _gridParams: Vector4;
   private _camera: Camera;
   private _node: SceneNode;

@@ -36,7 +36,7 @@ export class ABufferOIT implements OIT {
   private _headBuffer: GPUDataBuffer;
   private _scissorOffsetBuffer: GPUDataBuffer;
   private readonly _numLayers: number;
-  private _screenSize: Uint32Array;
+  private _screenSize: Uint32Array<ArrayBuffer>;
   private _hash: string;
   private readonly _debug: boolean;
   private _scissorSlices: number;

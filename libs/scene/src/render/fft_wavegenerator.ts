@@ -486,7 +486,7 @@ export class FFTWaveGenerator implements WaveGenerator {
     return parseInt(v.toString(2).padStart(width, '0').split('').reverse().join(''), 2);
   }
   /** @internal */
-  private createButterflyTexture(size: number): Float32Array {
+  private createButterflyTexture(size: number): Float32Array<ArrayBuffer> {
     const width = Math.log2(size);
     const height = size;
     const texture = new Float32Array(width * height * 4);

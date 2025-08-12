@@ -356,7 +356,7 @@ export class Material implements Clonable<Material> {
    * Returns the instance uniforms if this is a material instance
    * @internal
    **/
-  get $instanceUniforms(): Float32Array {
+  get $instanceUniforms(): Float32Array<ArrayBuffer> {
     return null;
   }
 }

@@ -10,7 +10,7 @@ import { MAX_GERSTNER_WAVE_COUNT } from '../values';
  */
 export class GerstnerWaveGenerator implements WaveGenerator {
   private _version: number;
-  private _waveParams: Float32Array;
+  private _waveParams: Float32Array<ArrayBuffer>;
   private _numWaves: number;
   private _disposed: boolean;
   /**

@@ -375,7 +375,7 @@ export class HeightField {
   rayIntersect(ray: Ray): number | null {
     return this.m_bboxTree.rayIntersect(ray);
   }
-  computeNormals(): Uint8Array {
+  computeNormals(): Uint8Array<ArrayBuffer> {
     const scaleX = this.m_scale.x;
     const scaleZ = this.m_scale.z;
     const heights = this.getHeights();

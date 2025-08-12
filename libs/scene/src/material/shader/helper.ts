@@ -858,8 +858,8 @@ export class ShaderHelper {
   static setLightUniforms(
     bindGroup: BindGroup,
     ctx: DrawContext,
-    clusterParams: Float32Array,
-    countParams: Int32Array,
+    clusterParams: Float32Array<ArrayBuffer>,
+    countParams: Int32Array<ArrayBuffer>,
     lightBuffer: StructuredBuffer,
     lightIndexTexture: Texture2D
   ) {

@@ -148,6 +148,7 @@ export class JSONArray extends JSONData {
 export function getJSONPropClass(): SerializableClass {
   return {
     ctor: JSONProp,
+    name: 'JSONProp',
     noTitle: true,
     createFunc(ctx: JSONData) {
       return { obj: new JSONProp(ctx) };
@@ -181,6 +182,7 @@ export function getJSONStringClass(): SerializableClass {
   return {
     ctor: JSONString,
     parent: JSONProp,
+    name: 'JSONString',
     noTitle: true,
     createFunc(ctx: JSONData) {
       return { obj: new JSONString(ctx) };
@@ -212,6 +214,7 @@ export function getJSONNumberClass(): SerializableClass {
   return {
     ctor: JSONNumber,
     parent: JSONProp,
+    name: 'JSONNumber',
     noTitle: true,
     createFunc(ctx: JSONData) {
       return { obj: new JSONString(ctx) };
@@ -243,6 +246,7 @@ export function getJSONBoolClass(): SerializableClass {
   return {
     ctor: JSONBool,
     parent: JSONProp,
+    name: 'JSONBool',
     noTitle: true,
     createFunc(ctx: JSONData) {
       return { obj: new JSONBool(ctx) };
@@ -274,6 +278,7 @@ export function getJSONObjectClass(): SerializableClass {
   return {
     ctor: JSONData,
     parent: JSONProp,
+    name: 'JSONData',
     noTitle: true,
     createFunc(ctx) {
       return { obj: new JSONData(ctx instanceof JSONData ? ctx : null) };
@@ -327,6 +332,7 @@ export function getJSONArrayClass(): SerializableClass {
   return {
     ctor: JSONArray,
     parent: JSONProp,
+    name: 'JSONArray',
     noTitle: true,
     createFunc(ctx) {
       return { obj: new JSONArray(ctx instanceof JSONData || ctx instanceof JSONArray ? ctx : null) };

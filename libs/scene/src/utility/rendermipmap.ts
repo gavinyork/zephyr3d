@@ -14,8 +14,8 @@ import { drawFullscreenQuad } from '../render/fullscreenquad';
 export abstract class RenderMipmap {
   private readonly _program: DRef<GPUProgram>;
   private readonly _bindGroup: DRef<BindGroup>;
-  private _srcSize: Float32Array;
-  private _dstSize: Float32Array;
+  private _srcSize: Float32Array<ArrayBuffer>;
+  private _dstSize: Float32Array<ArrayBuffer>;
   abstract renderPixel(
     scope: PBInsideFunctionScope,
     leftTop: PBShaderExp,

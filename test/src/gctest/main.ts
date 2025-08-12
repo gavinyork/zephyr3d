@@ -11,7 +11,7 @@ const myApp = new Application({
 myApp.ready().then(async function () {
   const vfs = new HttpFS('http://localhost:8001/dist/assets');
   const manager = new SerializationManager(vfs);
-  const scene = await manager.loadScene('/scenes/test.zscn');
+  const scene = await manager.loadScene('/scenes/test.scn');
   scene.mainCamera.controller = new FPSCameraController();
   myApp.inputManager.use(scene.mainCamera.handleEvent.bind(scene.mainCamera));
   myApp.on('tick', function () {

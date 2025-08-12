@@ -567,7 +567,10 @@ export class WebGPUDevice extends BaseDevice {
       bytes
     );
   }
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer<unknown> {
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer<unknown> {
     return new WebGPUIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
   createStructuredBuffer(

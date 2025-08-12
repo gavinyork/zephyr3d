@@ -234,7 +234,10 @@ export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>
     dstOffset: number,
     bytes: number
   );
-  abstract createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+  abstract createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer;
   abstract createStructuredBuffer(
     structureType: PBStructTypeInfo,
     options: BufferCreationOptions,

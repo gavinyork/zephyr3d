@@ -190,7 +190,7 @@ class PropertyGroup {
               .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0], -1));
             if (props.length > 0) {
               if (!cls.noTitle) {
-                this.addSeparator(cls.ctor.name);
+                this.addSeparator(cls.name);
               }
               for (const prop of props) {
                 this.addProperty(this.value.object[0], prop);
@@ -414,7 +414,7 @@ export class PropertyEditor extends makeEventTarget(Object)<{
         ImGui.Combo(
           '',
           group.selected,
-          group.objectTypes.map((val) => val?.ctor.name ?? 'NULL'),
+          group.objectTypes.map((val) => val?.name ?? 'NULL'),
           group.objectTypes.length
         );
         if (settable) {
@@ -777,8 +777,8 @@ export class PropertyEditor extends makeEventTarget(Object)<{
                 if (ImGui.BeginPopup('X##list')) {
                   for (const t of property.value.options.objectTypes) {
                     const cls = ProjectService.serializationManager.getClassByConstructor(t);
-                    if (cls && ImGui.MenuItem(`${cls.ctor.name}##create`)) {
-                      alert(cls.ctor.name);
+                    if (cls && ImGui.MenuItem(`${cls.name}##create`)) {
+                      alert(cls.name);
                     }
                   }
                   ImGui.EndPopup();

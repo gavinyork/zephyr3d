@@ -39,9 +39,9 @@ export class Renderer {
   /** @internal */
   private readonly _renderStateSet: RenderStateSet;
   /** @internal */
-  private _vertexCache: Uint8Array;
+  private _vertexCache: Uint8Array<ArrayBuffer>;
   /** @internal */
-  private readonly _indexCache: Uint16Array;
+  private readonly _indexCache: Uint16Array<ArrayBuffer>;
   /** @internal */
   private readonly _projectionMatrix: Matrix4x4;
   /** @internal */
@@ -191,8 +191,8 @@ export class Renderer {
   }
   /** @internal */
   stream(
-    vertexData: Uint8Array,
-    indexData: Uint16Array,
+    vertexData: Uint8Array<ArrayBuffer>,
+    indexData: Uint16Array<ArrayBuffer>,
     indexOffset: number,
     indexCount: number,
     texture: Texture2D,

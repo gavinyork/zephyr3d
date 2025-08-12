@@ -120,6 +120,7 @@ export class NodeHierarchy {
 export function getNodeHierarchyClass(): SerializableClass {
   return {
     ctor: NodeHierarchy,
+    name: 'NodeHierarchy',
     createFunc(ctx) {
       return { obj: new NodeHierarchy(ctx as Scene) };
     },
@@ -174,6 +175,7 @@ export function getNodeHierarchyClass(): SerializableClass {
 export function getSceneNodeClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: SceneNode,
+    name: 'SceneNode',
     async createFunc(ctx: NodeHierarchy | SceneNode, init?: { asset?: string }) {
       if (init?.asset) {
         return { obj: (await manager.fetchModel(init.asset, ctx.scene)).group };
@@ -379,6 +381,7 @@ export function getGraphNodeClass(): SerializableClass {
   return {
     ctor: GraphNode,
     parent: SceneNode,
+    name: 'GraphNode',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new GraphNode(ctx.scene);
       if (ctx instanceof SceneNode) {

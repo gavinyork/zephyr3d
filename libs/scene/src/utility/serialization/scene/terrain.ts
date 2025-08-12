@@ -23,10 +23,10 @@ function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, 
 
 async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
   const grassRenderer = terrain.grassRenderer;
-  const layerDatas: Uint8Array[] = [];
+  const layerDatas: Uint8Array<ArrayBuffer>[] = [];
   let dataSize = 4 + 4 * grassRenderer.numLayers;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
-    const promises: Promise<Uint8Array>[] = [];
+    const promises: Promise<Uint8Array<ArrayBuffer>>[] = [];
     const layer = grassRenderer.getLayer(i);
     const queue = [layer.quadtree];
     while (queue.length > 0) {
@@ -45,7 +45,7 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
       const data = await Promise.all(promises);
       const merged = mergeTypedArrays(Uint8Array, data);
       dataSize += merged.length;
-      layerDatas.push(merged);
+      layerDatas.push(merged as Uint8Array<ArrayBuffer>);
     } else {
       layerDatas.push(new Uint8Array());
     }
@@ -110,6 +110,7 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Array
 export function getTerrainClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: ClipmapTerrain,
+    name: 'ClipmapTerrain',
     parent: GraphNode,
     createFunc(ctx: NodeHierarchy | SceneNode, init: number) {
       const node = new ClipmapTerrain(ctx.scene);
@@ -257,6 +258,10 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           },
           async set(this: ClipmapTerrain, value) {
             const json = value.object[0] as JSONArray;
+            if (!json) {
+              this.material.numDetailMaps = 0;
+              return;
+            }
             const data =
               (json.data as {
                 albedo: string;

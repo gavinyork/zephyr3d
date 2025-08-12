@@ -11,6 +11,7 @@ export function getPunctualLightClass(): SerializableClass {
   return {
     ctor: PunctualLight,
     parent: SceneNode,
+    name: 'PunctualLight',
     getProps() {
       return [
         {
@@ -394,6 +395,7 @@ export function getPunctualLightClass(): SerializableClass {
 export function getDirectionalLightClass(): SerializableClass {
   return {
     ctor: DirectionalLight,
+    name: 'DirectionalLight',
     parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new DirectionalLight(ctx.scene);
@@ -424,6 +426,7 @@ export function getDirectionalLightClass(): SerializableClass {
 export function getPointLightClass(): SerializableClass {
   return {
     ctor: PointLight,
+    name: 'PointLight',
     parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PointLight(ctx.scene);
@@ -459,6 +462,7 @@ export function getPointLightClass(): SerializableClass {
 export function getSpotLightClass(): SerializableClass {
   return {
     ctor: SpotLight,
+    name: 'SpotLight',
     parent: PunctualLight,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new SpotLight(ctx.scene);

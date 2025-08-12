@@ -7,7 +7,7 @@ import { fetchSampler } from '../utility/misc';
 let hzbProgram: GPUProgram = null;
 let hzbBindGroup: BindGroup = null;
 let blitter: CopyBlitter = null;
-let srcSize: Int32Array = null;
+let srcSize: Int32Array<ArrayBuffer> = null;
 
 /*
 vec3 trace_ray(vec3 ray_start, vec3 ray_dir)

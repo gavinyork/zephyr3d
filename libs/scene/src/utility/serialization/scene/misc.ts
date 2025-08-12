@@ -5,6 +5,7 @@ import type { SerializableClass } from '../types';
 export function getAABBClass(): SerializableClass {
   return {
     ctor: AABB,
+    name: 'AABB',
     getProps() {
       return [
         {

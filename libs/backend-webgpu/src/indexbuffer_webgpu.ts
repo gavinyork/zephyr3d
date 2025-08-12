@@ -9,7 +9,11 @@ const typeU32 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U32);
 export class WebGPUIndexBuffer extends WebGPUBuffer implements IndexBuffer {
   readonly indexType: PBPrimitiveTypeInfo;
   readonly length: number;
-  constructor(device: WebGPUDevice, data: Uint16Array | Uint32Array, usage?: number) {
+  constructor(
+    device: WebGPUDevice,
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    usage?: number
+  ) {
     if (!(data instanceof Uint16Array) && !(data instanceof Uint32Array)) {
       throw new Error('invalid index data');
     }

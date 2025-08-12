@@ -204,7 +204,7 @@ export class SerializationManager {
     let info = cls[index];
     const initParams = info?.getInitParams?.(obj);
     json = json ?? {};
-    json.ClassName = info.ctor.name;
+    json.ClassName = info.name;
     json.Object = {};
     if (initParams !== undefined && initParams !== null) {
       json.Init = initParams;
@@ -218,7 +218,7 @@ export class SerializationManager {
   async deserializeObject<T extends object>(ctx: any, json: object): Promise<T> {
     const cls = this.getClasses();
     const className = json['ClassName'];
-    const index = cls.findIndex((val) => val.ctor.name === className);
+    const index = cls.findIndex((val) => val.name === className);
     if (index < 0) {
       throw new Error('Deserialize object failed: Cannot found serialization meta data');
     }
@@ -349,7 +349,7 @@ export class SerializationManager {
       const props = cls.getProps() ?? [];
       this._clsPropMap.set(cls, props);
       for (const prop of props) {
-        const path = `/${cls.ctor.name}/${prop.name}`;
+        const path = `/${cls.name}/${prop.name}`;
         if (this._propMap[path]) {
           throw new Error(`Cannot register property ${path}: property name already exists`);
         }

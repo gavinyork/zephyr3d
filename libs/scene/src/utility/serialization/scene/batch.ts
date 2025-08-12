@@ -7,6 +7,7 @@ export function getBatchGroupClass(): SerializableClass {
   return {
     ctor: BatchGroup,
     parent: GraphNode,
+    name: 'BatchGroup',
     createFunc(scene: Scene | SceneNode) {
       if (scene instanceof Scene) {
         return { obj: new BatchGroup(scene) };

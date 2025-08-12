@@ -2620,7 +2620,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param options - The creation options
    * @returns The created index buffer.
    */
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer;
   /**
    * Creates a structured buffer
    * @param structureType - The structure type

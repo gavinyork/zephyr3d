@@ -118,7 +118,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc BatchDrawable.getInstanceUniforms}
    */
-  getInstanceUniforms(): Float32Array {
+  getInstanceUniforms(): Float32Array<ArrayBuffer> {
     return this._material.get().$instanceUniforms;
   }
   /**

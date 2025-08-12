@@ -17,6 +17,7 @@ import {
 export function getCameraClass(): SerializableClass {
   return {
     ctor: Camera,
+    name: 'Camera',
     parent: SceneNode,
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new Camera(ctx.scene);
@@ -612,6 +613,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
   return {
     ctor: PerspectiveCamera,
     parent: Camera,
+    name: 'PerspectiveCamera',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new PerspectiveCamera(ctx.scene);
       if (ctx instanceof SceneNode) {
@@ -668,6 +670,7 @@ export function getOrthoCameraClass(): SerializableClass {
   return {
     ctor: OrthoCamera,
     parent: Camera,
+    name: 'OrthoCamera',
     createFunc(ctx: NodeHierarchy | SceneNode) {
       const node = new OrthoCamera(ctx.scene);
       if (ctx instanceof SceneNode) {

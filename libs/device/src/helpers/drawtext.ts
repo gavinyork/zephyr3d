@@ -35,7 +35,7 @@ export class DrawText {
   /** @internal */
   private static font: Font = null;
   /** @internal */
-  private static vertexCache: Float32Array = null;
+  private static vertexCache: Float32Array<ArrayBuffer> = null;
   /** @internal */
   private static readonly colorValue: Vector4 = new Vector4();
   /** @internal */

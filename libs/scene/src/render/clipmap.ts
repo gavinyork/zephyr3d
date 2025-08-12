@@ -22,8 +22,8 @@ const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
 export type PrimitiveInstanceInfo = {
   primitive: Primitive;
   numInstances: number;
-  instanceDatas: Float32Array;
-  mipLevels: Float32Array;
+  instanceDatas: Float32Array<ArrayBuffer>;
+  mipLevels: Float32Array<ArrayBuffer>;
   maxMiplevel: number;
 };
 /** @internal */
@@ -57,13 +57,13 @@ export interface ClipmapDrawContext extends ClipmapGatherContext {
 
 /** @internal */
 export class Clipmap {
-  private readonly _instanceDataPool: Float32Array[];
+  private readonly _instanceDataPool: Float32Array<ArrayBuffer>[];
   private _instanceDataPoolSize: number;
-  private readonly _mipLevelDataPool: Float32Array[];
+  private readonly _mipLevelDataPool: Float32Array<ArrayBuffer>[];
   private _mipLevelDataPoolSize: number;
-  private readonly _nonInstanceDataPool: Float32Array[];
+  private readonly _nonInstanceDataPool: Float32Array<ArrayBuffer>[];
   private _nonInstanceDataPoolSize: number;
-  private readonly _nonInstanceMipLevelDataPool: Float32Array[];
+  private readonly _nonInstanceMipLevelDataPool: Float32Array<ArrayBuffer>[];
   private _nonInstanceMipLevelDataPoolSize: number;
   private readonly _extraInstanceBuffers: VertexAttribFormat[];
   private _tileResolution: number;
@@ -142,7 +142,7 @@ export class Clipmap {
       this.generateTrimMesh();
     }
   }
-  private allocInstanceBuffer(): Float32Array {
+  private allocInstanceBuffer(): Float32Array<ArrayBuffer> {
     if (this._instanceDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16 * 4);
       this._instanceDataPool.push(buffer);
@@ -151,8 +151,8 @@ export class Clipmap {
       return this._instanceDataPool[--this._instanceDataPoolSize];
     }
   }
-  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number): Float32Array {
-    let buffer: Float32Array;
+  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number): Float32Array<ArrayBuffer> {
+    let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceDataPoolSize === 0) {
       buffer = new Float32Array(4);
       this._nonInstanceDataPool.push(buffer);
@@ -165,7 +165,7 @@ export class Clipmap {
     buffer[3] = w;
     return buffer;
   }
-  private allocMipLevelBuffer(): Float32Array {
+  private allocMipLevelBuffer(): Float32Array<ArrayBuffer> {
     if (this._mipLevelDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16);
       this._mipLevelDataPool.push(buffer);
@@ -174,8 +174,8 @@ export class Clipmap {
       return this._mipLevelDataPool[--this._mipLevelDataPoolSize];
     }
   }
-  private allocNonInstanceMipLevelBuffer(val: number): Float32Array {
-    let buffer: Float32Array;
+  private allocNonInstanceMipLevelBuffer(val: number): Float32Array<ArrayBuffer> {
+    let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceMipLevelDataPoolSize === 0) {
       buffer = new Float32Array(1);
       this._nonInstanceMipLevelDataPool.push(buffer);

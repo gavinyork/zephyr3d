@@ -6,6 +6,7 @@ import type { SerializableClass } from '../types';
 export function getPrimitiveClass(): SerializableClass {
   return {
     ctor: Primitive,
+    name: 'Primitive',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -30,6 +31,7 @@ export function getBoxShapeClass(): SerializableClass {
   return {
     ctor: BoxShape,
     parent: Primitive,
+    name: 'BoxShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -91,6 +93,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
   return {
     ctor: BoxFrameShape,
     parent: Primitive,
+    name: 'BoxFrameShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -152,6 +155,7 @@ export function getTorusShapeClass(): SerializableClass {
   return {
     ctor: TorusShape,
     parent: Primitive,
+    name: 'TorusShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -237,6 +241,7 @@ export function getPlaneShapeClass(): SerializableClass {
   return {
     ctor: PlaneShape,
     parent: Primitive,
+    name: 'PlaneShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -322,6 +327,7 @@ export function getCylinderShapeClass(): SerializableClass {
   return {
     ctor: CylinderShape,
     parent: Primitive,
+    name: 'CylinderShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {
@@ -440,6 +446,7 @@ export function getSphereShapeClass(): SerializableClass {
   return {
     ctor: SphereShape,
     parent: Primitive,
+    name: 'SphereShape',
     createFunc(ctx, initParams) {
       let primitive = Primitive.findPrimitiveById(initParams.persistentId);
       if (primitive) {

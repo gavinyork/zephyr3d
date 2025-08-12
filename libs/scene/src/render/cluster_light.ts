@@ -20,7 +20,7 @@ export class ClusteredLight {
   private readonly _tileCountX: number;
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
-  private readonly _lights: Float32Array;
+  private readonly _lights: Float32Array<ArrayBuffer>;
   private _lightIndexTexture: Texture2D;
   private _lightIndexFramebuffer: FrameBuffer;
   private _lightIndexProgram: GPUProgram;
@@ -29,7 +29,7 @@ export class ClusteredLight {
   private _lightIndexRenderStates: RenderStateSet;
   private _lightBuffer: StructuredBuffer;
   private readonly _sizeParam: Vector4;
-  private _countParam: Int32Array;
+  private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
   constructor() {
     this._tileCountX = 16;

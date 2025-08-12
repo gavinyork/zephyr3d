@@ -10,7 +10,7 @@ export type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline
  * Type of input/output values
  * @public
  */
-export type InterpolateData = Float32Array | number[];
+export type InterpolateData = Float32Array<ArrayBuffer> | number[];
 
 /**
  * Target of interpolation

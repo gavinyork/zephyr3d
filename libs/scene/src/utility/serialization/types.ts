@@ -84,6 +84,7 @@ export type SerializableClass = {
   ctor: GenericConstructor;
   parent?: GenericConstructor;
   noTitle?: boolean;
+  name: string;
   createFunc?: (
     ctx?: any,
     init?: any

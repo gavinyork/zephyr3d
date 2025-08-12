@@ -91,7 +91,7 @@ export class TGALoader extends AbstractTextureLoader {
     } while (false);
     throw new Error(`Unsupported TGA file format`);
   }
-  private mergeBytes(dest: Uint8Array, offset: number, pixel: number[], numBytes: number) {
+  private mergeBytes(dest: Uint8Array<ArrayBuffer>, offset: number, pixel: number[], numBytes: number) {
     if (numBytes === 4) {
       dest[offset + 0] = pixel[2];
       dest[offset + 1] = pixel[1];

@@ -1887,12 +1887,12 @@ export class ImDrawList {
   // This is what you have to render
   // ImVector<ImDrawCmd>     CmdBuffer;          // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
   // ImVector<ImDrawIdx>     IdxBuffer;          // Index buffer. Each command consume ImDrawCmd::ElemCount of those
-  get IdxBuffer(): Uint8Array {
-    return this.native.IdxBuffer;
+  get IdxBuffer(): Uint8Array<ArrayBuffer> {
+    return this.native.IdxBuffer as Uint8Array<ArrayBuffer>;
   }
   // ImVector<ImDrawVert>    VtxBuffer;          // Vertex buffer.
-  get VtxBuffer(): Uint8Array {
-    return this.native.VtxBuffer;
+  get VtxBuffer(): Uint8Array<ArrayBuffer> {
+    return this.native.VtxBuffer as Uint8Array<ArrayBuffer>;
   }
   // ImDrawListFlags         Flags;              // Flags, you may poke into these to adjust anti-aliasing settings per-primitive.
   get Flags(): ImDrawListFlags {
@@ -5377,14 +5377,14 @@ export function DragIntRange2(
 export function DragScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   v_speed: number,
   v_min: number | null = null,
   v_max: number | null = null,
@@ -5610,14 +5610,14 @@ export function SliderInt4(
 export function SliderScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   v_min: number,
   v_max: number,
   format: string | null = null,
@@ -5967,14 +5967,14 @@ export function InputDouble(
 export function InputScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   step: number | null = null,
   step_fast: number | null = null,
   format: string | null = null,
