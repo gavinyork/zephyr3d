@@ -176,7 +176,15 @@ export class Editor {
     await this._scriptingSystem.attachScript(this, {
       module: '#/main'
     });
-    new CodeEditor().show();
+    const editor = new CodeEditor('test.ts');
+    editor.show(
+      `
+      export default class {
+      }
+    `,
+      'typescript'
+    );
+    editor.formatDocument();
   }
   async loadAssets() {
     const assetManager = new AssetManager(

@@ -3,9 +3,22 @@ import type * as monaco from 'monaco-editor';
 export class CodeEditor {
   private isMinimized: boolean;
   private editor: monaco.editor.IStandaloneCodeEditor;
-  constructor() {
+  private fileName: string;
+  constructor(fileName: string) {
     this.isMinimized = false;
-    this.editor = (window as any).monaco.editor;
+    this.fileName = fileName;
+    this.editor = null;
+  }
+
+  get content(): string {
+    if (this.editor) {
+      return this.editor.getValue({
+        preserveBOM: false,
+        lineEnding: '\n'
+      });
+    } else {
+      return null;
+    }
   }
 
   close() {
@@ -15,21 +28,24 @@ export class CodeEditor {
     }
   }
 
-  show() {
+  async show(code: string, language: string) {
     const overlay = document.getElementById('monaco-overlay');
     if (overlay) {
       overlay.classList.remove('hidden');
     } else {
       this.createResizableEditorContainer();
-      setTimeout(async () => {
-        const editorContainer = document.getElementById('monaco-editor-container');
-        if (editorContainer) {
-          await this.initMonacoEditor(editorContainer, '');
-        }
-      }, 100);
+    }
+    const editorContainer = document.getElementById('monaco-editor-container');
+    if (editorContainer) {
+      await this.initMonacoEditor(editorContainer, code, language);
     }
   }
 
+  formatDocument() {
+    if (this.editor) {
+      this.editor.getAction('editor.action.formatDocument').run(); //自动格式化代码
+    }
+  }
   minimize() {
     const overlay = document.getElementById('monaco-overlay');
     if (overlay) {
@@ -117,7 +133,7 @@ export class CodeEditor {
             box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
             transition: all 0.3s ease;
             box-sizing: border-box;
-            overflow: hidden;
+            overflow: visible !important;
             display: flex;
             flex-direction: column; /* 关键：使用flex布局 */
         }
@@ -150,8 +166,8 @@ export class CodeEditor {
         }
 
         .monaco-editor-overlay .editor-content {
-            flex: 1; /* 关键：占满剩余空间 */
-            overflow: hidden;
+            flex: 1;
+            overflow: visible !important;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -164,9 +180,9 @@ export class CodeEditor {
 
         /* Monaco编辑器容器 */
         #monaco-editor-container {
-            flex: 1; /* 关键：占满除状态栏外的空间 */
+            flex: 1;
             width: 100%;
-            overflow: hidden;
+            overflow: visible !important;
             position: relative;
         }
 
@@ -237,7 +253,7 @@ export class CodeEditor {
 
         .resizable-editor {
             resize: none; /* 禁用默认resize，使用自定义 */
-            overflow: hidden; /* 修复：改为hidden */
+            overflow: hidden; /* 修复: 改为hidden */
             min-width: 400px; /* 增加最小宽度 */
             max-width: 80vw;
         }
@@ -428,17 +444,14 @@ export class CodeEditor {
     overlay.appendChild(content);
     document.body.appendChild(overlay);
 
-    // 键盘快捷键支持
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && overlay && !overlay.classList.contains('hidden')) {
-        this.close();
-      }
-    });
-
     return editorContainer;
   }
 
-  private async initMonacoEditor(container: HTMLElement, initialCode?: string): Promise<void> {
+  private async initMonacoEditor(
+    container: HTMLElement,
+    initialCode: string,
+    language: string
+  ): Promise<void> {
     try {
       // 获取保存的代码或使用默认代码
       const savedCode = localStorage.getItem('monaco-editor-content');
@@ -446,7 +459,7 @@ export class CodeEditor {
       const monaco = (window as any).monaco as typeof import('monaco-editor');
       this.editor = monaco.editor.create(container, {
         value: codeToUse,
-        language: 'typescript',
+        language: language,
         theme: 'vs-dark',
         renderLineHighlight: 'line',
         renderLineHighlightOnlyWhenFocus: false,
