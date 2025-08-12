@@ -19,7 +19,7 @@ type EventBusEventMap = {
   external_dragleave: [ev: DragEvent];
   external_dragover: [ev: DragEvent];
   external_drop: [ev: DragEvent];
-  action: [action: string];
+  action: [action: string, ...args: any];
 };
 
 export class EventBus extends makeEventTarget(Object)<EventBusEventMap>() {}

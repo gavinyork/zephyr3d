@@ -9,6 +9,7 @@ import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
+import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -641,12 +642,19 @@ export class VFSRenderer extends makeEventTarget(Object)<{
 
   private handleItemDoubleClick(item: FileInfo | DirectoryInfo) {
     const isDir = 'subDir' in item;
-
     if (isDir) {
       this.selectDir(item as DirectoryInfo);
-      (item as DirectoryInfo).open = true;
+      item.open = true;
     } else {
-      console.log('Open file:', (item as FileInfo).meta.path);
+      if (item.meta.path.toLowerCase().endsWith('.scn')) {
+        // open scene
+        eventBus.dispatchEvent('action', 'OPEN_DOC', item.meta.path);
+      } else {
+        const mimeType = this._vfs.guessMIMEType(item.meta.path);
+        if (mimeType === 'text/javascript' || mimeType === 'text/x-typescript') {
+          eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
+        }
+      }
     }
   }
 
@@ -698,8 +706,8 @@ export class VFSRenderer extends makeEventTarget(Object)<{
           this.createNewFolder();
         }
         ImGui.Separator();
-        if (ImGui.MenuItem('File...')) {
-          this.createNewFile();
+        if (ImGui.MenuItem('Typescript...')) {
+          this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8');
         }
         ImGui.EndMenu();
       }
@@ -937,23 +945,41 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     });
   }
 
-  private createNewFile() {
+  private async createNewFile(title: string, defaultName: string, encoding: 'utf8' | 'binary') {
     if (!this._selectedDir) {
       return;
     }
-
-    DlgPromptName.promptName('Create File', 'NewFile.txt').then((name) => {
-      if (name) {
-        if (/[\\/?*]/.test(name)) {
-          DlgMessage.messageBox('Error', 'Invalid file name');
-        } else {
-          const newPath = this._vfs.join(this._selectedDir.path, name);
-          this._vfs.writeFile(newPath, '', { encoding: 'utf8' }).catch((err) => {
-            DlgMessage.messageBox('Error', `Create file failed: ${err}`);
-          });
+    const name = await DlgPromptName.promptName(title, 'Name', defaultName);
+    if (name) {
+      if (/[\\/?*]/.test(name)) {
+        DlgMessage.messageBox('Error', 'Invalid file name');
+      } else {
+        const newPath = this._vfs.join(this._selectedDir.path, name);
+        const exists = await this._vfs.exists(newPath);
+        if (exists) {
+          const stat = await this._vfs.stat(newPath);
+          if (stat.isDirectory) {
+            DlgMessage.messageBox('Error', `${newPath} is a directory`);
+          } else {
+            if (
+              'Yes' !==
+              (await DlgMessageBoxEx.messageBoxEx(
+                title,
+                `'${this._vfs.basename(newPath)}' already exists, do you want to overwrite it?`,
+                ['Yes', 'No']
+              ))
+            ) {
+              return;
+            }
+          }
+        }
+        try {
+          await this._vfs.writeFile(newPath, '', { encoding, create: true });
+        } catch (err) {
+          DlgMessage.messageBox('Error', `Create file failed: ${err}`);
         }
       }
-    });
+    }
   }
 
   private deleteSelectedItems() {

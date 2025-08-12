@@ -57,7 +57,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   private invalidateScene() {
     this._sceneChanged = true;
   }
-  private async sceneAction(action: string) {
+  private async sceneAction(action: string, ...args: any[]) {
     switch (action) {
       case 'OPEN_PROJECT':
         await this.sceneAction('CLOSE_PROJECT');
@@ -128,14 +128,17 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
       }
       case 'OPEN_DOC': {
         if (await this.ensureSceneSaved()) {
-          const name = await Dialog.openFile(
-            'Open Scene',
-            ProjectService.VFS,
-            this._editor.currentProject,
-            'Scene (*.scn)|*.scn|All files (*)|*',
-            500,
-            400
-          );
+          const name =
+            typeof args[0] === 'string'
+              ? args[0]
+              : await Dialog.openFile(
+                  'Open Scene',
+                  ProjectService.VFS,
+                  this._editor.currentProject,
+                  'Scene (*.scn)|*.scn|All files (*)|*',
+                  500,
+                  400
+                );
           if (name) {
             await this.openScene(name, true);
           }

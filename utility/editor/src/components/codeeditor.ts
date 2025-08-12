@@ -451,8 +451,7 @@ export class CodeEditor {
   ): Promise<void> {
     try {
       // 获取保存的代码或使用默认代码
-      const savedCode = localStorage.getItem('monaco-editor-content');
-      const codeToUse = initialCode || savedCode || 'console.log("Hello, Monaco Editor!");';
+      const codeToUse = initialCode || '';
       const monaco = (window as any).monaco as typeof monaco;
       this.editor = monaco.editor.create(container, {
         value: codeToUse,

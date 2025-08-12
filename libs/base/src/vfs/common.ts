@@ -77,7 +77,8 @@ export function guessMimeType(path: string): string {
   const mimeTypes: Record<string, string> = {
     '.txt': 'text/plain',
     '.html': 'text/html',
-    '.js': 'application/javascript',
+    '.js': 'text/javascript',
+    '.ts': 'text/x-typescript',
     '.json': 'application/json',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',

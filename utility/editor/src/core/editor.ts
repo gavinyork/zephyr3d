@@ -24,6 +24,7 @@ import * as zephyr3d_base from '@zephyr3d/base';
 import * as zephyr3d_device from '@zephyr3d/device';
 import * as zephyr3d_scene from '@zephyr3d/scene';
 import * as zephyr3d_runtime from '@zephyr3d/runtime';
+import { CodeEditor } from '../components/codeeditor';
 
 const testScript2 = `
 import { Foo } from './hello';
@@ -71,6 +72,7 @@ export class Editor {
   private _currentProject: ProjectInfo;
   private _scriptRoot: string;
   private _registry: VFSScriptRegistry;
+  private _codeEditor: CodeEditor;
   private _scriptingSystem: ScriptingSystem;
   constructor() {
     this._moduleManager = new ModuleManager();
@@ -78,6 +80,7 @@ export class Editor {
     this._leakTestA = null;
     this._currentProject = null;
     this._scriptRoot = '/scripts';
+    this._codeEditor = null;
     this._registry = new VFSScriptRegistry({ mode: 'editor' }, ProjectService.VFS, this._scriptRoot);
     this._scriptingSystem = new ScriptingSystem(this._registry, {
       onLoadError(e) {
@@ -174,6 +177,7 @@ export class Editor {
     await this._scriptingSystem.attachScript(this, {
       module: '#/main'
     });
+    eventBus.on('action', this.onAction, this);
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -199,6 +203,15 @@ export class Editor {
     eventBus.on('switch_module', (name, ...args: any[]) => {
       this._moduleManager.activate(name, ...args);
     });
+  }
+  async editCode(fileName: string, language: 'javascript' | 'typescript') {
+    if (this._codeEditor) {
+      this._codeEditor.close();
+      this._codeEditor = null;
+    }
+    const content = (await ProjectService.VFS.readFile(fileName, { encoding: 'utf8' })) as string;
+    this._codeEditor = new CodeEditor(fileName);
+    this._codeEditor.show(content, language);
   }
   render() {
     imGuiNewFrame();
@@ -332,48 +345,13 @@ export class Editor {
   async deleteProject(uuid: string) {
     await ProjectService.deleteProject(uuid);
   }
-  protected async createMonacoLoader() {
-    return new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = './js/vs/loader.js';
-      document.head.appendChild(script);
-      script.onload = () => {
-        const require = (window as any).require;
-        require.config({
-          paths: {
-            vs: './js/vs'
-          }
-        });
-        resolve();
-      };
-      script.onerror = (err) => {
-        reject(err);
-      };
-    });
-  }
-  protected setupMonacoEnvironment(): void {
-    /*
-    (window as any).MonacoEnvironment = {
-      // 改用 getWorker 而不是 getWorkerUrl
-      getWorker: function (_moduleId: string, label: string) {
-        switch (label) {
-          case 'css':
-          case 'scss':
-          case 'less':
-            return new CSSWorker();
-          case 'html':
-          case 'handlebars':
-          case 'razor':
-            return new HTMLWorker();
-          case 'typescript':
-          case 'javascript':
-            return new TSWorker();
-          default:
-            // 对于默认的 editor worker，使用 workerMain.js
-            return new EditorWorker();
-        }
+  private onAction(action: string, fileName: string, mimeType: string) {
+    if (action === 'EDIT_CODE' && fileName) {
+      if (mimeType === 'text/javascript') {
+        this.editCode(fileName, 'javascript');
+      } else if (mimeType === 'text/x-typescript') {
+        this.editCode(fileName, 'typescript');
       }
-    };
-    */
+    }
   }
 }
