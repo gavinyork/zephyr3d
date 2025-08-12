@@ -1,13 +1,18 @@
-import type * as monaco from 'monaco-editor';
+import type * as Monaco from 'monaco-editor';
+import { eventBus } from '../core/eventbus';
 
 export class CodeEditor {
   private isMinimized: boolean;
-  private editor: monaco.editor.IStandaloneCodeEditor;
+  private editor: Monaco.editor.IStandaloneCodeEditor;
   protected fileName: string;
+  private dirty: boolean;
+  private baselineVersion: number;
   constructor(fileName: string) {
     this.isMinimized = false;
     this.fileName = fileName;
     this.editor = null;
+    this.dirty = false;
+    this.baselineVersion = 0;
   }
 
   get content(): string {
@@ -22,10 +27,19 @@ export class CodeEditor {
   }
 
   close() {
+    if (this.editor) {
+      if (this.dirty && !confirm(`${this.fileName} has been changed, close it without saving?`)) {
+        return false;
+      }
+      this.editor.getModel().dispose();
+      this.editor.dispose();
+      this.editor = null;
+    }
     const overlay = document.getElementById('monaco-overlay');
     if (overlay) {
       overlay.remove();
     }
+    return true;
   }
 
   async show(code: string, language: string) {
@@ -47,18 +61,13 @@ export class CodeEditor {
       this.isMinimized = true;
       overlay.classList.add('minimized');
 
-      // 修改标题栏提示用户可以点击恢复
-      const titleSpan = overlay.querySelector('.editor-title') as HTMLSpanElement;
-      if (titleSpan) {
-        titleSpan.textContent = '📝 代码编辑器 (点击恢复)';
-        titleSpan.style.cursor = 'pointer';
-      }
+      this.updateTitle();
 
       // 修改最小化按钮为恢复按钮
       const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
       if (minimizeBtn) {
         minimizeBtn.innerHTML = '□';
-        minimizeBtn.title = '恢复';
+        minimizeBtn.title = 'Restore';
       }
     }
   }
@@ -69,18 +78,13 @@ export class CodeEditor {
       this.isMinimized = false;
       overlay.classList.remove('minimized');
 
-      // 恢复标题栏
-      const titleSpan = overlay.querySelector('.editor-title') as HTMLSpanElement;
-      if (titleSpan) {
-        titleSpan.textContent = '📝 代码编辑器';
-        titleSpan.style.cursor = 'default';
-      }
+      this.updateTitle();
 
       // 恢复最小化按钮
       const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
       if (minimizeBtn) {
         minimizeBtn.innerHTML = '−';
-        minimizeBtn.title = '最小化';
+        minimizeBtn.title = 'Minimize';
       }
 
       // 恢复后重新布局编辑器
@@ -100,11 +104,25 @@ export class CodeEditor {
     }
   }
 
+  updateTitle() {
+    const overlay = document.getElementById('monaco-overlay');
+    if (overlay) {
+      const titleSpan = overlay.querySelector('.editor-title') as HTMLSpanElement;
+      if (titleSpan) {
+        titleSpan.textContent = `📝${this.fileName}${this.dirty ? '*' : ''}${
+          this.isMinimized ? ' (Click to restore)' : ''
+        }`;
+        titleSpan.style.cursor = this.isMinimized ? 'pointer' : 'default';
+      }
+    }
+  }
+
   saveCode() {
     if (this.editor) {
       const code = this.editor.getValue();
-      localStorage.setItem('monaco-editor-content', code);
-      console.log('代码已保存到本地存储');
+      eventBus.dispatchEvent('action', 'SAVE_CODE', this.fileName, code);
+      this.dirty = false;
+      this.updateTitle();
     }
   }
 
@@ -373,7 +391,6 @@ export class CodeEditor {
     // 创建标题
     const titleSpan = document.createElement('span');
     titleSpan.className = 'editor-title';
-    titleSpan.textContent = '📝 代码编辑器';
 
     // 双击标题栏恢复
     titleSpan.addEventListener('dblclick', () => {
@@ -397,14 +414,14 @@ export class CodeEditor {
     const minimizeBtn = document.createElement('button');
     minimizeBtn.className = 'close-btn minimize-btn';
     minimizeBtn.innerHTML = '−';
-    minimizeBtn.title = '最小化';
+    minimizeBtn.title = 'Minimize';
     minimizeBtn.onclick = () => this.toggleMinimize();
 
     // 创建关闭按钮
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-btn close-btn-red';
     closeBtn.innerHTML = '&times;';
-    closeBtn.title = '关闭';
+    closeBtn.title = 'Close';
     closeBtn.onclick = () => this.close();
 
     // 组装按钮
@@ -427,8 +444,8 @@ export class CodeEditor {
     const statusBar = document.createElement('div');
     statusBar.className = 'editor-status-bar';
     statusBar.innerHTML = `
-      <span>准备就绪</span>
-      <span>JavaScript | UTF-8</span>
+      <span>Ready</span>
+      <span>${this.fileName} | UTF-8</span>
     `;
 
     // 组装内容区域
@@ -450,12 +467,13 @@ export class CodeEditor {
     language: string
   ): Promise<void> {
     try {
-      // 获取保存的代码或使用默认代码
+      const monaco = (window as any).monaco as typeof Monaco;
       const codeToUse = initialCode || '';
-      const monaco = (window as any).monaco as typeof monaco;
+      const uri = monaco.Uri.parse(`file:///${this.fileName}`);
+      const model = monaco.editor.createModel(codeToUse, language, uri);
+      await Promise.resolve();
       this.editor = monaco.editor.create(container, {
-        value: codeToUse,
-        language: language,
+        model,
         theme: 'vs-dark',
         renderLineHighlight: 'line',
         renderLineHighlightOnlyWhenFocus: false,
@@ -511,15 +529,7 @@ export class CodeEditor {
           horizontalScrollbarSize: 14
         }
       });
-      const model = this.editor.getModel();
-      console.log(
-        'model exists:',
-        !!model,
-        'uri:',
-        model && model.uri.toString(),
-        'lang:',
-        model && model.getLanguageId()
-      );
+      console.log('TS options:', monaco.languages.typescript.typescriptDefaults.getCompilerOptions());
       // 强制重新计算布局
       setTimeout(() => {
         if (this.editor) {
@@ -535,6 +545,17 @@ export class CodeEditor {
       });
 
       this.setupEditorFeatures();
+      this.dirty = false;
+      //const model = this.editor.getModel();
+      this.baselineVersion = model.getAlternativeVersionId();
+      model.onDidChangeContent(() => {
+        const dirty = model.getAlternativeVersionId() !== this.baselineVersion;
+        if (dirty !== this.dirty) {
+          this.dirty = dirty;
+          this.updateTitle();
+        }
+      });
+      this.updateTitle();
       console.log('✅ Monaco编辑器初始化完成');
     } catch (error) {
       console.error('❌ Monaco编辑器初始化失败:', error);
@@ -572,8 +593,8 @@ export class CodeEditor {
       this.updateStatusBar();
     });
 
-    // 注册自定义代码片段提供程序
-    (window as any).monaco.languages.registerCompletionItemProvider('javascript', {
+    const monaco = (window as any).monaco as typeof Monaco;
+    monaco.languages.registerCompletionItemProvider('javascript', {
       provideCompletionItems: (model, position) => {
         const word = model.getWordUntilPosition(position);
         const range = {
@@ -583,7 +604,7 @@ export class CodeEditor {
           endColumn: word.endColumn
         };
 
-        const suggestions: monaco.languages.CompletionItem[] = [
+        const suggestions: Monaco.languages.CompletionItem[] = [
           {
             label: 'cl',
             kind: (window as any).monaco.languages.CompletionItemKind.Snippet,

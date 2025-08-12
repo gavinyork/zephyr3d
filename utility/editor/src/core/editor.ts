@@ -79,7 +79,7 @@ export class Editor {
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
-    this._scriptRoot = '/scripts';
+    this._scriptRoot = './';
     this._codeEditor = null;
     this._registry = new VFSScriptRegistry({ mode: 'editor' }, ProjectService.VFS, this._scriptRoot);
     this._scriptingSystem = new ScriptingSystem(this._registry, {
@@ -206,11 +206,13 @@ export class Editor {
   }
   async editCode(fileName: string, language: 'javascript' | 'typescript') {
     if (this._codeEditor) {
-      this._codeEditor.close();
+      if (!this._codeEditor.close()) {
+        return;
+      }
       this._codeEditor = null;
     }
     const content = (await ProjectService.VFS.readFile(fileName, { encoding: 'utf8' })) as string;
-    this._codeEditor = new CodeEditor(fileName);
+    this._codeEditor = new CodeEditor(ProjectService.VFS.relative(fileName, ProjectService.VFS.getCwd()));
     this._codeEditor.show(content, language);
   }
   render() {
@@ -293,6 +295,10 @@ export class Editor {
   }
   async closeProject(lastScenePath: string) {
     if (this._currentProject) {
+      if (this._codeEditor && !this._codeEditor.close()) {
+        return;
+      }
+      this._codeEditor = null;
       this._currentProject.lastEditScene = lastScenePath ?? '';
       await ProjectService.saveProject(this._currentProject);
       await ProjectService.closeCurrentProject();
@@ -345,13 +351,15 @@ export class Editor {
   async deleteProject(uuid: string) {
     await ProjectService.deleteProject(uuid);
   }
-  private onAction(action: string, fileName: string, mimeType: string) {
+  private onAction(action: string, fileName: string, arg: string) {
     if (action === 'EDIT_CODE' && fileName) {
-      if (mimeType === 'text/javascript') {
+      if (arg === 'text/javascript') {
         this.editCode(fileName, 'javascript');
-      } else if (mimeType === 'text/x-typescript') {
+      } else if (arg === 'text/x-typescript') {
         this.editCode(fileName, 'typescript');
       }
+    } else if (action === 'SAVE_CODE') {
+      ProjectService.VFS.writeFile(fileName, arg, { encoding: 'utf8', create: true });
     }
   }
 }
