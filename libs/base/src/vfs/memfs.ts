@@ -1,4 +1,4 @@
-import { guessMimeType, PathUtils } from './common';
+import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
@@ -236,7 +236,7 @@ export class MemoryFS extends VFS {
       type: 'file',
       created: this.metadata.get(path)?.created || new Date(),
       modified: new Date(),
-      mimeType: guessMimeType(path)
+      mimeType: this.guessMIMEType(path)
     });
   }
 

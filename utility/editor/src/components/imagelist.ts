@@ -1,4 +1,4 @@
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import { Application, DRef } from '@zephyr3d/scene';
@@ -8,11 +8,11 @@ type ImageInfo = {
   texture: DRef<Texture2D>;
   selected: boolean;
 };
-export class ImageList extends makeEventTarget(Object)<{
+export class ImageList extends Observable<{
   update_image: [asset: string, index: number];
   add_image: [asset: string, index: number];
   remove_image: [index: number];
-}>() {
+}> {
   private _images: ImageInfo[];
   private _linearColorSpace: boolean;
   private _isDragging: boolean;

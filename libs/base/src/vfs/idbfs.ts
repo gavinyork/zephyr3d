@@ -1,4 +1,4 @@
-import { guessMimeType, PathUtils } from './common';
+import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
@@ -330,7 +330,7 @@ export class IndexedDBFS extends VFS {
             modified: now,
             parent: parent,
             data: fileData,
-            mimeType: guessMimeType(path)
+            mimeType: this.guessMIMEType(path)
           };
 
           const saveRequest = existingRecord ? store.put(record) : store.add(record);

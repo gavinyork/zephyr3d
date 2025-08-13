@@ -100,11 +100,8 @@ export class VFSScriptRegistry extends ScriptRegistry {
         }
 
         const spec = m[2];
-        let replacement = spec;
 
-        if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
-          replacement = spec;
-        } else if (spec.startsWith('./') || spec.startsWith('../')) {
+        if (spec.startsWith('./') || spec.startsWith('../')) {
           await this.getDependencies(spec, normalizedId, dependencies);
         }
       }

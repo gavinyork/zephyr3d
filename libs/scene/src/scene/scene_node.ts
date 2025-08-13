@@ -9,8 +9,8 @@ import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
 import type { Quaternion } from '@zephyr3d/base';
 import {
-  makeEventTarget,
   Matrix4x4,
+  Observable,
   ObservableQuaternion,
   ObservableVector3,
   Vector3,
@@ -63,13 +63,13 @@ export interface NodeClonable<T extends SceneNode> {
  * @public
  */
 export class SceneNode
-  extends makeEventTarget(Object)<{
+  extends Observable<{
     nodeattached: [node: SceneNode];
     noderemoved: [node: SceneNode];
     visiblechanged: [node: SceneNode];
     transformchanged: [node: SceneNode];
     bvchanged: [node: SceneNode];
-  }>()
+  }>
   implements NodeClonable<SceneNode>
 {
   /*

@@ -23,7 +23,7 @@ export default defineConfig({
         unknownGlobalSideEffects: true
       }
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: false,
     terserOptions: {
       compress: {

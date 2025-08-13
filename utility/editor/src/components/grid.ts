@@ -9,7 +9,7 @@ import {
 } from '@zephyr3d/scene';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { AABB, ASSERT, degree2radian, makeEventTarget, Quaternion, radian2degree } from '@zephyr3d/base';
+import { AABB, ASSERT, degree2radian, Observable, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 import { ProjectService } from '../core/services/project';
@@ -204,13 +204,13 @@ class PropertyGroup {
   }
 }
 
-export class PropertyEditor extends makeEventTarget(Object)<{
+export class PropertyEditor extends Observable<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
   request_edit_track: [track: PropertyTrack, target: object];
   end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
   object_property_changed: [object: object, prop: PropertyAccessor];
-}>() {
+}> {
   private _rootGroup: PropertyGroup;
   private readonly _top: number;
   private _bottom: number;

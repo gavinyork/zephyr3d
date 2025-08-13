@@ -1,4 +1,4 @@
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { flushPendingDisposals } from './gc/ref';
@@ -70,7 +70,7 @@ export interface Logger {
  *
  * @public
  */
-export class Application extends makeEventTarget(Object)<appEventMap>() {
+export class Application extends Observable<appEventMap> {
   private readonly _options: AppOptions;
   private _device: AbstractDevice;
   private readonly _inputManager: InputManager;

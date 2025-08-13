@@ -62,13 +62,127 @@ export interface IEventTarget<T extends EventMap = any> {
   dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
 }
 
+export class Observable<X extends EventMap> implements IEventTarget<X> {
+  /** @internal */
+  _listeners: EventListenerMap<X>;
+  constructor() {
+    this._listeners = null;
+  }
+  /**
+   * {@inheritDoc IEventTarget.on}
+   */
+  on<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
+    if (listener) {
+      this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
+        context: context ?? null,
+        once: false
+      });
+    } else {
+      console.error('Cannot set NULL listener');
+    }
+  }
+  /**
+   * {@inheritDoc IEventTarget.once}
+   */
+  once<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
+    if (listener) {
+      this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
+        context: context ?? null,
+        once: true
+      });
+    } else {
+      console.error('Cannot set NULL listener');
+    }
+  }
+  /**
+   * {@inheritDoc IEventTarget.off}
+   */
+  off<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
+    this._internalRemoveEventListener(this._listeners, type, listener, context ?? null);
+  }
+  /**
+   * {@inheritDoc IEventTarget.dispatchEvent}
+   */
+  dispatchEvent<K extends keyof X>(type: K, ...args: X[K]): void {
+    this._invokeLocalListeners(type, ...args);
+  }
+  /** @internal */
+  _internalAddEventListener<K extends keyof X>(
+    listenerMap: EventListenerMap<X>,
+    type: K,
+    listener: EventListener<X, K>,
+    options: REventHandlerOptions
+  ): EventListenerMap<X> {
+    if (typeof type !== 'string') {
+      return;
+    }
+    if (!listenerMap) {
+      listenerMap = {};
+    }
+    const l: EventListener<X, K> = listener;
+    const o: REventHandlerOptions = { ...options };
+    let handlers = listenerMap[type];
+    if (!handlers) {
+      listenerMap[type] = handlers = [];
+    }
+    handlers.push({ handler: l, options: o, removed: false });
+    return listenerMap;
+  }
+  /** @internal */
+  _internalRemoveEventListener<K extends keyof X>(
+    listenerMap: EventListenerMap<X>,
+    type: K,
+    listener: EventListener<X, K>,
+    context: unknown
+  ): void {
+    if (typeof type !== 'string' || !listenerMap) {
+      return;
+    }
+    const l: EventListener<X, K> = listener;
+    const handlers = listenerMap[type];
+    if (handlers) {
+      for (let i = 0; i < handlers.length; i++) {
+        const handler = handlers[i];
+        if (handler.handler === l && handler.options.context === context) {
+          handlers.splice(i, 1);
+          break;
+        }
+      }
+      if (handlers.length === 0) {
+        listenerMap[type] = undefined;
+      }
+    }
+  }
+  /** @internal */
+  _invokeLocalListeners<K extends keyof X>(type: keyof X, ...args: X[K]): void {
+    if (!this._listeners) {
+      return;
+    }
+    const handlers = this._listeners[type];
+    if (handlers && handlers.length > 0) {
+      const handlersCopy = handlers.slice();
+      for (const handler of handlersCopy) {
+        handler.handler.call(handler.options?.context || this, ...args);
+        if (handler.options.once) {
+          handler.removed = true;
+        }
+      }
+      for (let i = handlers.length - 1; i >= 0; i--) {
+        if (handlers[i].removed) {
+          handlers.splice(i, 1);
+        }
+      }
+    }
+  }
+}
+
 /**
  * This mixin make a class an event target
  * @param cls - the class to make
  * @returns - The event target class
  * @public
  */
-export function makeEventTarget<C extends GenericConstructor | ObjectConstructor>(cls: C) {
+export function makeObservable<C extends GenericConstructor | ObjectConstructor>(cls: C) {
   return function _<X extends EventMap>() {
     type I = InstanceType<typeof cls> extends IEventTarget<infer U> ? X & U : X;
     return class E extends cls implements IEventTarget<I> {

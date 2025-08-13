@@ -1,5 +1,5 @@
 import type { Vector4, TypedArray } from '@zephyr3d/base';
-import { makeEventTarget } from '@zephyr3d/base';
+import { makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
   FrameBufferOptions,
@@ -1280,7 +1280,7 @@ export class WebGLDevice extends BaseDevice {
 
 let webGL1Supported = null;
 let webGL2Supported = null;
-const factory = makeEventTarget(WebGLDevice)<DeviceEventMap>();
+const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
   backend: DeviceBackend,

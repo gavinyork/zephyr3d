@@ -1,5 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import type { BaseView } from '../views/baseview';
 
 export type ToolBarItem = {
@@ -12,9 +12,9 @@ export type ToolBarItem = {
   selected?: () => boolean;
 };
 
-export class ToolBar extends makeEventTarget(Object)<{
+export class ToolBar extends Observable<{
   action: [id: string];
-}>() {
+}> {
   private readonly _id: string;
   private readonly _tools: ToolBarItem[];
   private readonly _pos: ImGui.ImVec2;

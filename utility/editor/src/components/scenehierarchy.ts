@@ -1,12 +1,12 @@
 import type { GenericConstructor } from '@zephyr3d/base';
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { Camera, Scene, SerializableClass } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { BatchGroup } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
 
-export class SceneHierarchy extends makeEventTarget(Object)<{
+export class SceneHierarchy extends Observable<{
   node_deselected: [node: SceneNode];
   node_selected: [node: SceneNode];
   node_request_delete: [node: SceneNode];
@@ -14,7 +14,7 @@ export class SceneHierarchy extends makeEventTarget(Object)<{
   node_drag_drop: [from: SceneNode, target: SceneNode];
   set_main_camera: [camea: Camera];
   request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
-}>() {
+}> {
   private static readonly baseFlags = ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth;
   private _scene: Scene;
   private _selectedNode: SceneNode;

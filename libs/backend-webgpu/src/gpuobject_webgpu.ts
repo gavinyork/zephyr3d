@@ -16,14 +16,11 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGPUObject<T>
-  extends makeEventTarget(Object)<{ disposed: [] }>()
-  implements GPUObject<T>
-{
+export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> implements GPUObject<T> {
   protected _device: WebGPUDevice;
   protected _object: T;
   protected _uid: number;

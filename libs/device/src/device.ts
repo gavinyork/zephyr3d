@@ -1,4 +1,4 @@
-import { type Vector4, type TypedArray, type IEventTarget, makeEventTarget } from '@zephyr3d/base';
+import { type Vector4, type TypedArray, type IEventTarget, Observable } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
 import type {
@@ -87,7 +87,7 @@ type DeviceState = {
  * Base class for rendering device
  * @public
  */
-export abstract class BaseDevice extends makeEventTarget(Object)<DeviceEventMap>() {
+export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _canvas: HTMLCanvasElement;
   protected _canvasClientWidth: number;
   protected _canvasClientHeight: number;

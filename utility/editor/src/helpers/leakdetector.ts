@@ -180,11 +180,16 @@ export function getGPUObjectStatistics() {
 }
 
 export async function initLeakDetector() {
-  const jsmap = await (await fetch('js/index.js.map')).text();
-  try {
-    traceMap = new TraceMap(jsmap);
-  } catch (_err) {
+  const headResponse = await fetch('js/index.js.map', { method: 'HEAD' });
+  if (!headResponse.ok) {
     traceMap = null;
+  } else {
+    const jsmap = await (await fetch('js/index.js.map')).text();
+    try {
+      traceMap = new TraceMap(jsmap);
+    } catch (_err) {
+      traceMap = null;
+    }
   }
 
   const device = Application.instance.device;

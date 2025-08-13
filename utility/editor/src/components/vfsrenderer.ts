@@ -1,5 +1,5 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
-import { DataTransferVFS, makeEventTarget } from '@zephyr3d/base';
+import { DataTransferVFS, Observable } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -53,9 +53,9 @@ type VFSRendererOptions = {
   multiSelect?: boolean;
 };
 
-export class VFSRenderer extends makeEventTarget(Object)<{
+export class VFSRenderer extends Observable<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
-}>() {
+}> {
   private static readonly baseFlags =
     ImGui.TreeNodeFlags.SpanAvailWidth |
     ImGui.TreeNodeFlags.SpanFullWidth |
@@ -622,12 +622,12 @@ export class VFSRenderer extends makeEventTarget(Object)<{
     }
 
     ImGui.TableSetColumnIndex(2);
-    if (isDir) {
-      ImGui.Text('Folder');
-    } else if (meta?.mimeType) {
-      ImGui.Text(meta.mimeType.split('/')[1] || 'File');
-    } else {
-      ImGui.Text('File');
+    if (!isDir) {
+      if (meta?.mimeType) {
+        ImGui.Text(meta.mimeType);
+      } else {
+        ImGui.Text('File');
+      }
     }
 
     ImGui.TableSetColumnIndex(3);

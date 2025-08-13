@@ -1,5 +1,5 @@
 import type { InterpolationMode } from '@zephyr3d/base';
-import { ASSERT, Interpolator, makeEventTarget } from '@zephyr3d/base';
+import { ASSERT, Interpolator, Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 interface Point {
@@ -25,10 +25,10 @@ interface CurveSettings {
 
 const keyFramePointShape = [new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2(), new ImGui.ImVec2()];
 
-export class CurveEditor extends makeEventTarget(Object)<{
+export class CurveEditor extends Observable<{
   curve_changed: [];
   preview_position: [{ key: number; value: number[] }];
-}>() {
+}> {
   private readonly _points: Point[] = [];
   private _interpolator: Interpolator = null;
 

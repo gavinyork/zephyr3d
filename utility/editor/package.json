@@ -17,7 +17,7 @@
     "build:check": "tsc -p . --noEmit",
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
-    "build": "cross-env vite build",
+    "build": "cross-env vite build --mode production",
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {

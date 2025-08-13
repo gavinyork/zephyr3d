@@ -1,5 +1,5 @@
 import type { Matrix4x4, AABB } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, makeEventTarget } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, Observable } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
@@ -17,11 +17,11 @@ import type { Metadata } from 'draco3d';
  * Presents a world that manages a couple of objects that will be rendered
  * @public
  */
-export class Scene extends makeEventTarget(Object)<{
+export class Scene extends Observable<{
   update: [Scene];
   startrender: [Scene, Camera, Compositor];
   endrender: [Scene, Camera, Compositor];
-}>() {
+}> {
   /** @internal */
   private static _nextId = 0;
   /** @internal */

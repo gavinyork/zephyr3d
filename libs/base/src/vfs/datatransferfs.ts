@@ -1,4 +1,4 @@
-import { guessMimeType, PathUtils } from './common';
+import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, ReadOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
@@ -68,7 +68,7 @@ export class DataTransferVFS extends VFS {
           type: 'file',
           created: entry.lastModified,
           modified: entry.lastModified,
-          mimeType: entry.file.type || guessMimeType(childPath)
+          mimeType: entry.file.type || this.guessMIMEType(childPath)
         };
       } else {
         metadata = {

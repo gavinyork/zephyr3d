@@ -1,4 +1,4 @@
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import { getFrameHeight } from '../views/misc';
 import type { BaseView } from '../views/baseview';
@@ -18,9 +18,9 @@ export type MenuBarOptions = {
 };
 
 let UID = 0;
-export class MenubarView extends makeEventTarget(Object)<{
+export class MenubarView extends Observable<{
   action: [id: string];
-}>() {
+}> {
   private _map: Map<string, { item: MenuItemOptions; parent: MenuItemOptions }>;
   private _options: MenuBarOptions;
   constructor(options?: MenuBarOptions) {

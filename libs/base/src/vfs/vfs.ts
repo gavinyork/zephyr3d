@@ -1,4 +1,4 @@
-import { makeEventTarget } from '../event';
+import { Observable } from '../event';
 import { guessMimeType, PathUtils } from './common';
 
 /**
@@ -304,9 +304,9 @@ export class GlobMatcher {
  * @public
  *
  */
-export abstract class VFS extends makeEventTarget(Object)<{
+export abstract class VFS extends Observable<{
   changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
-}>() {
+}> {
   /** Whether this file system is read-only */
   readonly readOnly: boolean;
 

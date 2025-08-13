@@ -1,4 +1,4 @@
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 
 type EventBusEventMap = {
   error: [msg: string];
@@ -22,5 +22,5 @@ type EventBusEventMap = {
   action: [action: string, ...args: any];
 };
 
-export class EventBus extends makeEventTarget(Object)<EventBusEventMap>() {}
+export class EventBus extends Observable<EventBusEventMap> {}
 export const eventBus = new EventBus();

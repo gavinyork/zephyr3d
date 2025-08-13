@@ -1,4 +1,4 @@
-import { guessMimeType, PathUtils } from './common';
+import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
@@ -575,7 +575,7 @@ export class ZipFS extends VFS {
             type: isDir ? 'directory' : 'file',
             created: entry.lastModDate || new Date(),
             modified: entry.lastModDate || new Date(),
-            mimeType: isDir ? undefined : guessMimeType('/' + firstPart)
+            mimeType: isDir ? undefined : this.guessMIMEType('/' + firstPart)
           };
 
           if (this.matchesFilter(metadata, options)) {
@@ -600,7 +600,7 @@ export class ZipFS extends VFS {
               type: entry.directory ? 'directory' : 'file',
               created: entry.lastModDate || new Date(),
               modified: entry.lastModDate || new Date(),
-              mimeType: entry.directory ? undefined : guessMimeType(fullPath)
+              mimeType: entry.directory ? undefined : this.guessMIMEType(fullPath)
             };
 
             if (this.matchesFilter(metadata, options)) {
@@ -623,7 +623,7 @@ export class ZipFS extends VFS {
                 type: isDir ? 'directory' : 'file',
                 created: entry.lastModDate || new Date(),
                 modified: entry.lastModDate || new Date(),
-                mimeType: isDir ? undefined : guessMimeType(childPath)
+                mimeType: isDir ? undefined : this.guessMIMEType(childPath)
               };
 
               if (this.matchesFilter(metadata, options)) {
@@ -653,7 +653,7 @@ export class ZipFS extends VFS {
             type: 'file',
             created: virtualFile.modified,
             modified: virtualFile.modified,
-            mimeType: guessMimeType(virtualPath)
+            mimeType: this.guessMIMEType(virtualPath)
           };
 
           if (this.matchesFilter(metadata, options)) {

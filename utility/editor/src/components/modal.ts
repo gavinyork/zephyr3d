@@ -1,10 +1,10 @@
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
-export class DialogRenderer<T> extends makeEventTarget(Object)<{
+export class DialogRenderer<T> extends Observable<{
   opened: [];
   closed: [];
-}>() {
+}> {
   private static readonly _currentModal: DialogRenderer<any>[] = [];
   private static readonly _modeless: DialogRenderer<any>[] = [];
   private _id: string;

@@ -16,14 +16,11 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
-import { makeEventTarget } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGLGPUObject<T>
-  extends makeEventTarget(Object)<{ disposed: [] }>()
-  implements GPUObject<T>
-{
+export abstract class WebGLGPUObject<T> extends Observable<{ disposed: [] }> implements GPUObject<T> {
   protected _device: WebGLDevice;
   protected _object: T;
   protected _uid: number;
