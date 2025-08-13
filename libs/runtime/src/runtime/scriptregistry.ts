@@ -43,7 +43,7 @@ export abstract class ScriptRegistry {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async fetchSource(
     _id: ModuleId
-  ): Promise<{ code: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
+  ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
     return undefined;
   }
 

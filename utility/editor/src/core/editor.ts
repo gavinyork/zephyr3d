@@ -1,3 +1,4 @@
+import type * as Monaco from 'monaco-editor';
 import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
@@ -26,42 +27,6 @@ import * as zephyr3d_scene from '@zephyr3d/scene';
 import * as zephyr3d_runtime from '@zephyr3d/runtime';
 import { CodeEditor } from '../components/codeeditor';
 
-const testScript2 = `
-import { Foo } from './hello';
-
-export default function(host, props) {
-  return {
-    init() {
-      this.foo = new Foo();
-      this.foo.init();
-    },
-    update() {
-      this.foo.update();
-    }
-  };
-}
-
-`;
-
-const testScript = `
-import { Vector3 } from "@zephyr3d/base";
-
-console.log('Test script imported');
-
-export class Foo {
-  private v: Vector3;
-  constructor() {
-    this.v = new Vector3(1, 2, 3);
-  }
-  init() {
-    console.log('init: ' + this.v.toString());
-  },
-  update() {
-    console.log('update: ' + this.v.toString());
-  }
-}
-`;
-
 export class Editor {
   private readonly _moduleManager: ModuleManager;
   private readonly _assetImages: {
@@ -74,6 +39,7 @@ export class Editor {
   private _registry: VFSScriptRegistry;
   private _codeEditor: CodeEditor;
   private _scriptingSystem: ScriptingSystem;
+  private _extraLibs: Record<string, Monaco.IDisposable>;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
@@ -81,6 +47,7 @@ export class Editor {
     this._currentProject = null;
     this._scriptRoot = './';
     this._codeEditor = null;
+    this._extraLibs = {};
     this._registry = new VFSScriptRegistry({ mode: 'editor' }, ProjectService.VFS, this._scriptRoot);
     this._scriptingSystem = new ScriptingSystem(this._registry, {
       onLoadError(e) {
@@ -90,6 +57,39 @@ export class Editor {
   }
   get sceneChanged() {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
+  }
+  async loadScriptDependencies(path: string) {
+    const dependencies: Record<string, string> = {};
+    await this._registry.getDependencies(path, null, dependencies);
+    for (const k of Object.keys(dependencies)) {
+      // Must delete old lib reference first!!!
+      const oldDisposable = this._extraLibs[k];
+      if (oldDisposable) {
+        oldDisposable.dispose();
+        delete this._extraLibs[k];
+      }
+      // And then add lib
+      const f = `file:///${ProjectService.VFS.relative(k)}`;
+      const disposable = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
+        dependencies[k],
+        f
+      );
+      if (disposable) {
+        this._extraLibs[k] = disposable;
+      }
+    }
+  }
+  deleteScriptDependence(path: string) {
+    const disposable = this._extraLibs[path];
+    if (disposable) {
+      disposable.dispose();
+    }
+    delete this._extraLibs[path];
+  }
+  deleteAllDependences() {
+    for (const k of Object.keys(this._extraLibs)) {
+      this.deleteScriptDependence(k);
+    }
   }
   handleEvent(ev: Event, type?: string): boolean {
     if (
@@ -167,6 +167,7 @@ export class Editor {
     moduleSharing.shareModules({
       '@zephyr3d/runtime': zephyr3d_runtime
     });
+    /*
     await ProjectService.VFS.makeDirectory(this._scriptRoot, true);
     await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'hello.ts'), testScript, {
       encoding: 'utf8'
@@ -177,6 +178,7 @@ export class Editor {
     await this._scriptingSystem.attachScript(this, {
       module: '#/main'
     });
+    */
     eventBus.on('action', this.onAction, this);
   }
   async loadAssets() {
@@ -299,6 +301,7 @@ export class Editor {
         return;
       }
       this._codeEditor = null;
+      this.deleteAllDependences();
       this._currentProject.lastEditScene = lastScenePath ?? '';
       await ProjectService.saveProject(this._currentProject);
       await ProjectService.closeCurrentProject();
@@ -352,12 +355,14 @@ export class Editor {
     await ProjectService.deleteProject(uuid);
   }
   private onAction(action: string, fileName: string, arg: string) {
-    if (action === 'EDIT_CODE' && fileName) {
-      if (arg === 'text/javascript') {
-        this.editCode(fileName, 'javascript');
-      } else if (arg === 'text/x-typescript') {
-        this.editCode(fileName, 'typescript');
-      }
+    if (action === 'EDIT_CODE' && fileName && (arg === 'text/javascript' || arg === 'text/x-typescript')) {
+      this.loadScriptDependencies(fileName).then(() => {
+        if (arg === 'text/javascript') {
+          this.editCode(fileName, 'javascript');
+        } else if (arg === 'text/x-typescript') {
+          this.editCode(fileName, 'typescript');
+        }
+      });
     } else if (action === 'SAVE_CODE') {
       ProjectService.VFS.writeFile(fileName, arg, { encoding: 'utf8', create: true });
     }

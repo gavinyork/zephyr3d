@@ -1,6 +1,12 @@
 import type * as Monaco from 'monaco-editor';
 import { eventBus } from '../core/eventbus';
 
+declare global {
+  interface Window {
+    monaco: typeof Monaco;
+  }
+}
+
 export class CodeEditor {
   private isMinimized: boolean;
   private editor: Monaco.editor.IStandaloneCodeEditor;
@@ -136,7 +142,7 @@ export class CodeEditor {
     if (this.editor) {
       const model = this.editor.getModel();
       if (model) {
-        (window as any).monaco.editor.setModelLanguage(model, language);
+        window.monaco.editor.setModelLanguage(model, language);
         this.updateStatusBar();
       }
     }
@@ -495,6 +501,10 @@ export class CodeEditor {
       const monaco = (window as any).monaco as typeof Monaco;
       const codeToUse = initialCode || '';
       const uri = monaco.Uri.parse(`file:///${this.fileName}`);
+      const oldModel = monaco.editor.getModel(uri);
+      if (oldModel) {
+        oldModel.dispose();
+      }
       const model = monaco.editor.createModel(codeToUse, language, uri);
       await Promise.resolve();
       this.editor = monaco.editor.create(container, {

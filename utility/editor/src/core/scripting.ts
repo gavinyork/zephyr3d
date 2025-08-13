@@ -31,17 +31,43 @@ export class VFSScriptRegistry extends ScriptRegistry {
 
   protected async fetchSource(
     _id: ModuleId
-  ): Promise<{ code: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
-    for (const type of ['ts', 'js']) {
-      const pathWithExt = `${_id}.${type}`;
+  ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
+    let type: 'js' | 'ts' = null;
+    let pathWithExt = '';
+    if (_id.endsWith('.ts')) {
+      pathWithExt = _id;
+      type = 'ts';
+    } else if (_id.endsWith('.js')) {
+      pathWithExt = _id;
+      type = 'js';
+    }
+    if (type) {
       const exists = await this._vfs.exists(pathWithExt);
-      if (exists) {
-        const stats = await this._vfs.stat(pathWithExt);
-        if (stats.isFile) {
-          const code = (await this._vfs.readFile(pathWithExt, { encoding: 'utf8' })) as string;
-          return { code, type: type as 'js' | 'ts' };
+      if (!exists) {
+        type = null;
+      }
+      const stat = await this._vfs.stat(pathWithExt);
+      if (stat.isDirectory) {
+        type = null;
+      }
+    }
+    const types = ['ts', 'js'] as const;
+    if (!type) {
+      for (const t of types) {
+        pathWithExt = `${_id}.${t}`;
+        const exists = await this._vfs.exists(pathWithExt);
+        if (exists) {
+          const stats = await this._vfs.stat(pathWithExt);
+          if (stats.isFile) {
+            type = t;
+            break;
+          }
         }
       }
+    }
+    if (type) {
+      const code = (await this._vfs.readFile(pathWithExt, { encoding: 'utf8' })) as string;
+      return { code, type, path: pathWithExt };
     }
   }
 
@@ -59,14 +85,14 @@ export class VFSScriptRegistry extends ScriptRegistry {
     const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
 
     const normalizedId = this.resolveLogicalId(entryId, fromId);
-    if (dependencies[normalizedId] !== undefined) {
+    const srcPath = await this.resolveSourcePath(normalizedId);
+    if (!srcPath || dependencies[srcPath.path] !== undefined) {
       return;
     }
-    const src = await this.fetchSource(normalizedId);
-    dependencies[normalizedId] = src.code;
+    const code = (await this._vfs.readFile(srcPath.path, { encoding: 'utf8' })) as string;
+    dependencies[srcPath.path] = code;
 
     const gather = async (input: string, re: RegExp) => {
-      let last = 0;
       for (;;) {
         const m = re.exec(input);
         if (!m) {
@@ -81,13 +107,11 @@ export class VFSScriptRegistry extends ScriptRegistry {
         } else if (spec.startsWith('./') || spec.startsWith('../')) {
           await this.getDependencies(spec, normalizedId, dependencies);
         }
-
-        last = m.index + m[0].length;
       }
     };
 
-    await gather(src.code, reStatic);
-    await gather(src.code, reDynamic);
+    await gather(code, reStatic);
+    await gather(code, reDynamic);
   }
 
   private async build(id: string): Promise<string> {
@@ -97,13 +121,14 @@ export class VFSScriptRegistry extends ScriptRegistry {
       return cached;
     }
 
-    const src = await this.fetchSource(key);
-    if (!src) {
+    const srcPath = await this.resolveSourcePath(key);
+    if (!srcPath) {
       throw new Error(`Module not found: ${key}`);
     }
+    const code = (await this._vfs.readFile(srcPath.path, { encoding: 'utf8' })) as string;
 
-    const rewritten = await this.rewriteImports(src.code, key);
-    const js = await this.transpile(rewritten, key, src.type);
+    const rewritten = await this.rewriteImports(code, key);
+    const js = await this.transpile(rewritten, key, srcPath.type);
     const url = toDataUrl(js, key);
     this._built.set(key, url);
     return url;
@@ -202,5 +227,42 @@ export class VFSScriptRegistry extends ScriptRegistry {
       return spec;
     }
     return path;
+  }
+
+  async resolveSourcePath(logicalId: string) {
+    let type: 'js' | 'ts' = null;
+    let pathWithExt = '';
+    if (logicalId.endsWith('.ts')) {
+      pathWithExt = logicalId;
+      type = 'ts';
+    } else if (logicalId.endsWith('.js')) {
+      pathWithExt = logicalId;
+      type = 'js';
+    }
+    if (type) {
+      const exists = await this._vfs.exists(pathWithExt);
+      if (!exists) {
+        type = null;
+      }
+      const stat = await this._vfs.stat(pathWithExt);
+      if (stat.isDirectory) {
+        type = null;
+      }
+    }
+    const types = ['ts', 'js'] as const;
+    if (!type) {
+      for (const t of types) {
+        pathWithExt = `${logicalId}.${t}`;
+        const exists = await this._vfs.exists(pathWithExt);
+        if (exists) {
+          const stats = await this._vfs.stat(pathWithExt);
+          if (stats.isFile) {
+            type = t;
+            break;
+          }
+        }
+      }
+    }
+    return type ? { type, path: pathWithExt } : null;
   }
 }

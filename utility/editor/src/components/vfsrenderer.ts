@@ -315,6 +315,24 @@ export class VFSRenderer extends makeEventTarget(Object)<{
   }
 
   private renderToolbar() {
+    const canGoUp = this._selectedDir && this._selectedDir.parent;
+    if (canGoUp) {
+      if (ImGui.Button('⬆##DirUP')) {
+        this._selectedDir.parent.open = true;
+        this.selectDir(this._selectedDir.parent);
+      }
+    } else {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, 0.5);
+      ImGui.Button('⬆##DirUP');
+      ImGui.PopStyleVar();
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip('Already at root directory');
+      }
+    }
+    ImGui.SameLine();
+    ImGui.Separator();
+    ImGui.SameLine();
+
     if (ImGui.RadioButton('List', this._viewMode === ViewMode.List)) {
       this._viewMode = ViewMode.List;
     }
@@ -1021,7 +1039,6 @@ export class VFSRenderer extends makeEventTarget(Object)<{
             ? item.path.slice(0, item.path.lastIndexOf('/'))
             : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
           const newPath = this._vfs.join(parentPath, newName);
-
           this._vfs.move(isDir ? item.path : item.meta.path, newPath);
         }
       }
