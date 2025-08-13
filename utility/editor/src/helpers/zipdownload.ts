@@ -1,4 +1,4 @@
-import { ZipWriter } from '@zip.js/zip.js';
+import { configure, ZipWriter } from '@zip.js/zip.js';
 import * as streamSaver from 'streamsaver';
 
 export class ZipDownloader {
@@ -9,6 +9,7 @@ export class ZipDownloader {
     const fileStream = streamSaver.createWriteStream(filename);
     this._transformStream = new TransformStream();
     this._downloadPromise = this._transformStream.readable.pipeTo(fileStream);
+    configure({ useWebWorkers: false });
     this._zipWriter = new ZipWriter(this._transformStream.writable);
   }
   get zipWriter() {
