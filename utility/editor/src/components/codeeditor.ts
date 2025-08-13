@@ -126,6 +126,31 @@ export class CodeEditor {
     }
   }
 
+  updateLayout(): void {
+    if (this.editor) {
+      this.editor.layout();
+    }
+  }
+
+  setLanguage(language: string): void {
+    if (this.editor) {
+      const model = this.editor.getModel();
+      if (model) {
+        (window as any).monaco.editor.setModelLanguage(model, language);
+        this.updateStatusBar();
+      }
+    }
+  }
+
+  getValue(): string {
+    return this.editor ? this.editor.getValue() : '';
+  }
+
+  setValue(code: string): void {
+    if (this.editor) {
+      this.editor.setValue(code);
+    }
+  }
   private addEditorStyles() {
     if (document.querySelector('#monaco-editor-styles')) {
       return;
@@ -475,11 +500,10 @@ export class CodeEditor {
       this.editor = monaco.editor.create(container, {
         model,
         theme: 'vs-dark',
-        renderLineHighlight: 'line',
+        renderLineHighlight: 'none',
         renderLineHighlightOnlyWhenFocus: false,
         lineNumbersMinChars: 3,
-        showFoldingControls: 'never',
-        automaticLayout: true, // 重要：自动布局
+        automaticLayout: true,
         fontSize: 14,
         lineHeight: 20,
         wordWrap: 'off',
@@ -492,7 +516,9 @@ export class CodeEditor {
         cursorBlinking: 'blink',
         cursorWidth: 2,
         glyphMargin: true,
-        folding: true,
+        folding: false,
+        foldingStrategy: 'auto',
+        showFoldingControls: 'never',
         lineDecorationsWidth: 10,
         lineNumbers: 'on',
         selectOnLineNumbers: false,
@@ -504,6 +530,7 @@ export class CodeEditor {
         acceptSuggestionOnEnter: 'on',
         tabCompletion: 'on',
         wordBasedSuggestions: 'currentDocument',
+        occurrencesHighlight: 'off',
         contextmenu: true,
         mouseWheelZoom: true,
         hover: {
@@ -529,7 +556,7 @@ export class CodeEditor {
           horizontalScrollbarSize: 14
         }
       });
-      console.log('TS options:', monaco.languages.typescript.typescriptDefaults.getCompilerOptions());
+      this.editor.focus();
       // 强制重新计算布局
       setTimeout(() => {
         if (this.editor) {
@@ -665,34 +692,5 @@ export class CodeEditor {
       <span>${statusText}</span>
       <span>${languageInfo}</span>
     `;
-  }
-
-  public updateLayout(): void {
-    if (this.editor) {
-      this.editor.layout();
-    }
-  }
-
-  // 公共方法：设置编程语言
-  public setLanguage(language: string): void {
-    if (this.editor) {
-      const model = this.editor.getModel();
-      if (model) {
-        (window as any).monaco.editor.setModelLanguage(model, language);
-        this.updateStatusBar();
-      }
-    }
-  }
-
-  // 公共方法：获取编辑器内容
-  public getValue(): string {
-    return this.editor ? this.editor.getValue() : '';
-  }
-
-  // 公共方法：设置编辑器内容
-  public setValue(code: string): void {
-    if (this.editor) {
-      this.editor.setValue(code);
-    }
   }
 }

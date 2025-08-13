@@ -37,8 +37,109 @@
           return './vendor/monaco/vs/base/worker/workerMain.js';
         }
       };
-      require(['vs/editor/editor.main'], () => {
+      require(['vs/editor/editor.main'], async () => {
         monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+        const typeFiles = [
+          { path: './vendor/@zephyr3d/base/index.d.ts', name: '@zephyr3d/base' },
+          { path: './vendor/@zephyr3d/device/index.d.ts', name: '@zephyr3d/device' },
+          { path: './vendor/@zephyr3d/scene/index.d.ts', name: '@zephyr3d/scene' },
+          { path: './vendor/@zephyr3d/runtime/index.d.ts', name: '@zephyr3d/runtime' },
+          { path: './vendor/@zephyr3d/backend-webgl/index.d.ts', name: '@zephyr3d/backend-webgl' },
+          { path: './vendor/@zephyr3d/backend-webgpu/index.d.ts', name: '@zephyr3d/backend-webgpu' }
+        ];
+        async function loadTypeFiles(files) {
+          const loadPromises = files.map(async (file) => {
+            try {
+              const response = await fetch(file.path);
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+              const content = await response.text();
+              const fileName = `file:///node_modules/${file.name}/index.d.ts`;
+              monaco.languages.typescript.typescriptDefaults.addExtraLib(content, fileName);
+              console.log(`✓ Loaded types: ${file.path}`);
+              return { success: true, file: file.path };
+            } catch (error) {
+              console.warn(`✗ Failed to load ${file.path}:`, error.message);
+              return { success: false, file: file.path, error: error.message };
+            }
+          });
+          const results = await Promise.allSettled(loadPromises);
+          const successful = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
+          console.log(`Loaded ${successful}/${files.length} type files`);
+
+          return results;
+        }
+        monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+          allowNonTsExtensions: true,
+          target: monaco.languages.typescript.ScriptTarget.ESNext,
+          module: monaco.languages.typescript.ModuleKind.ESNext,
+          moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+          allowJs: true,
+          checkJs: false,
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+          strict: true,
+          skipLibCheck: true, // 跳过库文件检查，提高性能
+          declaration: true,
+          // 这些对 Monaco 中的模块解析很重要
+          baseUrl: '.',
+          typeRoots: ['file:///node_modules/@types'],
+          resolveJsonModule: true
+        });
+        await loadTypeFiles(typeFiles);
+        // 注册自定义的补全提供者
+        monaco.languages.registerCompletionItemProvider('typescript', {
+          triggerCharacters: ["'", '"', '/'],
+
+          provideCompletionItems: (model, position) => {
+            const textUntilPosition = model.getValueInRange({
+              startLineNumber: position.lineNumber,
+              startColumn: 1,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column
+            });
+
+            // 检查是否在 import 语句中
+            const importMatch = textUntilPosition.match(/import\s+.*\s+from\s+['"]([^'"]*)$/);
+            if (!importMatch) {
+              return { suggestions: [] };
+            }
+
+            const typedPath = importMatch[1];
+            const suggestions = [];
+
+            // 提供 @zephyr3d 包的补全
+            const zephyrPackages = [
+              '@zephyr3d/base',
+              '@zephyr3d/device',
+              '@zephyr3d/scene',
+              '@zephyr3d/runtime',
+              '@zephyr3d/backend-webgl',
+              '@zephyr3d/backend-webgpu'
+            ];
+
+            zephyrPackages.forEach((pkg) => {
+              if (pkg.startsWith(typedPath)) {
+                suggestions.push({
+                  label: pkg,
+                  kind: monaco.languages.CompletionItemKind.Module,
+                  insertText: pkg,
+                  range: {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: position.column - typedPath.length,
+                    endColumn: position.column
+                  },
+                  detail: `Zephyr3D module: ${pkg}`,
+                  documentation: `Import from ${pkg}`
+                });
+              }
+            });
+
+            return { suggestions };
+          }
+        });
         console.log('models count:', monaco.editor.getModels().length);
       });
     </script>

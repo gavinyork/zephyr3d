@@ -29,7 +29,6 @@ export class VFSScriptRegistry extends ScriptRegistry {
     this._scriptsRoot = scriptsRoot;
   }
 
-  // 从 VFS 读取 .ts 或 .js 源码
   protected async fetchSource(
     _id: ModuleId
   ): Promise<{ code: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
@@ -46,12 +45,51 @@ export class VFSScriptRegistry extends ScriptRegistry {
     }
   }
 
-  public async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
+  async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
     const id = this.resolveLogicalId(entryId);
     return await this.build(String(id));
   }
 
-  // 构建逻辑模块为 data URL；递归处理内部依赖
+  async getDependencies(
+    entryId: string,
+    fromId: string,
+    dependencies: Record<string, string>
+  ): Promise<void> {
+    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
+    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+    const normalizedId = this.resolveLogicalId(entryId, fromId);
+    if (dependencies[normalizedId] !== undefined) {
+      return;
+    }
+    const src = await this.fetchSource(normalizedId);
+    dependencies[normalizedId] = src.code;
+
+    const gather = async (input: string, re: RegExp) => {
+      let last = 0;
+      for (;;) {
+        const m = re.exec(input);
+        if (!m) {
+          break;
+        }
+
+        const spec = m[2];
+        let replacement = spec;
+
+        if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
+          replacement = spec;
+        } else if (spec.startsWith('./') || spec.startsWith('../')) {
+          await this.getDependencies(spec, normalizedId, dependencies);
+        }
+
+        last = m.index + m[0].length;
+      }
+    };
+
+    await gather(src.code, reStatic);
+    await gather(src.code, reDynamic);
+  }
+
   private async build(id: string): Promise<string> {
     const key = String(id);
     const cached = this._built.get(key);
@@ -71,7 +109,6 @@ export class VFSScriptRegistry extends ScriptRegistry {
     return url;
   }
 
-  // TS 转译并内联 sourcemap；JS 直接追加 sourceURL
   protected async transpile(code: string, _id: ModuleId, type: 'js' | 'ts'): Promise<string> {
     const logicalId = String(_id);
 
@@ -105,7 +142,6 @@ export class VFSScriptRegistry extends ScriptRegistry {
     return out;
   }
 
-  // 重写 import：内部依赖 -> data URL；裸模块/绝对/data/blob 保持
   protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
     if (this.opts.mode !== 'editor') {
       return code;
@@ -148,8 +184,7 @@ export class VFSScriptRegistry extends ScriptRegistry {
     return out;
   }
 
-  // 将相对/别名/根相对 spec 解析为逻辑 ID；裸模块保持原样
-  protected resolveLogicalId(spec: string, fromId?: string): string {
+  resolveLogicalId(spec: string, fromId?: string): string {
     let path: string;
 
     if (spec.startsWith('#/')) {
@@ -164,9 +199,8 @@ export class VFSScriptRegistry extends ScriptRegistry {
     } else if (spec.startsWith('/')) {
       path = spec.replace(/^\/+/, '/');
     } else {
-      // 裸模块：保持原样（交由 SystemJS 命中注册表）
       return spec;
     }
-    return path; // e.g. "/scripts/a/b/module"
+    return path;
   }
 }
