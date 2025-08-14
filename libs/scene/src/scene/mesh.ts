@@ -1,4 +1,4 @@
-import { applyMixins } from '@zephyr3d/base';
+import { applyMixins, DRef } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
@@ -12,7 +12,6 @@ import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
-import { DRef } from '../app/gc/ref';
 
 /**
  * Mesh node

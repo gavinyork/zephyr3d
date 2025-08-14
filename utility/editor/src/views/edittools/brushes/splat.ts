@@ -6,8 +6,9 @@ import type {
   Texture2D,
   Texture2DArray
 } from '@zephyr3d/device';
-import { DRef, fetchSampler } from '@zephyr3d/scene';
+import { fetchSampler } from '@zephyr3d/scene';
 import { BaseTerrainBrush } from './base';
+import { DRef } from '@zephyr3d/base';
 
 export class TerrainTextureBrush extends BaseTerrainBrush {
   private _detailIndex: number;

@@ -2,7 +2,7 @@ import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, VertexLayo
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
-import type { Disposable } from '../app';
+import { Disposable } from '@zephyr3d/base';
 
 /**
  * Rendering layer of post processing effects
@@ -19,19 +19,18 @@ export enum PostEffectLayer {
  * Base class for any type of post effect
  * @public
  */
-export class AbstractPostEffect implements Disposable {
+export class AbstractPostEffect extends Disposable {
   private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
   protected _enabled: boolean;
   protected _layer: PostEffectLayer;
-  protected _disposed: boolean;
   /**
    * Creates an instance of a post effect
    * @param name - Name of the post effect
    */
   constructor() {
+    super();
     this._enabled = true;
     this._layer = PostEffectLayer.end;
-    this._disposed = false;
   }
   /** Whether this post effect is enabled */
   get enabled(): boolean {
@@ -122,14 +121,9 @@ export class AbstractPostEffect implements Disposable {
       ]
     });
   }
-  dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this.destroy();
-    }
-  }
-  get disposed() {
-    return this._disposed;
+  protected onDispose() {
+    super.onDispose();
+    this.destroy();
   }
   /** @internal */
   protected createRenderStates(device: AbstractDevice): RenderStateSet {

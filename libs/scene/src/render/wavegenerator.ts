@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, IDisposable } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -6,13 +6,12 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp
 } from '@zephyr3d/device';
-import type { Disposable } from '../app';
 
 /**
  * Abstract class for wave generators.
  * @public
  */
-export interface WaveGenerator extends Disposable {
+export interface WaveGenerator extends IDisposable {
   /**
    * Create a new instance from this
    * @returns The created instance

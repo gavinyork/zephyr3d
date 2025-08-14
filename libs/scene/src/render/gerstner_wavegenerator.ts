@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import { Disposable, type AABB } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
@@ -8,15 +8,15 @@ import { MAX_GERSTNER_WAVE_COUNT } from '../values';
  * Gerstner wave generator.
  * @public
  */
-export class GerstnerWaveGenerator implements WaveGenerator {
+export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   private _version: number;
   private _waveParams: Float32Array<ArrayBuffer>;
   private _numWaves: number;
-  private _disposed: boolean;
   /**
    * Creates a new Gerstner wave generator.
    */
   constructor() {
+    super();
     this._waveParams = new Float32Array(8 * MAX_GERSTNER_WAVE_COUNT);
     this.randomWave(0);
     this.randomWave(1);
@@ -24,7 +24,6 @@ export class GerstnerWaveGenerator implements WaveGenerator {
     this.randomWave(3);
     this._numWaves = 4;
     this._version = 0;
-    this._disposed = false;
   }
   /** @internal */
   static randomWaveData(array: Float32Array, offset: number) {
@@ -49,9 +48,6 @@ export class GerstnerWaveGenerator implements WaveGenerator {
   }
   get version() {
     return this._version;
-  }
-  get disposed() {
-    return this._disposed;
   }
   /** Gets the number of waves. */
   get numWaves(): number {
@@ -365,9 +361,5 @@ export class GerstnerWaveGenerator implements WaveGenerator {
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
     return 'GerstnerWaveGenerator';
-  }
-  /** {@inheritDoc WaveGenerator.dispose} */
-  dispose(): void {
-    this._disposed = true;
   }
 }

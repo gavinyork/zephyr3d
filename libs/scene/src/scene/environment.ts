@@ -1,12 +1,11 @@
 import type { Vector4 } from '@zephyr3d/base';
-import { Vector3 } from '@zephyr3d/base';
+import { Vector3, DRef } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
 import { SkyRenderer } from '../render/sky';
 import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
-import { DRef } from '../app';
 
 /**
  * Wrapper for environmant lighting

@@ -7,9 +7,9 @@ import type {
   RenderStateSet,
   TextureCube
 } from '@zephyr3d/device';
-import { Application, DRef } from '../app';
+import { Application } from '../app';
 import { Primitive } from '../render/primitive';
-import { Vector4 } from '@zephyr3d/base';
+import { DRef, Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 
 /**

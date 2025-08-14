@@ -7,7 +7,8 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { Quaternion } from '@zephyr3d/base';
+import type { IDisposable, Quaternion } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import {
   Matrix4x4,
   Observable,
@@ -17,7 +18,6 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
-import { DRef } from '../app/gc/ref';
 import { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
@@ -69,8 +69,9 @@ export class SceneNode
     visiblechanged: [node: SceneNode];
     transformchanged: [node: SceneNode];
     bvchanged: [node: SceneNode];
+    dispose: [];
   }>
-  implements NodeClonable<SceneNode>
+  implements NodeClonable<SceneNode>, IDisposable
 {
   /*
   static readonly PICK_INHERITED = -1;

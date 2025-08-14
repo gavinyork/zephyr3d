@@ -1,10 +1,8 @@
 import type { CubeFace } from '@zephyr3d/base';
-import { Plane } from '@zephyr3d/base';
-import { Vector2 } from '@zephyr3d/base';
-import { Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
+import { DRef, Plane, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
-import { Application, DRef } from '../app';
+import { Application } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
 import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';

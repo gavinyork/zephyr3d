@@ -3,8 +3,8 @@ import type { BindGroup, PBFunctionScope, Texture2D } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import type { Clonable } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
-import { DRef } from '../app';
 
 /**
  * Particle material

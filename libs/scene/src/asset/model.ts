@@ -1,11 +1,10 @@
-import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
-import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Interpolator, DRef } from '@zephyr3d/base';
+import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Texture2D, TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
 import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
-import type { DRef } from '../app';
 import type { Scene } from '../scene';
 import { SceneNode } from '../scene/scene_node';
 import { NodeRotationTrack, NodeScaleTrack, Skeleton, NodeTranslationTrack } from '../animation';
@@ -472,7 +471,7 @@ export class AssetScene extends NamedObject {
  * Model information that can be shared by multiple model nodes
  * @public
  */
-export class SharedModel {
+export class SharedModel extends Disposable {
   /** @internal */
   private _name: string;
   /** @internal */
@@ -485,44 +484,18 @@ export class SharedModel {
   private _scenes: AssetScene[];
   /** @internal */
   private _activeScene: number;
-  /** @internal */
-  private _disposed: boolean;
   /**
    * Creates an instance of SharedModel
    * @param name - Name of the model
    */
   constructor(name?: string) {
+    super();
     this._name = name || '';
     this._skeletons = [];
     this._nodes = [];
     this._scenes = [];
     this._animations = [];
     this._activeScene = -1;
-    this._disposed = false;
-  }
-  /** Whether this model has been disposed */
-  get disposed() {
-    return this._disposed;
-  }
-  /** Disposes this model */
-  dispose() {
-    const nodes = [...this._nodes];
-    while (nodes.length > 0) {
-      const node = nodes.shift();
-      nodes.push(...node.children);
-      const mesh = node.mesh;
-      if (mesh) {
-        for (const subMesh of mesh.subMeshes) {
-          subMesh.primitive?.dispose();
-          subMesh.material?.dispose();
-        }
-      }
-    }
-    this._nodes = [];
-    this._skeletons = [];
-    this._scenes = [];
-    this._animations = [];
-    this._disposed = true;
   }
   /** Name of the model */
   get name(): string {
@@ -659,6 +632,25 @@ export class SharedModel {
     });
     group.sharedModel = this;
     return group;
+  }
+  protected onDispose() {
+    super.onDispose();
+    const nodes = [...this._nodes];
+    while (nodes.length > 0) {
+      const node = nodes.shift();
+      nodes.push(...node.children);
+      const mesh = node.mesh;
+      if (mesh) {
+        for (const subMesh of mesh.subMeshes) {
+          subMesh.primitive?.dispose();
+          subMesh.material?.dispose();
+        }
+      }
+    }
+    this._nodes = [];
+    this._skeletons = [];
+    this._scenes = [];
+    this._animations = [];
   }
   private setAssetNodeToSceneNode(
     scene: Scene,

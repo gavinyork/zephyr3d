@@ -1,4 +1,4 @@
-import { Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
+import { DRef, Disposable, Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
 import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
 import type { QuadtreeNode } from './quadtree';
@@ -15,7 +15,6 @@ import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
 import type { SceneNode } from '..';
-import { DRef } from '../../app';
 
 export class GrassClusterBase {
   protected _terrain: Terrain;
@@ -100,21 +99,20 @@ export type GrassLayer = {
   clusters: Map<QuadtreeNode, GrassCluster>;
 };
 
-export class GrassManager {
+export class GrassManager extends Disposable {
   private _clusterSize: number;
   private readonly _baseVertexBuffer: Map<string, DRef<StructuredBuffer>>;
   private _indexBuffer: DRef<IndexBuffer>;
   private _layers: GrassLayer[];
-  private _disposed: boolean;
   constructor(clusterSize: number, _density: number[][]) {
+    super();
     this._clusterSize = clusterSize;
     this._baseVertexBuffer = new Map();
     this._indexBuffer = new DRef();
     this._layers = [];
-    this._disposed = false;
   }
-  dispose() {
-    this._disposed = true;
+  protected onDispose() {
+    super.onDispose();
     this._indexBuffer?.dispose();
     this._indexBuffer = null;
     for (const entry of this._baseVertexBuffer) {
@@ -131,9 +129,6 @@ export class GrassManager {
       }
     }
     this._layers = [];
-  }
-  get disposed() {
-    return this._disposed;
   }
   private getBaseVertexBuffer(device: AbstractDevice, bladeWidth: number, bladeHeight: number) {
     const hash = `${bladeWidth}-${bladeHeight}`;

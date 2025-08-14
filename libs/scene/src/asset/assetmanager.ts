@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
-import { HttpFS, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
+import { HttpFS, isPowerOf2, nextPowerOf2, DWeakRef } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -16,7 +16,6 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
-import { DWeakRef } from '../app';
 
 function getDefaultBaseURL() {
   if (

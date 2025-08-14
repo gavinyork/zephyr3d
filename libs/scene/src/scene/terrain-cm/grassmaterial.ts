@@ -1,5 +1,5 @@
 import type { Clonable } from '@zephyr3d/base';
-import { Vector2, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector4, DWeakRef } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
 import {
   applyMaterialMixins,
@@ -10,7 +10,6 @@ import {
 } from '../../material';
 import type { DrawContext } from '../../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
-import { DWeakRef } from '../../app';
 import type { ClipmapTerrain } from './terrain-cm';
 import { fetchSampler } from '../../utility/misc';
 

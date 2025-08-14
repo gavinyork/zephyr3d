@@ -16,17 +16,16 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
-import { Observable } from '@zephyr3d/base';
+import { Disposable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> implements GPUObject<T> {
+export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T> {
   protected _device: WebGPUDevice;
   protected _object: T;
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
-  protected _disposed: boolean;
   protected _queueState: number;
   protected _restoreHandler: (tex: GPUObject) => void;
   constructor(device: WebGPUDevice) {
@@ -37,7 +36,6 @@ export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> imple
     this._cid = 1;
     this._name = genDefaultName(this);
     this._queueState = 0;
-    this._disposed = false;
     this._restoreHandler = null;
     this._device.addGPUObject(this);
   }
@@ -52,9 +50,6 @@ export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> imple
   }
   get cid(): number {
     return this._cid;
-  }
-  get disposed(): boolean {
-    return this._disposed;
   }
   get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
@@ -114,12 +109,6 @@ export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> imple
   isBindGroup(): this is BindGroup {
     return false;
   }
-  dispose() {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._device.disposeObject(this, true);
-    }
-  }
   reload(): void {
     if (this.disposed) {
       this._device.restoreObject(this);
@@ -131,5 +120,9 @@ export abstract class WebGPUObject<T> extends Observable<{ disposed: [] }> imple
   }
   restore(): void {
     throw new Error('Abstract function call: restore()');
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._device.disposeObject(this, true);
   }
 }

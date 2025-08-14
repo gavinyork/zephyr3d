@@ -1,4 +1,4 @@
-import { Matrix4x4, Vector3, Vector4, AABB, CubeFace, Frustum } from '@zephyr3d/base';
+import { retainObject, Matrix4x4, Vector3, Vector4, AABB, CubeFace, Frustum } from '@zephyr3d/base';
 import type {
   PBShaderExp,
   FrameBuffer,
@@ -18,7 +18,7 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { Application, retainObject } from '../app';
+import { Application } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';

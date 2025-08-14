@@ -1,5 +1,5 @@
 import type { Vector2 } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector4, DRef } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -10,7 +10,7 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { Application, DRef, Primitive } from '@zephyr3d/scene';
+import { Application, Primitive } from '@zephyr3d/scene';
 
 export abstract class BaseTerrainBrush {
   private static _brushPrimitive: Primitive = null;

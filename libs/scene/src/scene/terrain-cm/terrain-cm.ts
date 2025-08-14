@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { Vector4, applyMixins, Vector3 } from '@zephyr3d/base';
+import { Vector4, applyMixins, Vector3, DRef } from '@zephyr3d/base';
 import type {
   GPUDataBuffer,
   PBInsideFunctionScope,
@@ -14,7 +14,7 @@ import { mixinDrawable } from '../../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget, Primitive, PrimitiveInstanceInfo } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
-import { Application, DRef } from '../../app';
+import { Application } from '../../app';
 import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';

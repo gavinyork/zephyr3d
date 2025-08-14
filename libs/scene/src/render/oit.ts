@@ -6,6 +6,7 @@ import type {
   RenderStateSet
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
+import type { IDisposable } from '@zephyr3d/base';
 
 /**
  * Abstract class for order-independent transparency renderers.
@@ -19,7 +20,7 @@ import type { DrawContext } from './drawable';
  *
  * @public
  */
-export interface OIT {
+export interface OIT extends IDisposable {
   /**
    * Returns the type of the renderer.
    *

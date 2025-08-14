@@ -1,7 +1,7 @@
 import type { HttpFS } from '@zephyr3d/base';
 import type { GPUDataBuffer, Texture2D, TextureCube } from '@zephyr3d/device';
 import type { Scene } from '@zephyr3d/scene';
-import { DRef } from '@zephyr3d/scene';
+import { DRef } from '@zephyr3d/base';
 import { CubemapSHProjector } from '@zephyr3d/scene';
 import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 

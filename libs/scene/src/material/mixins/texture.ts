@@ -8,8 +8,8 @@ import type {
 } from '@zephyr3d/device';
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4 } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
-import { DRef } from '../../app';
 
 /**
  * ToMixedTextureType

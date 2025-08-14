@@ -1,9 +1,18 @@
-import { ClipState, Frustum, Matrix4x4, Vector3, isPowerOf2, nextPowerOf2 } from '@zephyr3d/base';
+import {
+  DRef,
+  ClipState,
+  Frustum,
+  Matrix4x4,
+  Vector3,
+  isPowerOf2,
+  nextPowerOf2,
+  Disposable
+} from '@zephyr3d/base';
 import type { IndexBuffer, PrimitiveType, Texture2D } from '@zephyr3d/device';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
-import { Application, DRef } from '../../app';
+import { Application } from '../../app';
 import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
@@ -131,7 +140,7 @@ export class QuadtreeNode {
 }
 
 /** @internal */
-export class Quadtree {
+export class Quadtree extends Disposable {
   private _baseVertices: Float32Array;
   private _indices: DRef<IndexBuffer>;
   private _indicesWireframe: DRef<IndexBuffer>;
@@ -147,8 +156,8 @@ export class Quadtree {
   private _rootNode: QuadtreeNode;
   private readonly _terrain: Terrain;
   private _heightField: HeightField;
-  private _disposed: boolean;
   constructor(terrain: Terrain) {
+    super();
     this._terrain = terrain;
     this._baseVertices = null;
     this._indices = new DRef();
@@ -164,7 +173,6 @@ export class Quadtree {
     this._rootNode = null;
     this._primitiveCount = 0;
     this._primitiveType = 'triangle-strip';
-    this._disposed = false;
   }
   get normalMap(): Texture2D {
     return this._normalMap.get();
@@ -174,34 +182,6 @@ export class Quadtree {
   }
   get terrain(): Terrain {
     return this._terrain;
-  }
-  dispose() {
-    this._disposed = true;
-    if (this._rootNode) {
-      const nodes: QuadtreeNode[] = [this._rootNode];
-      while (nodes.length > 0) {
-        const node = nodes.shift();
-        if (node) {
-          for (let i = 0; i < 4; i++) {
-            const child = node.getChild(i);
-            if (child) {
-              nodes.push(child);
-            }
-          }
-          node.dispose();
-        }
-      }
-      this._rootNode = null;
-    }
-    this._indices?.dispose();
-    this._indices = null;
-    this._indicesWireframe?.dispose();
-    this._indicesWireframe = null;
-    this._normalMap?.dispose();
-    this._normalMap = null;
-  }
-  get disposed() {
-    return this._disposed;
   }
   build(
     patchSize: number,
@@ -517,5 +497,30 @@ export class Quadtree {
     }
     */
     return ret;
+  }
+  protected onDispose() {
+    super.onDispose();
+    if (this._rootNode) {
+      const nodes: QuadtreeNode[] = [this._rootNode];
+      while (nodes.length > 0) {
+        const node = nodes.shift();
+        if (node) {
+          for (let i = 0; i < 4; i++) {
+            const child = node.getChild(i);
+            if (child) {
+              nodes.push(child);
+            }
+          }
+          node.dispose();
+        }
+      }
+      this._rootNode = null;
+    }
+    this._indices?.dispose();
+    this._indices = null;
+    this._indicesWireframe?.dispose();
+    this._indicesWireframe = null;
+    this._normalMap?.dispose();
+    this._normalMap = null;
   }
 }

@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { applyMixins, nextPowerOf2 } from '@zephyr3d/base';
+import { applyMixins, nextPowerOf2, DRef } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
@@ -12,7 +12,6 @@ import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import { Application } from '../app/app';
-import { DRef } from '../app';
 import type { NodeClonable, NodeCloneMethod } from '.';
 
 const tmpVec3 = new Vector3();

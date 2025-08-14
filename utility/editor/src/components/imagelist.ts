@@ -1,7 +1,7 @@
-import { Observable } from '@zephyr3d/base';
+import { Observable, DRef } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { Application, DRef } from '@zephyr3d/scene';
+import { Application } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
 
 type ImageInfo = {

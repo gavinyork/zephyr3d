@@ -1,6 +1,7 @@
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, Texture2D } from '@zephyr3d/device';
 import { BaseTerrainBrush } from './base';
-import { DRef, fetchSampler } from '@zephyr3d/scene';
+import { fetchSampler } from '@zephyr3d/scene';
+import { DRef } from '@zephyr3d/base';
 
 export abstract class TerrainHeightBrush extends BaseTerrainBrush {
   private readonly _sourceHeightMap: DRef<Texture2D>;

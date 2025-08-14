@@ -1,5 +1,5 @@
 import type { AABB } from '@zephyr3d/base';
-import { PRNG, Vector2, Vector4 } from '@zephyr3d/base';
+import { Disposable, PRNG, Vector2, Vector4 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type {
   AbstractDevice,
@@ -137,7 +137,7 @@ const THREAD_GROUP_SIZE = 16;
  * This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
  * @public
  */
-export class FFTWaveGenerator implements WaveGenerator {
+export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   private static _globals: Globales = null;
   private readonly _useComputeShader: boolean;
   private readonly _h0BindGroup: BindGroup;
@@ -171,12 +171,12 @@ export class FFTWaveGenerator implements WaveGenerator {
   private readonly _h0TextureFormat: TextureFormat;
   private readonly _dataTextureFormat: TextureFormat;
   private readonly _renderMode: number;
-  private _disposed: boolean;
   /**
    * Create a new instance of the FFTWaveGenerator class.
    * @param params - Ocean field build parameters. If not provided, default parameters will be used.
    */
   constructor(params?: OceanFieldBuildParams) {
+    super();
     const device = Application.instance.device;
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
     const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
@@ -272,16 +272,12 @@ export class FFTWaveGenerator implements WaveGenerator {
       this._updateRenderStates = Application.instance.device.createRenderStateSet();
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
-      this._disposed = false;
       this._version = 0;
       this.paramsChanged();
     }
   }
   get version() {
     return this._version;
-  }
-  get disposed() {
-    return this._disposed;
   }
   clone(): this {
     return new FFTWaveGenerator(this._params) as this;
@@ -1301,11 +1297,6 @@ export class FFTWaveGenerator implements WaveGenerator {
     bindGroup.setValue('sizes', this._sizes);
     bindGroup.setValue('croppinesses', this._croppinesses);
   }
-  /** {@inheritDoc WaveGenerator.dispose} */
-  dispose() {
-    this._disposed = true;
-    this.disposeInstanceData();
-  }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     const disturb = Math.max(Math.abs(this.wind.x), Math.abs(this.wind.y), 2);
@@ -1315,5 +1306,9 @@ export class FFTWaveGenerator implements WaveGenerator {
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
     return 'FFTWaveGenerator';
+  }
+  protected onDispose() {
+    super.onDispose();
+    this.disposeInstanceData();
   }
 }

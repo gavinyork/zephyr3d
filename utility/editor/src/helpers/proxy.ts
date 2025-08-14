@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef } from '@zephyr3d/base';
 import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { TetrahedronFrameShape } from '@zephyr3d/scene';
 import {
@@ -6,9 +6,7 @@ import {
   CylinderShape,
   Mesh,
   Primitive,
-  DRef,
   UnlitMaterial,
-  DWeakRef,
   PerspectiveCamera
 } from '@zephyr3d/scene';
 

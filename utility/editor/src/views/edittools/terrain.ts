@@ -5,11 +5,19 @@ import {
   AssetManager,
   ClipmapTerrainMaterial,
   CopyBlitter,
-  DRef,
   fetchSampler
 } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { ASSERT, degree2radian, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import {
+  ASSERT,
+  degree2radian,
+  Disposable,
+  DRef,
+  HttpRequest,
+  Vector2,
+  Vector4,
+  type Vector3
+} from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -28,11 +36,10 @@ import { ProjectService } from '../../core/services/project';
 import { eventBus } from '../../core/eventbus';
 
 const blitter = new CopyBlitter();
-export class TerrainEditTool implements EditTool {
+export class TerrainEditTool extends Disposable implements EditTool {
   private static readonly defaultBrush: DRef<Texture2D> = new DRef();
   private readonly _editor: Editor;
   private _terrain: DRef<ClipmapTerrain>;
-  private _disposed: boolean;
   private _brushSize: number;
   private _brushAngle: number;
   private _brushStrength: number;
@@ -53,12 +60,12 @@ export class TerrainEditTool implements EditTool {
   private readonly _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
   constructor(editor: Editor, terrain: ClipmapTerrain) {
+    super();
     this._terrain = new DRef(terrain);
     this._editor = editor;
     this._brushSize = 10;
     this._brushAngle = 0;
     this._brushStrength = 1;
-    this._disposed = false;
     this._brushing = false;
     if (!TerrainEditTool.defaultBrush.get()) {
       TerrainEditTool.defaultBrush.set(TerrainEditTool.createDefaultBrushFallof());
@@ -691,9 +698,6 @@ export class TerrainEditTool implements EditTool {
   getTarget(): any {
     return this._terrain.get();
   }
-  get disposed(): boolean {
-    return this._disposed;
-  }
   refreshGrassTextures() {
     const grassRenderer = this._terrain.get().grassRenderer;
     this._grassAlbedo.clear();
@@ -743,12 +747,12 @@ export class TerrainEditTool implements EditTool {
     texture.update(data, 0, 0, size, size);
     return texture;
   }
-  dispose(): void {
+  protected onDispose(): void {
+    super.onDispose();
     if (this._heightDirty && this._terrain?.get()) {
       this._heightDirty = false;
       this._terrain.get().updateBoundingBox();
     }
-    this._disposed = true;
     this._terrain?.dispose();
     this._terrain = null;
     this._brushImageList?.dispose();

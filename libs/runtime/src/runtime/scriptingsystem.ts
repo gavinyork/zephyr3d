@@ -31,19 +31,14 @@ export interface AttachedScript {
   update?: (dt: number, time: number) => void;
 }
 
-type SystemCapableRegistry = ScriptRegistry & {
-  run?: (entryId: ModuleId) => Promise<any>; // 仅 editor 模式可用（VFSScriptRegistry 提供）
-  opts: { mode: 'editor' | 'runtime' | string };
-};
-
 export class ScriptingSystem {
-  private registry: SystemCapableRegistry;
+  private registry: ScriptRegistry;
   private hostScripts = new Map<Host, AttachedScript[]>();
   private onLoadError?: (e: unknown, id: ModuleId) => void;
   private importComment?: string;
 
   constructor(
-    registry: SystemCapableRegistry,
+    registry: ScriptRegistry,
     opts: {
       importComment?: string;
       onLoadError?: (e: unknown, id: ModuleId) => void;

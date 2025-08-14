@@ -16,7 +16,7 @@ import {
   createAPLutProgram,
   atmosphereLUTRendered
 } from '../shaders';
-import { Quaternion, Vector3 } from '@zephyr3d/base';
+import { DRef, Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -37,7 +37,6 @@ import {
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
 import { fetchSampler } from '../utility/misc';
-import { DRef } from '../app';
 import { CubemapSHProjector } from '../utility/shprojector';
 import { Fog, uniformSphereSamples } from '../values';
 import type { HeightFogParams } from '../shaders/fog';

@@ -7,9 +7,10 @@ import type {
   PBShaderExp,
   Texture2D
 } from '@zephyr3d/device';
-import { Application, DRef } from '../app';
+import { Application } from '../app';
 import { fetchSampler } from './misc';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
+import { DRef } from '@zephyr3d/base';
 
 export abstract class RenderMipmap {
   private readonly _program: DRef<GPUProgram>;

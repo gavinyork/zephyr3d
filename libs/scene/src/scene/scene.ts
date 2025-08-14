@@ -1,5 +1,5 @@
 import type { Matrix4x4, AABB } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, Observable } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, Observable, DRef, DWeakRef } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
@@ -10,7 +10,6 @@ import type { Camera } from '../camera/camera';
 import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
-import { DRef, DWeakRef } from '../app';
 import type { Metadata } from 'draco3d';
 
 /**

@@ -4,8 +4,8 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { DWeakRef } from '../app';
-import type { Clonable } from '@zephyr3d/base';
+import { DWeakRef, Disposable } from '@zephyr3d/base';
+import type { Clonable, IDisposable } from '@zephyr3d/base';
 
 type MaterialState = {
   program: GPUProgram;
@@ -20,15 +20,13 @@ type MaterialState = {
  *
  * @public
  */
-export class Material implements Clonable<Material> {
+export class Material extends Disposable implements Clonable<Material>, IDisposable {
   /** @internal */
   protected static _registry: Map<string, DWeakRef<Material>> = new Map();
   /** @internal */
   private static _nextId = 0;
   /** @internal */
   private static _programCache: { [hash: string]: GPUProgram } = {};
-  /** @internal */
-  private _disposed: boolean;
   /** @internal */
   private _states: { [hash: string]: MaterialState };
   /** @internal */
@@ -49,7 +47,7 @@ export class Material implements Clonable<Material> {
    * Creates an instance of material
    */
   constructor() {
-    this._disposed = false;
+    super();
     this._id = ++Material._nextId;
     this._persistentId = crypto.randomUUID();
     this._states = {};
@@ -290,8 +288,8 @@ export class Material implements Clonable<Material> {
   /**
    * Dispose material
    */
-  dispose() {
-    this._disposed = true;
+  protected onDispose() {
+    super.onDispose();
     const m = Material._registry.get(this.persistentId);
     if (m?.get() === this) {
       Material._registry.delete(this.persistentId);
@@ -303,12 +301,6 @@ export class Material implements Clonable<Material> {
       }
       this._states = {};
     }
-  }
-  /**
-   * Whether this material was disposed
-   */
-  get disposed() {
-    return this._disposed;
   }
   /** @internal */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {

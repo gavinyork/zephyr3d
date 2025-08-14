@@ -1,5 +1,5 @@
 import type { AABB } from '@zephyr3d/base';
-import { Vector2 } from '@zephyr3d/base';
+import { Disposable, Vector2 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { hash } from '../shaders';
@@ -11,7 +11,7 @@ const MAX_NUM_OCTAVES = 16;
  * FBM wave generator.
  * @public
  */
-export class FBMWaveGenerator implements WaveGenerator {
+export class FBMWaveGenerator extends Disposable implements WaveGenerator {
   private _version: number;
   private readonly _windVelocity: Vector2;
   private _numOctaves: number;
@@ -19,11 +19,11 @@ export class FBMWaveGenerator implements WaveGenerator {
   private _frequency: number;
   private readonly _lacunarity: number;
   private readonly _gain: number;
-  private _disposed: boolean;
   /**
    * Creates a new Gerstner wave generator.
    */
   constructor() {
+    super();
     this._version = 0;
     this._numOctaves = 4;
     this._windVelocity = new Vector2(0.1, 0);
@@ -31,7 +31,6 @@ export class FBMWaveGenerator implements WaveGenerator {
     this._frequency = 3;
     this._lacunarity = 1.83;
     this._gain = 0.57;
-    this._disposed = false;
   }
   clone(): this {
     const other = new FBMWaveGenerator();
@@ -43,9 +42,6 @@ export class FBMWaveGenerator implements WaveGenerator {
   }
   get version() {
     return this._version;
-  }
-  get disposed() {
-    return this._disposed;
   }
   /** Number of octaves */
   get numOctaves(): number {
@@ -413,9 +409,5 @@ export class FBMWaveGenerator implements WaveGenerator {
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
     return 'FBMWaveGenerator';
-  }
-  /** {@inheritDoc WaveGenerator.dispose} */
-  dispose(): void {
-    this._disposed = true;
   }
 }

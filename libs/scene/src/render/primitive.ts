@@ -1,5 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Clonable, Ray, TypedArray } from '@zephyr3d/base';
+import {
+  Disposable,
+  DWeakRef,
+  releaseObject,
+  retainObject,
+  type Clonable,
+  type Ray,
+  type TypedArray
+} from '@zephyr3d/base';
 import {
   type VertexStepMode,
   type VertexLayout,
@@ -16,13 +23,12 @@ import {
 import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
-import { releaseObject, retainObject, DWeakRef } from '../app';
 
 /**
  * Primitive contains only the vertex and index data of a mesh
  * @public
  */
-export class Primitive implements Clonable<Primitive> {
+export class Primitive extends Disposable implements Clonable<Primitive> {
   /** @internal */
   private static readonly _registry: Map<string, DWeakRef<Primitive>> = new Map();
   /** @internal */
@@ -50,13 +56,12 @@ export class Primitive implements Clonable<Primitive> {
   /** @internal */
   protected _bboxChangeCallback: (() => void)[];
   /** @internal */
-  protected _disposed: boolean;
-  /** @internal */
   private _changeTag: number;
   /**
    * Creates an instance of a primitive
    */
   constructor() {
+    super();
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -69,7 +74,6 @@ export class Primitive implements Clonable<Primitive> {
     this._changeTag = 0;
     this._bbox = null;
     this._bboxChangeCallback = [];
-    this._disposed = false;
     Primitive._registry.set(this._persistentId, new DWeakRef(this));
   }
   /** @internal */
@@ -353,8 +357,8 @@ export class Primitive implements Clonable<Primitive> {
    * To prevent specific vertex buffer or index buffer to be disposed,
    * call removeVertexBuffer() or setIndexBuffer(null) first.
    */
-  dispose() {
-    this._disposed = true;
+  protected onDispose() {
+    super.onDispose();
     const m = Primitive._registry.get(this.persistentId);
     if (m?.get() === this) {
       Primitive._registry.delete(this._persistentId);
@@ -369,12 +373,6 @@ export class Primitive implements Clonable<Primitive> {
       }
       this._vertexLayoutOptions = null;
     }
-  }
-  /**
-   * Whether this primitive was disposed
-   */
-  get disposed() {
-    return this._disposed;
   }
   /*
   createAABBTree(): AABBTree {

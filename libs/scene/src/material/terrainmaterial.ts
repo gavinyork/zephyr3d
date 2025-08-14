@@ -12,9 +12,9 @@ import type {
 import type { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinLight } from './mixins/lit';
-import { Application, retainObject } from '../app';
+import { Application } from '../app';
 import type { Clonable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { retainObject, Vector4 } from '@zephyr3d/base';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { ShaderHelper } from './shader/helper';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';

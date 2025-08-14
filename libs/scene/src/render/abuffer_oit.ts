@@ -13,6 +13,7 @@ import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
+import { Disposable } from '@zephyr3d/base';
 
 /**
  * per-pixel linked list OIT renderer using ABuffer.
@@ -22,7 +23,7 @@ import { ShaderHelper } from '../material';
  *
  * @public
  */
-export class ABufferOIT implements OIT {
+export class ABufferOIT extends Disposable implements OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
   public static readonly usePremultipliedAlpha = true;
@@ -43,13 +44,13 @@ export class ABufferOIT implements OIT {
   private _scissorHeight: number;
   private _currentPass: number;
   private _savedScissor: DeviceViewport;
-  private _disposed: boolean;
   /**
    * Creates an instance of ABufferOIT class
    *
    * @param numLayers - How many transparent layers, default is 16
    */
   constructor(numLayers = 16) {
+    super();
     this._nodeBuffer = null;
     this._headStagingBuffer = null;
     this._headBuffer = null;
@@ -62,7 +63,6 @@ export class ABufferOIT implements OIT {
     this._scissorHeight = 0;
     this._savedScissor = null;
     this._currentPass = 0;
-    this._disposed = false;
   }
   /**
    * {@inheritDoc OIT.getType}
@@ -81,28 +81,6 @@ export class ABufferOIT implements OIT {
    */
   wantsPremultipliedAlpha() {
     return ABufferOIT.usePremultipliedAlpha;
-  }
-  /**
-   * {@inheritDoc OIT.dispose}
-   */
-  dispose() {
-    this._disposed = true;
-    this._nodeBuffer?.dispose();
-    this._nodeBuffer = null;
-    this._headStagingBuffer?.dispose();
-    this._headStagingBuffer = null;
-    this._headBuffer?.dispose();
-    this._headBuffer = null;
-    this._scissorOffsetBuffer?.dispose();
-    this._scissorOffsetBuffer = null;
-    this._hash = null;
-    this._savedScissor = null;
-  }
-  /**
-   * {@inheritDoc OIT.disposed}
-   */
-  get disposed() {
-    return this._disposed;
   }
   /**
    * {@inheritDoc OIT.begin}
@@ -404,5 +382,18 @@ export class ABufferOIT implements OIT {
       stencilStates.setReadMask(0xff);
     }
     return this._compositeProgram;
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._nodeBuffer?.dispose();
+    this._nodeBuffer = null;
+    this._headStagingBuffer?.dispose();
+    this._headStagingBuffer = null;
+    this._headBuffer?.dispose();
+    this._headBuffer = null;
+    this._scissorOffsetBuffer?.dispose();
+    this._scissorOffsetBuffer = null;
+    this._hash = null;
+    this._savedScissor = null;
   }
 }

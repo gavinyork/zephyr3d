@@ -1,6 +1,6 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { applyMixins, Vector3 } from '@zephyr3d/base';
+import { applyMixins, Vector3, DRef } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
@@ -17,7 +17,7 @@ import type {
   GPUProgram,
   Texture2D
 } from '@zephyr3d/device';
-import { Application, DRef } from '../app';
+import { Application } from '../app';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';

@@ -23,7 +23,6 @@ import {
   PBRMetallicRoughnessMaterial,
   PlaneShape,
   PointLight,
-  DRef,
   SphereShape,
   SpotLight,
   TorusShape,
@@ -39,6 +38,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';

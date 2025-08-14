@@ -1,29 +1,54 @@
+import { Observable, type IEventTarget } from './event';
+
 /**
  * Represents an object that can be disposed
  * @public
  **/
-export interface Disposable {
+export interface IDisposable extends IEventTarget<{ dispose: [] }> {
   dispose(): void;
   readonly disposed: boolean;
+}
+
+/**
+ * Base class for any Disposable class
+ * @public
+ */
+export class Disposable extends Observable<{ dispose: [] }> implements IDisposable {
+  private _disposed: boolean;
+  constructor() {
+    super();
+    this._disposed = false;
+  }
+  get disposed() {
+    return this._disposed;
+  }
+  dispose() {
+    if (!this._disposed) {
+      this.dispatchEvent('dispose');
+      this.onDispose();
+      this._disposed = true;
+    }
+  }
+  protected onDispose() {}
 }
 
 /**
  * Maps disposable objects to their reference counts.
  * @internal
  */
-const objectReferenceMap = new WeakMap<Disposable, number>();
+const objectReferenceMap = new WeakMap<IDisposable, number>();
 
 /**
  * Maps disposable objects to their weak references.
  * @internal
  */
-const weakRefMap = new WeakMap<Disposable, Set<DWeakRef<Disposable>>>();
+const weakRefMap = new WeakMap<IDisposable, Set<DWeakRef<IDisposable>>>();
 
 /**
  * Holds objects that are pending disposal.
  * @internal
  */
-const disposalQueue = new Set<Disposable>();
+const disposalQueue = new Set<IDisposable>();
 
 /**
  * Processes all pending disposals from the previous frame.
@@ -48,7 +73,7 @@ export function flushPendingDisposals() {
  * @remarks
  * Retains an object will increase the reference counter for this object
  */
-export function retainObject(obj: Disposable) {
+export function retainObject(obj: IDisposable) {
   if (obj) {
     const ref = objectReferenceMap.get(obj) ?? 0;
     objectReferenceMap.set(obj, ref + 1);
@@ -67,7 +92,7 @@ export function retainObject(obj: Disposable) {
  * Releases an object will decrease the reference counter for this object.
  * If reference counter become zero, the object will be disposed at next frame.
  */
-export function releaseObject(obj: Disposable) {
+export function releaseObject(obj: IDisposable) {
   if (obj) {
     let refcount = objectReferenceMap.get(obj) ?? 0;
     if (refcount > 0) {
@@ -86,7 +111,7 @@ export function releaseObject(obj: Disposable) {
  *
  * @public
  */
-export class DRef<T extends Disposable> {
+export class DRef<T extends IDisposable> {
   /** @internal */
   private _object: T;
   /**
@@ -129,7 +154,7 @@ export class DRef<T extends Disposable> {
  *
  * @public
  */
-export class DWeakRef<T extends Disposable> {
+export class DWeakRef<T extends IDisposable> {
   /** @internal */
   private _object: T;
   /**

@@ -1,8 +1,8 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '@zephyr3d/scene';
-import { DRef, fetchSampler, linearToGamma, PostEffectLayer, ShaderHelper } from '@zephyr3d/scene';
+import { fetchSampler, linearToGamma, PostEffectLayer, ShaderHelper } from '@zephyr3d/scene';
 import { AbstractPostEffect, Application } from '@zephyr3d/scene';
-import { Vector2, Vector4 } from '@zephyr3d/base';
+import { DRef, Vector2, Vector4 } from '@zephyr3d/base';
 
 export class PostDecalRenderer extends AbstractPostEffect {
   static _defaultDecalTexture: DRef<Texture2D> = new DRef();

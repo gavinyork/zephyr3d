@@ -1,7 +1,6 @@
-import { Observable } from '@zephyr3d/base';
+import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
-import { flushPendingDisposals } from './gc/ref';
 
 type appEventMap = {
   resize: [width: number, height: number];

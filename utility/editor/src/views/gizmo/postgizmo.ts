@@ -7,10 +7,11 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
-import { BoxShape, Mesh, DRef, UnlitMaterial } from '@zephyr3d/scene';
+import { BoxShape, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, Application, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { calcHierarchyBoundingBox } from '../../helpers/misc';

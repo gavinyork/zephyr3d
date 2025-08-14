@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { InterpolationMode, TypedArray, VFS } from '@zephyr3d/base';
-import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
+import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, DRef } from '@zephyr3d/base';
 import type {
   AssetHierarchyNode,
   AssetMeshData,
@@ -49,7 +49,6 @@ import {
   MORPH_TARGET_TEX2,
   MORPH_TARGET_TEX3
 } from '../../../values';
-import { DRef } from '../../../app';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;

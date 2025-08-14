@@ -1,9 +1,9 @@
 import type { Ray } from '@zephyr3d/base';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4, DRef } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
-import { Application, DRef } from '../../app';
+import { Application } from '../../app';
 import { GrassManager } from './grass';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';

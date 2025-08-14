@@ -13,7 +13,7 @@ import type { AbstractPostEffect } from './posteffect';
 import { PostEffectLayer } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
-import { DRef } from '../app';
+import { DRef } from '@zephyr3d/base';
 
 /**
  * Posteffect rendering context

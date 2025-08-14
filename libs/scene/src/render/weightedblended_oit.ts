@@ -11,7 +11,7 @@ import type {
 import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { Vector4 } from '@zephyr3d/base';
+import { Disposable, Vector4 } from '@zephyr3d/base';
 
 /**
  * Weighted-blended OIT renderer.
@@ -21,17 +21,15 @@ import { Vector4 } from '@zephyr3d/base';
  *
  * @public
  */
-export class WeightedBlendedOIT implements OIT {
+export class WeightedBlendedOIT extends Disposable implements OIT {
   /** Type name of WeightedBlendedOIT */
   public static readonly type = 'wb';
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
-  /** @internal */
-  private _disposed: boolean;
 
   constructor() {
-    this._disposed = false;
+    super();
   }
   /**
    * {@inheritDoc OIT.getType}
@@ -50,18 +48,6 @@ export class WeightedBlendedOIT implements OIT {
    */
   wantsPremultipliedAlpha() {
     return false;
-  }
-  /**
-   * {@inheritDoc OIT.dispose}
-   */
-  dispose() {
-    this._disposed = true;
-  }
-  /**
-   * {@inheritDoc OIT.disposed}
-   */
-  get disposed() {
-    return this._disposed;
   }
   /**
    * {@inheritDoc OIT.begin}

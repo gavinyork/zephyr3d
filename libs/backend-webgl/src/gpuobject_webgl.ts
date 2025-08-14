@@ -16,17 +16,16 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
-import { Observable } from '@zephyr3d/base';
+import { Disposable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGLGPUObject<T> extends Observable<{ disposed: [] }> implements GPUObject<T> {
+export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<T> {
   protected _device: WebGLDevice;
   protected _object: T;
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
-  protected _disposed: boolean;
   protected _restoreHandler: (obj: GPUObject) => void;
   constructor(device: WebGLDevice) {
     super();
@@ -36,18 +35,13 @@ export abstract class WebGLGPUObject<T> extends Observable<{ disposed: [] }> imp
     this._cid = 1;
     this._name = genDefaultName(this);
     this._restoreHandler = null;
-    this._disposed = false;
     this._device.addGPUObject(this);
   }
   get device(): AbstractDevice {
-    this.dispatchEvent('disposed');
     return this._device;
   }
   get object(): T {
     return this._object;
-  }
-  get disposed(): boolean {
-    return this._disposed;
   }
   get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
@@ -107,14 +101,8 @@ export abstract class WebGLGPUObject<T> extends Observable<{ disposed: [] }> imp
   isBindGroup(): this is BindGroup {
     return false;
   }
-  dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._device.disposeObject(this, true);
-    }
-  }
   reload(): void {
-    if (this._disposed) {
+    if (this.disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }
@@ -124,5 +112,9 @@ export abstract class WebGLGPUObject<T> extends Observable<{ disposed: [] }> imp
   }
   restore(): void {
     throw new Error('Abstract function call: restore()');
+  }
+  protected onDispose(): void {
+    super.onDispose();
+    this._device.disposeObject(this, true);
   }
 }

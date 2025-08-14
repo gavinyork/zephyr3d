@@ -1,9 +1,7 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import type { Disposable } from '../../app';
-import { DWeakRef } from '../../app';
-import { Application, DRef } from '../../app';
+import { Application } from '../../app';
 import type { Vector4 } from '@zephyr3d/base';
-import { AABB, ClipState, nextPowerOf2 } from '@zephyr3d/base';
+import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
@@ -31,29 +29,25 @@ const INSTANCE_BYTES = 4 * 4;
  * Grass glade instance manager class
  * @internal
  */
-export class GrassInstances implements Disposable {
+export class GrassInstances extends Disposable {
   private readonly _instances: GrassInstanceInfo[];
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
   private readonly _indexBuffer: DRef<IndexBuffer>;
   private readonly _instanceBuffer: DRef<StructuredBuffer>;
   private readonly _primitive: DRef<Primitive>;
-  private _disposed: boolean;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
+    super();
     this._instances = [];
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
     this._instanceBuffer = new DRef();
     this._primitive = new DRef();
-    this._disposed = false;
   }
   get numInstances() {
     return this._instances.length;
   }
   get instanceBuffer(): StructuredBuffer {
     return this._instanceBuffer.get();
-  }
-  get disposed() {
-    return this._disposed;
   }
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
     if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
@@ -75,13 +69,6 @@ export class GrassInstances implements Disposable {
       }
       this._primitive.get().drawInstanced(this._instances.length);
     }
-  }
-  dispose(): void {
-    this._disposed = true;
-    this._baseVertexBuffer.dispose();
-    this._indexBuffer.dispose();
-    this._instanceBuffer.dispose();
-    this._primitive.dispose();
   }
   updateBuffers() {
     const device = Application.instance.device;
@@ -135,20 +122,26 @@ export class GrassInstances implements Disposable {
     this._instances.push(...instances);
     this.updateBuffers();
   }
+  protected onDispose(): void {
+    super.onDispose();
+    this._baseVertexBuffer.dispose();
+    this._indexBuffer.dispose();
+    this._instanceBuffer.dispose();
+    this._primitive.dispose();
+  }
 }
 
 /**
  * Grass layer class
  * @public
  */
-export class GrassLayer implements Disposable {
+export class GrassLayer extends Disposable {
   private static readonly _indexBuffer: DRef<IndexBuffer> = new DRef();
   private readonly _material: DRef<ClipmapGrassMaterial>;
   private readonly _quadtree: DRef<GrassQuadtreeNode>;
   private _bladeWidth: number;
   private _bladeHeight: number;
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
-  private _disposed: boolean;
   /**
    * Creates an instance of GrassLayer
    * @param terrain - Clipmap terrain object
@@ -157,6 +150,7 @@ export class GrassLayer implements Disposable {
    * @param albedoMap - Albedo texture for the blade
    */
   constructor(terrain: ClipmapTerrain, bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D) {
+    super();
     this._material = new DRef(new ClipmapGrassMaterial(terrain));
     this._material.get().albedoTexture = albedoMap;
     if (albedoMap) {
@@ -165,7 +159,6 @@ export class GrassLayer implements Disposable {
     this._bladeWidth = bladeWidth;
     this._bladeHeight = bladeHeight;
     this._baseVertexBuffer = new DRef(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
-    this._disposed = false;
     this._quadtree = new DRef(
       new GrassQuadtreeNode(this._baseVertexBuffer.get(), GrassLayer._getIndexBuffer())
     );
@@ -332,15 +325,9 @@ export class GrassLayer implements Disposable {
       this._quadtree.get().draw(ctx.camera, region, minY, maxY, false);
     }
   }
-  /**
-   * Whether this layer was disposed
-   */
-  get disposed() {
-    return this._disposed;
-  }
   /** @internal */
-  dispose(): void {
-    this._disposed = true;
+  protected onDispose(): void {
+    super.onDispose();
     this._material.dispose();
     this._quadtree.dispose();
     this._baseVertexBuffer.dispose();
@@ -350,18 +337,17 @@ export class GrassLayer implements Disposable {
  * Grass renderer for clipmap terrain
  * @public
  */
-export class GrassRenderer implements Disposable {
+export class GrassRenderer extends Disposable {
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
-  private _disposed: boolean;
   /**
    * Creates an instance of GrassRenderer
    * @param terrain - Clipmap terrain object
    */
   constructor(terrain: ClipmapTerrain) {
+    super();
     this._terrain = new DWeakRef(terrain);
     this._layers = [];
-    this._disposed = false;
   }
   /** @internal */
   updateMaterial() {
@@ -474,21 +460,6 @@ export class GrassRenderer implements Disposable {
       grassLayer.removeInstances(minX, minZ, maxX, maxZ, num);
     }
   }
-  /** Whether this was disposed */
-  get disposed() {
-    return this._disposed;
-  }
-  /** @internal */
-  dispose(): void {
-    if (!this._disposed) {
-      this._disposed = true;
-      this._terrain.dispose();
-      for (const layer of this._layers) {
-        layer.dispose();
-      }
-      this._layers = null;
-    }
-  }
   /** @internal */
   draw(ctx: DrawContext) {
     const bv = this._terrain.get().getWorldBoundingVolume().toAABB();
@@ -498,25 +469,33 @@ export class GrassRenderer implements Disposable {
       layer.draw(ctx, this._terrain.get().worldRegion, minY - layer.bladeHeight, maxY + layer.bladeHeight);
     }
   }
+  protected onDispose(): void {
+    super.onDispose();
+    this._terrain.dispose();
+    for (const layer of this._layers) {
+      layer.dispose();
+    }
+    this._layers = null;
+  }
 }
+
 /** @internal */
-export class GrassQuadtreeNode implements Disposable {
+export class GrassQuadtreeNode extends Disposable {
   private static readonly _cullAABB = new AABB();
   private readonly _grassInstances: DRef<GrassInstances>;
   private _children: GrassQuadtreeNode[];
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
   private readonly _indexBuffer: DRef<IndexBuffer>;
-  private _disposed: boolean;
   private _minX: number;
   private _minZ: number;
   private _maxX: number;
   private _maxZ: number;
   constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
+    super();
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
     this._grassInstances = new DRef(new GrassInstances(baseVertexBuffer, indexBuffer));
     this._children = null;
-    this._disposed = false;
     this._minX = 0;
     this._minZ = 0;
     this._maxX = 1;
@@ -630,11 +609,8 @@ export class GrassQuadtreeNode implements Disposable {
     }
     return n;
   }
-  get disposed() {
-    return this._disposed;
-  }
-  dispose(): void {
-    this._disposed = true;
+  protected onDispose(): void {
+    super.onDispose();
     this._baseVertexBuffer.dispose();
     this._indexBuffer.dispose();
     this._grassInstances.dispose();

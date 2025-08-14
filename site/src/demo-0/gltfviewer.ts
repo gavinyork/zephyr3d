@@ -1,8 +1,7 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3, HttpFS } from '@zephyr3d/base';
+import { Vector4, Vector3, HttpFS, DRef } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { DRef } from '@zephyr3d/scene';
 import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
 import { BatchGroup, WeightedBlendedOIT, ABufferOIT, OrbitCameraController } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';

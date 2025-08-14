@@ -1,4 +1,4 @@
-import type { VectorBase, CubeFace, TypedArray, IEventTarget } from '@zephyr3d/base';
+import type { VectorBase, CubeFace, TypedArray, IDisposable } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
 import type { PBTypeInfo } from './builder/types';
 import { PBArrayTypeInfo, PBPrimitiveTypeInfo, PBStructTypeInfo, PBPrimitiveType } from './builder/types';
@@ -1256,7 +1256,7 @@ export interface SamplerOptions {
  * Base class for a GPU object
  * @public
  */
-export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: [] }> {
+export interface GPUObject<T = unknown> extends IDisposable {
   /** The object was created by which device */
   readonly device: AbstractDevice;
   /** The internal GPU object  */

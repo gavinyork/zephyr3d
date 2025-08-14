@@ -1,10 +1,9 @@
-import { weightedAverage } from '@zephyr3d/base';
+import { weightedAverage, DWeakRef, Disposable } from '@zephyr3d/base';
+import type { IDisposable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
-import type { Disposable } from '../app/gc/ref';
-import { DWeakRef } from '../app/gc/ref';
 
 /**
  * Options for playing animation
@@ -60,9 +59,7 @@ export type StopAnimationOptions = {
  * Animation set
  * @public
  */
-export class AnimationSet implements Disposable {
-  /** @internal */
-  private _disposed: boolean;
+export class AnimationSet extends Disposable implements IDisposable {
   /** @internal */
   private _model: DWeakRef<SceneNode>;
   /** @internal */
@@ -93,7 +90,7 @@ export class AnimationSet implements Disposable {
    * @param model - The model which is controlled by the animation set
    */
   constructor(model: SceneNode) {
-    this._disposed = false;
+    super();
     this._model = new DWeakRef<SceneNode>(model);
     this._animations = {};
     this._activeTracks = new Map();
@@ -338,8 +335,8 @@ export class AnimationSet implements Disposable {
       }
     }
   }
-  dispose() {
-    this._disposed = true;
+  protected onDispose() {
+    super.onDispose();
     this._model?.dispose();
     this._model = null;
     for (const k in this._animations) {
@@ -349,8 +346,5 @@ export class AnimationSet implements Disposable {
     this._activeAnimations.clear();
     this._activeSkeletons.clear();
     this._activeTracks.clear();
-  }
-  get disposed() {
-    return this._disposed;
   }
 }

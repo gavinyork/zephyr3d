@@ -5,7 +5,7 @@ import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneController } from '../controllers/scenecontroller';
 import { FontGlyph } from './fontglyph';
-import { AssetManager, DRef } from '@zephyr3d/scene';
+import { AssetManager } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
   analyzeGPUObjectGrowth,
@@ -30,8 +30,8 @@ import { CodeEditor } from '../components/codeeditor';
 export class Editor {
   private readonly _moduleManager: ModuleManager;
   private readonly _assetImages: {
-    brushes: { [key: string]: DRef<Texture2D> };
-    app: { [key: string]: DRef<Texture2D> };
+    brushes: { [key: string]: zephyr3d_base.DRef<Texture2D> };
+    app: { [key: string]: zephyr3d_base.DRef<Texture2D> };
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
@@ -188,14 +188,14 @@ export class Editor {
     const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
     for (const name in brushConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
-      this._assetImages.brushes[name] = new DRef(tex);
+      this._assetImages.brushes[name] = new zephyr3d_base.DRef(tex);
     }
     const appConfig = await assetManager.fetchJsonData('conf/app.json');
     for (const name in appConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(appConfig[name], {
         samplerOptions: { mipFilter: 'none' }
       });
-      this._assetImages.app[name] = new DRef(tex);
+      this._assetImages.app[name] = new zephyr3d_base.DRef(tex);
     }
   }
   registerModules() {

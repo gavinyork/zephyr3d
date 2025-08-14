@@ -380,7 +380,6 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       } else {
         this._disposeObjectList.push(obj);
       }
-      obj.dispatchEvent('disposed');
     }
   }
   restoreObject(obj: GPUObject) {

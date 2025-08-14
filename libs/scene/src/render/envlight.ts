@@ -1,4 +1,4 @@
-import { Vector3 } from '@zephyr3d/base';
+import { DRef, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -10,7 +10,6 @@ import type {
   TextureCube
 } from '@zephyr3d/device';
 import { Application } from '../app/app';
-import { DRef } from '../app/gc/ref';
 import { fetchSampler } from '../utility/misc';
 
 /**
