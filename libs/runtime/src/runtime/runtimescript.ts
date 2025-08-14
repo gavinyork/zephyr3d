@@ -1,4 +1,4 @@
-import { IDisposable } from '@zephyr3d/base';
+import type { IDisposable } from '@zephyr3d/base';
 
 export class RuntimeScript<T extends IDisposable | null> {
   onCreated(): void | Promise<void> {}

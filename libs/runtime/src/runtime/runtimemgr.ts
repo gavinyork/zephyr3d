@@ -1,4 +1,4 @@
-import { VFS } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
 import ScriptingSystem from './scriptingsystem';
 
 export class RuntimeManager {
