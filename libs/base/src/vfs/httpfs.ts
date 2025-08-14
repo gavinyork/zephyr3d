@@ -21,11 +21,8 @@ export class HttpFS extends VFS {
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
     super(true); // Readonly
-    baseURL = baseURL || new URL(window.location.href).origin;
-    if (!URL.canParse(baseURL)) {
-      throw new Error(`Invalid base URL while contructing HttpFS: ${baseURL}`);
-    }
-    const url = new URL(baseURL);
+    baseURL = baseURL || './';
+    const url = new URL(baseURL, window.location.href);
     this.basePath = url.pathname;
     if (this.basePath.endsWith('/')) {
       this.basePath = this.basePath.slice(0, -1);

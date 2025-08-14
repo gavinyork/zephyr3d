@@ -18,7 +18,6 @@ import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
-import { VFSScriptRegistry } from './scripting';
 import { moduleSharing } from './moduleshare';
 
 import * as zephyr3d_base from '@zephyr3d/base';
@@ -35,8 +34,6 @@ export class Editor {
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
-  private _scriptRoot: string;
-  private _registry: VFSScriptRegistry;
   private _codeEditor: CodeEditor;
   private _scriptingSystem: ScriptingSystem;
   private _extraLibs: Record<string, Monaco.IDisposable>;
@@ -45,22 +42,22 @@ export class Editor {
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
-    this._scriptRoot = './';
     this._codeEditor = null;
     this._extraLibs = {};
-    this._registry = new VFSScriptRegistry({ mode: 'editor' }, ProjectService.VFS, this._scriptRoot);
-    this._scriptingSystem = new ScriptingSystem(this._registry, {
+    this._scriptingSystem = new ScriptingSystem({
       onLoadError(e) {
         console.error(e);
       }
     });
+    this._scriptingSystem.registry.VFS = ProjectService.VFS;
+    this._scriptingSystem.registry.editorMode = true;
   }
   get sceneChanged() {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
   }
   async loadScriptDependencies(path: string) {
     const dependencies: Record<string, string> = {};
-    await this._registry.getDependencies(path, null, dependencies);
+    await this._scriptingSystem.registry.getDependencies(path, null, dependencies);
     for (const k of Object.keys(dependencies)) {
       // Must delete old lib reference first!!!
       const oldDisposable = this._extraLibs[k];

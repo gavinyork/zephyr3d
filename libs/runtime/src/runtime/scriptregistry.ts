@@ -1,76 +1,275 @@
-/**
- * ScriptRegistry 基类
- * - 负责模块定位、源码读取、转译与导入重写等策略的抽象
- * - 子类可根据环境实现：VFS 文件系统（editor）或 URL/服务器（runtime）
- *
- * 约定：
- * - ModuleId：逻辑模块标识（通常不包含扩展名），例如 "/scripts/foo/bar"
- * - resolveUrl：返回可以被原生 import() 加载的 URL（runtime 模式）
- * - fetchSource/transpile/rewriteImports：用于编辑器模式的构建流程
- */
-
+import type { VFS } from '@zephyr3d/base';
+import { textToBase64 } from '@zephyr3d/base';
 import type { ModuleId } from './types';
 
-export interface RegistryOptions {
-  mode: 'editor' | 'runtime' | string;
+function toDataUrl(js: string, id: string): string {
+  const b64 = textToBase64(js);
+  return `data:text/javascript;base64,${b64}#${encodeURIComponent(String(id))}`;
 }
 
-export abstract class ScriptRegistry {
-  public readonly opts: RegistryOptions;
+function isAbsoluteUrl(spec: string): boolean {
+  return /^https?:\/\//i.test(spec);
+}
+function isSpecialUrl(spec: string): boolean {
+  return /^(data|blob):/i.test(spec);
+}
+function isBareModule(spec: string): boolean {
+  return !spec.startsWith('./') && !spec.startsWith('../') && !spec.startsWith('/') && !spec.startsWith('#/');
+}
 
-  constructor(opts: RegistryOptions) {
-    this.opts = opts;
+export class ScriptRegistry {
+  private _vfs: VFS;
+  private _scriptsRoot: string;
+  private _built = new Map<string, string>(); // logicalId -> dataURL
+  private _editorMode = false;
+
+  constructor(vfs: VFS, scriptsRoot: string, editorMode: boolean) {
+    this._vfs = vfs;
+    this._scriptsRoot = scriptsRoot;
+    this._editorMode = editorMode;
   }
 
-  /**
-   * runtime 模式下：把逻辑 ModuleId 映射为可被 import() 的真实 URL
-   * editor 模式：通常不使用此函数（返回空字符串或抛错均可），由子类自行决定
-   */
-  async resolveUrl(id: ModuleId): Promise<string> {
-    const u = await this.resolveRuntimeUrl(id);
-    if (!u) {
-      throw new Error(`resolveUrl not implemented for id: ${id}`);
-    }
-    return u;
+  get VFS() {
+    return this._vfs;
+  }
+  set VFS(vfs: VFS) {
+    this._vfs = vfs;
   }
 
-  protected abstract resolveRuntimeUrl(id: ModuleId): Promise<string>;
+  get editorMode() {
+    return this._editorMode;
+  }
+  set editorMode(val: boolean) {
+    this._editorMode = val;
+  }
 
-  /**
-   * editor 模式下：读取源代码。若找不到返回 undefined
-   * - 子类需要按自己的存储介质实现（如 VFS 或网络）
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async fetchSource(
     _id: ModuleId
   ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
-    return undefined;
+    let type: 'js' | 'ts' = null;
+    let pathWithExt = '';
+    if (_id.endsWith('.ts')) {
+      pathWithExt = _id;
+      type = 'ts';
+    } else if (_id.endsWith('.js')) {
+      pathWithExt = _id;
+      type = 'js';
+    }
+    if (type) {
+      const exists = await this._vfs.exists(pathWithExt);
+      if (!exists) {
+        type = null;
+      }
+      const stat = await this._vfs.stat(pathWithExt);
+      if (stat.isDirectory) {
+        type = null;
+      }
+    }
+    const types = ['ts', 'js'] as const;
+    if (!type) {
+      for (const t of types) {
+        pathWithExt = `${_id}.${t}`;
+        const exists = await this._vfs.exists(pathWithExt);
+        if (exists) {
+          const stats = await this._vfs.stat(pathWithExt);
+          if (stats.isFile) {
+            type = t;
+            break;
+          }
+        }
+      }
+    }
+    if (type) {
+      const code = (await this._vfs.readFile(pathWithExt, { encoding: 'utf8' })) as string;
+      return { code, type, path: pathWithExt };
+    }
   }
 
-  /**
-   * editor 模式下：转译 TS/新语法为 JS（默认直返）
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected async transpile(code: string, _id: ModuleId, _type: 'js' | 'ts'): Promise<string> {
-    return code;
+  async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
+    const id = this.resolveLogicalId(entryId);
+    return this._editorMode ? await this.build(String(id)) : id;
   }
 
-  /**
-   * editor 模式下：重写 import 路径以便加载（默认直返）
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected async rewriteImports(code: string, _fromId: ModuleId): Promise<string> {
-    return code;
+  async getDependencies(
+    entryId: string,
+    fromId: string,
+    dependencies: Record<string, string>
+  ): Promise<void> {
+    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
+    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+    const normalizedId = this.resolveLogicalId(entryId, fromId);
+    const srcPath = await this.resolveSourcePath(normalizedId);
+    if (!srcPath || dependencies[srcPath.path] !== undefined) {
+      return;
+    }
+    const code = (await this._vfs.readFile(srcPath.path, { encoding: 'utf8' })) as string;
+    dependencies[srcPath.path] = code;
+
+    const gather = async (input: string, re: RegExp) => {
+      for (;;) {
+        const m = re.exec(input);
+        if (!m) {
+          break;
+        }
+
+        const spec = m[2];
+
+        if (spec.startsWith('./') || spec.startsWith('../')) {
+          await this.getDependencies(spec, normalizedId, dependencies);
+        }
+      }
+    };
+
+    await gather(code, reStatic);
+    await gather(code, reDynamic);
   }
 
-  /**
-   * editor 模式下（可选）：提供统一执行入口。
-   * - base 类不实现，由子类（如 VFSScriptRegistry）在 editor 模式下借助 SystemJS 或其他机制实现
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async run(_entryId: ModuleId): Promise<any> {
-    throw new Error('run() not implemented by this registry');
+  private async build(id: string): Promise<string> {
+    const key = String(id);
+    const cached = this._built.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const srcPath = await this.resolveSourcePath(key);
+    if (!srcPath) {
+      throw new Error(`Module not found: ${key}`);
+    }
+    const code = (await this._vfs.readFile(srcPath.path, { encoding: 'utf8' })) as string;
+
+    const rewritten = await this.rewriteImports(code, key);
+    const js = await this.transpile(rewritten, key, srcPath.type);
+    const url = toDataUrl(js, key);
+    this._built.set(key, url);
+    return url;
+  }
+
+  protected async transpile(code: string, _id: ModuleId, type: 'js' | 'ts'): Promise<string> {
+    const logicalId = String(_id);
+
+    if (type === 'js') {
+      return `${code}\n//# sourceURL=${logicalId}`;
+    }
+
+    const ts = (window as any).ts as typeof import('typescript');
+    if (!ts) {
+      throw new Error('TypeScript runtime (window.ts) not found. Load /vendor/typescript.js first.');
+    }
+
+    const res = ts.transpileModule(code, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2015,
+        module: ts.ModuleKind.ESNext,
+        sourceMap: true,
+        inlineSources: true,
+        experimentalDecorators: true,
+        useDefineForClassFields: false
+      },
+      fileName: logicalId
+    });
+
+    let out = res.outputText || '';
+    if (res.sourceMapText) {
+      const mapBase64 = btoa(unescape(encodeURIComponent(res.sourceMapText)));
+      out += `\n//# sourceMappingURL=data:application/json;base64,${mapBase64}`;
+    }
+    out += `\n//# sourceURL=${logicalId}`;
+    return out;
+  }
+
+  protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
+    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
+    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+    const replaceAsync = async (input: string, re: RegExp) => {
+      let out = '';
+      let last = 0;
+      for (;;) {
+        const m = re.exec(input);
+        if (!m) {
+          break;
+        }
+        out += input.slice(last, m.index);
+
+        const quote = m[1];
+        const spec = m[2];
+        let replacement = spec;
+
+        if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
+          replacement = spec;
+        } else {
+          const depId = this.resolveLogicalId(spec, String(fromId));
+          replacement = await this.build(depId); // 递归构建为 data URL
+        }
+
+        const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
+        out += replaced;
+        last = m.index + m[0].length;
+      }
+      out += input.slice(last);
+      return out;
+    };
+
+    let out = await replaceAsync(code, reStatic);
+    out = await replaceAsync(out, reDynamic);
+    return out;
+  }
+
+  resolveLogicalId(spec: string, fromId?: string): string {
+    let path: string;
+
+    if (spec.startsWith('#/')) {
+      path = this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, spec.slice(2)));
+    } else if (spec.startsWith('./') || spec.startsWith('../')) {
+      if (!fromId) {
+        throw new Error(`Relative import "${spec}" requires fromId`);
+      }
+      path = this._vfs.normalizePath(
+        this._vfs.join(this._vfs.dirname(this._vfs.normalizePath(fromId)), spec)
+      );
+    } else if (spec.startsWith('/')) {
+      path = spec.replace(/^\/+/, '/');
+    } else {
+      return spec;
+    }
+    return path;
+  }
+
+  async resolveSourcePath(logicalId: string) {
+    let type: 'js' | 'ts' = null;
+    let pathWithExt = '';
+    if (logicalId.endsWith('.ts')) {
+      pathWithExt = logicalId;
+      type = 'ts';
+    } else if (logicalId.endsWith('.js')) {
+      pathWithExt = logicalId;
+      type = 'js';
+    }
+    if (type) {
+      const exists = await this._vfs.exists(pathWithExt);
+      if (!exists) {
+        type = null;
+      }
+      const stat = await this._vfs.stat(pathWithExt);
+      if (stat.isDirectory) {
+        type = null;
+      }
+    }
+    const types = ['ts', 'js'] as const;
+    if (!type) {
+      for (const t of types) {
+        pathWithExt = `${logicalId}.${t}`;
+        const exists = await this._vfs.exists(pathWithExt);
+        if (exists) {
+          const stats = await this._vfs.stat(pathWithExt);
+          if (stats.isFile) {
+            type = t;
+            break;
+          }
+        }
+      }
+    }
+    return type ? { type, path: pathWithExt } : null;
   }
 }
-
-export default ScriptRegistry;
