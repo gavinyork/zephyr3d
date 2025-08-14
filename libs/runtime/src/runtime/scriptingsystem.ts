@@ -1,35 +1,15 @@
-/**
- * ScriptingSystem
- * - 负责将模块加载委托给 ScriptRegistry
- * - 负责实例化模块（支持默认导出类、create 工厂、或直接模块对象）
- * - 负责绑定/解绑到宿主，并在每帧调用已附加脚本的 update
- *
- * 依赖：
- * - ScriptRegistry（见下个 Artifact）
- * - 可选：VFSScriptRegistry（editor 模式使用 SystemJS 的实现，见第三个 Artifact）
- */
-
 import type { ModuleId } from './types';
 import { ScriptRegistry } from './scriptregistry';
 import { HttpFS } from '@zephyr3d/base';
+import { RuntimeScript } from './runtimescript';
 
 // 你项目中的宿主接口（实体/节点等），至少需要一个 id 或可作为 Map 键
 export type Host = unknown;
 
-// 外部传入的脚本描述（要附加哪个模块、初始属性）
-export interface ScriptDescriptor {
-  module: ModuleId; // 逻辑模块 ID（不带扩展名）；runtime 模式可为 URL 映射的 key
-  props?: Record<string, any>;
-}
-
-// 附加后的脚本记录
 export interface AttachedScript {
   id: ModuleId;
   url: string; // runtime: 实际 URL；editor: 逻辑 ID 或 data URL（见实现）
-  instance: any;
-  props?: Record<string, any>;
-  dispose?: () => void;
-  update?: (dt: number, time: number) => void;
+  instance: RuntimeScript<any>;
 }
 
 export class ScriptingSystem {
@@ -54,55 +34,32 @@ export class ScriptingSystem {
   }
 
   // 将脚本模块附加到宿主，返回附加记录
-  async attachScript(host: Host, desc: ScriptDescriptor): Promise<AttachedScript | undefined> {
-    const { module, props } = desc;
+  async attachScript(host: Host, module: string): Promise<AttachedScript> {
     try {
       const url = await this._registry.resolveRuntimeUrl(module);
+      if (!url) {
+        return null;
+      }
       const mod = await import(/* @vite-ignore */ url + (this._importComment ?? ''));
-
-      let instance: any;
-      let disposer: undefined | (() => void);
-      let updater: undefined | ((dt: number, time: number) => void);
-
+      let instance: RuntimeScript<any>;
       if (typeof mod?.default === 'function') {
         // 默认导出类
-        instance = new mod.default(host, props);
-        if (typeof instance.init === 'function') {
-          await instance.init();
-        }
-        if (typeof instance.dispose === 'function') {
-          disposer = () => instance.dispose();
-        }
-        if (typeof instance.update === 'function') {
-          updater = (dt, t) => instance.update(dt, t);
-        }
-      } else if (typeof mod?.create === 'function') {
-        // 工厂函数
-        instance = await mod.create(host, props);
-        if (instance && typeof instance.dispose === 'function') {
-          disposer = () => instance.dispose();
-        }
-        if (instance && typeof instance.update === 'function') {
-          updater = (dt, t) => instance.update(dt, t);
+        instance = new mod.default();
+        if (instance instanceof RuntimeScript) {
+          const P = instance.onCreated();
+          if (P instanceof Promise) {
+            await P;
+          }
         }
       } else {
-        // 模块命名空间
-        instance = mod;
-        if (typeof mod?.dispose === 'function') {
-          disposer = () => mod.dispose(host);
-        }
-        if (typeof mod?.update === 'function') {
-          updater = (dt, t) => mod.update(host, dt, t);
-        }
+        console.warn(`Script '${module}' does not have RuntimeScript class exported as default`);
+        return null;
       }
 
       const attached: AttachedScript = {
         id: module,
         url,
-        instance,
-        props,
-        dispose: disposer,
-        update: updater
+        instance
       };
 
       let list = this._hostScripts.get(host);
@@ -112,10 +69,14 @@ export class ScriptingSystem {
       }
       list.push(attached);
       this.registerHost(host);
+      const P = instance.onAttached(host);
+      if (P instanceof Promise) {
+        await P;
+      }
       return attached;
     } catch (e) {
-      this._onLoadError?.(e, desc.module);
-      return undefined;
+      this._onLoadError?.(e, module);
+      return null;
     }
   }
 
@@ -125,19 +86,20 @@ export class ScriptingSystem {
     if (!list || list.length === 0) {
       return false;
     }
-
     let removed = false;
     for (let i = list.length - 1; i >= 0; i--) {
       const it = list[i];
-      const hit =
-        typeof idOrInstance === 'string' || typeof idOrInstance === 'number'
-          ? it.id === idOrInstance
-          : it.instance === idOrInstance;
+      const hit = typeof idOrInstance === 'string' ? it.id === idOrInstance : it.instance === idOrInstance;
       if (hit) {
         try {
-          it.dispose?.();
-        } catch {
-          // ignore user disposer errors
+          it.instance.onDetached();
+        } catch (err) {
+          console.error(`Error occured at onDetach() of module '${it.id}': ${err}`);
+        }
+        try {
+          it.instance.onDestroy();
+        } catch (err) {
+          console.error(`Error occured at onDestroy() of module '${it.id}': ${err}`);
         }
         list.splice(i, 1);
         removed = true;
@@ -158,9 +120,19 @@ export class ScriptingSystem {
     for (const list of this._hostScripts.values()) {
       for (const s of list) {
         try {
-          s.update?.(deltaTime, elapsedTime);
-        } catch {
-          // ignore user update errors
+          s.instance.onUpdate(deltaTime, elapsedTime);
+        } catch (err) {
+          console.error(`Error occured at onUpdate() of module '${s.id}': ${err}`);
+        }
+      }
+    }
+  }
+
+  dispose() {
+    while (this._hostScripts.size > 0) {
+      for (const entry of this._hostScripts) {
+        for (const attached of entry[1]) {
+          this.detachScript(entry[0], attached.instance);
         }
       }
     }

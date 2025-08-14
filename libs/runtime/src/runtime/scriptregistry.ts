@@ -43,6 +43,13 @@ export class ScriptRegistry {
     this._editorMode = val;
   }
 
+  get scriptsRoot() {
+    return this._scriptsRoot;
+  }
+  set scriptsRoot(path: string) {
+    this._scriptsRoot = path;
+  }
+
   protected async fetchSource(
     _id: ModuleId
   ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
@@ -134,7 +141,7 @@ export class ScriptRegistry {
 
     const srcPath = await this.resolveSourcePath(key);
     if (!srcPath) {
-      throw new Error(`Module not found: ${key}`);
+      return '';
     }
     const code = (await this._vfs.readFile(srcPath.path, { encoding: 'utf8' })) as string;
 

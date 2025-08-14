@@ -76,6 +76,7 @@ export class ProjectService {
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
     await this._serializationManager.vfs.chdir(info.homedir);
+    console.log(`Project opened: ${uuid}`);
     return info;
   }
   static async deleteProject(uuid: string): Promise<void> {

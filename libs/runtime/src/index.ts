@@ -4,3 +4,5 @@ export * from './runtime/param';
 export * from './runtime/types';
 export * from './runtime/hmr';
 export * from './runtime/scriptregistry';
+export * from './runtime/runtimescript';
+export * from './runtime/runtimemgr';

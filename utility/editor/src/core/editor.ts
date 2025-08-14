@@ -12,25 +12,20 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import { HttpFS } from '@zephyr3d/base';
+import { DRef, HttpFS } from '@zephyr3d/base';
 import type { ProjectInfo } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
 import { moduleSharing } from './moduleshare';
-
-import * as zephyr3d_base from '@zephyr3d/base';
-import * as zephyr3d_device from '@zephyr3d/device';
-import * as zephyr3d_scene from '@zephyr3d/scene';
-import * as zephyr3d_runtime from '@zephyr3d/runtime';
 import { CodeEditor } from '../components/codeeditor';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
   private readonly _assetImages: {
-    brushes: { [key: string]: zephyr3d_base.DRef<Texture2D> };
-    app: { [key: string]: zephyr3d_base.DRef<Texture2D> };
+    brushes: { [key: string]: DRef<Texture2D> };
+    app: { [key: string]: DRef<Texture2D> };
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
@@ -152,30 +147,7 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
-    moduleSharing.shareModules({
-      '@zephyr3d/base': zephyr3d_base
-    });
-    moduleSharing.shareModules({
-      '@zephyr3d/device': zephyr3d_device
-    });
-    moduleSharing.shareModules({
-      '@zephyr3d/scene': zephyr3d_scene
-    });
-    moduleSharing.shareModules({
-      '@zephyr3d/runtime': zephyr3d_runtime
-    });
-    /*
-    await ProjectService.VFS.makeDirectory(this._scriptRoot, true);
-    await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'hello.ts'), testScript, {
-      encoding: 'utf8'
-    });
-    await ProjectService.VFS.writeFile(ProjectService.VFS.join(this._scriptRoot, 'main.ts'), testScript2, {
-      encoding: 'utf8'
-    });
-    await this._scriptingSystem.attachScript(this, {
-      module: '#/main'
-    });
-    */
+    moduleSharing.shareZephyr3dModules();
     eventBus.on('action', this.onAction, this);
   }
   async loadAssets() {
@@ -185,14 +157,14 @@ export class Editor {
     const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
     for (const name in brushConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
-      this._assetImages.brushes[name] = new zephyr3d_base.DRef(tex);
+      this._assetImages.brushes[name] = new DRef(tex);
     }
     const appConfig = await assetManager.fetchJsonData('conf/app.json');
     for (const name in appConfig) {
       const tex = await assetManager.fetchTexture<Texture2D>(appConfig[name], {
         samplerOptions: { mipFilter: 'none' }
       });
-      this._assetImages.app[name] = new zephyr3d_base.DRef(tex);
+      this._assetImages.app[name] = new DRef(tex);
     }
   }
   registerModules() {

@@ -1,4 +1,7 @@
-import { textToBase64 } from '@zephyr3d/base';
+import * as zephyr3d_base from '@zephyr3d/base';
+import * as zephyr3d_device from '@zephyr3d/device';
+import * as zephyr3d_scene from '@zephyr3d/scene';
+import * as zephyr3d_runtime from '@zephyr3d/runtime';
 
 /**
  * Runtime module sharing system
@@ -32,6 +35,15 @@ export class RuntimeModuleSharing {
     console.log('[ModuleSharing] All modules shared:', Object.keys(modules));
   }
 
+  shareZephyr3dModules(): void {
+    this.shareModules({
+      '@zephyr3d/base': zephyr3d_base,
+      '@zephyr3d/device': zephyr3d_device,
+      '@zephyr3d/scene': zephyr3d_scene,
+      '@zephyr3d/runtime': zephyr3d_runtime
+    });
+  }
+
   private createModuleDataUrl(name: string, moduleExports: any): string {
     let moduleCode = '';
 
@@ -52,8 +64,8 @@ export class RuntimeModuleSharing {
     const globalVarName = this.getGlobalVarName(name);
     (window as any)[globalVarName] = moduleExports;
 
-    const encoded = textToBase64(moduleCode); // btoa(unescape(encodeURIComponent(moduleCode)));
-    return `data:text/javascript;base64,${encoded}`;
+    const blob = new Blob([moduleCode], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
   }
 
   private getGlobalVarName(moduleName: string): string {
@@ -65,21 +77,47 @@ export class RuntimeModuleSharing {
   }
 
   private batchUpdateImportMap(mappings: Record<string, string>): void {
-    if (!this.importMapElement) {
-      this.importMapElement = document.createElement('script');
-      this.importMapElement.type = 'importmap';
-      document.head.appendChild(this.importMapElement);
-    }
-
-    const currentMap = this.importMapElement.textContent
+    // Get current importmap
+    const currentMap = this.importMapElement?.textContent
       ? JSON.parse(this.importMapElement.textContent)
       : { imports: {} };
 
-    Object.assign(currentMap.imports, mappings);
+    // merge
+    const mergedImports = { ...currentMap.imports, ...mappings };
 
-    this.importMapElement.textContent = JSON.stringify(currentMap, null, 2);
+    // rebuild importmap
+    this.rebuildImportMap(mergedImports);
 
     console.log('[ModuleSharing] Updated import map:', mappings);
+  }
+
+  private rebuildImportMap(imports: Record<string, string>): void {
+    // remove current importmap
+    if (this.importMapElement && this.importMapElement.parentNode) {
+      this.importMapElement.parentNode.removeChild(this.importMapElement);
+      this.importMapElement = null;
+    }
+
+    // Delayed rebuild, wait for browser to cleanup
+    setTimeout(() => {
+      this.importMapElement = document.createElement('script');
+      this.importMapElement.type = 'importmap';
+      this.importMapElement.textContent = JSON.stringify({ imports }, null, 2);
+      document.head.appendChild(this.importMapElement);
+    }, 50);
+  }
+
+  async waitForImportMapReady(): Promise<void> {
+    return new Promise((resolve) => {
+      const checkReady = () => {
+        if (this.importMapElement && document.head.contains(this.importMapElement)) {
+          setTimeout(() => resolve(), 100);
+        } else {
+          setTimeout(checkReady, 10);
+        }
+      };
+      checkReady();
+    });
   }
 
   isModuleShared(name: string): boolean {
@@ -96,15 +134,23 @@ export class RuntimeModuleSharing {
     }
 
     try {
-      /* @vite-ignore */
-      return await import(this.moduleUrls.get(name)!);
+      await this.waitForImportMapReady();
+      return await import(name);
     } catch (e) {
       console.error(`Failed to import shared module ${name}:`, e);
+      console.log(`Falling back to direct module reference for ${name}`);
       return this.sharedModules.get(name);
     }
   }
 
   cleanup(): void {
+    for (const url of this.moduleUrls.values()) {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    // cleanup global variables
     for (const moduleName of this.sharedModules.keys()) {
       const globalVarName = this.getGlobalVarName(moduleName);
       try {
@@ -112,6 +158,7 @@ export class RuntimeModuleSharing {
       } catch (_e) {}
     }
 
+    // remove importmap
     if (this.importMapElement && this.importMapElement.parentNode) {
       this.importMapElement.parentNode.removeChild(this.importMapElement);
       this.importMapElement = null;

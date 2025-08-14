@@ -4,7 +4,7 @@ import { InputManager } from './inputmgr';
 
 type appEventMap = {
   resize: [width: number, height: number];
-  tick: [];
+  tick: [deltaTimeMs: number, elapsedTimeMs: number];
   click: [evt: PointerEvent];
   dblclick: [evt: PointerEvent];
   pointerdown: [evt: PointerEvent];
@@ -75,7 +75,6 @@ export class Application extends Observable<appEventMap> {
   private readonly _inputManager: InputManager;
   private _ready: boolean;
   private _logger: Logger;
-  private _elapsed: number;
   private static _instance: Application;
   /**
    * Creates an instance of Application
@@ -95,7 +94,6 @@ export class Application extends Observable<appEventMap> {
     };
     this._inputManager = new InputManager(this);
     this._ready = false;
-    this._elapsed = 0;
     this._logger = {
       log(text: string, mode?: LogMode) {
         if (mode === 'warn') {
@@ -119,12 +117,6 @@ export class Application extends Observable<appEventMap> {
   /** The options that was used to create the application */
   get options(): AppOptions {
     return this._options;
-  }
-  /**
-   * Query time elapsed since last frame in seconds
-   */
-  get timeElapsedInSeconds(): number {
-    return this._elapsed;
   }
   /** Gets the singleton instance of the application */
   static get instance(): Application {
@@ -172,11 +164,10 @@ export class Application extends Observable<appEventMap> {
     // Processes all pending disposals from the previous frame.
     flushPendingDisposals();
     if (this._ready) {
-      this._elapsed = this.device.frameInfo.elapsedFrame * 0.001;
       this.device.setFramebuffer(null);
       this.device.setViewport(null);
       this.device.setScissor(null);
-      this.dispatchEvent('tick');
+      this.dispatchEvent('tick', this.device.frameInfo.elapsedFrame, this.device.frameInfo.elapsedOverall);
     }
   }
   /** Start running the rendering loop */
