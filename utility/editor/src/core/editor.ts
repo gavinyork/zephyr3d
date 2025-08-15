@@ -20,7 +20,7 @@ import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
 import { moduleSharing } from './moduleshare';
 import { CodeEditor } from '../components/codeeditor';
-import { buildInBrowser } from './build/build';
+import { buildForEndUser } from './build/build';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -325,7 +325,7 @@ export class Editor {
     await ProjectService.deleteProject(uuid);
   }
   async buildProject() {
-    await buildInBrowser(ProjectService.VFS, {
+    await buildForEndUser(ProjectService.VFS, {
       vfsRoot: this._currentProject.homedir,
       input: '/src/index.ts',
       distDir: '/dist'

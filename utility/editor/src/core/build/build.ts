@@ -1,10 +1,9 @@
 import { rollup } from '@rollup/browser';
-import type { ImportMap } from './plugins/importmap';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
 import type { VFS } from '@zephyr3d/base';
 
-export async function buildInBrowser(
+export async function buildForEndUser(
   vfs: VFS,
   options: {
     vfsRoot: string;
@@ -13,20 +12,10 @@ export async function buildInBrowser(
     alias?: Record<string, string>;
     sourcemap?: boolean | 'inline' | 'hidden';
     format?: 'es' | 'iife' | 'umd' | 'cjs';
-    importMap?: ImportMap | 'auto';
   }
 ) {
-  const {
-    vfsRoot,
-    input,
-    distDir = '/dist',
-    alias = {},
-    sourcemap = true,
-    format = 'es',
-    importMap = 'auto'
-  } = options;
+  const { vfsRoot, input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
 
-  void importMap;
   const bundle = await rollup({
     input,
     plugins: [
@@ -49,7 +38,7 @@ export async function buildInBrowser(
   const htmlContent = (await vfs.readFile(vfs.join(vfsRoot, 'index.html'), { encoding: 'utf8' })) as string;
   const newContent = htmlContent.replace(
     '</body>',
-    `<script type="module" src="./index.js"></script></body>`
+    `  <script type="module" src="./index.js"></script>\n</body>`
   );
   await vfs.writeFile(vfs.join(vfsRoot, '/dist/index.html'), newContent, {
     encoding: 'utf8',
