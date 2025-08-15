@@ -144,6 +144,8 @@ export class SceneNode
   protected _metaData: Metadata;
   /** @internal */
   private _disableCallback: boolean;
+  /** @internal */
+  private _attachedScripts: string[];
   /**
    * Creates a new scene node
    * @param scene - Which scene the node belongs to
@@ -183,6 +185,7 @@ export class SceneNode
     this._disableCallback = false;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
+    this._attachedScripts = [];
     this._metaData = null;
     if (scene && this !== scene.rootNode) {
       this.reparent(scene.rootNode);
@@ -217,6 +220,12 @@ export class SceneNode
   }
   set metaData(val: Metadata) {
     this._metaData = val;
+  }
+  /**
+   * Attached scripts of this node
+   */
+  get attachedScripts() {
+    return this._attachedScripts;
   }
   /**
    * Name of the node

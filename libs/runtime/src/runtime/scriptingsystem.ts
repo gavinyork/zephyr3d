@@ -1,10 +1,10 @@
 import type { ModuleId } from './types';
 import { ScriptRegistry } from './scriptregistry';
-import { HttpFS } from '@zephyr3d/base';
+import { HttpFS, IDisposable } from '@zephyr3d/base';
 import { RuntimeScript } from './runtimescript';
 
 // 你项目中的宿主接口（实体/节点等），至少需要一个 id 或可作为 Map 键
-export type Host = unknown;
+export type Host = IDisposable;
 
 export interface AttachedScript {
   id: ModuleId;
@@ -66,6 +66,11 @@ export class ScriptingSystem {
       if (!list) {
         list = [];
         this._hostScripts.set(host, list);
+        if (host) {
+          host.on('dispose', () => {
+            this.detachScript(host);
+          });
+        }
       }
       list.push(attached);
       this.registerHost(host);
@@ -80,8 +85,8 @@ export class ScriptingSystem {
     }
   }
 
-  // 将模块从宿主解绑；idOrInstance 可为 ModuleId 或实际实例对象
-  detachScript(host: Host, idOrInstance: ModuleId | any): boolean {
+  // 将模块从宿主解绑；idOrInstance 可为 ModuleId 或实际实例对象，如果为空或null则解绑所有
+  detachScript(host: Host, idOrInstance?: ModuleId | any): boolean {
     const list = this._hostScripts.get(host);
     if (!list || list.length === 0) {
       return false;
@@ -89,7 +94,10 @@ export class ScriptingSystem {
     let removed = false;
     for (let i = list.length - 1; i >= 0; i--) {
       const it = list[i];
-      const hit = typeof idOrInstance === 'string' ? it.id === idOrInstance : it.instance === idOrInstance;
+      const hit =
+        !idOrInstance || typeof idOrInstance === 'string'
+          ? it.id === idOrInstance
+          : it.instance === idOrInstance;
       if (hit) {
         try {
           it.instance.onDetached();
@@ -131,9 +139,7 @@ export class ScriptingSystem {
   dispose() {
     while (this._hostScripts.size > 0) {
       for (const entry of this._hostScripts) {
-        for (const attached of entry[1]) {
-          this.detachScript(entry[0], attached.instance);
-        }
+        this.detachScript(entry[0]);
       }
     }
   }
