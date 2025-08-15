@@ -161,7 +161,7 @@ export class ScriptRegistry {
 
     const ts = (window as any).ts as typeof import('typescript');
     if (!ts) {
-      throw new Error('TypeScript runtime (window.ts) not found. Load /vendor/typescript.js first.');
+      throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
     }
 
     const res = ts.transpileModule(code, {

@@ -20,6 +20,7 @@ import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
 import { moduleSharing } from './moduleshare';
 import { CodeEditor } from '../components/codeeditor';
+import { buildInBrowser } from './build/build';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -175,7 +176,7 @@ export class Editor {
       this._moduleManager.activate(name, ...args);
     });
   }
-  async editCode(fileName: string, language: 'javascript' | 'typescript') {
+  async editCode(fileName: string, language: string) {
     if (this._codeEditor) {
       if (!this._codeEditor.close()) {
         return;
@@ -323,17 +324,36 @@ export class Editor {
   async deleteProject(uuid: string) {
     await ProjectService.deleteProject(uuid);
   }
+  async buildProject() {
+    await buildInBrowser(ProjectService.VFS, {
+      vfsRoot: this._currentProject.homedir,
+      input: '/src/index.ts',
+      distDir: '/'
+    });
+  }
   private onAction(action: string, fileName: string, arg: string) {
-    if (action === 'EDIT_CODE' && fileName && (arg === 'text/javascript' || arg === 'text/x-typescript')) {
-      this.loadScriptDependencies(fileName).then(() => {
-        if (arg === 'text/javascript') {
-          this.editCode(fileName, 'javascript');
-        } else if (arg === 'text/x-typescript') {
-          this.editCode(fileName, 'typescript');
-        }
-      });
+    if (action === 'EDIT_CODE' && fileName) {
+      if (arg === 'text/javascript' || arg === 'text/x-typescript') {
+        this.loadScriptDependencies(fileName).then(() => {
+          if (arg === 'text/javascript') {
+            this.editCode(fileName, 'javascript');
+          } else if (arg === 'text/x-typescript') {
+            this.editCode(fileName, 'typescript');
+          }
+        });
+      } else if (arg === 'text/html') {
+        this.editCode(fileName, 'html');
+      } else if (arg === 'application/json') {
+        this.editCode(fileName, 'json');
+      } else if (arg === 'text/plain') {
+        this.editCode(fileName, 'plaintext');
+      }
     } else if (action === 'SAVE_CODE') {
       ProjectService.VFS.writeFile(fileName, arg, { encoding: 'utf8', create: true });
+    } else if (action === 'BUILD_PROJECT') {
+      this.buildProject().then(() => {
+        console.log('Project build succeeded');
+      });
     }
   }
 }

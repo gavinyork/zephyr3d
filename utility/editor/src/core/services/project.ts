@@ -1,5 +1,6 @@
 import { IndexedDBFS } from '@zephyr3d/base';
 import { SerializationManager } from '@zephyr3d/scene';
+import { templateIndex, templateIndexHTML } from '../build/templates';
 
 export type ProjectInfo = {
   name: string;
@@ -123,6 +124,16 @@ export class ProjectService {
   private static async createHomeDir(uuid: string) {
     const homedir = this.getHomeDirName(uuid);
     await this._vfs.makeDirectory(homedir, true);
+    await this._vfs.makeDirectory(this._vfs.join(homedir, '/src'));
+    await this._vfs.makeDirectory(this._vfs.join(homedir, '/assets'));
+    await this._vfs.writeFile(this._vfs.join(homedir, 'index.html'), templateIndexHTML, {
+      encoding: 'utf8',
+      create: true
+    });
+    await this._vfs.writeFile(this._vfs.join(homedir, '/src/index.ts'), templateIndex, {
+      encoding: 'utf8',
+      create: true
+    });
     return homedir;
   }
   static async deleteHomeDir(uuid: string) {

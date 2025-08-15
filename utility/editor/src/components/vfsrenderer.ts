@@ -669,7 +669,13 @@ export class VFSRenderer extends Observable<{
         eventBus.dispatchEvent('action', 'OPEN_DOC', item.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(item.meta.path);
-        if (mimeType === 'text/javascript' || mimeType === 'text/x-typescript') {
+        if (
+          mimeType === 'text/javascript' ||
+          mimeType === 'text/x-typescript' ||
+          mimeType === 'text/html' ||
+          mimeType === 'application/json' ||
+          mimeType === 'text/plain'
+        ) {
           eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
         }
       }

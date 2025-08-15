@@ -727,6 +727,7 @@ importers:
       '@babel/preset-env': ^7.20.2
       '@jridgewell/trace-mapping': ^0.3.25
       '@monaco-editor/loader': ^1.5.0
+      '@rollup/browser': ^4.46.2
       '@rollup/plugin-commonjs': ~28.0.2
       '@rollup/plugin-json': ^6.1.0
       '@rollup/plugin-node-resolve': ~16.0.0
@@ -781,6 +782,7 @@ importers:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.29
       '@monaco-editor/loader': 1.5.0
+      '@rollup/browser': 4.46.2
       '@types/node': 22.17.1
       '@types/streamsaver': 2.0.5
       '@types/systemjs': 6.15.3
@@ -2643,6 +2645,12 @@ packages:
 
   /@popperjs/core/2.11.8:
     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
+    dev: false
+
+  /@rollup/browser/4.46.2:
+    resolution: {integrity: sha512-kNWmlqU13IPfGkAtgvNIOrqxgfN9WDHftPQ12H/7NI/kaGUTvlpgmL2ACzNE7qVD6a7RUVLZ++sUjYprVLtJIA==}
+    dependencies:
+      '@types/estree': 1.0.8
     dev: false
 
   /@rollup/plugin-commonjs/28.0.6_rollup@4.30.1:
