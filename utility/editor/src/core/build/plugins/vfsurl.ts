@@ -50,21 +50,29 @@ export function vfsAndUrlPlugin(
   };
 
   async function resolveRelativeLike(spec: string, importer?: string) {
-    const start = vfs.normalizePath(
-      vfs.join(vfsRoot, spec.startsWith('/') ? spec : vfs.join(importer ? vfs.dirname(importer) : root, spec))
-    );
-    if (await vfs.exists(start)) {
-      const st = await vfs.stat(start);
-      if (st.isDirectory) {
-        const idx = await tryResolveDirIndex(vfs, start);
-        if (idx) return idx;
-      } else return start;
+    if (importer && isURL(importer)) {
+      const url = new URL(spec, importer).href;
+      return url;
+    } else {
+      const start = vfs.normalizePath(
+        vfs.join(
+          vfsRoot,
+          spec.startsWith('/') ? spec : vfs.join(importer ? vfs.dirname(importer) : root, spec)
+        )
+      );
+      if (await vfs.exists(start)) {
+        const st = await vfs.stat(start);
+        if (st.isDirectory) {
+          const idx = await tryResolveDirIndex(vfs, start);
+          if (idx) return idx;
+        } else return start;
+      }
+      const withExt = await tryResolveWithExts(vfs, start, exts);
+      if (withExt) return withExt;
+      const asDir = await tryResolveDirIndex(vfs, start);
+      if (asDir) return asDir;
+      return null;
     }
-    const withExt = await tryResolveWithExts(vfs, start, exts);
-    if (withExt) return withExt;
-    const asDir = await tryResolveDirIndex(vfs, start);
-    if (asDir) return asDir;
-    return null;
   }
 
   return {
@@ -86,7 +94,14 @@ export function vfsAndUrlPlugin(
         if (r) return r;
       }
 
-      // 4) 裸模块：留给 importMapResolvePlugin 先处理；若没处理，这里返回 null
+      // 4) zephyr3d模块 -> 静态地址
+      if (source.startsWith('@zephyr3d/')) {
+        const baseurl = new URL('./', window.location.href);
+        const url = new URL(`vendor/${source.slice(1)}/dist/index.js`, baseurl).href;
+        return url;
+      }
+
+      // 5) 裸模块：留给 importMapResolvePlugin 先处理；若没处理，这里返回 null
       return null;
     },
 

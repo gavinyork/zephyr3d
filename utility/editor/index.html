@@ -48,12 +48,12 @@
         require(['vs/editor/editor.main'], async () => {
           monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
           const typeFiles = [
-            { path: './vendor/@zephyr3d/base/index.d.ts', name: '@zephyr3d/base' },
-            { path: './vendor/@zephyr3d/device/index.d.ts', name: '@zephyr3d/device' },
-            { path: './vendor/@zephyr3d/scene/index.d.ts', name: '@zephyr3d/scene' },
-            { path: './vendor/@zephyr3d/runtime/index.d.ts', name: '@zephyr3d/runtime' },
-            { path: './vendor/@zephyr3d/backend-webgl/index.d.ts', name: '@zephyr3d/backend-webgl' },
-            { path: './vendor/@zephyr3d/backend-webgpu/index.d.ts', name: '@zephyr3d/backend-webgpu' }
+            { path: './vendor/zephyr3d/base/dist/index.d.ts', name: '@zephyr3d/base' },
+            { path: './vendor/zephyr3d/device/dist/index.d.ts', name: '@zephyr3d/device' },
+            { path: './vendor/zephyr3d/scene/dist/index.d.ts', name: '@zephyr3d/scene' },
+            { path: './vendor/zephyr3d/runtime/dist/index.d.ts', name: '@zephyr3d/runtime' },
+            { path: './vendor/zephyr3d/backend-webgl/dist/index.d.ts', name: '@zephyr3d/backend-webgl' },
+            { path: './vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' }
           ];
           async function loadTypeFiles(files) {
             const loadPromises = files.map(async (file) => {

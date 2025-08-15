@@ -46,7 +46,6 @@ export const templateIndexHTML = `
   </head>
   <body>
     <canvas id="canvas"></canvas>
-    <script type="module" src="js/tut-0.js"></script>
   </body>
 </html>
 `;

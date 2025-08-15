@@ -328,7 +328,7 @@ export class Editor {
     await buildInBrowser(ProjectService.VFS, {
       vfsRoot: this._currentProject.homedir,
       input: '/src/index.ts',
-      distDir: '/'
+      distDir: '/dist'
     });
   }
   private onAction(action: string, fileName: string, arg: string) {

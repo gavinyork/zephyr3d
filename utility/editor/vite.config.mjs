@@ -53,30 +53,31 @@ export default defineConfig({
           dest: 'vendor/monaco'
         },
         {
-          src: 'node_modules/@zephyr3d/base/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/base'
+          src: 'node_modules/@zephyr3d/base/dist',
+          dest: 'vendor/zephyr3d/base'
         },
         {
-          src: 'node_modules/@zephyr3d/device/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/device'
+          src: 'node_modules/@zephyr3d/device/dist',
+          dest: 'vendor/zephyr3d/device'
         },
         {
-          src: 'node_modules/@zephyr3d/scene/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/scene'
+          src: 'node_modules/@zephyr3d/scene/dist',
+          dest: 'vendor/zephyr3d/scene'
         },
         {
-          src: 'node_modules/@zephyr3d/runtime/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/runtime'
+          src: 'node_modules/@zephyr3d/runtime/dist',
+          dest: 'vendor/zephyr3d/runtime'
         },
         {
-          src: 'node_modules/@zephyr3d/backend-webgl/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/backend-webgl'
+          src: 'node_modules/@zephyr3d/backend-webgl/dist',
+          dest: 'vendor/zephyr3d/backend-webgl'
         },
         {
-          src: 'node_modules/@zephyr3d/backend-webgpu/dist/index.d.ts',
-          dest: 'vendor/@zephyr3d/backend-webgpu'
+          src: 'node_modules/@zephyr3d/backend-webgpu/dist',
+          dest: 'vendor/zephyr3d/backend-webgpu'
         }
-      ]
+      ],
+      flatten: false
     })
   ],
   resolve: {

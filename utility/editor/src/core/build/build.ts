@@ -1,5 +1,4 @@
 import { rollup } from '@rollup/browser';
-import { importMapResolvePlugin } from './plugins/importmap';
 import type { ImportMap } from './plugins/importmap';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
@@ -27,10 +26,10 @@ export async function buildInBrowser(
     importMap = 'auto'
   } = options;
 
+  void importMap;
   const bundle = await rollup({
     input,
     plugins: [
-      importMapResolvePlugin(importMap), // 先按 import map 解析裸模块 -> URL（支持 scopes）
       vfsAndUrlPlugin(vfs, { vfsRoot, distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
       tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } }) // typescript.js 转译
     ]
@@ -39,29 +38,23 @@ export async function buildInBrowser(
   const { output } = await bundle.generate({
     format,
     sourcemap,
-    entryFileNames: 'assets/entry-[hash].js',
+    entryFileNames: 'index.js',
     chunkFileNames: 'assets/chunk-[hash].js',
     assetFileNames: 'assets/[name]-[hash][extname]'
   });
-
-  /*
-  // 如果 vfsAndUrlPlugin 的 generateBundle 已经写回，这里可以不再写；保留亦可双保险
-  for (const item of output) {
-    const outPath = vfs.join(distDir, item.fileName);
-    if (item.type === 'asset') {
-      const source = typeof item.source === 'string' ? item.source : new Uint8Array(item.source as any);
-      await vfs.writeFile(outPath, source as any, {
-        encoding: typeof source === 'string' ? 'utf8' : 'binary',
-        create: true
-      });
-    } else {
-      await vfs.writeFile(outPath, item.code, { encoding: 'utf8', create: true });
-      if (item.map)
-        await vfs.writeFile(outPath + '.map', item.map.toString(), { encoding: 'utf8', create: true });
-    }
-  }
-  */
+  console.log(output);
 
   await bundle.close();
+
+  const htmlContent = (await vfs.readFile(vfs.join(vfsRoot, 'index.html'), { encoding: 'utf8' })) as string;
+  const newContent = htmlContent.replace(
+    '</body>',
+    `<script type="module" src="./index.js"></script></body>`
+  );
+  await vfs.writeFile(vfs.join(vfsRoot, '/dist/index.html'), newContent, {
+    encoding: 'utf8',
+    create: true
+  });
+  await vfs.copyFileEx(vfs.join(vfsRoot, 'assets'), vfs.join(vfsRoot, 'dist'));
   return { distDir, output };
 }
