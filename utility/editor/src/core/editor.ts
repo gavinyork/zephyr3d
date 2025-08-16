@@ -61,7 +61,7 @@ export class Editor {
         delete this._extraLibs[k];
       }
       // And then add lib
-      const f = `file:///${ProjectService.VFS.relative(k)}`;
+      const f = `file:///${ProjectService.VFS.relative(k, '/')}`;
       const disposable = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
         dependencies[k],
         f
@@ -182,7 +182,7 @@ export class Editor {
       this._codeEditor = null;
     }
     const content = (await ProjectService.VFS.readFile(fileName, { encoding: 'utf8' })) as string;
-    this._codeEditor = new CodeEditor(ProjectService.VFS.relative(fileName, ProjectService.VFS.getCwd()));
+    this._codeEditor = new CodeEditor(fileName);
     this._codeEditor.show(content, language);
   }
   render() {
@@ -245,6 +245,7 @@ export class Editor {
                 if (id) {
                   ProjectService.openProject(id).then((project) => {
                     this._currentProject = project;
+                    this._scriptingSystem.registry.VFS = ProjectService.VFS;
                     this._moduleManager.activate('Scene', this._currentProject.lastEditScene ?? '');
                   });
                 }
@@ -272,9 +273,9 @@ export class Editor {
       this.deleteAllDependences();
       this._currentProject.lastEditScene = lastScenePath ?? '';
       await ProjectService.saveProject(this._currentProject);
+      this._moduleManager.activate('');
       await ProjectService.closeCurrentProject();
       this._currentProject = null;
-      this._moduleManager.activate('');
     }
   }
   async exportProject() {
@@ -282,7 +283,7 @@ export class Editor {
       return;
     }
     const zipDownloader = new ZipDownloader(`${this._currentProject.name}.zip`);
-    const fileList = await ProjectService.VFS.readDirectory(this.currentProject.homedir, {
+    const fileList = await ProjectService.VFS.readDirectory('/', {
       includeHidden: true,
       recursive: true
     });
@@ -290,12 +291,12 @@ export class Editor {
     let directories = fileList.filter((path) => path.type === 'directory');
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
-      const path = ProjectService.VFS.relative(file.path);
+      const path = file.path;
       await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
       directories = directories.filter((dir) => !file.path.startsWith(`${dir.path}/`));
     }
     for (const dir of directories) {
-      await zipDownloader.zipWriter.add(`${ProjectService.VFS.relative(dir.path)}/`);
+      await zipDownloader.zipWriter.add(`${dir.path}/`);
     }
     await zipDownloader.finish();
   }
@@ -324,7 +325,7 @@ export class Editor {
   }
   async buildProject() {
     await buildForEndUser(ProjectService.VFS, {
-      vfsRoot: this._currentProject.homedir,
+      vfsRoot: '/',
       input: '/src/index.ts',
       distDir: '/dist'
     });

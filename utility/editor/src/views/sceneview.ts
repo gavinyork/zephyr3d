@@ -1196,8 +1196,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
     if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
-      const path = ProjectService.VFS.relative(payload.path);
-      this.handleAddAsset(path);
+      this.handleAddAsset(payload.path);
     }
   }
   private handleWorkspaceDragLeave() {}

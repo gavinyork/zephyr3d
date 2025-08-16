@@ -12,8 +12,7 @@ moduleSharing.shareZephyr3dModules();
 const deviceType = new URL(window.location.href).searchParams.get('device');
 const project = new URL(window.location.href).searchParams.get('project');
 if (project) {
-  const projectInfo = await ProjectService.openProject(project);
-  await ProjectService.VFS.chdir(ProjectService.VFS.join(projectInfo.homedir, '/assets'));
+  await ProjectService.openProject(project);
 }
 
 const studioApp = new Application({
@@ -21,7 +20,7 @@ const studioApp = new Application({
   canvas: document.querySelector('#canvas'),
   runtimeOptions: {
     VFS: project ? ProjectService.VFS : null,
-    scriptsRoot: project ? ProjectService.VFS.getCwd() : '/',
+    scriptsRoot: '/assets',
     editorMode: true,
     enabled: !!project
   }

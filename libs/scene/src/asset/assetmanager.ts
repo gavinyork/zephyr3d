@@ -131,6 +131,28 @@ export class AssetManager {
     return this._vfs;
   }
   /**
+   * Clear cached references of allocated objects
+   */
+  clearCache() {
+    for (const k in Object.keys(this._textures)) {
+      const v = this._textures[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._textures = {};
+    for (const k in Object.keys(this._models)) {
+      const v = this._models[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._models = {};
+    this._binaryDatas = {};
+    this._textDatas = {};
+    this._jsonDatas = {};
+  }
+  /**
    * Adds a texture loader to the asset manager
    *
    * @remarks

@@ -33,7 +33,10 @@ export class ScriptRegistry {
     return this._vfs;
   }
   set VFS(vfs: VFS) {
-    this._vfs = vfs;
+    if (vfs !== this._vfs) {
+      this._vfs = vfs;
+      this._built.clear();
+    }
   }
 
   get editorMode() {

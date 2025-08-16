@@ -500,7 +500,7 @@ export class CodeEditor {
     try {
       const monaco = (window as any).monaco as typeof Monaco;
       const codeToUse = initialCode || '';
-      const uri = monaco.Uri.parse(`file:///${this.fileName}`);
+      const uri = monaco.Uri.parse(`file://${this.fileName}`);
       const oldModel = monaco.editor.getModel(uri);
       if (oldModel) {
         oldModel.dispose();

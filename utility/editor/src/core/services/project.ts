@@ -5,7 +5,6 @@ import { templateIndex, templateIndexHTML } from '../build/templates';
 export type ProjectInfo = {
   name: string;
   uuid?: string;
-  homedir?: string;
   lastEditScene?: string;
 };
 
@@ -19,17 +18,20 @@ type EditorManifest = {
   history: Record<string, number>;
 };
 
-const DATABASE_NAME = 'zephyr3d-editor';
-const editorVFS = new IndexedDBFS(DATABASE_NAME, '$');
+const META_DATABASE_NAME = 'zephyr3d-editor';
+const metaVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
 
 export class ProjectService {
   private static _currentProject = '';
-  private static readonly _serializationManager: SerializationManager = new SerializationManager(editorVFS);
+  private static _serializationManager: SerializationManager = null;
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
-  private static readonly _vfs = editorVFS;
+  private static _vfs: IndexedDBFS = null;
 
   static get VFS() {
     return this._vfs;
+  }
+  static get serializationManager() {
+    return this._serializationManager;
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest();
@@ -50,10 +52,24 @@ export class ProjectService {
     const manifest = await this.readManifest();
     manifest.projectList[uuid] = {
       name,
-      uuid,
-      homedir: await this.createHomeDir(uuid)
+      uuid
     };
     await this.writeManifest(manifest);
+    const vfs = new IndexedDBFS(uuid, '$');
+    try {
+      await vfs.makeDirectory('/src');
+      await vfs.makeDirectory('/assets');
+      await vfs.writeFile('/index.html', templateIndexHTML, {
+        encoding: 'utf8',
+        create: true
+      });
+      await vfs.writeFile('/src/index.ts', templateIndex, {
+        encoding: 'utf8',
+        create: true
+      });
+    } finally {
+      await vfs.close();
+    }
     return uuid;
   }
   static async getCurrentProjectInfo() {
@@ -62,7 +78,10 @@ export class ProjectService {
   static async closeCurrentProject() {
     if (this._currentProject) {
       this._currentProject = '';
-      await this._vfs.chdir('/');
+      await this._vfs.close();
+      this._vfs = null;
+      this._serializationManager.clearCache();
+      this._serializationManager = null;
     }
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
@@ -74,9 +93,12 @@ export class ProjectService {
     if (this._currentProject) {
       throw new Error('Current project must be closed before opening another project');
     }
+    await this.closeCurrentProject();
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
-    await this._vfs.chdir(info.homedir);
+
+    this._vfs = new IndexedDBFS(info.uuid, '$');
+    this._serializationManager = new SerializationManager(this._vfs);
     console.log(`Project opened: ${uuid}`);
     return info;
   }
@@ -90,7 +112,7 @@ export class ProjectService {
       delete manifest.projectList[uuid];
       delete manifest.history[uuid];
       await this.writeManifest(manifest);
-      await this._vfs.deleteDirectory(info.homedir, true);
+      await IndexedDBFS.deleteDatabase(info.uuid);
     }
   }
   static async saveProject(project: ProjectInfo) {
@@ -99,49 +121,24 @@ export class ProjectService {
     manifest.projectList[project.uuid] = project;
     await this.writeManifest(manifest);
   }
-  static get serializationManager() {
-    return this._serializationManager;
-  }
   private static async readManifest() {
-    const exists = await this._vfs.exists(ProjectService.PROJECT_MANIFEST);
+    const exists = await metaVFS.exists(ProjectService.PROJECT_MANIFEST);
     if (!exists) {
       return {
         history: {},
         projectList: {}
       };
     }
-    const content = (await this._vfs.readFile(ProjectService.PROJECT_MANIFEST, {
+    const content = (await metaVFS.readFile(ProjectService.PROJECT_MANIFEST, {
       encoding: 'utf8'
     })) as string;
     return JSON.parse(content) as EditorManifest;
   }
   private static async writeManifest(manifest: EditorManifest) {
-    await this._vfs.writeFile(ProjectService.PROJECT_MANIFEST, JSON.stringify(manifest, null, '  '), {
+    await metaVFS.writeFile(ProjectService.PROJECT_MANIFEST, JSON.stringify(manifest, null, '  '), {
       create: true,
       encoding: 'utf8'
     });
-  }
-  private static async createHomeDir(uuid: string) {
-    const homedir = this.getHomeDirName(uuid);
-    await this._vfs.makeDirectory(homedir, true);
-    await this._vfs.makeDirectory(this._vfs.join(homedir, '/src'));
-    await this._vfs.makeDirectory(this._vfs.join(homedir, '/assets'));
-    await this._vfs.writeFile(this._vfs.join(homedir, 'index.html'), templateIndexHTML, {
-      encoding: 'utf8',
-      create: true
-    });
-    await this._vfs.writeFile(this._vfs.join(homedir, '/src/index.ts'), templateIndex, {
-      encoding: 'utf8',
-      create: true
-    });
-    return homedir;
-  }
-  static async deleteHomeDir(uuid: string) {
-    const homedir = this.getHomeDirName(uuid);
-    await this._vfs.deleteDirectory(homedir, true);
-  }
-  private static getHomeDirName(uuid: string) {
-    return `/home/${uuid}`;
   }
   private static async getProjectInfo(uuid: string) {
     const manifest = await this.readManifest();

@@ -154,7 +154,7 @@ export class ImageList extends Observable<{
         const assetId = data[0].path;
         const mimeType = ProjectService.VFS.guessMIMEType(assetId);
         if (this._mimeTypes.includes(mimeType)) {
-          const path = ProjectService.VFS.relative(assetId);
+          const path = assetId;
           ProjectService.serializationManager
             .fetchTexture<Texture2D>(path, {
               linearColorSpace: this._linearColorSpace
