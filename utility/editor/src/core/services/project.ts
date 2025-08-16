@@ -62,7 +62,7 @@ export class ProjectService {
   static async closeCurrentProject() {
     if (this._currentProject) {
       this._currentProject = '';
-      await this._serializationManager.vfs.chdir('/');
+      await this._vfs.chdir('/');
     }
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
@@ -76,7 +76,7 @@ export class ProjectService {
     }
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
-    await this._serializationManager.vfs.chdir(info.homedir);
+    await this._vfs.chdir(info.homedir);
     console.log(`Project opened: ${uuid}`);
     return info;
   }
@@ -90,7 +90,7 @@ export class ProjectService {
       delete manifest.projectList[uuid];
       delete manifest.history[uuid];
       await this.writeManifest(manifest);
-      await this._serializationManager.vfs.deleteDirectory(info.homedir, true);
+      await this._vfs.deleteDirectory(info.homedir, true);
     }
   }
   static async saveProject(project: ProjectInfo) {

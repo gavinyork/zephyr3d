@@ -11,6 +11,9 @@ export class RuntimeManager {
     this.scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });
     this.enabled = enabled ?? true;
   }
+  get VFS() {
+    return this.scriptingSystem.registry.VFS;
+  }
   detachAllScripts() {
     if (this.enabled) {
       this.scriptingSystem.detachAllScripts();

@@ -1,5 +1,5 @@
 import type { Matrix4x4, AABB } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, Observable, DRef, DWeakRef } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, DRef, DWeakRef, makeObservable, Disposable } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
@@ -16,11 +16,11 @@ import type { Metadata } from 'draco3d';
  * Presents a world that manages a couple of objects that will be rendered
  * @public
  */
-export class Scene extends Observable<{
+export class Scene extends makeObservable(Disposable)<{
   update: [Scene];
   startrender: [Scene, Camera, Compositor];
   endrender: [Scene, Camera, Compositor];
-}> {
+}>() {
   /** @internal */
   private static _nextId = 0;
   /** @internal */
@@ -125,20 +125,28 @@ export class Scene extends Observable<{
     this._metaData = val;
   }
   /**
-   * Disposes the scene
-   */
-  dispose() {
-    this._env.dispose();
-    this._rootNode.dispose();
-    this._mainCamera.dispose();
-  }
-  /**
    * Find scene node by id
    */
   findNodeById<T extends SceneNode>(id: string) {
     let node: T = null;
     this._rootNode?.get().iterate((child) => {
       if (child.persistentId === id) {
+        node = child as T;
+        return true;
+      }
+    });
+    return node;
+  }
+  /**
+   * Find scene node by name
+   *
+   * @remarks
+   * If multiple nodes have the same name, the first found node will be returned
+   */
+  findNodeByName<T extends SceneNode>(name: string) {
+    let node: T = null;
+    this._rootNode?.get().iterate((child) => {
+      if (child.name === name) {
         node = child as T;
         return true;
       }
@@ -315,5 +323,13 @@ export class Scene extends Observable<{
         }
       }
     }
+  }
+  /**
+   * Disposes the scene
+   */
+  protected onDispose() {
+    this._env.dispose();
+    this._rootNode.dispose();
+    this._mainCamera.dispose();
   }
 }

@@ -47,6 +47,7 @@ import {
   getJSONStringClass,
   getJSONArrayClass
 } from './json';
+import { Application } from '../../app';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -280,6 +281,17 @@ export class SerializationManager {
     const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
     const json = JSON.parse(content);
     const scene = await this.deserializeObject<Scene>(null, json);
+    if (scene) {
+      const P: Promise<any>[] = [];
+      scene.rootNode.iterate((node) => {
+        if (node.script) {
+          P.push(Application.instance.runtimeManager.attachScript(node, node.script));
+        }
+      });
+      if (P.length > 0) {
+        await Promise.all(P);
+      }
+    }
     return scene;
   }
   async saveScene(scene: Scene, filename: string): Promise<void> {

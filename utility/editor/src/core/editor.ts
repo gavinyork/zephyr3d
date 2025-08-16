@@ -18,7 +18,6 @@ import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
-import { moduleSharing } from './moduleshare';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 

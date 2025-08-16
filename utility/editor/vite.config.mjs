@@ -21,6 +21,11 @@ export default defineConfig({
         },
         propertyReadSideEffects: true,
         unknownGlobalSideEffects: true
+      },
+      output: {
+        entryFileNames: 'assets/index-[hash].js',
+        chunkFileNames: 'assets/chunk-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]'
       }
     },
     sourcemap: false,

@@ -10,6 +10,7 @@ import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
+import { templateScript } from '../core/build/templates';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -731,7 +732,7 @@ export class VFSRenderer extends Observable<{
         }
         ImGui.Separator();
         if (ImGui.MenuItem('Typescript...')) {
-          this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8');
+          this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
         }
         ImGui.EndMenu();
       }
@@ -969,7 +970,12 @@ export class VFSRenderer extends Observable<{
     });
   }
 
-  private async createNewFile(title: string, defaultName: string, encoding: 'utf8' | 'binary') {
+  private async createNewFile(
+    title: string,
+    defaultName: string,
+    encoding: 'utf8' | 'binary',
+    content?: string
+  ) {
     if (!this._selectedDir) {
       return;
     }
@@ -998,7 +1004,7 @@ export class VFSRenderer extends Observable<{
           }
         }
         try {
-          await this._vfs.writeFile(newPath, '', { encoding, create: true });
+          await this._vfs.writeFile(newPath, content ?? '', { encoding, create: true });
         } catch (err) {
           DlgMessage.messageBox('Error', `Create file failed: ${err}`);
         }
@@ -1168,7 +1174,7 @@ export class VFSRenderer extends Observable<{
     if (!this._project) {
       return;
     }
-    const rootDir = await this.loadDirectoryInfo(this._project.homedir);
+    const rootDir = await this.loadDirectoryInfo(this._vfs.join(this._project.homedir, '/assets'));
     this._filesystem = rootDir;
 
     if (this._selectedDir) {

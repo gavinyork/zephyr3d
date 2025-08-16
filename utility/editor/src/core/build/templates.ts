@@ -1,5 +1,22 @@
-export const templateIndex = `
-import { Application } from '@zephyr3d/scene';
+export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
+import { RuntimeScript } from '@zephyr3d/runtime';
+// Change HostType to your attachment type
+type HostType = IDisposable;
+export default class MyScript extends RuntimeScript<HostType> {
+  onCreated(): void | Promise<void> {
+  }
+  onAttached(_host: HostType): void | Promise<void> {
+  }
+  onUpdate(_deltaTime: number, _elapsedTime: number) {
+  }
+  onDetached() {
+  }
+  onDestroy() {
+  }
+}
+`;
+
+export const templateIndex = `import { Application } from '@zephyr3d/scene';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -13,8 +30,7 @@ HelloApp.ready().then(async () => {
 });
 `;
 
-export const templateIndexHTML = `
-<!DOCTYPE html>
+export const templateIndexHTML = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />

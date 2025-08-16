@@ -17,6 +17,7 @@ function getTargetES6() {
     output: {
       dir: 'dist',
       preserveModules: true,
+      preserveModulesRoot: 'src',
       format: 'esm',
       sourcemap: true
     },
