@@ -751,15 +751,18 @@ export class PropertyEditor extends Observable<{
               ImGui.DragDropFlags.AcceptBeforeDelivery
             );
             if (peekPayload) {
-              const mimeType = ProjectService.VFS.guessMIMEType(peekPayload.Data as string);
-              if (value.options.mimeTypes.includes(mimeType)) {
-                const payload = ImGui.AcceptDragDropPayload('ASSET');
-                if (payload) {
-                  tmpProperty.str[0] = ProjectService.VFS.relative(payload.Data as string);
-                  Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
-                    this.refresh();
-                  });
-                  this.dispatchEvent('object_property_changed', object, value);
+              const data = peekPayload.Data as { isDir: boolean; path: string }[];
+              if (data.length === 1 && !data[0].isDir) {
+                const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
+                if (value.options.mimeTypes.includes(mimeType)) {
+                  const payload = ImGui.AcceptDragDropPayload('ASSET');
+                  if (payload) {
+                    tmpProperty.str[0] = ProjectService.VFS.relative(data[0].path);
+                    Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                      this.refresh();
+                    });
+                    this.dispatchEvent('object_property_changed', object, value);
+                  }
                 }
               }
             }

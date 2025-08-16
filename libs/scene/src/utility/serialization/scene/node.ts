@@ -358,6 +358,22 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           }
         },
         {
+          name: 'Script',
+          type: 'object',
+          options: {
+            mimeTypes: ['text/x-typescript']
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = this.script;
+          },
+          set(this: SceneNode, value) {
+            this.script = value?.str?.[0] ?? '';
+          }
+        },
+        {
           name: 'Metadata',
           type: 'object',
           options: { objectTypes: [JSONData] },

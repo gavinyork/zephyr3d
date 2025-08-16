@@ -279,7 +279,8 @@ export class SerializationManager {
   async loadScene(filename: string): Promise<Scene> {
     const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
     const json = JSON.parse(content);
-    return this.deserializeObject<Scene>(null, json);
+    const scene = await this.deserializeObject<Scene>(null, json);
+    return scene;
   }
   async saveScene(scene: Scene, filename: string): Promise<void> {
     const asyncTasks: Promise<unknown>[] = [];

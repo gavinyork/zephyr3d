@@ -1,7 +1,5 @@
 export const templateIndex = `
 import { Application } from '@zephyr3d/scene';
-import { HttpFS } from '@zephyr3d/base';
-import { RuntimeManager } from '@zephyr3d/runtime';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -11,11 +9,7 @@ const HelloApp = new Application({
   canvas: document.querySelector('#canvas')
 });
 HelloApp.ready().then(async () => {
-  const httpFS = new HttpFS('./');
-  await RuntimeManager.init(httpFS, '/', false);
-  HelloApp.on('tick', (deltaTime, elapsedTime) => {
-    RuntimeManager.update(deltaTime, elapsedTime);
-  });
+  HelloApp.run();
 });
 `;
 

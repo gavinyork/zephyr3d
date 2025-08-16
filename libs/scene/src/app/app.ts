@@ -1,6 +1,7 @@
-import { Observable, flushPendingDisposals } from '@zephyr3d/base';
+import { Observable, VFS, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
+import { RuntimeManager } from '@zephyr3d/runtime';
 
 type appEventMap = {
   resize: [width: number, height: number];
@@ -41,6 +42,17 @@ export type AppOptions = {
   enableMSAA?: boolean;
   /** The device pixel ratio */
   pixelRatio?: number;
+  /** Options for runtime scripting system */
+  runtimeOptions?: {
+    /** VFS for reading script files, default is HttpFS at '.' */
+    VFS?: VFS;
+    /** Root directory for script files, default is '/' */
+    scriptsRoot?: string;
+    /** Whether application is running in editor mode, should always be true for user application */
+    editorMode?: boolean;
+    /** Wether enable runtime scripting system, should always be true for user application */
+    enabled?: boolean;
+  };
 };
 
 /**
@@ -73,6 +85,7 @@ export class Application extends Observable<appEventMap> {
   private readonly _options: AppOptions;
   private _device: AbstractDevice;
   private readonly _inputManager: InputManager;
+  private readonly _runtimeManager: RuntimeManager;
   private _ready: boolean;
   private _logger: Logger;
   private static _instance: Application;
@@ -93,6 +106,12 @@ export class Application extends Observable<appEventMap> {
       canvas: opt.canvas
     };
     this._inputManager = new InputManager(this);
+    this._runtimeManager = new RuntimeManager(
+      opt.runtimeOptions.VFS,
+      opt.runtimeOptions.scriptsRoot,
+      opt.runtimeOptions.editorMode,
+      opt.runtimeOptions.enabled
+    );
     this._ready = false;
     this._logger = {
       log(text: string, mode?: LogMode) {
@@ -113,6 +132,10 @@ export class Application extends Observable<appEventMap> {
   /** The input manager instance */
   get inputManager(): InputManager {
     return this._inputManager;
+  }
+  /** The runtime manager instance */
+  get runtimeManager(): RuntimeManager {
+    return this._runtimeManager;
   }
   /** The options that was used to create the application */
   get options(): AppOptions {
@@ -167,7 +190,10 @@ export class Application extends Observable<appEventMap> {
       this.device.setFramebuffer(null);
       this.device.setViewport(null);
       this.device.setScissor(null);
-      this.dispatchEvent('tick', this.device.frameInfo.elapsedFrame, this.device.frameInfo.elapsedOverall);
+      const dt = this.device.frameInfo.elapsedFrame;
+      const elapsed = this.device.frameInfo.elapsedOverall;
+      this._runtimeManager.update(dt, elapsed);
+      this.dispatchEvent('tick', dt, elapsed);
     }
   }
   /** Start running the rendering loop */

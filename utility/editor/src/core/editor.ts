@@ -148,7 +148,6 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
-    moduleSharing.shareZephyr3dModules();
     eventBus.on('action', this.onAction, this);
   }
   async loadAssets() {

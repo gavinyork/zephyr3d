@@ -419,7 +419,6 @@ importers:
       '@typescript-eslint/parser': ^8.17.0
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
-      '@zephyr3d/scene': workspace:*
       cross-env: ^7.0.3
       eslint: ^8.56.0
       eslint-config-prettier: ^8.6.0
@@ -440,7 +439,6 @@ importers:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
-      '@zephyr3d/scene': link:../scene
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
     devDependencies:
       '@babel/core': 7.28.0
@@ -484,6 +482,7 @@ importers:
       '@webgpu/types': ^0.1.62
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
+      '@zephyr3d/runtime': workspace:*
       cross-env: ^7.0.3
       eslint: ^8.56.0
       eslint-config-prettier: ^8.6.0
@@ -506,6 +505,7 @@ importers:
       '@webgpu/types': 0.1.64
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
+      '@zephyr3d/runtime': link:../runtime
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
     devDependencies:
       '@babel/core': 7.28.0

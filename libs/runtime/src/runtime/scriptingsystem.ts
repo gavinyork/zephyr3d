@@ -1,14 +1,13 @@
 import type { ModuleId } from './types';
 import { ScriptRegistry } from './scriptregistry';
-import { HttpFS, IDisposable } from '@zephyr3d/base';
+import { HttpFS, IDisposable, VFS } from '@zephyr3d/base';
 import { RuntimeScript } from './runtimescript';
 
-// 你项目中的宿主接口（实体/节点等），至少需要一个 id 或可作为 Map 键
 export type Host = IDisposable;
 
 export interface AttachedScript {
   id: ModuleId;
-  url: string; // runtime: 实际 URL；editor: 逻辑 ID 或 data URL（见实现）
+  url: string;
   instance: RuntimeScript<any>;
 }
 
@@ -20,11 +19,18 @@ export class ScriptingSystem {
 
   constructor(
     opts: {
+      VFS?: VFS;
+      scriptsRoot?: string;
+      editorMode?: boolean;
       importComment?: string;
       onLoadError?: (e: unknown, id: ModuleId) => void;
     } = {}
   ) {
-    this._registry = new ScriptRegistry(new HttpFS('./'), '/', false);
+    this._registry = new ScriptRegistry(
+      opts.VFS ?? new HttpFS('./'),
+      opts.scriptsRoot ?? '/',
+      opts.editorMode ?? false
+    );
     this._importComment = opts.importComment;
     this._onLoadError = opts.onLoadError;
   }
@@ -33,17 +39,17 @@ export class ScriptingSystem {
     return this._registry;
   }
 
-  // 将脚本模块附加到宿主，返回附加记录
-  async attachScript(host: Host, module: string): Promise<AttachedScript> {
+  // Attachs a script to object and returns the script instance
+  async attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>> {
     try {
       const url = await this._registry.resolveRuntimeUrl(module);
       if (!url) {
         return null;
       }
-      const mod = await import(/* @vite-ignore */ url + (this._importComment ?? ''));
-      let instance: RuntimeScript<any>;
+      const mod = await import(url + (this._importComment ?? ''));
+      let instance: RuntimeScript<T>;
       if (typeof mod?.default === 'function') {
-        // 默认导出类
+        // default export
         instance = new mod.default();
         if (instance instanceof RuntimeScript) {
           const P = instance.onCreated();
@@ -78,15 +84,15 @@ export class ScriptingSystem {
       if (P instanceof Promise) {
         await P;
       }
-      return attached;
+      return attached.instance;
     } catch (e) {
       this._onLoadError?.(e, module);
       return null;
     }
   }
 
-  // 将模块从宿主解绑；idOrInstance 可为 ModuleId 或实际实例对象，如果为空或null则解绑所有
-  detachScript(host: Host, idOrInstance?: ModuleId | any): boolean {
+  // Detach script from host object
+  detachScript<T extends Host>(host: T, idOrInstance?: ModuleId | RuntimeScript<T>): boolean {
     const list = this._hostScripts.get(host);
     if (!list || list.length === 0) {
       return false;
@@ -120,7 +126,7 @@ export class ScriptingSystem {
     return removed;
   }
 
-  // 每帧更新：遍历每个宿主的脚本实例，调用其 update
+  // Update script instances
   update(deltaTime: number, elapsedTime: number): void {
     if (this._hostScripts.size === 0) {
       return;
@@ -136,7 +142,8 @@ export class ScriptingSystem {
     }
   }
 
-  dispose() {
+  // Detach all script instances
+  detachAllScripts() {
     while (this._hostScripts.size > 0) {
       for (const entry of this._hostScripts) {
         this.detachScript(entry[0]);
@@ -144,9 +151,7 @@ export class ScriptingSystem {
     }
   }
 
-  // 如果需要对宿主注册事件等，覆写这两个函数；默认空实现
+  // Preserved functions
   protected registerHost(_host: Host) {}
   protected unregisterHost(_host: Host) {}
 }
-
-export default ScriptingSystem;
