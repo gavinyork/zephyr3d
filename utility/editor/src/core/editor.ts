@@ -329,6 +329,106 @@ export class Editor {
       input: '/src/index.ts',
       distDir: '/dist'
     });
+    const zipDownloader = new ZipDownloader(`${this._currentProject.name}_dist.zip`);
+    const distFileList = await ProjectService.VFS.readDirectory('/dist', {
+      includeHidden: true,
+      recursive: true
+    });
+    const distFiles = distFileList.filter((path) => path.type === 'file');
+    let distDirs = distFileList.filter((path) => path.type === 'directory');
+    for (const file of distFiles) {
+      const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
+      const path = ProjectService.VFS.relative(file.path, '/');
+      await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
+      distDirs = distDirs.filter((dir) => !file.path.startsWith(`${dir.path}/`));
+    }
+    for (const dir of distDirs) {
+      await zipDownloader.zipWriter.add(`${dir.path}/`);
+    }
+    const assetFileList = await ProjectService.VFS.readDirectory('/assets', {
+      includeHidden: true,
+      recursive: true
+    });
+    const assetFiles = assetFileList.filter((path) => path.type === 'file');
+    let assetDirs = assetFileList.filter((path) => path.type === 'directory');
+    for (const file of assetFiles) {
+      const isTS = file.path.endsWith('.ts');
+      let content = await ProjectService.VFS.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
+      let path = ProjectService.VFS.relative(ProjectService.VFS.join('/dist', file.path), '/');
+      if (isTS) {
+        path = `${path.slice(0, -3)}.js`;
+        content = this.transpileTS(file.path, this.rewriteImports(content as string));
+      }
+      await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
+      assetDirs = assetDirs.filter((dir) => !file.path.startsWith(`${dir.path}/`));
+    }
+    for (const dir of assetDirs) {
+      await zipDownloader.zipWriter.add(
+        `${ProjectService.VFS.relative(ProjectService.VFS.join('/dist', dir.path), '/')}/`
+      );
+    }
+
+    await zipDownloader.finish();
+  }
+  rewriteImports(code: string): string {
+    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
+    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+    const replaceAsync = (input: string, re: RegExp) => {
+      let out = '';
+      let last = 0;
+      for (;;) {
+        const m = re.exec(input);
+        if (!m) {
+          break;
+        }
+        out += input.slice(last, m.index);
+
+        const quote = m[1];
+        const spec = m[2];
+        let replacement = spec;
+
+        if ((spec.startsWith('./') || spec.startsWith('../')) && !spec.endsWith('.js')) {
+          replacement = `${spec}.js`;
+        }
+
+        const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
+        out += replaced;
+        last = m.index + m[0].length;
+      }
+      out += input.slice(last);
+      return out;
+    };
+
+    let out = replaceAsync(code, reStatic);
+    out = replaceAsync(out, reDynamic);
+    return out;
+  }
+  private transpileTS(fileName: string, code: string) {
+    const ts = (window as any).ts as typeof import('typescript');
+    if (!ts) {
+      throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
+    }
+
+    const res = ts.transpileModule(code, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2015,
+        module: ts.ModuleKind.ESNext,
+        sourceMap: true,
+        inlineSources: true,
+        experimentalDecorators: true,
+        useDefineForClassFields: false
+      },
+      fileName
+    });
+
+    let out = res.outputText || '';
+    if (res.sourceMapText) {
+      const mapBase64 = btoa(unescape(encodeURIComponent(res.sourceMapText)));
+      out += `\n//# sourceMappingURL=data:application/json;base64,${mapBase64}`;
+    }
+    out += `\n//# sourceURL=${fileName}`;
+    return out;
   }
   private onAction(action: string, fileName: string, arg: string) {
     if (action === 'EDIT_CODE' && fileName) {

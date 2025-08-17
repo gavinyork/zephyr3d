@@ -6,9 +6,9 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 import { ProjectService } from './core/services/project';
-import { moduleSharing } from './core/moduleshare';
+import { shareZephyr3dModules } from './core/moduleshare';
 
-moduleSharing.shareZephyr3dModules();
+shareZephyr3dModules();
 const deviceType = new URL(window.location.href).searchParams.get('device');
 const project = new URL(window.location.href).searchParams.get('project');
 if (project) {
