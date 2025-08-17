@@ -97,7 +97,13 @@ export class ScriptRegistry {
 
   async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
     const id = this.resolveLogicalId(entryId);
-    return this._editorMode ? await this.build(String(id)) : id.endsWith('.js') ? id : `${id}.js`;
+    return this._editorMode
+      ? await this.build(String(id))
+      : id.endsWith('.js')
+      ? id
+      : id.endsWith('.ts')
+      ? `${id.slice(0, -3)}.js`
+      : `${id}.js`;
   }
 
   async getDependencies(

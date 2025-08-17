@@ -43,8 +43,8 @@ const HelloApp = new Application({
     scriptsRoot: '/assets'
   }
 });
-await HelloApp.runtimeManager.attachScript(null, '#/index');
 HelloApp.ready().then(async () => {
+  await HelloApp.runtimeManager.attachScript(null, '#/index');
   HelloApp.run();
 });
 `;

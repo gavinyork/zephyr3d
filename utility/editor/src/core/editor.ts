@@ -283,20 +283,22 @@ export class Editor {
       return;
     }
     const zipDownloader = new ZipDownloader(`${this._currentProject.name}.zip`);
-    const fileList = await ProjectService.VFS.readDirectory('/', {
+    const fileList = await ProjectService.VFS.glob('/**/*', {
       includeHidden: true,
+      includeDirs: true,
+      includeFiles: true,
       recursive: true
     });
     const files = fileList.filter((path) => path.type === 'file');
     let directories = fileList.filter((path) => path.type === 'directory');
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
-      const path = file.path;
+      const path = ProjectService.VFS.relative(file.path, '/');
       await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
       directories = directories.filter((dir) => !file.path.startsWith(`${dir.path}/`));
     }
     for (const dir of directories) {
-      await zipDownloader.zipWriter.add(`${dir.path}/`);
+      await zipDownloader.zipWriter.add(`${ProjectService.VFS.relative(dir.path, '/')}/`);
     }
     await zipDownloader.finish();
   }
@@ -330,8 +332,10 @@ export class Editor {
       distDir: '/dist'
     });
     const zipDownloader = new ZipDownloader(`${this._currentProject.name}_dist.zip`);
-    const distFileList = await ProjectService.VFS.readDirectory('/dist', {
+    const distFileList = await ProjectService.VFS.glob('/dist/**/*', {
       includeHidden: true,
+      includeDirs: false,
+      includeFiles: true,
       recursive: true
     });
     const distFiles = distFileList.filter((path) => path.type === 'file');
@@ -345,8 +349,10 @@ export class Editor {
     for (const dir of distDirs) {
       await zipDownloader.zipWriter.add(`${dir.path}/`);
     }
-    const assetFileList = await ProjectService.VFS.readDirectory('/assets', {
+    const assetFileList = await ProjectService.VFS.glob('/assets/**/*', {
       includeHidden: true,
+      includeDirs: false,
+      includeFiles: true,
       recursive: true
     });
     const assetFiles = assetFileList.filter((path) => path.type === 'file');
@@ -389,7 +395,11 @@ export class Editor {
         let replacement = spec;
 
         if ((spec.startsWith('./') || spec.startsWith('../')) && !spec.endsWith('.js')) {
-          replacement = `${spec}.js`;
+          if (spec.endsWith('.ts')) {
+            replacement = `${spec.slice(0, -3)}.js`;
+          } else {
+            replacement = `${spec}.js`;
+          }
         }
 
         const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
