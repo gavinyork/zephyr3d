@@ -18,7 +18,6 @@ export class SceneModel extends BaseModel {
     if (!scene) {
       this._scene.env.sky.fogType = 'height_fog';
       const light = new DirectionalLight(this._scene);
-      light.intensity = 18;
       light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
     }
     if (!this._scene.mainCamera) {
