@@ -326,10 +326,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       }
       const fb = this._feedbackRenderTarget.get();
       if (!fb || fb.getColorAttachment(0).width < points.length) {
-        const rt0 = device.createTexture2D('rgba32f', points.length, 0, {
+        const rt0 = device.createTexture2D('rgba32f', points.length, 1, {
           samplerOptions: { mipFilter: 'none' }
         });
-        const rt1 = device.createTexture2D('rgba32f', points.length, 0, {
+        const rt1 = device.createTexture2D('rgba32f', points.length, 1, {
           samplerOptions: { mipFilter: 'none' }
         });
         if (fb) {
@@ -340,6 +340,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this._feedbackRenderTarget.set(device.createFrameBuffer([rt0, rt1], null));
       }
       primitive.indexCount = points.length;
+      const bindGroup = this._feedbackBindGroup.get();
+      bindGroup.setValue('textureWidth', this._feedbackRenderTarget.get().getWidth());
+      this.waveGenerator.applyWaterBindGroup(bindGroup);
       device.pushDeviceStates();
       device.setProgram(this._feedbackProgram.get());
       device.setBindGroup(0, this._feedbackBindGroup.get());
@@ -368,7 +371,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
-        this.numPoints = pb.float().uniform(0);
         this.textureWidth = pb.float().uniform(0);
         that.waveGenerator.setupUniforms(this, 0);
         pb.main(function () {
@@ -382,6 +384,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
           );
           this.$outputs.worldPos = this.worldPos;
           this.$outputs.worldNorm = this.worldNorm;
+          this.$outputs.xz = this.$inputs.position.xz;
           this.$l.index =
             device.type === 'webgl' ? this.$inputs.instanceId : pb.float(this.$builtins.instanceIndex);
           this.$l.ndcX = pb.sub(pb.mul(pb.div(pb.add(this.index, 0.5), this.textureWidth), 2), 1);
@@ -391,9 +394,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       fragment(pb) {
         this.$outputs.worldPos = pb.vec4();
         this.$outputs.worldNorm = pb.vec4();
+        that.waveGenerator.setupUniforms(this, 0);
         pb.main(function () {
           this.$outputs.worldPos = pb.vec4(this.$inputs.worldPos, 1);
-          this.$outputs.worldNorm = pb.vec4(this.$inputs.worldNorm, 1);
+          this.$outputs.worldNorm = pb.vec4(
+            that.waveGenerator.calcFragmentNormal(this, this.$inputs.xz, this.$inputs.worldNorm),
+            1
+          );
         });
       }
     });
