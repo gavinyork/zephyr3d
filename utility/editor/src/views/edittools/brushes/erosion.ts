@@ -1,17 +1,24 @@
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
+import type { Vector4 } from '@zephyr3d/base';
+import { degree2radian, Vector2 } from '@zephyr3d/base';
+import type { TerrainEditTool } from '../terrain';
+import { ImGui } from '@zephyr3d/imgui';
 
-export class TerrainErosoinBrush extends TerrainHeightBrush {
-  private _randomSeed: number;
+export class ThermalErosionBrush extends TerrainHeightBrush {
+  private _talus: number;
+  private _pixelWorldSize: Vector2;
+  private _carryRate: number;
+  private _diagWeight: number;
   constructor() {
     super();
-    this._randomSeed = 0;
+    this._talus = 30;
+    this._pixelWorldSize = new Vector2(1, 1);
+    this._carryRate = 0.2;
+    this._diagWeight = 1 / Math.sqrt(2);
   }
-  get randomSeed() {
-    return this._randomSeed;
-  }
-  set randomSeed(val: number) {
-    this._randomSeed = val;
+  getName(): string {
+    return 'thermal erosion';
   }
   protected brushFragment(
     scope: PBInsideFunctionScope,
@@ -21,21 +28,6 @@ export class TerrainErosoinBrush extends TerrainHeightBrush {
     _centerUV: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const EROSION_STRENGTH = 0.3; // 侵蚀强度
-    const DEPOSITION_STRENGTH = 0.1; // 沉积强度
-    const TRANSPORT_CAPACITY = 0.05; // 水流携带沉积物容量
-    const GRAVITY = 1.0; // 重力系数
-    const PATH_STEPS = 12; // 水流路径步数
-    const MIN_SLOPE_FOR_EROSION = 0.01; // 最小侵蚀坡度（相对高度差）
-    const INERTIA = 0.6; // 水流惯性，值越大水流方向变化越慢
-
-    pb.func('random', [pb.vec2('st')], function () {
-      this.$return(
-        pb.fract(
-          pb.mul(pb.sin(pb.add(pb.dot(this.st, pb.vec2(12.9898, 78.233)), this.randomSeed)), 43758.5453123)
-        )
-      );
-    });
 
     scope.$l.brushEffect = pb.clamp(pb.mul(strength, mask), 0, 1);
     scope.$if(pb.lessThan(scope.brushEffect, 0.001), function () {
@@ -45,90 +37,106 @@ export class TerrainErosoinBrush extends TerrainHeightBrush {
     const heightMap = this.getOriginHeightMap(scope);
     scope.$l.texelSize = pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(heightMap, 0)));
     scope.$l.currentHeight = pb.textureSampleLevel(heightMap, heightMapUV, 0).r;
-    scope.$l.erosionAmount = pb.float(0);
-    scope.$l.sedimentAmount = pb.float(0);
-    scope.$l.waterPos = heightMapUV;
-    scope.$l.randomDir = pb.vec2(
-      pb.sub(pb.mul(scope.random(pb.add(heightMapUV, pb.vec2(0.123, 0.456))), 2), 1),
-      pb.sub(pb.mul(scope.random(pb.add(heightMapUV, pb.vec2(0.789, 0.321))), 2), 1)
-    );
-    scope.$l.waterDir = scope.randomDir;
-    scope.$for(pb.int('i'), 0, PATH_STEPS, function () {
-      this.$l.posHeight = pb.textureSampleLevel(heightMap, this.waterPos, 0).r;
-      this.$l.heightL = pb.textureSampleLevel(
-        heightMap,
-        pb.sub(this.waterPos, pb.vec2(this.texelSize.x, 0)),
-        0
-      ).r;
-      this.$l.heightR = pb.textureSampleLevel(
-        heightMap,
-        pb.add(this.waterPos, pb.vec2(this.texelSize.x, 0)),
-        0
-      ).r;
-      this.$l.heightT = pb.textureSampleLevel(
-        heightMap,
-        pb.add(this.waterPos, pb.vec2(0, this.texelSize.y)),
-        0
-      ).r;
-      this.$l.heightB = pb.textureSampleLevel(
-        heightMap,
-        pb.sub(this.waterPos, pb.vec2(0, this.texelSize.y)),
-        0
-      ).r;
-      this.$l.gradient = pb.mul(
-        pb.vec2(pb.sub(this.heightL, this.heightR), pb.sub(this.heightB, this.heightT)),
-        0.5
-      );
-      this.$if(pb.lessThan(pb.length(this.gradient), MIN_SLOPE_FOR_EROSION), function () {
-        this.gradient = pb.add(this.gradient, pb.mul(this.randomDir, MIN_SLOPE_FOR_EROSION));
-      });
-      this.waterDir = pb.mix(this.gradient, this.waterDir, INERTIA);
-      this.$if(pb.greaterThan(pb.length(this.waterDir), 0), function () {
-        this.waterDir = pb.normalize(this.waterDir);
-      }).$else(function () {
-        this.waterDir = this.randomDir;
-      });
-      this.$l.prevPos = this.waterPos;
-      this.waterPos = pb.add(this.waterPos, pb.mul(this.waterDir, this.texelSize, GRAVITY));
-      this.waterPos = pb.clamp(this.waterPos, pb.vec2(0), pb.sub(pb.vec2(1), this.texelSize));
-      this.$l.newPosHeight = pb.textureSampleLevel(heightMap, this.waterPos, 0).r;
-      this.$l.heightDiff = pb.sub(this.posHeight, this.newPosHeight);
-      this.$if(pb.greaterThan(this.heightDiff, 0), function () {
-        this.$l.erosionForce = pb.mul(this.heightDiff, EROSION_STRENGTH, this.brushEffect);
-        this.$l.maxCapacity = pb.mul(TRANSPORT_CAPACITY, pb.length(this.waterDir), GRAVITY);
-        this.$l.availableCapacity = pb.max(0, pb.sub(this.maxCapacity, this.sedimentAmount));
-        this.$l.actualErosion = pb.min(this.erosionForce, this.availableCapacity);
-        this.$if(pb.lessThan(pb.distance(this.prevPos, heightMapUV), pb.length(this.texelSize)), function () {
-          this.erosionAmount = pb.add(this.erosionAmount, this.actualErosion);
+    scope.$l.outgoing = pb.float(0);
+    scope.$l.incoming = pb.float(0);
+    scope.$l.hn = pb.float[8]();
+    scope.$l.dir = pb.float[8]();
+    scope.$l.index = pb.int(0);
+    scope.$for(pb.int('i'), -1, 2, function () {
+      this.$for(pb.int('j'), -1, 2, function () {
+        this.$if(pb.and(pb.equal(this.i, 0), pb.equal(this.j, 0)), function () {
+          this.$continue();
         });
-        this.sedimentAmount = pb.add(this.sedimentAmount, this.actualErosion);
-      }).$elseif(pb.or(pb.lessThan(this.heightDiff, 0), pb.greaterThan(this.sedimentAmount, 0)), function () {
-        this.$l.depositionForce = pb.mul(
-          this.$choice(pb.lessThan(this.heightDiff, 0), pb.neg(this.heightDiff), 0.1),
-          DEPOSITION_STRENGTH
+        this.$l.coord = pb.add(
+          heightMapUV,
+          pb.mul(this.texelSize, pb.vec2(pb.float(this.j), pb.float(this.i)))
         );
-        this.$l.actualDeposition = pb.min(this.sedimentAmount, this.depositionForce);
-        this.sedimentAmount = pb.sub(this.sedimentAmount, this.actualDeposition);
-        this.$if(
-          pb.lessThan(pb.distance(this.waterPos, heightMapUV), pb.length(this.texelSize)),
-          function () {
-            this.erosionAmount = pb.sub(this.erosionAmount, this.actualDeposition);
-          }
-        );
+        this.hn.setAt(this.index, pb.textureSampleLevel(heightMap, this.coord, 0).r);
+        this.index = pb.add(this.index, 1);
       });
     });
-    scope.$l.newHeight = pb.sub(scope.currentHeight, scope.erosionAmount);
-    return pb.vec4(pb.vec3(scope.newHeight), 1);
+    scope.$l.t = pb.tan(scope.talus);
+    scope.$l.r = pb.mul(scope.t, pb.length(scope.pixelWorldSize));
+    scope.$l.dx = pb.mul(scope.t, scope.pixelWorldSize.x);
+    scope.$l.dz = pb.mul(scope.t, scope.pixelWorldSize.y);
+    scope.$l.eps = pb.float(0.05);
+
+    scope.dir[0] = pb.add(scope.r, scope.eps);
+    scope.dir[1] = pb.add(scope.dz, scope.eps);
+    scope.dir[2] = pb.add(scope.r, scope.eps);
+    scope.dir[3] = pb.add(scope.dx, scope.eps);
+    scope.dir[4] = pb.add(scope.dx, scope.eps);
+    scope.dir[5] = pb.add(scope.r, scope.eps);
+    scope.dir[6] = pb.add(scope.dz, scope.eps);
+    scope.dir[7] = pb.add(scope.r, scope.eps);
+
+    scope.$for(pb.int('i'), 0, 8, function () {
+      this.$l.diffOut = pb.sub(pb.sub(this.currentHeight, this.hn.at(this.i)), this.dir.at(this.i));
+      this.$l.diffIn = pb.sub(pb.sub(this.hn.at(this.i), this.currentHeight), this.dir.at(this.i));
+      this.$if(pb.greaterThan(this.diffOut, 0), function () {
+        this.outgoing = pb.add(this.outgoing, this.diffOut);
+      });
+      this.$if(pb.greaterThan(this.diffIn, 0), function () {
+        this.incoming = pb.add(this.incoming, this.diffIn);
+      });
+    });
+
+    scope.$l.rate = pb.mul(pb.min(scope.carryRate, 0.5), pb.clamp(scope.brushEffect, 0, 1));
+    scope.$l.incomingFactor = pb.float(0.4);
+    scope.$l.maxStep = pb.float(0.2);
+    scope.$l.delta = pb.float(0);
+
+    scope.$if(pb.greaterThan(scope.outgoing, 0), function () {
+      this.delta = pb.sub(this.delta, pb.mul(this.rate, this.outgoing));
+    });
+    scope.$if(pb.greaterThan(scope.incoming, 0), function () {
+      this.delta = pb.add(this.delta, pb.mul(this.rate, this.incoming, scope.incomingFactor));
+    });
+    scope.delta = pb.clamp(scope.delta, pb.neg(scope.maxStep), scope.maxStep);
+    scope.$l.hNew = pb.add(scope.currentHeight, scope.delta);
+
+    return pb.vec4(pb.vec3(scope.hNew), 1);
+  }
+  renderSettings(_tool: TerrainEditTool): void {
+    ImGui.BeginChild(
+      'Detail',
+      new ImGui.ImVec2(
+        0,
+        3 * ImGui.GetFrameHeight() + 2 * ImGui.GetStyle().WindowPadding.y + 2 * ImGui.GetStyle().ItemSpacing.y
+      ),
+      true
+    );
+    const talus = [this._talus] as [number];
+    if (ImGui.DragFloat('Talus', talus, 1, 0, 90)) {
+      this._talus = talus[0];
+    }
+    const carryRate = [this._carryRate] as [number];
+    if (ImGui.DragFloat('Carry Rate', carryRate, 0.01, 0, 1)) {
+      this._carryRate = carryRate[0];
+    }
+    const diagWeight = [this._diagWeight] as [number];
+    if (ImGui.DragFloat('Diagnal Weight', diagWeight, 0.01, 0, 1)) {
+      this._diagWeight = diagWeight[0];
+    }
+    ImGui.EndChild();
   }
   protected setupBrushUniforms(scope: PBGlobalScope): void {
     super.setupBrushUniforms(scope);
     const pb = scope.$builder;
     if (pb.shaderKind === 'fragment') {
-      scope.randomSeed = pb.float().uniform(0);
+      scope.talus = pb.float().uniform(0);
+      scope.pixelWorldSize = pb.vec2().uniform(0);
+      scope.carryRate = pb.float().uniform(0);
+      scope.diagWeight = pb.float().uniform(0);
     }
   }
-  protected applyUniformValues(bindGroup: BindGroup): void {
-    super.applyUniformValues(bindGroup);
-    bindGroup.setValue('randomSeed', this._randomSeed);
+  protected applyUniformValues(bindGroup: BindGroup, region: Vector4): void {
+    super.applyUniformValues(bindGroup, region);
+    this._pixelWorldSize.x = (region.z - region.x) / this.sourceHeightMap.width;
+    this._pixelWorldSize.y = (region.w - region.y) / this.sourceHeightMap.height;
+    bindGroup.setValue('talus', degree2radian(this._talus));
+    bindGroup.setValue('pixelWorldSize', this._pixelWorldSize);
+    bindGroup.setValue('carryRate', this._carryRate);
+    bindGroup.setValue('diagWeight', this._diagWeight);
   }
 }

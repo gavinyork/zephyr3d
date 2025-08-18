@@ -1,4 +1,5 @@
-import { Observable, VFS, flushPendingDisposals } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
+import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { RuntimeManager } from '@zephyr3d/runtime';

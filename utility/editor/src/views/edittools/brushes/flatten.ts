@@ -2,6 +2,9 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
 
 export class TerrainFlattenBrush extends TerrainHeightBrush {
+  getName(): string {
+    return 'flatten';
+  }
   protected brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,

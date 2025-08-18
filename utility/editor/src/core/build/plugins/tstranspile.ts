@@ -20,7 +20,9 @@ export function tsTranspilePlugin(options?: {
   return {
     name: 'ts-transpile',
     async transform(code: string, id: string) {
-      if (!include(id)) return null;
+      if (!include(id)) {
+        return null;
+      }
       const res = ts.transpileModule(code, {
         compilerOptions: base,
         fileName: id,

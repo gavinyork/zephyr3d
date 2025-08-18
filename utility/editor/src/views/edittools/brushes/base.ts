@@ -1,4 +1,5 @@
 import type { Vector2 } from '@zephyr3d/base';
+import type { TerrainEditTool } from '../terrain';
 import { Vector4, DRef } from '@zephyr3d/base';
 import type {
   AbstractDevice,
@@ -23,6 +24,7 @@ export abstract class BaseTerrainBrush {
     this._brushBindGroup = new DRef();
     this._brushRenderStates = null;
   }
+  abstract getName(): string;
   brush(mask: Texture2D, region: Vector4, pos: Vector2, brushSize: number, angle: number, strength: number) {
     const device = Application.instance.device;
     this.prepareBrush(device);
@@ -34,12 +36,13 @@ export abstract class BaseTerrainBrush {
     bindGroup.setValue('strength', strength);
     bindGroup.setValue('brushSize', brushSize);
     bindGroup.setTexture('mask', mask ?? BaseTerrainBrush._defaultMask);
-    this.applyUniformValues(bindGroup);
+    this.applyUniformValues(bindGroup, region);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     device.setRenderStates(this._brushRenderStates);
     BaseTerrainBrush._brushPrimitive.draw();
   }
+  renderSettings(_tool: TerrainEditTool) {}
   protected abstract brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,
@@ -48,7 +51,7 @@ export abstract class BaseTerrainBrush {
     centerUV: PBShaderExp
   ): void;
   protected setupBrushUniforms(_scope: PBGlobalScope) {}
-  protected applyUniformValues(_bindGroup: BindGroup) {}
+  protected applyUniformValues(_bindGroup: BindGroup, _region: Vector4) {}
   protected createBrushProgram(device: AbstractDevice) {
     const that = this;
     return device.buildRenderProgram({
@@ -145,6 +148,8 @@ export abstract class BaseTerrainBrush {
     }
     if (!this._brushProgram.get()) {
       this._brushProgram.set(this.createBrushProgram(device));
+      console.log(this._brushProgram.get().getShaderSource('vertex'));
+      console.log(this._brushProgram.get().getShaderSource('fragment'));
     }
     if (!this._brushBindGroup.get()) {
       this._brushBindGroup.set(device.createBindGroup(this._brushProgram.get().bindGroupLayouts[0]));

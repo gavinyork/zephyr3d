@@ -3,6 +3,7 @@ import { DockPannel, ResizeDirection } from './dockpanel';
 import type { ProjectInfo } from '../core/services/project';
 import { VFSRenderer } from './vfsrenderer';
 import { ImGui } from '@zephyr3d/imgui';
+import { renderLogView } from './logview';
 
 export class BottomView {
   private readonly _panel: DockPannel;
@@ -21,6 +22,10 @@ export class BottomView {
       if (ImGui.BeginTabBar('##BottomTabBar')) {
         if (ImGui.BeginTabItem('Content Browser##VFSView')) {
           this._renderer.render();
+          ImGui.EndTabItem();
+        }
+        if (ImGui.BeginTabItem('Log View##LogView')) {
+          renderLogView();
           ImGui.EndTabItem();
         }
         ImGui.EndTabBar();

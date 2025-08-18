@@ -34,6 +34,9 @@ import { FilePicker } from '../../components/filepicker';
 import { Dialog } from '../dlg/dlg';
 import { ProjectService } from '../../core/services/project';
 import { eventBus } from '../../core/eventbus';
+import type { BaseTerrainBrush } from './brushes/base';
+import { EraseGrassBrush, GrassBrush } from './brushes/grass';
+import { ThermalErosionBrush } from './brushes/erosion';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool extends Disposable implements EditTool {
@@ -47,15 +50,11 @@ export class TerrainEditTool extends Disposable implements EditTool {
   private _detailAlbedo: ImageList;
   private readonly _grassAlbedo: ImageList;
   private _detailNormal: ImageList;
+  private readonly _brushList: BaseTerrainBrush[];
   private readonly _editList: string[];
   private _editSelected: number;
   private _brushing: boolean;
   private _hitPos: Vector2;
-  private readonly _raiseBrush: TerrainRaiseBrush;
-  private readonly _lowerBrush: TerrainLowerBrush;
-  private readonly _smoothBrush: TerrainSmoothBrush;
-  private readonly _flattenBrush: TerrainFlattenBrush;
-  private readonly _textureBrush: TerrainTextureBrush;
   private readonly _splatMapCopy: DRef<Texture2DArray | Texture2D>;
   private readonly _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
@@ -133,7 +132,17 @@ export class TerrainEditTool extends Disposable implements EditTool {
       this.refreshDetailMaps();
       eventBus.dispatchEvent('scene_changed');
     });
-    this._editList = ['raise', 'lower', 'smooth', 'flatten', 'texture', 'grass', 'erase grass'];
+    this._brushList = [
+      new TerrainRaiseBrush(),
+      new TerrainLowerBrush(),
+      new TerrainSmoothBrush(),
+      new TerrainFlattenBrush(),
+      new ThermalErosionBrush(),
+      new TerrainTextureBrush(),
+      new GrassBrush(),
+      new EraseGrassBrush()
+    ];
+    this._editList = this._brushList.map((brush) => brush.getName());
     this._editSelected = 0;
     this._hitPos = null;
     this._brushImageList.addImage(TerrainEditTool.defaultBrush.get());
@@ -141,11 +150,6 @@ export class TerrainEditTool extends Disposable implements EditTool {
       this._brushImageList.addImage(this._editor.getBrushes()[name].get());
     }
     this._brushImageList.selected = 0;
-    this._raiseBrush = new TerrainRaiseBrush();
-    this._lowerBrush = new TerrainLowerBrush();
-    this._smoothBrush = new TerrainSmoothBrush();
-    this._flattenBrush = new TerrainFlattenBrush();
-    this._textureBrush = new TerrainTextureBrush();
     this._heightDirty = false;
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy =
@@ -176,6 +180,18 @@ export class TerrainEditTool extends Disposable implements EditTool {
     heightMapCopy.name = 'heightMapCopy';
     blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._heightMapCopy = new DRef(heightMapCopy);
+  }
+  get terrain() {
+    return this._terrain.get();
+  }
+  get detailAlbedo() {
+    return this._detailAlbedo;
+  }
+  get detailNormal() {
+    return this._detailNormal;
+  }
+  get grassAlbedo() {
+    return this._grassAlbedo;
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
     if (hitPos && hitObject === this._terrain.get()) {
@@ -221,7 +237,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       switch (this._editList[this._editSelected]) {
         case 'raise':
           this.applyHeightBrush(
-            this._raiseBrush,
+            this._brushList[this._editSelected] as TerrainRaiseBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -231,7 +247,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
           break;
         case 'lower':
           this.applyHeightBrush(
-            this._lowerBrush,
+            this._brushList[this._editSelected] as TerrainLowerBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -241,7 +257,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
           break;
         case 'smooth':
           this.applyHeightBrush(
-            this._smoothBrush,
+            this._brushList[this._editSelected] as TerrainSmoothBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -251,7 +267,17 @@ export class TerrainEditTool extends Disposable implements EditTool {
           break;
         case 'flatten':
           this.applyHeightBrush(
-            this._flattenBrush,
+            this._brushList[this._editSelected] as TerrainFlattenBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'thermal erosion':
+          this.applyHeightBrush(
+            this._brushList[this._editSelected] as ThermalErosionBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -262,6 +288,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
         case 'texture':
           if (this._detailAlbedo.selected >= 0) {
             this.applyTextureBrush(
+              this._brushList[this._editSelected] as TerrainTextureBrush,
               texture,
               this._hitPos,
               this._brushSize,
@@ -366,6 +393,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     eventBus.dispatchEvent('scene_changed');
   }
   applyTextureBrush(
+    brush: TerrainTextureBrush,
     brushTexture: Texture2D,
     hitPos: Vector2,
     brushSize: number,
@@ -394,9 +422,9 @@ export class TerrainEditTool extends Disposable implements EditTool {
     device.pushDeviceStates();
     device.setFramebuffer(fb);
 
-    this._textureBrush.detailIndex = detailIndex;
-    this._textureBrush.sourceSplatMap = this._splatMapCopy.get();
-    this._textureBrush.brush(
+    brush.detailIndex = detailIndex;
+    brush.sourceSplatMap = this._splatMapCopy.get();
+    brush.brush(
       brushTexture,
       this._terrain.get().worldRegion,
       hitPos,
@@ -404,7 +432,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       angle,
       Math.max(strength * 0.1, 0.01)
     );
-    this._textureBrush.sourceSplatMap = null;
+    brush.sourceSplatMap = null;
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
@@ -660,13 +688,8 @@ export class TerrainEditTool extends Disposable implements EditTool {
       ImGui.Dummy(new ImGui.ImVec2(300, 0));
       this.renderBrushSection();
       this.renderEditSection();
-      if (this._editList[this._editSelected] === 'texture') {
-        this.renderDetailMapSection();
-      } else if (
-        this._editList[this._editSelected] === 'grass' ||
-        this._editList[this._editSelected] === 'erase grass'
-      ) {
-        this.renderGrassTextureSection();
+      if (this._editSelected >= 0) {
+        this._brushList[this._editSelected].renderSettings(this);
       }
     }
     ImGui.End();

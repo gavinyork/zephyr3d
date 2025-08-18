@@ -2,6 +2,9 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
 
 export class TerrainLowerBrush extends TerrainHeightBrush {
+  getName(): string {
+    return 'lower';
+  }
   protected brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,

@@ -20,6 +20,7 @@ import { ZipDownloader } from '../helpers/zipdownload';
 import { ScriptingSystem } from '@zephyr3d/runtime';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
+import { initLogView } from '../components/logview';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -147,6 +148,7 @@ export class Editor {
     //await Database.init();
     await FontGlyph.loadFontGlyphs('zef-16px');
     await this.loadAssets();
+    initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
   }
   async loadAssets() {

@@ -1,8 +1,8 @@
 import type { VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
-import { RuntimeScript } from './runtimescript';
-import { ModuleId } from './types';
+import type { RuntimeScript } from './runtimescript';
+import type { ModuleId } from './types';
 
 export class RuntimeManager {
   private scriptingSystem: ScriptingSystem;

@@ -1,6 +1,7 @@
 import type { ModuleId } from './types';
 import { ScriptRegistry } from './scriptregistry';
-import { HttpFS, IDisposable, VFS } from '@zephyr3d/base';
+import type { IDisposable, VFS } from '@zephyr3d/base';
+import { HttpFS } from '@zephyr3d/base';
 import { RuntimeScript } from './runtimescript';
 
 export type Host = IDisposable;

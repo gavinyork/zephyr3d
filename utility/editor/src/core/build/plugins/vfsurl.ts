@@ -1,5 +1,5 @@
 import type { OutputBundle } from '@rollup/browser';
-import { VFS } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
 
 const DEFAULT_EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json'];
 const INDEX_CANDIDATES = ['index.ts', 'index.tsx', 'index.js', 'index.jsx', 'index.mjs', 'index.cjs'];
@@ -11,14 +11,18 @@ function isURL(id: string) {
 async function tryResolveWithExts(vfs: VFS, base: string, exts = DEFAULT_EXTS) {
   for (const ext of exts) {
     const p = base + ext;
-    if (await vfs.exists(p)) return p;
+    if (await vfs.exists(p)) {
+      return p;
+    }
   }
   return null;
 }
 async function tryResolveDirIndex(vfs, dir: string) {
   for (const f of INDEX_CANDIDATES) {
     const p = vfs.join(dir, f);
-    if (await vfs.exists(p)) return p;
+    if (await vfs.exists(p)) {
+      return p;
+    }
   }
   return null;
 }
@@ -64,13 +68,21 @@ export function vfsAndUrlPlugin(
         const st = await vfs.stat(start);
         if (st.isDirectory) {
           const idx = await tryResolveDirIndex(vfs, start);
-          if (idx) return idx;
-        } else return start;
+          if (idx) {
+            return idx;
+          }
+        } else {
+          return start;
+        }
       }
       const withExt = await tryResolveWithExts(vfs, start, exts);
-      if (withExt) return withExt;
+      if (withExt) {
+        return withExt;
+      }
       const asDir = await tryResolveDirIndex(vfs, start);
-      if (asDir) return asDir;
+      if (asDir) {
+        return asDir;
+      }
       return null;
     }
   }
@@ -79,19 +91,25 @@ export function vfsAndUrlPlugin(
     name: 'vfs-url',
     async resolveId(source: string, importer?: string) {
       // 1) 绝对 URL（含 blob/data/http/https）：直接返回
-      if (isURL(source)) return source;
+      if (isURL(source)) {
+        return source;
+      }
 
       // 2) 别名
       const aliased = applyAlias(source);
       if (aliased) {
         const r = await resolveRelativeLike(aliased, importer);
-        if (r) return r;
+        if (r) {
+          return r;
+        }
       }
 
       // 3) 相对/绝对路径 -> VFS
       if (source.startsWith('.') || source.startsWith('/')) {
         const r = await resolveRelativeLike(source, importer);
-        if (r) return r;
+        if (r) {
+          return r;
+        }
       }
 
       // 4) zephyr3d模块 -> 静态地址
@@ -110,7 +128,9 @@ export function vfsAndUrlPlugin(
       if (isURL(id)) {
         // 仅处理文本模块（JS/TS/JSON 等）。若是二进制，可转 data URL 再导出
         const res = await fetch(id);
-        if (!res.ok) throw new Error(`Failed to fetch ${id}: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch ${id}: ${res.status}`);
+        }
         const contentType = res.headers.get('Content-Type') || '';
         if (
           /javascript|json|text|xml/.test(contentType) ||
@@ -123,7 +143,9 @@ export function vfsAndUrlPlugin(
           // 作为 data URL 导出
           const buf = new Uint8Array(await res.arrayBuffer());
           let binary = '';
-          for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+          for (let i = 0; i < buf.length; i++) {
+            binary += String.fromCharCode(buf[i]);
+          }
           const base64 = btoa(binary);
           const mime = contentType || 'application/octet-stream';
           return `export default "data:${mime};base64,${base64}";`;
@@ -146,7 +168,9 @@ export function vfsAndUrlPlugin(
           const buf = (await vfs.readFile(id, { encoding: 'binary' })) as ArrayBuffer;
           const u8 = new Uint8Array(buf);
           let binary = '';
-          for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]);
+          for (let i = 0; i < u8.length; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
           const base64 = btoa(binary);
           const code = `export default "data:${mime || 'application/octet-stream'};base64,${base64}";`;
           return code;

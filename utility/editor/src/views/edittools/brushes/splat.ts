@@ -9,6 +9,8 @@ import type {
 import { fetchSampler } from '@zephyr3d/scene';
 import { BaseTerrainBrush } from './base';
 import { DRef } from '@zephyr3d/base';
+import type { TerrainEditTool } from '../terrain';
+import { ImGui } from '@zephyr3d/imgui';
 
 export class TerrainTextureBrush extends BaseTerrainBrush {
   private _detailIndex: number;
@@ -17,6 +19,9 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
     super();
     this._detailIndex = -1;
     this._sourceSplatMap = new DRef();
+  }
+  getName(): string {
+    return 'texture';
   }
   get detailIndex() {
     return this._detailIndex;
@@ -29,6 +34,39 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
   }
   set sourceSplatMap(tex: Texture2DArray | Texture2D) {
     this._sourceSplatMap.set(tex);
+  }
+  renderSettings(tool: TerrainEditTool): void {
+    ImGui.BeginChild(
+      'Detail',
+      new ImGui.ImVec2(
+        0,
+        60 * 2 +
+          3 * ImGui.GetFrameHeight() +
+          2 * ImGui.GetStyle().WindowPadding.y +
+          3 * ImGui.GetStyle().ItemSpacing.y
+      ),
+      true
+    );
+    ImGui.Text('Detail Albedo');
+    ImGui.BeginChild('AlbedoList', new ImGui.ImVec2(0, 60));
+    tool.detailAlbedo.render(ImGui.GetContentRegionAvail());
+    ImGui.EndChild();
+    ImGui.Text('Detail Normal');
+    ImGui.BeginChild('NormalList', new ImGui.ImVec2(0, 60));
+    tool.detailNormal.render(ImGui.GetContentRegionAvail());
+    ImGui.EndChild();
+    const disabled = tool.detailAlbedo.selected < 0;
+    if (disabled) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+      ImGui.InputFloat('UVScale', [0] as [number], 1, 10, undefined, ImGui.InputTextFlags.ReadOnly);
+      ImGui.PopStyleVar();
+    } else {
+      const uvScale = [tool.terrain.material.getDetailMapUVScale(tool.detailAlbedo.selected)] as [number];
+      if (ImGui.DragFloat('UVScale', uvScale, 1, 0, 1000, undefined)) {
+        tool.terrain.material.setDetailMapUVScale(tool.detailAlbedo.selected, uvScale[0]);
+      }
+    }
+    ImGui.EndChild();
   }
   protected brushFragment(
     scope: PBInsideFunctionScope,
