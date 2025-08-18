@@ -172,7 +172,10 @@ export class HttpFS extends VFS {
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
-    url = new URL(this.join(this.basePath, url), this.baseOrigin).href;
+    url =
+      this.isObjectURL(url) || this.parseDataURI(url)
+        ? url
+        : new URL(this.join(this.basePath, url), this.baseOrigin).href;
     try {
       const response = await fetch(url, {
         ...init,

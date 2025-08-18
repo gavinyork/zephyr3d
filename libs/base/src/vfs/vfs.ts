@@ -1079,7 +1079,7 @@ export abstract class VFS extends Observable<{
     if (dataUriMatchResult) {
       return dataUriMatchResult[1];
     } else {
-      return guessMimeType(this.normalizePath(path));
+      return guessMimeType(path);
     }
   }
   /**

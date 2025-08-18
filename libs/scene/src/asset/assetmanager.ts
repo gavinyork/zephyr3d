@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
-import { HttpFS, isPowerOf2, nextPowerOf2, DWeakRef } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, DWeakRef } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -17,15 +17,6 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 
-function getDefaultBaseURL() {
-  if (
-    window.location.href.toLowerCase().endsWith('.html') ||
-    window.location.href.toLowerCase().endsWith('.htm')
-  ) {
-    return window.location.href.slice(0, window.location.href.lastIndexOf('/'));
-  }
-  return window.location.href;
-}
 /**
  * Options for texture fetching
  * @public
@@ -117,7 +108,7 @@ export class AssetManager {
    * Creates an instance of AssetManager
    */
   constructor(vfs?: VFS) {
-    this._vfs = vfs ?? new HttpFS(getDefaultBaseURL());
+    this._vfs = vfs ?? Application.instance.runtimeManager.VFS;
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
