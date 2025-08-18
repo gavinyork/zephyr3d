@@ -495,6 +495,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           action: () => {
             this._cmdManager.redo();
           }
+        },
+        {
+          label: '-'
+        },
+        {
+          label: FontGlyph.glyphs['play'],
+          id: 'PLAY',
+          selected: () => true,
+          tooltip: () => {
+            return 'Play current project in new tab';
+          },
+          action: () => {
+            this.play();
+          }
         }
       ],
       0,
@@ -621,12 +635,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._graphEditor) {
       this._graphEditor.render();
     }
-    /*
-    if (ImGui.Begin('FontTest')) {
-      ImGui.Text(FontGlyph.allGlyphs);
-    }
-    ImGui.End();
-    */
+  }
+  play() {
+    const projectId = this.controller.editor.currentProject.uuid;
+    const url = new URL(window.location.href);
+    url.searchParams.append('project', projectId);
+    window.open(url.href, '_blank');
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -1196,8 +1210,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
     if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
-      const path = ProjectService.VFS.relative(payload.path);
-      this.handleAddAsset(path);
+      this.handleAddAsset(payload.path);
     }
   }
   private handleWorkspaceDragLeave() {}

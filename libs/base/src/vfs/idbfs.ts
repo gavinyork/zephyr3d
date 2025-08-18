@@ -402,34 +402,39 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _wipe(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.db) {
-        this.db.close();
-        this.db = null;
-      }
-      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
-
-      deleteRequest.onsuccess = () => {
-        console.log(`Database "${this.dbName}" deleted successfully`);
-        resolve();
-      };
-
-      deleteRequest.onerror = () => {
-        console.error(`Delete database "${this.dbName}" failed:`, deleteRequest.error);
-        reject(deleteRequest.error);
-      };
-
-      deleteRequest.onblocked = () => {
-        console.warn(`Delete database "${this.dbName}" blocked`);
-      };
-    });
-  }
-  protected async _deleteFileSystem(): Promise<void> {
+  async close() {
     if (this.db) {
       this.db.close();
       this.db = null;
     }
+  }
+
+  static async deleteDatabase(name: string) {
+    return new Promise<void>((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(name);
+
+      deleteRequest.onsuccess = () => {
+        console.log(`Database "${name}" deleted successfully`);
+        resolve();
+      };
+
+      deleteRequest.onerror = () => {
+        console.error(`Delete database "${name}" failed:`, deleteRequest.error);
+        reject(deleteRequest.error);
+      };
+
+      deleteRequest.onblocked = () => {
+        console.warn(`Delete database "${name}" blocked`);
+      };
+    });
+  }
+
+  protected async _wipe(): Promise<void> {
+    await this.close();
+    await IndexedDBFS.deleteDatabase(this.dbName);
+  }
+  protected async _deleteFileSystem(): Promise<void> {
+    await this.close();
     const currentVersion = await this.getCurrentDatabaseVersion();
     return new Promise((resolve, reject) => {
       const newVersion = currentVersion + 1;

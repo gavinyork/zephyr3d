@@ -1174,7 +1174,7 @@ export class VFSRenderer extends Observable<{
     if (!this._project) {
       return;
     }
-    const rootDir = await this.loadDirectoryInfo(this._vfs.join(this._project.homedir, '/assets'));
+    const rootDir = await this.loadDirectoryInfo('/assets');
     this._filesystem = rootDir;
 
     if (this._selectedDir) {
@@ -1352,7 +1352,9 @@ export class VFSRenderer extends Observable<{
           }
         }
       }
-      dlg.setProgress(i + 1, payload.length);
+      if (dlg) {
+        dlg.setProgress(i + 1, payload.length);
+      }
     }
     if (dlg) {
       dlg.close();

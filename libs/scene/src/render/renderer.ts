@@ -170,6 +170,7 @@ export class SceneRenderer {
           blitter.viewport = camera.viewport;
         }
         blitter.scissor = camera.scissor;
+        blitter.srgbOut = !originFramebuffer;
         blitter.blit(
           tmpFramebuffer.getColorAttachments()[0],
           originFramebuffer ?? null,

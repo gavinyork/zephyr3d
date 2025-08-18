@@ -94,7 +94,7 @@ export class Application extends Observable<appEventMap> {
    * Creates an instance of Application
    * @param opt - The creation options
    */
-  constructor(opt: Partial<AppOptions>) {
+  constructor(opt: AppOptions) {
     super();
     if (Application._instance) {
       throw new Error('It is not allowed to have multiple Application instances');
@@ -108,10 +108,10 @@ export class Application extends Observable<appEventMap> {
     };
     this._inputManager = new InputManager(this);
     this._runtimeManager = new RuntimeManager(
-      opt.runtimeOptions.VFS,
-      opt.runtimeOptions.scriptsRoot,
-      opt.runtimeOptions.editorMode,
-      opt.runtimeOptions.enabled
+      opt.runtimeOptions?.VFS,
+      opt.runtimeOptions?.scriptsRoot,
+      opt.runtimeOptions?.editorMode,
+      opt.runtimeOptions?.enabled
     );
     this._ready = false;
     this._logger = {

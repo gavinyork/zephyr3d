@@ -513,7 +513,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
         this._frameInfo.nextFrameCall.push(() => {
           const p = f();
           if (p instanceof Promise) {
-            p.then(() => resolve);
+            p.then(() => resolve());
           } else {
             resolve();
           }

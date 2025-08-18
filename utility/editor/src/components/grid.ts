@@ -757,7 +757,7 @@ export class PropertyEditor extends Observable<{
                 if (value.options.mimeTypes.includes(mimeType)) {
                   const payload = ImGui.AcceptDragDropPayload('ASSET');
                   if (payload) {
-                    tmpProperty.str[0] = ProjectService.VFS.relative(data[0].path);
+                    tmpProperty.str[0] = data[0].path;
                     Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
                       this.refresh();
                     });

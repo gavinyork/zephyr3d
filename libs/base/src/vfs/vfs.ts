@@ -1128,6 +1128,10 @@ export abstract class VFS extends Observable<{
   }
 
   /**
+   * Closes file system and release resources
+   */
+  async close() {}
+  /**
    * Gets the mounted VFS for a given path, if any.
    *
    * Uses improved path matching to ensure the longest matching mount path is selected.

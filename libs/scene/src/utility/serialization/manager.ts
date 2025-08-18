@@ -79,7 +79,7 @@ export class SerializationManager {
   private readonly _propNameMap: Map<PropertyAccessor, string>;
   private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
   private readonly _assetManager: AssetManager;
-  private readonly _allocated: WeakMap<any, string>;
+  private _allocated: WeakMap<any, string>;
   constructor(vfs: VFS) {
     this._vfs = vfs;
     this._allocated = new WeakMap();
@@ -302,6 +302,10 @@ export class SerializationManager {
       encoding: 'utf8',
       create: true
     });
+  }
+  clearCache() {
+    this._allocated = new WeakMap();
+    this._assetManager.clearCache();
   }
   private static readonly _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {
