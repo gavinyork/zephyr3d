@@ -1,7 +1,7 @@
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, Texture2D } from '@zephyr3d/device';
 import { BaseTerrainBrush } from './base';
 import { fetchSampler } from '@zephyr3d/scene';
-import type { Vector4 } from '@zephyr3d/base';
+import type { Vector3, Vector4 } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 
 export abstract class TerrainHeightBrush extends BaseTerrainBrush {
@@ -25,7 +25,7 @@ export abstract class TerrainHeightBrush extends BaseTerrainBrush {
       scope.sourceHeightMap = pb.tex2D().uniform(0);
     }
   }
-  protected applyUniformValues(bindGroup: BindGroup, _region: Vector4): void {
+  protected applyUniformValues(bindGroup: BindGroup, _region: Vector4, _scale: Vector3): void {
     bindGroup.setTexture('sourceHeightMap', this._sourceHeightMap.get(), fetchSampler('clamp_nearest_nomip'));
   }
 }

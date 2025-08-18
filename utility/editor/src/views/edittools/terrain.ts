@@ -427,6 +427,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     brush.brush(
       brushTexture,
       this._terrain.get().worldRegion,
+      this._terrain.get().scale,
       hitPos,
       brushSize,
       angle,
@@ -454,7 +455,15 @@ export class TerrainEditTool extends Disposable implements EditTool {
     device.pushDeviceStates();
     device.setFramebuffer(fb);
     brush.sourceHeightMap = this._heightMapCopy.get();
-    brush.brush(brushTexture, this._terrain.get().worldRegion, hitPos, brushSize, angle, strength);
+    brush.brush(
+      brushTexture,
+      this._terrain.get().worldRegion,
+      this._terrain.get().scale,
+      hitPos,
+      brushSize,
+      angle,
+      strength
+    );
     brush.sourceHeightMap = null;
 
     device.popDeviceStates();

@@ -1,4 +1,4 @@
-import type { Vector2 } from '@zephyr3d/base';
+import type { Vector2, Vector3 } from '@zephyr3d/base';
 import type { TerrainEditTool } from '../terrain';
 import { Vector4, DRef } from '@zephyr3d/base';
 import type {
@@ -25,7 +25,15 @@ export abstract class BaseTerrainBrush {
     this._brushRenderStates = null;
   }
   abstract getName(): string;
-  brush(mask: Texture2D, region: Vector4, pos: Vector2, brushSize: number, angle: number, strength: number) {
+  brush(
+    mask: Texture2D,
+    region: Vector4,
+    scale: Vector3,
+    pos: Vector2,
+    brushSize: number,
+    angle: number,
+    strength: number
+  ) {
     const device = Application.instance.device;
     this.prepareBrush(device);
 
@@ -36,7 +44,7 @@ export abstract class BaseTerrainBrush {
     bindGroup.setValue('strength', strength);
     bindGroup.setValue('brushSize', brushSize);
     bindGroup.setTexture('mask', mask ?? BaseTerrainBrush._defaultMask);
-    this.applyUniformValues(bindGroup, region);
+    this.applyUniformValues(bindGroup, region, scale);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     device.setRenderStates(this._brushRenderStates);
@@ -51,7 +59,7 @@ export abstract class BaseTerrainBrush {
     centerUV: PBShaderExp
   ): void;
   protected setupBrushUniforms(_scope: PBGlobalScope) {}
-  protected applyUniformValues(_bindGroup: BindGroup, _region: Vector4) {}
+  protected applyUniformValues(_bindGroup: BindGroup, _region: Vector4, _scale: Vector3) {}
   protected createBrushProgram(device: AbstractDevice) {
     const that = this;
     return device.buildRenderProgram({

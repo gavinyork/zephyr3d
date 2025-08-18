@@ -1,6 +1,6 @@
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { TerrainHeightBrush } from './height';
-import type { Vector4 } from '@zephyr3d/base';
+import type { Vector3, Vector4 } from '@zephyr3d/base';
 import { degree2radian, Vector2 } from '@zephyr3d/base';
 import type { TerrainEditTool } from '../terrain';
 import { ImGui } from '@zephyr3d/imgui';
@@ -9,13 +9,13 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
   private _talus: number;
   private _pixelWorldSize: Vector2;
   private _carryRate: number;
-  private _diagWeight: number;
+  private _maxStep: number;
   constructor() {
     super();
     this._talus = 30;
     this._pixelWorldSize = new Vector2(1, 1);
     this._carryRate = 0.2;
-    this._diagWeight = 1 / Math.sqrt(2);
+    this._maxStep = 0.05;
   }
   getName(): string {
     return 'thermal erosion';
@@ -37,6 +37,7 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
     const heightMap = this.getOriginHeightMap(scope);
     scope.$l.texelSize = pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(heightMap, 0)));
     scope.$l.currentHeight = pb.textureSampleLevel(heightMap, heightMapUV, 0).r;
+    scope.currentHeight = pb.mul(scope.currentHeight, scope.heightScale);
     scope.$l.outgoing = pb.float(0);
     scope.$l.incoming = pb.float(0);
     scope.$l.hn = pb.float[8]();
@@ -51,7 +52,10 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
           heightMapUV,
           pb.mul(this.texelSize, pb.vec2(pb.float(this.j), pb.float(this.i)))
         );
-        this.hn.setAt(this.index, pb.textureSampleLevel(heightMap, this.coord, 0).r);
+        this.hn.setAt(
+          this.index,
+          pb.mul(pb.textureSampleLevel(heightMap, this.coord, 0).r, this.heightScale)
+        );
         this.index = pb.add(this.index, 1);
       });
     });
@@ -83,7 +87,6 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
 
     scope.$l.rate = pb.mul(pb.min(scope.carryRate, 0.5), pb.clamp(scope.brushEffect, 0, 1));
     scope.$l.incomingFactor = pb.float(0.4);
-    scope.$l.maxStep = pb.float(0.2);
     scope.$l.delta = pb.float(0);
 
     scope.$if(pb.greaterThan(scope.outgoing, 0), function () {
@@ -93,7 +96,7 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
       this.delta = pb.add(this.delta, pb.mul(this.rate, this.incoming, scope.incomingFactor));
     });
     scope.delta = pb.clamp(scope.delta, pb.neg(scope.maxStep), scope.maxStep);
-    scope.$l.hNew = pb.add(scope.currentHeight, scope.delta);
+    scope.$l.hNew = pb.div(pb.add(scope.currentHeight, scope.delta), scope.heightScale);
 
     return pb.vec4(pb.vec3(scope.hNew), 1);
   }
@@ -114,9 +117,9 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
     if (ImGui.DragFloat('Carry Rate', carryRate, 0.01, 0, 1)) {
       this._carryRate = carryRate[0];
     }
-    const diagWeight = [this._diagWeight] as [number];
-    if (ImGui.DragFloat('Diagnal Weight', diagWeight, 0.01, 0, 1)) {
-      this._diagWeight = diagWeight[0];
+    const maxStep = [this._maxStep] as [number];
+    if (ImGui.DragFloat('Max Step', maxStep, 0.01, 0, 1)) {
+      this._maxStep = maxStep[0];
     }
     ImGui.EndChild();
   }
@@ -128,15 +131,18 @@ export class ThermalErosionBrush extends TerrainHeightBrush {
       scope.pixelWorldSize = pb.vec2().uniform(0);
       scope.carryRate = pb.float().uniform(0);
       scope.diagWeight = pb.float().uniform(0);
+      scope.maxStep = pb.float().uniform(0);
+      scope.heightScale = pb.float().uniform(0);
     }
   }
-  protected applyUniformValues(bindGroup: BindGroup, region: Vector4): void {
-    super.applyUniformValues(bindGroup, region);
+  protected applyUniformValues(bindGroup: BindGroup, region: Vector4, scale: Vector3): void {
+    super.applyUniformValues(bindGroup, region, scale);
     this._pixelWorldSize.x = (region.z - region.x) / this.sourceHeightMap.width;
     this._pixelWorldSize.y = (region.w - region.y) / this.sourceHeightMap.height;
     bindGroup.setValue('talus', degree2radian(this._talus));
     bindGroup.setValue('pixelWorldSize', this._pixelWorldSize);
     bindGroup.setValue('carryRate', this._carryRate);
-    bindGroup.setValue('diagWeight', this._diagWeight);
+    bindGroup.setValue('maxStep', this._maxStep);
+    bindGroup.setValue('heightScale', scale.y);
   }
 }
