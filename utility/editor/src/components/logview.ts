@@ -196,62 +196,77 @@ class LogViewImpl {
   }
 
   renderLogView() {
-    if (
+    if (ImGui.BeginChild('##LogViewContainer', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
       ImGui.BeginChild(
-        '##LogViewContainer',
-        new ImGui.ImVec2(-1, -1),
-        false,
-        ImGui.WindowFlags.HorizontalScrollbar
-      )
-    ) {
-      const total = this.buffer.size;
-      if (total === 0) {
-        return;
-      }
+        '##LogViewToolBar',
+        new ImGui.ImVec2(-1, 2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetFrameHeight()),
+        true,
+        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+      );
+      ImGui.Button('Clear');
+      ImGui.SameLine();
+      ImGui.Button('Copy');
 
-      const lineH = ImGui.GetTextLineHeightWithSpacing();
-      const contentRegionH = ImGui.GetContentRegionAvail().y;
-      const scrollY = ImGui.GetScrollY();
-      const contentHeight = total * lineH + ImGui.GetStyle().ItemSpacing.y;
-
-      const maxScrollY = Math.max(0, contentHeight - contentRegionH);
-      const atBottom = scrollY >= maxScrollY - 0.5; // 小容差
-      this.wasAtBottom = atBottom;
-
-      const firstLine = Math.max(0, Math.floor(scrollY / lineH) - 3);
-      const visibleLines = Math.ceil(contentRegionH / lineH) + 6;
-      const lastLine = Math.min(total, firstLine + visibleLines);
-
-      const offsetY = firstLine * lineH;
-      if (offsetY > 0) {
-        ImGui.Dummy(new ImGui.Vec2(0, offsetY));
-      }
-
-      for (let i = firstLine; i < lastLine; i++) {
-        const item = this.buffer.get(i)!;
-        if (!this.levelEnabled[item.level]) {
-          continue;
+      ImGui.EndChild();
+      if (
+        ImGui.BeginChild(
+          '##LogViewContent',
+          ImGui.GetContentRegionAvail(),
+          //new ImGui.ImVec2(-1, -1),
+          false,
+          ImGui.WindowFlags.HorizontalScrollbar
+        )
+      ) {
+        const total = this.buffer.size;
+        if (total === 0) {
+          return;
         }
 
-        const col =
-          (this.options.levelColors && this.options.levelColors[item.level]) ||
-          defaultOptions.levelColors![item.level]!;
-        ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.Vec4(col[0], col[1], col[2], col[3]));
-        ImGui.TextUnformatted(item.text);
-        ImGui.PopStyleColor();
-      }
+        const lineH = ImGui.GetTextLineHeightWithSpacing();
+        const contentRegionH = ImGui.GetContentRegionAvail().y;
+        const scrollY = ImGui.GetScrollY();
+        const contentHeight = total * lineH + ImGui.GetStyle().ItemSpacing.y;
 
-      const renderedHeight = (lastLine - firstLine) * lineH;
-      const tailPad = Math.max(0, contentHeight - offsetY - renderedHeight);
-      if (tailPad > 0) {
-        ImGui.Dummy(new ImGui.Vec2(0, tailPad));
-      }
+        const maxScrollY = Math.max(0, contentHeight - contentRegionH);
+        const atBottom = scrollY >= maxScrollY - 0.5; // 小容差
+        this.wasAtBottom = atBottom;
 
-      if (this.scrollToBottomNextFrame) {
-        ImGui.SetScrollHereY(1.0);
-        //ImGui.SetScrollY(maxScrollY);
-        this.scrollToBottomNextFrame = false;
+        const firstLine = Math.max(0, Math.floor(scrollY / lineH) - 3);
+        const visibleLines = Math.ceil(contentRegionH / lineH) + 6;
+        const lastLine = Math.min(total, firstLine + visibleLines);
+
+        const offsetY = firstLine * lineH;
+        if (offsetY > 0) {
+          ImGui.Dummy(new ImGui.Vec2(0, offsetY));
+        }
+
+        for (let i = firstLine; i < lastLine; i++) {
+          const item = this.buffer.get(i)!;
+          if (!this.levelEnabled[item.level]) {
+            continue;
+          }
+
+          const col =
+            (this.options.levelColors && this.options.levelColors[item.level]) ||
+            defaultOptions.levelColors![item.level]!;
+          ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.Vec4(col[0], col[1], col[2], col[3]));
+          ImGui.TextUnformatted(item.text);
+          ImGui.PopStyleColor();
+        }
+
+        const renderedHeight = (lastLine - firstLine) * lineH;
+        const tailPad = Math.max(0, contentHeight - offsetY - renderedHeight);
+        if (tailPad > 0) {
+          ImGui.Dummy(new ImGui.Vec2(0, tailPad));
+        }
+
+        if (this.scrollToBottomNextFrame) {
+          ImGui.SetScrollHereY(1.0);
+          //ImGui.SetScrollY(maxScrollY);
+          this.scrollToBottomNextFrame = false;
+        }
       }
+      ImGui.EndChild();
     }
     ImGui.EndChild();
   }
