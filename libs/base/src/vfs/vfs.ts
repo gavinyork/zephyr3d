@@ -872,7 +872,12 @@ export abstract class VFS extends Observable<{
   async copyFileEx(
     sourcePattern: string | string[],
     targetDirectory: string,
-    options?: { overwrite?: boolean; targetVFS?: VFS; onProgress?: (current: number, total: number) => void }
+    options?: {
+      cwd?: string;
+      overwrite?: boolean;
+      targetVFS?: VFS;
+      onProgress?: (current: number, total: number) => void;
+    }
   ): Promise<void> {
     const targetVFS = options?.targetVFS ?? this;
     const overwrite = !!options?.overwrite;
@@ -903,7 +908,7 @@ export abstract class VFS extends Observable<{
         filesToCopy = sourcePattern;
       } else {
         // Glob pattern or single path
-        filesToCopy = await this.expandGlobPattern(sourcePattern);
+        filesToCopy = await this.expandGlobPattern(sourcePattern, options?.cwd);
       }
 
       let numCopied = 0;
@@ -1278,7 +1283,7 @@ export abstract class VFS extends Observable<{
   /**
    * Expand a glob pattern to a list of matching file paths
    */
-  private async expandGlobPattern(pattern: string): Promise<string[]> {
+  private async expandGlobPattern(pattern: string, cwd?: string): Promise<string[]> {
     const matchedFiles: string[] = [];
 
     if (pattern.includes('*') || pattern.includes('?')) {
@@ -1288,7 +1293,7 @@ export abstract class VFS extends Observable<{
         includeDirs: true,
         includeHidden: true,
         recursive: pattern.includes('**'),
-        cwd: this._cwd
+        cwd: cwd ?? this._cwd
       });
 
       matchedFiles.push(...globResults.map((result) => result.path));

@@ -250,7 +250,7 @@ class LogViewImpl {
             (this.options.levelColors && this.options.levelColors[item.level]) ||
             defaultOptions.levelColors![item.level]!;
           ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.Vec4(col[0], col[1], col[2], col[3]));
-          ImGui.TextUnformatted(item.text);
+          ImGui.TextUnformatted(item.text.slice(0, 512));
           ImGui.PopStyleColor();
         }
 

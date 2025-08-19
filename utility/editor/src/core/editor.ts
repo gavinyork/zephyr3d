@@ -330,7 +330,6 @@ export class Editor {
   }
   async buildProject() {
     await buildForEndUser(ProjectService.VFS, {
-      vfsRoot: '/',
       input: '/src/index.ts',
       distDir: '/dist'
     });
@@ -352,29 +351,31 @@ export class Editor {
     for (const dir of distDirs) {
       await zipDownloader.zipWriter.add(`${dir.path}/`);
     }
-    const assetFileList = await ProjectService.VFS.glob('/assets/**/*', {
-      includeHidden: true,
-      includeDirs: false,
-      includeFiles: true,
-      recursive: true
-    });
-    const assetFiles = assetFileList.filter((path) => path.type === 'file');
-    let assetDirs = assetFileList.filter((path) => path.type === 'directory');
-    for (const file of assetFiles) {
-      const isTS = file.path.endsWith('.ts');
-      let content = await ProjectService.VFS.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
-      let path = ProjectService.VFS.relative(ProjectService.VFS.join('/dist', file.path), '/');
-      if (isTS) {
-        path = `${path.slice(0, -3)}.js`;
-        content = this.transpileTS(file.path, this.rewriteImports(content as string));
+    if (false) {
+      const assetFileList = await ProjectService.VFS.glob('/assets/**/*', {
+        includeHidden: true,
+        includeDirs: false,
+        includeFiles: true,
+        recursive: true
+      });
+      const assetFiles = assetFileList.filter((path) => path.type === 'file');
+      let assetDirs = assetFileList.filter((path) => path.type === 'directory');
+      for (const file of assetFiles) {
+        const isTS = file.path.endsWith('.ts');
+        let content = await ProjectService.VFS.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
+        let path = ProjectService.VFS.relative(ProjectService.VFS.join('/dist', file.path), '/');
+        if (isTS) {
+          path = `${path.slice(0, -3)}.js`;
+          content = this.transpileTS(file.path, this.rewriteImports(content as string));
+        }
+        await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
+        assetDirs = assetDirs.filter((dir) => !file.path.startsWith(`${dir.path}/`));
       }
-      await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
-      assetDirs = assetDirs.filter((dir) => !file.path.startsWith(`${dir.path}/`));
-    }
-    for (const dir of assetDirs) {
-      await zipDownloader.zipWriter.add(
-        `${ProjectService.VFS.relative(ProjectService.VFS.join('/dist', dir.path), '/')}/`
-      );
+      for (const dir of assetDirs) {
+        await zipDownloader.zipWriter.add(
+          `${ProjectService.VFS.relative(ProjectService.VFS.join('/dist', dir.path), '/')}/`
+        );
+      }
     }
 
     await zipDownloader.finish();

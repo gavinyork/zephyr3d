@@ -54,15 +54,11 @@ export class RuntimeModuleSharing {
     return URL.createObjectURL(blob);
   }
 
-  private getGlobalVarName(moduleName: string): string {
-    return `__shared_module_${moduleName.replace(/[@\/\-\.]/g, '_')}__`;
-  }
-
-  private updateImportMap(name: string, url: string): void {
+  updateImportMap(name: string, url: string): void {
     this.batchUpdateImportMap({ [name]: url });
   }
 
-  private batchUpdateImportMap(mappings: Record<string, string>): void {
+  batchUpdateImportMap(mappings: Record<string, string>): void {
     // Get current importmap
     const currentMap = this.importMapElement?.textContent
       ? JSON.parse(this.importMapElement.textContent)
@@ -75,6 +71,10 @@ export class RuntimeModuleSharing {
     this.rebuildImportMap(mergedImports);
 
     console.log('[ModuleSharing] Updated import map:', mappings);
+  }
+
+  private getGlobalVarName(moduleName: string): string {
+    return `__shared_module_${moduleName.replace(/[@\/\-\.]/g, '_')}__`;
   }
 
   private rebuildImportMap(imports: Record<string, string>): void {

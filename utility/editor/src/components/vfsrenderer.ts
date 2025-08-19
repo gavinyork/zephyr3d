@@ -333,8 +333,12 @@ export class VFSRenderer extends Observable<{
     }
     ImGui.SameLine();
     if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
-      installDeps(this.VFS, '/', ['three@^0.158.0', 'stats.js']).then(() => {
-        console.log('Dependencies installed');
+      DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
+        if (val) {
+          installDeps(this.VFS, '/', [val]).then(() => {
+            console.log('Dependencies installed');
+          });
+        }
       });
     }
     ImGui.SameLine();

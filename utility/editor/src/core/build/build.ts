@@ -4,10 +4,75 @@ import { tsTranspilePlugin } from './plugins/tstranspile';
 import type { VFS } from '@zephyr3d/base';
 import { depsLockPlugin } from './plugins/dep';
 
+function rewriteImports(code: string): string {
+  const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
+  const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+
+  const replaceAsync = (input: string, re: RegExp) => {
+    let out = '';
+    let last = 0;
+    for (;;) {
+      const m = re.exec(input);
+      if (!m) {
+        break;
+      }
+      out += input.slice(last, m.index);
+
+      const quote = m[1];
+      const spec = m[2];
+      let replacement = spec;
+
+      if ((spec.startsWith('./') || spec.startsWith('../')) && !spec.endsWith('.js')) {
+        if (spec.endsWith('.ts')) {
+          replacement = `${spec.slice(0, -3)}.js`;
+        } else {
+          replacement = `${spec}.js`;
+        }
+      }
+
+      const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
+      out += replaced;
+      last = m.index + m[0].length;
+    }
+    out += input.slice(last);
+    return out;
+  };
+
+  let out = replaceAsync(code, reStatic);
+  out = replaceAsync(out, reDynamic);
+  return out;
+}
+
+function transpileTS(fileName: string, code: string) {
+  const ts = (window as any).ts as typeof import('typescript');
+  if (!ts) {
+    throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
+  }
+
+  const res = ts.transpileModule(code, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2015,
+      module: ts.ModuleKind.ESNext,
+      sourceMap: true,
+      inlineSources: true,
+      experimentalDecorators: true,
+      useDefineForClassFields: false
+    },
+    fileName
+  });
+
+  let out = res.outputText || '';
+  if (res.sourceMapText) {
+    const mapBase64 = btoa(unescape(encodeURIComponent(res.sourceMapText)));
+    out += `\n//# sourceMappingURL=data:application/json;base64,${mapBase64}`;
+  }
+  out += `\n//# sourceURL=${fileName}`;
+  return out;
+}
+
 export async function buildForEndUser(
   vfs: VFS,
   options: {
-    vfsRoot: string;
     input: string | string[] | Record<string, string>;
     distDir?: string;
     alias?: Record<string, string>;
@@ -15,13 +80,13 @@ export async function buildForEndUser(
     format?: 'es' | 'iife' | 'umd' | 'cjs';
   }
 ) {
-  const { vfsRoot, input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
+  const { input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
 
   const bundle = await rollup({
     input,
     plugins: [
-      depsLockPlugin(vfs, vfsRoot),
-      vfsAndUrlPlugin(vfs, { vfsRoot, distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
+      vfsAndUrlPlugin(vfs, { vfsRoot: '/', distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
+      depsLockPlugin(vfs, '/'),
       tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } }) // typescript.js 转译
     ]
   });
@@ -37,15 +102,59 @@ export async function buildForEndUser(
 
   await bundle.close();
 
-  const htmlContent = (await vfs.readFile(vfs.join(vfsRoot, 'index.html'), { encoding: 'utf8' })) as string;
-  const newContent = htmlContent.replace(
+  // copy asset files to dist
+  const assetFileList = await vfs.glob('/assets/**/*', {
+    includeHidden: true,
+    includeDirs: false,
+    includeFiles: true,
+    recursive: true
+  });
+  const assetFiles = assetFileList.filter((path) => path.type === 'file');
+  for (const file of assetFiles) {
+    const isTS = file.path.endsWith('.ts');
+    let content = await vfs.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
+    let path = vfs.relative(vfs.join('/dist', file.path), '/');
+    if (isTS) {
+      path = `${path.slice(0, -3)}.js`;
+      content = transpileTS(file.path, rewriteImports(content as string));
+    }
+    await vfs.writeFile(vfs.join('/dist', file.path), content, {
+      create: true,
+      encoding: isTS ? 'utf8' : 'binary'
+    });
+  }
+
+  const htmlContent = (await vfs.readFile('/index.html', { encoding: 'utf8' })) as string;
+  let newContent = htmlContent.replace(
     '</body>',
     `  <script type="module" src="./index.js"></script>\n</body>`
   );
-  await vfs.writeFile(vfs.join(vfsRoot, '/dist/index.html'), newContent, {
+
+  if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
+    if ((await vfs.stat('/deps.lock.json')).isFile && (await vfs.stat('/deps')).isDirectory) {
+      await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
+      await vfs.copyFileEx('/deps/**/*', '/dist/deps', { cwd: '/deps' });
+      // Add importmap
+      const deps = JSON.parse((await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string) as {
+        dependencies: {
+          [name: string]: { entry: string };
+        };
+      };
+      let importMaps: { imports: Record<string, string> } = { imports: {} };
+      for (const pkg in deps.dependencies) {
+        importMaps.imports[pkg] = `.${deps.dependencies[pkg].entry}`;
+      }
+      newContent = newContent.replace(
+        '</head>',
+        `<script type="importmap">\n${JSON.stringify(importMaps, null, '  ')}\n</script>\n</head>`
+      );
+    }
+  }
+
+  await vfs.writeFile('/dist/index.html', newContent, {
     encoding: 'utf8',
     create: true
   });
-  await vfs.copyFileEx(vfs.join(vfsRoot, 'assets'), vfs.join(vfsRoot, 'dist'));
+
   return { distDir, output };
 }
