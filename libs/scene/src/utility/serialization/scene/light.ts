@@ -3,7 +3,7 @@ import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../..
 import type { SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import type { NodeHierarchy } from './node';
-import { SceneNode } from '../../../scene';
+import { ClipmapTerrain, Mesh, SceneNode, Terrain } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 
 /** @internal */
@@ -130,6 +130,24 @@ export function getPunctualLightClass(): SerializableClass {
           },
           isNullable() {
             return true;
+          },
+          create(this: PunctualLight) {
+            const aabb = new AABB();
+            aabb.beginExtend();
+            this.scene.rootNode.iterate((child) => {
+              if (child instanceof Mesh || child instanceof Terrain || child instanceof ClipmapTerrain) {
+                if (child.castShadow) {
+                  const bbox = child.getWorldBoundingVolume().toAABB();
+                  aabb.extend(bbox.minPoint);
+                  aabb.extend(bbox.maxPoint);
+                }
+              }
+            });
+            if (!aabb.isValid()) {
+              aabb.minPoint.setXYZ(-1, -1, -1);
+              aabb.maxPoint.setXYZ(1, 1, 1);
+            }
+            return aabb;
           },
           get(this: PunctualLight, value) {
             value.object[0] = this.shadow.shadowRegion;

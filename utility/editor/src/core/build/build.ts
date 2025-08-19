@@ -2,6 +2,7 @@ import { rollup } from '@rollup/browser';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
 import type { VFS } from '@zephyr3d/base';
+import { depsLockPlugin } from './plugins/dep';
 
 export async function buildForEndUser(
   vfs: VFS,
@@ -19,6 +20,7 @@ export async function buildForEndUser(
   const bundle = await rollup({
     input,
     plugins: [
+      depsLockPlugin(vfs, vfsRoot),
       vfsAndUrlPlugin(vfs, { vfsRoot, distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
       tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } }) // typescript.js 转译
     ]

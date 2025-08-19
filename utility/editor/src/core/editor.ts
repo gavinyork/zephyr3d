@@ -310,6 +310,7 @@ export class Editor {
       const uuid = await ProjectService.createProject(name);
       const project = await ProjectService.openProject(uuid);
       this._currentProject = project;
+      this._scriptingSystem.registry.VFS = ProjectService.VFS;
       this._moduleManager.activate('Scene', '');
     }
   }

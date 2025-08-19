@@ -11,6 +11,7 @@ import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
+import { installDeps } from '../core/build/plugins/dep';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -329,6 +330,12 @@ export class VFSRenderer extends Observable<{
       if (ImGui.IsItemHovered()) {
         ImGui.SetTooltip('Already at root directory');
       }
+    }
+    ImGui.SameLine();
+    if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
+      installDeps(this.VFS, '/', ['three@^0.158.0', 'stats.js']).then(() => {
+        console.log('Dependencies installed');
+      });
     }
     ImGui.SameLine();
     ImGui.Separator();
@@ -1174,7 +1181,7 @@ export class VFSRenderer extends Observable<{
     if (!this._project) {
       return;
     }
-    const rootDir = await this.loadDirectoryInfo('/assets');
+    const rootDir = await this.loadDirectoryInfo('/');
     this._filesystem = rootDir;
 
     if (this._selectedDir) {

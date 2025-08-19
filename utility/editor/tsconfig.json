@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "target": "ESNext",
     "module": "ESNext",
-    "lib": ["es2020", "DOM", "DOM.Iterable"],
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noImplicitAny": false,
     "preserveConstEnums": false,
