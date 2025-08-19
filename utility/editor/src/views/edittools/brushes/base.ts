@@ -156,8 +156,8 @@ export abstract class BaseTerrainBrush {
     }
     if (!this._brushProgram.get()) {
       this._brushProgram.set(this.createBrushProgram(device));
-      console.log(this._brushProgram.get().getShaderSource('vertex'));
-      console.log(this._brushProgram.get().getShaderSource('fragment'));
+      // console.log(this._brushProgram.get().getShaderSource('vertex'));
+      // console.log(this._brushProgram.get().getShaderSource('fragment'));
     }
     if (!this._brushBindGroup.get()) {
       this._brushBindGroup.set(device.createBindGroup(this._brushProgram.get().bindGroupLayouts[0]));

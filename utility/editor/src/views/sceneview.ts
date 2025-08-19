@@ -1196,6 +1196,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete main camera');
       return;
     }
+    const editTarget = this._currentEditTool.get()?.getTarget();
+    if (editTarget instanceof SceneNode && editTarget.isParentOf(node)) {
+      this._currentEditTool.dispose();
+    }
     if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
       this._tab.sceneHierarchy.selectNode(null);
     }

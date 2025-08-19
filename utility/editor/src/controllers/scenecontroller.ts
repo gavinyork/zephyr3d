@@ -156,6 +156,8 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   }
   private async saveScene() {
     await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
+    this._editor.currentProject.lastEditScene = this._scenePath;
+    await this._editor.saveProject();
     this._sceneChanged = false;
   }
   async loadScene(path: string): Promise<Scene> {

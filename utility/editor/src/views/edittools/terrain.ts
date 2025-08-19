@@ -36,7 +36,8 @@ import { ProjectService } from '../../core/services/project';
 import { eventBus } from '../../core/eventbus';
 import type { BaseTerrainBrush } from './brushes/base';
 import { EraseGrassBrush, GrassBrush } from './brushes/grass';
-import { ThermalErosionBrush } from './brushes/erosion';
+import { ThermalErosionBrush } from './brushes/thermalerosion';
+import { HydraulicErosionBrush } from './brushes/hydraulicerosion';
 
 const blitter = new CopyBlitter();
 export class TerrainEditTool extends Disposable implements EditTool {
@@ -138,6 +139,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       new TerrainSmoothBrush(),
       new TerrainFlattenBrush(),
       new ThermalErosionBrush(),
+      new HydraulicErosionBrush(),
       new TerrainTextureBrush(),
       new GrassBrush(),
       new EraseGrassBrush()
@@ -278,6 +280,16 @@ export class TerrainEditTool extends Disposable implements EditTool {
         case 'thermal erosion':
           this.applyHeightBrush(
             this._brushList[this._editSelected] as ThermalErosionBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'hydraulic erosion':
+          this.applyHeightBrush(
+            this._brushList[this._editSelected] as HydraulicErosionBrush,
             texture,
             this._hitPos,
             this._brushSize,
