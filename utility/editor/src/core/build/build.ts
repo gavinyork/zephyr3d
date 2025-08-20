@@ -129,12 +129,27 @@ export async function buildForEndUser(
     '</body>',
     `  <script type="module" src="./index.js"></script>\n</body>`
   );
-
+  const shareConfig: { name: string; hasDefault: boolean; exports: string[] }[] = [];
+  for (const zephyr3dLib of [
+    '@zephyr3d/base',
+    '@zephyr3d/device',
+    '@zephyr3d/scene',
+    '@zephyr3d/runtime',
+    '@zephyr3d/backend-webgl',
+    '@zephyr3d/backend-webgpu'
+  ]) {
+    const imports = await import(zephyr3dLib);
+    shareConfig.push({
+      name: zephyr3dLib,
+      hasDefault: true,
+      exports: [...Object.keys(imports)]
+    });
+  }
   if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
     if ((await vfs.stat('/deps.lock.json')).isFile && (await vfs.stat('/deps')).isDirectory) {
       await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
       await vfs.copyFileEx('/deps/**/*', '/dist/deps', { cwd: '/deps' });
-      // Add importmap
+      // Create share config
       const deps = JSON.parse((await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string) as {
         dependencies: {
           [name: string]: { entry: string };
