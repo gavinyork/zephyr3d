@@ -13,8 +13,24 @@ if (project) {
   await ProjectService.openProject(project);
 }
 
+let backend =
+  deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU;
+if (!backend.supported()) {
+  backend = null;
+  for (const b of [backendWebGPU, backendWebGL2, backendWebGL1]) {
+    if (b.supported()) {
+      backend = b;
+      break;
+    }
+  }
+}
+
+if (!backend) {
+  throw new Error('No supported rendering device found');
+}
+
 const studioApp = new Application({
-  backend: deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU,
+  backend,
   canvas: document.querySelector('#canvas'),
   runtimeOptions: {
     VFS: project ? ProjectService.VFS : null,

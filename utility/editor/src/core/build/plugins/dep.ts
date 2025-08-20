@@ -15,10 +15,6 @@ import { init, parse } from 'es-module-lexer';
 
 /* -------------------- Utilities -------------------- */
 
-function isBareImport(spec: string): boolean {
-  return !spec.startsWith('.') && !spec.startsWith('/') && !spec.startsWith('http');
-}
-
 async function sha256Base64(text: string): Promise<string> {
   const buf = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest('SHA-256', buf);
@@ -288,19 +284,25 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
 
       // 解析为绝对 URL
       let childAbs: string;
+      let replaced: string;
       if (specRaw.startsWith('http')) {
         childAbs = specRaw;
+        replaced = `./${vfs.relative(depsPathOf(specRaw, name, version), vfs.dirname(localPath))}`;
       } else if (specRaw.startsWith('.') || specRaw.startsWith('/')) {
         childAbs = new URL(specRaw, url).href;
+        replaced = specRaw.startsWith('.')
+          ? specRaw
+          : `./${vfs.relative(depsPathOf(childAbs, name, version), vfs.dirname(localPath))}`;
       } else {
         childAbs = new URL(specRaw, url).href;
+        replaced = specRaw;
       }
 
       queue.push(childAbs);
 
       // 仅替换引号内部内容，不动引号本身
-      const replacedInner = depsPathOf(childAbs, name, version);
-      out += replacedInner; // 不加引号
+      //const replacedInner = depsPathOf(childAbs, name, version);
+      out += replaced; // 不加引号
 
       // 将 last 设为 e（引号内内容的结束位置）
       last = im.e;
@@ -326,7 +328,7 @@ export async function installDeps(vfs: VFS, projectRoot: string, specs: string[]
     if (existing?.version === version && (await vfs.exists(existing.entry))) continue;
 
     await crawlAndCache(vfs, entryUrl, name, version);
-    const entry = depsPathOf(entryUrl, name, version);
+    const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
     const code = (await vfs.readFile(entry, { encoding: 'utf8' })) as string;
     const integrity = await sha256Base64(code);
 

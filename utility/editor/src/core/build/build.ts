@@ -70,14 +70,18 @@ function transpileTS(fileName: string, code: string) {
   return out;
 }
 
-async function writeDependencies(vfs: VFS, distDir: string) {
+export async function getImportMap(vfs: VFS, distDir: string, writeDependencies = true) {
   const importMap: Record<string, string> = {};
   const depsDir = vfs.join(distDir, 'deps');
-  await vfs.makeDirectory(depsDir, true);
+  if (writeDependencies) {
+    await vfs.makeDirectory(depsDir, true);
+  }
   for (const name of ['base', 'device', 'scene', 'runtime', 'imgui', 'backend-webgl', 'backend-webgpu']) {
-    const content = await (await fetch(`./modules/zephyr3d_${name}.js`)).text();
     const path = vfs.join(depsDir, `@zephyr3d/${name}/index.js`);
-    await vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+    if (writeDependencies) {
+      const content = await (await fetch(`./modules/zephyr3d_${name}.js`)).text();
+      await vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+    }
     importMap[`@zephyr3d/${name}`] = `./${vfs.relative(path, distDir)}`;
   }
   if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
@@ -85,10 +89,12 @@ async function writeDependencies(vfs: VFS, distDir: string) {
       const content = (await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
       const packages = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
       for (const k of Object.keys(packages.dependencies)) {
-        importMap[k] = `.${packages.dependencies[k].entry}`;
+        importMap[k] = packages.dependencies[k].entry;
       }
-      await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
-      await vfs.copyFileEx('/deps/**/*', depsDir, { cwd: '/deps' });
+      if (writeDependencies) {
+        await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
+        await vfs.copyFileEx('/deps/**/*', depsDir, { cwd: '/deps' });
+      }
     }
   }
   return importMap;
@@ -148,7 +154,7 @@ export async function buildForEndUser(
     });
   }
 
-  const importMap = await writeDependencies(vfs, distDir);
+  const importMap = await getImportMap(vfs, distDir);
 
   const htmlContent = (await vfs.readFile('/index.html', { encoding: 'utf8' })) as string;
   let newContent = htmlContent.replace(

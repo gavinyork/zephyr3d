@@ -1,6 +1,7 @@
 import type { VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import type { ModuleId } from './types';
+import { init, parse } from 'es-module-lexer';
 
 function toDataUrl(js: string, id: string): string {
   const b64 = textToBase64(js);
@@ -96,7 +97,7 @@ export class ScriptRegistry {
   }
 
   async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
-    const id = this.resolveLogicalId(entryId);
+    const id = await this.resolveLogicalId(entryId);
     return this._editorMode
       ? await this.build(String(id))
       : id.endsWith('.js')
@@ -114,7 +115,7 @@ export class ScriptRegistry {
     const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
     const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
 
-    const normalizedId = this.resolveLogicalId(entryId, fromId);
+    const normalizedId = await this.resolveLogicalId(entryId, fromId);
     const srcPath = await this.resolveSourcePath(normalizedId);
     if (!srcPath || dependencies[srcPath.path] !== undefined) {
       return;
@@ -195,6 +196,52 @@ export class ScriptRegistry {
   }
 
   protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
+    await init;
+    const [imports] = parse(code);
+
+    // 保证按起点排序，避免错位
+    const list = [...imports].sort((a, b) => (a.s || 0) - (b.s || 0));
+
+    let out = '';
+    let last = 0;
+
+    for (const im of list) {
+      // 必须有字符串字面量边界（有引号）
+      if (!im.ss || !im.se || im.se <= im.ss) continue;
+      // 必须有内容区间
+      if (im.e <= im.s) continue;
+
+      // 追加 [last, s)：这段包含壳和开引号之前的所有代码
+      out += code.slice(last, im.s);
+
+      const spec = code.slice(im.s, im.e); // 原始 spec（无引号）
+
+      let replacement = spec;
+
+      if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
+        if (spec.startsWith('@zephyr3d/')) {
+          replacement = spec;
+        } else {
+          const depId = await this.resolveLogicalId(spec);
+          replacement = await this.build(depId); // 尝试构建为依赖项
+        }
+      } else {
+        const depId = await this.resolveLogicalId(spec, String(fromId));
+        replacement = await this.build(depId); // 递归构建为 data URL
+      }
+
+      // 仅替换引号内部内容，不动引号本身
+      //const replacedInner = depsPathOf(childAbs, name, version);
+      out += replacement; // 不加引号
+
+      // 将 last 设为 e（引号内内容的结束位置）
+      last = im.e;
+    }
+
+    // 追加尾部原文（包括最后一个引号、分号等）
+    out += code.slice(last);
+    return out;
+    /*
     const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
     const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
 
@@ -213,9 +260,14 @@ export class ScriptRegistry {
         let replacement = spec;
 
         if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
-          replacement = spec;
+          if (spec.startsWith('@zephyr3d/')) {
+            replacement = spec;
+          } else {
+            const depId = await this.resolveLogicalId(spec);
+            replacement = await this.build(depId); // 尝试构建为依赖项
+          }
         } else {
-          const depId = this.resolveLogicalId(spec, String(fromId));
+          const depId = await this.resolveLogicalId(spec, String(fromId));
           replacement = await this.build(depId); // 递归构建为 data URL
         }
 
@@ -230,9 +282,10 @@ export class ScriptRegistry {
     let out = await replaceAsync(code, reStatic);
     out = await replaceAsync(out, reDynamic);
     return out;
+    */
   }
 
-  resolveLogicalId(spec: string, fromId?: string): string {
+  async resolveLogicalId(spec: string, fromId?: string): Promise<string> {
     let path: string;
 
     if (spec.startsWith('#/')) {
@@ -246,6 +299,16 @@ export class ScriptRegistry {
       );
     } else if (spec.startsWith('/')) {
       path = spec.replace(/^\/+/, '/');
+    } else if (this._editorMode) {
+      // naked module, checking if it is a installed module in editor mode
+      const depsExists = await this._vfs.exists('/deps.lock.json');
+      if (depsExists) {
+        const content = (await this._vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+        const depsInfo = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
+        if (depsInfo?.dependencies[spec]) {
+          path = this._vfs.normalizePath(depsInfo.dependencies[spec].entry);
+        }
+      }
     } else {
       return spec;
     }
@@ -258,7 +321,7 @@ export class ScriptRegistry {
     if (logicalId.endsWith('.ts')) {
       pathWithExt = logicalId;
       type = 'ts';
-    } else if (logicalId.endsWith('.js')) {
+    } else if (logicalId.endsWith('.js') || logicalId.endsWith('.mjs')) {
       pathWithExt = logicalId;
       type = 'js';
     }
@@ -272,7 +335,7 @@ export class ScriptRegistry {
         type = null;
       }
     }
-    const types = ['ts', 'js'] as const;
+    const types = ['ts', 'js', 'mjs'] as const;
     if (!type) {
       for (const t of types) {
         pathWithExt = `${logicalId}.${t}`;
@@ -280,7 +343,7 @@ export class ScriptRegistry {
         if (exists) {
           const stats = await this._vfs.stat(pathWithExt);
           if (stats.isFile) {
-            type = t;
+            type = t === 'ts' ? 'ts' : 'js';
             break;
           }
         }
