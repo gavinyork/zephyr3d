@@ -1482,6 +1482,13 @@ async function testGlobBasicWildcards() {
   const fs = createVFS('GlobTest');
   await createGlobTestStructure(fs);
 
+  const a = await fs.glob('/src/**/*', {
+    includeDirs: false,
+    includeFiles: true,
+    recursive: true,
+    includeHidden: true
+  });
+  assertEqual(a.length, 9, '** 通配符应该工作');
   // 测试 * 通配符
   const txtFiles = await fs.glob('*.txt');
   const txtNames = txtFiles.map((r) => r.name).sort();

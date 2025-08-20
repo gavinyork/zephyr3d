@@ -112,14 +112,7 @@ export function vfsAndUrlPlugin(
         }
       }
 
-      // 4) zephyr3d模块 -> 静态地址
-      if (source.startsWith('@zephyr3d/')) {
-        const baseurl = new URL('./', window.location.href);
-        const url = new URL(`vendor/${source.slice(1)}/dist/index.js`, baseurl).href;
-        return url;
-      }
-
-      // 5) 裸模块：留给 importMapResolvePlugin 先处理；若没处理，这里返回 null
+      // 4) 裸模块：留给 importMapResolvePlugin 先处理；若没处理，这里返回 null
       return null;
     },
 

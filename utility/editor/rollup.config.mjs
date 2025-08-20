@@ -6,40 +6,22 @@ import path from 'path';
 import copy from 'rollup-plugin-copy';
 import { fileURLToPath } from 'url';
 import commonjs from '@rollup/plugin-commonjs';
-import { dir } from 'console';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const destdir = path.join(__dirname, 'dist');
 
-function getTargetWorker() {
+function getTargetWeb(name) {
   return {
-    input: './src/workers/zip.ts',
+    input: `./node_modules/@zephyr3d/${name}/dist/index.js`,
     preserveSymlinks: false,
     output: {
-      file: path.join(destdir, 'js', `zip.worker.js`),
+      file: path.join(destdir, `modules/zephyr3d_${name}.js`),
       format: 'esm',
       sourcemap: true
     },
-    plugins: [
-      nodeResolve(),
-      sourcemaps(),
-      swc({
-        sourceMaps: true,
-        inlineSourcesContent: false
-      })
-    ]
-  };
-}
-
-function getTargetWeb() {
-  return {
-    input: './src/app.ts',
-    preserveSymlinks: false,
-    output: {
-      dir: path.join(destdir, 'js'),
-      format: 'esm',
-      sourcemap: true
+    external: (id) => {
+      return id.startsWith('@zephyr3d/') && !id.startsWith(`@zephyr3d/${name}`);
     },
     treeshake: {
       moduleSideEffects: (id, external) => {
@@ -58,51 +40,13 @@ function getTargetWeb() {
         browser: true
       }),
       sourcemaps(),
-      importCss({
-        inline: true
-      }),
-      swc({
-        sourceMaps: true,
-        inlineSourcesContent: false
-      }),
-      commonjs(),
-      copy({
-        targets: [
-          {
-            src: './index.html',
-            dest: destdir
-          },
-          {
-            src: './assets',
-            dest: destdir
-          },
-          {
-            src: 'node_modules/monaco-editor/min/vs/language/**/*Worker.js',
-            dest: `${destdir}/js/vs/language/`
-          },
-          {
-            src: 'node_modules/monaco-editor/min/vs/loader.js',
-            dest: `${destdir}/js/vs/`
-          },
-          {
-            src: 'node_modules/monaco-editor/min/vs/editor/editor.main.css',
-            dest: `${destdir}/js/vs/`
-          },
-          {
-            src: 'node_modules/monaco-editor/esm/vs/editor/editor.worker.js',
-            dest: `${destdir}/js/vs/editor/`
-          },
-          {
-            src: 'node_modules/monaco-editor/min/vs/base/worker/workerMain.js',
-            dest: `${destdir}/js/vs/base/worker/`
-          }
-        ],
-        verbose: true
-      })
+      commonjs()
     ]
   };
 }
 
 export default (args) => {
-  return [getTargetWorker(), getTargetWeb()];
+  return ['base', 'device', 'scene', 'imgui', 'runtime', 'backend-webgl', 'backend-webgpu'].map((name) =>
+    getTargetWeb(name)
+  );
 };

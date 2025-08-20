@@ -70,6 +70,30 @@ function transpileTS(fileName: string, code: string) {
   return out;
 }
 
+async function writeDependencies(vfs: VFS, distDir: string) {
+  const importMap: Record<string, string> = {};
+  const depsDir = vfs.join(distDir, 'deps');
+  await vfs.makeDirectory(depsDir, true);
+  for (const name of ['base', 'device', 'scene', 'runtime', 'imgui', 'backend-webgl', 'backend-webgpu']) {
+    const content = await (await fetch(`./modules/zephyr3d_${name}.js`)).text();
+    const path = vfs.join(depsDir, `@zephyr3d/${name}/index.js`);
+    await vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+    importMap[`@zephyr3d/${name}`] = `./${vfs.relative(path, distDir)}`;
+  }
+  if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
+    if ((await vfs.stat('/deps.lock.json')).isFile && (await vfs.stat('/deps')).isDirectory) {
+      const content = (await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+      const packages = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
+      for (const k of Object.keys(packages.dependencies)) {
+        importMap[k] = `.${packages.dependencies[k].entry}`;
+      }
+      await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
+      await vfs.copyFileEx('/deps/**/*', depsDir, { cwd: '/deps' });
+    }
+  }
+  return importMap;
+}
+
 export async function buildForEndUser(
   vfs: VFS,
   options: {
@@ -103,7 +127,7 @@ export async function buildForEndUser(
   await bundle.close();
 
   // copy asset files to dist
-  const assetFileList = await vfs.glob('/assets/**/*', {
+  const assetFileList = await vfs.glob('assets/**/*', {
     includeHidden: true,
     includeDirs: false,
     includeFiles: true,
@@ -124,47 +148,17 @@ export async function buildForEndUser(
     });
   }
 
+  const importMap = await writeDependencies(vfs, distDir);
+
   const htmlContent = (await vfs.readFile('/index.html', { encoding: 'utf8' })) as string;
   let newContent = htmlContent.replace(
     '</body>',
     `  <script type="module" src="./index.js"></script>\n</body>`
   );
-  const shareConfig: { name: string; hasDefault: boolean; exports: string[] }[] = [];
-  for (const zephyr3dLib of [
-    '@zephyr3d/base',
-    '@zephyr3d/device',
-    '@zephyr3d/scene',
-    '@zephyr3d/runtime',
-    '@zephyr3d/backend-webgl',
-    '@zephyr3d/backend-webgpu'
-  ]) {
-    const imports = await import(zephyr3dLib);
-    shareConfig.push({
-      name: zephyr3dLib,
-      hasDefault: true,
-      exports: [...Object.keys(imports)]
-    });
-  }
-  if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
-    if ((await vfs.stat('/deps.lock.json')).isFile && (await vfs.stat('/deps')).isDirectory) {
-      await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
-      await vfs.copyFileEx('/deps/**/*', '/dist/deps', { cwd: '/deps' });
-      // Create share config
-      const deps = JSON.parse((await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string) as {
-        dependencies: {
-          [name: string]: { entry: string };
-        };
-      };
-      let importMaps: { imports: Record<string, string> } = { imports: {} };
-      for (const pkg in deps.dependencies) {
-        importMaps.imports[pkg] = `.${deps.dependencies[pkg].entry}`;
-      }
-      newContent = newContent.replace(
-        '</head>',
-        `<script type="importmap">\n${JSON.stringify(importMaps, null, '  ')}\n</script>\n</head>`
-      );
-    }
-  }
+  newContent = newContent.replace(
+    '</head>',
+    `<script type="importmap">\n${JSON.stringify(importMap, null, '  ')}\n</script>\n</head>`
+  );
 
   await vfs.writeFile('/dist/index.html', newContent, {
     encoding: 'utf8',

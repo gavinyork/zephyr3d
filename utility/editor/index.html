@@ -22,6 +22,19 @@
         height: 100%;
       }
     </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@zephyr3d/base": "./modules/zephyr3d_base.js",
+          "@zephyr3d/device": "./modules/zephyr3d_device.js",
+          "@zephyr3d/scene": "./modules/zephyr3d_scene.js",
+          "@zephyr3d/runtime": "./modules/zephyr3d_runtime.js",
+          "@zephyr3d/imgui": "./modules/zephyr3d_imgui.js",
+          "@zephyr3d/backend-webgl": "./modules/zephyr3d_backend-webgl.js",
+          "@zephyr3d/backend-webgpu": "./modules/zephyr3d_backend-webgpu.js"
+        }
+      }
+    </script>
   </head>
   <body>
     <canvas id="canvas"></canvas>

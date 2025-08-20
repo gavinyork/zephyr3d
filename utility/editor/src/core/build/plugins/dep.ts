@@ -356,10 +356,7 @@ export function depsLockPlugin(vfs: VFS, projectRoot: string) {
 
       // Bare import → lockfile
       if (!source.startsWith('.') && !source.startsWith('/') && !source.startsWith('http')) {
-        const entry = lock?.dependencies[source]?.entry;
-        if (entry) return entry;
-        console.warn(`Dependency "${source}" not installed. Install it before building.`);
-        return null;
+        return lock?.dependencies[source]?.entry || null;
       }
 
       // Defer relative/absolute paths to other plugins (e.g., your vfsAndUrlPlugin)

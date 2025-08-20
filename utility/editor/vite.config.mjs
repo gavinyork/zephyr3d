@@ -6,7 +6,6 @@ export default defineConfig({
   root: '.',
   publicDir: 'public',
   base: './',
-
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -15,6 +14,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html')
       },
+      external: (id) => id.startsWith('@zephyr3d/'),
       treeshake: {
         moduleSideEffects: (id, external) => {
           return /[\\\/]zephyr3d[\\\/]libs[\\\/]/.test(id);
@@ -72,6 +72,10 @@ export default defineConfig({
         {
           src: 'node_modules/@zephyr3d/runtime/dist',
           dest: 'vendor/zephyr3d/runtime'
+        },
+        {
+          src: 'node_modules/@zephyr3d/imgui/dist',
+          dest: 'vendor/zephyr3d/imgui'
         },
         {
           src: 'node_modules/@zephyr3d/backend-webgl/dist',

@@ -11,4 +11,3 @@ export * from './rectspacker';
 export * from './prng';
 export * from './vfs';
 export * from './ref';
-export * from './moduleshare';
