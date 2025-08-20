@@ -40,7 +40,7 @@ export class WebGPUFramebufferCaps implements FramebufferCaps {
     this.maxColorAttachmentBytesPerSample = device.device.limits.maxColorAttachmentBytesPerSample;
     this.supportRenderMipmap = true;
     this.supportMultisampledFramebuffer = true;
-    this.supportFloatBlending = true;
+    this.supportFloatBlending = device.device.features.has('float32-blendable');
     this.supportDepth32float = true;
     this.supportDepth32floatStencil8 = device.device.features.has('depth32float-stencil8');
   }

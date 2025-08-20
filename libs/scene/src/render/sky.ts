@@ -451,9 +451,14 @@ export class SkyRenderer {
   get irradianceSHFB(): FrameBuffer {
     if (!this._irradianceSHFB.get()) {
       const device = Application.instance.device;
-      const texture = device.createTexture2D('rgba32f', 3, 3, {
-        samplerOptions: { mipFilter: 'none' }
-      });
+      const texture = device.createTexture2D(
+        device.getDeviceCaps().framebufferCaps.supportFloatBlending ? 'rgba32f' : 'rgba16f',
+        3,
+        3,
+        {
+          samplerOptions: { mipFilter: 'none' }
+        }
+      );
       this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
     }
     return this._irradianceSHFB.get();
@@ -544,7 +549,12 @@ export class SkyRenderer {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
-      const tex = ctx.device.createTexture2D('rgba32f', 1, 1, { samplerOptions: { mipFilter: 'none' } });
+      const tex = ctx.device.createTexture2D(
+        ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending ? 'rgba32f' : 'rgba16f',
+        1,
+        1,
+        { samplerOptions: { mipFilter: 'none' } }
+      );
       tex.name = 'DistantSkyLut';
       this._skyDistantLightLut.set(ctx.device.createFrameBuffer([tex], null));
       this._bakedSkyboxDirty = true;
@@ -577,7 +587,7 @@ export class SkyRenderer {
           this.irradianceFramebuffer,
           this._irradianceConvSamples
         );
-        if (ctx.device.type === 'webgl') {
+        if (ctx.device.type === 'webgl' || !ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending) {
           this._shProjector.projectCubemapToTexture(
             this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
             this.irradianceSHFB

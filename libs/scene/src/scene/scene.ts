@@ -241,17 +241,19 @@ export class Scene extends makeObservable(Disposable)<{
   /** @internal */
   private updateEnvLight() {
     if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
-      const isWebGL1 = Application.instance.device.type === 'webgl';
+      const useSHFB =
+        Application.instance.device.type === 'webgl' ||
+        !Application.instance.device.getDeviceCaps().framebufferCaps.supportFloatBlending;
       if (!this.env.light.radianceMap) {
         this.env.light.radianceMap = this.env.sky.radianceMap;
       }
       if (!this.env.light.irradianceMap) {
         this.env.light.irradianceMap = this.env.sky.irradianceMap;
       }
-      if (isWebGL1 && !this.env.light.irradianceSHFB) {
+      if (useSHFB && !this.env.light.irradianceSHFB) {
         this.env.light.irradianceSHFB = this.env.sky.irradianceSHFB;
       }
-      if (!isWebGL1 && !this.env.light.irradianceSH) {
+      if (!useSHFB && !this.env.light.irradianceSH) {
         this.env.light.irradianceSH = this.env.sky.irradianceSH;
       }
     }
