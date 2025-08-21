@@ -9,12 +9,20 @@ export class DlgMessageBoxEx extends DialogRenderer<string> {
     message: string,
     buttons?: string[],
     width?: number,
-    height?: number
+    height?: number,
+    mask?: boolean
   ) {
-    return new DlgMessageBoxEx(title, message, buttons, width, height).showModal();
+    return new DlgMessageBoxEx(title, message, buttons, width, height, mask).showModal();
   }
-  constructor(id?: string, message?: string, buttons?: string[], width?: number, height?: number) {
-    super(id ?? 'MessageBox', width ?? 300, height ?? 0);
+  constructor(
+    id?: string,
+    message?: string,
+    buttons?: string[],
+    width?: number,
+    height?: number,
+    mask?: boolean
+  ) {
+    super(id ?? 'MessageBox', width ?? 300, height ?? 0, mask);
     this._text = message ?? '';
     this._buttons = buttons ? buttons.slice() : ['Ok'];
   }
@@ -23,6 +31,9 @@ export class DlgMessageBoxEx extends DialogRenderer<string> {
   }
   set text(val) {
     this._text = val;
+  }
+  get buttons() {
+    return this._buttons;
   }
   doRender(): void {
     ImGui.TextWrapped(this._text);

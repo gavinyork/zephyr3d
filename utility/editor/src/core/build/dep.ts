@@ -1,19 +1,6 @@
-/**
- * Minimal browser-side deps installer + Rollup plugin for your VFS.
- * - Registry: esm.sh (pluggable)
- * - Stores modules under /deps/{name}@{version}/...
- * - Writes /deps.lock.json
- * - Rollup resolves bare imports via the lock and loads code from VFS
- *
- * Requires:
- * - es-module-lexer
- * - Your VFS class (as provided)
- */
-
-import type { VFS } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';
-
-/* -------------------- Utilities -------------------- */
+import type { VFS } from '@zephyr3d/base';
+import { loadTypes } from './loadtypes';
 
 async function sha256Base64(text: string): Promise<string> {
   const buf = new TextEncoder().encode(text);
@@ -316,73 +303,44 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
   }
 }
 
-export async function installDeps(vfs: VFS, projectRoot: string, specs: string[]) {
+export async function installDeps(
+  vfs: VFS,
+  projectRoot: string,
+  specs: string[],
+  onProgress?: (msg: string) => void
+) {
+  let numPackagesInstalled = 0;
+  onProgress?.('Reading lock file...');
   const registry: LockFile['registry'] = 'esm.sh';
   let lock = (await readLock(vfs, projectRoot)) ?? { registry, dependencies: {} };
 
   for (const spec of specs) {
-    const { name, version, entryUrl } = await resolveOnEsmSh(spec);
-    const existing = lock.dependencies[name];
+    try {
+      onProgress?.(`Installing package ${spec}...`);
+      const { name, version, entryUrl } = await resolveOnEsmSh(spec);
+      const existing = lock.dependencies[name];
 
-    // Skip if same version already present and entry exists
-    if (existing?.version === version && (await vfs.exists(existing.entry))) continue;
+      // Skip if same version already present and entry exists
+      if (existing?.version === version && (await vfs.exists(existing.entry))) continue;
 
-    await crawlAndCache(vfs, entryUrl, name, version);
-    const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
-    const code = (await vfs.readFile(entry, { encoding: 'utf8' })) as string;
-    const integrity = await sha256Base64(code);
+      await crawlAndCache(vfs, entryUrl, name, version);
+      const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
+      const code = (await vfs.readFile(entry, { encoding: 'utf8' })) as string;
+      const integrity = await sha256Base64(code);
 
-    lock.dependencies[name] = { version, entry, url: entryUrl, integrity };
+      lock.dependencies[name] = { version, entry, url: entryUrl, integrity };
+      numPackagesInstalled++;
+
+      // Loading types
+      onProgress?.(`Loading DTS from package ${spec}...`);
+      await loadTypes(spec, window.monaco);
+    } catch (err) {
+      onProgress?.(`Failed to fetch ${spec}`);
+    }
   }
 
+  onProgress?.('Writing lock file...');
   await writeLock(vfs, projectRoot, lock);
+  onProgress?.(`${numPackagesInstalled} packages installed`);
   return lock;
 }
-
-/* -------------------- Rollup plugin -------------------- */
-
-export function depsLockPlugin(vfs: VFS, projectRoot: string) {
-  let lock: LockFile | null = null;
-
-  return {
-    name: 'deps-lock-vfs',
-    async buildStart() {
-      lock = await readLock(vfs, projectRoot);
-      if (!lock) {
-        console.warn('deps.lock.json not found. Bare imports will not resolve until you install deps.');
-      }
-    },
-    async resolveId(source, importer) {
-      // If already a VFS deps path, accept
-      if (source.startsWith('/deps/')) return source;
-
-      // Bare import → lockfile
-      if (!source.startsWith('.') && !source.startsWith('/') && !source.startsWith('http')) {
-        return lock?.dependencies[source]?.entry || null;
-      }
-
-      // Defer relative/absolute paths to other plugins (e.g., your vfsAndUrlPlugin)
-      return null;
-    },
-    async load(id) {
-      if (id.startsWith('/deps/')) {
-        const code = (await vfs.readFile(id, { encoding: 'utf8' })) as string | null;
-        if (code == null) throw new Error(`VFS miss for dependency: ${id}`);
-        return { code, map: null };
-      }
-      return null;
-    }
-  };
-}
-
-/* -------------------- Example integration -------------------- */
-
-// 1) Install deps from UI action:
-// await installDeps(vfs, vfsRoot, ["three@^0.158.0", "stats.js"]);
-
-// 2) Use plugin in your existing rollup call:
-// plugins: [
-//   depsLockPlugin(vfs, vfsRoot),
-//   vfsAndUrlPlugin(vfs, { vfsRoot, distDir, alias }),
-//   tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } })
-// ];

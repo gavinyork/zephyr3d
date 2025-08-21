@@ -2,7 +2,7 @@ import { rollup } from '@rollup/browser';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
 import type { VFS } from '@zephyr3d/base';
-import { depsLockPlugin } from './plugins/dep';
+import { depsResolvePlugin } from './plugins/depresolve';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -116,7 +116,7 @@ export async function buildForEndUser(
     input,
     plugins: [
       vfsAndUrlPlugin(vfs, { vfsRoot: '/', distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
-      depsLockPlugin(vfs, '/'),
+      depsResolvePlugin(vfs, '/'),
       tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } }) // typescript.js 转译
     ]
   });

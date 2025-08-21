@@ -11,7 +11,7 @@ import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
-import { installDeps } from '../core/build/plugins/dep';
+import { installDeps } from '../core/build/dep';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -335,8 +335,18 @@ export class VFSRenderer extends Observable<{
     if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
       DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
         if (val) {
-          installDeps(this.VFS, '/', [val]).then(() => {
+          const dlgMessageBoxEx = new DlgMessageBoxEx(
+            'Install package',
+            '',
+            ['Installing...'],
+            400,
+            0,
+            false
+          );
+          dlgMessageBoxEx.showModal();
+          installDeps(this.VFS, '/', [val], (msg) => (dlgMessageBoxEx.text = msg)).then(() => {
             console.log('Dependencies installed');
+            dlgMessageBoxEx.buttons[0] = 'Ok';
           });
         }
       });
