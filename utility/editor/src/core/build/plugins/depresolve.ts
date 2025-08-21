@@ -1,5 +1,6 @@
 import type { VFS } from '@zephyr3d/base';
-import { LockFile, readLock } from '../dep';
+import type { LockFile } from '../dep';
+import { readLock } from '../dep';
 
 export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
   let lock: LockFile | null = null;
@@ -12,9 +13,11 @@ export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
         console.warn('deps.lock.json not found. Bare imports will not resolve until you install deps.');
       }
     },
-    async resolveId(source, importer) {
+    async resolveId(source, _importer) {
       // If already a VFS deps path, accept
-      if (source.startsWith('/deps/')) return source;
+      if (source.startsWith('/deps/')) {
+        return source;
+      }
 
       // Bare import → lockfile
       if (!source.startsWith('.') && !source.startsWith('/') && !source.startsWith('http')) {
@@ -27,7 +30,9 @@ export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
     async load(id) {
       if (id.startsWith('/deps/')) {
         const code = (await vfs.readFile(id, { encoding: 'utf8' })) as string | null;
-        if (code == null) throw new Error(`VFS miss for dependency: ${id}`);
+        if (code == null) {
+          throw new Error(`VFS miss for dependency: ${id}`);
+        }
         return { code, map: null };
       }
       return null;

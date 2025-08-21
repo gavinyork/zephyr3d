@@ -207,9 +207,13 @@ export class ScriptRegistry {
 
     for (const im of list) {
       // 必须有字符串字面量边界（有引号）
-      if (!im.ss || !im.se || im.se <= im.ss) continue;
+      if (!im.ss || !im.se || im.se <= im.ss) {
+        continue;
+      }
       // 必须有内容区间
-      if (im.e <= im.s) continue;
+      if (im.e <= im.s) {
+        continue;
+      }
 
       // 追加 [last, s)：这段包含壳和开引号之前的所有代码
       out += code.slice(last, im.s);

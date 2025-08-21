@@ -344,7 +344,13 @@ export class VFSRenderer extends Observable<{
             false
           );
           dlgMessageBoxEx.showModal();
-          installDeps(this.VFS, '/', [val], (msg) => (dlgMessageBoxEx.text = msg)).then(() => {
+          installDeps(
+            ProjectService.currentProject,
+            this.VFS,
+            '/',
+            [val],
+            (msg) => (dlgMessageBoxEx.text = msg)
+          ).then(() => {
             console.log('Dependencies installed');
             dlgMessageBoxEx.buttons[0] = 'Ok';
           });

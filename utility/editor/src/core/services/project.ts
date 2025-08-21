@@ -33,6 +33,9 @@ export class ProjectService {
   static get serializationManager() {
     return this._serializationManager;
   }
+  static get currentProject() {
+    return this._currentProject;
+  }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest();
     return Object.values(manifest.projectList);

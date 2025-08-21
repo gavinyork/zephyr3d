@@ -1,3 +1,4 @@
+import type * as TS from 'typescript';
 import { rollup } from '@rollup/browser';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
@@ -44,7 +45,7 @@ function rewriteImports(code: string): string {
 }
 
 function transpileTS(fileName: string, code: string) {
-  const ts = (window as any).ts as typeof import('typescript');
+  const ts = (window as any).ts as typeof TS;
   if (!ts) {
     throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
   }

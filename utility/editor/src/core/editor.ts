@@ -1,4 +1,5 @@
 import type * as Monaco from 'monaco-editor';
+import type * as TS from 'typescript';
 import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
@@ -191,7 +192,7 @@ export class Editor {
               }
             }
           } catch (err) {
-            console.error(`Failed to load DTS for package ${pkg}`);
+            console.error(`Failed to load DTS for package ${pkg}: ${err}`);
           }
         }
       }
@@ -450,7 +451,7 @@ export class Editor {
     return out;
   }
   private transpileTS(fileName: string, code: string) {
-    const ts = (window as any).ts as typeof import('typescript');
+    const ts = (window as any).ts as typeof TS;
     if (!ts) {
       throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
     }

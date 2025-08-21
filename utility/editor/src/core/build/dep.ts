@@ -27,7 +27,9 @@ export type LockFile = {
 
 export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile | null> {
   const p = vfs.join(projectRoot, 'deps.lock.json');
-  if (!(await vfs.exists(p))) return null;
+  if (!(await vfs.exists(p))) {
+    return null;
+  }
   const text = (await vfs.readFile(p, { encoding: 'utf8' })) as string;
   try {
     return JSON.parse(text) as LockFile;
@@ -55,8 +57,12 @@ function cmp(a: string, b: string): number {
   const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
   const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
   for (let i = 0; i < 3; i++) {
-    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return 1;
-    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return -1;
+    if ((pa[i] ?? 0) > (pb[i] ?? 0)) {
+      return 1;
+    }
+    if ((pa[i] ?? 0) < (pb[i] ?? 0)) {
+      return -1;
+    }
   }
   return 0;
 }
@@ -65,16 +71,22 @@ function maxSatisfying(
   range: string | undefined,
   latest: string | undefined
 ): string | null {
-  if (!versions.length) return latest ?? null;
+  if (!versions.length) {
+    return latest ?? null;
+  }
   // 规范化、排序
   const vs = versions.filter((v) => /^\d+\.\d+\.\d+/.test(v)).sort((a, b) => cmp(a, b));
 
-  if (!range || range === 'latest') return vs.at(-1) ?? latest ?? null;
+  if (!range || range === 'latest') {
+    return vs.at(-1) ?? latest ?? null;
+  }
 
   range = range.trim();
 
   // 星号或x
-  if (range === '*' || /x/i.test(range)) return vs.at(-1) ?? null;
+  if (range === '*' || /x/i.test(range)) {
+    return vs.at(-1) ?? null;
+  }
 
   // 精确
   if (/^\d+\.\d+\.\d+(-.*)?$/.test(range)) {
@@ -111,11 +123,21 @@ function maxSatisfying(
     const ver = mRel[2];
     const candidates = vs.filter((v) => {
       const c = cmp(v, ver);
-      if (op === '>=') return c >= 0;
-      if (op === '<=') return c <= 0;
-      if (op === '>') return c > 0;
-      if (op === '<') return c < 0;
-      if (op === '=') return c === 0;
+      if (op === '>=') {
+        return c >= 0;
+      }
+      if (op === '<=') {
+        return c <= 0;
+      }
+      if (op === '>') {
+        return c > 0;
+      }
+      if (op === '<') {
+        return c < 0;
+      }
+      if (op === '=') {
+        return c === 0;
+      }
       return false;
     });
     return candidates.at(-1) ?? null;
@@ -132,7 +154,9 @@ async function fetchPackageJson(name: string): Promise<any | null> {
   try {
     const url = `https://esm.sh/${name}/package.json`;
     const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return null;
+    }
     const text = await res.text();
     return JSON.parse(text);
   } catch {
@@ -146,14 +170,18 @@ async function fetchPackageJson(name: string): Promise<any | null> {
  */
 export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
   const m = pkgSpec.match(/^(@?[^@]+)(?:@(.+))?$/);
-  if (!m) throw new Error(`Invalid spec: ${pkgSpec}`);
+  if (!m) {
+    throw new Error(`Invalid spec: ${pkgSpec}`);
+  }
   const [, name, rangeRaw] = m;
   const range = rangeRaw?.trim();
 
   // 第一次探测
   const probe = `https://esm.sh/${name}${range ? '@' + encodeURIComponent(range) : ''}`;
   const res = await fetch(probe, { redirect: 'follow' });
-  if (!res.ok) throw new Error(`Failed resolving ${pkgSpec}: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Failed resolving ${pkgSpec}: ${res.status}`);
+  }
 
   // 解析最终 URL 的 pathname，先 decode
   const u = new URL(res.url);
@@ -203,7 +231,7 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
 export function depsPathOf(cdnUrl: string, name: string, version: string): string {
   const u = new URL(cdnUrl);
   // 1) 去掉 /vNNN/ 与多余的前缀（保留包层之后的子路径）
-  let p = u.pathname.replace(/^\/v\d+\//, '/'); // /v133/... → /...
+  const p = u.pathname.replace(/^\/v\d+\//, '/'); // /v133/... → /...
   // 2) 找到 name@version 的锚点，并剥离其前缀
   const anchor = `${name}@${version}`;
   const idx = p.indexOf(anchor);
@@ -220,12 +248,16 @@ export function depsPathOf(cdnUrl: string, name: string, version: string): strin
   sub = sub.replace(/^\/(es\d+|stable|dev|node|browser)\//, '/');
 
   // 4) 标准化：确保以 "/" 开头
-  if (!sub.startsWith('/')) sub = '/' + sub;
+  if (!sub.startsWith('/')) {
+    sub = '/' + sub;
+  }
 
   // 5) 若没有文件名（目录）则补 mod.js
   const last = sub.split('/').pop()!;
   const isDirLike = sub.endsWith('/') || !last.includes('.');
-  if (isDirLike) sub = (sub.endsWith('/') ? sub : sub + '/') + 'mod.js';
+  if (isDirLike) {
+    sub = (sub.endsWith('/') ? sub : sub + '/') + 'mod.js';
+  }
 
   // 6) 去掉 query/hash（本地键稳定），注意：抓取请求时仍用原始 URL
   return `/deps/${name}@${version}${sub}`;
@@ -240,14 +272,20 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
 
   while (queue.length) {
     const url = queue.pop()!;
-    if (seen.has(url)) continue;
+    if (seen.has(url)) {
+      continue;
+    }
     seen.add(url);
 
     const localPath = depsPathOf(url, name, version);
-    if (await vfs.exists(localPath)) continue;
+    if (await vfs.exists(localPath)) {
+      continue;
+    }
 
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`Fetch failed: ${url} (${res.status})`);
+    if (!res.ok) {
+      throw new Error(`Fetch failed: ${url} (${res.status})`);
+    }
     const code = await res.text();
 
     const [imports] = parse(code);
@@ -260,9 +298,13 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
 
     for (const im of list) {
       // 必须有字符串字面量边界（有引号）
-      if (!im.ss || !im.se || im.se <= im.ss) continue;
+      if (!im.ss || !im.se || im.se <= im.ss) {
+        continue;
+      }
       // 必须有内容区间
-      if (im.e <= im.s) continue;
+      if (im.e <= im.s) {
+        continue;
+      }
 
       // 追加 [last, s)：这段包含壳和开引号之前的所有代码
       out += code.slice(last, im.s);
@@ -298,12 +340,15 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
     // 追加尾部原文（包括最后一个引号、分号等）
     out += code.slice(last);
     const dir = vfs.dirname(localPath);
-    if (!(await vfs.exists(dir))) await vfs.makeDirectory(dir, true);
+    if (!(await vfs.exists(dir))) {
+      await vfs.makeDirectory(dir, true);
+    }
     await vfs.writeFile(localPath, out, { encoding: 'utf8', create: true });
   }
 }
 
 export async function installDeps(
+  project: string,
   vfs: VFS,
   projectRoot: string,
   specs: string[],
@@ -312,7 +357,7 @@ export async function installDeps(
   let numPackagesInstalled = 0;
   onProgress?.('Reading lock file...');
   const registry: LockFile['registry'] = 'esm.sh';
-  let lock = (await readLock(vfs, projectRoot)) ?? { registry, dependencies: {} };
+  const lock = (await readLock(vfs, projectRoot)) ?? { registry, dependencies: {} };
 
   for (const spec of specs) {
     try {
@@ -321,7 +366,9 @@ export async function installDeps(
       const existing = lock.dependencies[name];
 
       // Skip if same version already present and entry exists
-      if (existing?.version === version && (await vfs.exists(existing.entry))) continue;
+      if (existing?.version === version && (await vfs.exists(existing.entry))) {
+        continue;
+      }
 
       await crawlAndCache(vfs, entryUrl, name, version);
       const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
@@ -333,9 +380,9 @@ export async function installDeps(
 
       // Loading types
       onProgress?.(`Loading DTS from package ${spec}...`);
-      await loadTypes(spec, window.monaco);
+      await loadTypes(project, spec, window.monaco);
     } catch (err) {
-      onProgress?.(`Failed to fetch ${spec}`);
+      onProgress?.(`Failed to fetch ${spec}: ${err}`);
     }
   }
 

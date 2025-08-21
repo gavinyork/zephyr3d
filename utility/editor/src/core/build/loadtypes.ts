@@ -1,4 +1,4 @@
-import * as Monaco from 'monaco-editor';
+import type * as Monaco from 'monaco-editor';
 import type { IDisposable as ExtraLib } from 'monaco-editor';
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -44,7 +44,9 @@ export async function loadTypes(
       Promise.resolve().then(() => {
         try {
           let f: (() => void) | undefined;
-          while ((f = registrationQueue.shift())) f();
+          while ((f = registrationQueue.shift())) {
+            f();
+          }
         } finally {
           draining = false;
         }
@@ -56,14 +58,18 @@ export async function loadTypes(
     try {
       return new URL(maybe, base).toString();
     } catch {
-      if (/^(data:|blob:|https?:)/i.test(maybe)) return maybe;
+      if (/^(data:|blob:|https?:)/i.test(maybe)) {
+        return maybe;
+      }
       return maybe;
     }
   }
 
   function toVirtualPath(finalUrl: string): string {
     let vp = urlToVirtualPath.get(finalUrl);
-    if (vp) return vp;
+    if (vp) {
+      return vp;
+    }
 
     if (finalUrl.startsWith('data:')) {
       const hash = simpleHash(finalUrl);
@@ -107,7 +113,9 @@ export async function loadTypes(
   async function fetchWithFinalUrl(url: string): Promise<{ finalUrl: string; content: string }> {
     if (url.startsWith('data:')) {
       const content = decodeDataUrlToText(url);
-      if (!urlContentCache.has(url)) urlContentCache.set(url, content);
+      if (!urlContentCache.has(url)) {
+        urlContentCache.set(url, content);
+      }
       return { finalUrl: url, content };
     }
 
@@ -123,7 +131,9 @@ export async function loadTypes(
           return { finalUrl, content: urlContentCache.get(finalUrl)! };
         }
         const g = await fetcher(url);
-        if (!g.ok) throw new Error(`GET ${url} failed: ${g.status}`);
+        if (!g.ok) {
+          throw new Error(`GET ${url} failed: ${g.status}`);
+        }
         const finalUrl2 = g.url || finalUrl;
         const text = await g.text();
         urlContentCache.set(finalUrl2, text);
@@ -134,7 +144,9 @@ export async function loadTypes(
     }
 
     const resp = await fetcher(url);
-    if (!resp.ok) throw new Error(`GET ${url} failed: ${resp.status}`);
+    if (!resp.ok) {
+      throw new Error(`GET ${url} failed: ${resp.status}`);
+    }
     const finalUrl = resp.url || url;
     const text = await resp.text();
     urlContentCache.set(finalUrl, text);
@@ -142,9 +154,13 @@ export async function loadTypes(
   }
 
   async function checkExists(url: string): Promise<boolean> {
-    if (url.startsWith('data:')) return true;
+    if (url.startsWith('data:')) {
+      return true;
+    }
     const cached = existsCache.get(url);
-    if (typeof cached === 'boolean') return cached;
+    if (typeof cached === 'boolean') {
+      return cached;
+    }
     try {
       const h = await fetcher(url, { method: 'HEAD' });
       if (h.ok) {
@@ -176,14 +192,20 @@ export async function loadTypes(
     let m: RegExpExecArray | null;
     while ((m = importExportRe.exec(source))) {
       const spec = m[1] || m[2] || m[3];
-      if (spec && isLikelyPathOrUrl(spec)) paths.add(spec);
+      if (spec && isLikelyPathOrUrl(spec)) {
+        paths.add(spec);
+      }
     }
 
     const triplePathRe = /\/\/\/\s*<reference\s+path=["']([^"']+)["']\s*\/>/g;
-    while ((m = triplePathRe.exec(source))) tsPaths.add(m[1]);
+    while ((m = triplePathRe.exec(source))) {
+      tsPaths.add(m[1]);
+    }
 
     const tripleTypesRe = /\/\/\/\s*<reference\s+types=["']([^"']+)["']\s*\/>/g;
-    while ((m = tripleTypesRe.exec(source))) tsTypes.add(m[1]);
+    while ((m = tripleTypesRe.exec(source))) {
+      tsTypes.add(m[1]);
+    }
 
     return { paths: [...paths], tripleSlashPaths: [...tsPaths], tripleSlashTypes: [...tsTypes] };
   }
@@ -201,9 +223,13 @@ export async function loadTypes(
 
   function resolveAsTypeScriptModule(spec: string, baseUrl: string): string[] {
     const abs = toAbsoluteUrl(spec, baseUrl);
-    if (abs.startsWith('data:')) return [abs];
+    if (abs.startsWith('data:')) {
+      return [abs];
+    }
     const u = tryNewUrl(abs, baseUrl);
-    if (!u) return [abs];
+    if (!u) {
+      return [abs];
+    }
     const href = u.toString();
     const hasExt = /\.[a-zA-Z0-9]+$/.test(u.pathname);
     const c: string[] = [];
@@ -234,7 +260,9 @@ export async function loadTypes(
 
   async function resolveFirstExisting(spec: string, baseUrl: string): Promise<string | null> {
     const key = `${baseUrl}::${spec}`;
-    if (resolvedModuleUrlCache.has(key)) return resolvedModuleUrlCache.get(key)!;
+    if (resolvedModuleUrlCache.has(key)) {
+      return resolvedModuleUrlCache.get(key)!;
+    }
 
     const candidates = resolveAsTypeScriptModule(spec, baseUrl);
     for (const u of candidates) {
@@ -249,7 +277,9 @@ export async function loadTypes(
 
   function registerOnceVirtual(finalUrl: string, content: string, extraLibs: Record<string, ExtraLib>) {
     const virtualPath = toVirtualPath(finalUrl);
-    if (virtualPathRegistered.has(virtualPath)) return;
+    if (virtualPathRegistered.has(virtualPath)) {
+      return;
+    }
     enqueueRegistration(() => {
       if (!virtualPathRegistered.has(virtualPath)) {
         extraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
@@ -259,7 +289,9 @@ export async function loadTypes(
         if (createModels) {
           const uri = monaco.Uri.parse(virtualPath);
           const existing = monaco.editor.getModel(uri);
-          if (!existing) monaco.editor.createModel(content, 'typescript', uri);
+          if (!existing) {
+            monaco.editor.createModel(content, 'typescript', uri);
+          }
         }
         virtualPathRegistered.add(virtualPath);
       }
@@ -267,7 +299,9 @@ export async function loadTypes(
   }
 
   function registerAtPath(virtualPath: string, content: string, extraLibs: Record<string, ExtraLib>) {
-    if (virtualPathRegistered.has(virtualPath)) return;
+    if (virtualPathRegistered.has(virtualPath)) {
+      return;
+    }
     enqueueRegistration(() => {
       if (!virtualPathRegistered.has(virtualPath)) {
         extraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
@@ -277,7 +311,9 @@ export async function loadTypes(
         if (createModels) {
           const uri = monaco.Uri.parse(virtualPath);
           const existing = monaco.editor.getModel(uri);
-          if (!existing) monaco.editor.createModel(content, 'typescript', uri);
+          if (!existing) {
+            monaco.editor.createModel(content, 'typescript', uri);
+          }
         }
         virtualPathRegistered.add(virtualPath);
       }
@@ -308,14 +344,17 @@ export async function loadTypes(
   }
 
   const entryResp = await fetcher(`https://esm.sh/${encodeURIComponent(packageName)}`);
-  if (!entryResp.ok)
+  if (!entryResp.ok) {
     throw new Error(
       `Failed to fetch esm.sh entry for ${packageName}: ${entryResp.status} ${entryResp.statusText}`
     );
+  }
   const baseForEntry = entryResp.url || `https://esm.sh/${encodeURIComponent(packageName)}`;
   const typesHeader =
     entryResp.headers.get('X-Typescript-Types') || entryResp.headers.get('x-typescript-types');
-  if (!typesHeader) throw new Error(`No X-Typescript-Types header for ${packageName}`);
+  if (!typesHeader) {
+    throw new Error(`No X-Typescript-Types header for ${packageName}`);
+  }
   const typesEntryUrl = toAbsoluteUrl(typesHeader, baseForEntry);
 
   const queue: string[] = [typesEntryUrl];
@@ -327,12 +366,16 @@ export async function loadTypes(
   async function worker(extraLibs: Record<string, ExtraLib>) {
     while (queue.length > 0 && processed < maxFiles) {
       const url = queue.shift()!;
-      if (visited.has(url)) continue;
+      if (visited.has(url)) {
+        continue;
+      }
       visited.add(url);
       processed++;
       try {
         const { finalUrl, content } = await fetchWithFinalUrl(url);
-        if (!visited.has(finalUrl)) visited.add(finalUrl);
+        if (!visited.has(finalUrl)) {
+          visited.add(finalUrl);
+        }
 
         registerOnceVirtual(finalUrl, content, extraLibs);
 
@@ -344,20 +387,26 @@ export async function loadTypes(
 
         for (const p of paths) {
           const resolved = await resolveFirstExisting(p, finalUrl);
-          if (resolved && !visited.has(resolved)) queue.push(resolved);
+          if (resolved && !visited.has(resolved)) {
+            queue.push(resolved);
+          }
         }
 
         for (const p of tripleSlashPaths) {
           const abs = toAbsoluteUrl(p, finalUrl);
           const resolved = await resolveFirstExisting(abs, finalUrl);
-          if (resolved && !visited.has(resolved)) queue.push(resolved);
+          if (resolved && !visited.has(resolved)) {
+            queue.push(resolved);
+          }
         }
 
         for (const t of tripleSlashTypes) {
           const mapped = typesRefMap[t];
           if (mapped) {
             const abs = toAbsoluteUrl(mapped, finalUrl);
-            if (!visited.has(abs)) queue.push(abs);
+            if (!visited.has(abs)) {
+              queue.push(abs);
+            }
           }
         }
       } catch (e) {
@@ -399,7 +448,9 @@ declare module "${packageName}" {
 
 function decodeDataUrlToText(url: string): string {
   const m = url.match(/^data:([^,]*?),(.*)$/s);
-  if (!m) throw new Error('Invalid data URL');
+  if (!m) {
+    throw new Error('Invalid data URL');
+  }
   const meta = m[1] || '';
   const data = m[2] || '';
   const isBase64 = /;base64/i.test(meta);
