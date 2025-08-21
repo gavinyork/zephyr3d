@@ -1,4 +1,5 @@
-type Monaco = typeof import('monaco-editor');
+import * as Monaco from 'monaco-editor';
+import type { IDisposable as ExtraLib } from 'monaco-editor';
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -7,29 +8,33 @@ interface LoadTypesOptions {
   maxFiles?: number;
   createModels?: boolean;
   typesReferenceMap?: Record<string, string>;
-  concurrency?: number; // 并发抓取上限（默认 8）
+  concurrency?: number; // 默认 8
+  addModuleShim?: boolean;
+  mapBareSpecifier?: boolean;
 }
 
 export async function loadTypes(
+  project: string,
   packageName: string,
-  monaco: Monaco,
+  monaco: typeof Monaco,
   opts: LoadTypesOptions = {}
-): Promise<void> {
+): Promise<{ project: string; libs: Record<string, ExtraLib> }> {
+  const extraLibs: Record<string, ExtraLib> = {};
   const fetcher: Fetcher = opts.fetcher ?? ((i, init) => fetch(i, { redirect: 'follow', ...init }));
   const maxFiles = opts.maxFiles ?? 500;
-  const createModels = opts.createModels ?? true;
+  const createModels = opts.createModels ?? false;
   const typesRefMap = opts.typesReferenceMap ?? {};
   const concurrency = Math.max(1, opts.concurrency ?? 8);
+  const addModuleShim = opts.addModuleShim ?? true;
+  const mapBareSpecifier = opts.mapBareSpecifier ?? true;
 
-  // 全局缓存/去重结构（可上移为模块级单例）
-  const urlContentCache = new Map<string, string>(); // finalUrl -> content
-  const existsCache = new Map<string, boolean>(); // candidateUrl -> existence
-  const resolvedModuleUrlCache = new Map<string, string | null>(); // base::spec -> finalUrl|null
-  const urlToVirtualPath = new Map<string, string>(); // finalUrl -> virtualPath
-  const virtualPathRegistered = new Set<string>(); // virtualPath added
-  const visited = new Set<string>(); // 已处理 finalUrl 或入队 URL
+  const urlContentCache = new Map<string, string>();
+  const existsCache = new Map<string, boolean>();
+  const resolvedModuleUrlCache = new Map<string, string | null>();
+  const urlToVirtualPath = new Map<string, string>();
+  const virtualPathRegistered = new Set<string>();
+  const visited = new Set<string>();
 
-  // 注册串行队列，避免竞争导致重复 model
   const registrationQueue: Array<() => void> = [];
   let draining = false;
   function enqueueRegistration(fn: () => void) {
@@ -47,24 +52,6 @@ export async function loadTypes(
     }
   }
 
-  function simpleHash(input: string): string {
-    let h = 0;
-    for (let i = 0; i < input.length; i++) {
-      h = (h << 5) - h + input.charCodeAt(i);
-      h |= 0;
-    }
-    return (h >>> 0).toString(36);
-  }
-
-  function toVirtualPath(finalUrl: string): string {
-    let vp = urlToVirtualPath.get(finalUrl);
-    if (!vp) {
-      vp = `file:///types/${simpleHash(finalUrl)}.d.ts`;
-      urlToVirtualPath.set(finalUrl, vp);
-    }
-    return vp;
-  }
-
   function toAbsoluteUrl(maybe: string, base: string): string {
     try {
       return new URL(maybe, base).toString();
@@ -74,7 +61,49 @@ export async function loadTypes(
     }
   }
 
-  // 统一抓取：返回最终 URL 和正文，并缓存正文到 finalUrl 键
+  function toVirtualPath(finalUrl: string): string {
+    let vp = urlToVirtualPath.get(finalUrl);
+    if (vp) return vp;
+
+    if (finalUrl.startsWith('data:')) {
+      const hash = simpleHash(finalUrl);
+      vp = `file:///types/_data/${hash}.d.ts`;
+      urlToVirtualPath.set(finalUrl, vp);
+      return vp;
+    }
+
+    const u = tryNewUrl(finalUrl, 'https://esm.sh/');
+    if (!u) {
+      const hash = simpleHash(finalUrl);
+      vp = `file:///types/_misc/${hash}.d.ts`;
+      urlToVirtualPath.set(finalUrl, vp);
+      return vp;
+    }
+
+    const safeSegments = u.pathname.split('/').map((seg) => encodeURIComponent(seg));
+    const safePath = safeSegments.join('/');
+    vp = `file:///types/${u.host}${safePath}`;
+    urlToVirtualPath.set(finalUrl, vp);
+    return vp;
+  }
+
+  function simpleHash(input: string): string {
+    let h = 0;
+    for (let i = 0; i < input.length; i++) {
+      h = (h << 5) - h + input.charCodeAt(i);
+      h |= 0;
+    }
+    return (h >>> 0).toString(36);
+  }
+
+  function tryNewUrl(input: string, base: string): URL | null {
+    try {
+      return new URL(input, base);
+    } catch {
+      return null;
+    }
+  }
+
   async function fetchWithFinalUrl(url: string): Promise<{ finalUrl: string; content: string }> {
     if (url.startsWith('data:')) {
       const content = decodeDataUrlToText(url);
@@ -82,12 +111,10 @@ export async function loadTypes(
       return { finalUrl: url, content };
     }
 
-    // 若已缓存（以 finalUrl 存），用当前键做一次直取（无法知道重定向），先尝试按 url 命中
     if (urlContentCache.has(url)) {
       return { finalUrl: url, content: urlContentCache.get(url)! };
     }
 
-    // HEAD 获取最终 URL，如果可用可避免重复 GET（有些 CDN 不支持 HEAD）
     try {
       const h = await fetcher(url, { method: 'HEAD' });
       if (h.ok) {
@@ -103,10 +130,9 @@ export async function loadTypes(
         return { finalUrl: finalUrl2, content: text };
       }
     } catch {
-      // ignore and fallback
+      // ignore
     }
 
-    // Fallback: 直接 GET
     const resp = await fetcher(url);
     if (!resp.ok) throw new Error(`GET ${url} failed: ${resp.status}`);
     const finalUrl = resp.url || url;
@@ -144,6 +170,7 @@ export async function loadTypes(
     const tsPaths = new Set<string>();
     const tsTypes = new Set<string>();
 
+    // import()/import from/require()
     const importExportRe =
       /\b(?:import|export)\b(?:[\s\w*{},]+from\s*)?\(\s*["']([^"']+)["']\s*\)|\b(?:import|export)\b[\s\w*{},]*from\s*["']([^"']+)["']|\brequire\(\s*["']([^"']+)["']\s*\)/g;
     let m: RegExpExecArray | null;
@@ -205,14 +232,6 @@ export async function loadTypes(
     return [...new Set(c)];
   }
 
-  function tryNewUrl(input: string, base: string): URL | null {
-    try {
-      return new URL(input, base);
-    } catch {
-      return null;
-    }
-  }
-
   async function resolveFirstExisting(spec: string, baseUrl: string): Promise<string | null> {
     const key = `${baseUrl}::${spec}`;
     if (resolvedModuleUrlCache.has(key)) return resolvedModuleUrlCache.get(key)!;
@@ -228,12 +247,15 @@ export async function loadTypes(
     return null;
   }
 
-  function registerOnce(finalUrl: string, content: string) {
+  function registerOnceVirtual(finalUrl: string, content: string, extraLibs: Record<string, ExtraLib>) {
     const virtualPath = toVirtualPath(finalUrl);
     if (virtualPathRegistered.has(virtualPath)) return;
     enqueueRegistration(() => {
       if (!virtualPathRegistered.has(virtualPath)) {
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(content, virtualPath);
+        extraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
+          content,
+          virtualPath
+        );
         if (createModels) {
           const uri = monaco.Uri.parse(virtualPath);
           const existing = monaco.editor.getModel(uri);
@@ -244,7 +266,47 @@ export async function loadTypes(
     });
   }
 
-  // 1) 获取入口 d.ts
+  function registerAtPath(virtualPath: string, content: string, extraLibs: Record<string, ExtraLib>) {
+    if (virtualPathRegistered.has(virtualPath)) return;
+    enqueueRegistration(() => {
+      if (!virtualPathRegistered.has(virtualPath)) {
+        extraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
+          content,
+          virtualPath
+        );
+        if (createModels) {
+          const uri = monaco.Uri.parse(virtualPath);
+          const existing = monaco.editor.getModel(uri);
+          if (!existing) monaco.editor.createModel(content, 'typescript', uri);
+        }
+        virtualPathRegistered.add(virtualPath);
+      }
+    });
+  }
+
+  function setCompilerOptionsMapping(pkgName: string, aliasEntry: string) {
+    const defaults = monaco.languages.typescript.typescriptDefaults;
+    const prev = defaults.getCompilerOptions?.() ?? {};
+    const nextPaths = { ...(prev.paths || {}) };
+
+    if (mapBareSpecifier) {
+      const rel = aliasEntry.replace('file:///', '');
+      nextPaths[pkgName] = [rel];
+    }
+
+    defaults.setCompilerOptions({
+      ...prev,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      module: monaco.languages.typescript.ModuleKind.ESNext,
+      target: monaco.languages.typescript.ScriptTarget.ES2020,
+      baseUrl: 'file:///',
+      paths: nextPaths,
+      allowJs: true,
+      checkJs: false,
+      strict: true
+    });
+  }
+
   const entryResp = await fetcher(`https://esm.sh/${encodeURIComponent(packageName)}`);
   if (!entryResp.ok)
     throw new Error(
@@ -256,11 +318,13 @@ export async function loadTypes(
   if (!typesHeader) throw new Error(`No X-Typescript-Types header for ${packageName}`);
   const typesEntryUrl = toAbsoluteUrl(typesHeader, baseForEntry);
 
-  // 2) 并发受限递归抓取
   const queue: string[] = [typesEntryUrl];
   let processed = 0;
 
-  async function worker() {
+  const aliasEntryPath = `file:///types/${packageName}/index.d.ts`;
+  let entryFinalUrl: string | null = null;
+
+  async function worker(extraLibs: Record<string, ExtraLib>) {
     while (queue.length > 0 && processed < maxFiles) {
       const url = queue.shift()!;
       if (visited.has(url)) continue;
@@ -270,7 +334,11 @@ export async function loadTypes(
         const { finalUrl, content } = await fetchWithFinalUrl(url);
         if (!visited.has(finalUrl)) visited.add(finalUrl);
 
-        registerOnce(finalUrl, content);
+        registerOnceVirtual(finalUrl, content, extraLibs);
+
+        if (!entryFinalUrl) {
+          entryFinalUrl = finalUrl;
+        }
 
         const { paths, tripleSlashPaths, tripleSlashTypes } = parseDtsDependencies(content);
 
@@ -298,11 +366,37 @@ export async function loadTypes(
     }
   }
 
-  const workers = Array.from({ length: concurrency }, () => worker());
+  const workers = Array.from({ length: concurrency }, () => worker(extraLibs));
   await Promise.all(workers);
+
+  if (entryFinalUrl) {
+    const realEntryVirtual = toVirtualPath(entryFinalUrl);
+
+    const aliasContent = `
+export * from "${realEntryVirtual}";
+export { default } from "${realEntryVirtual}";
+`.trim();
+
+    registerAtPath(aliasEntryPath, aliasContent, extraLibs);
+    setCompilerOptionsMapping(packageName, aliasEntryPath);
+
+    if (addModuleShim) {
+      const shimPath = `file:///types/${packageName}/shim.d.ts`;
+      const shim = `
+declare module "${packageName}" {
+  export * from "${aliasEntryPath}";
+  export { default } from "${aliasEntryPath}";
+}
+`.trim();
+      registerAtPath(shimPath, shim, extraLibs);
+    }
+  } else {
+    console.warn(`Entry content for ${packageName} was not captured; mapping may be incomplete.`);
+  }
+
+  return { project, libs: extraLibs };
 }
 
-/* -------------- data: URL 解码 -------------- */
 function decodeDataUrlToText(url: string): string {
   const m = url.match(/^data:([^,]*?),(.*)$/s);
   if (!m) throw new Error('Invalid data URL');

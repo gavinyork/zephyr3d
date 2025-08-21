@@ -21,6 +21,7 @@ import { ScriptingSystem } from '@zephyr3d/runtime';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
+import { loadTypes } from './build/loadtypes';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -168,6 +169,34 @@ export class Editor {
       this._assetImages.app[name] = new DRef(tex);
     }
   }
+  async loadDepTypes() {
+    if (await ProjectService.VFS.exists('/deps.lock.json')) {
+      const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+      const deps = JSON.parse(content) as {
+        dependencies: Record<string, { version: string; entry: string }>;
+      };
+      if (this._currentProject) {
+        for (const k of Object.keys(deps.dependencies)) {
+          const pkg = `${k}@${deps.dependencies[k].version}`;
+          console.log(`Loading DTS for package ${pkg}`);
+          try {
+            const libs = await loadTypes(this._currentProject.uuid, pkg, window.monaco);
+            if (libs.project === this._currentProject?.uuid) {
+              for (const k of Object.keys(libs.libs)) {
+                this._extraLibs[k] = libs.libs[k];
+              }
+            } else {
+              for (const k of Object.keys(libs.libs)) {
+                libs.libs[k]?.dispose();
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to load DTS for package ${pkg}`);
+          }
+        }
+      }
+    }
+  }
   registerModules() {
     const sceneController = new SceneController(this);
     this._moduleManager.register('Scene', sceneController);
@@ -248,6 +277,7 @@ export class Editor {
                   ProjectService.openProject(id).then((project) => {
                     this._currentProject = project;
                     this._scriptingSystem.registry.VFS = ProjectService.VFS;
+                    this.loadDepTypes();
                     this._moduleManager.activate('Scene', this._currentProject.lastEditScene ?? '');
                   });
                 }
@@ -322,6 +352,7 @@ export class Editor {
     if (id) {
       const project = await ProjectService.openProject(id);
       this._currentProject = project;
+      this.loadDepTypes();
       this._moduleManager.activate('Scene', project.lastEditScene ?? '');
     }
   }
