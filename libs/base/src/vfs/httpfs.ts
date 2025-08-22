@@ -1,11 +1,14 @@
-import type { FileMetadata, FileStat, ReadOptions, WriteOptions } from './vfs';
-import { VFS, VFSError } from './vfs';
+import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import { VFS, VFSError, GlobMatcher } from './vfs';
+import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './readers/reader';
+import { PathUtils } from './common';
 
 export interface HttpFSOptions {
   timeout?: number;
   headers?: Record<string, string>;
   credentials?: RequestCredentials;
   urlResolver?: (url: string) => string;
+  directoryReader?: HttpDirectoryReader | HttpDirectoryReader[];
 }
 
 /**
@@ -18,6 +21,7 @@ export class HttpFS extends VFS {
   private readonly baseOrigin: string;
   private readonly basePath: string;
   private readonly options: HttpFSOptions;
+  private readonly dirReaders: HttpDirectoryReader[];
 
   constructor(baseURL: string, options: HttpFSOptions = {}) {
     super(true); // Readonly
@@ -32,6 +36,11 @@ export class HttpFS extends VFS {
       timeout: 30000,
       ...options
     };
+    this.dirReaders = Array.isArray(options.directoryReader)
+      ? options.directoryReader
+      : options.directoryReader
+      ? [options.directoryReader]
+      : [];
   }
 
   get urlResolver(): (url: string) => string {
@@ -55,8 +64,75 @@ export class HttpFS extends VFS {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
-  protected async _readDirectory(path: string): Promise<FileMetadata[]> {
-    throw new VFSError('HTTP file system does not support reading directory', 'EROFS', path);
+  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+    const normalized = this.normalizePath(path);
+    const dirPath = normalized.endsWith('/') ? normalized : normalized + '/';
+
+    if (!this.dirReaders.length) {
+      throw new VFSError('No HttpDirectoryReader configured for HttpFS', 'ENOTSUP', dirPath);
+    }
+
+    const ctx: HttpDirectoryReaderContext = {
+      fetch: (url, init) => this.fetchWithTimeout(url, init),
+      toURL: (p) => this.toAbsoluteURL(p),
+      normalizePath: (p) => super.normalizePath(p), // 调用父类 normalize，保留 urlResolver 规则
+      joinPath: (...parts) => PathUtils.join(...parts),
+      guessMimeType: (name) => this.guessMIMEType(name)
+    };
+
+    // 选择 reader
+    const reader = await this.selectReader(dirPath, ctx);
+
+    // 读取一层
+    let layer = await reader.readOnce(dirPath, ctx);
+
+    // 统一过滤 includeHidden
+    const includeHidden = options?.includeHidden ?? false;
+    layer = layer.filter((e) => includeHidden || !e.name.startsWith('.'));
+
+    // 统一 pattern 过滤
+    if (options?.pattern) {
+      const pattern = options.pattern!;
+      if (typeof pattern === 'string') {
+        const matcher = new GlobMatcher(pattern, true);
+        layer = layer.filter((e) => matcher.test(e.name) || matcher.test(e.path));
+      } else {
+        layer = layer.filter((e) => pattern.test(e.name) || pattern.test(e.path));
+      }
+    }
+
+    if (!options?.recursive) return layer;
+
+    // 递归收集
+    const out: FileMetadata[] = [...layer];
+    for (const e of layer) {
+      if (e.type === 'directory') {
+        try {
+          const sub = await this._readDirectory(e.path, options);
+          out.push(...sub);
+        } catch (err) {
+          // 忽略或记录
+        }
+      }
+    }
+    return out;
+  }
+
+  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
+    // 若只配置一个，直接用
+    if (this.dirReaders.length === 1) return this.dirReaders[0];
+
+    // 多个 reader：按 canHandle 动态选择
+    for (const r of this.dirReaders) {
+      if (!r.canHandle) continue;
+      try {
+        if (await r.canHandle(dirPath, ctx)) return r;
+      } catch {
+        /* 忽略 */
+      }
+    }
+    // 若都没有 canHandle 或都未通过，取第一个作为默认
+    return this.dirReaders[0];
   }
 
   protected async _deleteDirectory(path: string): Promise<void> {
@@ -169,6 +245,14 @@ export class HttpFS extends VFS {
   protected async _move(): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }
+  private toAbsoluteURL(url: string): string {
+    url =
+      this.isObjectURL(url) || this.parseDataURI(url)
+        ? url
+        : new URL(this.join(this.basePath, url), this.baseOrigin).href;
+    return url;
+  }
+
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);

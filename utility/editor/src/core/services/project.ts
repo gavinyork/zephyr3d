@@ -1,4 +1,4 @@
-import { IndexedDBFS } from '@zephyr3d/base';
+import { HttpDirectoryReader, HttpFS, IndexedDBFS, VFS } from '@zephyr3d/base';
 import { SerializationManager } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
 
@@ -25,7 +25,7 @@ export class ProjectService {
   private static _currentProject = '';
   private static _serializationManager: SerializationManager = null;
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
-  private static _vfs: IndexedDBFS = null;
+  private static _vfs: VFS = null;
 
   static get VFS() {
     return this._vfs;
@@ -96,7 +96,6 @@ export class ProjectService {
     if (this._currentProject) {
       throw new Error('Current project must be closed before opening another project');
     }
-    await this.closeCurrentProject();
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
 
@@ -104,6 +103,18 @@ export class ProjectService {
     this._serializationManager = new SerializationManager(this._vfs);
     console.log(`Project opened: ${uuid}`);
     return info;
+  }
+  static async openRemoteProject(url: string, directoryReader: HttpDirectoryReader): Promise<ProjectInfo> {
+    if (this._currentProject) {
+      throw new Error('Current project must be closed before opening another project');
+    }
+    this._vfs = new HttpFS(url, { directoryReader });
+    this._serializationManager = new SerializationManager(this._vfs);
+    console.log(`Remote project opened: ${url}`);
+    return {
+      name: url,
+      uuid: url
+    };
   }
   static async deleteProject(uuid: string): Promise<void> {
     if (this._currentProject === uuid) {

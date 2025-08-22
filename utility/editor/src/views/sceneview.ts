@@ -38,7 +38,7 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { GenericConstructor, AABB } from '@zephyr3d/base';
-import { DRef } from '@zephyr3d/base';
+import { DRef, HttpFS } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';
@@ -640,6 +640,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     const projectId = this.controller.editor.currentProject.uuid;
     const url = new URL(window.location.href);
     url.searchParams.append('project', projectId);
+    url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
     window.open(url.href, '_blank');
   }
   renderDropZone(x: number, y: number, w: number, h: number) {

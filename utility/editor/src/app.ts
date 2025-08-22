@@ -6,11 +6,18 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 import { ProjectService } from './core/services/project';
+import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 
 const deviceType = new URL(window.location.href).searchParams.get('device');
-const project = new URL(window.location.href).searchParams.get('project');
+const searchParams = new URL(window.location.href).searchParams;
+const project = searchParams.get('project');
 if (project) {
-  await ProjectService.openProject(project);
+  const remote = !!Number(searchParams.get('remote'));
+  if (remote) {
+    await ProjectService.openRemoteProject(project, new GenericHtmlDirectoryReader());
+  } else {
+    await ProjectService.openProject(project);
+  }
 }
 
 let backend =

@@ -331,31 +331,33 @@ export class VFSRenderer extends Observable<{
         ImGui.SetTooltip('Already at root directory');
       }
     }
-    ImGui.SameLine();
-    if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
-      DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
-        if (val) {
-          const dlgMessageBoxEx = new DlgMessageBoxEx(
-            'Install package',
-            '',
-            ['Installing...'],
-            400,
-            0,
-            false
-          );
-          dlgMessageBoxEx.showModal();
-          installDeps(
-            ProjectService.currentProject,
-            this.VFS,
-            '/',
-            [val],
-            (msg) => (dlgMessageBoxEx.text = msg)
-          ).then(() => {
-            console.log('Dependencies installed');
-            dlgMessageBoxEx.buttons[0] = 'Ok';
-          });
-        }
-      });
+    if (!this._vfs.readOnly) {
+      ImGui.SameLine();
+      if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
+        DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
+          if (val) {
+            const dlgMessageBoxEx = new DlgMessageBoxEx(
+              'Install package',
+              '',
+              ['Installing...'],
+              400,
+              0,
+              false
+            );
+            dlgMessageBoxEx.showModal();
+            installDeps(
+              ProjectService.currentProject,
+              this.VFS,
+              '/',
+              [val],
+              (msg) => (dlgMessageBoxEx.text = msg)
+            ).then(() => {
+              console.log('Dependencies installed');
+              dlgMessageBoxEx.buttons[0] = 'Ok';
+            });
+          }
+        });
+      }
     }
     ImGui.SameLine();
     ImGui.Separator();
@@ -490,7 +492,7 @@ export class VFSRenderer extends Observable<{
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-    if (isDir) {
+    if (isDir && !this._vfs.readOnly) {
       this.acceptFileMoveOrCopy(item.path);
     }
     if (this._selectedItems.size > 0) {
@@ -753,18 +755,20 @@ export class VFSRenderer extends Observable<{
     }
 
     if (ImGui.BeginPopup('##ContentContextMenu')) {
-      if (ImGui.BeginMenu('Create New')) {
-        if (ImGui.MenuItem('Folder...')) {
-          this.createNewFolder();
+      if (!this._vfs.readOnly) {
+        if (ImGui.BeginMenu('Create New')) {
+          if (ImGui.MenuItem('Folder...')) {
+            this.createNewFolder();
+          }
+          ImGui.Separator();
+          if (ImGui.MenuItem('Typescript...')) {
+            this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
+          }
+          ImGui.EndMenu();
         }
-        ImGui.Separator();
-        if (ImGui.MenuItem('Typescript...')) {
-          this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
-        }
-        ImGui.EndMenu();
-      }
 
-      ImGui.Separator();
+        ImGui.Separator();
+      }
 
       if (ImGui.BeginMenu('View')) {
         if (ImGui.RadioButton('List View', this._viewMode === ViewMode.List)) {
@@ -1135,59 +1139,61 @@ export class VFSRenderer extends Observable<{
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       this.selectDir(dir);
     }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
-      ImGui.OpenPopup(`vfs_${id}`);
-    }
-    if (ImGui.BeginPopup(`vfs_${id}`)) {
-      if (ImGui.BeginMenu('Create New##VFSCreate')) {
-        if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
-          DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
-            if (name) {
-              if (/[\\/?*]/.test(name)) {
-                DlgMessage.messageBox('Error', 'Invalid folder name');
-              } else {
-                this._vfs
-                  .readDirectory(dir.path, { includeHidden: true, recursive: false })
-                  .then((items) => {
-                    if (items.find((item) => item.type === 'directory' && item.name === name)) {
-                      DlgMessage.messageBox('Error', 'A folder with same name already exists');
-                    } else {
-                      this._vfs.makeDirectory(this._vfs.join(dir.path, name), false).catch((err) => {
-                        DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
-                      });
-                    }
-                  })
-                  .catch((err) => {
-                    DlgMessage.messageBox('Error', `Read parent path failed: ${err}`);
-                  });
-              }
-            }
-          });
-        }
-        ImGui.Separator();
-        if (ImGui.MenuItem('Scene...##VFSCreateScene')) {
-          console.log('Create scene');
-        }
-        ImGui.EndMenu();
+    if (!this._vfs.readOnly) {
+      if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
+        ImGui.OpenPopup(`vfs_${id}`);
       }
-      if (dir !== this._filesystem) {
-        if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
-          this._vfs
-            .deleteDirectory(dir.path, true)
-            .then(() => {
-              if (dir === this._selectedDir) {
-                this.selectDir(null);
+      if (ImGui.BeginPopup(`vfs_${id}`)) {
+        if (ImGui.BeginMenu('Create New##VFSCreate')) {
+          if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
+            DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
+              if (name) {
+                if (/[\\/?*]/.test(name)) {
+                  DlgMessage.messageBox('Error', 'Invalid folder name');
+                } else {
+                  this._vfs
+                    .readDirectory(dir.path, { includeHidden: true, recursive: false })
+                    .then((items) => {
+                      if (items.find((item) => item.type === 'directory' && item.name === name)) {
+                        DlgMessage.messageBox('Error', 'A folder with same name already exists');
+                      } else {
+                        this._vfs.makeDirectory(this._vfs.join(dir.path, name), false).catch((err) => {
+                          DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
+                        });
+                      }
+                    })
+                    .catch((err) => {
+                      DlgMessage.messageBox('Error', `Read parent path failed: ${err}`);
+                    });
+                }
               }
-            })
-            .catch((err) => {
-              DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
             });
+          }
+          ImGui.Separator();
+          if (ImGui.MenuItem('Scene...##VFSCreateScene')) {
+            console.log('Create scene');
+          }
+          ImGui.EndMenu();
         }
-        if (ImGui.MenuItem('Rename##VFSRenameFolder')) {
-          this.renameItem(dir);
+        if (dir !== this._filesystem) {
+          if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
+            this._vfs
+              .deleteDirectory(dir.path, true)
+              .then(() => {
+                if (dir === this._selectedDir) {
+                  this.selectDir(null);
+                }
+              })
+              .catch((err) => {
+                DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
+              });
+          }
+          if (ImGui.MenuItem('Rename##VFSRenameFolder')) {
+            this.renameItem(dir);
+          }
         }
+        ImGui.EndPopup();
       }
-      ImGui.EndPopup();
     }
     if (dir.open) {
       for (const subdir of dir.subDir) {
@@ -1247,7 +1253,7 @@ export class VFSRenderer extends Observable<{
     }
 
     const stats = await this._vfs.stat(path);
-    if (!stats || !stats.isDirectory) {
+    if (!stats) {
       return null;
     }
 
@@ -1291,7 +1297,7 @@ export class VFSRenderer extends Observable<{
       new ImGui.ImVec2(ev.offsetX, ev.offsetY),
       ev.type !== 'dragleave' && ev.type !== 'drop'
     );
-    if (info.targetDirectory && ev.type === 'drop') {
+    if (info.targetDirectory && ev.type === 'drop' && !this._vfs.readOnly) {
       const data = ev.dataTransfer;
       const testVFS = new DataTransferVFS(data);
       const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);

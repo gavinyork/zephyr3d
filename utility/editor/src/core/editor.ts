@@ -13,7 +13,7 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import { DRef, HttpFS } from '@zephyr3d/base';
+import { DRef, GenericHtmlDirectoryReader, HttpFS } from '@zephyr3d/base';
 import type { ProjectInfo } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -256,7 +256,7 @@ export class Editor {
       ImGui.PushStyleColor(ImGui.Col.HeaderHovered, new ImGui.Vec4(0, 0, 0, 0)); // 透明悬停
       ImGui.PushStyleColor(ImGui.Col.HeaderActive, new ImGui.Vec4(0, 0, 0, 0)); // 透明激活
       ImGui.PushStyleColor(ImGui.Col.Header, new ImGui.Vec4(0, 0, 0, 0));
-      const links = ['Create Project...', 'Open Project...'];
+      const links = ['Create Project...', 'Open Project...', 'Open Remote Project...'];
       ImGui.PushID('WelcomeLink');
       for (let i = 0; i < links.length; i++) {
         ImGui.PushID(i);
@@ -283,6 +283,18 @@ export class Editor {
                   });
                 }
               });
+            });
+          }
+          if (i === 2) {
+            Dialog.promptName('Open Remote Project', 'Project URL', '', 400).then((url) => {
+              if (url) {
+                ProjectService.openRemoteProject(url, new GenericHtmlDirectoryReader()).then((project) => {
+                  this._currentProject = project;
+                  this._scriptingSystem.registry.VFS = ProjectService.VFS;
+                  this.loadDepTypes();
+                  this._moduleManager.activate('Scene', '');
+                });
+              }
             });
           }
         }

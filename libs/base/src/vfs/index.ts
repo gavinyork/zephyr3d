@@ -5,3 +5,6 @@ export * from './idbfs';
 export * from './memfs';
 export * from './zipfs';
 export * from './datatransferfs';
+export * from './readers/reader';
+export * from './readers/generic_html_index_reader';
+export * from './readers/python_httpserver_reader';
