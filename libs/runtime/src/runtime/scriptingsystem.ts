@@ -87,6 +87,8 @@ export class ScriptingSystem {
       }
       return attached.instance;
     } catch (e) {
+      const moduleName = module ? String(module).slice(0, 64) : '';
+      console.error(`Load module '${moduleName}' failed: ${e}`);
       this._onLoadError?.(e, module);
       return null;
     }

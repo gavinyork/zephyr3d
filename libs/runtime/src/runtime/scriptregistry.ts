@@ -198,95 +198,41 @@ export class ScriptRegistry {
   protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
     await init;
     const [imports] = parse(code);
-
-    // 保证按起点排序，避免错位
     const list = [...imports].sort((a, b) => (a.s || 0) - (b.s || 0));
-
     let out = '';
     let last = 0;
 
     for (const im of list) {
-      // 必须有字符串字面量边界（有引号）
-      if (!im.ss || !im.se || im.se <= im.ss) {
+      // must have quotes
+      const hasQuote = im.ss != null && im.se != null;
+      if (!hasQuote || im.se <= im.ss) {
         continue;
       }
-      // 必须有内容区间
+      // must have contents
       if (im.e <= im.s) {
         continue;
       }
-
-      // 追加 [last, s)：这段包含壳和开引号之前的所有代码
+      // append [last, s)
       out += code.slice(last, im.s);
 
-      const spec = code.slice(im.s, im.e); // 原始 spec（无引号）
-
+      const spec = code.slice(im.s, im.e); // original spec
       let replacement = spec;
-
       if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
         if (spec.startsWith('@zephyr3d/')) {
           replacement = spec;
         } else {
           const depId = await this.resolveLogicalId(spec);
-          replacement = await this.build(depId); // 尝试构建为依赖项
+          replacement = await this.build(depId); // try build as dependence
         }
       } else {
         const depId = await this.resolveLogicalId(spec, String(fromId));
-        replacement = await this.build(depId); // 递归构建为 data URL
+        replacement = await this.build(depId); // recursively build as dataURL
       }
-
-      // 仅替换引号内部内容，不动引号本身
-      //const replacedInner = depsPathOf(childAbs, name, version);
       out += replacement; // 不加引号
-
-      // 将 last 设为 e（引号内内容的结束位置）
       last = im.e;
     }
-
-    // 追加尾部原文（包括最后一个引号、分号等）
     out += code.slice(last);
     return out;
-    /*
-    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
-    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
-
-    const replaceAsync = async (input: string, re: RegExp) => {
-      let out = '';
-      let last = 0;
-      for (;;) {
-        const m = re.exec(input);
-        if (!m) {
-          break;
-        }
-        out += input.slice(last, m.index);
-
-        const quote = m[1];
-        const spec = m[2];
-        let replacement = spec;
-
-        if (isAbsoluteUrl(spec) || isSpecialUrl(spec) || isBareModule(spec)) {
-          if (spec.startsWith('@zephyr3d/')) {
-            replacement = spec;
-          } else {
-            const depId = await this.resolveLogicalId(spec);
-            replacement = await this.build(depId); // 尝试构建为依赖项
-          }
-        } else {
-          const depId = await this.resolveLogicalId(spec, String(fromId));
-          replacement = await this.build(depId); // 递归构建为 data URL
-        }
-
-        const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
-        out += replaced;
-        last = m.index + m[0].length;
-      }
-      out += input.slice(last);
-      return out;
-    };
-
-    let out = await replaceAsync(code, reStatic);
-    out = await replaceAsync(out, reDynamic);
-    return out;
-    */
   }
 
   async resolveLogicalId(spec: string, fromId?: string): Promise<string> {

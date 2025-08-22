@@ -9,8 +9,6 @@ async function sha256Base64(text: string): Promise<string> {
   return 'sha256-' + btoa(b);
 }
 
-/* -------------------- Lockfile Types -------------------- */
-
 export type LockEntry = {
   version: string;
   entry: string; // /deps/name@version/mod.js
@@ -22,8 +20,6 @@ export type LockFile = {
   registry: 'esm.sh' | 'jspm.io';
   dependencies: Record<string, LockEntry>;
 };
-
-/* -------------------- Lockfile IO -------------------- */
 
 export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile | null> {
   const p = vfs.join(projectRoot, 'deps.lock.json');
@@ -45,14 +41,9 @@ export async function writeLock(vfs: VFS, projectRoot: string, lock: LockFile): 
   await vfs.writeFile(p, pretty, { encoding: 'utf8', create: true });
 }
 
-/* -------------------- Registry Resolve (esm.sh) -------------------- */
-
 export type ResolvedPkg = { name: string; version: string; entryUrl: string };
 
-/**
- * 轻量级 semver 工具：解析简单范围并返回满足的最高版本
- * 仅支持常见范围：^ ~ x * >= <= > < = 精确
- */
+// semver helper (^ ~ x * >= <= > < =)
 function cmp(a: string, b: string): number {
   const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
   const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
@@ -74,21 +65,16 @@ function maxSatisfying(
   if (!versions.length) {
     return latest ?? null;
   }
-  // 规范化、排序
   const vs = versions.filter((v) => /^\d+\.\d+\.\d+/.test(v)).sort((a, b) => cmp(a, b));
-
   if (!range || range === 'latest') {
     return vs.at(-1) ?? latest ?? null;
   }
 
   range = range.trim();
-
-  // 星号或x
   if (range === '*' || /x/i.test(range)) {
     return vs.at(-1) ?? null;
   }
 
-  // 精确
   if (/^\d+\.\d+\.\d+(-.*)?$/.test(range)) {
     return vs.includes(range) ? range : null;
   }
@@ -104,7 +90,7 @@ function maxSatisfying(
     return candidates.at(-1) ?? null;
   }
 
-  // ~major.minor.patch 或 ~major.minor
+  // ~major.minor.patch or ~major.minor
   const mTilde = range.match(/^~(\d+)\.(\d+)(?:\.(\d+))?/);
   if (mTilde) {
     const M = parseInt(mTilde[1], 10);
@@ -116,7 +102,7 @@ function maxSatisfying(
     return candidates.at(-1) ?? null;
   }
 
-  // 关系运算符：>= <= > < =
+  // >= <= > < =
   const mRel = range.match(/^(>=|<=|>|<|=)\s*(\d+\.\d+\.\d+)/);
   if (mRel) {
     const op = mRel[1];
@@ -143,13 +129,9 @@ function maxSatisfying(
     return candidates.at(-1) ?? null;
   }
 
-  // 未识别，回退 latest
   return vs.at(-1) ?? latest ?? null;
 }
 
-/**
- * 从 esm.sh 获取 package.json（已转发 npm registry 的精简信息）
- */
 async function fetchPackageJson(name: string): Promise<any | null> {
   try {
     const url = `https://esm.sh/${name}/package.json`;
@@ -164,10 +146,6 @@ async function fetchPackageJson(name: string): Promise<any | null> {
   }
 }
 
-/**
- * 解析包规范，优先尝试从 res.url 直接得到 version；
- * 若未包含具体版本，则读取 package.json 并用 semver 解析范围以确定具体版本。
- */
 export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
   const m = pkgSpec.match(/^(@?[^@]+)(?:@(.+))?$/);
   if (!m) {
@@ -176,30 +154,27 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
   const [, name, rangeRaw] = m;
   const range = rangeRaw?.trim();
 
-  // 第一次探测
   const probe = `https://esm.sh/${name}${range ? '@' + encodeURIComponent(range) : ''}`;
   const res = await fetch(probe, { redirect: 'follow' });
   if (!res.ok) {
     throw new Error(`Failed resolving ${pkgSpec}: ${res.status}`);
   }
 
-  // 解析最终 URL 的 pathname，先 decode
   const u = new URL(res.url);
   const decodedPath = decodeURIComponent(u.pathname).replace(/^\/v\d+\//, '/');
   const direct = decodedPath.match(/\/(@?[^/@]+)@(\d+\.\d+\.\d+(?:[-+][^\/]+)?)(?:\/|$)/);
 
   if (direct) {
-    // 直接得到了具体版本
     const version = direct[2];
     u.search = '';
     u.hash = '';
     return { name, version, entryUrl: u.toString() };
   }
 
-  // 未包含具体版本——读取 package.json
+  // No version found, query version from package.json
   const pkg = await fetchPackageJson(name);
   if (!pkg) {
-    // 最后兜底：无 package.json，只能使用“latest”作为版本名（不推荐，但避免中断）
+    // No package.json, use latest
     const version = 'latest';
     const entryUrl = `https://esm.sh/${name}@${version}`;
     return { name, version, entryUrl };
@@ -215,7 +190,7 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
 
   const resolved = maxSatisfying(versions, range, latest);
   if (!resolved) {
-    // 仍解析不到，使用 latest 或报错
+    // Not resolved
     if (latest) {
       return { name, version: latest, entryUrl: `https://esm.sh/${name}@${latest}` };
     }
@@ -226,44 +201,30 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
   return { name, version: resolved, entryUrl };
 }
 
-/* -------------------- Path mapping -------------------- */
-
 export function depsPathOf(cdnUrl: string, name: string, version: string): string {
   const u = new URL(cdnUrl);
-  // 1) 去掉 /vNNN/ 与多余的前缀（保留包层之后的子路径）
+  // Remove prefix
   const p = u.pathname.replace(/^\/v\d+\//, '/'); // /v133/... → /...
-  // 2) 找到 name@version 的锚点，并剥离其前缀
+  // Find anchor: name@version
   const anchor = `${name}@${version}`;
   const idx = p.indexOf(anchor);
   let sub = '';
   if (idx >= 0) {
     sub = p.slice(idx + anchor.length); // 例如 "", "/es2022/three.mjs", "/examples/jsm/..."
   } else {
-    // 某些边缘路径不含显式 name@version（少见），退化处理：以根为全部子路径
     sub = p;
   }
-
-  // 3) 去掉常见的构建层前缀（esm.sh 可能注入的目录），仅保留包内相对路径
-  // 例如 "/es2022/three.mjs" → "/three.mjs"
   sub = sub.replace(/^\/(es\d+|stable|dev|node|browser)\//, '/');
-
-  // 4) 标准化：确保以 "/" 开头
   if (!sub.startsWith('/')) {
     sub = '/' + sub;
   }
-
-  // 5) 若没有文件名（目录）则补 mod.js
   const last = sub.split('/').pop()!;
   const isDirLike = sub.endsWith('/') || !last.includes('.');
   if (isDirLike) {
     sub = (sub.endsWith('/') ? sub : sub + '/') + 'mod.js';
   }
-
-  // 6) 去掉 query/hash（本地键稳定），注意：抓取请求时仍用原始 URL
   return `/deps/${name}@${version}${sub}`;
 }
-
-/* -------------------- Install (crawl + rewrite) -------------------- */
 
 export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, version: string) {
   await init;
@@ -287,31 +248,24 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
       throw new Error(`Fetch failed: ${url} (${res.status})`);
     }
     const code = await res.text();
-
     const [imports] = parse(code);
-
-    // 保证按起点排序，避免错位
     const list = [...imports].sort((a, b) => (a.s || 0) - (b.s || 0));
-
     let out = '';
     let last = 0;
 
     for (const im of list) {
-      // 必须有字符串字面量边界（有引号）
-      if (!im.ss || !im.se || im.se <= im.ss) {
+      // Must have quotes
+      const hasQuote = im.ss != null && im.se != null;
+      if (!hasQuote || im.se <= im.ss) {
         continue;
       }
-      // 必须有内容区间
+      // Must have contents
       if (im.e <= im.s) {
         continue;
       }
-
-      // 追加 [last, s)：这段包含壳和开引号之前的所有代码
+      // append [last, s)
       out += code.slice(last, im.s);
-
-      const specRaw = code.slice(im.s, im.e); // 原始 spec（无引号）
-
-      // 解析为绝对 URL
+      const specRaw = code.slice(im.s, im.e); // original spec
       let childAbs: string;
       let replaced: string;
       if (specRaw.startsWith('http')) {
@@ -328,17 +282,11 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
       }
 
       queue.push(childAbs);
-
-      // 仅替换引号内部内容，不动引号本身
-      //const replacedInner = depsPathOf(childAbs, name, version);
       out += replaced; // 不加引号
-
-      // 将 last 设为 e（引号内内容的结束位置）
       last = im.e;
     }
-
-    // 追加尾部原文（包括最后一个引号、分号等）
     out += code.slice(last);
+
     const dir = vfs.dirname(localPath);
     if (!(await vfs.exists(dir))) {
       await vfs.makeDirectory(dir, true);
