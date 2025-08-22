@@ -69,7 +69,6 @@ export class CodeEditor {
 
       this.updateTitle();
 
-      // 修改最小化按钮为恢复按钮
       const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
       if (minimizeBtn) {
         minimizeBtn.innerHTML = '□';
@@ -86,14 +85,12 @@ export class CodeEditor {
 
       this.updateTitle();
 
-      // 恢复最小化按钮
       const minimizeBtn = overlay.querySelector('.minimize-btn') as HTMLButtonElement;
       if (minimizeBtn) {
         minimizeBtn.innerHTML = '−';
         minimizeBtn.title = 'Minimize';
       }
 
-      // 恢复后重新布局编辑器
       setTimeout(() => {
         if (this.editor) {
           this.editor.layout();
@@ -169,7 +166,7 @@ export class CodeEditor {
             position: fixed;
             top: 0;
             right: 0;
-            width: 60vw; /* 增加默认宽度 */
+            width: 60vw;
             height: 100vh;
             background-color: #1e1e1e;
             border-left: 2px solid #333;
@@ -201,7 +198,7 @@ export class CodeEditor {
             padding: 0 15px;
             color: #cccccc;
             font-size: 14px;
-            flex-shrink: 0; /* 防止头部被压缩 */
+            flex-shrink: 0;
             box-sizing: border-box;
         }
 
@@ -222,7 +219,6 @@ export class CodeEditor {
             display: none;
         }
 
-        /* Monaco编辑器容器 */
         #monaco-editor-container {
             flex: 1;
             width: 100%;
@@ -230,7 +226,6 @@ export class CodeEditor {
             position: relative;
         }
 
-        /* 状态栏样式 */
         .editor-status-bar {
             height: 24px;
             background-color: #007acc;
@@ -245,7 +240,6 @@ export class CodeEditor {
             border-top: 1px solid #005a9e;
         }
 
-        /* 标题样式 */
         .editor-title {
             transition: color 0.2s ease;
             user-select: none;
@@ -255,7 +249,6 @@ export class CodeEditor {
             color: #007acc;
         }
 
-        /* 按钮容器样式 */
         .button-container {
             display: flex;
             flex-direction: row;
@@ -296,9 +289,9 @@ export class CodeEditor {
         }
 
         .resizable-editor {
-            resize: none; /* 禁用默认resize，使用自定义 */
-            overflow: hidden; /* 修复: 改为hidden */
-            min-width: 400px; /* 增加最小宽度 */
+            resize: none;
+            overflow: hidden;
+            min-width: 400px;
             max-width: 80vw;
         }
 
@@ -320,12 +313,10 @@ export class CodeEditor {
             opacity: 0.6;
         }
 
-        /* 最小化状态下隐藏调整手柄 */
         .monaco-editor-overlay.minimized .resize-handle {
             display: none;
         }
 
-        /* 确保Monaco编辑器正确渲染 */
         .monaco-editor {
             width: 100% !important;
             height: 100% !important;
@@ -335,7 +326,6 @@ export class CodeEditor {
             background-color: #1e1e1e !important;
         }
 
-        /* 滚动条样式优化 */
         .monaco-scrollable-element > .scrollbar > .slider {
             background: rgba(121, 121, 121, 0.4) !important;
         }
@@ -344,7 +334,6 @@ export class CodeEditor {
             background: rgba(121, 121, 121, 0.7) !important;
         }
 
-        /* 响应式设计 */
         @media (max-width: 1200px) {
             .monaco-editor-overlay {
                 width: 70vw;
@@ -368,11 +357,9 @@ export class CodeEditor {
     overlay.className = 'monaco-editor-overlay resizable-editor';
     overlay.id = 'monaco-overlay';
 
-    // 添加拖拽调整大小的手柄
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
 
-    // 实现拖拽调整大小
     let isResizing = false;
     let startX = 0;
     let startWidth = 0;
@@ -394,7 +381,7 @@ export class CodeEditor {
         return;
       }
 
-      const deltaX = startX - e.clientX; // 注意：向左拖动应该增加宽度
+      const deltaX = startX - e.clientX;
       const newWidth = startWidth + deltaX;
       const minWidth = 400;
       const maxWidth = window.innerWidth * 0.9;
@@ -402,7 +389,6 @@ export class CodeEditor {
       const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
       overlay.style.width = constrainedWidth + 'px';
 
-      // 强制Monaco编辑器重新布局
       if (this.editor) {
         setTimeout(() => this.editor.layout(), 0);
       }
@@ -419,59 +405,48 @@ export class CodeEditor {
     const header = document.createElement('div');
     header.className = 'editor-header';
 
-    // 创建标题
     const titleSpan = document.createElement('span');
     titleSpan.className = 'editor-title';
 
-    // 双击标题栏恢复
     titleSpan.addEventListener('dblclick', () => {
       if (this.isMinimized) {
         this.restore();
       }
     });
 
-    // 点击标题栏恢复（当最小化时）
     titleSpan.addEventListener('click', () => {
       if (this.isMinimized) {
         this.restore();
       }
     });
 
-    // 创建按钮容器
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'button-container';
 
-    // 创建最小化/恢复按钮
     const minimizeBtn = document.createElement('button');
     minimizeBtn.className = 'close-btn minimize-btn';
     minimizeBtn.innerHTML = '−';
     minimizeBtn.title = 'Minimize';
     minimizeBtn.onclick = () => this.toggleMinimize();
 
-    // 创建关闭按钮
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-btn close-btn-red';
     closeBtn.innerHTML = '&times;';
     closeBtn.title = 'Close';
     closeBtn.onclick = () => this.close();
 
-    // 组装按钮
     buttonContainer.appendChild(minimizeBtn);
     buttonContainer.appendChild(closeBtn);
 
-    // 组装头部
     header.appendChild(titleSpan);
     header.appendChild(buttonContainer);
 
-    // 创建内容区域
     const content = document.createElement('div');
     content.className = 'editor-content';
 
-    // 创建编辑器容器
     const editorContainer = document.createElement('div');
     editorContainer.id = 'monaco-editor-container';
 
-    // 创建状态栏
     const statusBar = document.createElement('div');
     statusBar.className = 'editor-status-bar';
     statusBar.innerHTML = `
@@ -479,11 +454,9 @@ export class CodeEditor {
       <span>${this.fileName} | UTF-8</span>
     `;
 
-    // 组装内容区域
     content.appendChild(editorContainer);
     content.appendChild(statusBar);
 
-    // 组装整个overlay
     overlay.appendChild(resizeHandle);
     overlay.appendChild(header);
     overlay.appendChild(content);
@@ -567,14 +540,14 @@ export class CodeEditor {
         }
       });
       this.editor.focus();
-      // 强制重新计算布局
+      // Force calculating layout
       setTimeout(() => {
         if (this.editor) {
           this.editor.layout();
         }
       }, 100);
 
-      // 监听窗口大小变化
+      // Calculate layout when window size changed
       window.addEventListener('resize', () => {
         if (this.editor) {
           this.editor.layout();
@@ -583,7 +556,6 @@ export class CodeEditor {
 
       this.setupEditorFeatures();
       this.dirty = false;
-      //const model = this.editor.getModel();
       this.baselineVersion = model.getAlternativeVersionId();
       model.onDidChangeContent(() => {
         const dirty = model.getAlternativeVersionId() !== this.baselineVersion;
@@ -593,9 +565,9 @@ export class CodeEditor {
         }
       });
       this.updateTitle();
-      console.log('✅ Monaco编辑器初始化完成');
+      console.log('Code editor initialized');
     } catch (error) {
-      console.error('❌ Monaco编辑器初始化失败:', error);
+      console.error('Code editor initialize failed:', error);
     }
   }
 
@@ -604,31 +576,13 @@ export class CodeEditor {
       return;
     }
 
-    // 自定义快捷键
+    // Ctrl+S shortcut for saving file
     this.editor.addCommand(
       (window as any).monaco.KeyMod.CtrlCmd | (window as any).monaco.KeyCode.KeyS,
       () => {
         this.saveCode();
       }
     );
-
-    // 监听光标位置变化
-    this.editor.onDidChangeCursorPosition(() => {
-      this.updateStatusBar();
-    });
-
-    // 监听选择变化
-    this.editor.onDidChangeCursorSelection(() => {
-      this.updateStatusBar();
-    });
-
-    // 监听内容变化
-    this.editor.onDidChangeModelContent(() => {
-      // 自动保存到本地存储
-      const code = this.editor.getValue();
-      localStorage.setItem('monaco-editor-content', code);
-      this.updateStatusBar();
-    });
 
     const monaco = (window as any).monaco as typeof Monaco;
     monaco.languages.registerCompletionItemProvider('javascript', {
@@ -647,7 +601,7 @@ export class CodeEditor {
             kind: (window as any).monaco.languages.CompletionItemKind.Snippet,
             insertText: 'console.log(${1:message});',
             insertTextRules: (window as any).monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: '快速插入console.log',
+            documentation: 'Insert console.log',
             range: range
           },
           {
@@ -656,7 +610,7 @@ export class CodeEditor {
             insertText:
               'function ${1:functionName}(${2:params}) {\n\t${3:// 函数体}\n\treturn ${4:result};\n}',
             insertTextRules: (window as any).monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            documentation: '创建函数模板',
+            documentation: 'Create function template',
             range: range
           }
         ];
@@ -665,7 +619,6 @@ export class CodeEditor {
       }
     });
 
-    // 初始状态栏
     setTimeout(() => this.updateStatusBar(), 100);
   }
 
@@ -675,7 +628,7 @@ export class CodeEditor {
       return;
     }
 
-    let statusText = '准备就绪';
+    let statusText = 'Ready';
     let languageInfo = 'JavaScript | UTF-8';
 
     if (this.editor) {

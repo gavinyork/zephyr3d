@@ -193,7 +193,7 @@ export class MemoryFS extends VFS {
           bytes[i] = binaryString.charCodeAt(i);
         }
         fileData = bytes.buffer;
-      } catch (_error) {
+      } catch {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
       }
     } else if (options?.encoding === 'utf8') {

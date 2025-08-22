@@ -80,17 +80,17 @@ export class HttpFS extends VFS {
       guessMimeType: (name) => this.guessMIMEType(name)
     };
 
-    // 选择 reader
     const reader = await this.selectReader(dirPath, ctx);
+    if (!reader) {
+      console.warn('No directory reader can handle this directory');
+      return [];
+    }
 
-    // 读取一层
     let layer = await reader.readOnce(dirPath, ctx);
 
-    // 统一过滤 includeHidden
     const includeHidden = options?.includeHidden ?? false;
     layer = layer.filter((e) => includeHidden || !e.name.startsWith('.'));
 
-    // 统一 pattern 过滤
     if (options?.pattern) {
       const pattern = options.pattern!;
       if (typeof pattern === 'string') {
@@ -101,17 +101,18 @@ export class HttpFS extends VFS {
       }
     }
 
-    if (!options?.recursive) return layer;
+    if (!options?.recursive) {
+      return layer;
+    }
 
-    // 递归收集
     const out: FileMetadata[] = [...layer];
     for (const e of layer) {
       if (e.type === 'directory') {
         try {
           const sub = await this._readDirectory(e.path, options);
           out.push(...sub);
-        } catch (err) {
-          // 忽略或记录
+        } catch {
+          // ignore
         }
       }
     }
@@ -119,20 +120,23 @@ export class HttpFS extends VFS {
   }
 
   private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
-    // 若只配置一个，直接用
-    if (this.dirReaders.length === 1) return this.dirReaders[0];
+    if (this.dirReaders.length === 1) {
+      return this.dirReaders[0];
+    }
 
-    // 多个 reader：按 canHandle 动态选择
     for (const r of this.dirReaders) {
-      if (!r.canHandle) continue;
+      if (!r.canHandle) {
+        continue;
+      }
       try {
-        if (await r.canHandle(dirPath, ctx)) return r;
+        if (await r.canHandle(dirPath, ctx)) {
+          return r;
+        }
       } catch {
-        /* 忽略 */
+        // ignore
       }
     }
-    // 若都没有 canHandle 或都未通过，取第一个作为默认
-    return this.dirReaders[0];
+    return null;
   }
 
   protected async _deleteDirectory(path: string): Promise<void> {

@@ -1,4 +1,5 @@
-import { HttpDirectoryReader, HttpFS, IndexedDBFS, VFS } from '@zephyr3d/base';
+import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
+import { HttpFS, IndexedDBFS } from '@zephyr3d/base';
 import { SerializationManager } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
 

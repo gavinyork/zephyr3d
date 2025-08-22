@@ -3971,7 +3971,7 @@ var Module = (() => {
           bytes[i] = decoded.codePointAt(i);
         }
         return bytes;
-      } catch (_) {
+      } catch {
         throw new Error('Converting base64 string to bytes failed.');
       }
     }

@@ -309,7 +309,7 @@ export class IndexedDBFS extends VFS {
                 bytes[i] = binaryString.charCodeAt(i);
               }
               fileData = bytes.buffer;
-            } catch (_error) {
+            } catch {
               reject(new VFSError('Invalid base64 data', 'EINVAL', path));
               return;
             }

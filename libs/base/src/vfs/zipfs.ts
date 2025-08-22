@@ -529,7 +529,7 @@ export class ZipFS extends VFS {
         directory: true,
         lastModDate: new Date()
       });
-    } catch (_error) {
+    } catch {
       // zip.js will throw an error if directory already exists
     }
 
@@ -769,7 +769,7 @@ export class ZipFS extends VFS {
           bytes[i] = binaryString.charCodeAt(i);
         }
         fileData = bytes.buffer;
-      } catch (_error) {
+      } catch {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
       }
     } else if (options?.encoding === 'utf8') {
@@ -790,7 +790,7 @@ export class ZipFS extends VFS {
         const existingStat = await this._stat(path);
         createdTime = existingStat.created;
         isExistingFile = true;
-      } catch (_error) {}
+      } catch {}
     }
 
     if (options?.append && isExistingFile) {
@@ -798,7 +798,7 @@ export class ZipFS extends VFS {
 
       try {
         existingData = await this._readFile(path);
-      } catch (_error) {}
+      } catch {}
 
       if (existingData) {
         if (typeof fileData === 'string' && typeof existingData === 'string') {

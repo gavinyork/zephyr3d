@@ -187,7 +187,7 @@ export async function initLeakDetector() {
     const jsmap = await (await fetch('js/index.js.map')).text();
     try {
       traceMap = new TraceMap(jsmap);
-    } catch (_err) {
+    } catch {
       traceMap = null;
     }
   }

@@ -5,6 +5,6 @@ export class RuntimeScript<T extends IDisposable | null> {
   onCreated(): void | Promise<void> {}
   onAttached(_host: T): void | Promise<void> {}
   onUpdate(_deltaTime: number, _elapsedTime: number) {}
-  onDetached() {}
+  onDetached(_host: T) {}
   onDestroy() {}
 }
