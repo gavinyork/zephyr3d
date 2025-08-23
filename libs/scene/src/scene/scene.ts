@@ -13,40 +13,67 @@ import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 
 /**
- * Presents a world that manages a couple of objects that will be rendered
+ * Represents a renderable world that manages scene graph, spatial indexing, and environment.
+ *
+ * Core responsibilities:
+ * - Owns the root {@link SceneNode} and maintains a spatial {@link Octree} for culling/raycasting.
+ * - Manages environment/lighting via {@link Environment}.
+ * - Provides per-frame update queues (global and per-camera) for scene nodes.
+ * - Offers utilities like ray construction and raycasting.
+ * - Emits observable events: `update`, `startrender`, `endrender`.
+ *
+ * Performance notes:
+ * - Octree placement is lazily synchronized on demand before reads (e.g., `octree`, `boundingBox`)
+ *   and during per-frame updates.
+ * - Update queues use weak references to avoid retaining disposed nodes.
+ *
  * @public
  */
 export class Scene extends makeObservable(Disposable)<{
+  /** Dispatched once per frame before render-related work. */
   update: [Scene];
+  /** Dispatched immediately before rendering begins for a camera. */
   startrender: [Scene, Camera, Compositor];
+  /** Dispatched immediately after rendering finishes for a camera. */
   endrender: [Scene, Camera, Compositor];
 }>() {
   /** @internal */
   private static _nextId = 0;
-  /** @internal */
+  /** @internal Scene name. */
   protected _name: string;
-  /** @internal */
+  /** @internal Root node reference. */
   protected _rootNode: DRef<SceneNode>;
-  /** @internal */
+  /** @internal Spatial index for placement/culling. */
   protected _octree: Octree;
-  /** @internal */
+  /**
+   * @internal Pending nodes whose placement in the octree must be updated.
+   * Populated by {@link invalidateNodePlacement} and drained by {@link updateNodePlacement}.
+   */
   protected _nodePlaceList: Set<GraphNode>;
-  /** @internal */
+  /** @internal Environment data (sky/light/IBL). */
   protected _env: Environment;
-  /** @internal */
+  /** @internal Frame counter that last updated this scene. */
   protected _updateFrame: number;
-  /** @internal */
+  /** @internal Unique scene ID. */
   protected _id: number;
-  /** @internal */
+  /** @internal One-shot per-frame update queue (runs before render). */
   protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
-  /** @internal */
+  /** @internal One-shot per-frame-per-camera update queue. */
   protected _perCameraUpdateQueue: DWeakRef<SceneNode>[];
-  /** @internal */
+  /** @internal Main camera reference. */
   protected _mainCamera: DRef<Camera>;
-  /** @internal */
+  /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Metadata;
   /**
-   * Creates an instance of scene
+   * Creates an instance of Scene.
+   *
+   * Initializes:
+   * - Unique ID
+   * - Empty environment
+   * - Octree with default depth/leaf capacities
+   * - Root scene node named "Root"
+   *
+   * @param name - Optional scene name for diagnostics/UI.
    */
   constructor(name?: string) {
     super();
@@ -64,7 +91,7 @@ export class Scene extends makeObservable(Disposable)<{
     this._mainCamera = new DRef();
   }
   /**
-   * Gets the unique identifier of the scene
+   * Gets the unique identifier of the scene.
    */
   get id(): number {
     return this._id;
@@ -79,7 +106,7 @@ export class Scene extends makeObservable(Disposable)<{
     this._name = val ?? '';
   }
   /**
-   * Main camera
+   * Main camera used to render the scene by default.
    */
   get mainCamera() {
     return this._mainCamera.get();
@@ -94,7 +121,9 @@ export class Scene extends makeObservable(Disposable)<{
     return this._rootNode?.get() ?? null;
   }
   /**
-   * Gets the octree
+   * Gets the octree used for spatial organization and queries.
+   *
+   * Ensures pending node placements are synchronized before returning.
    */
   get octree(): Octree {
     // Make sure the octree state is up to date
@@ -102,7 +131,9 @@ export class Scene extends makeObservable(Disposable)<{
     return this._octree;
   }
   /**
-   * Gets the bounding box of the scene
+   * Gets the world-axis-aligned bounding box of the scene.
+   *
+   * Ensures pending node placements are synchronized before computing.
    */
   get boundingBox(): AABB {
     this.updateNodePlacement(this._octree, this._nodePlaceList);
@@ -110,13 +141,13 @@ export class Scene extends makeObservable(Disposable)<{
     return this._octree.getRootNode().getBoxLoosed();
   }
   /**
-   * The environment of the scene
+   * The environment (sky, lights, IBL) of the scene.
    */
   get env(): Environment {
     return this._env;
   }
   /**
-   * Metadata of the scene
+   * Arbitrary metadata associated with the scene (e.g., imported asset info).
    */
   get metaData(): Metadata {
     return this._metaData;
@@ -125,7 +156,11 @@ export class Scene extends makeObservable(Disposable)<{
     this._metaData = val;
   }
   /**
-   * Find scene node by id
+   * Finds a scene node by its persistent ID.
+   *
+   * @typeParam T - Expected node type.
+   * @param id - Persistent identifier to match against `SceneNode.persistentId`.
+   * @returns The first matching node, or `null` if not found.
    */
   findNodeById<T extends SceneNode>(id: string) {
     let node: T = null;
@@ -138,10 +173,17 @@ export class Scene extends makeObservable(Disposable)<{
     return node;
   }
   /**
-   * Find scene node by name
+   * Finds a scene node by name.
+   *
+   * If multiple nodes share the same name, returns the first match encountered
+   * during traversal.
+   *
+   * @typeParam T - Expected node type.
+   * @param name - Node name to match.
+   * @returns The first matching node, or `null` if not found.
    *
    * @remarks
-   * If multiple nodes have the same name, the first found node will be returned
+   * Names are not guaranteed unique. Prefer IDs for stable references.
    */
   findNodeByName<T extends SceneNode>(name: string) {
     let node: T = null;
@@ -154,11 +196,14 @@ export class Scene extends makeObservable(Disposable)<{
     return node;
   }
   /**
-   * Cast a ray into the scene to get the closest object hit by the ray
+   * Casts a ray into the scene and returns the closest intersection, if any.
    *
-   * @param ray - The ray in world coordinate space
-   * @param length - Length of the ray
-   * @returns The closest object hit by the ray
+   * @param ray - The ray in world space.
+   * @param length - Maximum ray length. Defaults to `Infinity`.
+   * @returns Intersection info `{ target, dist, point }`, or `null` if no hit.
+   *
+   * @remarks
+   * Uses the octree for efficient traversal via {@link RaycastVisitor}.
    */
   raycast(ray: Ray, length = Infinity): { target: PickTarget; dist: number; point: Vector3 } {
     const raycastVisitor = new RaycastVisitor(ray, length);
@@ -172,14 +217,20 @@ export class Scene extends makeObservable(Disposable)<{
       : null;
   }
   /**
-   * Constructs a ray by a given camera and the position on screen
-   * @param camera - The camera used to compute the ray
-   * @param viewportWidth - Width of the viewport
-   * @param viewportHeight - Height of the viewport
-   * @param screenX - The x position on screen
-   * @param screenY - The y position on screen
-   * @param invModelMatrix - A matrix used to transform the ray
-   * @returns The constructed ray
+   * Constructs a world-space ray from a camera and a screen position.
+   *
+   * @param camera - Camera whose projection/view defines the ray.
+   * @param viewportWidth - Current viewport width in pixels.
+   * @param viewportHeight - Current viewport height in pixels.
+   * @param screenX - Screen-space x (pixels).
+   * @param screenY - Screen-space y (pixels).
+   * @param invModelMatrix - Optional inverse model matrix to transform the ray into local space.
+   * @returns The constructed {@link Ray}.
+   *
+   * @remarks
+   * Computes NDC from screen coordinates, unprojects using `invViewProjectionMatrix`,
+   * then forms a ray from the camera world position to the unprojected point.
+   * If `invModelMatrix` is provided, both origin and direction are transformed.
    */
   constructRay(
     camera: Camera,
@@ -201,12 +252,16 @@ export class Scene extends makeObservable(Disposable)<{
     return new Ray(vEye, vDir);
   }
   /**
-   * Add node to the update queue so the node's update method will be called before render.
-   * @param node - Node to be queued to update
+   * Queues a node for a one-shot update before the next render.
+   *
+   * The node's `update(frame, elapsedSeconds, deltaSeconds)` will be called
+   * during {@link frameUpdate} and then the node is removed from the queue.
+   *
+   * @param node - Node to schedule.
    *
    * @remarks
-   * Node will be removed from update queue after frame rendered, to update the node continuous,
-   * call queueUpdateNode in the update method.
+   * - To update continuously each frame, call `queueUpdateNode(this)` from within the node's `update` method.
+   * - Duplicate scheduling within the same frame is prevented.
    */
   queueUpdateNode(node: SceneNode) {
     if (node && this._nodeUpdateQueue.findIndex((val) => val.get() === node) < 0) {
@@ -214,12 +269,16 @@ export class Scene extends makeObservable(Disposable)<{
     }
   }
   /**
-   * Add node to the per-camera update queue so the node's update method will be called once per camera before render.
-   * @param node - Node to be queued to update
+   * Queues a node for a one-shot per-camera update before render.
+   *
+   * The node's `updatePerCamera(camera, elapsedSeconds, deltaSeconds)` will be
+   * called once for each camera during {@link frameUpdatePerCamera}, then removed.
+   *
+   * @param node - Node to schedule.
    *
    * @remarks
-   * Node will be removed from update queue after frame rendered, to update the node continuous,
-   * call queuePerCameraUpdateNode in the update method.
+   * - To run per-camera work continuously, re-queue from `updatePerCamera`.
+   * - Duplicate scheduling within the same frame is prevented.
    */
   queuePerCameraUpdateNode(node: SceneNode) {
     if (node && this._perCameraUpdateQueue.findIndex((val) => val.get() === node) < 0) {
@@ -227,18 +286,34 @@ export class Scene extends makeObservable(Disposable)<{
     }
   }
   /**
-   * Render this scene using main camera of the scene
+   * Renders this scene using the `mainCamera`, if present.
+   *
+   * Equivalent to `mainCamera.render(this)` when `mainCamera` is set.
    */
   render() {
     if (this.mainCamera) {
       this.mainCamera.render(this);
     }
   }
-  /** @internal */
+  /**
+   * Marks a graph node as needing placement update in the octree.
+   *
+   * Called by nodes when their transform/visibility/attachment changes in a way
+   * that affects spatial placement.
+   *
+   * @internal
+   */
   invalidateNodePlacement(node: GraphNode) {
     this._nodePlaceList.add(node);
   }
-  /** @internal */
+  /**
+   * Synchronizes environment light maps (IBL, SH/FB) with the sky as needed.
+   *
+   * Uses device capabilities to decide between Spherical Harmonics floating-point blending (SHFB)
+   * and classic SH textures, and lazily fills missing environment fields from the sky.
+   *
+   * @internal
+   */
   private updateEnvLight() {
     if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
       const useSHFB =
@@ -258,11 +333,28 @@ export class Scene extends makeObservable(Disposable)<{
       }
     }
   }
-  /** @internal */
+  /**
+   * Returns the renderer class used to render the scene.
+   *
+   * Override in subclasses to supply a custom renderer.
+   *
+   * @internal
+   */
   getRenderer(): typeof SceneRenderer {
     return SceneRenderer;
   }
-  /** @internal */
+  /**
+   * Performs per-frame scene updates, once per device frame.
+   *
+   * Steps:
+   * - Ensure this runs only once per frame (via `frameInfo.frameCounter`).
+   * - Update environment light synchronization.
+   * - Dispatch `update` event.
+   * - Drain the one-shot node update queue and call `node.update(...)`.
+   * - Apply pending octree placement updates.
+   *
+   * @internal
+   */
   frameUpdate() {
     const frameInfo = Application.instance.device.frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
@@ -287,7 +379,16 @@ export class Scene extends makeObservable(Disposable)<{
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
   }
-  /** @internal */
+  /**
+   * Performs per-camera scene updates for the current frame.
+   *
+   * Steps:
+   * - Drain the per-camera update queue and call `node.updatePerCamera(camera, ...)`.
+   * - Apply pending octree placement updates.
+   *
+   * @param camera - The camera being updated for.
+   * @internal
+   */
   frameUpdatePerCamera(camera: Camera) {
     if (this._perCameraUpdateQueue.length > 0) {
       const frameInfo = Application.instance.device.frameInfo;
@@ -304,7 +405,15 @@ export class Scene extends makeObservable(Disposable)<{
     this.updateNodePlacement(this._octree, this._nodePlaceList);
   }
   /**
-   * Update node placement in the octree
+   * Applies placement changes for nodes in `list` to the given `octree`.
+   *
+   * Rules:
+   * - If node is not disposed, attached, not hidden, and `placeToOctree` is true,
+   *   it is placed; otherwise removed.
+   * - Drains `list` until empty.
+   *
+   * @param octree - Target spatial index.
+   * @param list - Set of nodes awaiting placement evaluation.
    */
   updateNodePlacement(octree: Octree, list: Set<GraphNode>) {
     function placeNode(node: GraphNode) {
@@ -327,7 +436,14 @@ export class Scene extends makeObservable(Disposable)<{
     }
   }
   /**
-   * Disposes the scene
+   * Disposes the scene and its owned resources.
+   *
+   * Disposes:
+   * - Environment
+   * - Root node (and, by extension, its hierarchy)
+   * - Main camera reference wrapper
+   *
+   * @protected
    */
   protected onDispose() {
     this._env.dispose();

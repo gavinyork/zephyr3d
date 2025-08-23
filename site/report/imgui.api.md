@@ -23,7 +23,7 @@ export function imGuiCalcTextSize(text: string, out?: ImVec2): ImVec2;
 export function imGuiEndFrame(): void;
 
 // @public
-export function imGuiGetCharCodeMap(): Record<number, number>;
+export function imGuiGetCharCodeMap(): Record<number, string>;
 
 // @public
 export function imGuiInFrame(): boolean;
@@ -38,7 +38,7 @@ export function imGuiInjectEvent(ev: Event, type?: string): boolean;
 export function imGuiNewFrame(): void;
 
 // @public
-export function imGuiSetCharCodeMap(map: Record<number, number>): void;
+export function imGuiSetCharCodeMap(map: Record<number, string>): void;
 
 // @public
 export function imGuiSetFontGlyph(charCode: number, font: Font): void;

@@ -18,18 +18,26 @@ import { SAO } from '../posteffect/sao';
 import { MotionBlur } from '../posteffect/motionblur';
 
 /**
- * Camera pick result
+ * Result of a camera picking operation.
+ *
+ * Used by GPU/CPU picking flows to report what was intersected.
+ *
  * @public
  */
 export type PickResult = {
+  /** Distance from ray origin to intersection point (world units). */
   distance: number;
+  /** Intersection point in world space. */
   intersectedPoint: Vector3;
+  /** The intersected drawable, if known. */
   drawable: Drawable;
+  /** Logical pick target information. */
   target: PickTarget;
 };
 
 /**
- * History data of the camera
+ * Temporal history resources used by reprojection (TAA, motion blur).
+ *
  * @public
  */
 export type CameraHistoryData = {
@@ -38,153 +46,178 @@ export type CameraHistoryData = {
 };
 
 /**
- * The camera node class
+ * A renderable camera node that manages view/projection math, frusta,
+ * input control, picking, and a post-processing chain via a compositor.
+ *
+ * Key features:
+ * - Maintains projection, view, VP, and inverse VP matrices and lazily recomputes them when invalidated.
+ * - Provides world- and view-space frusta for culling and clipping.
+ * - Supports perspective and orthographic projections.
+ * - Integrates with post effects (Tonemap, FXAA, TAA, Bloom, SSR, SSAO, Motion Blur) through an internal `Compositor`.
+ * - Handles temporal jitter and history state when TAA or motion blur are enabled.
+ * - Emits picking rays from screen coordinates and supports async GPU picking.
+ * - Optional controller integration for user input handling.
+ *
+ * Performance notes:
+ * - Matrices/frusta are computed on demand and cached until invalidation.
+ * - Temporal jitter and history are set up only when required by enabled features and device support.
+ *
  * @public
  */
 export class Camera extends SceneNode implements NodeClonable<Camera> {
-  /** @internal */
+  /** @internal Halton 2-3 sequence used for TAA jittering. */
   private static readonly _halton23 = halton23(16);
-  /** @internal */
+  /** @internal Per-camera history resources. */
   private static readonly _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
-  /** @internal */
+  /** @internal Projection matrix. */
   protected _projMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Inverse projection matrix. */
   protected _invProjMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal View matrix (world -> camera). */
   protected _viewMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal View-projection matrix. */
   protected _viewProjMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Rotation matrix derived from world transform (camera conventions). */
   protected _rotationMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Inverse view-projection matrix. */
   protected _invViewProjMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Optional clip plane in camera space. */
   protected _clipPlane: Plane;
-  /** @internal */
+  /** @internal Camera controller (input). */
   protected _controller: BaseCameraController;
-  /** @internal */
+  /** @internal World-space frustum (from VP). */
   protected _frustum: Frustum;
-  /** @internal */
+  /** @internal View-space frustum (from P). */
   protected _frustumV: Frustum;
-  /** @internal */
+  /** @internal Dirty flag indicating derived matrices/frusta need recompute. */
   protected _dirty: boolean;
-  /** @internal */
+  /** @internal Viewport [x, y, w, h]; null uses full framebuffer. */
   protected _viewport: number[];
-  /** @internal */
+  /** @internal Scissor rectangle [x, y, w, h]; null uses viewport. */
   protected _scissor: number[];
-  /** @internal */
+  /** @internal Clip plane mask for custom clipping schemes. */
   protected _clipMask: number;
-  /** @internal */
+  /** @internal Order-Independent Transparency reference. */
   protected _oit: DRef<OIT>;
-  /** @internal */
+  /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
-  /** @internal */
+  /** @internal Whether command buffers may be reused for optimization. */
   protected _commandBufferReuse: boolean;
-  /** @internal */
+  /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
-  /** @internal */
+  /** @internal Tonemap enable flag (via post effect). */
   protected _toneMap: boolean;
-  /** @internal */
+  /** @internal Tonemap post effect reference. */
   protected _postEffectTonemap: DRef<Tonemap>;
-  /** @internal */
+  /** @internal Tonemap exposure. */
   protected _tonemapExposure: number;
-  /** @internal */
+  /** @internal Motion blur enable flag (via post effect). */
   protected _motionBlur: boolean;
-  /** @internal */
+  /** @internal Motion blur post effect reference. */
   protected _postEffectMotionBlur: DRef<MotionBlur>;
-  /** @internal */
+  /** @internal Motion blur strength. */
   protected _motionBlurStrength: number;
-  /** @internal */
+  /** @internal Bloom enable flag (via post effect). */
   protected _bloom: boolean;
-  /** @internal */
+  /** @internal Bloom post effect reference. */
   protected _postEffectBloom: DRef<Bloom>;
-  /** @internal */
+  /** @internal Bloom downsample level cap. */
   protected _bloomMaxDownsampleLevels: number;
-  /** @internal */
+  /** @internal Bloom downsample resolution limit. */
   protected _bloomDownsampleLimit: number;
-  /** @internal */
+  /** @internal Bloom threshold. */
   protected _bloomThreshold: number;
-  /** @internal */
+  /** @internal Bloom threshold knee (soft thresholding). */
   protected _bloomThresholdKnee: number;
-  /** @internal */
+  /** @internal Bloom intensity. */
   protected _bloomIntensity: number;
-  /** @internal */
+
+  /** @internal FXAA enable flag (via post effect). */
   protected _FXAA: boolean;
-  /** @internal */
+  /** @internal FXAA post effect reference. */
   protected _postEffectFXAA: DRef<FXAA>;
-  /** @internal */
+
+  /** @internal TAA enable flag (via post effect). */
   protected _TAA: boolean;
-  /** @internal */
+  /** @internal TAA post effect reference. */
   protected _postEffectTAA: DRef<TAA>;
-  /** @internal */
+  /** @internal TAA debug mode (implementation-defined). */
   protected _TAADebug: number;
-  /** @internal */
+
+  /** @internal SSR enable flag (via post effect). */
   protected _SSR: boolean;
-  /** @internal */
+  /** @internal SSR post effect reference. */
   protected _postEffectSSR: DRef<SSR>;
-  /** @internal */
+  /** @internal SSR parameter vector: (maxDistance, iterations, thickness, reserved). */
   protected _ssrParams: Vector4;
-  /** @internal */
+  /** @internal SSR roughness cutoff; above this SSR is suppressed. */
   protected _ssrMaxRoughness: number;
-  /** @internal */
+  /** @internal SSR roughness factor scaling. */
   protected _ssrRoughnessFactor: number;
-  /** @internal */
+  /** @internal SSR stride for ray marching. */
   protected _ssrStride: number;
-  /** @internal */
+  /** @internal Whether SSR thickness is computed automatically. */
   protected _ssrCalcThickness: boolean;
-  /** @internal */
+  /** @internal SSR blur scale. */
   protected _ssrBlurriness: number;
-  /** @internal */
+  /** @internal SSR blur depth cutoff. */
   protected _ssrBlurDepthCutoff: number;
-  /** @internal */
+  /** @internal SSR blur kernel size. */
   protected _ssrBlurKernelSize: number;
-  /** @internal */
+  /** @internal SSR Gaussian blur standard deviation. */
   protected _ssrBlurStdDev: number;
-  /** @internal */
+
+  /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
-  /** @internal */
+  /** @internal SSAO post effect reference. */
   protected _postEffectSSAO: DRef<SAO>;
-  /** @internal */
+  /** @internal SSAO scale (sampling radius multiplier). */
   protected _SSAOScale: number;
-  /** @internal */
+  /** @internal SSAO bias (self-shadowing reduction). */
   protected _SSAOBias: number;
-  /** @internal */
+  /** @internal SSAO sample radius. */
   protected _SSAORadius: number;
-  /** @internal */
+  /** @internal SSAO intensity. */
   protected _SSAOIntensity: number;
-  /** @internal */
+  /** @internal SSAO blur depth cutoff. */
   protected _SSAOBlurDepthCutoff: number;
-  /** @internal */
+
+  /** @internal Pending GPU-pick promise (one-shot). */
   protected _pickResultPromise: Promise<PickResult>;
-  /** @internal */
+  /** @internal Resolver for the pending pick promise. */
   protected _pickResultResolve: (result: PickResult) => void;
-  /** @internal */
+  /** @internal Last pick X position (viewport-relative). */
   protected _pickPosX: number;
-  /** @internal */
+  /** @internal Last pick Y position (viewport-relative). */
   protected _pickPosY: number;
-  /** @internal */
+  /** @internal Last resolved pick result (optional cache). */
   protected _pickResult: PickResult;
-  /** @internal */
+
+  /** @internal Current jitter value in clip space (x, y). */
   protected _jitterValue: Vector2;
-  /** @internal */
+  /** @internal Previous frame’s jitter value. */
   protected _prevJitterValue: Vector2;
-  /** @internal */
+  /** @internal Current jittered VP matrix. */
   protected _jitteredVPMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Inverse of the current jittered VP matrix. */
   protected _jitteredInvVPMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Previous frame’s non-jittered VP matrix. */
   protected _prevVPMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Previous frame’s camera world position. */
   protected _prevPosition: Vector3;
-  /** @internal */
+  /** @internal Previous frame’s jittered VP matrix. */
   protected _prevJitteredVPMatrix: Matrix4x4;
-  /** @internal */
+
+  /** @internal Post-processing compositor attached to this camera. */
   protected _compositor: Compositor;
   /**
-   * Creates a new camera node
+   * Creates a new camera node.
    *
-   * @param scene - The scene that the camera belongs to
-   * @param projectionMatrix - Projection matrix for this camera
+   * Initializes projection/view matrices, temporal fields, controller linkage, and
+   * builds the default post-processing pipeline on the internal compositor.
+   *
+   * @param scene - The scene that owns this camera.
+   * @param projectionMatrix - Optional projection matrix to initialize with.
    */
   constructor(scene: Scene, projectionMatrix?: Matrix4x4) {
     super(scene);
@@ -256,12 +289,14 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._compositor = new Compositor();
     this.updatePostProcessing();
   }
+  /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean): Camera {
     const other = new Camera(this.scene);
     other.copyFrom(this, method, recursive);
     other.parent = this.parent;
     return other;
   }
+  /** {@inheritDoc SceneNode.copyFrom} */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
@@ -291,11 +326,17 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this.scissor = other.scissor?.slice() ?? null;
     this.setProjectionMatrix(other.getProjectionMatrix());
   }
-  /** Compositor */
+  /**
+   * The compositor that owns and runs the camera's post-processing chain.
+   */
   get compositor() {
     return this._compositor;
   }
-  /** Clip plane in camera space */
+  /**
+   * Clip plane in camera space.
+   *
+   * Setting this invalidates derived data. Shaders should respect `clipMask` and plane.
+   */
   get clipPlane(): Plane {
     return this._clipPlane;
   }
@@ -304,8 +345,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._invalidate(false);
   }
   /**
-   * Gets whether Hi-Z acceleration is enabled.
-   * When enabled, it can significantly improve SSR performance with minimal quality impact.
+   * Whether Hi-Z acceleration is enabled.
+   *
+   * Often improves SSR performance with little quality impact when supported.
    */
   get HiZ(): boolean {
     return this._HiZ;
@@ -314,7 +356,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._HiZ = !!val;
   }
   /**
-   * Gets whether Tonemap is enabled.
+   * Whether tonemapping is enabled via the post effect.
    */
   get toneMap(): boolean {
     return this._postEffectTonemap.get().enabled;
@@ -323,7 +365,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._postEffectTonemap.get().enabled = !!val;
   }
   /**
-   * Gets whether motion blur is enabled
+   * Whether motion blur is enabled via the post effect.
    */
   get motionBlur(): boolean {
     return this._postEffectMotionBlur.get().enabled;

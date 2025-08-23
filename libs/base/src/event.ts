@@ -62,9 +62,21 @@ export interface IEventTarget<T extends EventMap = any> {
   dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
 }
 
+/**
+ * Observable event emitter implementation.
+ *
+ * Provides subscription, one-time subscription, unsubscription, and synchronous dispatch
+ * for events defined by an {@link EventMap}.
+ *
+ * @typeParam X - The event map describing event names and payload tuples
+ * @public
+ */
 export class Observable<X extends EventMap> implements IEventTarget<X> {
   /** @internal */
   _listeners: EventListenerMap<X>;
+  /**
+   * Creates an {@link Observable}.
+   */
   constructor() {
     this._listeners = null;
   }
@@ -106,7 +118,19 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   dispatchEvent<K extends keyof X>(type: K, ...args: X[K]): void {
     this._invokeLocalListeners(type, ...args);
   }
-  /** @internal */
+  /**
+   * Adds an event listener to the given map.
+   *
+   * If the map is `null`, a new one will be created.
+   *
+   * @typeParam K - The event key within the event map
+   * @param listenerMap - The current listener map
+   * @param type - The event type to listen for
+   * @param listener - The listener callback
+   * @param options - Additional listener options
+   * @returns The updated listener map
+   * @internal
+   */
   _internalAddEventListener<K extends keyof X>(
     listenerMap: EventListenerMap<X>,
     type: K,
@@ -128,7 +152,18 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
     handlers.push({ handler: l, options: o, removed: false });
     return listenerMap;
   }
-  /** @internal */
+  /**
+   * Removes an event listener from the given map.
+   *
+   * A listener is removed only if both the function reference and the context match.
+   *
+   * @typeParam K - The event key within the event map
+   * @param listenerMap - The current listener map
+   * @param type - The event type to remove from
+   * @param listener - The listener callback to remove
+   * @param context - The context object that must match the one used when adding
+   * @internal
+   */
   _internalRemoveEventListener<K extends keyof X>(
     listenerMap: EventListenerMap<X>,
     type: K,
@@ -153,7 +188,16 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
       }
     }
   }
-  /** @internal */
+  /**
+   * Invokes local listeners for a given event type with the provided arguments.
+   *
+   * Listeners added with `once: true` are marked and pruned after invocation.
+   *
+   * @typeParam K - The event key within the event map
+   * @param type - The event type to invoke
+   * @param args - The payload to pass to each listener
+   * @internal
+   */
   _invokeLocalListeners<K extends keyof X>(type: keyof X, ...args: X[K]): void {
     if (!this._listeners) {
       return;
@@ -177,9 +221,23 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
 }
 
 /**
- * This mixin make a class an event target
- * @param cls - the class to make
- * @returns - The event target class
+ * Mixin that augments a class with {@link IEventTarget} capabilities.
+ *
+ * It returns a higher-order factory that, when instantiated with an event map `X`,
+ * produces a subclass adding `on/once/off/dispatchEvent` and the internal listener management.
+ *
+ * Usage:
+ * ```ts
+ * class Base {}
+ * const Eventful = makeObservable(Base)<{ 'ready': []; 'data': [number] }>();
+ * const obj = new Eventful();
+ * obj.on('data', (n) => console.log(n));
+ * obj.dispatchEvent('data', 42);
+ * ```
+ *
+ * @typeParam C - A constructor type to be extended (plain `ObjectConstructor` or a generic class)
+ * @param cls - The base class to extend
+ * @returns A generic factory that accepts an event map and returns an extended class
  * @public
  */
 export function makeObservable<C extends GenericConstructor | ObjectConstructor>(cls: C) {
@@ -230,7 +288,19 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
       dispatchEvent<K extends keyof I>(type: K, ...args: I[K]): void {
         this._invokeLocalListeners(type, ...args);
       }
-      /** @internal */
+      /**
+       * Adds an event listener to the given map.
+       *
+       * If the map is `null`, a new one will be created.
+       *
+       * @typeParam K - The event key within the event map
+       * @param listenerMap - The current listener map
+       * @param type - The event type to listen for
+       * @param listener - The listener callback
+       * @param options - Additional listener options
+       * @returns The updated listener map
+       * @internal
+       */
       _internalAddEventListener<K extends keyof I>(
         listenerMap: EventListenerMap<I>,
         type: K,
@@ -252,7 +322,18 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
         handlers.push({ handler: l, options: o, removed: false });
         return listenerMap;
       }
-      /** @internal */
+      /**
+       * Removes an event listener from the given map.
+       *
+       * A listener is removed only if both the function reference and the context match.
+       *
+       * @typeParam K - The event key within the event map
+       * @param listenerMap - The current listener map
+       * @param type - The event type to remove from
+       * @param listener - The listener callback to remove
+       * @param context - The context object that must match the one used when adding
+       * @internal
+       */
       _internalRemoveEventListener<K extends keyof I>(
         listenerMap: EventListenerMap<I>,
         type: K,
@@ -277,7 +358,16 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
           }
         }
       }
-      /** @internal */
+      /**
+       * Invokes local listeners for a given event type with the provided arguments.
+       *
+       * Listeners added with `once: true` are marked and pruned after invocation.
+       *
+       * @typeParam K - The event key within the event map
+       * @param type - The event type to invoke
+       * @param args - The payload to pass to each listener
+       * @internal
+       */
       _invokeLocalListeners<K extends keyof I>(type: keyof I, ...args: I[K]): void {
         if (!this._listeners) {
           return;

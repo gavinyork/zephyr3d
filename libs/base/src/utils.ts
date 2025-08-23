@@ -392,6 +392,7 @@ export function base64ToText(base64: string): string {
 /**
  * Generate 128bit random UUID
  * @returns random UUID
+ * @public
  */
 export function randomUUID() {
   if (crypto.randomUUID) {

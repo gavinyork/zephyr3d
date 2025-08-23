@@ -25,50 +25,81 @@ import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
 
 /**
- * Node iterate function type
+ * Iteration callback used by traversal helpers.
+ *
+ * Return true to stop traversal early.
+ *
  * @public
  */
 export type NodeIterateFunc = ((node: SceneNode) => boolean) | ((node: SceneNode) => void);
 
 /**
- * Scene node visible state
+ * Visibility state of a node.
+ *
+ * - 'visible': force visible
+ * - 'hidden': force hidden
+ * - 'inherit': inherits from the closest ancestor that is not 'inherit'
+ *
  * @public
  */
 export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
 
 /**
- * Scene node clone method
+ * Clone method for scene nodes.
+ *
+ * - 'deep': recursively clone children
+ * - 'instance': create an instanced/linked representation when supported
+ *
  * @public
  */
 export type NodeCloneMethod = 'deep' | 'instance';
 
 /**
- * NodeClonable interface
+ * Interface for clonable scene nodes.
+ *
  * @public
  */
 export interface NodeClonable<T extends SceneNode> {
+  /**
+   * Create a clone of this node.
+   *
+   * @param method - Clone method ('deep' or 'instance').
+   * @param recursive - If true, clone children recursively.
+   */
   clone(method: NodeCloneMethod, recursive: boolean): T;
 }
 
 /**
- * The base class for any kind of scene objects
+ * The base class of all scene graph objects.
  *
- * @remarks
- * We use a data structure called SceneGraph to store scenes,
- * which consists of a couple of scene objects forming a
- * hierarchical structure. This is the base class for any kind
- * of the scene object, which contains the basic properties such
- * as position, rotation, and scale of the object.
+ * Responsibilities:
+ * - Defines hierarchical transform (position, rotation, scale) with lazy-computed matrices.
+ * - Integrates with the scene graph (parent/children, attachment notifications).
+ * - Provides traversal utilities (iterate, traverse).
+ * - Manages visibility state and picking flags.
+ * - Computes local and world bounding volumes and notifies scene for spatial indexing updates.
+ * - Supports cloning and shared model instancing.
+ * - Emits events on visibility, transform, bounding volume, attachment, and disposal.
+ *
+ * Performance notes:
+ * - `localMatrix`, `worldMatrix`, and `invWorldMatrix` are lazily computed and cached until invalidated.
+ * - Use `invalidateBoundingVolume` or mutating transforms to refresh BV; world BV invalidation informs spatial structures.
  *
  * @public
  */
 export class SceneNode
   extends Observable<{
+    /** Emitted on all ancestors when a node is attached under them. */
     nodeattached: [node: SceneNode];
+    /** Emitted on all ancestors when a node is removed from under them. */
     noderemoved: [node: SceneNode];
+    /** Emitted when effective visibility changes (considering inheritance). */
     visiblechanged: [node: SceneNode];
+    /** Emitted when local/world transform changes. */
     transformchanged: [node: SceneNode];
+    /** Emitted when local/world bounding volume changes. */
     bvchanged: [node: SceneNode];
+    /** Emitted when the node is disposed. */
     dispose: [];
   }>
   implements NodeClonable<SceneNode>, IDisposable
@@ -78,77 +109,94 @@ export class SceneNode
   static readonly PICK_DISABLED = 0;
   static readonly PICK_ENABLED = 1;
   */
+  /** Bounding-box draw mode inherited from nearest graph ancestor. */
   static readonly BBOXDRAW_INHERITED = -1;
+  /** Disable bounding-box visualization. */
   static readonly BBOXDRAW_DISABLED = 0;
+  /** Draw local-space bounding box. */
   static readonly BBOXDRAW_LOCAL = 1;
+  /** Draw world-space bounding box. */
   static readonly BBOXDRAW_WORLD = 2;
-  /** @internal */
+
+  /** @internal Unique persistent id. */
   protected _id: string;
-  /** @internal */
+  /** @internal Disposal flag. */
   protected _disposed: boolean;
-  /** @internal */
+  /** @internal Animation set reference. */
   protected _animationSet: DRef<AnimationSet>;
-  /** @internal */
+  /** @internal Optional shared model reference for instancing. */
   protected _sharedModel: DRef<SharedModel>;
-  /** @internal */
+  /** @internal Clip test flag used by renderer. */
   protected _clipMode: boolean;
-  /** @internal */
+  /** @internal Bounding-box visualization mode. */
   protected _boxDrawMode: number;
-  /** @internal */
+  /** @internal Visibility state ('visible'|'hidden'|'inherit'). */
   protected _visible: SceneNodeVisible;
-  /** @internal */
+  /** @internal CPU picking flag. */
   protected _pickable: boolean;
-  /** @internal */
+  /** @internal GPU picking flag. */
   protected _gpuPickable: boolean;
-  /** @internal */
+  /** @internal Friendly name for debugging/UI. */
   protected _name: string;
-  /** @internal */
+  /** @internal Owning scene. */
   protected _scene: Scene;
-  /** @internal */
+
+  /** @internal Local-space bounding volume cache. */
   protected _bv: BoundingVolume;
-  /** @internal */
+  /** @internal True if local BV needs recomputing. */
   protected _bvDirty: boolean;
-  /** @internal */
+  /** @internal World-space bounding volume cache. */
   protected _bvWorld: BoundingVolume;
-  /** @internal */
+
+  /** @internal Whether this node participates in scene spatial structures (octree). */
   private _placeToOctree: boolean;
-  /** @internal */
+  /** @internal If true, this node cannot be cloned/attached as a child (engine policy). */
   private _sealed: boolean;
-  /** @internal */
+
+  /** @internal Parent node. */
   protected _parent: SceneNode;
-  /** @internal */
+  /** @internal Children list (DRef for memory/resource mgmt). */
   protected _children: DRef<SceneNode>[];
-  /** @internal */
+
+  /** @internal Local position (observable). */
   protected _position: ObservableVector3;
-  /** @internal */
+  /** @internal Local scale (observable). */
   protected _scaling: ObservableVector3;
-  /** @internal */
+  /** @internal Local rotation (observable quaternion). */
   protected _rotation: ObservableQuaternion;
-  /** @internal */
+
+  /** @internal Local transform matrix cache. */
   protected _localMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal World transform matrix cache. */
   protected _worldMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Determinant of world transform (cached). */
   protected _worldMatrixDet: number;
-  /** @internal */
+  /** @internal Inverse world transform matrix cache. */
   protected _invWorldMatrix: Matrix4x4;
-  /** @internal */
+
+  /** @internal Scratch local matrix to avoid allocations. */
   protected _tmpLocalMatrix: Matrix4x4;
-  /** @internal */
+  /** @internal Scratch world matrix to avoid allocations. */
   protected _tmpWorldMatrix: Matrix4x4;
-  /** @internal */
+
+  /** @internal Monotonically increasing tag for transform changes. */
   protected _transformTag: number;
-  /** @internal */
+  /** @internal Shared callback used by observables on transform mutation. */
   protected _transformChangeCallback: () => void;
-  /** @internal */
+
+  /** @internal Arbitrary metadata payload for this node. */
   protected _metaData: Metadata;
-  /** @internal */
+  /** @internal If true, suppress transform-change callbacks (during bulk updates). */
   private _disableCallback: boolean;
-  /** @internal */
+  /** @internal User-attached script entry (engine-defined). */
   private _script: string;
   /**
-   * Creates a new scene node
-   * @param scene - Which scene the node belongs to
+   * Construct a scene node.
+   *
+   * If a scene is provided and this is not the root node, the node is reparented
+   * under the scene's root immediately.
+   *
+   * @param scene - Scene that will own this node.
    */
   constructor(scene: Scene) {
     super();
@@ -191,7 +239,7 @@ export class SceneNode
       this.reparent(scene.rootNode);
     }
   }
-  /** @internal */
+  /** @internal Whether the node should be inserted into the scene's spatial structure. */
   get placeToOctree(): boolean {
     return this._placeToOctree;
   }
@@ -204,7 +252,9 @@ export class SceneNode
     }
   }
   /**
-   * Id of the node
+   * Node's persistent identifier.
+   *
+   * Note: Changing this affects serialization/lookup; ensure uniqueness.
    */
   get persistentId() {
     return this._id;
@@ -213,7 +263,7 @@ export class SceneNode
     this._id = id;
   }
   /**
-   * Metadata of the scene
+   * Arbitrary metadata associated with this node.
    */
   get metaData(): Metadata {
     return this._metaData;
@@ -222,7 +272,7 @@ export class SceneNode
     this._metaData = val;
   }
   /**
-   * Attached scripts of this node
+   * Attached script filename or identifier (engine-specific integration).
    */
   get script() {
     return this._script;
@@ -231,7 +281,7 @@ export class SceneNode
     this._script = fileName ?? '';
   }
   /**
-   * Name of the node
+   * Display name of the node (for UI/debugging).
    */
   get name() {
     return this._name;
@@ -239,11 +289,13 @@ export class SceneNode
   set name(val: string) {
     this._name = val || '';
   }
-  /** The scene to which the node belongs */
+  /** The owning scene. */
   get scene(): Scene {
     return this._scene;
   }
-  /** true if the node is attached to a scene, false otherwise */
+  /**
+   * Whether this node is currently attached under the scene's root.
+   */
   get attached(): boolean {
     let node: SceneNode = this;
     while (node && node !== this._scene.rootNode) {
@@ -251,13 +303,21 @@ export class SceneNode
     }
     return node === this._scene.rootNode;
   }
-  /** true if the node is sealed */
+  /**
+   * If true, the node is logically sealed; some operations (like cloning as child)
+   * may be restricted by engine policies.
+   */
   get sealed(): boolean {
     return this._sealed;
   }
   set sealed(val: boolean) {
     this._sealed = val;
   }
+  /**
+   * Lazily creates and returns this node's animation set.
+   *
+   * Accessing this schedules the node for update in the scene.
+   */
   get animationSet() {
     if (!this._animationSet.get()) {
       this._animationSet.set(new AnimationSet(this));
@@ -265,6 +325,9 @@ export class SceneNode
     }
     return this._animationSet.get();
   }
+  /**
+   * Shared model reference for instancing/streaming systems.
+   */
   get sharedModel() {
     return this._sharedModel.get();
   }
@@ -272,10 +335,14 @@ export class SceneNode
     this._sharedModel.set(model);
   }
   /**
-   * Creates a new node by cloning this node
-   * @param method - clone method
-   * @param recursive - true if children should also be cloned, otherwise false
-   * @returns New cloned node
+   * Clone this node.
+   *
+   * If a shared model exists, let it create an appropriate node (instanced or normal).
+   * The cloned node is attached under the same parent.
+   *
+   * @param method - Clone method ('deep' or 'instance').
+   * @param recursive - Whether children are cloned recursively.
+   * @returns The newly created clone.
    */
   clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
     const other = this._sharedModel.get()
@@ -286,10 +353,14 @@ export class SceneNode
     return other;
   }
   /**
-   * Copy properties from other node
-   * @param other - Other node to copy properties from
-   * @param method - Clone method
-   * @param recursive - true if children of the node to copy from should be cloned and copied to this node, otherwise, children of the node to copy from will not be copied.
+   * Copy core properties from another node in the same scene.
+   *
+   * Does not copy children unless `recursive` is true. Sealed children are skipped.
+   * Validates source/target are not disposed and belong to the same scene.
+   *
+   * @param other - Source node.
+   * @param method - Clone method for children when recursive.
+   * @param recursive - If true, clone and attach children to this node.
    */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
     if (other.disposed || this.disposed) {
@@ -317,7 +388,7 @@ export class SceneNode
     }
   }
   /**
-   * Check if given node is a direct child of the node
+   * Whether the given node is a direct child of this node.
    * @param child - The node to be checked
    * @returns true if the given node is a direct child of this node, false otherwise
    */
@@ -325,7 +396,7 @@ export class SceneNode
     return child && child.parent === this;
   }
   /**
-   * Removes all children from this node
+   * Remove all children from this node.
    */
   removeChildren() {
     while (this._children.length) {
@@ -333,9 +404,7 @@ export class SceneNode
     }
   }
   /**
-   * Checks if this node is the direct parent or indirect parent of a given node
-   * @param child - The node to be checked
-   * @returns true if this node is the direct parent or indirect parent of the given node, false otherwise
+   * Whether this node is an ancestor (direct or indirect) of the given node.
    */
   isParentOf(child: SceneNode): boolean {
     while (child && child !== this) {
@@ -344,17 +413,18 @@ export class SceneNode
     return child === this;
   }
   /**
-   * Removes this node from it's parent
-   * @returns self
+   * Detach this node from its parent.
+   *
+   * @returns this
    */
   remove() {
     this.parent = null;
     return this;
   }
   /**
-   * Traverse the entire subtree of this node by a visitor
-   * @param v - The visitor that will travel the subtree of this node
-   * @param inverse - true if traversing from bottom to top, otherwise top to bottom
+   * Depth-first traversal of this node's subtree (pre-order).
+   *
+   * @param v - Visitor invoked on each node.
    */
   traverse(v: Visitor<SceneNode>): void {
     v.visit(this);
@@ -363,12 +433,12 @@ export class SceneNode
     }
   }
   /**
-   * Iterate self and all of the children
+   * Iterate self and descendants in pre-order.
    *
-   * @remarks
-   * DO NOT remove child duration iteration!
+   * Warning: Do not remove children during this iteration. To allow removal, use `iterateBottomToTop`.
    *
-   * @param callback - callback function that will be called on each node, if callback returns true, iteration will be stopped immediately
+   * @param callback - Called for each node; if returns true, iteration stops.
+   * @returns true if iteration was aborted early.
    */
   iterate(callback: NodeIterateFunc): boolean {
     if (!!callback(this)) {
@@ -382,12 +452,12 @@ export class SceneNode
     return false;
   }
   /**
-   * Iterate self and all of the children from bottom to top in reversed order
+   * Iterate self and descendants in reverse post-order (bottom-to-top).
    *
-   * @remarks
-   * Child can be removed duration iteration!
+   * Child nodes can be safely removed during this iteration.
    *
-   * @param callback - callback function that will be called on each node, if callback returns true, iteration will be stopped immediately
+   * @param callback - Called for each node; if returns true, iteration stops.
+   * @returns true if iteration was aborted early.
    */
   iterateBottomToTop(callback: NodeIterateFunc): boolean {
     for (let i = this._children.length - 1; i >= 0; i--) {
@@ -401,35 +471,35 @@ export class SceneNode
     }
     return false;
   }
-  /** true if this is a graph node, false otherwise */
+  /** Type guard: true if this node is a graph node. */
   isGraphNode(): this is GraphNode {
     return false;
   }
-  /** true if this is a light node, false otherwise */
+  /** Type guard: true if this node is a light. */
   isLight(): this is BaseLight {
     return false;
   }
-  /** true if this is a mesh node, false otherwise */
+  /** Type guard: true if this node is a mesh. */
   isMesh(): this is Mesh {
     return false;
   }
-  /** true if this is a water node, false otherwise */
+  /** Type guard: true if this node is a water node. */
   isWater(): this is Water {
     return false;
   }
-  /** true if this is a particle system node, false otherwise */
+  /** Type guard: true if this node is a particle system. */
   isParticleSystem(): this is ParticleSystem {
     return false;
   }
-  /** true if this is a batch group, false otherwise */
+  /** Type guard: true if this node is a batch group. */
   isBatchGroup(): this is BatchGroup {
     return false;
   }
-  /** true if this is a terrain node, false otherwise */
+  /** Type guard: true if this node is a terrain. */
   isTerrain(): this is Terrain {
     return false;
   }
-  /** true if this is a clipmap terrain node, false otherwise */
+  /** Type guard: true if this node is a clipmap terrain. */
   isClipmapTerrain(): this is ClipmapTerrain {
     return false;
   }

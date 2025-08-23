@@ -5,12 +5,13 @@
 ```ts
 
 import { CubeFace } from '@zephyr3d/base';
+import { IDisposable } from '@zephyr3d/base';
 import { IEventTarget } from '@zephyr3d/base';
 import { MaybeArray } from '@zephyr3d/base';
+import { Observable } from '@zephyr3d/base';
 import { TypedArray } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { VectorBase } from '@zephyr3d/base';
-import * as _zephyr3d_base from '@zephyr3d/base';
 
 // @public
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
@@ -33,7 +34,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     createDepthState(): DepthState;
     createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
     createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
-    createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+    createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
     createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
     createRasterizerState(): RasterizerState;
     createRenderStateSet(): RenderStateSet;
@@ -93,6 +94,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     runLoop(func: (device: AbstractDevice) => void): void;
     runLoopFunction: (device: AbstractDevice) => void;
     runNextFrame(f: () => void): void;
+    runNextFrameAsync(f: () => void): Promise<void>;
     screenToDevice(val: number): number;
     setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
     setFont(fontName: string): any;
@@ -147,10 +149,8 @@ export interface BaseCreationOptions {
     dynamic?: boolean;
 }
 
-// Warning: (ae-forgotten-export) The symbol "BaseDevice_base" needs to be exported by the entry point index.d.ts
-//
 // @public
-export abstract class BaseDevice extends BaseDevice_base {
+export abstract class BaseDevice extends Observable<DeviceEventMap> {
     constructor(cvs: HTMLCanvasElement, backend: DeviceBackend);
     // (undocumented)
     addGPUObject(obj: GPUObject): void;
@@ -213,7 +213,7 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     abstract createGPUTimer(): ITimer;
     // (undocumented)
-    abstract createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+    abstract createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
     // (undocumented)
     createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
     // (undocumented)
@@ -390,6 +390,8 @@ export abstract class BaseDevice extends BaseDevice_base {
     // (undocumented)
     runNextFrame(f: () => void): void;
     // (undocumented)
+    runNextFrameAsync(f: () => void | Promise<void>): Promise<void>;
+    // (undocumented)
     protected _runningLoop: number;
     // (undocumented)
     screenToDevice(val: number): number;
@@ -479,7 +481,7 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
 // @public
 export interface BindGroup extends GPUObject<unknown> {
     // (undocumented)
-    getBuffer(name: string): GPUDataBuffer;
+    getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
     // (undocumented)
     getDynamicOffsets(): number[];
     // (undocumented)
@@ -717,6 +719,8 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
     // (undocumented)
     bind(): boolean;
     // (undocumented)
+    getColorAttachment<T extends BaseTexture = BaseTexture>(index: number): T;
+    // (undocumented)
     getColorAttachmentCubeFace(index: number): CubeFace;
     // (undocumented)
     getColorAttachmentGenerateMipmaps(index: number): boolean;
@@ -764,6 +768,7 @@ export interface FramebufferCaps {
     supportDepth32floatStencil8: boolean;
     supportFloatBlending: boolean;
     supportMultisampledFramebuffer: boolean;
+    supportRenderMipmap: boolean;
 }
 
 // @public
@@ -865,15 +870,13 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
     // (undocumented)
     readonly byteLength: number;
     // (undocumented)
-    getBufferSubData(dstBuffer?: Uint8Array, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array>;
+    getBufferSubData(dstBuffer?: Uint8Array<ArrayBuffer>, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array<ArrayBuffer>>;
     // (undocumented)
     readonly usage: number;
 }
 
 // @public
-export interface GPUObject<T = unknown> extends IEventTarget<{
-    disposed: [];
-}> {
+export interface GPUObject<T = unknown> extends IDisposable {
     // (undocumented)
     readonly cid: number;
     // (undocumented)
@@ -1652,7 +1655,7 @@ export class Pool {
     constructor(device: AbstractDevice, id: string | symbol, memCostThreshold?: number);
     // (undocumented)
     autoRelease(): void;
-    createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer<unknown>;
+    createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer;
     disposeFrameBuffer(fb: FrameBuffer): void;
     disposeTexture(texture: BaseTexture): void;
     fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: MaybeArray<TextureFormat | T>, depthTexOrFormat?: TextureFormat | T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer;
@@ -2584,7 +2587,7 @@ export class VertexData {
     getIndexBuffer(): IndexBuffer;
     getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
     getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
-    get indexBuffer(): IndexBuffer<unknown>;
+    get indexBuffer(): IndexBuffer;
     removeVertexBuffer(buffer: StructuredBuffer): boolean;
     // (undocumented)
     setDrawOffset(offset: number): void;

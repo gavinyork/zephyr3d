@@ -3,7 +3,11 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
- * File entry interface for DataTransfer file system
+ * File entry descriptor used by the DataTransfer-based VFS.
+ *
+ * Represents files captured from `DataTransfer` or `FileList`, along with
+ * minimal metadata required by the virtual file system.
+ *
  * @public
  */
 export interface DataTransferFileEntry {
@@ -22,7 +26,15 @@ export interface DataTransferFileEntry {
 /**
  * DataTransfer-based virtual file system for handling dropped files and directories.
  *
- * Read-only VFS populated from DataTransfer (drag-and-drop) or FileList (input with webkitdirectory).
+ * Read-only VFS populated from a `DataTransfer` (drag-and-drop) or a `FileList`
+ * (e.g., from `<input type="file" webkitdirectory>`).
+ *
+ * Notes:
+ * - This VFS is read-only; mutating operations throw `VFSError` with code `"EROFS"`.
+ * - For directory support via drag-and-drop, relies on non-standard WebKit APIs
+ *   (`webkitGetAsEntry`, `FileSystemDirectoryEntry`, etc.) where available.
+ *
+ * @public
  */
 export class DataTransferVFS extends VFS {
   private readonly entries: Map<string, DataTransferFileEntry> = new Map();
@@ -30,6 +42,14 @@ export class DataTransferVFS extends VFS {
   private initialized = false;
   private readonly initPromise: Promise<void>;
 
+  /**
+   * Constructs a read-only VFS from `DataTransfer` or `FileList`.
+   *
+   * Initialization is asynchronous. Public operations wait for completion via
+   * an internal gate (`ensureInitialized`).
+   *
+   * @param data - The source of files/directories (drag-and-drop `DataTransfer` or `FileList`).
+   */
   constructor(data: DataTransfer | FileList) {
     super(true); // Always read-only
     this.initialized = false;
@@ -39,9 +59,16 @@ export class DataTransferVFS extends VFS {
         : this.initializeFromFileList(data);
   }
 
-  // ============== VFS Implementation ==============
-
-  /** {@inheritDoc VFS._readDirectory} */
+  /**
+   * {@inheritDoc VFS._readDirectory}
+   *
+   * Behavior:
+   * - Validates existence of the directory in the synthetic `directoryStructure`.
+   * - Builds `FileMetadata` for each child entry (file or directory).
+   * - Applies `options.pattern` filtering and optional recursive expansion.
+   *
+   * @throws {@link VFSError} with code `"ENOENT"` if the directory does not exist.
+   */
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
     await this.ensureInitialized();
 
@@ -95,7 +122,16 @@ export class DataTransferVFS extends VFS {
     return results;
   }
 
-  /** {@inheritDoc VFS._readFile} */
+  /**
+   * {@inheritDoc VFS._readFile}
+   *
+   * Behavior:
+   * - Looks up the file in the in-memory `entries` map.
+   * - Supports partial reads using `Blob.slice(offset, offset+length)`.
+   * - Decodes to `utf8` or `base64` if requested; otherwise returns `ArrayBuffer`.
+   *
+   * @throws {@link VFSError} with code `"ENOENT"` if the file does not exist or is a directory.
+   */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
     await this.ensureInitialized();
 
@@ -127,7 +163,11 @@ export class DataTransferVFS extends VFS {
     }
   }
 
-  /** {@inheritDoc VFS._exists} */
+  /**
+   * {@inheritDoc VFS._exists}
+   *
+   * Returns true for the root path `/`, any known file path, or any known synthetic directory path.
+   */
   protected async _exists(path: string): Promise<boolean> {
     await this.ensureInitialized();
 
@@ -139,7 +179,16 @@ export class DataTransferVFS extends VFS {
     return this.entries.has(normalizedPath) || this.directoryStructure.has(normalizedPath);
   }
 
-  /** {@inheritDoc VFS._stat} */
+  /**
+   * {@inheritDoc VFS._stat}
+   *
+   * Behavior:
+   * - Root `/` returns directory stats with zero size and current timestamps.
+   * - Files return size and timestamps from the `File` object.
+   * - Known directories return zero size and current timestamps.
+   *
+   * @throws {@link VFSError} with code `"ENOENT"` if the path is unknown.
+   */
   protected async _stat(path: string): Promise<FileStat> {
     await this.ensureInitialized();
 
@@ -171,24 +220,49 @@ export class DataTransferVFS extends VFS {
   }
 
   // Read-only file system - throw errors for write operations
+  /**
+   * Not supported. DataTransfer VFS is read-only.
+   * @throws {@link VFSError} with code `"EROFS"`.
+   */
   protected async _writeFile(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
+  /**
+   * Not supported. DataTransfer VFS is read-only.
+   * @throws {@link VFSError} with code `"EROFS"`.
+   */
   protected async _makeDirectory(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
+  /**
+   * Not supported. DataTransfer VFS is read-only.
+   * @throws {@link VFSError} with code `"EROFS"`.
+   */
   protected async _deleteFile(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
+  /**
+   * Not supported. DataTransfer VFS is read-only.
+   * @throws {@link VFSError} with code `"EROFS"`.
+   */
   protected async _deleteDirectory(): Promise<void> {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
+  /**
+   * No-op for read-only VFS.
+   */
   protected async _wipe(): Promise<void> {
     return;
   }
+  /**
+   * No-op for read-only VFS.
+   */
   protected _deleteFileSystem(): Promise<void> {
     return Promise.resolve();
   }
+  /**
+   * No-op for read-only VFS.
+   */
   protected _move(): Promise<void> {
     return Promise.resolve();
   }
@@ -201,17 +275,6 @@ export class DataTransferVFS extends VFS {
     this.initialized = true;
   }
 
-  // ============== Initialization ==============
-
-  /**
-   * Initialize the VFS from a DataTransfer object (from drag and drop).
-   *
-   * 核心策略：
-   * - 同步遍历 items，立即启动 entry.file()/readEntries()；
-   * - 将每个启动后的回调包装成 Promise 收集；
-   * - 最后统一 Promise.all 等待；
-   * - 避免保存 FileSystemEntry 到后续再访问。
-   */
   private async initializeFromDataTransfer(dataTransfer: DataTransfer): Promise<void> {
     this.entries.clear();
     this.directoryStructure.clear();
@@ -229,7 +292,6 @@ export class DataTransferVFS extends VFS {
         continue;
       }
 
-      // 优先使用支持目录的 entry
       const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
       if (entry) {
         const rootPath = this.normalizePath(`/${entry.name}`);
@@ -241,18 +303,15 @@ export class DataTransferVFS extends VFS {
         continue;
       }
 
-      // 回退：直接文件
       const file = item.getAsFile && item.getAsFile();
       if (file) {
         filePromises.push(Promise.resolve({ file, path: file.name }));
       }
     }
 
-    // 统一等待所有已启动的操作
     const results = await Promise.all(filePromises);
     const flattened = results.flat() as Array<{ file: File; path: string }>;
 
-    // 构建内部结构
     const fileEntries: DataTransferFileEntry[] = [];
     for (const { file, path } of flattened) {
       await this.processFile(file, path, fileEntries);
@@ -266,9 +325,6 @@ export class DataTransferVFS extends VFS {
     }
   }
 
-  /**
-   * Initialize from a FileList (for input[type="file"] with webkitdirectory)
-   */
   private async initializeFromFileList(fileList: FileList): Promise<void> {
     this.entries.clear();
     this.directoryStructure.clear();
@@ -291,18 +347,12 @@ export class DataTransferVFS extends VFS {
     }
   }
 
-  // ============== Helpers: synchronous start, promise collection ==============
-
-  /**
-   * 同步启动文件读取（entry.file），返回在回调触发时 resolve 的 Promise。
-   */
   private collectFileOperation(
     fileEntry: FileSystemFileEntry,
     relativePath: string
   ): Promise<{ file: File; path: string }> {
     return new Promise((resolve, reject) => {
       try {
-        // 同步触发 entry.file(...)
         fileEntry.file(
           (file: File) => resolve({ file, path: relativePath }),
           (err: any) => {
@@ -317,10 +367,6 @@ export class DataTransferVFS extends VFS {
     });
   }
 
-  /**
-   * 同步启动目录读取（createReader + 连续 readEntries），
-   * 目录完全读取后，递归对子项同步启动收集，返回扁平化文件列表。
-   */
   private collectDirectoryOperation(
     dirEntry: FileSystemDirectoryEntry,
     basePath: string
@@ -334,7 +380,6 @@ export class DataTransferVFS extends VFS {
           reader.readEntries(
             (entries: FileSystemEntry[]) => {
               if (entries.length === 0) {
-                // 目录读完，递归处理所有子项
                 const promises: Array<
                   Promise<{ file: File; path: string } | Array<{ file: File; path: string }>>
                 > = [];
@@ -361,7 +406,6 @@ export class DataTransferVFS extends VFS {
                 return;
               }
 
-              // 累积条目并继续读取下一批
               batchEntries.push(...entries);
               readBatch();
             },
@@ -376,16 +420,10 @@ export class DataTransferVFS extends VFS {
         }
       };
 
-      // 立即开始读取
       readBatch();
     });
   }
 
-  // ============== Internal builders ==============
-
-  /**
-   * Process an individual file into VFS entry structures (no disk I/O here).
-   */
   private async processFile(
     file: File,
     relativePath: string,
@@ -404,9 +442,6 @@ export class DataTransferVFS extends VFS {
     fileEntries.push(entry);
   }
 
-  /**
-   * Update the directory structure for a given file path.
-   */
   private updateDirectoryStructure(filePath: string): void {
     const parts = filePath.split('/').filter((p) => p);
     let currentPath = '';

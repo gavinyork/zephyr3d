@@ -1,35 +1,84 @@
 import type { VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
-import type { ModuleId } from './types';
 import { init, parse } from 'es-module-lexer';
 
+/**
+ * Converts JavaScript source to a data URL tied to a logical module id.
+ *
+ * @param js - The JavaScript source code to embed.
+ * @param id - Logical module identifier (used only for sourceURL tagging).
+ * @returns A `data:text/javascript;base64,...` URL with an encoded `#id` suffix.
+ * @internal
+ */
 function toDataUrl(js: string, id: string): string {
   const b64 = textToBase64(js);
   return `data:text/javascript;base64,${b64}#${encodeURIComponent(String(id))}`;
 }
 
+/**
+ * Checks whether a specifier is an absolute HTTP(S) URL.
+ * @internal
+ */
 function isAbsoluteUrl(spec: string): boolean {
   return /^https?:\/\//i.test(spec);
 }
+
+/**
+ * Checks whether a specifier is a special URL (data: or blob:).
+ * @internal
+ */
 function isSpecialUrl(spec: string): boolean {
   return /^(data|blob):/i.test(spec);
 }
+
+/**
+ * Checks whether a specifier is a bare module (not starting with ./, ../, /, or #/).
+ * @internal
+ */
 function isBareModule(spec: string): boolean {
   return !spec.startsWith('./') && !spec.startsWith('../') && !spec.startsWith('/') && !spec.startsWith('#/');
 }
 
+/**
+ * Resolves, builds, and serves runtime modules using a {@link VFS}.
+ *
+ * Responsibilities:
+ * - Resolve logical module IDs to physical paths or URLs.
+ * - In editor mode, rewrite import specifiers and serve modules as data URLs after transpile.
+ * - Transpile TypeScript to JavaScript on the fly (requires `window.ts` TypeScript runtime).
+ * - Gather static and dynamic import dependencies for tooling.
+ *
+ * Modes:
+ * - Editor mode (`editorMode === true`): modules are rewritten to data URLs after transpile/build.
+ * - Runtime mode (`editorMode === false`): returns .js URLs directly (with .ts -> .js mapping).
+ *
+ * Caching:
+ * - Built modules are memoized in `_built` map keyed by logical ID.
+ *
+ * @public
+ */
 export class ScriptRegistry {
   private _vfs: VFS;
   private _scriptsRoot: string;
   private _built = new Map<string, string>(); // logicalId -> dataURL
   private _editorMode = false;
 
+  /**
+   * @param vfs - The virtual file system for existence checks, reads, and path ops.
+   * @param scriptsRoot - Root directory for script resolution (used with `#/` specifiers).
+   * @param editorMode - Whether to build modules to data URLs and rewrite imports.
+   */
   constructor(vfs: VFS, scriptsRoot: string, editorMode: boolean) {
     this._vfs = vfs;
     this._scriptsRoot = scriptsRoot;
     this._editorMode = editorMode;
   }
 
+  /**
+   * The active virtual file system.
+   *
+   * Assigning a new VFS clears the build cache.
+   */
   get VFS() {
     return this._vfs;
   }
@@ -40,6 +89,9 @@ export class ScriptRegistry {
     }
   }
 
+  /**
+   * Whether the registry operates in editor mode (rewrite/build to data URLs).
+   */
   get editorMode() {
     return this._editorMode;
   }
@@ -47,6 +99,9 @@ export class ScriptRegistry {
     this._editorMode = val;
   }
 
+  /**
+   * The root path used by `#/` specifiers.
+   */
   get scriptsRoot() {
     return this._scriptsRoot;
   }
@@ -54,16 +109,27 @@ export class ScriptRegistry {
     this._scriptsRoot = path;
   }
 
+  /**
+   * Fetches raw source for a logical module id by probing known extensions.
+   *
+   * Search order:
+   * - If `id` already ends with `.ts` or `.js` and is a file -> return it.
+   * - Else try `.id.ts`, then `.id.js`.
+   *
+   * @param id - Logical module identifier (absolute or logical path-like).
+   * @returns Source code, resolved path, and type (`'js' | 'ts'`), or `undefined` if not found.
+   * @protected
+   */
   protected async fetchSource(
-    _id: ModuleId
+    id: string
   ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
     let type: 'js' | 'ts' = null;
     let pathWithExt = '';
-    if (_id.endsWith('.ts')) {
-      pathWithExt = _id;
+    if (id.endsWith('.ts')) {
+      pathWithExt = id;
       type = 'ts';
-    } else if (_id.endsWith('.js')) {
-      pathWithExt = _id;
+    } else if (id.endsWith('.js')) {
+      pathWithExt = id;
       type = 'js';
     }
     if (type) {
@@ -79,7 +145,7 @@ export class ScriptRegistry {
     const types = ['ts', 'js'] as const;
     if (!type) {
       for (const t of types) {
-        pathWithExt = `${_id}.${t}`;
+        pathWithExt = `${id}.${t}`;
         const exists = await this._vfs.exists(pathWithExt);
         if (exists) {
           const stats = await this._vfs.stat(pathWithExt);
@@ -96,7 +162,20 @@ export class ScriptRegistry {
     }
   }
 
-  async resolveRuntimeUrl(entryId: ModuleId): Promise<string> {
+  /**
+   * Resolves a module entry to a URL suitable for dynamic import.
+   *
+   * Behavior:
+   * - In editor mode, builds the module to a data URL via {@link build}.
+   * - Otherwise, returns `.js` URL directly:
+   *   - If `id` ends with `.js`: return as-is.
+   *   - If `id` ends with `.ts`: map to `.js` (assumes pre-built file exists).
+   *   - Else: append `.js`.
+   *
+   * @param entryId - Entry module identifier (logical or path-like).
+   * @returns A URL string that can be used in `import(...)`.
+   */
+  async resolveRuntimeUrl(entryId: string): Promise<string> {
     const id = await this.resolveLogicalId(entryId);
     return this._editorMode
       ? await this.build(String(id))
@@ -107,6 +186,16 @@ export class ScriptRegistry {
       : `${id}.js`;
   }
 
+  /**
+   * Recursively gathers direct static and dynamic import dependencies for a module.
+   *
+   * Only relative specifiers (`./` or `../`) are followed. Absolute, special, and bare
+   * module specifiers are ignored here.
+   *
+   * @param entryId - The starting (possibly relative) specifier from `fromId`.
+   * @param fromId - The logical id of the module containing `entryId`.
+   * @param dependencies - Output map of `resolvedSourcePath -> file contents`.
+   */
   async getDependencies(
     entryId: string,
     fromId: string,
@@ -142,6 +231,20 @@ export class ScriptRegistry {
     await gather(code, reDynamic);
   }
 
+  /**
+   * Builds a logical module id into a data URL (editor mode pipeline).
+   *
+   * Steps:
+   * - Resolve source path (.ts/.js) via {@link resolveSourcePath}.
+   * - Read source code.
+   * - Rewrite import specifiers via {@link rewriteImports}.
+   * - Transpile TypeScript if needed via {@link transpile}.
+   * - Convert to `data:` URL and memoize in `_built`.
+   *
+   * @param id - Logical module id to build.
+   * @returns Data URL string for dynamic import, or empty string if not found.
+   * @private
+   */
   private async build(id: string): Promise<string> {
     const key = String(id);
     const cached = this._built.get(key);
@@ -162,7 +265,22 @@ export class ScriptRegistry {
     return url;
   }
 
-  protected async transpile(code: string, _id: ModuleId, type: 'js' | 'ts'): Promise<string> {
+  /**
+   * Transpiles code to JavaScript and appends sourceURL/sourceMap hints.
+   *
+   * Behavior:
+   * - For `'js'`, returns code with `//# sourceURL=logicalId`.
+   * - For `'ts'`, requires `window.ts` (TypeScript compiler) to be present and
+   *   transpiles to ES2015/ESNext module with inline source maps.
+   *
+   * @param code - Source code to transpile.
+   * @param _id - Logical module id (used for fileName/sourceURL).
+   * @param type - Source type (`'js' | 'ts'`).
+   * @returns Transpiled JavaScript source.
+   * @throws If TypeScript runtime is not found for TS input.
+   * @protected
+   */
+  private async transpile(code: string, _id: string, type: 'js' | 'ts'): Promise<string> {
     const logicalId = String(_id);
 
     if (type === 'js') {
@@ -195,7 +313,29 @@ export class ScriptRegistry {
     return out;
   }
 
-  protected async rewriteImports(code: string, fromId: ModuleId): Promise<string> {
+  /**
+   * Rewrites ESM import specifiers in `code` into runtime-loadable URLs.
+   *
+   * Parsing:
+   * - Uses `es-module-lexer` to find import spans; sorts them ascending by start.
+   *
+   * Replacement rules:
+   * - Skip invalid spans or ones without quoted specifiers.
+   * - If spec is absolute URL, special URL (data:, blob:), or bare module:
+   *   - If it starts with `@zephyr3d/`, keep as-is (external).
+   *   - Otherwise resolve to a logical id and attempt to `build` it (if available).
+   * - Else (relative spec), resolve from `fromId` and `build` recursively.
+   *
+   * Output:
+   * - Directly writes the replacement specifier without re-adding quotes,
+   *   so replacements must themselves be quoted or be valid URLs/data URLs.
+   *
+   * @param code - Module source code to transform.
+   * @param fromId - The logical id of the current module (resolution base for relatives).
+   * @returns Transformed source with rewritten import specifiers.
+   * @protected
+   */
+  private async rewriteImports(code: string, fromId: string): Promise<string> {
     await init;
     const [imports] = parse(code);
     const list = [...imports].sort((a, b) => (a.s || 0) - (b.s || 0));
@@ -235,6 +375,22 @@ export class ScriptRegistry {
     return out;
   }
 
+  /**
+   * Resolves a specifier to a logical id suitable for further processing.
+   *
+   * Resolution rules:
+   * - `#/path`: resolved against `scriptsRoot` via VFS join/normalize.
+   * - `./` or `../`: resolved relative to `fromId` directory (requires `fromId`).
+   * - `/absolute`: treated as absolute from root (normalized).
+   * - Bare module in editor mode: if `/deps.lock.json` exists and contains an entry,
+   *   map to the dependency's `entry` path; otherwise return as-is.
+   * - Else (non-editor bare module): return `spec` unchanged (external).
+   *
+   * @param spec - Import specifier string.
+   * @param fromId - Optional base logical id used for relative resolution.
+   * @returns A normalized logical id or an external specifier string.
+   * @throws If a relative import is provided without `fromId`.
+   */
   async resolveLogicalId(spec: string, fromId?: string): Promise<string> {
     let path: string;
 
@@ -265,6 +421,17 @@ export class ScriptRegistry {
     return path;
   }
 
+  /**
+   * Resolves a logical id to a concrete source path and type by probing extensions.
+   *
+   * Rules:
+   * - If `logicalId` ends with `.ts` or `.js`/`.mjs` and is a file, return it.
+   * - Else probe `logicalId.ts`, `logicalId.js`, `logicalId.mjs` in that order.
+   * - Maps `.mjs` to type `'js'`.
+   *
+   * @param logicalId - The normalized logical module id (path-like).
+   * @returns `{ type, path }` or `null` if not found.
+   */
   async resolveSourcePath(logicalId: string) {
     let type: 'js' | 'ts' = null;
     let pathWithExt = '';

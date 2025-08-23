@@ -3,26 +3,72 @@ import { VFS, VFSError, GlobMatcher } from './vfs';
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './readers/reader';
 import { PathUtils } from './common';
 
+/**
+ * Options for {@link HttpFS}.
+ *
+ * @public
+ */
 export interface HttpFSOptions {
+  /**
+   * Request timeout in milliseconds for HTTP operations. Defaults to 30000.
+   */
   timeout?: number;
+  /**
+   * Default headers to include with each HTTP request.
+   */
   headers?: Record<string, string>;
+  /**
+   * Fetch credentials policy for cross-origin requests.
+   * See `RequestCredentials` for allowed values.
+   */
   credentials?: RequestCredentials;
+  /**
+   * Optional URL pre-processor. If provided, every incoming VFS path is first
+   * passed through this resolver to produce the final URL or path string.
+   *
+   * Use cases:
+   * - Rewriting logical VFS paths to CDN URLs
+   * - Injecting cache-busting query params
+   * - Mapping to object/data URLs
+   */
   urlResolver?: (url: string) => string;
+  /**
+   * One or more directory readers used to enumerate HTTP-backed directories.
+   * If not provided, directory listing is not supported.
+   */
   directoryReader?: HttpDirectoryReader | HttpDirectoryReader[];
 }
 
 /**
- * Http file system.
+ * HTTP-backed virtual file system.
+ *
+ * Provides a read-only VFS implementation that resolves files via HTTP(S).
+ * Supports:
+ * - File reads via `GET`
+ * - Existence/stat probing via `HEAD`
+ * - Optional directory listing via pluggable {@link HttpDirectoryReader}s
+ *
+ * Limitations:
+ * - This FS is read-only; mutating operations throw `VFSError` with code `"EROFS"`.
+ * - Partial reads (HTTP range) are not implemented yet.
  *
  * @public
  */
-
 export class HttpFS extends VFS {
   private readonly baseOrigin: string;
   private readonly basePath: string;
   private readonly options: HttpFSOptions;
   private readonly dirReaders: HttpDirectoryReader[];
 
+  /**
+   * Creates an HTTP file system rooted at `baseURL`.
+   *
+   * All relative VFS paths are resolved against `baseURL` and fetched using
+   * the configured options.
+   *
+   * @param baseURL - Base URL of the HTTP root. Can be absolute or relative to `window.location`.
+   * @param options - Optional HTTP and directory-reading configuration.
+   */
   constructor(baseURL: string, options: HttpFSOptions = {}) {
     super(true); // Readonly
     baseURL = baseURL || './';
@@ -43,12 +89,33 @@ export class HttpFS extends VFS {
       : [];
   }
 
+  /**
+   * Optional URL resolver hook that transforms VFS paths into concrete URLs.
+   *
+   * If present, it is applied by {@link normalizePath} before other checks.
+   */
   get urlResolver(): (url: string) => string {
     return this.options.urlResolver ?? null;
   }
+  /**
+   * Sets a URL resolver hook that transforms VFS paths into concrete URLs.
+   *
+   * Pass `null`/`undefined` to clear it.
+   */
   set urlResolver(resolver: (url: string) => string) {
     this.options.urlResolver = resolver ?? null;
   }
+  /**
+   * Normalizes a VFS path for HTTP use.
+   *
+   * Behavior:
+   * - Applies `urlResolver` if provided.
+   * - If the result is a data URI or an object URL, it is returned as-is.
+   * - Otherwise falls back to the base VFS `normalizePath` logic.
+   *
+   * @param path - Input VFS path or URL-like string.
+   * @returns Normalized path or URL.
+   */
   normalizePath(path: string): string {
     if (this.options.urlResolver) {
       path = this.options.urlResolver(path);
@@ -60,10 +127,12 @@ export class HttpFS extends VFS {
     return super.normalizePath(path);
   }
 
+  /** {@inheritDoc VFS._makeDirectory} */
   protected async _makeDirectory(path: string): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
+  /** {@inheritDoc VFS._readDirectory} */
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
     const normalized = this.normalizePath(path);
     const dirPath = normalized.endsWith('/') ? normalized : normalized + '/';
@@ -119,30 +188,12 @@ export class HttpFS extends VFS {
     return out;
   }
 
-  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
-    if (this.dirReaders.length === 1) {
-      return this.dirReaders[0];
-    }
-
-    for (const r of this.dirReaders) {
-      if (!r.canHandle) {
-        continue;
-      }
-      try {
-        if (await r.canHandle(dirPath, ctx)) {
-          return r;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  }
-
+  /** {@inheritDoc VFS._deleteDirectory} */
   protected async _deleteDirectory(path: string): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
+  /** {@inheritDoc VFS._readFile} */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
     try {
       const response = await this.fetchWithTimeout(path);
@@ -183,6 +234,7 @@ export class HttpFS extends VFS {
     }
   }
 
+  /** {@inheritDoc VFS._writeFile} */
   protected async _writeFile(
     path: string,
     _data: ArrayBuffer | string,
@@ -191,10 +243,12 @@ export class HttpFS extends VFS {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
+  /** {@inheritDoc VFS._deleteFile} */
   protected async _deleteFile(path: string): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
+  /** {@inheritDoc VFS._exists} */
   protected async _exists(path: string): Promise<boolean> {
     const normalizedPath = this.normalizePath(path);
 
@@ -206,6 +260,7 @@ export class HttpFS extends VFS {
     }
   }
 
+  /** {@inheritDoc VFS._stat} */
   protected async _stat(path: string): Promise<FileStat> {
     try {
       const response = await this.fetchWithTimeout(path, { method: 'HEAD' });
@@ -240,12 +295,15 @@ export class HttpFS extends VFS {
       throw new VFSError(`Failed to stat file: ${error}`, 'EIO', path);
     }
   }
+  /** {@inheritDoc VFS._deleteFileSystem} */
   protected async _deleteFileSystem(): Promise<void> {
     return;
   }
+  /** {@inheritDoc VFS._wipe} */
   protected async _wipe(): Promise<void> {
     return;
   }
+  /** {@inheritDoc VFS._move} */
   protected async _move(): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }
@@ -278,5 +336,24 @@ export class HttpFS extends VFS {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
+    if (this.dirReaders.length === 1) {
+      return this.dirReaders[0];
+    }
+
+    for (const r of this.dirReaders) {
+      if (!r.canHandle) {
+        continue;
+      }
+      try {
+        if (await r.canHandle(dirPath, ctx)) {
+          return r;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return null;
   }
 }
