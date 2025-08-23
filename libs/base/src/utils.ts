@@ -390,6 +390,31 @@ export function base64ToText(base64: string): string {
 }
 
 /**
+ * Generate 128bit random UUID
+ * @returns random UUID
+ */
+export function randomUUID() {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  } else {
+    const rnds = new Uint8Array(16);
+    crypto.getRandomValues(rnds);
+    // Per RFC 4122 v4
+    rnds[6] = (rnds[6] & 0x0f) | 0x40;
+    rnds[8] = (rnds[8] & 0x3f) | 0x80;
+
+    const hex = [...rnds].map((b) => b.toString(16).padStart(2, '0'));
+    return [
+      hex.slice(0, 4).join(''),
+      hex.slice(4, 6).join(''),
+      hex.slice(6, 8).join(''),
+      hex.slice(8, 10).join(''),
+      hex.slice(10, 16).join('')
+    ].join('-');
+  }
+}
+
+/**
  * Check if a value is an instance of a specific constructor.
  * @param value - The value to check.
  * @param constructor - The constructor to check against.

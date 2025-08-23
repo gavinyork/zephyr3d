@@ -1,5 +1,5 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
-import { HttpFS, IndexedDBFS } from '@zephyr3d/base';
+import { HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
 import { SerializationManager } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
 
@@ -52,7 +52,7 @@ export class ProjectService {
     if (!name) {
       throw new Error('Create project failed: Project name must not be empty');
     }
-    const uuid = crypto.randomUUID();
+    const uuid = randomUUID();
     const manifest = await this.readManifest();
     manifest.projectList[uuid] = {
       name,
@@ -132,7 +132,7 @@ export class ProjectService {
   }
   static async saveProject(project: ProjectInfo) {
     const manifest = await this.readManifest();
-    project.uuid = project.uuid || crypto.randomUUID();
+    project.uuid = project.uuid || randomUUID();
     manifest.projectList[project.uuid] = project;
     await this.writeManifest(manifest);
   }

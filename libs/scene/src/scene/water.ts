@@ -15,6 +15,7 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   GPUProgram,
+  RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
 import { Application } from '../app';
@@ -39,6 +40,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _feedbackBindGroup: DRef<BindGroup>;
   private _feedbackPrimitive: DRef<Primitive>;
   private _feedbackRenderTarget: DRef<FrameBuffer>;
+  private _feedbackRenderStates: RenderStateSet;
   private readonly _material: DRef<WaterMaterial>;
   /**
    * Creates an instance of Water node
@@ -60,6 +62,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._feedbackBindGroup = new DRef();
     this._feedbackPrimitive = new DRef();
     this._feedbackRenderTarget = new DRef();
+    this._feedbackRenderStates = null;
     scene.queuePerCameraUpdateNode(this);
   }
   /** Disposes the water node */
@@ -71,6 +74,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._feedbackBindGroup.dispose();
     this._feedbackPrimitive.dispose();
     this._feedbackProgram.dispose();
+    this._feedbackRenderStates = null;
     if (this._feedbackRenderTarget.get()) {
       this._feedbackRenderTarget.get().getColorAttachment(0).dispose();
       this._feedbackRenderTarget.get().getColorAttachment(1).dispose();
@@ -298,10 +302,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    */
   async getSurfacePoint(points: Vector3[], outPos?: Vector3[], outNorm?: Vector3[]) {
     const device = Application.instance.device;
+    if (!points || points.length === 0) {
+      return;
+    }
+    points = points.map((v) => v.clone());
     await device.runNextFrameAsync(async () => {
-      if (!points || points.length === 0) {
-        return;
-      }
       if (!this._feedbackProgram.get()) {
         this._feedbackProgram.set(this._createFeedbackProgram(device));
         this._feedbackBindGroup.set(device.createBindGroup(this._feedbackProgram.get().bindGroupLayouts[0]));
@@ -310,15 +315,21 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this._feedbackPrimitive.set(new Primitive());
         this._feedbackPrimitive.get().primitiveType = 'point-list';
       }
+      if (!this._feedbackRenderStates) {
+        this._feedbackRenderStates = device.createRenderStateSet();
+        this._feedbackRenderStates.useDepthState().enableTest(false).enableWrite(false);
+        this._feedbackRenderStates.useRasterizerState().setCullMode('none');
+      }
       const primitive = this._feedbackPrimitive.get();
-      const vertices = new Float32Array(points.length * 3);
+      const vertices = new Float32Array(points.length * 4);
       for (let i = 0; i < points.length; i++) {
-        vertices[i * 3 + 0] = points[i].x;
-        vertices[i * 3 + 1] = points[i].y;
-        vertices[i * 3 + 2] = points[i].z;
+        vertices[i * 4 + 0] = points[i].x;
+        vertices[i * 4 + 1] = points[i].y;
+        vertices[i * 4 + 2] = points[i].z;
+        vertices[i * 4 + 3] = i;
       }
       if (primitive.indexCount < points.length) {
-        const positionBuffer = device.createVertexBuffer('position_f32x3', vertices, { dynamic: true });
+        const positionBuffer = device.createVertexBuffer('position_f32x4', vertices, { dynamic: true });
         primitive.setVertexBuffer(positionBuffer);
       } else {
         const vb = primitive.getVertexBuffer('position');
@@ -357,10 +368,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       ]);
       for (let i = 0; i < points.length; i++) {
         if (outPos) {
-          outPos[i].setXYZ(pos[i * 3 + 0], pos[i * 3 + 1], pos[i * 3 + 2]);
+          outPos[i].setXYZ(pos[i * 4 + 0], pos[i * 4 + 1], pos[i * 4 + 2]);
         }
         if (outNorm) {
-          outNorm[i].setXYZ(norm[i * 3 + 0], norm[i * 3 + 1], norm[i * 3 + 2]);
+          outNorm[i].setXYZ(norm[i * 4 + 0], norm[i * 4 + 1], norm[i * 4 + 2]);
         }
       }
     });
@@ -370,7 +381,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const that = this;
     return device.buildRenderProgram({
       vertex(pb) {
-        this.$inputs.position = pb.vec3().attrib('position');
+        this.$inputs.position = pb.vec4().attrib('position');
         this.textureWidth = pb.float().uniform(0);
         that.waveGenerator.setupUniforms(this, 0);
         pb.main(function () {
@@ -378,17 +389,21 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
           this.$l.worldNorm = pb.vec3();
           that.waveGenerator.calcVertexPositionAndNormal(
             this,
-            this.$inputs.position,
+            this.$inputs.position.xyz,
             this.worldPos,
             this.worldNorm
           );
           this.$outputs.worldPos = this.worldPos;
           this.$outputs.worldNorm = this.worldNorm;
           this.$outputs.xz = this.$inputs.position.xz;
-          this.$l.index =
-            device.type === 'webgl' ? this.$inputs.instanceId : pb.float(this.$builtins.instanceIndex);
-          this.$l.ndcX = pb.sub(pb.mul(pb.div(pb.add(this.index, 0.5), this.textureWidth), 2), 1);
-          this.$l.$builtins.position = pb.vec4(this.ndcX, 0.5, 0, 1);
+          this.$l.ndcX = pb.sub(
+            pb.mul(pb.div(pb.add(this.$inputs.position.w, 0.5), this.textureWidth), 2),
+            1
+          );
+          if (pb.getDevice().type !== 'webgpu') {
+            this.$builtins.pointSize = 1;
+          }
+          this.$l.$builtins.position = pb.vec4(this.ndcX, 0, 0, 1);
         });
       },
       fragment(pb) {

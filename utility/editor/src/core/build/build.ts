@@ -98,7 +98,7 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
       }
     }
   }
-  return importMap;
+  return { imports: importMap };
 }
 
 export async function buildForEndUser(
@@ -144,12 +144,12 @@ export async function buildForEndUser(
   for (const file of assetFiles) {
     const isTS = file.path.endsWith('.ts');
     let content = await vfs.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
-    let path = vfs.relative(vfs.join('/dist', file.path), '/');
+    let path = file.path;
     if (isTS) {
-      path = `${path.slice(0, -3)}.js`;
       content = transpileTS(file.path, rewriteImports(content as string));
+      path = `${path.slice(0, -3)}.js`;
     }
-    await vfs.writeFile(vfs.join('/dist', file.path), content, {
+    await vfs.writeFile(vfs.join('/dist', path), content, {
       create: true,
       encoding: isTS ? 'utf8' : 'binary'
     });

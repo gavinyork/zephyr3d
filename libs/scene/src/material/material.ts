@@ -4,7 +4,7 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { DWeakRef, Disposable } from '@zephyr3d/base';
+import { DWeakRef, Disposable, randomUUID } from '@zephyr3d/base';
 import type { Clonable, IDisposable } from '@zephyr3d/base';
 
 type MaterialState = {
@@ -49,7 +49,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   constructor() {
     super();
     this._id = ++Material._nextId;
-    this._persistentId = crypto.randomUUID();
+    this._persistentId = randomUUID();
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];

@@ -1,6 +1,7 @@
 import {
   Disposable,
   DWeakRef,
+  randomUUID,
   releaseObject,
   retainObject,
   type Clonable,
@@ -70,7 +71,7 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     this._defaultIndexCount = 0;
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
-    this._persistentId = crypto.randomUUID();
+    this._persistentId = randomUUID();
     this._changeTag = 0;
     this._bbox = null;
     this._bboxChangeCallback = [];

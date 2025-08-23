@@ -1175,7 +1175,7 @@ export class VFSRenderer extends Observable<{
           }
           ImGui.EndMenu();
         }
-        if (dir !== this._filesystem) {
+        if (dir !== this._filesystem && dir.path !== '/assets' && dir.path !== '/src') {
           if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
             this._vfs
               .deleteDirectory(dir.path, true)

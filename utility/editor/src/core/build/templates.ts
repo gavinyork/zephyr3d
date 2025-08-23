@@ -49,6 +49,9 @@ export const templateIndexHTML = `<!DOCTYPE html>
         height: 100vh;
       }
       canvas {
+        touch-action: none;
+        overscroll-behavior: contain;
+        overflow: hidden;
         position: absolute;
         left: 0;
         top: 0;

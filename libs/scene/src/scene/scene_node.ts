@@ -8,7 +8,7 @@ import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
 import type { IDisposable, Quaternion } from '@zephyr3d/base';
-import { DRef } from '@zephyr3d/base';
+import { DRef, randomUUID } from '@zephyr3d/base';
 import {
   Matrix4x4,
   Observable,
@@ -152,7 +152,7 @@ export class SceneNode
    */
   constructor(scene: Scene) {
     super();
-    this._id = crypto.randomUUID();
+    this._id = randomUUID();
     this._disposed = false;
     this._scene = scene;
     this._name = '';

@@ -24,7 +24,7 @@ import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
-import { Vector2, Vector3, Vector4, applyMixins, DRef, DWeakRef } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, applyMixins, DRef, DWeakRef, randomUUID } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
 /**
@@ -243,7 +243,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    let persistentId = crypto.randomUUID();
+    let persistentId = randomUUID();
     Material._registry.set(persistentId, new DWeakRef(instance));
     Object.defineProperty(instance, 'coreMaterial', {
       get: function () {

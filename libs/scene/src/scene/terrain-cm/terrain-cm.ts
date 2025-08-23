@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { Vector4, applyMixins, Vector3, DRef } from '@zephyr3d/base';
+import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
 import type {
   GPUDataBuffer,
   PBInsideFunctionScope,
@@ -115,9 +115,9 @@ export class ClipmapTerrain
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
-    this._heightMapAssetId = `.embedded.dir/${this.persistentId}-heightmap.bin`;
-    this._grassAssetId = `.embedded.dir/${this.persistentId}-grass.bin`;
-    this._splatMapAssetId = `.embedded.dir/${this.persistentId}-splatmap.bin`;
+    this._heightMapAssetId = `assets/.embedded.dir/${this.persistentId}-heightmap.bin`;
+    this._grassAssetId = `assets/.embedded.dir/${this.persistentId}-grass.bin`;
+    this._splatMapAssetId = `assets/.embedded.dir/${this.persistentId}-splatmap.bin`;
     this._minHeight = 0;
     this._maxHeight = 0;
     this._material = new DRef(
@@ -154,7 +154,7 @@ export class ClipmapTerrain
    */
   get heightMapAssetId() {
     if (!this._heightMapAssetId) {
-      this._heightMapAssetId = crypto.randomUUID();
+      this._heightMapAssetId = randomUUID();
     }
     return this._heightMapAssetId;
   }
@@ -170,7 +170,7 @@ export class ClipmapTerrain
    */
   get splatMapAssetId() {
     if (!this._splatMapAssetId) {
-      this._splatMapAssetId = crypto.randomUUID();
+      this._splatMapAssetId = randomUUID();
     }
     return this._splatMapAssetId;
   }
@@ -186,7 +186,7 @@ export class ClipmapTerrain
    */
   get grassAssetId() {
     if (!this._grassAssetId) {
-      this._grassAssetId = crypto.randomUUID();
+      this._grassAssetId = randomUUID();
     }
     return this._grassAssetId;
   }
