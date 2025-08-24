@@ -207,13 +207,6 @@ export class TerrainMaterial
   supportInstancing(): boolean {
     return false;
   }
-  /**
-   * {@inheritDoc Material.isBatchable}
-   * @override
-   */
-  isBatchable(): boolean {
-    return false;
-  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {

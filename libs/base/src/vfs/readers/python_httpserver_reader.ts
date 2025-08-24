@@ -2,6 +2,23 @@
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './reader';
 import type { FileMetadata } from '../vfs';
 
+/**
+ * Directory reader for Python's built-in `http.server` (and similar)
+ * HTML directory listings.
+ *
+ * @remarks
+ * - Detects pages served by Python's `http.server` by scanning the `<title>` or `<h1>` tags.
+ * - Parses `<ul><li><a>` (default Python layout) and falls back to plain `<a>` links.
+ * - Skips parent directory entries (`../`), external links, and anchors.
+ * - Attempts to extract file size and modification date from the link's surrounding text.
+ * - Normalizes resolved paths via the provided `HttpDirectoryReaderContext`.
+ *
+ * Limitations:
+ * - Parsing depends on the server's HTML structure; non-standard variants may not be fully parsed.
+ * - Size and date extraction are best-effort and may be unavailable in some cases.
+ *
+ * @public
+ */
 export class PythonHttpServerReader implements HttpDirectoryReader {
   readonly name = 'python-http-server';
 

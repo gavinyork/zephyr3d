@@ -1,4 +1,4 @@
-import { DRef, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -22,7 +22,7 @@ export type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none'
  * Base class for any kind of environment light
  * @public
  */
-export abstract class EnvironmentLighting {
+export abstract class EnvironmentLighting extends Disposable {
   /**
    * The environment light type
    */
@@ -64,10 +64,6 @@ export abstract class EnvironmentLighting {
    * Returns whether this environment lighting supports diffuse light
    */
   abstract hasIrradiance(): boolean;
-  /**
-   * Dispose this object
-   */
-  dispose() {}
 }
 
 /**
@@ -109,15 +105,6 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   getType(): EnvLightType {
     return 'ibl-sh';
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.dispose}
-   * @override
-   */
-  dispose() {
-    this._radianceMap.dispose();
-    this._irradianceSH.dispose();
-    this._irradianceSHFB.dispose();
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
@@ -389,6 +376,16 @@ export class EnvShIBL extends EnvironmentLighting {
   hasIrradiance(): boolean {
     return !!this._irradianceSH;
   }
+  /**
+   * Disposes the object and releases all GPU resources
+   * @override
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._radianceMap.dispose();
+    this._irradianceSH.dispose();
+    this._irradianceSHFB.dispose();
+  }
 }
 
 /**
@@ -422,14 +419,6 @@ export class EnvIBL extends EnvironmentLighting {
    */
   getType(): EnvLightType {
     return 'ibl';
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.dispose}
-   * @override
-   */
-  dispose() {
-    this._radianceMap.dispose();
-    this._irradianceMap.dispose();
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
@@ -508,6 +497,15 @@ export class EnvIBL extends EnvironmentLighting {
    */
   hasIrradiance(): boolean {
     return !!this._irradianceMap;
+  }
+  /**
+   * Disposes the EnvIBL object
+   * @override
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._radianceMap.dispose();
+    this._irradianceMap.dispose();
   }
 }
 

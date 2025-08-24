@@ -40,6 +40,8 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     this._defaultWeights =
       assetTrack.defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
   }
+  /** {@inheritDoc AnimationTrack.calculateState} */
+
   calculateState(target: object, currentTime: number): MorphState {
     this._interpolator.interpolate(currentTime, this._state.weights);
     calculateMorphBoundingBox(
@@ -50,12 +52,14 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     );
     return this._state;
   }
+  /** {@inheritDoc AnimationTrack.applyState} */
   applyState(node: SceneNode, state: MorphState) {
     (node as Mesh).getMorphInfo().bufferSubData(4 * 4, state.weights);
     state.boundingBox.minPoint.addBy(this._originBox.minPoint);
     state.boundingBox.maxPoint.addBy(this._originBox.maxPoint);
     (node as Mesh).setAnimatedBoundingBox(state.boundingBox);
   }
+  /** {@inheritDoc AnimationTrack.mixState} */
   mixState(a: MorphState, b: MorphState, t: number): MorphState {
     const state: MorphState = {
       weights: new Float32Array(a.numTargets),
@@ -69,12 +73,15 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     }
     return state;
   }
+  /** {@inheritDoc AnimationTrack.getBlendId} */
   getBlendId(): unknown {
     return 'node-morph';
   }
+  /** {@inheritDoc AnimationTrack.getDuration} */
   getDuration(): number {
     return this._interpolator.maxTime;
   }
+  /** {@inheritDoc AnimationTrack.reset} */
   reset(node: SceneNode) {
     // apply default weights
     this._state.weights.set(this._defaultWeights);

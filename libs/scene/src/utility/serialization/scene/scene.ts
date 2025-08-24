@@ -548,6 +548,22 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
+          name: 'Script',
+          type: 'object',
+          options: {
+            mimeTypes: ['text/x-typescript']
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.script;
+          },
+          set(this: Scene, value) {
+            this.script = value?.str?.[0] ?? '';
+          }
+        },
+        {
           name: 'Metadata',
           type: 'object',
           default: null,

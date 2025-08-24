@@ -3,7 +3,7 @@
  */
 
 import type { Vector4 } from '@zephyr3d/base';
-import { AABB, ClipState, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
+import { AABB, ClipState, Disposable, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera';
 import { Primitive } from './primitive';
 import {
@@ -56,7 +56,7 @@ export interface ClipmapDrawContext extends ClipmapGatherContext {
 }
 
 /** @internal */
-export class Clipmap {
+export class Clipmap extends Disposable {
   private readonly _instanceDataPool: Float32Array<ArrayBuffer>[];
   private _instanceDataPoolSize: number;
   private readonly _mipLevelDataPool: Float32Array<ArrayBuffer>[];
@@ -92,6 +92,7 @@ export class Clipmap {
   private _wireframe: boolean;
 
   constructor(resolution: number, extraInstanceBuffers: VertexAttribFormat[], maxMipLevels = 64) {
+    super();
     if (
       extraInstanceBuffers &&
       extraInstanceBuffers.findIndex(
@@ -1126,7 +1127,9 @@ export class Clipmap {
     }
     return drawn;
   }
-  dispose() {
+  /** Disposes the clipmap and release all meshes */
+  protected onDispose() {
+    super.onDispose();
     this._crossMesh.dispose();
     this._crossMesh = null;
     this._crossMeshLines.dispose();

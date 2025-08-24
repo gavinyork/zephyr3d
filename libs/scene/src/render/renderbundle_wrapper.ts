@@ -3,10 +3,10 @@ import { Application } from '../app';
 import type { Material } from '../material';
 import type { Drawable } from './drawable';
 import type { Primitive } from './primitive';
+import { Disposable } from '@zephyr3d/base';
 
-export class RenderBundleWrapper {
+export class RenderBundleWrapper extends Disposable {
   private _renderBundles: Record<string, RenderBundle>;
-  private _disposed: boolean;
   private static readonly _drawableContainer: WeakMap<
     Drawable,
     { wrapper: RenderBundleWrapper; hashes: string[] }[]
@@ -137,11 +137,8 @@ export class RenderBundleWrapper {
     }
   }
   constructor() {
+    super();
     this._renderBundles = {};
-    this._disposed = false;
-  }
-  get disposed() {
-    return this._disposed;
   }
   getRenderBundle(hash: string) {
     return this._renderBundles[hash] ?? null;
@@ -155,8 +152,8 @@ export class RenderBundleWrapper {
   invalidate(hash: string) {
     this._renderBundles[hash] = undefined;
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._renderBundles = {};
-    this._disposed = true;
   }
 }

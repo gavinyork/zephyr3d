@@ -1,6 +1,6 @@
 import { Application } from '../app/app';
 import type { Vector4 } from '@zephyr3d/base';
-import { Vector3 } from '@zephyr3d/base';
+import { Disposable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -149,7 +149,7 @@ export interface DrawableInstanceInfo {
  * A queue that contains the items to be rendered
  * @public
  */
-export class RenderQueue {
+export class RenderQueue extends Disposable {
   /** @internal */
   private _itemList: RenderItemList;
   /** @internal */
@@ -174,13 +174,12 @@ export class RenderQueue {
   private _drawTransparent: boolean;
   /** @internal */
   private readonly _objectColorMaps: Map<number, Drawable>[];
-  /** @internal */
-  private _disposed: boolean;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
    */
   constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
+    super();
     this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
     this._itemList = null;
     this._renderPass = renderPass;
@@ -193,12 +192,7 @@ export class RenderQueue {
     this._needSceneDepth = false;
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
-    this._disposed = false;
     this._objectColorMaps = [new Map()];
-  }
-  /** Whether this is disposed */
-  get disposed() {
-    return this._disposed;
   }
   /** The sun light */
   get sunLight(): DirectionalLight {
@@ -448,11 +442,6 @@ export class RenderQueue {
     this._drawTransparent = false;
   }
   /** @internal */
-  dispose() {
-    this.reset();
-    this._disposed = true;
-  }
-  /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
     const frameCounter = Application.instance.device.frameInfo.frameCounter;
     const itemList = this._itemList;
@@ -599,6 +588,12 @@ export class RenderQueue {
       );
     }
   }
+  /** Disposes the render queue */
+  protected onDispose() {
+    super.onDispose();
+    this.reset();
+  }
+
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
     const drawablePos = drawable.getNode().position;
     return Vector3.distanceSq(drawablePos, cameraPos);

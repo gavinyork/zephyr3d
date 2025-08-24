@@ -789,10 +789,10 @@ export class ParticleSystem
     }
   }
   /**
-   * {@inheritDoc SceneNode.dispose}
+   * {@inheritDoc SceneNode.onDispose}
    */
-  dispose() {
-    super.dispose();
+  onDispose() {
+    super.onDispose();
     this._primitive.dispose();
     this._material.dispose();
     const func = ParticleSystem.updateFuncMap.get(this);

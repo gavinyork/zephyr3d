@@ -19,12 +19,13 @@ import type { Terrain } from './terrain';
 import type { GrassCluster } from './grass';
 
 /** @internal */
-export class QuadtreeNode {
+export class QuadtreeNode extends Disposable {
   private _patch: TerrainPatch;
   private readonly _grassClusters: GrassCluster[];
   private _parent: QuadtreeNode;
   private _children: QuadtreeNode[];
   constructor() {
+    super();
     this._patch = null;
     this._grassClusters = [];
     this._parent = null;
@@ -134,7 +135,8 @@ export class QuadtreeNode {
   getChild(index: number): QuadtreeNode {
     return this._children[index];
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._patch?.dispose();
   }
 }

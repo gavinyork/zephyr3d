@@ -16,9 +16,10 @@ import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
 import type { SceneNode } from '..';
 
-export class GrassClusterBase {
+export class GrassClusterBase extends Disposable {
   protected _terrain: Terrain;
   constructor(terrain: Terrain) {
+    super();
     this._terrain = terrain;
   }
   getNode(): SceneNode {
@@ -89,7 +90,8 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
     this.bind(ctx);
     this._material.draw(this._primitive, ctx, this._numInstances);
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._primitive.dispose();
   }
 }

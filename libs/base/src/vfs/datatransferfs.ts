@@ -61,13 +61,6 @@ export class DataTransferVFS extends VFS {
 
   /**
    * {@inheritDoc VFS._readDirectory}
-   *
-   * Behavior:
-   * - Validates existence of the directory in the synthetic `directoryStructure`.
-   * - Builds `FileMetadata` for each child entry (file or directory).
-   * - Applies `options.pattern` filtering and optional recursive expansion.
-   *
-   * @throws {@link VFSError} with code `"ENOENT"` if the directory does not exist.
    */
   protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
     await this.ensureInitialized();
@@ -124,13 +117,6 @@ export class DataTransferVFS extends VFS {
 
   /**
    * {@inheritDoc VFS._readFile}
-   *
-   * Behavior:
-   * - Looks up the file in the in-memory `entries` map.
-   * - Supports partial reads using `Blob.slice(offset, offset+length)`.
-   * - Decodes to `utf8` or `base64` if requested; otherwise returns `ArrayBuffer`.
-   *
-   * @throws {@link VFSError} with code `"ENOENT"` if the file does not exist or is a directory.
    */
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
     await this.ensureInitialized();
@@ -165,8 +151,6 @@ export class DataTransferVFS extends VFS {
 
   /**
    * {@inheritDoc VFS._exists}
-   *
-   * Returns true for the root path `/`, any known file path, or any known synthetic directory path.
    */
   protected async _exists(path: string): Promise<boolean> {
     await this.ensureInitialized();
@@ -181,13 +165,6 @@ export class DataTransferVFS extends VFS {
 
   /**
    * {@inheritDoc VFS._stat}
-   *
-   * Behavior:
-   * - Root `/` returns directory stats with zero size and current timestamps.
-   * - Files return size and timestamps from the `File` object.
-   * - Known directories return zero size and current timestamps.
-   *
-   * @throws {@link VFSError} with code `"ENOENT"` if the path is unknown.
    */
   protected async _stat(path: string): Promise<FileStat> {
     await this.ensureInitialized();

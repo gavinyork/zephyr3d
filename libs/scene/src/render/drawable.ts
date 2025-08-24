@@ -165,7 +165,7 @@ export interface Drawable {
   /**
    * Computes the distance used for sorting (e.g., transparent draw order).
    *
-   * @param camera - Camera from which to compute distance (usually camera -> object).
+   * @param camera - Camera from which to compute distance (usually camera -\> object).
    */
   getSortDistance(camera: Camera): number;
   /** Returns the type/category of render queue this object belongs to. */

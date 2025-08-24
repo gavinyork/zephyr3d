@@ -1,4 +1,4 @@
-import { Observable, DRef } from '@zephyr3d/base';
+import { DRef, Disposable, makeObservable } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import { Application } from '@zephyr3d/scene';
@@ -8,11 +8,11 @@ type ImageInfo = {
   texture: DRef<Texture2D>;
   selected: boolean;
 };
-export class ImageList extends Observable<{
+export class ImageList extends makeObservable(Disposable)<{
   update_image: [asset: string, index: number];
   add_image: [asset: string, index: number];
   remove_image: [index: number];
-}> {
+}>() {
   private _images: ImageInfo[];
   private _linearColorSpace: boolean;
   private _isDragging: boolean;
@@ -114,10 +114,6 @@ export class ImageList extends Observable<{
       img.texture.dispose();
     }
     this._images = [];
-  }
-  dispose() {
-    this.clear();
-    this._defaultImage.dispose();
   }
   scrollToSelected(height: number) {
     if (this._selectedIndex >= 0 && this._selectedIndex < this._images.length) {
@@ -272,5 +268,10 @@ export class ImageList extends Observable<{
     ImGui.EndChild();
     ImGui.PopID();
     return selectionChanged;
+  }
+  protected onDispose() {
+    super.onDispose();
+    this.clear();
+    this._defaultImage.dispose();
   }
 }

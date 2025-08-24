@@ -47,7 +47,7 @@ export class Scene extends makeObservable(Disposable)<{
   protected _octree: Octree;
   /**
    * @internal Pending nodes whose placement in the octree must be updated.
-   * Populated by {@link invalidateNodePlacement} and drained by {@link updateNodePlacement}.
+   * Populated by {@link Scene.invalidateNodePlacement} and drained by {@link Scene.updateNodePlacement}.
    */
   protected _nodePlaceList: Set<GraphNode>;
   /** @internal Environment data (sky/light/IBL). */
@@ -64,6 +64,8 @@ export class Scene extends makeObservable(Disposable)<{
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Metadata;
+  /** @internal User-attached script entry (engine-defined). */
+  private _script: string;
   /**
    * Creates an instance of Scene.
    *
@@ -88,6 +90,7 @@ export class Scene extends makeObservable(Disposable)<{
     this._rootNode = new DRef(new SceneNode(this));
     this._rootNode.get().name = 'Root';
     this._metaData = null;
+    this._script = '';
     this._mainCamera = new DRef();
   }
   /**
@@ -156,6 +159,18 @@ export class Scene extends makeObservable(Disposable)<{
     this._metaData = val;
   }
   /**
+   * Attached script filename or identifier (engine-specific).
+   *
+   * @remarks
+   * Integrates with the engine’s scripting system if available.
+   */
+  get script() {
+    return this._script;
+  }
+  set script(fileName: string) {
+    this._script = fileName ?? '';
+  }
+  /**
    * Finds a scene node by its persistent ID.
    *
    * @typeParam T - Expected node type.
@@ -202,8 +217,6 @@ export class Scene extends makeObservable(Disposable)<{
    * @param length - Maximum ray length. Defaults to `Infinity`.
    * @returns Intersection info `{ target, dist, point }`, or `null` if no hit.
    *
-   * @remarks
-   * Uses the octree for efficient traversal via {@link RaycastVisitor}.
    */
   raycast(ray: Ray, length = Infinity): { target: PickTarget; dist: number; point: Vector3 } {
     const raycastVisitor = new RaycastVisitor(ray, length);
@@ -225,7 +238,7 @@ export class Scene extends makeObservable(Disposable)<{
    * @param screenX - Screen-space x (pixels).
    * @param screenY - Screen-space y (pixels).
    * @param invModelMatrix - Optional inverse model matrix to transform the ray into local space.
-   * @returns The constructed {@link Ray}.
+   * @returns The constructed Ray.
    *
    * @remarks
    * Computes NDC from screen coordinates, unprojects using `invViewProjectionMatrix`,
@@ -255,7 +268,7 @@ export class Scene extends makeObservable(Disposable)<{
    * Queues a node for a one-shot update before the next render.
    *
    * The node's `update(frame, elapsedSeconds, deltaSeconds)` will be called
-   * during {@link frameUpdate} and then the node is removed from the queue.
+   * during {@link Scene.frameUpdate} and then the node is removed from the queue.
    *
    * @param node - Node to schedule.
    *
@@ -272,7 +285,7 @@ export class Scene extends makeObservable(Disposable)<{
    * Queues a node for a one-shot per-camera update before render.
    *
    * The node's `updatePerCamera(camera, elapsedSeconds, deltaSeconds)` will be
-   * called once for each camera during {@link frameUpdatePerCamera}, then removed.
+   * called once for each camera during {@link Scene.frameUpdatePerCamera}, then removed.
    *
    * @param node - Node to schedule.
    *
@@ -353,7 +366,6 @@ export class Scene extends makeObservable(Disposable)<{
    * - Drain the one-shot node update queue and call `node.update(...)`.
    * - Apply pending octree placement updates.
    *
-   * @internal
    */
   frameUpdate() {
     const frameInfo = Application.instance.device.frameInfo;
@@ -387,7 +399,6 @@ export class Scene extends makeObservable(Disposable)<{
    * - Apply pending octree placement updates.
    *
    * @param camera - The camera being updated for.
-   * @internal
    */
   frameUpdatePerCamera(camera: Camera) {
     if (this._perCameraUpdateQueue.length > 0) {
@@ -443,7 +454,6 @@ export class Scene extends makeObservable(Disposable)<{
    * - Root node (and, by extension, its hierarchy)
    * - Main camera reference wrapper
    *
-   * @protected
    */
   protected onDispose() {
     this._env.dispose();

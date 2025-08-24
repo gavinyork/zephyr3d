@@ -1,5 +1,5 @@
 import type { Vector4 } from '@zephyr3d/base';
-import { Vector3, DRef } from '@zephyr3d/base';
+import { Vector3, DRef, Disposable } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
@@ -11,7 +11,7 @@ import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
  * Wrapper for environmant lighting
  * @public
  */
-export class EnvLightWrapper {
+export class EnvLightWrapper extends Disposable {
   private _envLight: EnvironmentLighting;
   private readonly _ambientColor: ObservableVector4;
   private readonly _ambientDown: ObservableVector4;
@@ -24,6 +24,7 @@ export class EnvLightWrapper {
   private _strength: number;
   /** @internal */
   constructor() {
+    super();
     this._envLight = new EnvIBL();
     this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1);
     this._ambientColor.callback = () => {
@@ -49,14 +50,6 @@ export class EnvLightWrapper {
     this._irradianceSHFB = new DRef();
     this._irradianceWindow = new Vector3();
     this._strength = 1;
-  }
-  /** @internal */
-  dispose() {
-    this._envLight?.dispose();
-    this._radianceMap.dispose();
-    this._irradianceMap.dispose();
-    this._irradianceSHFB.dispose();
-    this._irradianceSH.dispose();
   }
   /** @internal */
   getHash(ctx?: DrawContext): string {
@@ -186,17 +179,27 @@ export class EnvLightWrapper {
         break;
     }
   }
+  /** Disposes the environment lighting wrapper */
+  protected onDispose() {
+    super.onDispose();
+    this._envLight?.dispose();
+    this._radianceMap.dispose();
+    this._irradianceMap.dispose();
+    this._irradianceSHFB.dispose();
+    this._irradianceSH.dispose();
+  }
 }
 
 /**
  * Environment of scene
  * @public
  */
-export class Environment {
+export class Environment extends Disposable {
   private readonly _sky: SkyRenderer;
   private readonly _light: EnvLightWrapper;
   /** @internal */
   constructor() {
+    super();
     this._sky = new SkyRenderer();
     this._light = new EnvLightWrapper();
   }
@@ -216,8 +219,9 @@ export class Environment {
   needSceneDepthTexture(): boolean {
     return this._sky.fogType !== 'none';
   }
-  /** @internal */
-  dispose() {
+  /** Disposes the environment object */
+  protected onDispose() {
+    super.onDispose();
     this._sky.dispose();
     this._light.dispose();
   }

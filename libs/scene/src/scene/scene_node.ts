@@ -8,15 +8,8 @@ import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
 import type { IDisposable, Quaternion } from '@zephyr3d/base';
-import { DRef, randomUUID } from '@zephyr3d/base';
-import {
-  Matrix4x4,
-  Observable,
-  ObservableQuaternion,
-  ObservableVector3,
-  Vector3,
-  Vector4
-} from '@zephyr3d/base';
+import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
+import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import { AnimationSet } from '../animation';
 import type { SharedModel } from '../asset';
@@ -72,23 +65,27 @@ export interface NodeClonable<T extends SceneNode> {
 /**
  * The base class of all scene graph objects.
  *
+ * @remarks
  * Responsibilities:
- * - Defines hierarchical transform (position, rotation, scale) with lazy-computed matrices.
+ * - Defines hierarchical transform (position, rotation, scale) with lazily computed matrices.
  * - Integrates with the scene graph (parent/children, attachment notifications).
- * - Provides traversal utilities (iterate, traverse).
- * - Manages visibility state and picking flags.
- * - Computes local and world bounding volumes and notifies scene for spatial indexing updates.
+ * - Provides traversal utilities (`iterate`, `iterateBottomToTop`, `traverse`).
+ * - Manages visibility state and CPU/GPU picking flags.
+ * - Computes and caches local/world bounding volumes, notifies scene for spatial updates.
  * - Supports cloning and shared model instancing.
  * - Emits events on visibility, transform, bounding volume, attachment, and disposal.
  *
- * Performance notes:
- * - `localMatrix`, `worldMatrix`, and `invWorldMatrix` are lazily computed and cached until invalidated.
- * - Use `invalidateBoundingVolume` or mutating transforms to refresh BV; world BV invalidation informs spatial structures.
+ * Performance:
+ * - `localMatrix`, `worldMatrix`, and `invWorldMatrix` are cached until invalidated.
+ * - Transform mutations and `invalidateBoundingVolume` update caches and spatial structures.
+ *
+ * Events:
+ * - `nodeattached`, `noderemoved`, `visiblechanged`, `transformchanged`, `bvchanged`, `dispose`.
  *
  * @public
  */
 export class SceneNode
-  extends Observable<{
+  extends makeObservable(Disposable)<{
     /** Emitted on all ancestors when a node is attached under them. */
     nodeattached: [node: SceneNode];
     /** Emitted on all ancestors when a node is removed from under them. */
@@ -101,7 +98,7 @@ export class SceneNode
     bvchanged: [node: SceneNode];
     /** Emitted when the node is disposed. */
     dispose: [];
-  }>
+  }>()
   implements NodeClonable<SceneNode>, IDisposable
 {
   /*
@@ -120,8 +117,6 @@ export class SceneNode
 
   /** @internal Unique persistent id. */
   protected _id: string;
-  /** @internal Disposal flag. */
-  protected _disposed: boolean;
   /** @internal Animation set reference. */
   protected _animationSet: DRef<AnimationSet>;
   /** @internal Optional shared model reference for instancing. */
@@ -193,7 +188,8 @@ export class SceneNode
   /**
    * Construct a scene node.
    *
-   * If a scene is provided and this is not the root node, the node is reparented
+   * @remarks
+   * If a `scene` is provided and this is not the root node, the node is reparented
    * under the scene's root immediately.
    *
    * @param scene - Scene that will own this node.
@@ -201,7 +197,6 @@ export class SceneNode
   constructor(scene: Scene) {
     super();
     this._id = randomUUID();
-    this._disposed = false;
     this._scene = scene;
     this._name = '';
     this._animationSet = new DRef();
@@ -239,7 +234,12 @@ export class SceneNode
       this.reparent(scene.rootNode);
     }
   }
-  /** @internal Whether the node should be inserted into the scene's spatial structure. */
+  /**
+   * Whether the node should be inserted into the scene's spatial structure.
+   *
+   * @remarks
+   * Toggling this hints the scene to (re)place the node in octree/acceleration structures.
+   */
   get placeToOctree(): boolean {
     return this._placeToOctree;
   }
@@ -254,7 +254,8 @@ export class SceneNode
   /**
    * Node's persistent identifier.
    *
-   * Note: Changing this affects serialization/lookup; ensure uniqueness.
+   * @remarks
+   * Changing this affects serialization and registry lookup; ensure uniqueness.
    */
   get persistentId() {
     return this._id;
@@ -264,6 +265,9 @@ export class SceneNode
   }
   /**
    * Arbitrary metadata associated with this node.
+   *
+   * @remarks
+   * Stored and transported with the node; format is application-defined.
    */
   get metaData(): Metadata {
     return this._metaData;
@@ -272,7 +276,10 @@ export class SceneNode
     this._metaData = val;
   }
   /**
-   * Attached script filename or identifier (engine-specific integration).
+   * Attached script filename or identifier (engine-specific).
+   *
+   * @remarks
+   * Integrates with the engine’s scripting system if available.
    */
   get script() {
     return this._script;
@@ -314,8 +321,9 @@ export class SceneNode
     this._sealed = val;
   }
   /**
-   * Lazily creates and returns this node's animation set.
+   * Lazily created animation set for this node.
    *
+   * @remarks
    * Accessing this schedules the node for update in the scene.
    */
   get animationSet() {
@@ -337,12 +345,13 @@ export class SceneNode
   /**
    * Clone this node.
    *
-   * If a shared model exists, let it create an appropriate node (instanced or normal).
-   * The cloned node is attached under the same parent.
+   * @remarks
+   * If a shared model exists, it may create an instanced node. The clone is
+   * attached under the same parent; children are cloned based on `method` and `recursive`.
    *
    * @param method - Clone method ('deep' or 'instance').
    * @param recursive - Whether children are cloned recursively.
-   * @returns The newly created clone.
+   * @returns New node instance
    */
   clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
     const other = this._sharedModel.get()
@@ -353,14 +362,16 @@ export class SceneNode
     return other;
   }
   /**
-   * Copy core properties from another node in the same scene.
+   * Copy core properties from another node.
    *
-   * Does not copy children unless `recursive` is true. Sealed children are skipped.
-   * Validates source/target are not disposed and belong to the same scene.
+   * @remarks
+   * Requires both nodes to belong to the same scene and be undisposed.
+   * When `recursive` is true, non-sealed children are cloned and attached.
    *
    * @param other - Source node.
    * @param method - Clone method for children when recursive.
-   * @param recursive - If true, clone and attach children to this node.
+   * @param recursive - If true, clone and attach children.
+   *
    */
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
     if (other.disposed || this.disposed) {
@@ -511,22 +522,6 @@ export class SceneNode
   isPunctualLight(): this is PunctualLight {
     return false;
   }
-  /** Disposes the node */
-  dispose() {
-    this._disposed = true;
-    this.remove();
-    this.removeChildren();
-    this._animationSet?.dispose();
-    this._animationSet = null;
-    this._sharedModel?.dispose();
-    this._sharedModel = null;
-  }
-  /**
-   * Whether this node was disposed
-   */
-  get disposed() {
-    return this._disposed;
-  }
   /**
    * Computes the bounding volume of the node
    * @returns The output bounding volume
@@ -663,6 +658,16 @@ export class SceneNode
   }
   set boundingBoxDrawMode(mode: number) {
     this._boxDrawMode = mode;
+  }
+  /** Disposes the node */
+  protected onDispose() {
+    super.onDispose();
+    this.remove();
+    this.removeChildren();
+    this._animationSet?.dispose();
+    this._animationSet = null;
+    this._sharedModel?.dispose();
+    this._sharedModel = null;
   }
   /** @internal */
   protected _setParent(p: SceneNode): void {

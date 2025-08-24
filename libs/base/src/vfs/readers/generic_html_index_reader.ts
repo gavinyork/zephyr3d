@@ -1,6 +1,23 @@
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './reader';
 import type { FileMetadata } from '../vfs';
 
+/**
+ * A generic HTML directory reader that parses index-style HTML pages
+ * to list directory entries (files and subdirectories).
+ *
+ * @remarks
+ * - Targets simple directory listings produced by common HTTP servers (e.g., Apache, Nginx).
+ * - Extracts entries from `<a>` elements and attempts to infer size and modified time
+ *   from surrounding table rows or text content.
+ * - Skips external links, parent-directory links, and anchors.
+ * - Normalizes and resolves paths using the provided `HttpDirectoryReaderContext`.
+ *
+ * Limitations:
+ * - Parsing depends on the server’s HTML structure; non-standard listings may yield incomplete metadata.
+ * - Size/mtime extraction uses best-effort heuristics and may be unavailable for some servers.
+ *
+ * @public
+ */
 export class GenericHtmlDirectoryReader implements HttpDirectoryReader {
   readonly name = 'generic-html';
 

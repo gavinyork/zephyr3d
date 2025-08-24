@@ -24,7 +24,7 @@ export class PathUtils {
    * - The result always starts with "/" (absolute form).
    *
    * Example:
-   * - normalize('/a//b/./c/../d') -> '/a/b/d'
+   * - normalize('/a//b/./c/../d') -\> '/a/b/d'
    *
    * @param path - Input path (relative or absolute).
    * @returns The normalized absolute path (always starting with "/").
@@ -53,7 +53,7 @@ export class PathUtils {
    * - The returned path is always absolute.
    *
    * Example:
-   * - join('/a', 'b', '../c') -> '/a/c'
+   * - join('/a', 'b', '../c') -\> '/a/c'
    *
    * @param paths - Path segments in order.
    * @returns Normalized absolute path.
@@ -70,9 +70,9 @@ export class PathUtils {
    * - If the path is root "/" or has no parent, returns "/".
    *
    * Examples:
-   * - dirname('/a/b/c') -> '/a/b'
-   * - dirname('/a') -> '/'
-   * - dirname('/') -> '/'
+   * - dirname('/a/b/c') -\> '/a/b'
+   * - dirname('/a') -\> '/'
+   * - dirname('/') -\> '/'
    *
    * @param path - Input path.
    * @returns Directory path of the input.
@@ -91,9 +91,9 @@ export class PathUtils {
    * - If `ext` is provided and the name ends with it, the extension is stripped.
    *
    * Examples:
-   * - basename('/a/b/c.txt') -> 'c.txt'
-   * - basename('/a/b/c.txt', '.txt') -> 'c'
-   * - basename('/') -> ''
+   * - basename('/a/b/c.txt') -\> 'c.txt'
+   * - basename('/a/b/c.txt', '.txt') -\> 'c'
+   * - basename('/') -\> ''
    *
    * @param path - Input path.
    * @param ext - Optional extension to strip (exact suffix match).
@@ -119,8 +119,8 @@ export class PathUtils {
    * - If there is no dot, returns an empty string.
    *
    * Examples:
-   * - extname('/a/b/c.txt') -> '.txt'
-   * - extname('/a/b/c') -> ''
+   * - extname('/a/b/c.txt') -\> '.txt'
+   * - extname('/a/b/c') -\> ''
    *
    * @param path - Input path.
    * @returns The extension (e.g., ".txt") or an empty string if none.
@@ -152,9 +152,9 @@ export class PathUtils {
    * - If both resolve to the same path, returns ".".
    *
    * Examples:
-   * - relative('/a/b/c', '/a/d/e') -> '../../d/e'
-   * - relative('/a/b', '/a/b/c') -> 'c'
-   * - relative('/a/b', '/a/b') -> '.'
+   * - relative('/a/b/c', '/a/d/e') -\> '../../d/e'
+   * - relative('/a/b', '/a/b/c') -\> 'c'
+   * - relative('/a/b', '/a/b') -\> '.'
    *
    * @param from - Base path to start from.
    * @param to - Target path to reach.
@@ -188,9 +188,9 @@ export class PathUtils {
  * - Extend the `mimeTypes` table if you need additional types.
  *
  * Examples:
- * - guessMimeType('image.png') -> 'image/png'
- * - guessMimeType('/a/b/model.glb') -> 'model/gltf-binary'
- * - guessMimeType('unknown.ext') -> 'application/octet-stream'
+ * - guessMimeType('image.png') -\> 'image/png'
+ * - guessMimeType('/a/b/model.glb') -\> 'model/gltf-binary'
+ * - guessMimeType('unknown.ext') -\> 'application/octet-stream'
  *
  * @param path - File path or name used to infer the MIME type.
  * @returns The guessed MIME type string.

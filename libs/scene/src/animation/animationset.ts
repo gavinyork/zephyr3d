@@ -6,57 +6,71 @@ import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 
 /**
- * Options for playing animation
+ * Options for playing an animation.
+ *
+ * Controls looping, playback speed (including reverse), and fade-in blending.
  * @public
  **/
 export type PlayAnimationOptions = {
   /**
-   * Repeat times
+   * Number of loops to play.
    *
-   * @remarks
-   * Number of loops, 0 for infinite loops. Default value is 0
-   **/
+   * - 0: infinite looping (default).
+   * - n \> 0: play exactly n loops (each loop is one full duration of the clip).
+   */
   repeat?: number;
   /**
-   * Speed factor
+   * Playback speed multiplier.
    *
-   * @remarks
-   * The larger the absolute value, the faster the speed.
-   * If it is a negative value, it plays in reverse.
-   * Default value is 1
+   * - 1: normal speed (default).
+   * - \>1: faster; \<1: slower.
+   * - Negative values play the clip in reverse. The initial `currentTime` will be set to the end.
    */
   speedRatio?: number;
   /**
-   * Fade-in time
+   * Fade-in duration in seconds.
    *
-   * @remarks
-   * How long it takes for the animation weight to increase from 0 to weight,
-   * default is 0, indicating no fade-in effect. Usually used in conjunction
-   * with the fadeOut parameter of stopAnimation() for seamless transition
-   * between two animations
-   **/
+   * Interpolates the animation weight from 0 to the clip's configured weight over this time.
+   * Use together with `stopAnimation(..., { fadeOut })` for smooth cross-fading.
+   * Default is 0 (no fade-in).
+   */
   fadeIn?: number;
 };
 
 /**
- * Options for stop playing animation
+ * Options for stopping an animation.
+ *
+ * Allows a graceful fade-out instead of abrupt stop.
  * @public
- **/
+ */
 export type StopAnimationOptions = {
   /**
-   * Fade-out time
+   * Fade-out duration in seconds.
    *
-   * @remarks
-   * How long it takes for the animation weight to decrease from current weight
-   * to 0, default is 0, indicating no fade-out effect. Usually used in conjunction
-   * with the fadeIn parameter of startAnimation() for seamless transition between
-   * two animations
+   * Interpolates the current animation weight down to 0 over this time.
+   * Default is 0 (immediate stop).
    */
   fadeOut?: number;
 };
 
 /**
  * Animation set
+ *
+ * Manages a collection of named animation clips for a model and orchestrates:
+ * - Playback state (time, loops, speed, weights, fade-in/out).
+ * - Blending across multiple tracks targeting the same property via weighted averages.
+ * - Skeleton usage and application for clips that drive skeletal animation.
+ * - Active track registration and cleanup as clips start/stop.
+ *
+ * Usage:
+ * - Create or retrieve `AnimationClip`s by name.
+ * - Start playback with `playAnimation(name, options)`.
+ * - Advance animation with `update(deltaSeconds)`.
+ * - Optionally adjust weight while playing with `setAnimationWeight(name, weight)`.
+ *
+ * Lifetime:
+ * - Disposing the set releases references to the model, clips, and clears active state.
+ *
  * @public
  */
 export class AnimationSet extends Disposable implements IDisposable {
@@ -85,9 +99,9 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   >;
   /**
-   * Creates an instance of AnimationSet
-   * @param scene - The scene to which the animation set belongs
-   * @param model - The model which is controlled by the animation set
+   * Create an AnimationSet controlling the provided model.
+   *
+   * @param model - The SceneNode (model root) controlled by this animation set.
    */
   constructor(model: SceneNode) {
     super();
@@ -98,26 +112,32 @@ export class AnimationSet extends Disposable implements IDisposable {
     this._activeAnimations = new Map();
   }
   /**
-   * The model which is controlled by the animation set
+   * The model (SceneNode) controlled by this animation set.
    */
   get model(): SceneNode {
     return this._model.get();
   }
   /**
-   * How many animations in this set
+   * Number of animation clips registered in this set.
    */
   get numAnimations(): number {
     return Object.getOwnPropertyNames(this._animations).length;
   }
   /**
-   * Gets an animation clip by name
-   * @param name - name of the animation to get
+   * Retrieve an animation clip by name.
+   *
+   * @param name - Name of the animation.
+   * @returns The clip if present; otherwise null.
    */
   get(name: string): AnimationClip {
     return this._animations[name] ?? null;
   }
   /**
-   * Creates an animation
+   * Create and register a new animation clip.
+   *
+   * @param name - Unique name for the animation clip.
+   * @param embedded - Whether the clip is embedded/owned (implementation-specific). Default false.
+   * @returns The created clip, or null if the name is empty or not unique.
    */
   createAnimation(name: string, embedded = false): AnimationClip {
     if (!name || this._animations[name]) {
@@ -130,7 +150,11 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   }
   /**
-   * Deletes an animation
+   * Delete and dispose an animation clip by name.
+   *
+   * - If the animation is currently playing, it is first stopped (immediately).
+   *
+   * @param name - Name of the animation to remove.
    */
   deleteAnimation(name: string) {
     const animation = this._animations[name];
@@ -141,14 +165,24 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   }
   /**
-   * Gets names of all the animations of the model
-   * @returns An array of string that contains the animation names
+   * Get the list of all registered animation names.
+   *
+   * @returns An array of clip names.
    */
   getAnimationNames(): string[] {
     return Object.keys(this._animations);
   }
   /**
-   * Updates all animations of the model
+   * Advance and apply active animations.
+   *
+   * Responsibilities per call:
+   * - Update time cursor for each active clip (respecting speedRatio and looping).
+   * - Enforce repeat limits and apply fade-out termination if configured.
+   * - For each animated target, blend active tracks (weighted by clip weight × fade-in × fade-out)
+   *   and apply the resulting state to the target.
+   * - Apply all active skeletons to update skinning transforms.
+   *
+   * @param deltaInSeconds - Time step in seconds since last update.
    */
   update(deltaInSeconds: number): void {
     this._activeAnimations.forEach((v, k) => {
@@ -216,25 +250,32 @@ export class AnimationSet extends Disposable implements IDisposable {
     });
   }
   /**
-   * Checks whether an animation is playing
-   * @param name - Name of the animation to be checked, if not given, checks if any animation is playing
-   * @returns true if the animation is playing, otherwise false
+   * Check whether an animation is currently playing.
+   *
+   * @param name - Optional animation name. If omitted, returns true if any animation is playing.
+   * @returns True if playing; otherwise false.
    */
   isPlayingAnimation(name?: string): boolean {
     return name ? this._activeAnimations.has(this._animations[name]) : this._activeAnimations.size > 0;
   }
   /**
-   * Gets the animation clip by name
-   * @param name - Name of the animation to get
-   * @returns The animation clip if exists, otherwise null
+   * Get an animation clip by name.
+   *
+   * Alias of `get(name)` returning a nullable type.
+   *
+   * @param name - Name of the animation.
+   * @returns The clip if present; otherwise null.
    */
   getAnimationClip(name: string): AnimationClip | null {
     return this._animations[name] ?? null;
   }
   /**
-   * Sets the weight of specific animation which is currently playing
-   * @param name - Name of the animation
-   * @param weight - New weight value
+   * Set the runtime blend weight for a currently playing animation.
+   *
+   * Has no effect if the clip is not active.
+   *
+   * @param name - Name of the playing animation.
+   * @param weight - New weight value used during blending.
    */
   setAnimationWeight(name: string, weight: number): void {
     const ani = this._animations[name];
@@ -244,9 +285,15 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   }
   /**
-   * Starts playing an animation of the model
-   * @param name - Name of the animation to play
-   * @param options - Playing options
+   * Start (or update) playback of an animation clip.
+   *
+   * Behavior:
+   * - If the clip is already playing, updates its fade-in (resets fade-out).
+   * - Otherwise initializes playback state (repeat counter, speed, weight, initial time).
+   * - Registers clip tracks and skeletons into the active sets for blending and application.
+   *
+   * @param name - Name of the animation to play.
+   * @param options - Playback options (repeat, speedRatio, fadeIn).
    */
   playAnimation(name: string, options?: PlayAnimationOptions): void {
     const ani = this._animations[name];
@@ -302,8 +349,17 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   }
   /**
-   * Stops playing an animation of the model
-   * @param name - Name of the animation to stop playing
+   * Stop playback of an animation clip.
+   *
+   * Behavior:
+   * - If `options.fadeOut > 0`, marks the clip for fade-out; actual removal occurs after fade completes.
+   * - If `fadeOut` is 0 or omitted, immediately:
+   *   - Removes the clip from active animations.
+   *   - Unregisters its tracks from active track maps.
+   *   - Decrements skeleton reference counts; resets and removes skeletons when refcount reaches 0.
+   *
+   * @param name - Name of the animation to stop.
+   * @param options - Optional fade-out configuration.
    */
   stopAnimation(name: string, options?: StopAnimationOptions): void {
     const ani = this._animations[name];
@@ -335,6 +391,13 @@ export class AnimationSet extends Disposable implements IDisposable {
       }
     }
   }
+  /**
+   * Dispose the animation set and release owned resources.
+   *
+   * - Disposes the weak reference to the model.
+   * - Disposes all registered animation clips.
+   * - Clears active animations, tracks, and skeleton references.
+   */
   protected onDispose() {
     super.onDispose();
     this._model?.dispose();

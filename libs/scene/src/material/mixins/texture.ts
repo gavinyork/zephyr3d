@@ -238,8 +238,8 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      dispose() {
-        super.dispose();
+      protected onDispose() {
+        super.onDispose();
         (this as any)[`${name}Texture`] = null;
       }
     };

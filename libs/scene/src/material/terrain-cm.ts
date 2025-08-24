@@ -814,8 +814,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     };
   }
 
-  dispose(): void {
-    super.dispose();
+  protected onDispose(): void {
+    super.onDispose();
     this._heightMap.dispose();
     this._levelDataBuffer.dispose();
     if (this._detailMapInfo) {

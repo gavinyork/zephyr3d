@@ -1,4 +1,4 @@
-import type { GenericConstructor } from '@zephyr3d/base';
+import type { Disposable, GenericConstructor } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import type { BindGroup } from '@zephyr3d/device';
@@ -63,10 +63,11 @@ function releaseBindGroup(bindGroup: BindGroup) {
 }
 
 export function mixinDrawable<
-  T extends GenericConstructor<{
-    getNode(): SceneNode;
-    dispose(): void;
-  }>
+  T extends GenericConstructor<
+    {
+      getNode(): SceneNode;
+    } & Disposable
+  >
 >(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
     private readonly _mdRenderQueueRef: RenderQueueRef[];
@@ -264,8 +265,8 @@ export function mixinDrawable<
       }
       return bindGroup;
     }
-    dispose() {
-      super.dispose();
+    onDispose() {
+      super.onDispose();
       this.renderQueueRefPrune(true);
       releaseBindGroup(this._mdDrawableBindGroup);
       releaseBindGroup(this._mdDrawableBindGroupSkin);

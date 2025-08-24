@@ -1,4 +1,4 @@
-import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
+import { Disposable, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
@@ -12,9 +12,10 @@ import type { MeshMaterial } from '../../material';
 import type { SceneNode } from '..';
 
 /** @internal */
-export class TerrainPatchBase {
+export class TerrainPatchBase extends Disposable {
   protected _terrain: Terrain;
   constructor(terrain: Terrain) {
+    super();
     this._terrain = terrain;
   }
   getNode(): SceneNode {
@@ -572,7 +573,8 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   isDummy(): boolean {
     return !this._geometry && !!this._quadtree;
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._geometry?.dispose();
   }
 }

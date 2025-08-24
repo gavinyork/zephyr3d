@@ -11,6 +11,7 @@ import { DlgOpen } from './opendlg';
 import type { ProjectInfo } from '../../core/services/project';
 import { DlgSaveFile } from './savefiledlg';
 import { DlgOpenFile } from './openfiledlg';
+import { DlgProjectSettings } from './projectsettingsdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -24,6 +25,9 @@ export class Dialog {
     height?: number
   ) {
     return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height ?? 0);
+  }
+  public static async editProjectSettings(title: string, vfs: VFS, projectInfo: ProjectInfo, width?: number) {
+    return DlgProjectSettings.editProjectSettings(title, vfs, projectInfo, width);
   }
   public static async saveFile(
     title: string,

@@ -303,7 +303,8 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
   isTerrain(): this is Terrain {
     return true;
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._grassManager.dispose();
     this._material?.dispose();
     this._quadtree.dispose();

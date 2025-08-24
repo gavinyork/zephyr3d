@@ -73,7 +73,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _projMatrix: Matrix4x4;
   /** @internal Inverse projection matrix. */
   protected _invProjMatrix: Matrix4x4;
-  /** @internal View matrix (world -> camera). */
+  /** @internal View matrix (world -\> camera). */
   protected _viewMatrix: Matrix4x4;
   /** @internal View-projection matrix. */
   protected _viewProjMatrix: Matrix4x4;
@@ -1204,8 +1204,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     super._onTransformChanged(invalidateLocal);
     this._invalidate(false);
   }
-  /** {@inheritdoc SceneNode.dispose} */
-  dispose() {
+  /** {@inheritdoc SceneNode.onDispose} */
+  protected onDispose() {
+    super.onDispose();
     this.setController(null);
     this.clearHistoryData();
     this._projMatrix = null;
@@ -1219,6 +1220,5 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._postEffectTAA.dispose();
     this._postEffectTonemap.dispose();
     this._oit.dispose();
-    super.dispose();
   }
 }

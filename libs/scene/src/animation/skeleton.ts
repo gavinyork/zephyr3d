@@ -1,4 +1,4 @@
-import { Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
+import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import type { Mesh } from '../scene';
@@ -7,9 +7,23 @@ import type { AssetSubMeshData } from '../asset';
 import { Application } from '../app/app';
 
 interface SkinnedBoundingBox {
+  /**
+   * Representative vertices used to bound a skinned mesh (extreme points along axes).
+   */
   boundingVertices: Vector3[];
+  /**
+   * Joint indices (up to 4 per vertex) for each representative vertex, flattened.
+   * Layout: [i0_0, i0_1, i0_2, i0_3, i1_0, ...] for 6 vertices.
+   */
   boundingVertexBlendIndices: Float32Array;
+  /**
+   * Corresponding joint weights (up to 4 per vertex) for each representative vertex, flattened.
+   * Layout matches `boundingVertexBlendIndices`.
+   */
   boundingVertexJointWeights: Float32Array;
+  /**
+   * Computed axis-aligned bounding box in model space for the current pose.
+   */
   boundingBox: BoundingBox;
 }
 
@@ -19,10 +33,28 @@ const tmpV2 = new Vector3();
 const tmpV3 = new Vector3();
 
 /**
- * Skeleton for skinned animation
+ * Skeleton for skinned animation.
+ *
+ * Responsibilities:
+ * - Maintains joint transforms: inverse bind, bind pose, and current skinning matrices.
+ * - Provides a texture containing joint matrices for GPU skinning.
+ * - Applies skinning state to associated meshes each frame.
+ * - Computes animated axis-aligned bounding boxes using representative skinned vertices.
+ *
+ * Joint matrix texture layout:
+ * - Texture format: `rgba32f`.
+ * - Stored as a 2-layered ring buffer: current and previous joint transforms to support
+ *   temporal addressing if needed. Offsets are tracked in `_jointOffsets[0]` (current)
+ *   and `_jointOffsets[1]` (previous).
+ *
+ * Usage:
+ * - Construct with joints, bind data, meshes and submesh bounding info.
+ * - Call `apply()` each frame to update joint texture, bind to meshes, and update bounds.
+ * - Call `reset()` to clear skinning on meshes.
+ *
  * @public
  */
-export class Skeleton {
+export class Skeleton extends Disposable {
   /** @internal */
   protected _meshes: { mesh: Mesh; bounding: SkinnedBoundingBox; box: BoundingBox }[];
   /** @internal */
@@ -40,10 +72,13 @@ export class Skeleton {
   /** @internal */
   protected _jointTexture: Texture2D;
   /**
-   * Creates an instance of skeleton
-   * @param joints - The joint nodes
-   * @param inverseBindMatrices - The inverse binding matrices of the joints
-   * @param bindPoseMatrices - The binding pose matrices of the joints
+   * Create a skeleton instance.
+   *
+   * @param joints - Joint scene nodes (one per joint), ordered to match skin data.
+   * @param inverseBindMatrices - Inverse bind matrices for each joint.
+   * @param bindPoseMatrices - Bind pose matrices for each joint (model-space).
+   * @param meshes - Mesh instances influenced by this skeleton.
+   * @param bounding - Sub-mesh raw data used to derive representative bounding vertices.
    */
   constructor(
     joints: SceneNode[],
@@ -52,6 +87,7 @@ export class Skeleton {
     meshes: Mesh[],
     bounding: AssetSubMeshData[]
   ) {
+    super();
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
     this._bindPoseMatrices = bindPoseMatrices;
@@ -69,24 +105,29 @@ export class Skeleton {
     });
   }
   /**
-   * Disposes self
-   */
-  dispose() {
-    this._jointTexture?.dispose();
-    this._jointTexture = null;
-    this._joints = null;
-    this._inverseBindMatrices = null;
-    this._bindPoseMatrices = null;
-    this._jointMatrices = null;
-    this._jointMatrixArray = null;
-  }
-  /**
-   * The texture that contains the transform matrices of all the joints
+   * Texture containing joint matrices for GPU skinning.
+   *
+   * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
    */
   get jointTexture(): Texture2D {
     return this._jointTexture;
   }
-  /** @internal */
+  /**
+   * Update joint matrices from either provided transforms or the joints' world matrices.
+   *
+   * - Lazily creates the joint texture and its backing arrays on first call.
+   * - Advances the ring buffer offset in `_jointOffsets` to write a new "current" set.
+   * - For each joint:
+   *   - Optionally premultiplies by `worldMatrix` (to transform into model space).
+   *   - Computes skinning matrix: ( M_\{skin\} = M_\{joint\} \\times M_\{inverseBind\} ).
+   *
+   * Note: This method only writes into the CPU-side array; callers like `computeJoints()`
+   * update the GPU texture.
+   *
+   * @param jointTransforms - Optional per-joint transforms to use instead of node world matrices.
+   * @param worldMatrix - Optional world-to-model transform applied before inverse bind.
+   * @internal
+   */
   updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
     if (!this._jointTexture) {
       this._createJointTexture();
@@ -107,7 +148,15 @@ export class Skeleton {
       Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
     }
   }
-  /** @internal */
+  /**
+   * Compute and upload the bind pose matrices to the joint texture for a given model.
+   *
+   * - Fills the "current" ring buffer slot with bind pose transforms.
+   * - Uploads the entire matrix array to the GPU texture.
+   *
+   * @param model - The model node whose world matrix provides the reference space.
+   * @internal
+   */
   computeBindPose(model: SceneNode) {
     this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
     this._jointOffsets[1] = this._jointOffsets[0];
@@ -119,7 +168,11 @@ export class Skeleton {
       this._jointTexture.height
     );
   }
-  /** @internal */
+  /**
+   * Compute current joint matrices from the nodes and upload them to the joint texture.
+   *
+   * @internal
+   */
   computeJoints() {
     this.updateJointMatrices();
     this._jointTexture.update(
@@ -130,7 +183,14 @@ export class Skeleton {
       this._jointTexture.height
     );
   }
-  /** @internal */
+  /**
+   * Apply current skeleton state to all meshes:
+   * - Updates joint matrices and uploads to the texture.
+   * - Computes animated bounding boxes per mesh in model space.
+   * - Binds the joint texture to each mesh for GPU skinning.
+   *
+   * @internal
+   */
   apply() {
     this.computeJoints();
     for (const mesh of this._meshes) {
@@ -139,14 +199,29 @@ export class Skeleton {
       mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
     }
   }
-  /** @internal */
+  /**
+   * Reset all meshes to an unskinned state and clear animated bounds.
+   *
+   * @internal
+   */
   reset() {
     for (const mesh of this._meshes) {
       mesh.mesh.setBoneMatrices(null);
       mesh.mesh.setAnimatedBoundingBox(null);
     }
   }
-  /** @internal */
+  /**
+   * Compute the animated bounding box for a single mesh using its representative vertices.
+   *
+   * For each representative vertex:
+   * - Blends the vertex by up to 4 joint matrices using provided weights.
+   * - Transforms to the mesh's local space using `invWorldMatrix`.
+   * - Expands the bounding box.
+   *
+   * @param info - Precomputed bounding data (representative vertices, indices, weights).
+   * @param invWorldMatrix - Mesh inverse world matrix to convert to model/local space.
+   * @internal
+   */
   computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4) {
     info.boundingBox.beginExtend();
     for (let i = 0; i < info.boundingVertices.length; i++) {
@@ -167,7 +242,34 @@ export class Skeleton {
       info.boundingBox.extend(tmpV0);
     }
   }
-  /** @internal */
+  /**
+   * Dispose GPU resources and references held by the skeleton.
+   *
+   * - Disposes the joint texture.
+   * - Clears matrix arrays and joint references.
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._jointTexture?.dispose();
+    this._jointTexture = null;
+    this._joints = null;
+    this._inverseBindMatrices = null;
+    this._bindPoseMatrices = null;
+    this._jointMatrices = null;
+    this._jointMatrixArray = null;
+  }
+  /**
+   * Initialize joint texture and CPU-side matrix storage.
+   *
+   * Layout details:
+   * - Texture size is the next power-of-two able to contain all matrices plus two offset texels.
+   * - `_jointMatrixArray` holds:
+   *   - First 2 vec4s: ring buffer offsets `[current, previous, 0, 0]`.
+   *   - Followed by 2×N matrices (current and previous), each as 16 floats.
+   * - `_jointMatrices` is a view into `_jointMatrixArray` providing Matrix4x4 objects per slot.
+   *
+   * @internal
+   */
   private _createJointTexture() {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
     const device = Application.instance.device;
@@ -187,7 +289,21 @@ export class Skeleton {
       (val, index) => new Matrix4x4(buffer, (index + 1) * 16 * Float32Array.BYTES_PER_ELEMENT)
     );
   }
-  /** @internal */
+  /**
+   * Build representative skinned bounding data for a submesh.
+   *
+   * Strategy:
+   * - For all vertices, compute their skinned position (using current ring buffer slot).
+   * - Track the indices of the min/max extents along x, y, z (6 indices total).
+   * - Store:
+   *   - The 6 representative positions in object space.
+   *   - Their 4 joint indices and weights (flattened).
+   *   - An empty BoundingBox to be filled during animation.
+   *
+   * @param meshData - Raw submesh attributes (positions, blend indices, weights).
+   * @returns Skinned bounding box info used during per-frame updates.
+   * @internal
+   */
   private getBoundingInfo(meshData: AssetSubMeshData): SkinnedBoundingBox {
     const indices = [0, 0, 0, 0, 0, 0];
     let minx = Number.MAX_VALUE;

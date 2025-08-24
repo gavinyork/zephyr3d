@@ -10,6 +10,7 @@ import {
 import { ShaderHelper } from '../material/shader/helper';
 import { BoundingBox } from '../utility/bounding_volume';
 
+/** @internal */
 export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
   const device = Application.instance.device;
   const numTargets = subMesh.numTargets;

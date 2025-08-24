@@ -20,13 +20,28 @@ type WheelEventHandler = (this: HTMLElement, ev: WheelEvent) => any;
 type CompositionEventHandler = (this: HTMLElement, ev: CompositionEvent) => any;
 
 /**
- * Input handler type
+ * Input handler middleware type.
+ *
+ * Return true to indicate the event has been handled and should not be forwarded
+ * to the Application's observable event system.
+ *
  * @public
- * */
+ */
 export type InputEventHandler = (ev: Event, type?: string) => boolean;
 
 /**
- * Input manager class
+ * Input manager
+ *
+ * Centralizes DOM input event handling for the engine:
+ * - Subscribes to pointer/keyboard/drag/wheel/composition events on the target canvas element.
+ * - Normalizes click and double-click detection using distance/time tolerances.
+ * - Supports a middleware chain (`use`) to intercept and optionally consume events
+ *   before they are dispatched to the Application's observable event map.
+ * - Manages pointer capture for mouse interactions to ensure consistent up/move delivery.
+ *
+ * Lifecycle:
+ * - Call `start()` to attach all event listeners; `stop()` to remove them.
+ *
  * @public
  */
 export class InputManager {
@@ -46,11 +61,12 @@ export class InputManager {
   private readonly _wheelHandler: WheelEventHandler;
   private readonly _compositionHandler: CompositionEventHandler;
   private _captureId: number;
-  private readonly _middlewares: InputEventHandler[];
+  private readonly _middlewares: { handler: InputEventHandler; ctx: unknown }[];
   private _lastEventDatas: PointerEventData[];
   /**
-   * Creates an instance of InputManager
-   * @param app - Application object
+   * Creates an instance of InputManager bound to the given application/canvas.
+   *
+   * @param app - The owning Application instance.
    */
   constructor(app: Application) {
     this._app = app;
@@ -72,7 +88,13 @@ export class InputManager {
     this._captureId = -1;
     this._middlewares = [];
   }
-  /** @internal */
+  /**
+   * Begin listening to DOM events on the target element.
+   *
+   * Idempotent: additional calls have no effect after the first successful start.
+   *
+   * @internal
+   */
   start() {
     if (!this._started) {
       this._started = true;
@@ -96,7 +118,13 @@ export class InputManager {
       this._target.addEventListener('compositionend', this._compositionHandler);
     }
   }
-  /** @internal */
+  /**
+   * Stop listening to DOM events and clear per-pointer cached state.
+   *
+   * Idempotent: does nothing if not started.
+   *
+   * @internal
+   */
   stop() {
     if (this._started) {
       this._started = false;
@@ -122,28 +150,51 @@ export class InputManager {
     }
   }
   /**
-   * Adds a event handler middleware.
+   * Register a middleware (interceptor) for input events.
    *
-   * @remarks
-   * All handlers will be called in the order in which they were added
-   * until a handler returns true.
-   * If either handler returns true, the event that the Application
-   * listens to will not be triggered
+   * Order matters: middlewares are invoked in the order they were added until one returns true.
+   * If a middleware returns true, the event is considered handled and will not be dispatched
+   * to the Application's observers.
    *
-   * @param handler - The event handler to be added
-   * @returns self
+   * @param handler - Middleware function to add.
+   * @param ctx - `this` object for handler
+   * @returns The InputManager instance for chaining.
    */
-  use(handler: InputEventHandler): this {
+  use(handler: InputEventHandler, ctx?: unknown): this {
     if (handler) {
-      this._middlewares.push(handler);
+      this._middlewares.push({ handler, ctx });
     }
     return this;
   }
   /**
-   * Log event handler
-   * @param ev - Event to be logged
-   * @param type - Event type
-   * @returns Always returns false
+   * Unregister a previously registered middleware (interceptor) for input events.
+   *
+   * Removes the first middleware that matches both the given `handler` and `ctx`.
+   * If no matching middleware is found, this method is a no-op.
+   *
+   * Note: This only removes the specific pair of `(handler, ctx)` previously added
+   * via `use`. If the same `handler` was registered multiple times with different
+   * contexts, only the first exact match will be removed.
+   *
+   * @param handler - Middleware function to remove.
+   * @param ctx - `this` object that was associated with the `handler` when it was added.
+   * @returns The InputManager instance for chaining.
+   */
+  unuse(handler: InputEventHandler, ctx?: unknown): this {
+    const index = this._middlewares.findIndex((h) => h.handler === handler && h.ctx === ctx);
+    if (index >= 0) {
+      this._middlewares.splice(index, 1);
+    }
+    return this;
+  }
+  /**
+   * Utility middleware that logs the event type to the console.
+   *
+   * Can be used with `use(InputManager.log)` for quick diagnostics.
+   *
+   * @param ev - The DOM event being logged.
+   * @param type - Optional explicit event type; falls back to `ev.type`.
+   * @returns Always false (does not consume the event).
    */
   static log(ev: Event, type?: string) {
     console.log('Event log:', type ?? ev.type);
@@ -153,8 +204,8 @@ export class InputManager {
     ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent | CompositionEvent,
     type?: string
   ): boolean {
-    for (const handler of this._middlewares) {
-      if (handler(ev, type ?? ev.type)) {
+    for (const mw of this._middlewares) {
+      if (mw.handler.call(mw.ctx, ev, type ?? ev.type)) {
         return true;
       }
     }

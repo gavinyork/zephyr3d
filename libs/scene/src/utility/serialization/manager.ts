@@ -69,7 +69,27 @@ const defaultValues: Record<PropertyType, any> = {
 };
 
 /**
- * Serialization manager class
+ * Manages serialization and deserialization of engine objects to/from JSON,
+ * including asset resolution via a virtual file system (VFS) and asset manager.
+ *
+ * @remarks
+ * - Keeps a registry of serializable classes and their properties.
+ * - Converts object graphs to JSON using per-class metadata and property accessors.
+ * - Supports async asset embedding/export and lazy deserialization via phases.
+ * - Maps loaded assets/objects back to their source IDs for caching and deduplication.
+ *
+ * Typical workflow:
+ * 1. Construct with a `VFS`.
+ * 2. Optionally `registerClass` for custom types.
+ * 3. Use `serializeObject` and `deserializeObject` to convert between runtime objects and JSON.
+ * 4. Use `saveScene` / `loadScene` for scene I/O.
+ *
+ * Caching:
+ * - `getAssetId` returns the known source ID for an allocated asset when available.
+ *
+ * Threading:
+ * - Methods returning Promises perform async I/O using the provided `VFS`/AssetManager.
+ *
  * @public
  */
 export class SerializationManager {
@@ -80,6 +100,11 @@ export class SerializationManager {
   private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
   private readonly _assetManager: AssetManager;
   private _allocated: WeakMap<any, string>;
+  /**
+   * Create a SerializationManager bound to a virtual file system.
+   *
+   * @param vfs - Virtual file system used for reading/writing assets and scenes.
+   */
   constructor(vfs: VFS) {
     this._vfs = vfs;
     this._allocated = new WeakMap();
@@ -137,18 +162,54 @@ export class SerializationManager {
       this.registerProps(k[1]);
     }
   }
+  /**
+   * The virtual file system used by this manager.
+   *
+   * @remarks
+   * Used by asset fetchers and scene save/load operations.
+   */
   get vfs() {
     return this._vfs;
   }
+  /**
+   * Get the list of all registered serializable classes.
+   *
+   * @remarks
+   * Includes built-in classes registered during construction and any custom classes
+   * registered via `registerClass`.
+   *
+   * @returns An array of `SerializableClass` metadata.
+   */
   getClasses(): SerializableClass[] {
     return [...this._classMap.values()];
   }
+  /**
+   * Get serialization metadata by a constructor function.
+   *
+   * @param ctor - The class constructor to look up.
+   *
+   * @returns The `SerializableClass` metadata, or `null` if not found.
+   */
   getClassByConstructor(ctor: GenericConstructor) {
     return this._classMap.get(ctor) ?? null;
   }
+  /**
+   * Get serialization metadata by an object instance.
+   *
+   * @param obj - The object whose constructor will be used for the lookup.
+   *
+   * @returns The `SerializableClass` metadata, or `null` if not found.
+   */
   getClassByObject(obj: object) {
     return this.getClassByConstructor(obj.constructor as GenericConstructor);
   }
+  /**
+   * Get serialization metadata by class name.
+   *
+   * @param className - Fully qualified class name as stored in JSON.
+   *
+   * @returns The `SerializableClass` metadata, or `null` if not found.
+   */
   getClassByName(className: string) {
     for (const val of this._classMap) {
       if (val[0].name === className) {
@@ -157,6 +218,13 @@ export class SerializationManager {
     }
     return null;
   }
+  /**
+   * Find the class that owns a given property accessor.
+   *
+   * @param prop - Property accessor to search for.
+   *
+   * @returns The `SerializableClass` that declares the property, or `null` if unknown.
+   */
   getClassByProperty(prop: PropertyAccessor): SerializableClass {
     for (const k of this._clsPropMap) {
       if (k[1].indexOf(prop) >= 0) {
@@ -165,27 +233,92 @@ export class SerializationManager {
     }
     return null;
   }
+  /**
+   * Get the properties declared on a given class.
+   *
+   * @param cls - Serializable class metadata.
+   *
+   * @returns An array of `PropertyAccessor` entries, or `null` if none.
+   */
   getPropertiesByClass(cls: SerializableClass) {
     return this._clsPropMap.get(cls) ?? null;
   }
+  /**
+   * Get a property accessor by class and property name.
+   *
+   * @param cls - Serializable class metadata.
+   * @param name - Property name to search for.
+   *
+   * @returns The `PropertyAccessor`, or `null` if not found.
+   */
   getPropertyByClass(cls: SerializableClass, name: string) {
     return this.getPropertiesByClass(cls)?.find((value) => value.name === name) ?? null;
   }
+  /**
+   * Get a property accessor by its canonical path.
+   *
+   * @remarks
+   * The canonical path format is `/ClassName/propName`.
+   *
+   * @param name - Canonical property path.
+   *
+   * @returns The `PropertyAccessor`, or `null` if not found.
+   */
   getPropertyByName(name: string) {
     return this._propMap[name] ?? null;
   }
+  /**
+   * Get the canonical path for a property accessor.
+   *
+   * @remarks
+   * Returns a string like `/ClassName/propName` if the property is registered.
+   *
+   * @param prop - Property accessor.
+   *
+   * @returns The canonical path, or `null` if unknown.
+   */
   getPropertyName(prop: PropertyAccessor) {
     return this._propNameMap.get(prop) ?? null;
   }
+  /**
+   * Register a serializable class and its properties.
+   *
+   * @remarks
+   * - No effect if the class is already registered.
+   * - Also registers the class's properties with canonical paths.
+   *
+   * @param cls - Serializable class metadata to register.
+   */
   registerClass(cls: SerializableClass) {
     if (!this._classMap.has(cls.ctor)) {
       this._classMap.set(cls.ctor, cls);
       this.registerProps(cls);
     }
   }
+  /**
+   * Get the known asset ID previously associated with a loaded/allocated asset.
+   *
+   * @remarks
+   * Returns `null` if the asset was not loaded or tracked by this manager.
+   *
+   * @param asset - Asset instance (e.g., texture, model group) to look up.
+   *
+   * @returns The asset ID string, or `null` if unknown.
+   */
   getAssetId(asset: unknown) {
     return this._allocated.get(asset) ?? null;
   }
+  /**
+   * Fetch a binary asset by ID via the asset manager.
+   *
+   * @remarks
+   * - Associates the returned data with the given ID for future reverse lookup.
+   * - The ID is typically a VFS path or locator.
+   *
+   * @param id - Asset identifier or path.
+   *
+   * @returns A Promise that resolves to the binary content, or `null` if not found.
+   */
   async fetchBinary(id: string) {
     const data = await this.doFetchBinary(id);
     if (data) {
@@ -193,6 +326,19 @@ export class SerializationManager {
     }
     return data;
   }
+  /**
+   * Serialize an object to a JSON structure using registered class metadata.
+   *
+   * @remarks
+   * - Throws if the object's class is not registered.
+   * - Populates `asyncTasks` with pending I/O tasks for embedded resources.
+   *
+   * @param obj - The object to serialize.
+   * @param json - Optional existing JSON object to fill.
+   * @param asyncTasks - Optional list to collect async tasks for embedded asset export.
+   *
+   * @returns The serialized JSON structure.
+   */
   serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
     if (obj === null || obj === undefined) {
       return obj;
@@ -216,6 +362,18 @@ export class SerializationManager {
     }
     return json;
   }
+  /**
+   * Deserialize a JSON structure into an object instance.
+   *
+   * @remarks
+   * - Uses the `ClassName` field to locate the registered class.
+   * - Supports custom `createFunc` and phased property loading.
+   *
+   * @param ctx - Context object passed to custom constructors/resolvers.
+   * @param json - The serialized JSON structure.
+   *
+   * @returns A Promise resolving to the reconstructed object instance, or `null` on failure.
+   */
   async deserializeObject<T extends object>(ctx: any, json: object): Promise<T> {
     const cls = this.getClasses();
     const className = json['ClassName'];
@@ -263,6 +421,15 @@ export class SerializationManager {
   ) {
     return await this._assetManager.fetchTexture<T>(path, options);
   }
+  /**
+   * Load a model by ID and track the allocation for reverse lookup.
+   *
+   * @param id - Model identifier or path.
+   * @param scene - Scene into which the model is loaded.
+   * @param options - Optional model fetch options.
+   *
+   * @returns A Promise resolving to the loaded model object, or `null` if failed.
+   */
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions) {
     const model = await this.doFetchModel(id, scene, options);
     if (model) {
@@ -270,6 +437,14 @@ export class SerializationManager {
     }
     return model;
   }
+  /**
+   * Load a texture by ID and track the allocation for reverse lookup.
+   *
+   * @param id - Texture identifier or path.
+   * @param options - Optional texture fetch options.
+   *
+   * @returns A Promise resolving to the loaded texture, or `null` if failed.
+   */
   async fetchTexture<T extends Texture2D | TextureCube>(id: string, options?: TextureFetchOptions<T>) {
     const texture = await this.doFetchTexture(id, options);
     if (texture) {
@@ -277,11 +452,25 @@ export class SerializationManager {
     }
     return texture;
   }
+  /**
+   * Load a scene from a JSON file via VFS.
+   *
+   * @remarks
+   * - Deserializes the scene graph.
+   * - Attaches scripts referenced by nodes after load (asynchronous).
+   *
+   * @param filename - Path to the scene JSON file in VFS.
+   *
+   * @returns A Promise resolving to the loaded `Scene`.
+   */
   async loadScene(filename: string): Promise<Scene> {
     const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
     const json = JSON.parse(content);
     const scene = await this.deserializeObject<Scene>(null, json);
     if (scene) {
+      if (scene.script) {
+        await Application.instance.runtimeManager.attachScript(scene, scene.script);
+      }
       const P: Promise<any>[] = [];
       scene.rootNode.iterate((node) => {
         if (node.script) {
@@ -294,6 +483,16 @@ export class SerializationManager {
     }
     return scene;
   }
+  /**
+   * Save a scene to a JSON file via VFS.
+   *
+   * @remarks
+   * - Collects async export tasks for embedded resources and awaits them.
+   * - Writes a UTF-8 JSON representation to VFS.
+   *
+   * @param scene - Scene to serialize and save.
+   * @param filename - Destination path in VFS.
+   */
   async saveScene(scene: Scene, filename: string): Promise<void> {
     const asyncTasks: Promise<unknown>[] = [];
     const content = await this.serializeObject(scene, null, asyncTasks);
@@ -303,6 +502,12 @@ export class SerializationManager {
       create: true
     });
   }
+  /**
+   * Clear cached allocations and asset-manager caches.
+   *
+   * @remarks
+   * Useful when reloading content or changing VFS mounts.
+   */
   clearCache() {
     this._allocated = new WeakMap();
     this._assetManager.clearCache();
@@ -321,7 +526,19 @@ export class SerializationManager {
     }
     return null;
   }
-
+  /**
+   * Find the object targeted by an animation track starting from a node.
+   *
+   * @remarks
+   * - Parses a target path like `prop/subprop[0]/child` where indexed entries
+   *   require `object_array` type and non-indexed entries require `object` type.
+   * - Returns `null` if any segment cannot be resolved through registered metadata.
+   *
+   * @param node - Root node used as the starting point.
+   * @param track - Property track containing a target path.
+   *
+   * @returns The resolved target object, or `null` if not found.
+   */
   findAnimationTarget(node: SceneNode, track: PropertyTrack) {
     const target = track.target ?? '';
     const value: PropertyValue = { object: [] };

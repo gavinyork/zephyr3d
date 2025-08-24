@@ -270,14 +270,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   isBatchable(): this is BatchDrawable {
     return this._batchable && !this._boneMatrices && !this._morphData && this._material.get()?.isBatchable();
   }
-  /** Disposes the mesh node */
-  dispose() {
-    this._primitive.dispose();
-    this._material.dispose();
-    this._renderBundle = null;
-    RenderBundleWrapper.drawableChanged(this);
-    super.dispose();
-  }
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
@@ -371,6 +363,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       this._boundingBoxNode.position.set(bbox.toAABB().minPoint);
     }
     return bbox;
+  }
+  /** Disposes the mesh node */
+  protected onDispose() {
+    super.onDispose();
+    this._primitive.dispose();
+    this._material.dispose();
+    this._renderBundle = null;
+    RenderBundleWrapper.drawableChanged(this);
   }
   /** @internal */
   private _onBoundingboxChange() {

@@ -1,5 +1,5 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
-import { DataTransferVFS, Observable } from '@zephyr3d/base';
+import { DataTransferVFS, Disposable, makeObservable } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -55,9 +55,9 @@ type VFSRendererOptions = {
   multiSelect?: boolean;
 };
 
-export class VFSRenderer extends Observable<{
+export class VFSRenderer extends makeObservable(Disposable)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
-}> {
+}>() {
   private static readonly baseFlags =
     ImGui.TreeNodeFlags.SpanAvailWidth |
     ImGui.TreeNodeFlags.SpanFullWidth |
@@ -1324,7 +1324,8 @@ export class VFSRenderer extends Observable<{
       });
     }
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._vfs.off('changed', this.onVFSChanged, this);
     if (this._options.allowDrop) {
       eventBus.off('external_dragenter', this.handleDragEvent, this);

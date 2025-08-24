@@ -1,5 +1,5 @@
 import type { ColorRGBA } from '@zephyr3d/base';
-import { ASSERT, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
   type RenderStateSet,
@@ -11,7 +11,7 @@ import {
   type VertexLayoutOptions
 } from '@zephyr3d/device';
 
-export class Renderer {
+export class Renderer extends Disposable {
   /** @internal */
   private static readonly VERTEX_BUFFER_SIZE = 65536;
   /** @internal */
@@ -53,6 +53,7 @@ export class Renderer {
    * @param device - The render device
    */
   constructor(device: AbstractDevice) {
+    super();
     this._device = device;
     this._projectionMatrix = new Matrix4x4();
     this._flipMatrix = new Matrix4x4();
@@ -98,12 +99,6 @@ export class Renderer {
   }
   set clearBeforeRender(val: boolean) {
     this._clearBeforeRender = val;
-  }
-  /** Disposes this renderer */
-  dispose() {
-    this._primitiveBuffer = null;
-    this._vertexCache = null;
-    this._device = null;
   }
   /** @internal */
   getCanvas(): HTMLCanvasElement {
@@ -258,6 +253,13 @@ export class Renderer {
   }
   /** @internal */
   endRender() {}
+  /** Disposes this renderer */
+  protected onDispose() {
+    super.onDispose();
+    this._primitiveBuffer = null;
+    this._vertexCache = null;
+    this._device = null;
+  }
   /** @internal */
   private createStateSet(): RenderStateSet {
     const rs = this._device.createRenderStateSet();

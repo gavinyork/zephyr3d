@@ -66,8 +66,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     scene.queuePerCameraUpdateNode(this);
   }
   /** Disposes the water node */
-  dispose(): void {
-    super.dispose();
+  protected onDispose(): void {
+    super.onDispose();
     this._clipmap.dispose();
     this._clipmap = null;
     this._renderData = null;

@@ -1,12 +1,25 @@
+import { Disposable } from '@zephyr3d/base';
 import type { AnimationSet } from './animationset';
 import type { AnimationTrack } from './animationtrack';
 import type { Skeleton } from './skeleton';
 
 /**
- * Animation that contains multiple tracks
+ * Animation clip
+ *
+ * Represents a named animation composed of multiple tracks targeting various objects/properties,
+ * with an overall duration, weight, and optional auto-play behavior. Tracks may target different
+ * objects and are grouped by a per-target array. Skeletons used by this clip are tracked for
+ * lifecycle and application during playback.
+ *
+ * Typical workflow:
+ * - Create a clip via `AnimationSet.createAnimation(name)`.
+ * - Add one or more `AnimationTrack`s via `addTrack(target, track)`.
+ * - Optionally register skeletons via `addSkeleton(...)`.
+ * - Start playback through the owning `AnimationSet.playAnimation(name, options)`.
+ *
  * @public
  */
-export class AnimationClip {
+export class AnimationClip extends Disposable {
   /** @internal */
   protected _name: string;
   /** @internal */
@@ -28,6 +41,7 @@ export class AnimationClip {
    * @param model - Parent node if this is a skeleton animation
    */
   constructor(name: string, animationSet: AnimationSet, embedded = false) {
+    super();
     this._name = name;
     this._animationSet = animationSet;
     this._embedded = embedded;
@@ -37,47 +51,63 @@ export class AnimationClip {
     this._autoPlay = false;
     this._skeletons = new Set();
   }
-  /** Whether this is an embedded animation */
+  /**
+   * Whether this clip is embedded (owned inline by its container/resource).
+   */
   get embedded(): boolean {
     return this._embedded;
   }
-  /** AnimationSet this animation belongs to */
+  /**
+   * The `AnimationSet` that owns this clip.
+   */
   get animationSet() {
     return this._animationSet;
   }
-  /** Animatoin weight */
+  /**
+   * Global blend weight for the clip.
+   *
+   * Used by the animation system when combining multiple active clips.
+   */
   get weight() {
     return this._weight;
   }
   set weight(val: number) {
     this._weight = val;
   }
-  /** Whether animation should play automatically when loaded */
+  /**
+   * Whether this clip should start playing automatically when loaded/instantiated.
+   */
   get autoPlay() {
     return this._autoPlay;
   }
   set autoPlay(val: boolean) {
     this._autoPlay = val;
   }
-  /** Disposes self */
-  dispose() {
-    this._tracks = null;
-    this._skeletons?.forEach((val, key) => key.dispose());
-    this._skeletons = null;
-  }
-  /** Gets the name of the animation */
+  /**
+   * The unique name of this clip.
+   */
   get name(): string {
     return this._name;
   }
-  /** Gets all the tracks of this animation */
+  /**
+   * All animation tracks grouped by target object.
+   *
+   * Key: target object; Value: list of `AnimationTrack`s affecting that target.
+   */
   get tracks() {
     return this._tracks;
   }
-  /** Gets all skeletons */
+  /**
+   * All skeletons referenced by this clip.
+   */
   get skeletons() {
     return this._skeletons;
   }
-  /** The duration of the animation */
+  /**
+   * Total time span of the clip in seconds.
+   *
+   * Automatically extended when adding tracks with longer duration.
+   */
   get timeDuration(): number {
     return this._duration;
   }
@@ -85,18 +115,20 @@ export class AnimationClip {
     this._duration = val;
   }
   /**
-   * Adds a skeleton to the animation
-   * @param skeleton - The skeleton to be added
-   * @param meshList - The meshes controlled by the skeleton
-   * @param boundingBoxInfo - Bounding box information for the skeleton
+   * Add a skeleton used by this clip.
+   *
+   * @param skeleton - Skeleton to register for this clip.
    */
   addSkeleton(skeleton: Skeleton) {
     this._skeletons.add(skeleton);
   }
   /**
-   * Deletes an animation track from this animation
-   * @param track - The track to delete
-   * @returns self
+   * Remove a specific track from this clip.
+   *
+   * Errors if the track does not belong to this clip. Does nothing if not found.
+   *
+   * @param track - The track instance to remove.
+   * @returns This clip (for chaining).
    */
   deleteTrack(track: AnimationTrack): this {
     if (track?.animation !== this) {
@@ -112,10 +144,20 @@ export class AnimationClip {
     return this;
   }
   /**
-   * Adds an animation track to this animation
-   * @param target - The node that will be controlled by the track
-   * @param track - The track to be added
-   * @returns self
+   * Add a track to this clip for a specific target object.
+   *
+   * Constraints:
+   * - The track must not already belong to another clip.
+   * - Only one track with the same blendId may exist per target in a single clip.
+   *
+   * Side effects:
+   * - Assigns this clip to `track.animation`.
+   * - Extends `timeDuration` to cover the track duration if longer.
+   * - Calls `track.reset(target)` to initialize the target state if needed.
+   *
+   * @param target - Target object controlled by the track.
+   * @param track - Track to add.
+   * @returns This clip (for chaining).
    */
   addTrack(target: object, track: AnimationTrack): this {
     if (!track) {
@@ -145,5 +187,18 @@ export class AnimationClip {
     this._duration = Math.max(this._duration, track.getDuration() ?? 0);
     track.reset(target);
     return this;
+  }
+  /**
+   * Dispose internal resources/references held by this clip.
+   *
+   * Notes:
+   * - Clears track collections and disposes registered skeletons.
+   * - The clip becomes unusable after disposing.
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._tracks = null;
+    this._skeletons?.forEach((val, key) => key.dispose());
+    this._skeletons = null;
   }
 }

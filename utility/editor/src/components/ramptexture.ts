@@ -1,12 +1,12 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { Texture2D } from '@zephyr3d/device';
 import { Application } from '@zephyr3d/scene';
-import { Interpolator, Observable } from '@zephyr3d/base';
+import { Disposable, Interpolator, makeObservable } from '@zephyr3d/base';
 import { CurveEditor } from './curveeditor';
 
-export class RampTextureCreator extends Observable<{
+export class RampTextureCreator extends makeObservable(Disposable)<{
   preview_position: [{ key: number; value: number[] }];
-}> {
+}>() {
   private readonly _textureWidth: number;
   private _texture: Texture2D;
   private _interpolator: Interpolator;
@@ -499,7 +499,8 @@ export class RampTextureCreator extends Observable<{
     }
   }
 
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._texture?.dispose();
     this._texture = null;
   }

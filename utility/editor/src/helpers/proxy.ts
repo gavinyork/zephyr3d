@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
 import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { TetrahedronFrameShape } from '@zephyr3d/scene';
 import {
@@ -12,7 +12,7 @@ import {
 
 const PROXY_NAME = '$__PROXY__$';
 
-export class NodeProxy {
+export class NodeProxy extends Disposable {
   private readonly _diamondPrimitive: DRef<Primitive>;
   private readonly _spotLightPrimitive: DRef<Primitive>;
   private readonly _directionalLightPrimitive: DRef<Primitive>;
@@ -21,23 +21,13 @@ export class NodeProxy {
   private _scene: Scene;
   private _proxyList: DWeakRef<Mesh>[];
   constructor(scene: Scene) {
+    super();
     this._scene = scene;
     this._diamondPrimitive = new DRef();
     this._spotLightPrimitive = new DRef();
     this._directionalLightPrimitive = new DRef();
     this._perspectiveCameraPrimitive = new DRef();
     this._lightProxyMaterial = new DRef(new UnlitMaterial());
-    this._proxyList = [];
-  }
-  dispose() {
-    this._scene = null;
-    this._diamondPrimitive.dispose();
-    this._spotLightPrimitive.dispose();
-    this._directionalLightPrimitive.dispose();
-    this._lightProxyMaterial.dispose();
-    for (const ref of this._proxyList) {
-      ref.dispose();
-    }
     this._proxyList = [];
   }
   getProto(proxy: SceneNode) {
@@ -118,6 +108,18 @@ export class NodeProxy {
         proxy.showState = 'visible';
       }
     }
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._scene = null;
+    this._diamondPrimitive.dispose();
+    this._spotLightPrimitive.dispose();
+    this._directionalLightPrimitive.dispose();
+    this._lightProxyMaterial.dispose();
+    for (const ref of this._proxyList) {
+      ref.dispose();
+    }
+    this._proxyList = [];
   }
   private getDirectionalLightProxyMesh() {
     if (!this._directionalLightPrimitive.get()) {

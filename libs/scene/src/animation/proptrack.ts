@@ -3,7 +3,22 @@ import type { PropertyAccessor, PropertyValue } from '../utility';
 import { Interpolator } from '@zephyr3d/base';
 
 /**
- * Translate animation track
+ * Property animation track
+ *
+ * Animates a single property (scalar, vector, or color) on a target object using
+ * time-based interpolation. Supports:
+ * - float, vec2, vec3/rgb, vec4, rgba property types
+ * - Separate interpolation for RGB and Alpha in RGBA mode
+ * - Linear and cubic spline (natural) interpolation presets
+ *
+ * The track reads a `PropertyAccessor` which encapsulates how to get/set the property
+ * on the target object. Internally, the current state is represented as a numeric array.
+ *
+ * Notes:
+ * - `calculateState` samples interpolators into an internal reusable state instance
+ *   for performance; consumers should treat returned states as ephemeral.
+ * - `mixState` performs component-wise linear interpolation for blending.
+ *
  * @public
  */
 export class PropertyTrack extends AnimationTrack<PropertyValue> {
@@ -15,8 +30,16 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   private _interpolator: Interpolator;
   private _interpolatorAlpha: Interpolator;
   /**
-   * Create an instance of TranslationTrack from keyframe values
-   * @param prop - Property to be animated
+   * Construct a PropertyTrack for a specific property.
+   *
+   * Initializes interpolators and internal state based on the property type.
+   * If an initial `value` is provided, it seeds the starting state and default key values.
+   *
+   * @param prop - The property accessor describing what and how to animate.
+   * @param value - Optional initial numeric values (length must match the property type).
+   * @param embedded - Whether this track is embedded/owned inline. Default false.
+   *
+   * @throws Error if the property type is unsupported for animation.
    */
   constructor(prop: PropertyAccessor, value?: number[], embedded?: boolean) {
     super(embedded);
@@ -87,18 +110,36 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
         throw new Error(`Property '${this._prop.name}' cannot be animated`);
     }
   }
+  /**
+   * Logical target identifier for this track (optional metadata).
+   *
+   * This does not affect application; it can be used by tooling or higher-level
+   * systems to label/group tracks.
+   */
   get target() {
     return this._target;
   }
   set target(val: string) {
     this._target = val;
   }
+  /**
+   * The primary interpolator for the property components.
+   *
+   * - For float/vec2/vec3/vec4/rgb: handles all channels.
+   * - For rgba: handles RGB channels only; alpha is handled by `interpolatorAlpha`.
+   */
   get interpolator() {
     return this._interpolator;
   }
   set interpolator(interpolator: Interpolator) {
     this._interpolator = interpolator;
   }
+  /**
+   * The alpha-channel interpolator for RGBA properties.
+   *
+   * - Only used when the property type is `rgba`.
+   * - Setting a non-null interpolator ensures alpha state storage is allocated.
+   */
   get interpolatorAlpha() {
     return this._interpolatorAlpha;
   }
@@ -108,6 +149,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
       this._stateAlpha = { num: [0] };
     }
   }
+  /** {@inheritDoc AnimationTrack.calculateState} */
   calculateState(target: unknown, currentTime: number): PropertyValue {
     this._interpolator.interpolate(currentTime, this._state.num);
     if (this._interpolatorAlpha) {
@@ -116,9 +158,11 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
     }
     return this._state;
   }
+  /** {@inheritDoc AnimationTrack.applyState} */
   applyState(target: object, state: PropertyValue) {
     this._prop.set.call(target, state);
   }
+  /** {@inheritDoc AnimationTrack.mixState} */
   mixState(a: PropertyValue, b: PropertyValue, t: number): PropertyValue {
     const v: number[] = [];
     for (let i = 0; i < this._count; i++) {
@@ -126,12 +170,19 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
     }
     return { num: v };
   }
+  /** {@inheritDoc AnimationTrack.getBlendId} */
   getBlendId(): unknown {
     return this._prop;
   }
+  /** {@inheritDoc AnimationTrack.getDuration} */
   getDuration(): number {
     return this._interpolator.maxTime;
   }
+  /**
+   * Access the underlying property accessor.
+   *
+   * @returns The `PropertyAccessor` used by this track.
+   */
   getProp(): PropertyAccessor {
     return this._prop;
   }

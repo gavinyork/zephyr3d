@@ -157,6 +157,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               action: () => eventBus.dispatchEvent('action', 'OPEN_PROJECT')
             },
             {
+              label: 'Project Settings...',
+              action: () => eventBus.dispatchEvent('action', 'PROJECT_SETTINGS')
+            },
+            {
               label: 'Build Project',
               action: () => eventBus.dispatchEvent('action', 'BUILD_PROJECT')
             },

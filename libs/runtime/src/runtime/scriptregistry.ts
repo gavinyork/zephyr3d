@@ -118,7 +118,6 @@ export class ScriptRegistry {
    *
    * @param id - Logical module identifier (absolute or logical path-like).
    * @returns Source code, resolved path, and type (`'js' | 'ts'`), or `undefined` if not found.
-   * @protected
    */
   protected async fetchSource(
     id: string
@@ -278,7 +277,6 @@ export class ScriptRegistry {
    * @param type - Source type (`'js' | 'ts'`).
    * @returns Transpiled JavaScript source.
    * @throws If TypeScript runtime is not found for TS input.
-   * @protected
    */
   private async transpile(code: string, _id: string, type: 'js' | 'ts'): Promise<string> {
     const logicalId = String(_id);
@@ -333,7 +331,6 @@ export class ScriptRegistry {
    * @param code - Module source code to transform.
    * @param fromId - The logical id of the current module (resolution base for relatives).
    * @returns Transformed source with rewritten import specifiers.
-   * @protected
    */
   private async rewriteImports(code: string, fromId: string): Promise<string> {
     await init;

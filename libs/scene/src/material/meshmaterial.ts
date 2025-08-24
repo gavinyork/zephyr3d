@@ -28,19 +28,25 @@ import { Vector2, Vector3, Vector4, applyMixins, DRef, DWeakRef, randomUUID } fr
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 
 /**
- * Blending mode for mesh material
+ * Blending mode for mesh materials.
+ *
+ * - `none`: No blending (opaque).
+ * - `blend`: Standard alpha blending (srcAlpha, 1 - srcAlpha).
+ * - `additive`: Additive blending (1, 1), commonly for glow/FX.
+ *
+ * May be combined with alpha-to-coverage and alpha test.
  * @public
  */
 export type BlendMode = 'none' | 'blend' | 'additive';
 
 /**
- * Extract mixin return type
+ * Extracts the return type of a mixin function.
  * @public
  */
 export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
 
 /**
- * Extract mixin type
+ * Produces the intersection type of multiple mixins’ return types.
  * @public
  */
 export type ExtractMixinType<M> = M extends [infer First]
@@ -50,11 +56,18 @@ export type ExtractMixinType<M> = M extends [infer First]
   : never;
 
 /**
- * Apply material mixins to specific material class
- * @param target - Material class
- * @param mixins - mixins
- * @returns Mixed mesh material class
+ * Apply material mixins to a target material class.
  *
+ * Useful for composing optional capabilities (e.g., base color, normal map, PBR terms).
+ *
+ * @param target - The material class (constructor or prototype).
+ * @param mixins - One or more mixin functions.
+ * @returns The target class augmented with the mixins (intersection type).
+ *
+ * @example
+ * class MyMaterial extends MeshMaterial \{\}
+ * const Mixed = applyMaterialMixins(MyMaterial, WithBaseColor, WithNormalMap);
+ * const m = new Mixed();
  * @public
  */
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
@@ -73,40 +86,95 @@ let FEATURE_DISABLE_TAA = 0;
 export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
 
 /**
- * Base class for any kind of mesh materials
+ * Base class for mesh materials.
+ *
+ * Key responsibilities:
+ * - Defines feature-based shader variants (alpha test, blending, alpha-to-coverage, TAA toggle, etc.).
+ * - Provides a material instancing mechanism (per-instance uniforms via a shared core material).
+ * - Implements the base shader scaffolding for multiple render passes (LIGHT, DEPTH, OBJECT_COLOR, SHADOWMAP).
+ * - Updates render states depending on pass and features (blending, depth, culling).
+ * - Submits material uniforms and cooperates with OIT/TAA/SSR/motion vectors.
+ *
+ * Variant system:
+ * - Features are stored in `_featureStates` and hashed into `_createHash()`.
+ * - Changing features calls `useFeature(...)` which triggers `optionChanged(true)` to rebuild programs.
+ *
+ * Instancing:
+ * - `defineInstanceUniform` registers per-instance fields with packed layout.
+ * - `createInstance()` returns a lightweight instance that shares the core’s GPU programs and updates
+ *   instance uniform buffer only. This improves batching/instancing support.
+ *
+ * Shader hooks:
+ * - `vertexShader(scope)` and `fragmentShader(scope)` provide per-pass hook points to implement the
+ *   material’s vertex/fragment logic. The base class wires up common I/O (skin, morph, instancing).
+ * - `outputFragmentColor(...)` centralizes final color output across passes, handling OIT and alpha ops.
+ *
+ * Render states and queues:
+ * - `updateRenderStates(...)` sets depth/blend/cull states based on blending, alpha-to-coverage,
+ *   depth equality optimizations, pass type, and optional OIT overrides.
+ * - `getQueueType()` chooses between opaque and transparent queues.
+ *
+ * Extending:
+ * - Override `vertexShader`, `fragmentShader`, and optionally `outputFragmentColor`.
+ * - Override `supportLighting`, `isTransparentPass`, `needFragmentColor`, etc., as needed.
+ * - Use `uniformChanged()` when changing uniform-only values that do not alter shader variants.
+ * - Use `useFeature()` when toggling options that affect shader variants.
  *
  * @public
  */
 export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
-  /** @internal */
+  /**
+   * Registered instance uniforms for this material class.
+   *
+   * Each entry defines property name, type, and packed offset (float-aligned).
+   * @internal
+   */
   static INSTANCE_UNIFORMS: { prop: string; type: InstanceUniformType; offset: number }[] = [];
-  /** @internal */
+  /**
+   * Next free feature index for subclasses to define their own feature toggles.
+   * @internal
+   */
   static NEXT_FEATURE_INDEX = 3;
-  /** @internal */
+  /**
+   * Built-in per-instance uniform: object color (rgba), used for GPU picking/object-ID pass.
+   * @internal
+   */
   static OBJECT_COLOR_UNIFORM = this.defineInstanceUniform('objectColor', 'rgba');
-  /** @internal */
+  /**
+   * Built-in per-instance uniform: opacity (float), used in transparent passes.
+   * @internal
+   */
   static OPACITY_UNIFORM = this.defineInstanceUniform('opacity', 'float');
-  /** @internal */
+  /** @internal Feature state array (indexed by feature indices). */
   private _featureStates: unknown[];
-  /** @internal */
+  /** @internal Alpha test cutoff in [0, 1]. */
   private _alphaCutoff: number;
-  /** @internal */
+  /** @internal Blending mode. */
   private _blendMode: BlendMode;
-  /** @internal */
+  /** @internal Face culling mode. */
   private _cullMode: FaceMode;
-  /** @internal */
+  /** @internal Opacity in [0, 1]. */
   private _opacity: number;
-  /** @internal */
+  /**
+   * @internal TAA strength in [0, 1], where higher value typically means stronger accumulation
+   * (here used inversely when mapping to motion vector output).
+   */
   private _taaStrength: number;
-  /** @internal */
+  /** @internal Per-object color for object picking pass. */
   private readonly _objectColor: Vector4;
-  /** @internal */
+  /** @internal Last draw context used for shader creation. */
   private _ctx: DrawContext;
-  /** @internal */
+  /** @internal Current material pass index during program building. */
   private _materialPass: number;
   /**
-   * Creates an instance of MeshMaterial class
-   * @param args - constructor arguments
+   * Create a MeshMaterial with default opaque settings.
+   *
+   * Defaults:
+   * - `blendMode = 'none'`
+   * - `cullMode = 'back'`
+   * - `opacity = 1`
+   * - `alphaCutoff = 0`
+   * - `taaStrength = 1 - 1/16`
    */
   constructor() {
     super();
@@ -121,11 +189,21 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this._materialPass = -1;
     this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
   }
+  /**
+   * Create a shallow clone of this material.
+   * Subclasses should override to copy custom fields.
+   */
   clone(): MeshMaterial {
     const other = new MeshMaterial();
     other.copyFrom(this);
     return other;
   }
+  /**
+   * Copy common MeshMaterial properties from another material.
+   * Call `super.copyFrom(other)` first when overriding in subclasses.
+   *
+   * @param other - Source material.
+   */
   copyFrom(other: this): void {
     super.copyFrom(other);
     this.alphaCutoff = other.alphaCutoff;
@@ -134,17 +212,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this.opacity = other.opacity;
     this.objectColor = other.objectColor;
   }
-  /** Indicate that the uniform has changed and needs to be resubmitted. */
+  /**
+   * Mark uniform-only changes so uniforms are re-uploaded on next apply, without
+   * rebuilding shader programs.
+   */
   uniformChanged() {
     this.optionChanged(false);
   }
-  /** Define feature index */
+  /**
+   * Define a new feature bit/index for shader variants.
+   * Subclasses may use this to add their own switches.
+   */
   static defineFeature(): number {
     const val = this.NEXT_FEATURE_INDEX;
     this.NEXT_FEATURE_INDEX++;
     return val;
   }
-  /** @internal */
+  /** @internal Helper: get number of scalar components for a given instance uniform type. */
   private static getNumComponents(type: InstanceUniformType) {
     if (type === 'float') {
       return 1;
@@ -160,7 +244,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
     return 0;
   }
-  /** Define instance uniform index */
+  /**
+   * Define a per-instance uniform for this class.
+   *
+   * Returns a compact index encoding the vector index and component offset, which can be
+   * used in shader code via `getInstancedUniform(...)`.
+   *
+   * @param prop - Property name exposed on instances.
+   * @param type - Uniform data type.
+   * @returns Encoded index for use in `getInstancedUniform`.
+   *
+   * @throws If the property is already defined or type is invalid.
+   */
   static defineInstanceUniform(prop: string, type: InstanceUniformType): number {
     if (this.INSTANCE_UNIFORMS.findIndex((val) => val.prop === prop) >= 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
@@ -193,6 +288,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this.INSTANCE_UNIFORMS.splice(index, 0, { prop, offset, type });
     return (offset << 2) | (numComponents - 1);
   }
+  /**
+   * Read an encoded per-instance uniform in shader code.
+   *
+   * Encoded index packs: vector index, component offset, and component count.
+   *
+   * @param scope - Inside-function shader scope.
+   * @param uniformIndex - Encoded index from `defineInstanceUniform`.
+   * @returns The shader expression reading the selected components.
+   */
   getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
     const pb = scope.$builder;
     const instanceID = scope.$builtins.instanceIndex;
@@ -212,11 +316,24 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const m = ['x', 'y', 'z', 'w'].slice(vecOffset, vecOffset + numComponents).join('');
     return u[m];
   }
-  /** Get instanced material property list */
+  /**
+   * Get the list of per-instance uniforms for this material class.
+   */
   getInstancedUniforms() {
     return (this.constructor as typeof MeshMaterial).INSTANCE_UNIFORMS;
   }
-  /** Create material instance */
+  /**
+   * Create a material instance (preferred for GPU instancing).
+   *
+   * - On WebGL1 (or when instancing unsupported), falls back to cloning.
+   * - Otherwise, returns a proxy instance that shares GPU programs and
+   *   stores per-instance uniforms in a compact Float32Array.
+   *
+   * The returned instance:
+   * - Exposes properties defined by `defineInstanceUniform` with getter/setter
+   *   that read/write the packed buffer and notify `RenderBundleWrapper`.
+   * - Delegates methods to the core material via prototype chain.
+   */
   createInstance(): this {
     if (this.$isInstance) {
       return this.coreMaterial.createInstance();
@@ -370,18 +487,30 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     Object.setPrototypeOf(instance, that);
     return instance;
   }
-  /** Draw context for shader creation */
+  /**
+   * Draw context captured during program creation, available inside shader hooks.
+   *
+   * @returns The last `DrawContext` used to build or apply this material.
+   */
   get drawContext(): DrawContext {
     return this._ctx;
   }
   /**
-   * Current material pass
+   * Current material pass index during program building.
+   * Typically used inside shader hooks to select per-pass logic.
+   *
+   * @returns The active pass index while building the program, or -1 when idle.
    * @internal
-   **/
+   */
   get pass(): number {
     return this._materialPass;
   }
-  /** A value between 0 and 1, presents the cutoff for alpha testing */
+  /**
+   * Alpha test cutoff in [0, 1].
+   * - 0 disables alpha testing.
+   * - \> 0 discards fragments with alpha \< cutoff.
+   * Changing this marks uniforms dirty (no shader rebuild).
+   */
   get alphaCutoff(): number {
     return this._alphaCutoff;
   }
@@ -392,14 +521,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.uniformChanged();
     }
   }
-  /** Whether TAA should be disabled on this material */
+  /**
+   * Whether TAA is disabled for this material.
+   * - When true, motion vectors encode a large sentinel to skip TAA accumulation.
+   * - Managed via an internal feature toggle.
+   */
   get TAADisabled(): boolean {
     return !!this.featureUsed(FEATURE_DISABLE_TAA);
   }
   set TAADisabled(val: boolean) {
     this.useFeature(FEATURE_DISABLE_TAA, !!val);
   }
-  /** TAA strength */
+  /**
+   * TAA strength in [0, 1].
+   * - Higher values generally imply stronger accumulation.
+   * - The value is mapped when writing motion-vector outputs during depth pass.
+   */
   get TAAStrength(): number {
     return this._taaStrength;
   }
@@ -410,13 +547,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.uniformChanged();
     }
   }
+  /**
+   * Alpha-to-coverage toggle.
+   * - Useful to approximate transparency for MSAA targets.
+   * - Managed as a shader feature; toggling rebuilds variants.
+   */
   get alphaToCoverage(): boolean {
     return this.featureUsed(FEATURE_ALPHATOCOVERAGE);
   }
   set alphaToCoverage(val: boolean) {
     this.useFeature(FEATURE_ALPHATOCOVERAGE, !!val);
   }
-  /** Blending mode */
+  /**
+   * Blending mode of this material.
+   * - 'none' for opaque, 'blend' for standard alpha, 'additive' for emissive FX.
+   * - Changing the mode toggles an internal feature and rebuilds variants.
+   */
   get blendMode(): BlendMode {
     return this._blendMode;
   }
@@ -426,14 +572,20 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
     }
   }
-  /** Cull mode */
+  /**
+   * Face culling mode: 'none' | 'front' | 'back'.
+   * - Does not force shader rebuild; affects rasterizer state.
+   */
   get cullMode(): FaceMode {
     return this._cullMode;
   }
   set cullMode(val: FaceMode) {
     this._cullMode = val;
   }
-  /** A value between 0 and 1, presents the opacity */
+  /**
+   * Material opacity in [0, 1].
+   * - Used in transparent passes. Changing marks uniforms dirty only.
+   */
   get opacity(): number {
     return this._opacity;
   }
@@ -444,7 +596,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.uniformChanged();
     }
   }
-  /** Object color used for GPU picking */
+  /**
+   * Per-object color used for GPU picking/object-ID pass.
+   * - Changing marks uniforms dirty only.
+   */
   get objectColor(): Vector4 {
     return this._objectColor;
   }
@@ -454,12 +609,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.uniformChanged();
     }
   }
-  /** Returns true if shading of the material will be affected by lights  */
+  /**
+   * Whether this material responds to scene lighting.
+   * Override to return false for unlit materials.
+   *
+   * @returns True if lighting affects this material; otherwise false.
+   */
   supportLighting(): boolean {
     return true;
   }
   /**
-   * {@inheritDoc Material.updateRenderStates}
+   * Update render states per pass and draw context.
+   * Sets blending, alpha-to-coverage, depth test/write, cull mode, color mask, and cooperates with OIT.
+   *
+   * @param pass - Current material pass index.
+   * @param stateSet - Render state set to update.
+   * @param ctx - Current draw context.
+   * @returns void
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
     const isObjectColorPass = ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
@@ -515,11 +681,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
   }
   /**
-   * Submit Uniform values before rendering with this material.
+   * Submit material uniforms/resources to the material bind group (set 2).
+   * Handles alpha cutoff, opacity (non-instanced transparent), OIT, object color, and TAA strength.
    *
-   * @param bindGroup - Bind group for this material
-   * @param ctx - Draw context
-   * @param pass - Current pass of the material
+   * @param bindGroup - The material bind group to write into.
+   * @param ctx - Current draw context.
+   * @param pass - Current material pass index.
+   * @returns void
    */
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
@@ -546,21 +714,33 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
   }
   /**
-   * Determine which queue should be used to render this material.
-   * @returns QUEUE_TRANSPARENT or QUEUE_OPAQUE
+   * Determine the render queue for this material.
+   * Transparent materials are queued as `QUEUE_TRANSPARENT`, otherwise `QUEUE_OPAQUE`.
+   *
+   * @returns The queue type constant.
    */
   getQueueType(): number {
     return this.isTransparentPass(0) ? QUEUE_TRANSPARENT : QUEUE_OPAQUE;
   }
   /**
-   * Determine if a certain pass of this material is translucent.
-   * @param pass - Pass of the material
-   * @returns True if it is translucent, otherwise false.
+   * Whether the given pass is transparent.
+   * Default returns true when `blendMode !== 'none'`.
+   *
+   * @param pass - Material pass index.
+   * @returns True if the pass is transparent; otherwise false.
    */
   isTransparentPass(_pass: number): boolean {
     return this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none';
   }
-  /** @internal */
+  /**
+   * Create the GPU program for a given pass and draw context.
+   * Enables depth-clamp emulation for shadow map passes when required by the light, then delegates to `_createProgram`.
+   *
+   * @param ctx - Current draw context.
+   * @param pass - Material pass index.
+   * @returns The created `GPUProgram`.
+   * @internal
+   */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
     const pb = new ProgramBuilder(ctx.device);
     if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
@@ -570,19 +750,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return this._createProgram(pb, ctx, pass);
   }
   /**
-   * Check if a feature is in use for given render pass type.
+   * Query a feature flag’s current value.
    *
-   * @param feature - The feature index
-   * @returns true if the feature is in use, otherwise false.
+   * @typeParam T - Expected value type.
+   * @param feature - The feature index.
+   * @returns The current value for the feature, typed as `T`.
    */
   featureUsed<T = unknown>(feature: number): T {
     return this._featureStates[feature] as T;
   }
   /**
-   * Use or unuse a feature of the material, this will cause the shader to be rebuild.
+   * Enable or disable a feature and trigger variant rebuild when changed.
+   * Calls `optionChanged(true)` internally on change.
    *
-   * @param feature - Which feature will be used or unused
-   * @param use - true if use the feature, otherwise false
+   * @param feature - The feature index to set.
+   * @param use - The new feature value (typed by convention).
+   * @returns void
    */
   useFeature(feature: number, use: unknown) {
     if (this._featureStates[feature] !== use) {
@@ -591,27 +774,35 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
   }
   /**
-   * {@inheritDoc Material._createHash}
-   * @override
+   * Create the material-specific hash fragment from feature state.
+   * Contributes to program variant hashing.
    *
+   * @returns The hash fragment string.
    * @internal
    */
   protected _createHash(): string {
     return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
   }
   /**
-   * {@inheritDoc Material._applyUniforms}
-   * @override
+   * Apply material uniforms to the bind group (set 2).
+   * Default implementation delegates to `applyUniformValues`.
    *
+   * @param bindGroup - The material bind group to update.
+   * @param ctx - Current draw context.
+   * @param pass - Current material pass index.
+   * @returns void
    * @internal
    */
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     this.applyUniformValues(bindGroup, ctx, pass);
   }
   /**
-   * Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use.
+   * Whether the fragment shader needs to compute color.
+   * Returns true for LIGHT pass, or when alpha test or alpha-to-coverage is enabled.
+   * Override if the material writes color in other passes.
    *
-   * @returns - true if the color should be computed in fragment shader, otherwise false.
+   * @param ctx - Optional draw context; defaults to the last captured `drawContext`.
+   * @returns True if fragment color computation is needed; otherwise false.
    */
   needFragmentColor(ctx?: DrawContext): boolean {
     return (
@@ -621,8 +812,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     );
   }
   /**
-   * Vertex shader implementation of this material
-   * @param scope - Shader scope
+   * Vertex shader hook.
+   * Prepares common inputs (skin/morph/instancing), varyings, and pass-dependent outputs.
+   * Override to implement per-vertex logic; use `ShaderHelper` as needed.
+   *
+   * @param scope - Vertex shader function scope.
+   * @returns void
    */
   vertexShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
@@ -648,8 +843,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
   }
   /**
-   * Fragment shader implementation of this material
-   * @param scope - Shader scope
+   * Fragment shader hook.
+   * Declares pass-dependent uniforms (e.g., opacity, objectColor, alphaCutoff).
+   * Override to implement per-fragment logic, and call `outputFragmentColor` to finalize writes.
+   *
+   * @param scope - Fragment shader function scope.
+   * @returns void
    */
   fragmentShader(scope: PBFunctionScope): void {
     const pb = scope.$builder;
@@ -672,9 +871,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
   }
   /**
-   * {@inheritDoc Material._createProgram}
-   * @override
+   * Build and return the GPU program for this pass.
+   * Wires `vertexShader` and `fragmentShader`; sets up pass-dependent outputs (OIT, SSR, motion vectors, distance/object color).
    *
+   * @param pb - Program builder.
+   * @param ctx - Current draw context.
+   * @param pass - Material pass index.
+   * @returns The created `GPUProgram`.
    * @internal
    */
   protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
@@ -712,12 +915,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return program;
   }
   /**
-   * Calculate final fragment color for output.
+   * Centralized final color write and per-pass output composition.
    *
-   * @param scope - Shader scope
-   * @param color - Lit fragment color
+   * Behavior by pass:
+   * - LIGHT: clipping, alpha handling, optional OIT integration, fog application, color output encoding.
+   * - DEPTH: encoded depth; optional motion vectors (TAA enabled/disabled handling).
+   * - OBJECT_COLOR: object color and distance output (linear depth or world-pos + distance).
+   * - SHADOWMAP: writes shadow depth via light’s shadow implementation.
    *
-   * @returns The final fragment color
+   * Also writes SSR roughness/normal buffers when requested via material flags.
+   *
+   * @param scope - Inside-function shader scope.
+   * @param worldPos - Fragment world-space position expression.
+   * @param color - Lit fragment color expression; may be undefined for depth-only paths.
+   * @param ssrRoughness - Optional SSR roughness output expression.
+   * @param ssrNormal - Optional SSR normal output expression.
+   * @returns void
    */
   outputFragmentColor(
     scope: PBInsideFunctionScope,

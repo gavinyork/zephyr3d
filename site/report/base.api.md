@@ -254,7 +254,7 @@ export type GenericConstructor<T = object> = {
     isPrototypeOf(v: object): boolean;
 };
 
-// @public (undocumented)
+// @public
 export class GenericHtmlDirectoryReader implements HttpDirectoryReader {
     // (undocumented)
     readonly name = "generic-html";
@@ -299,27 +299,19 @@ export function halfToFloat(val: number): number;
 // @public
 export function halton23(length: number): [number, number][];
 
-// @public (undocumented)
+// @public
 export interface HttpDirectoryReader {
-    // (undocumented)
     canHandle?(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<boolean> | boolean;
-    // (undocumented)
     readonly name: string;
-    // (undocumented)
     readOnce(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<FileMetadata[]>;
 }
 
-// @public (undocumented)
+// @public
 export interface HttpDirectoryReaderContext {
-    // (undocumented)
     fetch: (url: string, init?: RequestInit) => Promise<Response>;
-    // (undocumented)
     guessMimeType: (name: string) => string | undefined;
-    // (undocumented)
     joinPath: (...parts: string[]) => string;
-    // (undocumented)
     normalizePath: (path: string) => string;
-    // (undocumented)
     toURL: (path: string) => string;
 }
 
@@ -895,7 +887,7 @@ export class PRNG {
     get(): number;
 }
 
-// @public (undocumented)
+// @public
 export class PythonHttpServerReader implements HttpDirectoryReader {
     // (undocumented)
     canHandle(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<boolean>;

@@ -16,7 +16,7 @@ import {
   createAPLutProgram,
   atmosphereLUTRendered
 } from '../shaders';
-import { DRef, Quaternion, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Quaternion, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -72,7 +72,7 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * The sky renderer
  * @public
  */
-export class SkyRenderer {
+export class SkyRenderer extends Disposable {
   private static readonly _skyCamera = (() => {
     const camera = new Camera(null);
     camera.setPerspective(Math.PI / 2, 1, 1, 20);
@@ -132,6 +132,7 @@ export class SkyRenderer {
    * Creates an instance of SkyRenderer
    */
   constructor() {
+    super();
     this._skyType = 'scatter';
     this._skyColor = Vector4.zero();
     this._skyboxTexture = new DRef();
@@ -167,29 +168,6 @@ export class SkyRenderer {
     this._bindgroupDistantLight = new DRef();
     this._bindgroupSky = {};
     this._bindgroupFog = new DRef();
-  }
-  /** @internal */
-  dispose() {
-    this._skyboxTexture.dispose();
-    this._bakedSkyboxTexture.dispose();
-    this._bakedSkyboxFrameBuffer.dispose();
-    this._radianceMap.dispose();
-    this._radianceFrameBuffer.dispose();
-    this._irradianceMap.dispose();
-    this._irradianceSH.dispose();
-    this._irradianceSHFB.dispose();
-    this._irradianceFrameBuffer.dispose();
-    this._shProjector.dispose();
-    if (this._skyDistantLightLut.get()) {
-      this._skyDistantLightLut.get().getColorAttachments()[0].dispose();
-      this._skyDistantLightLut.dispose();
-    }
-    this._bindgroupDistantLight.dispose();
-    for (const k in this._bindgroupSky) {
-      this._bindgroupSky[k].dispose();
-    }
-    this._bindgroupSky = {};
-    this._bindgroupFog.dispose();
   }
   /** @internal */
   getHash(_ctx: DrawContext): string {
@@ -752,6 +730,30 @@ export class SkyRenderer {
       ctx.camera.worldMatrix.decompose(null, skyCamera.rotation, null);
     }
     this._renderSky(skyCamera, true);
+  }
+  /** Disposes resources of this SkyRenderer */
+  protected onDispose() {
+    super.onDispose();
+    this._skyboxTexture.dispose();
+    this._bakedSkyboxTexture.dispose();
+    this._bakedSkyboxFrameBuffer.dispose();
+    this._radianceMap.dispose();
+    this._radianceFrameBuffer.dispose();
+    this._irradianceMap.dispose();
+    this._irradianceSH.dispose();
+    this._irradianceSHFB.dispose();
+    this._irradianceFrameBuffer.dispose();
+    this._shProjector.dispose();
+    if (this._skyDistantLightLut.get()) {
+      this._skyDistantLightLut.get().getColorAttachments()[0].dispose();
+      this._skyDistantLightLut.dispose();
+    }
+    this._bindgroupDistantLight.dispose();
+    for (const k in this._bindgroupSky) {
+      this._bindgroupSky[k].dispose();
+    }
+    this._bindgroupSky = {};
+    this._bindgroupFog.dispose();
   }
   /** @internal */
   private _renderSky(camera: Camera, depthTest: boolean) {

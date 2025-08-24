@@ -18,48 +18,93 @@ import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loade
 import { TGALoader } from './loaders/image/tga_Loader';
 
 /**
- * Options for texture fetching
+ * Options for texture fetching.
+ *
+ * Controls how a texture is loaded, converted, and optionally uploaded into an existing texture object.
+ *
+ * @typeParam T - Texture type to be returned, extending BaseTexture.
  * @public
- **/
+ */
 export type TextureFetchOptions<T extends BaseTexture> = {
-  /** MIME type of the texture, if not specified, model type will be determined by file extension */
+  /**
+   * Explicit MIME type hint. If omitted, the type is inferred from file extension via VFS.
+   */
   mimeType?: string;
-  /** If true, load the texture in linear color space, other wise load in sRGB color space */
+  /**
+   * If true, load the image as linear data. If false or omitted, load as sRGB (when supported).
+   *
+   * Note: For WebGL targets, non-power-of-two or sRGB textures may be repacked based on constraints.
+   */
   linearColorSpace?: boolean;
-  /** If not null, load into existing texture */
+  /**
+   * Optional target texture to upload into. If provided, loader data will be copied/blitted
+   * into this texture instead of creating a new one.
+   */
   texture?: T;
-  /** Sampler options of the texture */
+  /**
+   * Optional sampler options for the loaded texture. May be used by loaders for mip generation
+   * or by blit paths when repacking textures on constrained backends.
+   */
   samplerOptions?: SamplerOptions;
 };
 
 /**
- * Options for model fetching
+ * Options for model fetching.
+ *
+ * Provides decoding and instancing hints used by supported model loaders.
  * @public
- **/
+ */
 export type ModelFetchOptions = {
-  /** MIME type of the model, if not specified, model type will be determined by file extension */
+  /**
+   * Explicit MIME type hint for the model. If omitted, inferred from file extension via VFS.
+   */
   mimeType?: string;
-  /** Draco module */
+  /**
+   * Optional Draco decoder module for compressed geometry decoding.
+   */
   dracoDecoderModule?: DecoderModule;
-  /** True if the model need to be rendered instanced, the default value is false */
+  /**
+   * If true, the created scene node may be prepared for instanced rendering (engine-dependent).
+   * Default is false.
+   */
   enableInstancing?: boolean;
-  /** PostProcess loading function for the mesh  */
+  /**
+   * Optional post-process callback applied to the loaded SharedModel before creating nodes.
+   * Use this to remap materials, merge meshes, or apply custom data transforms.
+   */
   postProcess?: (model: SharedModel) => SharedModel;
 };
 
 /**
- * Data structure returned by AssetManager.fetchModel()
+ * Data structure returned by AssetManager.fetchModel().
+ *
+ * Bundles the created scene node group and an optional animation set if present in the asset.
  * @public
  */
 export type ModelInfo = {
-  /** Mesh group */
+  /**
+   * The root scene node of the loaded model (may contain child hierarchy).
+   */
   group: SceneNode;
-  /** Animation set, null if no animation */
+  /**
+   * The animation set associated with the model or null if none.
+   */
   animationSet: AnimationSet;
 };
 
 /**
- * The asset manager
+ * Centralized asset manager for loading and caching resources.
+ *
+ * Responsibilities:
+ * - Abstracts resource loading via VFS (text/json/binary).
+ * - Dispatches texture/model loading to registered loaders by MIME type.
+ * - Caches results and uses weak references to allow GPU resources to be GC'd when unused.
+ * - Harmonizes cross-backend constraints (e.g., WebGL non-power-of-two rules and sRGB handling).
+ * - Provides access to built-in textures with device-restore handlers.
+ *
+ * Threading/async model:
+ * - All I/O is async; repeated calls are coalesced via internal promise caches keyed by URL or hash.
+ *
  * @public
  */
 export class AssetManager {
@@ -116,13 +161,18 @@ export class AssetManager {
     this._jsonDatas = {};
   }
   /**
-   * VFS used to resources
+   * VFS used to read resources (files, URLs, virtual mounts).
    */
   get vfs() {
     return this._vfs;
   }
   /**
-   * Clear cached references of allocated objects
+   * Clear cached references and promises.
+   *
+   * - Disposes any DWeakRef holders maintained by this manager.
+   * - Empties internal maps for textures, models, and raw data (text/json/binary).
+   * - Does not forcibly dispose GPU resources; it only clears references so they can be GC'd
+   *   if no other owners are holding them.
    */
   clearCache() {
     for (const k in Object.keys(this._textures)) {
@@ -144,12 +194,11 @@ export class AssetManager {
     this._jsonDatas = {};
   }
   /**
-   * Adds a texture loader to the asset manager
+   * Register a texture loader (highest priority first).
    *
-   * @remarks
-   * TODO: this should be a static method
+   * Note: This is a static registry shared by all AssetManager instances.
    *
-   * @param loader - The texture loader to be added
+   * @param loader - A concrete texture loader implementation.
    */
   static addTextureLoader(loader: AbstractTextureLoader): void {
     if (loader) {
@@ -157,12 +206,11 @@ export class AssetManager {
     }
   }
   /**
-   * Adds a model loader to the asset manager
+   * Register a model loader (highest priority first).
    *
-   * @remarks
-   * TODO: this should be a static method
+   * Note: This is a static registry shared by all AssetManager instances.
    *
-   * @param loader - The model loader to be added
+   * @param loader - A concrete model loader implementation.
    */
   static addModelLoader(loader: AbstractModelLoader) {
     if (loader) {
@@ -170,18 +218,16 @@ export class AssetManager {
     }
   }
   /**
-   * Fetches a text resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param postProcess - A function that will be involved when the text data was loaded.
-   * @param httpRequest - Custom HttpRequest object to be used
+   * Fetch a UTF-8 text resource via VFS.
    *
-   * @remarks
-   * If a text data has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the text loaded previously.
-   * To load the same text with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Results are cached per resolved URL (via HttpRequest.urlResolver if provided; otherwise the raw URL).
+   * - If cached, any provided postProcess is ignored for subsequent calls; create a separate AssetManager
+   *   if you need different post-processing of the same URL.
    *
-   * @returns The fetched text
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the loaded text.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) text.
    */
   async fetchTextData(
     url: string,
@@ -197,18 +243,15 @@ export class AssetManager {
     return P;
   }
   /**
-   * Fetches a json resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param postProcess - A function that will be involved when the text data was loaded.
-   * @param httpRequest - Custom HttpRequest object to be used
+   * Fetch a JSON resource via VFS.
    *
-   * @remarks
-   * If a json data has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the json loaded previously.
-   * To load the same json with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Parses as JSON after text load.
+   * - Cached per resolved URL. Post-process is applied only on the first load for a given cache key.
    *
-   * @returns The fetched json object
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the parsed JSON object.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) JSON value.
    */
   async fetchJsonData<T = any>(
     url: string,
@@ -224,18 +267,14 @@ export class AssetManager {
     return P;
   }
   /**
-   * Fetches a binary resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param postProcess - A function that will be involved when the binary data was loaded.
-   * @param httpRequest - Custom HttpRequest object to be used
+   * Fetch a binary resource via VFS.
    *
-   * @remarks
-   * If a binary data has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the data loaded previously.
-   * To load the same data with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Cached per resolved URL. Post-process is applied only on first load for a given key.
    *
-   * @returns Binary data as ArrayBuffer
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the loaded ArrayBuffer.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
    */
   async fetchBinaryData(
     url: string,
@@ -251,12 +290,18 @@ export class AssetManager {
     return P;
   }
   /**
-   * Fetches a texture resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param options - Options for texture fetching
-   * @param httpRequest - Custom HttpRequest object to be used
+   * Fetch a texture resource via registered loaders.
    *
-   * @returns The fetched texture
+   * - Chooses loader by explicit MIME type or by VFS file extension inference.
+   * - Deduplicates in-flight requests and caches ready textures.
+   * - If `options.texture` is provided, the asset will be uploaded/blitted into that texture.
+   * - On WebGL backends, enforces constraints by repacking non-power-of-two or sRGB textures.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param url - Resource URL or VFS path.
+   * @param options - Texture fetching options (color space, sampler, target texture).
+   * @param httpRequest - Optional HttpRequest (not used for binary read but may supply URL resolver for hashing).
+   * @returns A promise that resolves to the loaded texture.
    */
   async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
     if (options?.texture) {
@@ -289,7 +334,17 @@ export class AssetManager {
       return tex;
     }
   }
-  /** @internal */
+  /**
+   * Fetch a model resource via registered model loaders (data only).
+   *
+   * - Returns a SharedModel which can create scene nodes in any Scene.
+   * - Uses DWeakRef to cache and allow model data to be reclaimed if unused.
+   *
+   * @param url - Model URL or VFS path.
+   * @param options - Model loader options (MIME override, Draco, instancing hint, post-process).
+   * @returns A promise that resolves to the SharedModel.
+   * @internal
+   */
   async fetchModelData(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
@@ -306,26 +361,32 @@ export class AssetManager {
     return sharedModel;
   }
   /**
-   * Fetches a model resource from a given URL and adds it to a scene
-   * @param scene - The scene to which the model node belongs
-   * @param url - The URL from where to fetch the resource
-   * @param options - Options for model fetching
-   * @param httpRequest - HttpRequest object to be used
+   * Fetch a model resource and instantiate it under a scene.
    *
-   * @remarks
-   * If a model has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the model loaded previously.
-   * To load the same model with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Loads or retrieves a cached SharedModel, then creates a SceneNode hierarchy.
+   * - Returns both the created group node and any associated AnimationSet.
    *
-   * @returns The created model node
+   * @param scene - Scene into which the model node will be created.
+   * @param url - Model URL or VFS path.
+   * @param options - Model loader options and instancing hint.
+   * @param httpRequest - Optional HttpRequest (unused for binary read; present for API symmetry).
+   * @returns A promise with the created node group and animation set info.
    */
   async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
     const sharedModel = await this.fetchModelData(url, options);
     const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
     return { group: node, animationSet: node.animationSet };
   }
-  /** @internal */
+  /**
+   * Load a text resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchTextData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the text.
+   * @returns A promise that resolves to the loaded (and optionally processed) text.
+   * @internal
+   */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
     let text = (await this._vfs.readFile(url, { encoding: 'utf8' })) as string;
     if (postProcess) {
@@ -337,7 +398,16 @@ export class AssetManager {
     }
     return text;
   }
-  /** @internal */
+  /**
+   * Load a JSON resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchJsonData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the parsed JSON.
+   * @returns A promise that resolves to the loaded (and optionally processed) JSON.
+   * @internal
+   */
   async loadJsonData(url: string, postProcess?: (json: any) => any): Promise<string> {
     let json = JSON.parse((await this._vfs.readFile(url, { encoding: 'utf8' })) as string);
 
@@ -350,7 +420,16 @@ export class AssetManager {
     }
     return json;
   }
-  /** @internal */
+  /**
+   * Load a binary resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchBinaryData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the ArrayBuffer.
+   * @returns A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
+   * @internal
+   */
   async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
     let data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     if (postProcess) {
@@ -363,16 +442,18 @@ export class AssetManager {
     return data;
   }
   /**
-   * Load a texture resource from ArrayBuffer
-   * @param arrayBuffer - ArrayBuffer that contains the texture data
-   * @param byteOffset - Byte offset of the ArrayBuffer to read
-   * @param byteLength - Byte length of the ArrayBuffer to read
-   * @param mimeType - MIME type for the image
-   * @param srgb - Whether to load the texture data in sRGB color space
-   * @param samplerOptions - Texture sampler options
-   * @param texture - load into existing texture
+   * Load a texture directly from an ArrayBuffer or typed array.
    *
-   * @returns The loaded texture
+   * - Chooses an appropriate loader based on the provided MIME type.
+   * - Can upload into an existing texture if `texture` is specified.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param arrayBuffer - Raw texture data buffer.
+   * @param mimeType - MIME type of the texture (must be supported by a registered loader).
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options passed to the loader path.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
    */
   async loadTextureFromBuffer<T extends BaseTexture>(
     arrayBuffer: ArrayBuffer | TypedArray,
@@ -390,7 +471,21 @@ export class AssetManager {
     }
     throw new Error(`Can not find loader for MIME type '${mimeType}'`);
   }
-  /** @internal */
+  /**
+   * Load a texture via VFS by URL and MIME type.
+   *
+   * - Uses the first loader that supports the inferred or provided MIME type.
+   * - On WebGL, may repack textures (resample to power-of-two, convert formats) to meet backend constraints.
+   * - If `texture` is provided, the source is blitted into it, possibly resizing or changing sampling accordingly.
+   *
+   * @param url - Texture URL or VFS path.
+   * @param mimeType - Optional explicit MIME type; otherwise inferred by VFS.
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options for loader or blit path.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   * @internal
+   */
   async loadTexture(
     url: string,
     mimeType?: string,
@@ -410,7 +505,19 @@ export class AssetManager {
     }
     throw new Error(`Can not find loader for asset ${url}`);
   }
-  /** @internal */
+  /**
+   * Internal routine that executes the texture load using a specific loader and applies
+   * backend-specific compatibility steps (e.g., WebGL NPOT/sRGB rules).
+   *
+   * @param loader - Concrete loader to use for decoding/creation.
+   * @param mimeType - Texture MIME type.
+   * @param data - Raw binary data.
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   * @internal
+   */
   async doLoadTexture(
     loader: AbstractTextureLoader,
     mimeType: string,
@@ -468,7 +575,18 @@ export class AssetManager {
       return tex;
     }
   }
-  /** @internal */
+  /**
+   * Load a model via registered model loaders.
+   *
+   * - Selects loader by MIME type (explicit or inferred).
+   * - Optionally applies a post-process transform to the SharedModel.
+   * - Sets the model's name from the source filename for convenience.
+   *
+   * @param url - Model URL or VFS path.
+   * @param options - Model load options (MIME override, Draco module, post-process hook).
+   * @returns A promise that resolves to the loaded SharedModel.
+   * @internal
+   */
   async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
     const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
@@ -501,9 +619,16 @@ export class AssetManager {
     throw new Error(`Can not find loader for asset ${url}`);
   }
   /**
-   * Fetches a built-in texture
-   * @param name - Name of the built-in texture
-   * @returns The built-in texture
+   * Fetch a built-in texture synchronously by name.
+   *
+   * - If this built-in was not created yet, the registered loader is invoked.
+   * - Registers a device restore handler so the texture can be re-initialized after device loss.
+   * - If an existing texture is provided, the loader uploads into it.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param name - Built-in texture identifier.
+   * @param texture - Optional destination texture to populate.
+   * @returns The built-in texture (created or populated).
    */
   fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T {
     const loader = AssetManager._builtinTextureLoaders[name];
@@ -525,9 +650,13 @@ export class AssetManager {
     }
   }
   /**
-   * Sets the loader for a given builtin-texture
-   * @param name - Name of the builtin texture
-   * @param loader - Loader for the builtin texture
+   * Override or unregister the loader for a named built-in texture.
+   *
+   * - Passing a valid loader function sets/overrides the creation path.
+   * - Passing `undefined` removes the loader mapping for the given name.
+   *
+   * @param name - Built-in texture identifier.
+   * @param loader - Factory that creates the built-in texture using the provided AssetManager.
    */
   static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void {
     if (loader) {
@@ -536,6 +665,18 @@ export class AssetManager {
       this._builtinTextureLoaders[name] = undefined;
     }
   }
+  /**
+   * Compute a cache key for texture requests.
+   *
+   * Includes texture type tag, URL, and color space choice to avoid cross-color-space cache collisions.
+   *
+   * @typeParam T - Texture type parameter (not used for runtime behavior; helps preserve generic intent).
+   * @param type - Logical texture type tag (e.g., '2d', 'cube').
+   * @param url - Resource URL or VFS path.
+   * @param options - Texture fetch options to incorporate into the key.
+   * @returns A string cache key combining type, URL, and color space choice.
+   * @internal
+   */
   private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {
     return `${type}:${url}:${!options?.linearColorSpace}`;
   }

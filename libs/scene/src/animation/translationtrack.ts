@@ -48,19 +48,24 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
     }
     this._state = new Vector3();
   }
+  /** {@inheritDoc AnimationTrack.calculateState} */
   calculateState(target: object, currentTime: number): Vector3 {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }
+  /** {@inheritDoc AnimationTrack.applyState} */
   applyState(node: SceneNode, state: Vector3) {
     node.position.set(state);
   }
+  /** {@inheritDoc AnimationTrack.mixState} */
   mixState(a: Vector3, b: Vector3, t: number): Vector3 {
     return new Vector3(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z));
   }
+  /** {@inheritDoc AnimationTrack.getBlendId} */
   getBlendId(): unknown {
     return 'node-translation';
   }
+  /** {@inheritDoc AnimationTrack.getDuration} */
   getDuration(): number {
     return this._interpolator.maxTime;
   }

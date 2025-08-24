@@ -6,6 +6,7 @@ import { SceneView } from '../views/sceneview';
 import { Dialog } from '../views/dlg/dlg';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
+import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -76,6 +77,18 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           await this._editor.closeProject(this._scenePath);
         }
         break;
+      case 'PROJECT_SETTINGS': {
+        const info = await DlgProjectSettings.editProjectSettings(
+          'Edit Project Settings',
+          ProjectService.VFS,
+          this._editor.currentProject,
+          400
+        );
+        if (info) {
+          await ProjectService.saveProject(info);
+        }
+        break;
+      }
       case 'EXPORT_PROJECT':
         if (await this.ensureSceneSaved()) {
           await this._editor.exportProject();

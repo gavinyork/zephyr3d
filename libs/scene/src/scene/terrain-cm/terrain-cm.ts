@@ -604,8 +604,8 @@ export class ClipmapTerrain
    * Disposes of all resources used by this terrain.
    * Should be called when the terrain is no longer needed.
    */
-  dispose(): void {
-    super.dispose();
+  protected onDispose(): void {
+    super.onDispose();
     this._clipmap?.dispose();
     this._clipmap = null;
     this._material?.dispose();

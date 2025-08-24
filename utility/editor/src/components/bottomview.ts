@@ -1,15 +1,16 @@
-import type { VFS } from '@zephyr3d/base';
+import { Disposable, type VFS } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import type { ProjectInfo } from '../core/services/project';
 import { VFSRenderer } from './vfsrenderer';
 import { ImGui } from '@zephyr3d/imgui';
 import { renderLogView } from './logview';
 
-export class BottomView {
+export class BottomView extends Disposable {
   private readonly _panel: DockPannel;
   private _renderer: VFSRenderer;
 
   constructor(vfs: VFS, project: ProjectInfo, left: number, top: number, width: number, height: number) {
+    super();
     this._renderer = new VFSRenderer(vfs, project);
     this._panel = new DockPannel(left, top, width, height, 8, 0, 99999, ResizeDirection.Top, 200, 600);
   }
@@ -33,7 +34,8 @@ export class BottomView {
     }
     this._panel.end();
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._renderer.dispose();
     this._renderer = null;
   }

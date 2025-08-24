@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { Application } from '../app';
 import { Primitive } from '../render/primitive';
-import { DRef, Vector4 } from '@zephyr3d/base';
+import { Disposable, DRef, Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 
 /**
@@ -30,7 +30,7 @@ import { fetchSampler } from './misc';
  *
  * @public
  */
-export class CubemapSHProjector {
+export class CubemapSHProjector extends Disposable {
   private static _programInst: GPUProgram = null;
   private static _bindGroupInst: BindGroup = null;
   private static _renderStats: RenderStateSet = null;
@@ -45,20 +45,10 @@ export class CubemapSHProjector {
    *                     Default is 10000.
    */
   constructor(numSamples = 10000) {
+    super();
     this._numSamples = numSamples;
     this._primitive = new DRef();
     this._renderTarget = new DRef();
-  }
-  /**
-   * Disposes of all resources allocated by this projector instance.
-   * Should be called when the projector is no longer needed to prevent memory leaks.
-   */
-  dispose() {
-    this._primitive.dispose();
-    if (this._renderTarget.get()) {
-      this._renderTarget.get().getColorAttachments()[0].dispose();
-      this._renderTarget.dispose();
-    }
   }
   /**
    * Projects a cubemap texture into spherical harmonics coefficients and stores them in a GPUBuffer.
@@ -118,6 +108,18 @@ export class CubemapSHProjector {
     device.setBindGroup(0, bindGroup);
     this._primitive.get().drawInstanced(9);
     device.popDeviceStates();
+  }
+  /**
+   * Disposes of all resources allocated by this projector instance.
+   * Should be called when the projector is no longer needed to prevent memory leaks.
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._primitive.dispose();
+    if (this._renderTarget.get()) {
+      this._renderTarget.get().getColorAttachments()[0].dispose();
+      this._renderTarget.dispose();
+    }
   }
   /**
    * Initializes the GPU resources needed for SH projection.

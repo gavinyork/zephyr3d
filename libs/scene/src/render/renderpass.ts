@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import { Application } from '../app';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
@@ -14,7 +14,7 @@ import type { BindGroup } from '@zephyr3d/device';
  * Base class for any kind of render passes
  * @public
  */
-export abstract class RenderPass {
+export abstract class RenderPass extends Disposable {
   /** @internal */
   protected _type: number;
   /** @internal */
@@ -30,6 +30,7 @@ export abstract class RenderPass {
    * @param type - Render pass type
    */
   constructor(type: number) {
+    super();
     this._type = type;
     this._clearColor = new Vector4(0, 0, 0, 1);
     this._clearDepth = 1;
@@ -94,12 +95,6 @@ export abstract class RenderPass {
       this._globalBindGroups[hash] = bindGroup;
     }
     return bindGroup;
-  }
-  /**
-   * Disposes the render pass
-   */
-  dispose() {
-    this._globalBindGroups = {};
   }
   /** @internal */
   getGlobalBindGroupHash(ctx: DrawContext) {
@@ -256,6 +251,13 @@ export abstract class RenderPass {
       }
     }
     ctx.renderQueue = null;
+  }
+  /**
+   * Disposes the render pass
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._globalBindGroups = {};
   }
   /** @internal */
   private clearFramebuffer() {

@@ -5,8 +5,21 @@ import { InputManager } from './inputmgr';
 import { RuntimeManager } from '@zephyr3d/runtime';
 
 type appEventMap = {
+  /**
+   * Emitted when the drawing surface (canvas/device) is resized.
+   *
+   * @param width - New drawable width in device pixels.
+   * @param height - New drawable height in device pixels.
+   */
   resize: [width: number, height: number];
+  /**
+   * Emitted every frame with timing information.
+   *
+   * @param deltaTimeMs - Elapsed time since last frame in milliseconds.
+   * @param elapsedTimeMs - Elapsed time since app start in milliseconds.
+   */
   tick: [deltaTimeMs: number, elapsedTimeMs: number];
+  /** Pointer/mouse and keyboard input events forwarded by the Application. */
   click: [evt: PointerEvent];
   dblclick: [evt: PointerEvent];
   pointerdown: [evt: PointerEvent];
@@ -31,54 +44,89 @@ type appEventMap = {
 };
 
 /**
- * The creation options for Application
+ * Creation options for Application.
+ *
+ * Provides the canvas, device backend, and optional runtime and device configuration.
  * @public
  */
 export type AppOptions = {
-  /** The canvas element */
+  /**
+   * Target canvas element to attach the rendering device to.
+   */
   canvas: HTMLCanvasElement;
-  /** The backend that will be used to create the rendering device */
+  /**
+   * Device backend implementation to use for GPU creation (e.g., WebGL/WebGPU backend).
+   */
   backend: DeviceBackend;
-  /** Whether to enable MSAA */
+  /**
+   * Whether to enable multi-sample anti-aliasing (MSAA) if supported by the backend.
+   * Defaults to false.
+   */
   enableMSAA?: boolean;
-  /** The device pixel ratio */
+  /**
+   * Device pixel ratio used when creating the device. Defaults to `window.devicePixelRatio` or 1.
+   */
   pixelRatio?: number;
-  /** Options for runtime scripting system */
+  /**
+   * Options for the runtime scripting system.
+   */
   runtimeOptions?: {
-    /** VFS for reading script files, default is HttpFS at '.' */
+    /**
+     * Virtual file system used to load scripts. Defaults to HttpFS at '.' if not provided.
+     */
     VFS?: VFS;
-    /** Root directory for script files, default is '/' */
+    /**
+     * Root directory for script files. Defaults to '/'.
+     */
     scriptsRoot?: string;
-    /** Whether application is running in editor mode, should always be true for user application */
+    /**
+     * Whether the application is running in editor mode. Should be true for user applications.
+     */
     editorMode?: boolean;
-    /** Wether enable runtime scripting system, should always be true for user application */
+    /**
+     * Whether the runtime scripting system is enabled. Should be true for user applications.
+     */
     enabled?: boolean;
   };
 };
 
 /**
- * Log mode
+ * Log severity levels.
  * @public
  */
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 /**
- * Logger interface
+ * Minimal logger interface used by Application.
  * @public
  */
 export interface Logger {
+  /**
+   * Log a message with optional level.
+   *
+   * @param text - Message text to log.
+   * @param mode - Optional severity; defaults to standard console.log behavior.
+   */
   log(text: string, mode?: LogMode): void;
 }
 
 /**
- * Application class
+ * Application
  *
- * @remarks
- * This is the entry point of your application.
- * The Application is responsible for initializing the rendering device
- * and doing the rendering loop.
- * The Application can not be created more than once. You can get the
- * instance by calling the 'Application.instance' static method.
+ * Entry-point and lifecycle coordinator for the engine. Responsible for:
+ * - Creating and owning the rendering device from a chosen backend.
+ * - Managing the per-frame loop, including timing and viewport setup.
+ * - Forwarding device/DOM input events via an observable event map.
+ * - Hosting the runtime scripting system and input manager.
+ *
+ * Singleton:
+ * - Only one instance may exist at a time. Access via `Application.instance`.
+ *
+ * Events:
+ * - See `appEventMap` for all emitted events (resize, tick, pointer/keyboard/drag).
+ *
+ * Usage:
+ * - Construct with `AppOptions`, await `ready()`, then call `run()` to start the loop.
  *
  * @public
  */
@@ -91,8 +139,11 @@ export class Application extends Observable<appEventMap> {
   private _logger: Logger;
   private static _instance: Application;
   /**
-   * Creates an instance of Application
-   * @param opt - The creation options
+   * Construct the Application singleton with the provided options.
+   *
+   * Throws if an instance already exists.
+   *
+   * @param opt - Application creation options (canvas, backend, and optional runtime/device settings).
    */
   constructor(opt: AppOptions) {
     super();
@@ -130,42 +181,74 @@ export class Application extends Observable<appEventMap> {
       }
     };
   }
-  /** The input manager instance */
+  /**
+   * The input manager instance handling pointer/keyboard event routing.
+   */
   get inputManager(): InputManager {
     return this._inputManager;
   }
-  /** The runtime manager instance */
+  /**
+   * The runtime scripting system manager.
+   */
   get runtimeManager(): RuntimeManager {
     return this._runtimeManager;
   }
-  /** The options that was used to create the application */
+  /**
+   * The (sanitized) options used to create this application.
+   *
+   * Note: Defaults are applied for `enableMSAA` and `pixelRatio` if omitted.
+   */
   get options(): AppOptions {
     return this._options;
   }
-  /** Gets the singleton instance of the application */
+  /**
+   * Singleton accessor for the current Application instance.
+   *
+   * @returns The Application singleton.
+   */
   static get instance(): Application {
     return this._instance;
   }
-  /** The rendering device that was initialized by the application */
+  /**
+   * The initialized rendering device.
+   *
+   * Available after `await ready()`.
+   */
   get device(): AbstractDevice {
     return this._device;
   }
-  /** Gets the device type */
+  /**
+   * Convenience accessor for the device type name provided by the backend.
+   */
   get deviceType(): string {
     return this._options.backend.typeName();
   }
-  /** The logger object */
+  /**
+   * Logger used by the application to emit messages.
+   *
+   * Replaceable for custom logging sinks.
+   */
   get logger(): Logger {
     return this._logger;
   }
   set logger(val: Logger) {
     this._logger = val;
   }
-  /** Set focus */
+  /**
+   * Set keyboard focus to the device's canvas element.
+   */
   focus() {
     this._device.canvas.focus();
   }
-  /** Wait until the application is ready. */
+  /**
+   * Initialize the rendering device and start input processing.
+   *
+   * - Creates the GPU device with the provided DPR and MSAA settings.
+   * - Focuses the canvas and subscribes to device resize events to emit `resize`.
+   * - Idempotent: only performs initialization on first call.
+   *
+   * @throws If device creation fails.
+   */
   async ready() {
     if (!this._ready) {
       this._device = await this._options.backend.createDevice(this._options.canvas, {
@@ -183,7 +266,18 @@ export class Application extends Observable<appEventMap> {
       this._ready = true;
     }
   }
-  /** Render one frame */
+  /**
+   * Render a single frame.
+   *
+   * Steps:
+   * - Flushes pending disposals from the previous frame.
+   * - Clears device state (framebuffer, viewport, scissor).
+   * - Queries frame timing from the device (`elapsedFrame`, `elapsedOverall`).
+   * - Updates the runtime manager (scripting/behaviors).
+   * - Emits `tick` with delta/elapsed times.
+   *
+   * Safe to call manually; also used by the run loop.
+   */
   frame() {
     // Processes all pending disposals from the previous frame.
     flushPendingDisposals();
@@ -197,17 +291,30 @@ export class Application extends Observable<appEventMap> {
       this.dispatchEvent('tick', dt, elapsed);
     }
   }
-  /** Start running the rendering loop */
+  /**
+   * Start the application's render loop.
+   *
+   * Uses the device's internal scheduling (`device.runLoop`) to repeatedly call `frame()`.
+   */
   run() {
     this.device.runLoop(() => {
       this.frame();
     });
   }
-  /** Stop running the rendering loop */
+  /**
+   * Stop the application's render loop.
+   *
+   * Uses `device.exitLoop()` to end the scheduling started by `run()`.
+   */
   stop() {
     this.device.exitLoop();
   }
-  /** Message log */
+  /**
+   * Convenience message logging using the current logger.
+   *
+   * @param text - Message text to log.
+   * @param mode - Optional log severity (info, warn, error, debug).
+   */
   log(text: string, mode?: LogMode) {
     this._logger?.log(text, mode);
   }

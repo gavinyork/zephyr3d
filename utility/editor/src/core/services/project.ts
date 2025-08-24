@@ -7,6 +7,9 @@ export type ProjectInfo = {
   name: string;
   uuid?: string;
   lastEditScene?: string;
+  startupScene?: string;
+  splashScreen?: string;
+  preferredRHI?: string[];
 };
 
 export type RecentProject = {
