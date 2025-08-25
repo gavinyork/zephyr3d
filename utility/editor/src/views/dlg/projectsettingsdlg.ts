@@ -37,7 +37,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectInfo> {
           'Select Image File',
           this._vfs,
           this._info,
-          'Image|*.jpg;*.jpeg;*.png;*.tga;*.dds',
+          'Image (*.jpg;*.png;*.tga;*.dds)|*.jpg;*.jpeg;*.png;*.tga;*.dds',
           500,
           400
         ).then((value) => {
@@ -54,13 +54,18 @@ export class DlgProjectSettings extends DialogRenderer<ProjectInfo> {
     if (ImGui.IsItemHovered()) {
       ImGui.SetTooltip('Double click to select file');
       if (ImGui.IsMouseDoubleClicked(0)) {
-        DlgOpenFile.openFile('Select Scene File', this._vfs, this._info, 'Scene|*.scn', 500, 400).then(
-          (value) => {
-            if (value) {
-              this._info.startupScene = value;
-            }
+        DlgOpenFile.openFile(
+          'Select Scene File',
+          this._vfs,
+          this._info,
+          'Scene (*.scn)|*.scn',
+          500,
+          400
+        ).then((value) => {
+          if (value) {
+            this._info.startupScene = value;
           }
-        );
+        });
       }
     }
     const items = [

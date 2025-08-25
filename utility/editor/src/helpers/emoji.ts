@@ -15,7 +15,8 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '🎥': 0xe00b, // camera
   '📝': 0xe00c, // text
   '🌍': 0xe00d, // earth
-  '⚠️': 0xe00e // warning
+  '⚠️': 0xe00e, // warning
+  '♻️': 0xe00f // reinstall packages
 };
 
 export function initEmojiMapping() {

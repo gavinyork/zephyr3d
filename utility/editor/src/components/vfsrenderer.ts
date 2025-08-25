@@ -315,7 +315,33 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
     DlgMessage.messageBox('Properties', info);
   }
-
+  private async reinstallPackages() {
+    if (!(await this.VFS.exists('/deps.lock.json'))) {
+      return;
+    }
+    if (await this.VFS.exists('/deps')) {
+      await this.VFS.deleteDirectory('/deps', true);
+    }
+    const content = (await this.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+    const entries = JSON.parse(content) as {
+      dependencies: Record<string, { version: string }>;
+    };
+    const deps = entries.dependencies ?? {};
+    for (const pkg of Object.keys(deps)) {
+      const packageName = `${pkg}@${deps[pkg].version}`;
+      const dlgMessageBoxEx = new DlgMessageBoxEx(
+        'Install package',
+        `Installing ${packageName}`,
+        [],
+        400,
+        0,
+        false
+      );
+      dlgMessageBoxEx.showModal();
+      await installDeps(ProjectService.currentProject, this.VFS, '/', [packageName]);
+      dlgMessageBoxEx.close('');
+    }
+  }
   private renderToolbar() {
     const canGoUp = this._selectedDir && this._selectedDir.parent;
     if (canGoUp) {
@@ -357,6 +383,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             });
           }
         });
+      }
+      ImGui.SameLine();
+      if (ImGui.Button(convertEmojiString('♻️##ReinstallPackages'))) {
+        this.reinstallPackages();
       }
     }
     ImGui.SameLine();

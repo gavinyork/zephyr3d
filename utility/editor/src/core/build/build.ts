@@ -112,13 +112,16 @@ export async function buildForEndUser(
   }
 ) {
   const { input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
+  if (await vfs.exists(distDir)) {
+    await vfs.deleteDirectory(distDir);
+  }
 
   const bundle = await rollup({
     input,
     plugins: [
-      vfsAndUrlPlugin(vfs, { vfsRoot: '/', distDir, alias }), // VFS 路径解析 + URL fetch + 写回 VFS
+      vfsAndUrlPlugin(vfs, { vfsRoot: '/', distDir, alias }),
       depsResolvePlugin(vfs, '/'),
-      tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } }) // typescript.js 转译
+      tsTranspilePlugin({ compilerOptions: { sourceMap: sourcemap !== false } })
     ]
   });
 
