@@ -1300,6 +1300,22 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (info.targetDirectory && ev.type === 'drop' && !this._vfs.readOnly) {
       const data = ev.dataTransfer;
       const testVFS = new DataTransferVFS(data);
+      if (!this._vfs.isParentOf('/assets', info.targetDirectory.path)) {
+        if (
+          (await DlgMessageBoxEx.messageBoxEx(
+            'Warning',
+            `Copying asset files outside the /assets folder may break paths and loading. Do you want to proceed?`,
+            ['Cancel', 'Continue'],
+            400,
+            0,
+            true,
+            new ImGui.ImVec4(211 / 255, 47 / 255, 47 / 255, 1),
+            '⚠️'
+          )) === 'Cancel'
+        ) {
+          return;
+        }
+      }
       const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
       dlgProgressBar.showModal();
       await testVFS.copyFileEx('/**/*', info.targetDirectory.path, {

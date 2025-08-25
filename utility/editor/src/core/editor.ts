@@ -357,6 +357,13 @@ export class Editor {
       this._moduleManager.activate('Scene', '');
     }
   }
+  async updateProject(info: ProjectInfo) {
+    await ProjectService.saveProject(info);
+    const newInfo = await ProjectService.getCurrentProjectInfo();
+    if (newInfo.uuid === this._currentProject.uuid) {
+      Object.assign(this._currentProject, newInfo);
+    }
+  }
   async openProject() {
     const projects = await ProjectService.listProjects();
     const names = projects.map((project) => project.name);

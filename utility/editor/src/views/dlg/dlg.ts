@@ -12,6 +12,7 @@ import type { ProjectInfo } from '../../core/services/project';
 import { DlgSaveFile } from './savefiledlg';
 import { DlgOpenFile } from './openfiledlg';
 import { DlgProjectSettings } from './projectsettingsdlg';
+import { ImGui } from '@zephyr3d/imgui';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -22,9 +23,21 @@ export class Dialog {
     message: string,
     buttons?: string[],
     width?: number,
-    height?: number
+    height?: number,
+    mask?: boolean,
+    color?: ImGui.ImVec4,
+    icon?: string
   ) {
-    return DlgMessageBoxEx.messageBoxEx(title, message, buttons, width, height ?? 0);
+    return DlgMessageBoxEx.messageBoxEx(
+      title,
+      message,
+      buttons,
+      width,
+      height ?? 0,
+      mask ?? true,
+      color,
+      icon
+    );
   }
   public static async editProjectSettings(title: string, vfs: VFS, projectInfo: ProjectInfo, width?: number) {
     return DlgProjectSettings.editProjectSettings(title, vfs, projectInfo, width);

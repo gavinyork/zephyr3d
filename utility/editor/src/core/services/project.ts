@@ -105,6 +105,7 @@ export class ProjectService {
 
     this._vfs = new IndexedDBFS(info.uuid, '$');
     this._serializationManager = new SerializationManager(this._vfs);
+    this._currentProject = uuid;
     console.log(`Project opened: ${uuid}`);
     return info;
   }

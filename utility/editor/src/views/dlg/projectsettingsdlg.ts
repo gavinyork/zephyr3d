@@ -26,27 +26,43 @@ export class DlgProjectSettings extends DialogRenderer<ProjectInfo> {
     if (ImGui.InputText('Project Name', name, undefined, ImGui.InputTextFlags.AutoSelectAll)) {
       this._info.name = name[0];
     }
-    if (ImGui.Button('SplashScreen')) {
-      DlgOpenFile.openFile(
-        'Select Image File',
-        this._vfs,
-        this._info,
-        'Image|*.jpg;*.jpeg;*.png;*.tga;*.dds',
-        500,
-        400
-      ).then((value) => {
-        if (value) {
-          this._info.splashScreen = value;
-        }
-      });
+    const splashScreen = [this._info.splashScreen ?? ''] as [string];
+    if (ImGui.InputText('Splash Screen', splashScreen, undefined, ImGui.InputTextFlags.None)) {
+      this._info.splashScreen = splashScreen[0];
     }
-    ImGui.SameLine();
-    if (ImGui.Button('Clear')) {
-      this._info.splashScreen = '';
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Double click to select file');
+      if (ImGui.IsMouseDoubleClicked(0)) {
+        DlgOpenFile.openFile(
+          'Select Image File',
+          this._vfs,
+          this._info,
+          'Image|*.jpg;*.jpeg;*.png;*.tga;*.dds',
+          500,
+          400
+        ).then((value) => {
+          if (value) {
+            this._info.splashScreen = value;
+          }
+        });
+      }
     }
-    ImGui.SameLine();
-    ImGui.TextUnformatted(this._info.splashScreen ?? '');
-
+    const startupScene = [this._info.startupScene ?? ''] as [string];
+    if (ImGui.InputText('Startup Scene', startupScene, undefined, ImGui.InputTextFlags.None)) {
+      this._info.startupScene = startupScene[0];
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Double click to select file');
+      if (ImGui.IsMouseDoubleClicked(0)) {
+        DlgOpenFile.openFile('Select Scene File', this._vfs, this._info, 'Scene|*.scn', 500, 400).then(
+          (value) => {
+            if (value) {
+              this._info.startupScene = value;
+            }
+          }
+        );
+      }
+    }
     const items = [
       {
         text: 'WebGL',
@@ -61,7 +77,15 @@ export class DlgProjectSettings extends DialogRenderer<ProjectInfo> {
         selected: !!this._info.preferredRHI?.includes('WebGPU')
       }
     ];
-    if (renderMultiSelectedCombo('RHI', items, -1)) {
+    if (
+      renderMultiSelectedCombo('##RHI', 'Targeted RHIs', items, (selected) => {
+        if (selected.length === 0) {
+          return 'Please select target RHI...';
+        } else {
+          return selected.join(';');
+        }
+      })
+    ) {
       this._info.preferredRHI = items.filter((val) => val.selected).map((val) => val.text);
     }
     ImGui.Button('Ok');

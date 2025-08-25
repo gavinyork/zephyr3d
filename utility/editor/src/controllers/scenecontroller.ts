@@ -85,7 +85,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           400
         );
         if (info) {
-          await ProjectService.saveProject(info);
+          await this._editor.updateProject(info);
         }
         break;
       }

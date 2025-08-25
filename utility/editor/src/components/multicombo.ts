@@ -1,22 +1,23 @@
 import { ImGui } from '@zephyr3d/imgui';
 
 export function renderMultiSelectedCombo(
+  id: string,
   label: string,
   items: { text: string; selected: boolean }[],
-  width: number
+  hint?: (selected: string[]) => string
 ) {
   let changed = false;
   items = items ?? [];
-  const selected = items.filter((val) => val.selected);
+  const selected = items.filter((val) => val.selected).map((val) => val.text);
   const numSelected = selected.length;
-  const text =
-    numSelected === 0
-      ? 'Select items...'
-      : numSelected === 1
-      ? selected[0].text
-      : `${numSelected} items selected`;
-  ImGui.SetNextItemWidth(width);
-  if (ImGui.BeginCombo(label, text)) {
+  const text = hint
+    ? hint(selected)
+    : numSelected === 0
+    ? 'Select items...'
+    : numSelected === 1
+    ? selected[0]
+    : `${numSelected} items selected`;
+  if (ImGui.BeginCombo(id, text)) {
     if (ImGui.Selectable('Select All') && numSelected < items.length) {
       items.forEach((val) => (val.selected = true));
       changed = true;
@@ -37,5 +38,7 @@ export function renderMultiSelectedCombo(
     }
     ImGui.EndCombo();
   }
+  ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.x);
+  ImGui.TextUnformatted(label);
   return changed;
 }
