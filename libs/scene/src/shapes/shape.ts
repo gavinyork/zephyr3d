@@ -48,7 +48,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     uv1: number[],
     uv2: number[],
     normal: number[]
-  ) {
+  ): number[] {
     const dp1 = new Vector3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
     const dp2 = new Vector3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
 
@@ -60,37 +60,40 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     const denom = du1 * dv2 - dv1 * du2;
 
     if (Math.abs(denom) <= 1e-8) {
-      return { t: new Vector3(1, 0, 0), w: 1 };
+      return [1, 0, 0, 1];
     }
 
     const r = 1.0 / denom;
-    let t = new Vector3(
-      (dp1.x * dv2 - dp2.x * dv1) * r,
-      (dp1.y * dv2 - dp2.y * dv1) * r,
-      (dp1.z * dv2 - dp2.z * dv1) * r
-    );
-    const b = new Vector3(
-      (dp2.x * du1 - dp1.x * du2) * r,
-      (dp2.y * du1 - dp1.y * du2) * r,
-      (dp2.z * du1 - dp1.z * du2) * r
-    );
+    let t0 = (dp1.x * dv2 - dp2.x * dv1) * r;
+    let t1 = (dp1.y * dv2 - dp2.y * dv1) * r;
+    let t2 = (dp1.z * dv2 - dp2.z * dv1) * r;
+    const b0 = (dp2.x * du1 - dp1.x * du2) * r;
+    const b1 = (dp2.y * du1 - dp1.y * du2) * r;
+    const b2 = (dp2.z * du1 - dp1.z * du2) * r;
 
     // Gram-Schmidt
-    const dotNT = normal[0] * t.x + normal[1] * t.y + normal[2] * t.z;
-    t = new Vector3(t.x - normal[0] * dotNT, t.y - normal[1] * dotNT, t.z - normal[2] * dotNT);
-    const lenT = Math.hypot(t.x, t.y, t.z);
-    if (lenT > 1e-8) t = new Vector3(t.x / lenT, t.y / lenT, t.z / lenT);
-    else t = new Vector3(1, 0, 0);
+    const dotNT = normal[0] * t0 + normal[1] * t1 + normal[2] * t2;
+    t0 -= normal[0] * dotNT;
+    t1 -= normal[1] * dotNT;
+    t2 -= normal[2] * dotNT;
+    const lenT = Math.hypot(t0, t1, t2);
+    if (lenT > 1e-8) {
+      t0 /= lenT;
+      t1 /= lenT;
+      t2 /= lenT;
+    } else {
+      t0 = 1;
+      t1 = 0;
+      t2 = 0;
+    }
 
     // w
-    const cx = new Vector3(
-      normal[1] * t.z - normal[2] * t.y,
-      normal[2] * t.x - normal[0] * t.z,
-      normal[0] * t.y - normal[1] * t.x
-    );
-    const w = cx.x * b.x + cx.y * b.y + cx.z * b.z < 0 ? -1 : 1;
+    const c0 = normal[1] * t2 - normal[2] * t1;
+    const c1 = normal[2] * t0 - normal[0] * t2;
+    const c2 = normal[0] * t1 - normal[1] * t0;
+    const w = c0 * b0 + c1 * b1 + c2 * b2 < 0 ? -1 : 1;
 
-    return { t, w };
+    return [t0, t1, t2, w];
   }
 
   abstract clone(): Shape<T>;

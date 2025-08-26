@@ -81,7 +81,7 @@ export class TetrahedronShape
     uvs?.push(...uv2); // 右下
 
     if (tangents) {
-      const { t, w } = this.computeTangent(
+      const t = this.computeTangent(
         [v0.x, v0.y, v0.z],
         [v1.x, v1.y, v1.z],
         [v2.x, v2.y, v2.z],
@@ -90,9 +90,9 @@ export class TetrahedronShape
         uv2,
         [normal.x, normal.y, normal.z]
       );
-      tangents.push(t.x, t.y, t.z, w);
-      tangents.push(t.x, t.y, t.z, w);
-      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(...t);
+      tangents.push(...t);
+      tangents.push(...t);
     }
 
     // Add index (CCW)
@@ -306,7 +306,7 @@ export class TetrahedronFrameShape
 
     // Add tangents
     if (tangents) {
-      const { t, w } = this.computeTangent(
+      const t = this.computeTangent(
         [v0.x, v0.y, v0.z],
         [v1.x, v1.y, v1.z],
         [v2.x, v2.y, v2.z],
@@ -315,9 +315,9 @@ export class TetrahedronFrameShape
         uv2,
         [normal.x, normal.y, normal.z]
       );
-      tangents.push(t.x, t.y, t.z, w);
-      tangents.push(t.x, t.y, t.z, w);
-      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(...t);
+      tangents.push(...t);
+      tangents.push(...t);
     }
 
     // Add index
