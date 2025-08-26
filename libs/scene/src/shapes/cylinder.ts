@@ -93,7 +93,8 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -112,6 +113,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         vertices?.push(radius * sinTheta, (v - options.anchor) * options.height, radius * cosTheta);
         normals?.push(sinTheta * m, slope * m, cosTheta * m);
         uvs?.push(u, 1 - v);
+        tangents?.push(cosTheta, 0.0, -sinTheta, 1.0);
         if (y < options.heightDetail && x < options.radialDetail) {
           this.addPatch(options.radialDetail, x, y, indices, indexOffset);
         }
@@ -124,6 +126,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
       vertices?.push(0, -options.anchor * options.height, 0);
       normals?.push(0, -1, 0);
       uvs?.push(0.5, 0.5);
+      tangents?.push(1, 0, 0, 1);
 
       const bottomCenterIndex = currentVertexOffset - start;
       currentVertexOffset++;
@@ -139,6 +142,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         );
         normals?.push(0, -1, 0);
         uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
+        tangents?.push(1, 0, 0, 1);
         currentVertexOffset++;
 
         if (i < options.radialDetail) {
@@ -155,7 +159,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
       vertices?.push(0, (1 - options.anchor) * options.height, 0);
       normals?.push(0, 1, 0);
       uvs?.push(0.5, 0.5);
-
+      tangents?.push(1, 0, 0, 1);
       const topCenterIndex = currentVertexOffset - start;
       currentVertexOffset++;
 
@@ -170,6 +174,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         );
         normals?.push(0, 1, 0);
         uvs?.push(0.5 + 0.5 * sinTheta, 0.5 + 0.5 * cosTheta);
+        tangents?.push(1, 0, 0, 1);
         currentVertexOffset++;
 
         if (i < options.radialDetail) {

@@ -71,7 +71,8 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -93,6 +94,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
         uvs?.push(i / resolutionX, j / resolutionY);
         vertices?.push(minX + dx * i, 0, minY + dy * j);
         normals?.push(0, 1, 0);
+        tangents?.push(1, 0, 0, 1);
       }
     }
     if (indices) {

@@ -209,6 +209,7 @@ export function guessMimeType(path: string): string {
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
     '.gif': 'image/gif',
     '.tga': 'image/tga',
     '.dds': 'image/x-dds',

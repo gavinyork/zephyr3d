@@ -79,8 +79,10 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
+    /*
     function getVertex(v: number, h: number, r: number) {
       const y = r * Math.cos(v);
       const hRadius = r * Math.sin(v);
@@ -88,6 +90,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
       const z = hRadius * Math.cos(h);
       return [x, y, z];
     }
+*/
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
@@ -98,11 +101,57 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     const vTheta = Math.PI / verticalDetail;
     const hTheta = (Math.PI * 2) / horizonalDetail;
     for (let i = 0; i <= verticalDetail; i++) {
+      const v = i * vTheta;
+      const sinV = Math.sin(v);
+      const cosV = Math.cos(v);
       for (let j = 0; j <= horizonalDetail; j++) {
-        const v = getVertex(i * vTheta, j * hTheta, radius);
-        vertices.push(v[0], v[1], v[2]);
-        uvs?.push(j / horizonalDetail, i / verticalDetail);
-        normals?.push(v[0] / radius, v[1] / radius, v[2] / radius);
+        const h = j * hTheta;
+        const sinH = Math.sin(h);
+        const cosH = Math.cos(h);
+
+        // 位置
+        const x = radius * sinV * sinH;
+        const y = radius * cosV;
+        const z = radius * sinV * cosH;
+        vertices.push(x, y, z);
+
+        // UV（与原来一致）
+        if (uvs) {
+          uvs.push(j / horizonalDetail, i / verticalDetail);
+        }
+
+        // 法线
+        if (normals) {
+          const invR = 1 / radius;
+          normals.push(x * invR, y * invR, z * invR);
+        }
+
+        // 切线：与 u 对齐（沿经度 h 的方向）
+        if (tangents) {
+          let tx: number,
+            ty: number,
+            tz: number,
+            w = 1.0;
+
+          // 非极点：单位切线 [cosH, 0, -sinH]
+          if (sinV > 1e-6) {
+            tx = cosH;
+            ty = 0.0;
+            tz = -sinH;
+          } else {
+            // 极点退化：选择一个与法线正交的稳定方向
+            // 北极 cosV≈1 时法线≈[0,1,0]，取切线=[1,0,0]
+            // 南极 cosV≈-1 时法线≈[0,-1,0]，同样取切线=[1,0,0]（w 保持 +1）
+            tx = 1.0;
+            ty = 0.0;
+            tz = 0.0;
+          }
+
+          // 可选：如果你需要让 seam（经度环）在 j=0 与 j=horizonalDetail 对齐的切线一致，
+          // 上述公式已经自洽：j=0 => [1,0,0]，j=H => [cos 2π, 0, -sin 2π]=[1,0,0]
+
+          tangents.push(tx, ty, tz, w);
+        }
       }
     }
     for (let i = 0; i < verticalDetail; i++) {

@@ -625,7 +625,6 @@ export abstract class WebGPUBaseTexture<
       return;
     }
     if (
-      false &&
       !this._device.isTextureUploading(this as any) &&
       this._device.device.queue.copyExternalImageToTexture
     ) {

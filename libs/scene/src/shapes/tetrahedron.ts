@@ -53,6 +53,7 @@ export class TetrahedronShape
     v2: Vector3,
     vertices: number[],
     normals: number[],
+    tangents: number[],
     uvs: number[],
     indices: number[],
     indexOffset: number,
@@ -71,10 +72,28 @@ export class TetrahedronShape
     normals?.push(normal.x, normal.y, normal.z);
     normals?.push(normal.x, normal.y, normal.z);
 
+    const uv0 = [0.5, 0];
+    const uv1 = [0, 1];
+    const uv2 = [1, 1];
     // Add UV
-    uvs?.push(0.5, 0); // 顶点
-    uvs?.push(0, 1); // 左下
-    uvs?.push(1, 1); // 右下
+    uvs?.push(...uv0); // 顶点
+    uvs?.push(...uv1); // 左下
+    uvs?.push(...uv2); // 右下
+
+    if (tangents) {
+      const { t, w } = this.computeTangent(
+        [v0.x, v0.y, v0.z],
+        [v1.x, v1.y, v1.z],
+        [v2.x, v2.y, v2.z],
+        uv0,
+        uv1,
+        uv2,
+        [normal.x, normal.y, normal.z]
+      );
+      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(t.x, t.y, t.z, w);
+    }
 
     // Add index (CCW)
     indices.push(indexOffset + currentVertexIndex);
@@ -92,7 +111,8 @@ export class TetrahedronShape
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -120,6 +140,7 @@ export class TetrahedronShape
       bottomVertices[1], // pxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -133,6 +154,7 @@ export class TetrahedronShape
       bottomVertices[2], // nxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -146,6 +168,7 @@ export class TetrahedronShape
       bottomVertices[3], // nxpz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -159,6 +182,7 @@ export class TetrahedronShape
       bottomVertices[0], // pxpz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -173,6 +197,7 @@ export class TetrahedronShape
       bottomVertices[1], // pxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -186,6 +211,7 @@ export class TetrahedronShape
       bottomVertices[2], // nxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -251,6 +277,7 @@ export class TetrahedronFrameShape
     v2: Vector3,
     vertices: number[],
     normals: number[],
+    tangents: number[],
     uvs: number[],
     indices: number[],
     indexOffset: number,
@@ -270,9 +297,28 @@ export class TetrahedronFrameShape
     normals?.push(normal.x, normal.y, normal.z);
 
     // Add UV
-    uvs?.push(0.5, 0); // 顶点
-    uvs?.push(0, 1); // 左下
-    uvs?.push(1, 1); // 右下
+    const uv0 = [0.5, 0];
+    const uv1 = [0, 1];
+    const uv2 = [1, 1];
+    uvs?.push(...uv0); // 顶点
+    uvs?.push(...uv1); // 左下
+    uvs?.push(...uv2); // 右下
+
+    // Add tangents
+    if (tangents) {
+      const { t, w } = this.computeTangent(
+        [v0.x, v0.y, v0.z],
+        [v1.x, v1.y, v1.z],
+        [v2.x, v2.y, v2.z],
+        uv0,
+        uv1,
+        uv2,
+        [normal.x, normal.y, normal.z]
+      );
+      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(t.x, t.y, t.z, w);
+      tangents.push(t.x, t.y, t.z, w);
+    }
 
     // Add index
     indices.push(indexOffset + currentVertexIndex);
@@ -293,7 +339,8 @@ export class TetrahedronFrameShape
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -321,6 +368,7 @@ export class TetrahedronFrameShape
       bottomVertices[1], // pxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -334,6 +382,7 @@ export class TetrahedronFrameShape
       bottomVertices[2], // nxnz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -347,6 +396,7 @@ export class TetrahedronFrameShape
       bottomVertices[3], // nxpz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,
@@ -360,6 +410,7 @@ export class TetrahedronFrameShape
       bottomVertices[0], // pxpz
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       indexOffset,

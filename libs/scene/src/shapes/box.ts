@@ -65,7 +65,8 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -150,6 +151,23 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
       ...bottomFaceNormal
     );
     uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    if (tangents) {
+      const pushFaceTangent = (tx: number, ty: number, tz: number) => {
+        tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);
+      };
+      // Top (+Y): u -> +X
+      pushFaceTangent(+1, 0, 0);
+      // Front (+Z): u -> +X
+      pushFaceTangent(+1, 0, 0);
+      // Right (+X): u -> -Z
+      pushFaceTangent(0, 0, -1);
+      // Back (-Z): u -> -X （与 front 相反，保持 TBN 右手一致）
+      pushFaceTangent(-1, 0, 0);
+      // Left (-X): u -> +Z
+      pushFaceTangent(0, 0, +1);
+      // Bottom (-Y): u -> +X
+      pushFaceTangent(+1, 0, 0);
+    }
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {
@@ -219,7 +237,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -270,6 +289,23 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
     vertices?.push(...topFacePos, ...bottomFacePos);
     normals?.push(...topFacenormal, ...bottomFaceNormal);
     uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    if (tangents) {
+      const pushFaceTangent = (tx: number, ty: number, tz: number) => {
+        tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);
+      };
+      // Top (+Y): u -> +X
+      pushFaceTangent(+1, 0, 0);
+      // Front (+Z): u -> +X
+      pushFaceTangent(+1, 0, 0);
+      // Right (+X): u -> -Z
+      pushFaceTangent(0, 0, -1);
+      // Back (-Z): u -> -X （与 front 相反，保持 TBN 右手一致）
+      pushFaceTangent(-1, 0, 0);
+      // Left (-X): u -> +Z
+      pushFaceTangent(0, 0, +1);
+      // Bottom (-Y): u -> +X
+      pushFaceTangent(+1, 0, 0);
+    }
     Shape._transform(options.transform, vertices, normals, start);
     if (bbox || vertexCallback) {
       for (let i = start; i < vertices.length - 2; i += 3) {

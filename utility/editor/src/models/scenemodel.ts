@@ -22,7 +22,7 @@ export class SceneModel extends BaseModel {
     }
     if (!this._scene.mainCamera) {
       const defaultCamera = new PerspectiveCamera(this._scene, Math.PI / 3, 1, 1, 1000);
-      defaultCamera.lookAt(new Vector3(0, 80, 180), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
+      defaultCamera.lookAt(new Vector3(0, 8, 18), new Vector3(0, 0, 0), new Vector3(0, 1, 0));
       this._scene.mainCamera = defaultCamera;
     }
     this._scene.mainCamera.controller = new EditorCameraController();

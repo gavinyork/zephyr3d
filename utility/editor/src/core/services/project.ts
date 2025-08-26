@@ -7,6 +7,8 @@ export type ProjectInfo = {
   name: string;
   uuid?: string;
   lastEditScene?: string;
+  title?: string;
+  favicon?: string;
   startupScene?: string;
   splashScreen?: string;
   preferredRHI?: string[];

@@ -247,7 +247,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               subMenus: [
                 {
                   label: 'Box',
-                  action: () => this.handleAddShape(BoxShape, { anchor: 0.5, anchorY: 0 })
+                  action: () =>
+                    this.handleAddShape(BoxShape, {
+                      anchor: 0.5,
+                      anchorY: 0
+                    })
                 },
                 {
                   label: 'Sphere',
@@ -259,7 +263,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 },
                 {
                   label: 'Cylinder',
-                  action: () => this.handleAddShape(CylinderShape, { topCap: true, bottomCap: true })
+                  action: () =>
+                    this.handleAddShape(CylinderShape, {
+                      topCap: true,
+                      bottomCap: true
+                    })
                 },
                 {
                   label: 'Torus',
@@ -1305,7 +1313,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._typeToBePlaced = 'none';
     }
     const shape = new shapeCls(options);
-    const mesh = new Mesh(this.controller.model.scene, shape, new PBRMetallicRoughnessMaterial());
+    const material = new PBRMetallicRoughnessMaterial();
+    material.vertexNormal = true;
+    material.vertexTangent = true;
+    const mesh = new Mesh(this.controller.model.scene, shape, material);
     mesh.gpuPickable = false;
     this._nodeToBePlaced.set(mesh);
     this._shapeToBeAdded = {

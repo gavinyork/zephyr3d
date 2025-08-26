@@ -191,7 +191,10 @@ export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
   }
   async execute() {
     const shape = new this._shapeCls(this._options);
-    const mesh = new Mesh(this._scene, shape, new PBRMetallicRoughnessMaterial());
+    const material = new PBRMetallicRoughnessMaterial();
+    material.vertexNormal = shape.options.needNormal;
+    material.vertexTangent = shape.options.needTangent;
+    const mesh = new Mesh(this._scene, shape, material);
     mesh.position.set(this._position);
     if (this._nodeId) {
       mesh.persistentId = this._nodeId;

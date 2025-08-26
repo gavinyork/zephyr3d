@@ -80,7 +80,8 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
+    tangents?: number[]
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -91,16 +92,21 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
     const IR = options.innerRadius;
     for (let n = 0; n <= N; n++) {
       const alpha = ((n % N) / N) * Math.PI * 2;
-      const cx = OR * Math.cos(alpha);
+      const cosA = Math.cos(alpha);
+      const sinA = Math.sin(alpha);
+      const cx = OR * cosA;
       const cy = 0;
-      const cz = OR * Math.sin(alpha);
+      const cz = OR * sinA;
       for (let m = 0; m <= M; m++) {
         const theta = ((m % M) / M) * Math.PI * 2;
-        const t = 1 + (IR * Math.cos(theta)) / OR;
-        const s = IR * Math.sin(theta);
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        const t = 1 + (IR * cosT) / OR;
+        const s = IR * sinT;
         const x = cx * t;
         const y = cy * t + s;
         const z = cz * t;
+        vertices.push(x, y, z);
         if (normals) {
           const nx = x - cx;
           const ny = y - cy;
@@ -108,9 +114,14 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
           const mag = Math.sqrt(nx * nx + ny * ny + nz * nz);
           normals.push(nx / mag, ny / mag, nz / mag);
         }
-        vertices.push(x, y, z);
         if (uvs) {
           uvs.push(m / M, n / N);
+        }
+        if (tangents) {
+          const tx = -sinT * cosA;
+          const ty = cosT;
+          const tz = -sinT * sinA;
+          tangents.push(tx, ty, tz, 1.0);
         }
       }
     }
