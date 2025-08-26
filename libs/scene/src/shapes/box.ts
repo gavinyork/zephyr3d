@@ -61,12 +61,12 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
     options: BoxCreationOptions,
     vertices: number[],
     normals: number[],
+    tangents: number[],
     uvs: number[],
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
-    tangents?: number[]
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
@@ -233,12 +233,12 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
     options: BoxCreationOptions,
     vertices: number[],
     normals: number[],
+    tangents: number[],
     uvs: number[],
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
-    tangents?: number[]
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;

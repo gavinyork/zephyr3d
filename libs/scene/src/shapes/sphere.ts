@@ -75,12 +75,12 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     options: SphereCreationOptions,
     vertices: number[],
     normals: number[],
+    tangents: number[],
     uvs: number[],
     indices: number[],
     bbox?: AABB,
     indexOffset?: number,
-    vertexCallback?: (index: number, x: number, y: number, z: number) => void,
-    tangents?: number[]
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
     /*
     function getVertex(v: number, h: number, r: number) {

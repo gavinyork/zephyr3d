@@ -118,7 +118,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     const vertices: number[] = [];
     const indices: number[] = [];
     const normals: number[] = this._options.needNormal ? [] : null;
-    const tangents: number[] = this._options.needNormal && this._options.needTangent ? [] : null;
+    const tangents: number[] = this._options.needTangent ? [] : null;
     const uvs: number[] = this._options.needUV ? [] : null;
     const bbox = new BoundingBox();
     bbox.beginExtend();
@@ -126,12 +126,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
       this._options,
       vertices,
       normals,
+      tangents,
       uvs,
       indices,
       bbox,
       null,
-      null,
-      tangents
+      null
     );
     for (const s of ['position', 'normal', 'tangent', 'texCoord0'] as const) {
       this.removeVertexBuffer(s);

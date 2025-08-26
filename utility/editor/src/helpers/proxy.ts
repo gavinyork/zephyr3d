@@ -138,6 +138,7 @@ export class NodeProxy extends Disposable {
         vertices,
         null,
         null,
+        null,
         indices,
         bbox,
         vertices.length / 3
@@ -153,6 +154,7 @@ export class NodeProxy extends Disposable {
           )
         },
         vertices,
+        null,
         null,
         null,
         indices,
