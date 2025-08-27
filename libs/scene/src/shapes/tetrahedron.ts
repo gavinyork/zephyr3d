@@ -267,7 +267,6 @@ export class TetrahedronFrameShape
   private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3): Vector3 {
     const edge1 = Vector3.sub(v1, v0);
     const edge2 = Vector3.sub(v2, v0);
-    // 使用右手定则：edge1 × edge2，确保逆时针顶点顺序产生向外法线
     return Vector3.normalize(Vector3.cross(edge1, edge2));
   }
 
@@ -300,9 +299,9 @@ export class TetrahedronFrameShape
     const uv0 = [0.5, 0];
     const uv1 = [0, 1];
     const uv2 = [1, 1];
-    uvs?.push(...uv0); // 顶点
-    uvs?.push(...uv1); // 左下
-    uvs?.push(...uv2); // 右下
+    uvs?.push(...uv0);
+    uvs?.push(...uv1);
+    uvs?.push(...uv2);
 
     // Add tangents
     if (tangents) {

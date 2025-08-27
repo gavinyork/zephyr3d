@@ -78,14 +78,16 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         }
         break;
       case 'PROJECT_SETTINGS': {
-        const info = await DlgProjectSettings.editProjectSettings(
+        const settings = await this._editor.getProjectSettings();
+        const newSettings = await DlgProjectSettings.editProjectSettings(
           'Edit Project Settings',
           ProjectService.VFS,
           this._editor.currentProject,
+          settings,
           400
         );
-        if (info) {
-          await this._editor.updateProject(info);
+        if (newSettings) {
+          await this._editor.saveProjectSettings(newSettings);
         }
         break;
       }

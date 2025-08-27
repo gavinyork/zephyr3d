@@ -20,16 +20,16 @@ export const templateIndex = `import { Application } from '@zephyr3d/scene';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 const deviceType = new URL(window.location.href).searchParams.get('device');
-const HelloApp = new Application({
+const application = new Application({
   backend: deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU,
   canvas: document.querySelector('#canvas'),
   runtimeOptions: {
     scriptsRoot: '/assets'
   }
 });
-HelloApp.ready().then(async () => {
-  await HelloApp.runtimeManager.attachScript(null, '#/index');
-  HelloApp.run();
+application.ready().then(async () => {
+  await application.runtimeManager.attachScript(null, '#/index');
+  application.run();
 });
 `;
 
@@ -37,7 +37,7 @@ export const templateIndexHTML = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>HelloApp</title>
+    <title>%s</title>
     <style>
       * {
         margin: 0;

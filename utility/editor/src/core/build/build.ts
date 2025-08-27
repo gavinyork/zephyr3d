@@ -4,6 +4,7 @@ import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
 import type { VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
+import { ProjectService } from '../services/project';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -101,17 +102,15 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
   return { imports: importMap };
 }
 
-export async function buildForEndUser(
-  vfs: VFS,
-  options: {
-    input: string | string[] | Record<string, string>;
-    distDir?: string;
-    alias?: Record<string, string>;
-    sourcemap?: boolean | 'inline' | 'hidden';
-    format?: 'es' | 'iife' | 'umd' | 'cjs';
-  }
-) {
+export async function buildForEndUser(options: {
+  input: string | string[] | Record<string, string>;
+  distDir?: string;
+  alias?: Record<string, string>;
+  sourcemap?: boolean | 'inline' | 'hidden';
+  format?: 'es' | 'iife' | 'umd' | 'cjs';
+}) {
   const { input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
+  const vfs = ProjectService.VFS;
   if (await vfs.exists(distDir)) {
     await vfs.deleteDirectory(distDir);
   }
@@ -152,7 +151,7 @@ export async function buildForEndUser(
       content = transpileTS(file.path, rewriteImports(content as string));
       path = `${path.slice(0, -3)}.js`;
     }
-    await vfs.writeFile(vfs.join('/dist', path), content, {
+    await vfs.writeFile(vfs.join(distDir, path), content, {
       create: true,
       encoding: isTS ? 'utf8' : 'binary'
     });
@@ -170,7 +169,13 @@ export async function buildForEndUser(
     `<script type="importmap">\n${JSON.stringify(importMap, null, '  ')}\n</script>\n</head>`
   );
 
-  await vfs.writeFile('/dist/index.html', newContent, {
+  await vfs.writeFile(vfs.join(distDir, 'index.html'), newContent, {
+    encoding: 'utf8',
+    create: true
+  });
+
+  const settings = await ProjectService.getCurrentProjectSettings();
+  await vfs.writeFile(vfs.join(distDir, 'settings.json'), JSON.stringify(settings, null, '  '), {
     encoding: 'utf8',
     create: true
   });

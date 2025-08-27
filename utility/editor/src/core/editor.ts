@@ -1,5 +1,4 @@
 import type * as Monaco from 'monaco-editor';
-import type * as TS from 'typescript';
 import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
@@ -14,7 +13,7 @@ import {
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
 import { DRef, GenericHtmlDirectoryReader, HttpFS } from '@zephyr3d/base';
-import type { ProjectInfo } from './services/project';
+import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
@@ -144,6 +143,14 @@ export class Editor {
   async saveProject() {
     if (this._currentProject) {
       ProjectService.saveProject(this._currentProject);
+    }
+  }
+  async getProjectSettings() {
+    return this._currentProject ? await ProjectService.getCurrentProjectSettings() : null;
+  }
+  async saveProjectSettings(settings: ProjectSettings) {
+    if (this._currentProject) {
+      await ProjectService.saveCurrentProjectSettings(settings);
     }
   }
   async init() {
@@ -357,13 +364,6 @@ export class Editor {
       this._moduleManager.activate('Scene', '');
     }
   }
-  async updateProject(info: ProjectInfo) {
-    await ProjectService.saveProject(info);
-    const newInfo = await ProjectService.getCurrentProjectInfo();
-    if (newInfo.uuid === this._currentProject.uuid) {
-      Object.assign(this._currentProject, newInfo);
-    }
-  }
   async openProject() {
     const projects = await ProjectService.listProjects();
     const names = projects.map((project) => project.name);
@@ -380,7 +380,7 @@ export class Editor {
     await ProjectService.deleteProject(uuid);
   }
   async buildProject() {
-    await buildForEndUser(ProjectService.VFS, {
+    await buildForEndUser({
       input: '/src/index.ts',
       distDir: '/dist'
     });
@@ -402,98 +402,7 @@ export class Editor {
     for (const dir of distDirs) {
       await zipDownloader.zipWriter.add(`${dir.path}/`);
     }
-    if (false) {
-      const assetFileList = await ProjectService.VFS.glob('/assets/**/*', {
-        includeHidden: true,
-        includeDirs: false,
-        includeFiles: true,
-        recursive: true
-      });
-      const assetFiles = assetFileList.filter((path) => path.type === 'file');
-      let assetDirs = assetFileList.filter((path) => path.type === 'directory');
-      for (const file of assetFiles) {
-        const isTS = file.path.endsWith('.ts');
-        let content = await ProjectService.VFS.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
-        let path = ProjectService.VFS.relative(ProjectService.VFS.join('/dist', file.path), '/');
-        if (isTS) {
-          path = `${path.slice(0, -3)}.js`;
-          content = this.transpileTS(file.path, this.rewriteImports(content as string));
-        }
-        await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
-        assetDirs = assetDirs.filter((dir) => !file.path.startsWith(`${dir.path}/`));
-      }
-      for (const dir of assetDirs) {
-        await zipDownloader.zipWriter.add(
-          `${ProjectService.VFS.relative(ProjectService.VFS.join('/dist', dir.path), '/')}/`
-        );
-      }
-    }
-
     await zipDownloader.finish();
-  }
-  rewriteImports(code: string): string {
-    const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
-    const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
-
-    const replaceAsync = (input: string, re: RegExp) => {
-      let out = '';
-      let last = 0;
-      for (;;) {
-        const m = re.exec(input);
-        if (!m) {
-          break;
-        }
-        out += input.slice(last, m.index);
-
-        const quote = m[1];
-        const spec = m[2];
-        let replacement = spec;
-
-        if ((spec.startsWith('./') || spec.startsWith('../')) && !spec.endsWith('.js')) {
-          if (spec.endsWith('.ts')) {
-            replacement = `${spec.slice(0, -3)}.js`;
-          } else {
-            replacement = `${spec}.js`;
-          }
-        }
-
-        const replaced = m[0].replace(`${quote}${spec}${quote}`, `${quote}${replacement}${quote}`);
-        out += replaced;
-        last = m.index + m[0].length;
-      }
-      out += input.slice(last);
-      return out;
-    };
-
-    let out = replaceAsync(code, reStatic);
-    out = replaceAsync(out, reDynamic);
-    return out;
-  }
-  private transpileTS(fileName: string, code: string) {
-    const ts = (window as any).ts as typeof TS;
-    if (!ts) {
-      throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
-    }
-
-    const res = ts.transpileModule(code, {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2015,
-        module: ts.ModuleKind.ESNext,
-        sourceMap: true,
-        inlineSources: true,
-        experimentalDecorators: true,
-        useDefineForClassFields: false
-      },
-      fileName
-    });
-
-    let out = res.outputText || '';
-    if (res.sourceMapText) {
-      const mapBase64 = btoa(unescape(encodeURIComponent(res.sourceMapText)));
-      out += `\n//# sourceMappingURL=data:application/json;base64,${mapBase64}`;
-    }
-    out += `\n//# sourceURL=${fileName}`;
-    return out;
   }
   private onAction(action: string, fileName: string, arg: string) {
     if (action === 'EDIT_CODE' && fileName) {

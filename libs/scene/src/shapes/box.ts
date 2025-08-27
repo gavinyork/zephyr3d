@@ -299,7 +299,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
       pushFaceTangent(+1, 0, 0);
       // Right (+X): u -> -Z
       pushFaceTangent(0, 0, -1);
-      // Back (-Z): u -> -X （与 front 相反，保持 TBN 右手一致）
+      // Back (-Z): u -> -X
       pushFaceTangent(-1, 0, 0);
       // Left (-X): u -> +Z
       pushFaceTangent(0, 0, +1);

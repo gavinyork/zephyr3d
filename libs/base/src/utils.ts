@@ -516,6 +516,277 @@ export function applyMixins<M extends ((target: any) => any)[], T>(
   return r;
 }
 
+type SprintfArg = string | number | boolean | null | undefined;
+
+interface FormatToken {
+  flags: {
+    leftAlign: boolean; // -
+    sign: boolean; // +
+    space: boolean; // (space)
+    zeroPad: boolean; // 0
+    alt: boolean; // #
+  };
+  width?: number; // number or from-arg
+  widthFromArg?: boolean; // *
+  precision?: number; // .number or from-arg
+  precisionFromArg?: boolean; // .*
+  type: string; // s d i u f x X o c %
+  explicitIndex?: number; // n$ style index (1-based)
+}
+
+const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc])/g;
+
+export function formatString(format: string, ...args: SprintfArg[]): string {
+  let out = '';
+  let lastIndex = 0;
+  let argIndex = 0;
+
+  const readArg = (explicit?: number): SprintfArg => {
+    if (explicit != null) {
+      const idx = explicit - 1;
+      if (idx < 0 || idx >= args.length) {
+        throw new Error(`Argument index ${explicit}$ out of range`);
+      }
+      return args[idx];
+    }
+    if (argIndex >= args.length) {
+      throw new Error('Too few arguments for format string');
+    }
+    return args[argIndex++];
+  };
+
+  const parseNumber = (val: SprintfArg, name: string): number => {
+    const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
+    if (!Number.isFinite(n)) {
+      throw new Error(`Invalid ${name}: ${val}`);
+    }
+    return n;
+  };
+
+  format.replace(formatRegex, (match, i$, flagsStr, widthStr, precStr, type, offset) => {
+    out += format.slice(lastIndex, offset);
+    lastIndex = offset + match.length;
+
+    const token: FormatToken = {
+      flags: {
+        leftAlign: false,
+        sign: false,
+        space: false,
+        zeroPad: false,
+        alt: false
+      },
+      type
+    };
+
+    if (i$) {
+      token.explicitIndex = parseInt(i$, 10);
+    }
+
+    // flags
+    for (const ch of flagsStr || '') {
+      switch (ch) {
+        case '-':
+          token.flags.leftAlign = true;
+          break;
+        case '+':
+          token.flags.sign = true;
+          break;
+        case ' ':
+          token.flags.space = true;
+          break;
+        case '0':
+          token.flags.zeroPad = true;
+          break;
+        case '#':
+          token.flags.alt = true;
+          break;
+      }
+    }
+
+    // width
+    if (widthStr === '*') {
+      token.widthFromArg = true;
+    } else if (widthStr) {
+      token.width = parseInt(widthStr, 10);
+    }
+
+    // precision
+    if (precStr === '*') {
+      token.precisionFromArg = true;
+    } else if (precStr) {
+      token.precision = parseInt(precStr, 10);
+    }
+
+    // 渲染该占位符
+    const render = (): string => {
+      // read * parameter of width/precision
+      if (token.widthFromArg) {
+        const wArg = readArg(token.explicitIndex);
+        token.width = parseNumber(wArg, 'width');
+      }
+      if (token.precisionFromArg) {
+        const pArg = readArg(token.explicitIndex);
+        token.precision = parseNumber(pArg, 'precision');
+        if (token.precision! < 0) {
+          token.precision = undefined;
+        }
+      }
+
+      const t = token.type;
+
+      if (t === '%') {
+        // literal %
+        return '%';
+      }
+
+      const raw = readArg(token.explicitIndex);
+
+      let body = '';
+      let signStr = '';
+
+      const asNumber = (v: SprintfArg): number => {
+        const n =
+          typeof v === 'boolean'
+            ? v
+              ? 1
+              : 0
+            : v == null
+            ? NaN
+            : typeof v === 'string' && v.trim() === ''
+            ? 0
+            : Number(v);
+        return n;
+      };
+
+      const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
+        if (!width || s.length >= width) {
+          return s;
+        }
+        const fill = padChar.repeat(width - s.length);
+        return leftAlign ? s + fill : fill + s;
+      };
+
+      const prefixForAlt = (t: string): string => {
+        if (t === 'x') {
+          return '0x';
+        }
+        if (t === 'X') {
+          return '0X';
+        }
+        if (t === 'o') {
+          return '0o';
+        }
+        return '';
+      };
+
+      switch (t) {
+        case 's': {
+          body = String(raw ?? '');
+          if (token.precision != null) {
+            // precision
+            body = body.slice(0, token.precision);
+          }
+          break;
+        }
+        case 'c': {
+          if (typeof raw === 'number') {
+            body = String.fromCharCode(raw);
+          } else {
+            const s = String(raw ?? '');
+            body = s.length ? s[0] : '\u0000';
+          }
+          break;
+        }
+        case 'd':
+        case 'i':
+        case 'u': {
+          let n = asNumber(raw);
+          if (t === 'u') {
+            n = Math.floor(Math.abs(n)) >>> 0; // unsigned 32bit
+            body = n.toString(10);
+          } else {
+            const isNeg = n < 0 || Object.is(n, -0);
+            const abs = Math.abs(n);
+            body = Math.trunc(abs).toString(10);
+            if (isNeg) {
+              signStr = '-';
+            } else if (token.flags.sign) {
+              signStr = '+';
+            } else if (token.flags.space) {
+              signStr = ' ';
+            }
+          }
+          if (token.precision != null) {
+            body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
+          }
+          body = signStr + body;
+          break;
+        }
+        case 'f': {
+          const n = asNumber(raw);
+          const prec = token.precision ?? 6;
+          if (!Number.isFinite(n)) {
+            body = String(n);
+          } else {
+            body = n.toFixed(Math.max(0, Math.min(100, prec)));
+          }
+          if (n >= 0) {
+            if (token.flags.sign) {
+              body = '+' + body;
+            } else if (token.flags.space) {
+              body = ' ' + body;
+            }
+          }
+          break;
+        }
+        case 'x':
+        case 'X':
+        case 'o': {
+          const n = asNumber(raw);
+          const isUpper = t === 'X';
+          const abs = Math.trunc(Math.abs(n));
+          let str = t === 'o' ? abs.toString(8) : abs.toString(16);
+          if (isUpper) {
+            str = str.toUpperCase();
+          }
+          if (token.precision != null) {
+            str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
+          }
+          const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
+          body = pre + str;
+          break;
+        }
+        default:
+          throw new Error(`Unsupported format type: ${t}`);
+      }
+
+      const useZeroPad =
+        token.flags.zeroPad &&
+        !token.flags.leftAlign &&
+        token.type !== 's' &&
+        token.precision == null &&
+        token.type !== '%';
+
+      if (useZeroPad) {
+        const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
+        const prefix = prefixMatch ? prefixMatch[0] : '';
+        const rest = body.slice(prefix.length);
+        body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
+      } else {
+        body = pad(body, token.width, token.flags.leftAlign, ' ');
+      }
+
+      return body;
+    };
+
+    out += render();
+    return match;
+  });
+
+  out += format.slice(lastIndex);
+  return out;
+}
+
 /**
  * Convert union type to intersection
  * @public

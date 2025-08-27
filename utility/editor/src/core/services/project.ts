@@ -1,5 +1,5 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
-import { HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
+import { formatString, HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
 import { SerializationManager } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
 
@@ -7,11 +7,18 @@ export type ProjectInfo = {
   name: string;
   uuid?: string;
   lastEditScene?: string;
+};
+
+export type ProjectSettings = {
   title?: string;
   favicon?: string;
   startupScene?: string;
   splashScreen?: string;
   preferredRHI?: string[];
+};
+
+const defaultProjectSettings: Readonly<ProjectSettings> = {
+  preferredRHI: ['WebGL', 'WebGL2', 'WebGPU']
 };
 
 export type RecentProject = {
@@ -68,11 +75,15 @@ export class ProjectService {
     try {
       await vfs.makeDirectory('/src');
       await vfs.makeDirectory('/assets');
-      await vfs.writeFile('/index.html', templateIndexHTML, {
+      await vfs.writeFile('/index.html', formatString(templateIndexHTML, name), {
         encoding: 'utf8',
         create: true
       });
       await vfs.writeFile('/src/index.ts', templateIndex, {
+        encoding: 'utf8',
+        create: true
+      });
+      await vfs.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
         encoding: 'utf8',
         create: true
       });
@@ -83,6 +94,28 @@ export class ProjectService {
   }
   static async getCurrentProjectInfo() {
     return this._currentProject ? await this.getProjectInfo(this._currentProject) : null;
+  }
+  static async getCurrentProjectSettings(): Promise<ProjectSettings> {
+    if (this._vfs) {
+      const exists = await this._vfs.exists('/src/settings.json');
+      if (!exists) {
+        await this._vfs.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
+          encoding: 'utf8',
+          create: true
+        });
+      }
+      const content = (await this._vfs.readFile('/src/settings.json', { encoding: 'utf8' })) as string;
+      return JSON.parse(content);
+    }
+    return null;
+  }
+  static async saveCurrentProjectSettings(settings: ProjectSettings) {
+    if (this._vfs) {
+      await this._vfs.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
+        encoding: 'utf8',
+        create: true
+      });
+    }
   }
   static async closeCurrentProject() {
     if (this._currentProject) {

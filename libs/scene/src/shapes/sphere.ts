@@ -82,15 +82,6 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
   ): PrimitiveType {
-    /*
-    function getVertex(v: number, h: number, r: number) {
-      const y = r * Math.cos(v);
-      const hRadius = r * Math.sin(v);
-      const x = hRadius * Math.sin(h);
-      const z = hRadius * Math.cos(h);
-      return [x, y, z];
-    }
-*/
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
@@ -109,47 +100,27 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         const sinH = Math.sin(h);
         const cosH = Math.cos(h);
 
-        // 位置
         const x = radius * sinV * sinH;
         const y = radius * cosV;
         const z = radius * sinV * cosH;
         vertices.push(x, y, z);
-
-        // UV（与原来一致）
-        if (uvs) {
-          uvs.push(j / horizonalDetail, i / verticalDetail);
-        }
-
-        // 法线
+        uvs?.push(j / horizonalDetail, i / verticalDetail);
         if (normals) {
           const invR = 1 / radius;
           normals.push(x * invR, y * invR, z * invR);
         }
-
-        // 切线：与 u 对齐（沿经度 h 的方向）
         if (tangents) {
-          let tx: number,
-            ty: number,
-            tz: number,
-            w = 1.0;
-
-          // 非极点：单位切线 [cosH, 0, -sinH]
+          const w = 1;
+          let tx: number, ty: number, tz: number;
           if (sinV > 1e-6) {
             tx = cosH;
             ty = 0.0;
             tz = -sinH;
           } else {
-            // 极点退化：选择一个与法线正交的稳定方向
-            // 北极 cosV≈1 时法线≈[0,1,0]，取切线=[1,0,0]
-            // 南极 cosV≈-1 时法线≈[0,-1,0]，同样取切线=[1,0,0]（w 保持 +1）
             tx = 1.0;
             ty = 0.0;
             tz = 0.0;
           }
-
-          // 可选：如果你需要让 seam（经度环）在 j=0 与 j=horizonalDetail 对齐的切线一致，
-          // 上述公式已经自洽：j=0 => [1,0,0]，j=H => [cos 2π, 0, -sin 2π]=[1,0,0]
-
           tangents.push(tx, ty, tz, w);
         }
       }

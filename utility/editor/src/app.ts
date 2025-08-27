@@ -1,16 +1,16 @@
 import { Application } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 import { ProjectService } from './core/services/project';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
+import type { DeviceBackend } from '@zephyr3d/device';
 
 const deviceType = new URL(window.location.href).searchParams.get('device');
 const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
+let backend: DeviceBackend = null;
 if (project) {
   const remote = !!Number(searchParams.get('remote'));
   if (remote) {
@@ -18,16 +18,17 @@ if (project) {
   } else {
     await ProjectService.openProject(project);
   }
-}
-
-let backend =
-  deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU;
-if (!backend.supported()) {
-  backend = null;
-  for (const b of [backendWebGPU, backendWebGL2, backendWebGL1]) {
-    if (b.supported()) {
-      backend = b;
-      break;
+} else {
+  const { backendWebGL1, backendWebGL2 } = await import('@zephyr3d/backend-webgl');
+  const { backendWebGPU } = await import('@zephyr3d/backend-webgpu');
+  backend = deviceType === 'webgl' ? backendWebGL1 : deviceType === 'webgl2' ? backendWebGL2 : backendWebGPU;
+  if (!backend.supported()) {
+    backend = null;
+    for (const b of [backendWebGPU, backendWebGL2, backendWebGL1]) {
+      if (b.supported()) {
+        backend = b;
+        break;
+      }
     }
   }
 }
