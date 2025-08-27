@@ -300,7 +300,8 @@ export async function installDeps(
   vfs: VFS,
   projectRoot: string,
   specs: string[],
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  noFetchDTS?: boolean
 ) {
   let numPackagesInstalled = 0;
   onProgress?.('Reading lock file...');
@@ -326,9 +327,11 @@ export async function installDeps(
       lock.dependencies[name] = { version, entry, url: entryUrl, integrity };
       numPackagesInstalled++;
 
-      // Loading types
-      onProgress?.(`Loading DTS from package ${spec}...`);
-      await loadTypes(project, spec, window.monaco);
+      if (!noFetchDTS) {
+        // Loading types
+        onProgress?.(`Loading DTS from package ${spec}...`);
+        await loadTypes(project, spec, window.monaco);
+      }
     } catch (err) {
       onProgress?.(`Failed to fetch ${spec}: ${err}`);
     }

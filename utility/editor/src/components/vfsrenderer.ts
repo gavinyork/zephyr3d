@@ -204,7 +204,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y),
       false
     );
-    //this.renderToolbar();
+    this.renderToolbar();
     ImGui.EndChild();
 
     ImGui.BeginChild('##VFSContentContainer', new ImGui.ImVec2(-1, -1), true);
@@ -338,7 +338,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         false
       );
       dlgMessageBoxEx.showModal();
-      await installDeps(ProjectService.currentProject, this.VFS, '/', [packageName]);
+      await installDeps(ProjectService.currentProject, this.VFS, '/', [packageName], null, true);
       dlgMessageBoxEx.close('');
     }
   }
@@ -353,9 +353,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       ImGui.PushStyleVar(ImGui.StyleVar.Alpha, 0.5);
       ImGui.Button('⬆##DirUP');
       ImGui.PopStyleVar();
-      if (ImGui.IsItemHovered()) {
-        ImGui.SetTooltip('Already at root directory');
-      }
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(canGoUp ? 'Go to parent directory' : 'Already at root directory');
     }
     if (!this._vfs.readOnly) {
       ImGui.SameLine();
@@ -384,13 +384,19 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           }
         });
       }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip('Installs a third party library');
+      }
       ImGui.SameLine();
       if (ImGui.Button(convertEmojiString('♻️##ReinstallPackages'))) {
         this.reinstallPackages();
       }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip('Reinstalls all third party libraries');
+      }
     }
     ImGui.SameLine();
-    ImGui.Separator();
+    ImGui.Dummy(new ImGui.ImVec2(20, 0));
     ImGui.SameLine();
 
     if (ImGui.RadioButton('List', this._viewMode === ViewMode.List)) {

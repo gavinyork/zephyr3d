@@ -20,8 +20,12 @@ if (project) {
       const link = document.createElement('link');
       link.rel = rel;
       link.href = url;
-      if (type) link.type = type;
-      if (sizes) link.sizes = sizes;
+      if (type) {
+        link.type = type;
+      }
+      if (sizes) {
+        link.sizes = sizes;
+      }
       head.appendChild(link);
     });
   };
