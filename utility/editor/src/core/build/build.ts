@@ -2,9 +2,10 @@ import type * as TS from 'typescript';
 import { rollup } from '@rollup/browser';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
-import type { VFS } from '@zephyr3d/base';
+import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
+import { templateIndexHTML } from './templates';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -159,22 +160,22 @@ export async function buildForEndUser(options: {
 
   const importMap = await getImportMap(vfs, distDir);
 
-  const htmlContent = (await vfs.readFile('/index.html', { encoding: 'utf8' })) as string;
-  let newContent = htmlContent.replace(
-    '</body>',
-    `  <script type="module" src="./index.js"></script>\n</body>`
-  );
-  newContent = newContent.replace(
+  const settings = await ProjectService.getCurrentProjectSettings();
+  const info = await ProjectService.getCurrentProjectInfo();
+  const favicon = settings.favicon
+    ? `<link rel="icon" type="${vfs.guessMIMEType(settings.favicon)}" href=".${settings.favicon}" />`
+    : '';
+  let htmlContent = formatString(templateIndexHTML, settings.title ?? info.name, favicon);
+  htmlContent = htmlContent.replace('</body>', `  <script type="module" src="./index.js"></script>\n</body>`);
+  htmlContent = htmlContent.replace(
     '</head>',
     `<script type="importmap">\n${JSON.stringify(importMap, null, '  ')}\n</script>\n</head>`
   );
-
-  await vfs.writeFile(vfs.join(distDir, 'index.html'), newContent, {
+  await vfs.writeFile(vfs.join(distDir, 'index.html'), htmlContent, {
     encoding: 'utf8',
     create: true
   });
 
-  const settings = await ProjectService.getCurrentProjectSettings();
   await vfs.writeFile(vfs.join(distDir, 'settings.json'), JSON.stringify(settings, null, '  '), {
     encoding: 'utf8',
     create: true

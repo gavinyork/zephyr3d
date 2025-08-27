@@ -40,12 +40,12 @@ export class ImageList extends makeObservable(Disposable)<{
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
     this._maxImageCount = -1;
     this._mimeTypes = mimeTypes?.slice() ?? [
-      'image/jpg',
       'image/jpeg',
       'image/png',
       'image/tga',
       'image/vnd.radiance',
-      'image/x-dds'
+      'image/x-dds',
+      'image/webp'
     ];
   }
   get defaultImage() {

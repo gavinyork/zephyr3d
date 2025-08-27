@@ -38,6 +38,7 @@ export const templateIndexHTML = `<!DOCTYPE html>
   <head>
     <meta charset="UTF-8" />
     <title>%s</title>
+    %s
     <style>
       * {
         margin: 0;

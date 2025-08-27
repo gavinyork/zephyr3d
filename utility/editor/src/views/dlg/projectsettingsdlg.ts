@@ -25,6 +25,31 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     this._settings = { ...projectSettings };
   }
   doRender(): void {
+    const title = [this._settings.title ?? this._info.name] as [string];
+    if (ImGui.InputText('Title', title, undefined, ImGui.InputTextFlags.None)) {
+      this._settings.title = title[0];
+    }
+    const favicon = [this._settings.favicon ?? ''] as [string];
+    if (ImGui.InputText('Favicon', favicon, undefined, ImGui.InputTextFlags.None)) {
+      this._settings.favicon = favicon[0];
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Double click to select icon');
+      if (ImGui.IsMouseDoubleClicked(0)) {
+        DlgOpenFile.openFile(
+          'Select Image File',
+          this._vfs,
+          this._info,
+          'Image (*.ico;*.jpg;*.png;*.webp)|*.ico;*.jpg;*.png;*.webp',
+          500,
+          400
+        ).then((value) => {
+          if (value) {
+            this._settings.favicon = value;
+          }
+        });
+      }
+    }
     const splashScreen = [this._settings.splashScreen ?? ''] as [string];
     if (ImGui.InputText('Splash Screen', splashScreen, undefined, ImGui.InputTextFlags.None)) {
       this._settings.splashScreen = splashScreen[0];
@@ -36,7 +61,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           'Select Image File',
           this._vfs,
           this._info,
-          'Image (*.jpg;*.png;*.tga;*.dds)|*.jpg;*.jpeg;*.png;*.tga;*.dds',
+          'Image (*.jpg;*.png;*.tga;*.webp;*.dds)|*.jpg;*.png;*.tga;*.webp;*.dds',
           500,
           400
         ).then((value) => {

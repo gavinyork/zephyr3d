@@ -204,7 +204,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y),
       false
     );
-    this.renderToolbar();
+    //this.renderToolbar();
     ImGui.EndChild();
 
     ImGui.BeginChild('##VFSContentContainer', new ImGui.ImVec2(-1, -1), true);

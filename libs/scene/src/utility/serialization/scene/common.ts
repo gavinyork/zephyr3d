@@ -27,7 +27,7 @@ export function getTextureProps<T extends Material>(
       options: {
         mimeTypes:
           type === '2D'
-            ? ['image/jpg', 'image/jpeg', 'image/png', 'image/tga', 'image/vnd.radiance', 'image/x-dds']
+            ? ['image/jpeg', 'image/png', 'image/tga', 'image/vnd.radiance', 'image/x-dds', 'image/webp']
             : ['image/x-dds']
       },
       isNullable() {

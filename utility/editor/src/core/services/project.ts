@@ -83,7 +83,8 @@ export class ProjectService {
         encoding: 'utf8',
         create: true
       });
-      await vfs.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
+      const settings = { ...defaultProjectSettings, title: name };
+      await vfs.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
         encoding: 'utf8',
         create: true
       });

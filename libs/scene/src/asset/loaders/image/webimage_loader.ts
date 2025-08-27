@@ -9,12 +9,7 @@ import type { TypedArray } from '@zephyr3d/base';
  */
 export class WebImageLoader extends AbstractTextureLoader {
   supportMIMEType(mimeType: string): boolean {
-    return (
-      mimeType === 'image/jpg' ||
-      mimeType === 'image/jpeg' ||
-      mimeType === 'image/png' ||
-      mimeType === 'image/webp'
-    );
+    return mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/webp';
   }
   async load(
     mimeType: string,
