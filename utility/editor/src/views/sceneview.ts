@@ -1443,13 +1443,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.dispatchEvent('action', action);
   }
   private handleStartRender(scene: Scene, camera: Camera, compositor: Compositor) {
-    if (this._postGizmoRenderer && (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)) {
+    if (
+      this._postGizmoRenderer &&
+      camera === this.controller.model.scene.mainCamera &&
+      (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)
+    ) {
       this._postGizmoRenderer.camera = camera;
       compositor.appendPostEffect(this._postGizmoRenderer);
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
-    if ((this._postGizmoRenderer && this._postGizmoRenderer.node) || this._postGizmoRenderer.drawGrid) {
+    if (
+      this._postGizmoRenderer &&
+      camera === this.controller.model.scene.mainCamera &&
+      (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)
+    ) {
       //compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);
     }
