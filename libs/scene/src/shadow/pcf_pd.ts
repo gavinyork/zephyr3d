@@ -7,10 +7,10 @@ import {
 } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export class PCFPD extends ShadowImpl {
@@ -67,7 +67,7 @@ export class PCFPD extends ShadowImpl {
     if (this.useNativeShadowMap(shadowMapParams)) {
       return null;
     } else {
-      const device = Application.instance.device;
+      const device = getDevice();
       return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
         ? device.type === 'webgl'
           ? 'rgba16f'
@@ -80,7 +80,7 @@ export class PCFPD extends ShadowImpl {
     }
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
+    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
@@ -218,7 +218,7 @@ export class PCFPD extends ShadowImpl {
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
   useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
-    return Application.instance.device.type !== 'webgl';
+    return getDevice().type !== 'webgl';
   }
   /** @internal */
   sampleShadowMap(

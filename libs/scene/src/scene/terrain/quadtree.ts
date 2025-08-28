@@ -12,11 +12,11 @@ import type { IndexBuffer, PrimitiveType, Texture2D } from '@zephyr3d/device';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { TerrainPatch } from './patch';
 import { HeightField } from './heightfield';
-import { Application } from '../../app';
 import type { CullVisitor } from '../../render/cull_visitor';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { Terrain } from './terrain';
 import type { GrassCluster } from './grass';
+import { getDevice } from '../../app/api';
 
 /** @internal */
 export class QuadtreeNode extends Disposable {
@@ -206,7 +206,7 @@ export class Quadtree extends Disposable {
       this._heightField = null;
       return false;
     }
-    const device = Application.instance.device;
+    const device = getDevice();
     this._patchSize = patchSize;
     this._rootSizeX = rootSizeX;
     this._rootSizeZ = rootSizeZ;

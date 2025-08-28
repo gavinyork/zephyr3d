@@ -11,11 +11,11 @@ import type { DrawContext, WaveGenerator } from '../render';
 import { MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { DRef, DWeakRef, Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
-import { Application } from '../app';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
 import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
+import { getDevice } from '../app/api';
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly _absorptionGrad = new Interpolator(
@@ -89,7 +89,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   get scatterRampTexture(): Texture2D {
-    const tex = this._getScatterRampTexture(Application.instance.device);
+    const tex = this._getScatterRampTexture(getDevice());
     return tex === WaterMaterial._defaultScatterRampTexture.get() ? null : tex;
   }
   set scatterRampTexture(tex: Texture2D) {
@@ -99,7 +99,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   get absorptionRampTexture(): Texture2D {
-    const tex = this._getAbsorptionRampTexture(Application.instance.device);
+    const tex = this._getAbsorptionRampTexture(getDevice());
     return tex === WaterMaterial._defaultAbsorptionRampTexture.get() ? null : tex;
   }
   set absorptionRampTexture(tex: Texture2D) {

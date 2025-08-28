@@ -5,9 +5,9 @@ import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
 import type { DrawableInstanceInfo, RenderQueue, RenderQueueRef } from './render_queue';
-import { Application } from '../app/app';
 import type { Mesh, SceneNode } from '../scene';
 import { MaterialVaryingFlags } from '../values';
+import { getDevice } from '../app/api';
 
 export interface IMixinDrawable {
   readonly objectColor: Vector4;
@@ -38,7 +38,7 @@ function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolea
     bindGroup = bindGroups.pop();
   } else {
     const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
-    bindGroup = Application.instance.device.createBindGroup(layout);
+    bindGroup = getDevice().createBindGroup(layout);
   }
   usedBindGroups.set(bindGroup, hash);
   return bindGroup;
@@ -97,11 +97,11 @@ export function mixinDrawable<
       this._currentWorldMatrixBuffer = this._worldMatrixBuffer.subarray(0, 16);
       this._prevWorldMatrixBuffer = this._worldMatrixBuffer.subarray(20, 36);
       this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
-      this._framestampBuffer[0] = Application.instance.device.frameInfo.frameCounter;
+      this._framestampBuffer[0] = getDevice().frameInfo.frameCounter;
       this._framestampBuffer[1] = this._framestampBuffer[0];
       this._prevWorldMatrixBuffer.set(this.getNode().worldMatrix);
       this.getNode().on('transformchanged', () => {
-        const frame = Application.instance.device.frameInfo.frameCounter;
+        const frame = getDevice().frameInfo.frameCounter;
         if (frame !== this._framestampBuffer[1]) {
           this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
           this._framestampBuffer[0] = frame;
@@ -146,7 +146,7 @@ export function mixinDrawable<
       }
     }
     applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void {
-      const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, true, renderQueue);
+      const drawableBindGroup = this.getDrawableBindGroup(getDevice(), true, renderQueue);
       drawableBindGroup.setValue(ShaderHelper.getInstanceDataStrideUniformName(), stride >> 2);
       drawableBindGroup.setValue(ShaderHelper.getInstanceDataOffsetUniformName(), offset >> 2);
     }
@@ -166,7 +166,7 @@ export function mixinDrawable<
           instanceBindGroupTransfromTags.set(instanceInfo, currentTag);
         }
       } else {
-        const drawableBindGroup = this.getDrawableBindGroup(Application.instance.device, false, renderQueue);
+        const drawableBindGroup = this.getDrawableBindGroup(getDevice(), false, renderQueue);
         const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
         if (tag !== currentTag) {
           drawableBindGroup.setValue(

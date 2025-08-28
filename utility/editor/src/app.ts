@@ -1,4 +1,4 @@
-import { Application } from '@zephyr3d/scene';
+import { Application, getDevice, getInput } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 import { initLeakDetector } from './helpers/leakdetector';
@@ -93,13 +93,13 @@ const editorApp = new Application({
 editorApp.ready().then(async () => {
   if (!project) {
     await initLeakDetector();
-    const device = editorApp.device;
+    const device = getDevice();
     await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
     initEmojiMapping();
     const editor = new Editor();
     await editor.init();
     editor.registerModules();
-    editorApp.inputManager.use(editor.handleEvent.bind(editor));
+    getInput().use(editor.handleEvent.bind(editor));
 
     document.addEventListener('contextmenu', function (e) {
       e.preventDefault();

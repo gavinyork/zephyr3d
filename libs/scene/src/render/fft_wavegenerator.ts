@@ -16,7 +16,6 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import { Primitive } from './primitive';
-import { Application } from '../app';
 import {
   createProgramFFT2H,
   createProgramFFT2V,
@@ -25,6 +24,7 @@ import {
   createProgramPostFFT2
 } from '../shaders';
 import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 type OceanFieldCascade = {
   /** The size of simulated patch of field. (in meters) */
@@ -177,7 +177,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
    */
   constructor(params?: OceanFieldBuildParams) {
     super();
-    const device = Application.instance.device;
+    const device = getDevice();
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
     const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
       ? device.getDeviceCaps().framebufferCaps.maxDrawBuffers
@@ -269,7 +269,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this._sizes = new Vector4();
       this._croppinesses = new Vector4();
       this._cascades = [new Vector4(), new Vector4(), new Vector4(), new Vector4()];
-      this._updateRenderStates = Application.instance.device.createRenderStateSet();
+      this._updateRenderStates = getDevice().createRenderStateSet();
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
       this._version = 0;
@@ -399,7 +399,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private getButterflyTexture(size: number) {
-    const device = Application.instance.device;
+    const device = getDevice();
     let tex = FFTWaveGenerator._globals.butterflyTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D('rgba32f', Math.log2(size), size, {
@@ -413,7 +413,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private generateInitialSpectrum(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     device.setProgram(FFTWaveGenerator._globals.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
@@ -451,7 +451,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private getNoiseTexture(size: number, randomSeed: number): Texture2D {
-    const device = Application.instance.device;
+    const device = getDevice();
     let tex = FFTWaveGenerator._globals.noiseTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
@@ -522,7 +522,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   /** @internal */
   private getInstanceData(): WaterInstanceData {
     if (!this._instanceData) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const h0Textures = this.createNTextures(
         device,
         this._h0TextureFormat,
@@ -636,7 +636,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.update} */
   update(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     device.pushDeviceStates();
     device.setRenderStates(this._updateRenderStates);
     if (this._resolutionChanged) {
@@ -700,7 +700,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private generateSpectrum(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.hkProgram);
@@ -732,7 +732,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private generateSpectrumTwoPass(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.hkProgram4);
@@ -768,7 +768,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private ifft2(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     const phases = Math.log2(this._params.resolution);
@@ -914,7 +914,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private ifft2TwoPass(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     const phases = Math.log2(this._params.resolution);
@@ -1040,7 +1040,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private postIfft2(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.postfft2Program);
@@ -1073,7 +1073,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   private postIfft2TwoPass(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setFramebuffer(instanceData.postIfft2Framebuffer4);

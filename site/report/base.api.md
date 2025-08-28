@@ -221,6 +221,11 @@ export function floatToHalf(val: number): number;
 // @public
 export function flushPendingDisposals(): void;
 
+// Warning: (ae-forgotten-export) The symbol "SprintfArg" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function formatString(format: string, ...args: SprintfArg[]): string;
+
 // @public
 export class Frustum {
     constructor(transform: Matrix4x4);
@@ -498,7 +503,6 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
         _internalRemoveEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context: unknown): void;
         _invokeLocalListeners<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X), ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K]): void;
     };
-    isPrototypeOf: ((v: object) => boolean) | ((v: Object) => boolean);
 } & C;
 
 // @public
@@ -1448,7 +1452,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:310:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:312:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

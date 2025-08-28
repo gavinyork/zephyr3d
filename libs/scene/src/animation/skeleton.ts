@@ -4,7 +4,7 @@ import type { SceneNode } from '../scene/scene_node';
 import type { Mesh } from '../scene';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { AssetSubMeshData } from '../asset';
-import { Application } from '../app/app';
+import { getDevice } from '../app/api';
 
 interface SkinnedBoundingBox {
   /**
@@ -272,7 +272,7 @@ export class Skeleton extends Disposable {
    */
   private _createJointTexture() {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
-    const device = Application.instance.device;
+    const device = getDevice();
     this._jointTexture = device.createTexture2D('rgba32f', textureWidth, textureWidth, {
       samplerOptions: {
         magFilter: 'nearest',

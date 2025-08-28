@@ -12,7 +12,8 @@ import {
   SphereShape,
   AssetManager,
   BoxShape,
-  TorusShape
+  TorusShape,
+  getInput
 } from '@zephyr3d/scene';
 import { WoodMaterial } from './materials/wood';
 import { FurMaterial } from './materials/fur';
@@ -176,7 +177,7 @@ myApp.ready().then(async function () {
 
   //const inspector = new common.Inspector(scene, compositor, camera);
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // UI
   //const ui = new UI(camera, meshes);

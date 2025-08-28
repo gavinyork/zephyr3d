@@ -11,8 +11,8 @@ import { Primitive } from '../render';
 import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
-import { Application } from '../app/app';
 import type { NodeClonable, NodeCloneMethod } from '.';
+import { getDevice } from '../app/api';
 
 const tmpVec3 = new Vector3();
 
@@ -583,7 +583,7 @@ export class ParticleSystem
     }
   }
   update() {
-    const tick = Application.instance.device.frameInfo.elapsedOverall;
+    const tick = getDevice().frameInfo.elapsedOverall;
     if (this._startTick === 0) {
       this._startTick = tick;
     }

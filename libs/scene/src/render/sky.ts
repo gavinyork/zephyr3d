@@ -1,4 +1,3 @@
-import { Application } from '../app/app';
 import { linearToGamma } from '../shaders/misc';
 import type { AtmosphereParams } from '../shaders';
 import {
@@ -41,6 +40,7 @@ import { CubemapSHProjector } from '../utility/shprojector';
 import { Fog, uniformSphereSamples } from '../values';
 import type { HeightFogParams } from '../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../shaders/fog';
+import { getDevice } from '../app/api';
 
 /**
  * Type of sky
@@ -379,7 +379,7 @@ export class SkyRenderer extends Disposable {
    */
   get radianceMap(): TextureCube {
     if (!this._radianceMap.get()) {
-      this._radianceMap.set(Application.instance.device.createCubeTexture('rgba16f', this._radianceMapWidth));
+      this._radianceMap.set(getDevice().createCubeTexture('rgba16f', this._radianceMapWidth));
       this._radianceMap.get().name = 'SkyRadianceMap';
     }
     return this._radianceMap.get();
@@ -395,7 +395,7 @@ export class SkyRenderer extends Disposable {
   /** @internal */
   get radianceFramebuffer() {
     if (!this._radianceFrameBuffer.get()) {
-      this._radianceFrameBuffer.set(Application.instance.device.createFrameBuffer([this.radianceMap], null));
+      this._radianceFrameBuffer.set(getDevice().createFrameBuffer([this.radianceMap], null));
     }
     return this._radianceFrameBuffer.get();
   }
@@ -405,7 +405,7 @@ export class SkyRenderer extends Disposable {
   get irradianceMap(): TextureCube {
     if (!this._irradianceMap.get()) {
       this._irradianceMap.set(
-        Application.instance.device.createCubeTexture('rgba16f', this._irradianceMapWidth, {
+        getDevice().createCubeTexture('rgba16f', this._irradianceMapWidth, {
           samplerOptions: { mipFilter: 'none' }
         })
       );
@@ -418,7 +418,7 @@ export class SkyRenderer extends Disposable {
    */
   get irradianceSH(): GPUDataBuffer {
     if (!this._irradianceSH.get()) {
-      const buffer = Application.instance.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
+      const buffer = getDevice().createBuffer(4 * 4 * 9, { usage: 'uniform' });
       this._irradianceSH.set(buffer);
     }
     return this._irradianceSH.get();
@@ -428,7 +428,7 @@ export class SkyRenderer extends Disposable {
    */
   get irradianceSHFB(): FrameBuffer {
     if (!this._irradianceSHFB.get()) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const texture = device.createTexture2D(
         device.getDeviceCaps().framebufferCaps.supportFloatBlending ? 'rgba32f' : 'rgba16f',
         3,
@@ -444,9 +444,7 @@ export class SkyRenderer extends Disposable {
   /** @internal */
   get irradianceFramebuffer() {
     if (!this._irradianceFrameBuffer.get()) {
-      this._irradianceFrameBuffer.set(
-        Application.instance.device.createFrameBuffer([this.irradianceMap], null)
-      );
+      this._irradianceFrameBuffer.set(getDevice().createFrameBuffer([this.irradianceMap], null));
     }
     return this._irradianceFrameBuffer.get();
   }
@@ -626,7 +624,7 @@ export class SkyRenderer extends Disposable {
     if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._bakedSkyboxTexture.set(this.skyboxTexture);
     } else {
-      const device = Application.instance.device;
+      const device = getDevice();
       const texCaps = device.getDeviceCaps().textureCaps;
       const format: TextureFormat =
         texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
@@ -757,7 +755,7 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal */
   private _renderSky(camera: Camera, depthTest: boolean) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
@@ -771,7 +769,7 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal */
   private _drawSkyColor(camera: Camera, depthTest: boolean) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const bindgroup = this._bindgroupSky.color.get();
     const p = new Vector3();
     const s = new Vector3();
@@ -792,7 +790,7 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal */
   private _drawSkybox(camera: Camera, depthTest: boolean) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const bindgroup = this._bindgroupSky.skybox.get();
     bindgroup.setTexture('skyCubeMap', this.skyboxTexture, fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue(
@@ -887,7 +885,7 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal */
   private _drawScattering(camera: Camera, depthTest: boolean) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
     //const apLut = ScatteringLut.getAerialPerspectiveLut(alpha, 8000);

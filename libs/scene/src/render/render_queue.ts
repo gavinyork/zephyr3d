@@ -1,4 +1,3 @@
-import { Application } from '../app/app';
 import type { Vector4 } from '@zephyr3d/base';
 import { Disposable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
@@ -11,6 +10,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { Material } from '../material';
 import { ShaderHelper } from '../material';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export type CachedBindGroup = {
@@ -46,7 +46,7 @@ export class InstanceBindGroupAllocator {
       }
     }
     if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
-      const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+      const buildInfo = new ProgramBuilder(getDevice()).buildRender({
         vertex(pb) {
           this[ShaderHelper.getInstanceDataUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
           pb.main(function () {});
@@ -58,9 +58,7 @@ export class InstanceBindGroupAllocator {
       InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
     }
     const bindGroup = {
-      bindGroup: Application.instance.device.createBindGroup(
-        InstanceBindGroupAllocator._instanceBindGroupLayout
-      ),
+      bindGroup: getDevice().createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
       buffer: new Float32Array(maxBufferSizeInFloats),
       offset: 0,
       dirty: true
@@ -260,7 +258,7 @@ export class RenderQueue extends Disposable {
    * @internal
    */
   getMaxBatchSize() {
-    return Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize / 64;
+    return getDevice().getDeviceCaps().shaderCaps.maxUniformBufferSize / 64;
   }
   /**
    * Push a punctual light
@@ -443,7 +441,7 @@ export class RenderQueue extends Disposable {
   }
   /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
-    const frameCounter = Application.instance.device.frameInfo.frameCounter;
+    const frameCounter = getDevice().frameInfo.frameCounter;
     const itemList = this._itemList;
     if (!this.itemList) {
       return this;

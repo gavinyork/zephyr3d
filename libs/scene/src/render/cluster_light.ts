@@ -1,5 +1,4 @@
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import { Application } from '../app/app';
 import { MAX_CLUSTERED_LIGHTS } from '../values';
 import type {
   AbstractDevice,
@@ -15,6 +14,7 @@ import type {
 import type { Camera } from '../camera/camera';
 import type { RenderQueue } from './render_queue';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 export class ClusteredLight {
   private readonly _tileCountX: number;
@@ -337,7 +337,7 @@ export class ClusteredLight {
   }
   calculateLightIndex(camera: Camera, renderQueue: RenderQueue) {
     const numLights = this.getVisibleLights(renderQueue, this._lights);
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
     }

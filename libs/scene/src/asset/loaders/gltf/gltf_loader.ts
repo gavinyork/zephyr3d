@@ -35,7 +35,6 @@ import type {
 } from '@zephyr3d/device';
 import type { AssetManager } from '../../assetmanager';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
-import { Application } from '../../../app/app';
 import { PBRMetallicRoughnessMaterial } from '../../../material/pbrmr';
 import { PBRSpecularGlossinessMaterial } from '../../../material/pbrsg';
 import { DracoMeshDecoder } from '../../../utility/draco/decoder';
@@ -49,6 +48,7 @@ import {
   MORPH_TARGET_TEX2,
   MORPH_TARGET_TEX3
 } from '../../../values';
+import { getDevice } from '../../../app/api';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
@@ -85,7 +85,6 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
-    gltf._device = Application.instance.device;
     gltf._vfs = assetManager.vfs;
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
@@ -113,7 +112,6 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     if (gltf) {
       gltf._manager = assetManager;
-      gltf._device = Application.instance.device;
       gltf._vfs = vfs;
       gltf._loadedBuffers = buffers;
       return this.loadJson(url, gltf, decoderModule);
@@ -551,7 +549,7 @@ export class GLTFLoader extends AbstractModelLoader {
             );
           }
           if (p.targets) {
-            if (Application.instance.device.type === 'webgl') {
+            if (getDevice().type === 'webgl') {
               // Emulate vertexID for WebGL1 device
               if (attributes['TEXCOORD_7'] !== undefined) {
                 console.error(`Could not load morph target animation`);
@@ -1204,7 +1202,7 @@ export class GLTFLoader extends AbstractModelLoader {
         }
       }
       if (mt.texture) {
-        mt.sampler = Application.instance.device.createSampler({
+        mt.sampler = getDevice().createSampler({
           addressU: wrapS,
           addressV: wrapT,
           magFilter: magFilter,
@@ -1382,7 +1380,7 @@ export class GLTFLoader extends AbstractModelLoader {
     semantic: VertexSemantic,
     subMeshData: AssetSubMeshData
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const accessor = gltf._accessors[accessorIndex];
     const componentCount = accessor.getComponentCount(accessor.type);
     const normalized = !!accessor.normalized;
@@ -1415,12 +1413,12 @@ export class GLTFLoader extends AbstractModelLoader {
         }
       }
       if (!semantic) {
-        buffer = gltf._device.createIndexBuffer(data as Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, {
+        buffer = getDevice().createIndexBuffer(data as Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, {
           managed: true
         });
       } else {
         const attribFormat = device.getVertexAttribFormat(semantic, 'f32', componentCount);
-        buffer = gltf._device.createVertexBuffer(attribFormat, data);
+        buffer = getDevice().createVertexBuffer(attribFormat, data);
       }
       gltf._bufferCache[hash] = buffer;
     }

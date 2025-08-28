@@ -1,5 +1,4 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import { Application } from '../../app';
 import type { Vector4 } from '@zephyr3d/base';
 import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
@@ -7,6 +6,7 @@ import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import type { Camera } from '../../camera';
+import { getDevice } from '../../app/api';
 
 const MAX_INSTANCES_PER_NODE = 2048;
 
@@ -71,7 +71,7 @@ export class GrassInstances extends Disposable {
     }
   }
   updateBuffers() {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (this._instances.length === 0) {
       this._instanceBuffer.set(null);
       return;
@@ -237,7 +237,7 @@ export class GrassLayer extends Disposable {
   private static _getIndexBuffer() {
     if (!this._indexBuffer.get()) {
       this._indexBuffer.set(
-        Application.instance.device.createIndexBuffer(
+        getDevice().createIndexBuffer(
           new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11])
         )
       );
@@ -246,7 +246,7 @@ export class GrassLayer extends Disposable {
   }
   /** @internal */
   private createBaseVertexBuffer(bladeWidth: number, bladeHeight: number) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const r = bladeWidth * 0.5;
     const t = bladeHeight;
     const c = r * Math.cos(Math.PI / 3);

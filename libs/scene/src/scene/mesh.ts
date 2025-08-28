@@ -4,7 +4,6 @@ import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
-import { Application } from '../app/app';
 import type { GPUDataBuffer, RenderBundle, Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
@@ -12,6 +11,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
+import { getDevice } from '../app/api';
 
 /**
  * Mesh node
@@ -70,7 +70,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._instanceHash = null;
     this._pickTarget = { node: this };
     this._boundingBoxNode = null;
-    this._batchable = Application.instance.deviceType !== 'webgl';
+    this._batchable = getDevice().type !== 'webgl';
     this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();

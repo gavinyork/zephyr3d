@@ -7,7 +7,8 @@ import {
   OrbitCameraController,
   PerspectiveCamera,
   SphereShape,
-  DirectionalLight
+  DirectionalLight,
+  getInput
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -44,7 +45,7 @@ myApp.ready().then(function () {
   camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
   // Handle camera input events
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // frame animation
   myApp.on('tick', function () {

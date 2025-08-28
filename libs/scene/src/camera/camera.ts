@@ -2,7 +2,6 @@ import type { CubeFace } from '@zephyr3d/base';
 import { DRef, Plane, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
 import { SceneNode } from '../scene/scene_node';
-import { Application } from '../app';
 import type { Drawable, PickTarget } from '../render/drawable';
 import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
@@ -16,6 +15,7 @@ import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
 import { SAO } from '../posteffect/sao';
 import { MotionBlur } from '../posteffect/motionblur';
+import { getDevice } from '../app/api';
 
 /**
  * Result of a camera picking operation.
@@ -752,8 +752,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * @returns The ray originating from the camera position and passing through the given screen coordinates.
    */
   constructRay(x: number, y: number): Ray {
-    const width = this.viewport ? this.viewport[2] : Application.instance.device.getViewport().width;
-    const height = this.viewport ? this.viewport[3] : Application.instance.device.getViewport().height;
+    const width = this.viewport ? this.viewport[2] : getDevice().getViewport().width;
+    const height = this.viewport ? this.viewport[3] : getDevice().getViewport().height;
     const ndcX = (2 * x) / width - 1;
     const ndcY = 1 - (2 * y) / height;
     const nearClip = new Vector4(ndcX, ndcY, 0, 1);
@@ -973,10 +973,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     const data = Camera._historyData.get(this);
     if (data) {
       if (data.prevColorTex) {
-        Application.instance.device.pool.releaseTexture(data.prevColorTex);
+        getDevice().pool.releaseTexture(data.prevColorTex);
       }
       if (data.prevMotionVectorTex) {
-        Application.instance.device.pool.releaseTexture(data.prevMotionVectorTex);
+        getDevice().pool.releaseTexture(data.prevMotionVectorTex);
       }
       Camera._historyData.delete(this);
     }
@@ -1049,7 +1049,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
    * @param compositor - Compositor instance that will be used to apply postprocess effects
    */
   render(scene: Scene) {
-    const device = Application.instance.device;
+    const device = getDevice();
     //this.updatePostProcessing(device);
     const useMotionVector = (this.TAA || this.motionBlur) && device.type !== 'webgl';
     const useTAA = useMotionVector && this.TAA;

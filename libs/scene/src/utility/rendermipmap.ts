@@ -7,10 +7,10 @@ import type {
   PBShaderExp,
   Texture2D
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { fetchSampler } from './misc';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { DRef } from '@zephyr3d/base';
+import { getDevice } from '../app/api';
 
 export abstract class RenderMipmap {
   private readonly _program: DRef<GPUProgram>;
@@ -34,7 +34,7 @@ export abstract class RenderMipmap {
     this._dstSize = new Float32Array(2);
   }
   render(srcTex: Texture2D) {
-    const device = Application.instance.device;
+    const device = getDevice();
     this.prepare(device);
     device.pushDeviceStates();
     if (device.type === 'webgpu') {

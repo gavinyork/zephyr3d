@@ -2,8 +2,8 @@ import { Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import {
-  Application,
   DirectionalLight,
+  getDevice,
   LambertMaterial,
   Mesh,
   PerspectiveCamera,
@@ -29,7 +29,7 @@ export class RotationEditor {
   static reset(rotation: Quaternion, canvasSize: ImGui.ImVec2) {
     this._rotation.set(rotation);
     this._canvasSize = new ImGui.ImVec2(canvasSize.x, canvasSize.y);
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._fb || this._fb.getWidth() !== canvasSize.x || this._fb.getHeight() !== canvasSize.y) {
       if (this._fb) {
         this._fb.getColorAttachments()[0].dispose();
@@ -72,7 +72,7 @@ export class RotationEditor {
     }
     const cursorPos = ImGui.GetCursorScreenPos();
     if (this._dirty) {
-      const device = Application.instance.device;
+      const device = getDevice();
       device.pushDeviceStates();
       device.setFramebuffer(this._fb);
       this._camera.render(this._scene);

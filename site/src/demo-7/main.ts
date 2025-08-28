@@ -13,7 +13,8 @@ import {
   BoxShape,
   Mesh,
   ABufferOIT,
-  WeightedBlendedOIT
+  WeightedBlendedOIT,
+  getInput
 } from '@zephyr3d/scene';
 import { Panel } from './ui';
 
@@ -55,7 +56,7 @@ app.ready().then(async () => {
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
 
-  app.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const batchGroup = new BatchGroup(scene);
   const boxShape = new BoxShape();

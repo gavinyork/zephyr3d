@@ -1,8 +1,8 @@
 import { AbstractTextureLoader } from '../loader';
 import type { TypedArray } from '@zephyr3d/base';
 import { floatToHalf, packFloat3 } from '@zephyr3d/base';
-import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
+import { getDevice } from '../../../app/api';
 
 const _f16one = floatToHalf(1);
 /**
@@ -22,7 +22,7 @@ export class HDRLoader extends AbstractTextureLoader {
   ): Promise<BaseTexture> {
     let format: TextureFormat;
     for (const fmt of ['rg11b10uf', 'rgba16f', 'rgba32f', 'rgba8unorm'] as const) {
-      const info = Application.instance.device.getDeviceCaps().textureCaps.getTextureFormatInfo(fmt);
+      const info = getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(fmt);
       if (info && info.filterable && info.renderable) {
         format = fmt;
         break;
@@ -35,12 +35,7 @@ export class HDRLoader extends AbstractTextureLoader {
       texture: texture,
       samplerOptions
     };
-    const tex = Application.instance.device.createTexture2D(
-      format,
-      textureData.width,
-      textureData.height,
-      options
-    );
+    const tex = getDevice().createTexture2D(format, textureData.width, textureData.height, options);
     tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);
     return tex;
   }

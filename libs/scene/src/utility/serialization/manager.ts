@@ -47,7 +47,6 @@ import {
   getJSONStringClass,
   getJSONArrayClass
 } from './json';
-import { Application } from '../../app';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,

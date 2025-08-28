@@ -14,9 +14,9 @@ import type {
   PBInsideFunctionScope,
   PBShaderExp
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { Primitive } from '../render/primitive';
 import { linearToGamma } from '../shaders/misc';
+import { getDevice } from '../app/api';
 
 // TODO: multi-pass support for filter
 
@@ -146,7 +146,7 @@ export abstract class Blitter {
       switch (type) {
         case '2d':
         case 'cube':
-          return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
+          return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
             ? pb.textureSampleLevel(srcTex, uv, 0)
             : pb.textureSample(srcTex, uv);
         case '2d-array':
@@ -218,7 +218,7 @@ export abstract class Blitter {
   protected abstract calcHash(): string;
   /** @internal */
   protected blit2D(source: Texture2D, dest: FrameBuffer, sampler?: TextureSampler): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
@@ -258,7 +258,7 @@ export abstract class Blitter {
     layer: number,
     sampler?: TextureSampler
   ): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
@@ -288,7 +288,7 @@ export abstract class Blitter {
     face: CubeFace,
     sampler?: TextureSampler
   ): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
       ? sampler.magFilter === 'linear' || sampler.minFilter === 'linear' || sampler.mipFilter === 'linear'
@@ -400,7 +400,7 @@ export abstract class Blitter {
     layer?: number | TextureSampler,
     sampler?: TextureSampler
   ): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     device.pushDeviceStates();
     if (!dest) {
       if (source.isTexture2D()) {
@@ -484,7 +484,7 @@ function getBlitPrimitive2D(): Primitive {
 
 function getBlitRenderStateSet(): RenderStateSet {
   if (!blitRenderStates) {
-    blitRenderStates = Application.instance.device.createRenderStateSet();
+    blitRenderStates = getDevice().createRenderStateSet();
     blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
     blitRenderStates.useRasterizerState().setCullMode('none');
   }
@@ -516,7 +516,7 @@ function createBlitProgram(
   flip: boolean,
   scaleBias: boolean
 ): BlitProgramInfo {
-  const program = Application.instance.device.buildRenderProgram({
+  const program = getDevice().buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
       this.$outputs.uv = pb.vec2();
@@ -530,7 +530,7 @@ function createBlitProgram(
           type === 'cube'
             ? pb.mul(pb.vec2(1, -1), this.$inputs.pos.xy)
             : pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-        if (Application.instance.device.type === 'webgpu') {
+        if (getDevice().type === 'webgpu') {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
         }
         if (scaleBias) {
@@ -639,7 +639,7 @@ function createBlitProgram(
   return program
     ? {
         program,
-        bindGroup: Application.instance.device.createBindGroup(program.bindGroupLayouts[0])
+        bindGroup: getDevice().createBindGroup(program.bindGroupLayouts[0])
       }
     : null;
 }

@@ -8,8 +8,8 @@ import type {
 import type { PropertyAccessor } from '../types';
 import type { Material } from '../../../material';
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
-import { Application } from '../../../app';
 import type { SerializationManager } from '../manager';
+import { getDevice } from '../../../app/api';
 
 export function getTextureProps<T extends Material>(
   manager: SerializationManager,
@@ -130,7 +130,7 @@ export function getTextureProps<T extends Material>(
         const sampler =
           (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
           (this[name] as BaseTexture).getDefaultSampler(false);
-        this[name.slice(0, name.length - 7) + 'TextureSampler'] = Application.instance.device.createSampler({
+        this[name.slice(0, name.length - 7) + 'TextureSampler'] = getDevice().createSampler({
           addressU: value.str[0] as TextureAddressMode,
           addressV: sampler.addressModeV,
           lodMax: sampler.lodMax,
@@ -173,7 +173,7 @@ export function getTextureProps<T extends Material>(
         const sampler =
           (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
           (this[name] as BaseTexture).getDefaultSampler(false);
-        this[name.slice(0, name.length - 7) + 'TextureSampler'] = Application.instance.device.createSampler({
+        this[name.slice(0, name.length - 7) + 'TextureSampler'] = getDevice().createSampler({
           addressU: sampler.addressModeU,
           addressV: value.str[0] as TextureAddressMode,
           lodMax: sampler.lodMax,

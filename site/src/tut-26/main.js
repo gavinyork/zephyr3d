@@ -5,7 +5,8 @@ import {
   Application,
   PerspectiveCamera,
   AssetManager,
-  AnimationTrack
+  AnimationTrack,
+  getInput
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -77,7 +78,7 @@ myApp.ready().then(async () => {
   camera.lookAt(new Vector3(0, 3, 8), Vector3.zero(), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', () => {
     camera.updateController();

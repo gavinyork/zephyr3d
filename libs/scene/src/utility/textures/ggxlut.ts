@@ -1,5 +1,5 @@
 import type { Texture2D } from '@zephyr3d/device';
-import { Application } from '../../app';
+import { getDevice } from '../../app/api';
 
 const ggxLut: Map<number, Texture2D> = new Map();
 export function getGGXLUT(size: number): Texture2D {
@@ -11,7 +11,7 @@ export function getGGXLUT(size: number): Texture2D {
   return lut;
 }
 function createGGXLUT(size: number) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');

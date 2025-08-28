@@ -3,10 +3,10 @@ import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { computeShadowMapDepth, computeReceiverPlaneDepthBias, filterShadowPCF } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export class PCFOPT extends ShadowImpl {
@@ -60,7 +60,7 @@ export class PCFOPT extends ShadowImpl {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
+    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
@@ -198,7 +198,7 @@ export class PCFOPT extends ShadowImpl {
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
   useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
-    return Application.instance.device.type !== 'webgl';
+    return getDevice().type !== 'webgl';
   }
   /** @internal */
   sampleShadowMap(

@@ -1,5 +1,5 @@
 import type { PerspectiveCamera } from '@zephyr3d/scene';
-import { Application, FPSCameraController, SerializationManager } from '@zephyr3d/scene';
+import { Application, FPSCameraController, getInput, SerializationManager } from '@zephyr3d/scene';
 import * as common from '../common';
 import { HttpFS } from '@zephyr3d/base';
 
@@ -13,7 +13,7 @@ myApp.ready().then(async function () {
   const manager = new SerializationManager(vfs);
   const scene = await manager.loadScene('/scenes/test.scn');
   scene.mainCamera.controller = new FPSCameraController();
-  myApp.inputManager.use(scene.mainCamera.handleEvent.bind(scene.mainCamera));
+  getInput().use(scene.mainCamera.handleEvent.bind(scene.mainCamera));
   myApp.on('tick', function () {
     scene.mainCamera.updateController();
     (scene.mainCamera as PerspectiveCamera).aspect =

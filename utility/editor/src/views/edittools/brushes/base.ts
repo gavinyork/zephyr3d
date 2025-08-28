@@ -11,7 +11,7 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { Application, Primitive } from '@zephyr3d/scene';
+import { getDevice, Primitive } from '@zephyr3d/scene';
 
 export abstract class BaseTerrainBrush {
   private static _brushPrimitive: Primitive = null;
@@ -34,7 +34,7 @@ export abstract class BaseTerrainBrush {
     angle: number,
     strength: number
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     this.prepareBrush(device);
 
     const program = this._brushProgram.get();

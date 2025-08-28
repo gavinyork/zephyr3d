@@ -1,5 +1,5 @@
+import { getDevice } from '@zephyr3d/scene';
 import { GUI } from 'lil-gui';
-import { Application } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -13,9 +13,7 @@ export class Panel {
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._params = {
       deviceType:
-        this._deviceList[
-          this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
-        ]
+        this._deviceList[this._deviceList.findIndex((val) => val.toLowerCase() === getDevice().type)]
     };
     this._gui = new GUI({ container: document.body });
     this.create();

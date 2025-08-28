@@ -11,7 +11,8 @@ import {
   BatchGroup,
   LambertMaterial,
   BoxShape,
-  Mesh
+  Mesh,
+  getInput
 } from '@zephyr3d/scene';
 import { Panel } from './ui';
 
@@ -52,7 +53,7 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 100);
   camera.controller = new OrbitCameraController();
-  app.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const numMaterials = 8;
   const batchGroup = new BatchGroup(scene);

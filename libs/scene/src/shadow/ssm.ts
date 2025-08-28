@@ -2,11 +2,11 @@ import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { computeShadowMapDepth } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export class SSM extends ShadowImpl {
@@ -47,7 +47,7 @@ export class SSM extends ShadowImpl {
     if (this.useNativeShadowMap(shadowMapParams)) {
       return null;
     } else {
-      const device = Application.instance.device;
+      const device = getDevice();
       if (device.type === 'webgl') {
         return device.getDeviceCaps().textureCaps.supportFloatColorBuffer
           ? 'rgba32f'
@@ -60,7 +60,7 @@ export class SSM extends ShadowImpl {
     }
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return Application.instance.device.type === 'webgl' ? 'd24s8' : 'd32f';
+    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
@@ -268,6 +268,6 @@ export class SSM extends ShadowImpl {
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
   useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
-    return Application.instance.device.type !== 'webgl';
+    return getDevice().type !== 'webgl';
   }
 }

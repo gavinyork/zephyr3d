@@ -14,7 +14,6 @@ import { mixinDrawable } from '../../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget, Primitive, PrimitiveInstanceInfo } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
-import { Application } from '../../app';
 import type { MeshMaterial } from '../../material';
 import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -29,6 +28,7 @@ import { fetchSampler } from '../../utility/misc';
 import { RenderMipmap } from '../../utility/rendermipmap';
 import { GrassRenderer } from './grass';
 import type { Camera } from '../../camera';
+import { getDevice } from '../../app/api';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -407,13 +407,13 @@ export class ClipmapTerrain
    */
   updateBoundingBox() {
     const heightMap = this.heightMap;
-    const device = Application.instance.device;
+    const device = getDevice();
     let tmp = this._tmpTexture.get();
     if (tmp && (tmp.width !== heightMap.width || tmp.height !== heightMap.height)) {
       this._tmpTexture.dispose();
     }
     if (!this._tmpTexture.get()) {
-      tmp = Application.instance.device.createTexture2D(
+      tmp = getDevice().createTexture2D(
         device.type === 'webgl' ? 'rgba32f' : 'rg32f',
         heightMap.width,
         heightMap.height
@@ -439,11 +439,7 @@ export class ClipmapTerrain
   }
   /** @internal */
   createHeightMapTexture(width: number, height: number) {
-    return Application.instance.device.createTexture2D(
-      Application.instance.device.type === 'webgl' ? 'rgba16f' : 'r16f',
-      width,
-      height
-    );
+    return getDevice().createTexture2D(getDevice().type === 'webgl' ? 'rgba16f' : 'r16f', width, height);
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean): void {
@@ -535,7 +531,7 @@ export class ClipmapTerrain
   /** @internal */
   private resizeHeightMap(sizeX: number, sizeZ: number) {
     const oldHeightMap = this.material.heightMap;
-    const device = Application.instance.device;
+    const device = getDevice();
     const maxTextureSize = device.getDeviceCaps().textureCaps.maxTextureSize;
     sizeX = Math.min(Math.max(sizeX, 1), maxTextureSize) >> 0;
     sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
@@ -550,7 +546,7 @@ export class ClipmapTerrain
   }
   /*
   private calcNormalHeightMap(): Texture2D {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!ClipmapTerrain._normalHeightMapProgram) {
       ClipmapTerrain._normalHeightMapProgram = device.buildRenderProgram({
         vertex(pb) {

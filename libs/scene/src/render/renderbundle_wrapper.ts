@@ -1,9 +1,9 @@
 import type { RenderBundle } from '@zephyr3d/device';
-import { Application } from '../app';
 import type { Material } from '../material';
 import type { Drawable } from './drawable';
 import type { Primitive } from './primitive';
 import { Disposable } from '@zephyr3d/base';
+import { getDevice } from '../app/api';
 
 export class RenderBundleWrapper extends Disposable {
   private _renderBundles: Record<string, RenderBundle>;
@@ -144,10 +144,10 @@ export class RenderBundleWrapper extends Disposable {
     return this._renderBundles[hash] ?? null;
   }
   beginRenderBundle() {
-    Application.instance.device.beginCapture();
+    getDevice().beginCapture();
   }
   endRenderBundle(hash: string) {
-    this._renderBundles[hash] = Application.instance.device.endCapture();
+    this._renderBundles[hash] = getDevice().endCapture();
   }
   invalidate(hash: string) {
     this._renderBundles[hash] = undefined;

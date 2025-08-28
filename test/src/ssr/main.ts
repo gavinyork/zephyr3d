@@ -10,7 +10,8 @@ import {
   FPSCameraController,
   BoxShape,
   BlinnMaterial,
-  createGradientNoiseTexture
+  createGradientNoiseTexture,
+  getInput
 } from '@zephyr3d/scene';
 import * as common from '../common';
 import { Vector3, Vector4 } from '@zephyr3d/base';
@@ -66,7 +67,7 @@ ssrApp.ready().then(async () => {
     .setIntensity(15);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  ssrApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   ssrApp.on('resize', (width, height) => {
     camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());

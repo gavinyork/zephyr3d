@@ -9,7 +9,7 @@ import type {
   RenderStateSet
 } from '@zephyr3d/device';
 import type { AssetManager } from '@zephyr3d/scene';
-import { BoxShape, panoramaToCubemap, prefilterCubemap, Application, linearToGamma } from '@zephyr3d/scene';
+import { BoxShape, panoramaToCubemap, prefilterCubemap, linearToGamma, getDevice } from '@zephyr3d/scene';
 
 const panorama = './assets/images/cloudy.hdr';
 const texture = './assets/images/Di-3d.png';
@@ -34,14 +34,14 @@ export abstract class TextureTestCase {
     this.texture = await this.createTexture();
     this.bindgroup = this.createBindGroup();
     this.box = new BoxShape({ size: 2 });
-    this.renderStates = Application.instance.device.createRenderStateSet();
+    this.renderStates = getDevice().createRenderStateSet();
     this.renderStates.useDepthState().enableTest(true);
   }
   draw(w: number, h: number) {
     this.updateBindGroup(Date.now(), w, h);
-    Application.instance.device.setProgram(this.program);
-    Application.instance.device.setRenderStates(this.renderStates);
-    Application.instance.device.setBindGroup(0, this.bindgroup);
+    getDevice().setProgram(this.program);
+    getDevice().setRenderStates(this.renderStates);
+    getDevice().setBindGroup(0, this.bindgroup);
     this.box.draw();
   }
   protected abstract createProgram(): GPUProgram;
@@ -61,7 +61,7 @@ export class TestTexture2D extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -87,7 +87,7 @@ export class TestTexture2D extends TextureTestCase {
     return (await this.assetManager.fetchTexture(texture)) as Texture2D;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -114,7 +114,7 @@ export class TestTextureVideo extends TextureTestCase {
     this.videoSrc = video;
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -144,10 +144,10 @@ export class TestTextureVideo extends TextureTestCase {
     document.body.append(this.el);
     await this.el.play();
 
-    return Application.instance.device.createTextureVideo(this.el);
+    return getDevice().createTextureVideo(this.el);
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -171,7 +171,7 @@ export class TestTexture2DArray extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d-array',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -273,12 +273,12 @@ export class TestTexture2DArray extends TextureTestCase {
       ...yellow,
       ...purple
     ]);
-    const tex = Application.instance.device.createTexture2DArray('rgba8unorm', 4, 4, 4);
+    const tex = getDevice().createTexture2DArray('rgba8unorm', 4, 4, 4);
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -302,7 +302,7 @@ export class TestTexture3D extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '3d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -400,14 +400,14 @@ export class TestTexture3D extends TextureTestCase {
       ...yellow,
       ...purple
     ]);
-    const tex = Application.instance.device.createTexture3D('rgba8unorm', 4, 4, 4, {
+    const tex = getDevice().createTexture3D('rgba8unorm', 4, 4, 4, {
       samplerOptions: { mipFilter: 'none' }
     });
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -435,7 +435,7 @@ export class TestTextureCube extends TextureTestCase {
     this.prefilteredTex = null;
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: 'cube',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -461,17 +461,17 @@ export class TestTextureCube extends TextureTestCase {
   }
   protected async createTexture(): Promise<BaseTexture> {
     const tex = await this.assetManager.fetchTexture<Texture2D>(panorama);
-    this.srcTex = Application.instance.device.createCubeTexture(tex.format, 128);
+    this.srcTex = getDevice().createCubeTexture(tex.format, 128);
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
-    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, {
+    this.prefilteredTex = getDevice().createCubeTexture('rgba16f', 128, {
       samplerOptions: { mipFilter: 'none' }
     });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefilteredTex, 300);
     return this.srcTex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }

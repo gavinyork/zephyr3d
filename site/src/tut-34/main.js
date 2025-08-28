@@ -5,7 +5,8 @@ import {
   Application,
   PerspectiveCamera,
   OrbitCameraController,
-  DirectionalLight
+  DirectionalLight,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -28,7 +29,7 @@ myApp.ready().then(async () => {
     500
   );
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // Create a directional light (which automatically sets the sunlight properties)
   const sunLight = new DirectionalLight(scene);

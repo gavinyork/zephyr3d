@@ -9,11 +9,11 @@ import type {
   ProgramBuilder,
   Texture2D
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { fetchSampler } from '../utility/misc';
 import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { uniformSphereSamples } from '../values';
+import { getDevice } from '../app/api';
 
 const TRANSMITTANCE_SAMPLES = 16;
 const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
@@ -1034,7 +1034,7 @@ export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgra
 
 /** @internal */
 export function renderTransmittanceLut(params: AtmosphereParams) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (transmittanceLutProgram === undefined) {
     try {
       transmittanceLutProgram = createTransmittanceLutProgram(device);
@@ -1098,7 +1098,7 @@ export function createMultiScatteringLutProgram(device: AbstractDevice) {
 
 /** @internal */
 export function renderMultiScatteringLut(params: AtmosphereParams) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (multiScatteringLutProgram === undefined) {
     try {
       multiScatteringLutProgram = createMultiScatteringLutProgram(device);
@@ -1178,7 +1178,7 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
 
 /** @internal */
 export function renderSkyViewLut(params: AtmosphereParams) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (skyViewLutProgram === undefined) {
     try {
       skyViewLutProgram = createSkyViewLutProgram(device);
@@ -1250,7 +1250,7 @@ export function createAPLutProgram(device: AbstractDevice) {
 
 /** @internal */
 export function renderAPLut(params: AtmosphereParams) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (APLutProgram === undefined) {
     try {
       APLutProgram = createAPLutProgram(device);

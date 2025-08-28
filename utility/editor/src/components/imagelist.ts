@@ -1,7 +1,7 @@
 import { DRef, Disposable, makeObservable } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
 
 type ImageInfo = {
@@ -36,7 +36,7 @@ export class ImageList extends makeObservable(Disposable)<{
     this._spacingY = 5;
     this._selectable = true;
     this._acceptDragDrop = true;
-    this._defaultImage = new DRef(Application.instance.device.createTexture2D('rgba8unorm', 1, 1));
+    this._defaultImage = new DRef(getDevice().createTexture2D('rgba8unorm', 1, 1));
     this._defaultImage.get().update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
     this._maxImageCount = -1;
     this._mimeTypes = mimeTypes?.slice() ?? [

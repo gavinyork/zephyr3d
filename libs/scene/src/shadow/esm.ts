@@ -4,10 +4,10 @@ import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowESM } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 type ESMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -154,7 +154,7 @@ export class ESM extends ShadowImpl {
     depthFormat: TextureFormat,
     mipmapping?: boolean
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const useTextureArray = numCascades > 1 && device.type !== 'webgl';
     const colorAttachments = colorFormat
       ? useTextureArray
@@ -255,7 +255,7 @@ export class ESM extends ShadowImpl {
     return '';
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? device.type === 'webgl'
         ? 'rgba16f'

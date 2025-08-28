@@ -9,8 +9,8 @@ import type {
   ProgramBuilder,
   TextureCube
 } from '@zephyr3d/device';
-import { Application } from '../app/app';
 import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 /**
  * Environment light type
@@ -144,10 +144,7 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (
-        Application.instance.device.type === 'webgl' ||
-        !Application.instance.device.getDeviceCaps().framebufferCaps.supportFloatBlending
-      ) {
+      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
         if (this.irradianceSHFB) {
           pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.tex2D().uniform(0);
           pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
@@ -169,10 +166,7 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (
-      Application.instance.device.type === 'webgl' ||
-      !Application.instance.device.getDeviceCaps().framebufferCaps.supportFloatBlending
-    ) {
+    if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
       if (this.irradianceSHFB) {
         bg.setTexture(
           EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH,
@@ -194,7 +188,7 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
+    return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
       ? pb.textureSampleLevel(
           scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
           refl,
@@ -237,10 +231,7 @@ export class EnvShIBL extends EnvironmentLighting {
     });
     pb.func('Z_sh_eval', [pb.vec3('v')], function () {
       this.$l.window = this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW];
-      if (
-        Application.instance.device.type === 'webgl' ||
-        !Application.instance.device.getDeviceCaps().framebufferCaps.supportFloatBlending
-      ) {
+      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
         this.$l.c = pb.mul(
           pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 0.5 / 3), 0)
             .rgb,
@@ -468,7 +459,7 @@ export class EnvIBL extends EnvironmentLighting {
    */
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
+    return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
       ? pb.textureSampleLevel(
           scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
           refl,

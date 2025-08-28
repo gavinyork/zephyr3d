@@ -10,7 +10,6 @@ import type {
   Texture2D,
   TextureFormat
 } from '@zephyr3d/device';
-import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
 import type { RenderQueue } from './render_queue';
@@ -26,6 +25,7 @@ import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
 import type { Primitive } from '.';
 import { BoxShape } from '../shapes';
+import { getDevice } from '../app/api';
 
 /**
  * Forward render scheme
@@ -83,7 +83,7 @@ export class SceneRenderer {
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
   static renderScene(scene: Scene, camera: Camera): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const colorFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? 'rgba16f'
       : 'rgba8unorm';

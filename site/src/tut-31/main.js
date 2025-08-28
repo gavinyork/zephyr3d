@@ -7,7 +7,8 @@ import {
   AssetManager,
   Application,
   PerspectiveCamera,
-  Terrain
+  Terrain,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -113,7 +114,7 @@ myApp.ready().then(async () => {
     500
   );
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // Directional light，4 Cascade levels
   const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);

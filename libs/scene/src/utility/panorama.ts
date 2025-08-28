@@ -7,8 +7,8 @@ import type {
   TextureCube,
   VertexLayout
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { gammaToLinear } from '../shaders/misc';
+import { getDevice } from '../app/api';
 
 let vertexLayout: VertexLayout = null;
 let renderStates: RenderStateSet = null;
@@ -26,7 +26,7 @@ const faceDirections = [
 ];
 
 function init() {
-  const device = Application.instance.device;
+  const device = getDevice();
   const vertices = new Float32Array([1, 1, -1, 1, -1, -1, 1, -1]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
   vertexLayout = device.createVertexLayout({
@@ -47,7 +47,7 @@ function init() {
 }
 
 function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
-  const device = Application.instance.device;
+  const device = getDevice();
   const pb = device;
   return pb.buildRenderProgram({
     vertex(pb) {
@@ -90,7 +90,7 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
 }
 
 function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCube) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const rgbm = srcTexture.format === 'rgba8unorm';
   const program = rgbm ? panoramaToCubemapProgramRGBM : panoramaToCubemapProgram;
   const bindgroup = rgbm ? panoramaToCubemapBindGroupRGBM : panoramaToCubemapBindGroup;
@@ -122,7 +122,7 @@ function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCu
  * @public
  */
 export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (!vertexLayout) {
     init();
   }

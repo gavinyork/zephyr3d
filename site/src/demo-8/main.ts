@@ -13,7 +13,8 @@ import {
   UnlitMaterial,
   AssetManager,
   PointLight,
-  SceneNode
+  SceneNode,
+  getInput
 } from '@zephyr3d/scene';
 
 function getQueryString(name: string) {
@@ -55,7 +56,7 @@ app.ready().then(async () => {
   );
   camera.position.setXYZ(200, 0, 12);
   camera.controller = new FPSCameraController();
-  app.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const batchGroup = new BatchGroup(scene);
 

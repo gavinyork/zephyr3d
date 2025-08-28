@@ -80,7 +80,7 @@ myApp.ready().then(function () {
   camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
   // Handle camera input events
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // frame animation
   myApp.on('tick', function () {

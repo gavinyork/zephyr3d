@@ -7,7 +7,8 @@ import {
   Mesh,
   Application,
   PerspectiveCamera,
-  BoxShape
+  BoxShape,
+  getInput
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -65,7 +66,7 @@ myApp.ready().then(async () => {
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 8, 0) });
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', () => {
     // light rotation

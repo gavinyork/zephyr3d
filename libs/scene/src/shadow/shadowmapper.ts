@@ -18,7 +18,6 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { Application } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
@@ -26,6 +25,7 @@ import type { ShadowImpl } from './shadow_impl';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 const tmpMatrix = new Matrix4x4();
 const tmpFrustum = new Frustum(Matrix4x4.identity());
@@ -284,9 +284,8 @@ export class ShadowMapper {
     return `${shadowMapParams.impl.constructor.name}_${shadowMapParams.impl.getShaderHash()}_${
       shadowMapParams.lightType
     }_${shadowMapParams.shadowMap.target}_${Number(shadowMapParams.numShadowCascades > 1)}_${Number(
-      Application.instance.device
-        .getDeviceCaps()
-        .textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
+      getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+        .filterable
     )}`;
   }
   /** Sample count for poisson disc PCF */
@@ -520,7 +519,7 @@ export class ShadowMapper {
     height: number,
     depth: number
   ): Texture2D | TextureCube | Texture2DArray {
-    const device = Application.instance.device;
+    const device = getDevice();
     const options: TextureCreationOptions = {
       samplerOptions: { mipFilter: 'none' }
     };
@@ -546,7 +545,7 @@ export class ShadowMapper {
     depthFormat: TextureFormat,
     mipmapping?: boolean
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const useTextureArray = numCascades > 1 && device.type !== 'webgl';
     const colorAttachments = colorFormat
       ? useTextureArray
@@ -582,7 +581,7 @@ export class ShadowMapper {
   }
   /** @internal */
   protected updateResources(shadowMapParams: ShadowMapParams) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const colorFormat = shadowMapParams.impl.getShadowMapColorFormat(shadowMapParams);
     const depthFormat = shadowMapParams.impl.getShadowMapDepthFormat(shadowMapParams);
     const numCascades = shadowMapParams.numShadowCascades;
@@ -888,7 +887,7 @@ export class ShadowMapper {
     renderPass.light = this._light;
     this.updateResources(shadowMapParams);
     shadowMapParams.shaderHash = this.getShaderHash(shadowMapParams);
-    const device = Application.instance.device;
+    const device = getDevice();
     const fb = shadowMapParams.shadowMapFramebuffer;
     shadowMapParams.depthClampEnabled = false;
     renderPass.clearColor = fb.getColorAttachments()[0]
@@ -941,8 +940,7 @@ export class ShadowMapper {
         const shadowMapCullCamera = ShadowMapper.fetchCameraForScene(scene);
         shadowMapCullCamera.clipMask = AABB.ClipLeft | AABB.ClipRight | AABB.ClipBottom | AABB.ClipTop;
         cascadeCamera.parent = camera;
-        shadowMapParams.depthClampEnabled =
-          Application.instance.device.getDeviceCaps().shaderCaps.supportFragmentDepth;
+        shadowMapParams.depthClampEnabled = getDevice().getDeviceCaps().shaderCaps.supportFragmentDepth;
         for (let split = 0; split < this._config.numCascades; split++) {
           cascadeCamera.setPerspective(
             camera.getFOV(),

@@ -7,7 +7,7 @@ import type {
   TextureCube,
   VertexLayout
 } from '@zephyr3d/device';
-import { Application } from '../app';
+import { getDevice } from '../app/api';
 
 // reference: https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
 
@@ -33,7 +33,7 @@ const faceDirections = [
 ];
 
 function init() {
-  const device = Application.instance.device;
+  const device = getDevice();
   const vertices = new Float32Array([1, 1, -1, 1, -1, -1, 1, -1]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
   vertexLayout = device.createVertexLayout({
@@ -50,7 +50,7 @@ function init() {
 }
 
 function getProgramInfo(type: DistributionType, numSamples: number) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const hash = `${type}:${numSamples}`;
   let ret = programs[hash];
   if (!ret) {
@@ -62,7 +62,7 @@ function getProgramInfo(type: DistributionType, numSamples: number) {
 }
 
 function createPMREMProgram(type: DistributionType, numSamples: number): GPUProgram {
-  const device = Application.instance.device;
+  const device = getDevice();
   const pb = device;
   return pb.buildRenderProgram({
     vertex(pb) {
@@ -299,7 +299,7 @@ function doPrefilterCubemap(
   filteringInfo: Vector2,
   numSamples: number
 ): void {
-  const device = Application.instance.device;
+  const device = getDevice();
   const framebuffer = dstFramebuffer;
   framebuffer.setColorAttachmentMipLevel(0, miplevel);
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
@@ -343,7 +343,7 @@ export function prefilterCubemap(
     console.error('prefilterCubemap(): source texture must be cube texture');
     return;
   }
-  const device = Application.instance.device;
+  const device = getDevice();
   if (!vertexLayout) {
     init();
   }

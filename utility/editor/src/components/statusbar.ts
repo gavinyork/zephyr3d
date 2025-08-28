@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { Application } from '@zephyr3d/scene';
 import { getFrameHeight } from '../views/misc';
+import { getDevice } from '@zephyr3d/scene';
 
 export class StatusBar {
   get height() {
@@ -8,11 +8,11 @@ export class StatusBar {
   }
   render() {
     if (ImGui.BeginStatusBar()) {
-      ImGui.Text(`Device: ${Application.instance.device.type}`);
-      ImGui.Text(`FPS: ${Application.instance.device.frameInfo.FPS.toFixed(2)}`);
-      ImGui.Text(`DrawCall: ${Application.instance.device.frameInfo.drawCalls}`);
-      ImGui.Text(`CPU time: ${Number(Application.instance.device.frameInfo.elapsedTimeCPU).toFixed(2)}`);
-      ImGui.Text(`GPU time: ${Number(Application.instance.device.frameInfo.elapsedTimeGPU).toFixed(2)}`);
+      ImGui.Text(`Device: ${getDevice().type}`);
+      ImGui.Text(`FPS: ${getDevice().frameInfo.FPS.toFixed(2)}`);
+      ImGui.Text(`DrawCall: ${getDevice().frameInfo.drawCalls}`);
+      ImGui.Text(`CPU time: ${Number(getDevice().frameInfo.elapsedTimeCPU).toFixed(2)}`);
+      ImGui.Text(`GPU time: ${Number(getDevice().frameInfo.elapsedTimeGPU).toFixed(2)}`);
       ImGui.EndStatusBar();
     }
   }

@@ -1,4 +1,4 @@
-import { Application, Scene } from '@zephyr3d/scene';
+import { Application, getDevice, Scene } from '@zephyr3d/scene';
 import { GLTFViewer } from './gltfviewer';
 import { backendWebGL2, backendWebGL1 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -35,8 +35,6 @@ const gltfApp = new Application({
 
 gltfApp.ready().then(async () => {
   console.log(gltfApp.device.getAdapterInfo());
-  //await imGuiInit(gltfApp.device);
-  //gltfApp.inputManager.use(imGuiInjectEvent);
   const scene = new Scene();
   const gltfViewer = new GLTFViewer(scene);
   await gltfViewer.ready();
@@ -48,7 +46,7 @@ gltfApp.ready().then(async () => {
       gltfViewer.handleDrop(ev.dataTransfer);
     }
   });
-  Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
+  getDevice().canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });

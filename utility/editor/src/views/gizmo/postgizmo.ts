@@ -7,8 +7,8 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
-import { BoxShape, Mesh, UnlitMaterial } from '@zephyr3d/scene';
-import { AbstractPostEffect, Application, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
+import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
+import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
 import type { Ray } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
@@ -510,7 +510,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _beginRotate(startX: number, startY: number, axis: number, hitPosition: Vector3) {
     this._endTranslation();
     this._endScale();
-    Application.instance.device.canvas.style.cursor = 'grab';
+    getDevice().canvas.style.cursor = 'grab';
     this._rotateInfo = {
       startX: startX,
       startY: startY,
@@ -567,7 +567,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._node.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
   }
   private _endRotate() {
-    Application.instance.device.canvas.style.cursor = 'default';
+    getDevice().canvas.style.cursor = 'default';
     if (this._rotateInfo) {
       this._rotateInfo = null;
       if (this._node) {
@@ -578,7 +578,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _beginScale(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endTranslation();
-    Application.instance.device.canvas.style.cursor = 'grab';
+    getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
       const ray = this._camera.constructRay(startX, startY);
@@ -642,7 +642,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
   }
   private _endScale() {
-    Application.instance.device.canvas.style.cursor = 'default';
+    getDevice().canvas.style.cursor = 'default';
     if (this._scaleInfo) {
       this._scaleInfo = null;
       if (this._node) {
@@ -653,7 +653,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endScale();
-    Application.instance.device.canvas.style.cursor = 'grab';
+    getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
       const ray = this._camera.constructRay(startX, startY);
@@ -712,7 +712,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
   }
   private _endTranslation() {
-    Application.instance.device.canvas.style.cursor = 'default';
+    getDevice().canvas.style.cursor = 'default';
     if (this._translatePlaneInfo) {
       this._translatePlaneInfo = null;
       if (this._node) {
@@ -724,12 +724,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const pos1 = new Vector4(0, 0, this._axisLength, 1);
     const pos2 = Matrix4x4.rotation(PostGizmoRenderer._axises[0], 1).transformAffine(pos1);
     const mvpMatrix = this._calcGizmoMVPMatrix(this._mode, false);
-    const width = this._camera.viewport
-      ? this._camera.viewport[2]
-      : Application.instance.device.getViewport().width;
-    const height = this._camera.viewport
-      ? this._camera.viewport[3]
-      : Application.instance.device.getViewport().height;
+    const width = this._camera.viewport ? this._camera.viewport[2] : getDevice().getViewport().width;
+    const height = this._camera.viewport ? this._camera.viewport[3] : getDevice().getViewport().height;
     mvpMatrix.transform(pos1, pos1);
     mvpMatrix.transform(pos2, pos2);
     let dx = pos2.x / pos2.w - pos1.x / pos1.w;
@@ -764,17 +760,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     return matrix;
   }
   private _createGizmoRenderStates() {
-    const rs = Application.instance.device.createRenderStateSet();
+    const rs = getDevice().createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(true).setDepthBias(0).setDepthBiasSlopeScale(0);
     return rs;
   }
   private _createGridRenderStates() {
-    const rs = Application.instance.device.createRenderStateSet();
+    const rs = getDevice().createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(false);
     return rs;
   }
   private _createBlendRenderStates() {
-    const rs = Application.instance.device.createRenderStateSet();
+    const rs = getDevice().createRenderStateSet();
     rs.useDepthState().enableTest(false).enableWrite(false);
     rs.useRasterizerState().setCullMode('none');
     rs.useBlendingState()
@@ -855,7 +851,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     info.distance = minDistance;
   }
   private _createGridProgram() {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         this.params = pb.vec4().uniform(0);
@@ -1122,7 +1118,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     });
   }
   private _createAxisProgram(selectMode: boolean) {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         if (selectMode) {
@@ -1232,7 +1228,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       });
       PostGizmoRenderer._gridProgram = this._createGridProgram();
       PostGizmoRenderer._gridRenderState = this._createGridRenderStates();
-      PostGizmoRenderer._gridBindGroup = Application.instance.device.createBindGroup(
+      PostGizmoRenderer._gridBindGroup = getDevice().createBindGroup(
         PostGizmoRenderer._gridProgram.bindGroupLayouts[0]
       );
     }
@@ -1243,7 +1239,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(false);
       PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates();
       PostGizmoRenderer._blendRenderState = this._createBlendRenderStates();
-      PostGizmoRenderer._bindGroup = Application.instance.device.createBindGroup(
+      PostGizmoRenderer._bindGroup = getDevice().createBindGroup(
         PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
       );
     }

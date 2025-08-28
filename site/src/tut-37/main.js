@@ -8,7 +8,8 @@ import {
   PBRMetallicRoughnessMaterial,
   BoxShape,
   Mesh,
-  FPSCameraController
+  FPSCameraController,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -30,7 +31,7 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // Create sunlight
   const sunLight = new DirectionalLight(scene);

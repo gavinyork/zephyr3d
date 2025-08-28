@@ -1,10 +1,10 @@
 import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { hasDepthChannel } from '@zephyr3d/device';
-import { Application } from '../app';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 import { interleavedGradientNoise } from './noise';
+import { getDevice } from '../app/api';
 
 /*
   const PCF_KERNEL_3x3 = [
@@ -245,7 +245,7 @@ function sampleShadowMapPCF(
       const uv = pb.add(this.coords, this.offset);
       if (nativeShadowMap) {
         this.$return(
-          cascade && Application.instance.device.type !== 'webgl'
+          cascade && getDevice().type !== 'webgl'
             ? pb.textureArraySampleCompareLevel(
                 ShaderHelper.getShadowMap(this),
                 uv,
@@ -256,7 +256,7 @@ function sampleShadowMapPCF(
         );
       } else {
         this.$l.shadowTex =
-          cascade && Application.instance.device.type !== 'webgl'
+          cascade && getDevice().type !== 'webgl'
             ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, 0)
             : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), uv, 0);
         if (shadowMapFormat === 'rgba8unorm') {
@@ -303,7 +303,7 @@ function sampleShadowMap(
       } else {
         if (nativeShadowMap) {
           this.$return(
-            cascade && Application.instance.device.type !== 'webgl'
+            cascade && getDevice().type !== 'webgl'
               ? pb.textureArraySampleCompareLevel(
                   ShaderHelper.getShadowMap(this),
                   this.coords,
@@ -314,7 +314,7 @@ function sampleShadowMap(
           );
         } else {
           this.$l.shadowTex =
-            cascade && Application.instance.device.type !== 'webgl'
+            cascade && getDevice().type !== 'webgl'
               ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, 0)
               : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
           if (shadowMapFormat === 'rgba8unorm') {
@@ -376,7 +376,7 @@ export function filterShadowVSM(
           )
         );
       } else {
-        if (Application.instance.device.type !== 'webgl' && cascade) {
+        if (getDevice().type !== 'webgl' && cascade) {
           this.$l.shadowTex = pb.textureArraySampleLevel(
             ShaderHelper.getShadowMap(this),
             this.texCoord.xy,
@@ -426,7 +426,7 @@ export function filterShadowESM(
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
       } else {
-        if (cascade && Application.instance.device.type !== 'webgl') {
+        if (cascade && getDevice().type !== 'webgl') {
           this.$l.shadowTex = pb.textureArraySampleLevel(
             ShaderHelper.getShadowMap(this),
             this.shadowVertex.xy,

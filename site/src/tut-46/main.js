@@ -8,7 +8,8 @@ import {
   Mesh,
   DirectionalLight,
   BoxShape,
-  LambertMaterial
+  LambertMaterial,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -37,7 +38,7 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', () => {
     camera.updateController();

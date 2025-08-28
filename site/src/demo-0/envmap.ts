@@ -2,8 +2,8 @@ import type { HttpFS } from '@zephyr3d/base';
 import type { GPUDataBuffer, Texture2D, TextureCube } from '@zephyr3d/device';
 import type { Scene } from '@zephyr3d/scene';
 import { DRef } from '@zephyr3d/base';
-import { CubemapSHProjector } from '@zephyr3d/scene';
-import { Application, AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
+import { CubemapSHProjector, getDevice } from '@zephyr3d/scene';
+import { AssetManager, panoramaToCubemap, prefilterCubemap } from '@zephyr3d/scene';
 
 type EnvMapInfo = {
   path: string;
@@ -51,7 +51,7 @@ export class EnvMaps {
     assetManager: AssetManager
   ): Promise<{ maps: DRef<TextureCube>[]; sh: DRef<GPUDataBuffer> }> {
     const maps = this.createMaps();
-    const sh = Application.instance.device.createBuffer(4 * 4 * 9, { usage: 'uniform' });
+    const sh = getDevice().createBuffer(4 * 4 * 9, { usage: 'uniform' });
     try {
       const panorama = await assetManager.fetchTexture<Texture2D>(path);
       panoramaToCubemap(panorama, maps[0]);
@@ -65,9 +65,9 @@ export class EnvMaps {
   }
   createMaps(): TextureCube[] {
     return [
-      Application.instance.device.createCubeTexture('rgba16f', 512),
-      Application.instance.device.createCubeTexture('rgba16f', 256),
-      Application.instance.device.createCubeTexture('rgba16f', 64, {
+      getDevice().createCubeTexture('rgba16f', 512),
+      getDevice().createCubeTexture('rgba16f', 256),
+      getDevice().createCubeTexture('rgba16f', 64, {
         samplerOptions: { mipFilter: 'none' }
       })
     ];

@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import type { Camera } from '@zephyr3d/scene';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 
 interface GUIParams {
   numInstances: number;
@@ -19,7 +19,7 @@ export class Panel {
     this._camera = camera;
     this._params = {
       numInstances: instanceCount,
-      deviceType: Application.instance.device.type,
+      deviceType: getDevice().type,
       commandBufferReuse: this._camera.commandBufferReuse,
       FPS: '',
       add() {
@@ -58,7 +58,7 @@ export class Panel {
     stats.add(this._params, 'remove').name('Remove 500 instances');
     stats.add(this._params, 'FPS').name('FPS').disable(true).listen();
     setInterval(() => {
-      this._params.FPS = Application.instance.device.frameInfo.FPS.toFixed(2);
+      this._params.FPS = getDevice().frameInfo.FPS.toFixed(2);
     }, 1000);
   }
 }

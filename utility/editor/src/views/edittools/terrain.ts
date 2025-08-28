@@ -1,12 +1,6 @@
 import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
-import {
-  Application,
-  AssetManager,
-  ClipmapTerrainMaterial,
-  CopyBlitter,
-  fetchSampler
-} from '@zephyr3d/scene';
+import { AssetManager, ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
 import {
   ASSERT,
@@ -155,30 +149,20 @@ export class TerrainEditTool extends Disposable implements EditTool {
     this._heightDirty = false;
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy =
-      Application.instance.device.type === 'webgl'
-        ? Application.instance.device.createTexture2D(splatMap.format, splatMap.width, splatMap.height)
-        : Application.instance.device.createTexture2DArray(
-            splatMap.format,
-            splatMap.width,
-            splatMap.height,
-            splatMap.depth
-          );
+      getDevice().type === 'webgl'
+        ? getDevice().createTexture2D(splatMap.format, splatMap.width, splatMap.height)
+        : getDevice().createTexture2DArray(splatMap.format, splatMap.width, splatMap.height, splatMap.depth);
     splatMapCopy.name = 'SplatMapCopy';
     blitter.blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._splatMapCopy = new DRef(splatMapCopy);
 
     this.ensureTerrainHeightMap();
     const heightMap = this._terrain.get().heightMap;
-    const heightMapCopy = Application.instance.device.createTexture2D(
-      heightMap.format,
-      heightMap.width,
-      heightMap.height,
-      {
-        samplerOptions: {
-          mipFilter: 'none'
-        }
+    const heightMapCopy = getDevice().createTexture2D(heightMap.format, heightMap.width, heightMap.height, {
+      samplerOptions: {
+        mipFilter: 'none'
       }
-    );
+    });
     heightMapCopy.name = 'heightMapCopy';
     blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._heightMapCopy = new DRef(heightMapCopy);
@@ -223,7 +207,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     ) {
       this._heightMapCopy.dispose();
       this._heightMapCopy.set(
-        Application.instance.device.createTexture2D(
+        getDevice().createTexture2D(
           this._terrain.get().heightMap.format,
           this._terrain.get().heightMap.width,
           this._terrain.get().heightMap.height,
@@ -417,7 +401,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     const splatMap = terrain.material.getSplatMap();
     blitter.blit(splatMap, this._splatMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
 
-    const device = Application.instance.device;
+    const device = getDevice();
     const fb = device.pool.fetchTemporalFramebuffer<Texture2DArray | Texture2D>(
       false,
       0,
@@ -462,7 +446,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     const terrain = this._terrain.get();
     const heightMap = terrain.heightMap;
     blitter.blit(heightMap, this._heightMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
-    const device = Application.instance.device;
+    const device = getDevice();
     const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMap, null, false);
     device.pushDeviceStates();
     device.setFramebuffer(fb);
@@ -614,7 +598,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     if (stride !== 1 && stride !== 2 && stride !== 3 && stride !== 4) {
       return null;
     }
-    const tmpTexture = Application.instance.device.createTexture2D('r32f', width, height, {
+    const tmpTexture = getDevice().createTexture2D('r32f', width, height, {
       samplerOptions: { mipFilter: 'none' }
     });
     const texels = new Float32Array(width * height);
@@ -717,7 +701,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
   }
   ensureTerrainHeightMap(): void {
     if (!this._terrain.get().heightMap) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const heightMap = device.createTexture2D(
         'r32f',
         Math.max(1, this._terrain.get().sizeX),
@@ -784,7 +768,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
         data[k++] = 255;
       }
     }
-    const texture = Application.instance.device.createTexture2D('rgba8unorm', size, size, {
+    const texture = getDevice().createTexture2D('rgba8unorm', size, size, {
       samplerOptions: { mipFilter: 'none' }
     });
     texture.name = 'DefaultBrush';

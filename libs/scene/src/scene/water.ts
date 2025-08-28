@@ -18,12 +18,12 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
+import { getDevice } from '../app/api';
 
 /**
  * Water scene node
@@ -301,7 +301,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * Retreive the disturbed world position and normal at water surface
    */
   async getSurfacePoint(points: Vector3[], outPos?: Vector3[], outNorm?: Vector3[]) {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!points || points.length === 0) {
       return;
     }

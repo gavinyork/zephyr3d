@@ -6,7 +6,7 @@ First, we need to create an application object.
 
 **It's important to note that projects using the @zephyr3d/scene framework must have exactly one application instance!**
 
-Once an application is created, the [Application.instance](/doc/markdown/./scene.application.instance) static property can be used to access the global application instance.
+Once an application is created, the [getApp](/doc/markdown/./scene.getapp) global function can be used to access the global application instance.
 
 ```javascript
 import { Application } from '@zephyr3d/scene';
@@ -131,10 +131,10 @@ In many cases, when we handle input events, there is a priority involved. For ex
 
 ```javascript
 
-app.inputManager.use(function(evt, type){
+getInput().use(function(evt, type){
   return processGUIEvent(evt, type);
 });
-app.inputManager.use(function(evt, type){
+getInput().use(function(evt, type){
   if(type === 'pointerdown') {
     onPointerDown();
     return true;
@@ -233,7 +233,7 @@ camera.controller = new OrbitCameraController();
 //...
 
 // Add an input middleware to update the camera controller
-app.inputManager.use(camera.handleEvent.bind(camera));
+getInput().use(camera.handleEvent.bind(camera));
 
 //...
 

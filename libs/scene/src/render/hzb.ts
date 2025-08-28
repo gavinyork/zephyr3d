@@ -1,8 +1,8 @@
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter';
 import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 let hzbProgram: GPUProgram = null;
 let hzbBindGroup: BindGroup = null;
@@ -266,7 +266,7 @@ function buildHiZLevel(
 }
 
 export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (!hzbProgram) {
     hzbProgram = buildHZBProgram(device);
     hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);

@@ -2,7 +2,6 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { Application } from '../../../app/app';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { NodeHierarchy } from './node';
@@ -10,6 +9,7 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
+import { getDevice } from '../../../app/api';
 
 /** @internal */
 export function getSceneClass(manager: SerializationManager): SerializableClass {
@@ -491,7 +491,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
                 tex = null;
               }
               if (tex?.isTexture2D()) {
-                const device = Application.instance.device;
+                const device = getDevice();
                 const skyBoxTexture = this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
                 const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
                 const irradianceMap =

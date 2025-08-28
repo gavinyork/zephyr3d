@@ -7,10 +7,10 @@ import type {
   RenderStateSet,
   TextureCube
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { Primitive } from '../render/primitive';
 import { Disposable, DRef, Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
+import { getDevice } from '../app/api';
 
 /**
  * CubemapSHProjector is responsible for projecting a cubemap texture into spherical harmonics (SH) coefficients.
@@ -95,7 +95,7 @@ export class CubemapSHProjector extends Disposable {
    * ```
    */
   projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const clearColor = new Vector4(0, 0, 0, 1);
     this.init(device);
     device.pushDeviceStates();

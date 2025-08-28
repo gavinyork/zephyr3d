@@ -10,7 +10,8 @@ import {
   DirectionalLight,
   Application,
   PerspectiveCamera,
-  BatchGroup
+  BatchGroup,
+  getInput
 } from '@zephyr3d/scene';
 import { Panel } from './ui';
 
@@ -52,7 +53,7 @@ instancingApp.ready().then(async () => {
   );
   camera.position.setXYZ(0, 0, 60);
   camera.controller = new OrbitCameraController();
-  instancingApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const batchGroup = new BatchGroup(scene);
   const assetManager = new AssetManager();

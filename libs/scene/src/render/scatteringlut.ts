@@ -9,8 +9,8 @@ import type {
   PBGlobalScope,
   FrameBuffer
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import { Vector3 } from '@zephyr3d/base';
+import { getDevice } from '../app/api';
 
 export class ScatteringLut {
   private static readonly _groundAlbedo = 1.0;
@@ -69,7 +69,7 @@ export class ScatteringLut {
     return this._viewPos;
   }
   static getMultiScatteringLut() {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._multiScatteringLut) {
       this.prepare(device);
       const format: TextureFormat =
@@ -101,7 +101,7 @@ export class ScatteringLut {
     return this._multiScatteringLut;
   }
   static getAerialPerspectiveLut(sunAltitude: number, maxDistance: number) {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (
       sunAltitude !== this._currentAerialPerspectiveAltitude ||
       maxDistance !== this._currentMaxAerialPerspectiveDistance ||
@@ -146,7 +146,7 @@ export class ScatteringLut {
     return this._aerialPerspectiveLut;
   }
   static getSkyViewLut(sunAltitude: number) {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (sunAltitude !== this._currentSkyViewSunAltitude || !this._skyViewFramebuffer) {
       if (!this._skyViewFramebuffer) {
         const format: TextureFormat =
@@ -177,7 +177,7 @@ export class ScatteringLut {
     return this._skyViewFramebuffer.getColorAttachments()[0];
   }
   static getTransmittanceLut() {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._transmittanceLut) {
       this.prepare(device);
       const format: TextureFormat =

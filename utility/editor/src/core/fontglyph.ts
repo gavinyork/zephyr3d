@@ -1,5 +1,5 @@
 import { Font } from '@zephyr3d/device';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 import { imGuiSetFontGlyph } from '@zephyr3d/imgui';
 
 type FontConfig = {
@@ -17,7 +17,7 @@ export class FontGlyph {
       const font = new FontFace(config.name, fontData);
       const loadedFont = await font.load();
       document.fonts.add(loadedFont);
-      const deviceFont = new Font(`12px ${config.name}`, Application.instance.device.getScale());
+      const deviceFont = new Font(`12px ${config.name}`, getDevice().getScale());
       for (const glyph of config.glyphs) {
         imGuiSetFontGlyph(glyph.code, deviceFont);
         //console.log(`==> ${glyph.css}`);

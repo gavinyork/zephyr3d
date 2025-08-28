@@ -1,5 +1,4 @@
 import { PBArrayTypeInfo, PBPrimitiveType, PBPrimitiveTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
-import { Application } from '../app/app';
 import type { AssetSubMeshData } from '../asset';
 import {
   MAX_MORPH_ATTRIBUTES,
@@ -9,10 +8,11 @@ import {
 } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { BoundingBox } from '../utility/bounding_volume';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const numTargets = subMesh.numTargets;
   if (numTargets === 0) {
     return;

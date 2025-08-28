@@ -1,6 +1,6 @@
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
 import type { GPUObject } from '@zephyr3d/device';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 
 let traceMap: TraceMap = null;
 const gpuObjectStackTraceMap: WeakMap<GPUObject, string> = new WeakMap();
@@ -192,7 +192,7 @@ export async function initLeakDetector() {
     }
   }
 
-  const device = Application.instance.device;
+  const device = getDevice();
   device.on('gpuobject_added', function (obj) {
     const stack = new Error().stack;
     if (stack) {

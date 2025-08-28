@@ -1,6 +1,6 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import type { DrawContext } from '@zephyr3d/scene';
-import { Application, MeshMaterial, ShaderHelper } from '@zephyr3d/scene';
+import { getDevice, MeshMaterial, ShaderHelper } from '@zephyr3d/scene';
 
 export class LinearDepthMaterial extends MeshMaterial {
   private _screenSize: Int32Array<ArrayBuffer>;
@@ -11,7 +11,7 @@ export class LinearDepthMaterial extends MeshMaterial {
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
-      const device = Application.instance.device;
+      const device = getDevice();
       this._screenSize[0] = device.getDrawingBufferWidth();
       this._screenSize[1] = device.getDrawingBufferHeight();
       bindGroup.setValue('screenSize', this._screenSize);

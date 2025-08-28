@@ -1,9 +1,10 @@
-import { DRef, HttpFS, type VFS } from '@zephyr3d/base';
+import type { DRef } from '@zephyr3d/base';
+import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
 import { SerializationManager } from '../utility';
-import { Scene, SceneNode } from '../scene';
+import type { Scene } from '../scene';
 
 /**
  * Lightweight facade over {@link ScriptingSystem} that adds feature gating.
@@ -23,7 +24,7 @@ export class Engine {
   private _scriptingSystem: ScriptingSystem;
   private _serializationManager: SerializationManager;
   private _enabled: boolean;
-  private _activeScenes: DRef<Scene>[];
+  protected _activeScenes: DRef<Scene>[];
   private _loadingScenes: Record<string, Promise<Scene>>[];
   /**
    * Creates a new runtime manager.

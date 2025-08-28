@@ -1,7 +1,7 @@
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '@zephyr3d/scene';
-import { fetchSampler, linearToGamma, PostEffectLayer, ShaderHelper } from '@zephyr3d/scene';
-import { AbstractPostEffect, Application } from '@zephyr3d/scene';
+import { fetchSampler, getDevice, linearToGamma, PostEffectLayer, ShaderHelper } from '@zephyr3d/scene';
+import { AbstractPostEffect } from '@zephyr3d/scene';
 import { DRef, Vector2, Vector4 } from '@zephyr3d/base';
 
 export class PostDecalRenderer extends AbstractPostEffect {
@@ -68,12 +68,12 @@ export class PostDecalRenderer extends AbstractPostEffect {
   }
   private prepare() {
     if (!PostDecalRenderer._defaultDecalTexture.get()) {
-      const tex = Application.instance.device.createTexture2D('rgba8unorm', 1, 1);
+      const tex = getDevice().createTexture2D('rgba8unorm', 1, 1);
       tex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
       PostDecalRenderer._defaultDecalTexture.set(tex);
     }
     if (!PostDecalRenderer._decalProgram) {
-      PostDecalRenderer._decalProgram = Application.instance.device.buildRenderProgram({
+      PostDecalRenderer._decalProgram = getDevice().buildRenderProgram({
         vertex(pb) {
           this.flip = pb.int().uniform(0);
           this.$inputs.pos = pb.vec2().attrib('position');
@@ -126,7 +126,7 @@ export class PostDecalRenderer extends AbstractPostEffect {
           });
         }
       });
-      PostDecalRenderer._decalBindGroup = Application.instance.device.createBindGroup(
+      PostDecalRenderer._decalBindGroup = getDevice().createBindGroup(
         PostDecalRenderer._decalProgram.bindGroupLayouts[0]
       );
     }

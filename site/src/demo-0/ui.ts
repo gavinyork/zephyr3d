@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import type { GLTFViewer } from './gltfviewer';
-import { ABufferOIT, Application, WeightedBlendedOIT } from '@zephyr3d/scene';
+import { ABufferOIT, getDevice, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -43,10 +43,8 @@ export class Panel {
     this._gui = new GUI({ container: document.body });
     this._params = {
       deviceType:
-        this._deviceList[
-          this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
-        ],
-      vSync: Application.instance.device.vSync,
+        this._deviceList[this._deviceList.findIndex((val) => val.toLowerCase() === getDevice().type)],
+      vSync: getDevice().vSync,
       environment: this._viewer.envMaps.getCurrentId(),
       iblLighting:
         this._viewer.scene.env.light.type === 'ibl' || this._viewer.scene.env.light.type === 'ibl-sh',
@@ -120,9 +118,9 @@ export class Panel {
       .add(this._params, 'vSync')
       .name('VSync')
       .onChange((value) => {
-        Application.instance.device.vSync = value;
+        getDevice().vSync = value;
       });
-    if (Application.instance.device.type !== 'webgl') {
+    if (getDevice().type !== 'webgl') {
       systemSettings
         .add(this._params, 'HiZ')
         .name('HiZ')
@@ -224,7 +222,7 @@ export class Panel {
     const perfSettings = this._gui.addFolder('Performance');
     perfSettings.add(this._params, 'FPS').name('FPS').disable(true).listen();
     setInterval(() => {
-      this._params.FPS = Application.instance.device.frameInfo.FPS.toFixed(2);
+      this._params.FPS = getDevice().frameInfo.FPS.toFixed(2);
     }, 1000);
   }
 }

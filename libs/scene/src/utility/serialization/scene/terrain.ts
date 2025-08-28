@@ -4,11 +4,11 @@ import type { SerializableClass } from '../types';
 import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
-import { Application } from '../../../app';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 import { JSONArray } from '../json';
+import { getDevice } from '../../../app/api';
 
 function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, arrays: T[]): T {
   const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
@@ -85,7 +85,7 @@ async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<Arra
 }
 
 async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
-  const device = Application.instance.device;
+  const device = getDevice();
   const splatMap = terrain.splatMap;
   const numLayers = (terrain.material.numDetailMaps + 3) >> 2;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(splatMap.format);

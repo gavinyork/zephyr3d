@@ -13,10 +13,10 @@ import { MaterialVaryingFlags, MAX_TERRAIN_MIPMAP_LEVELS } from '../values';
 import { ShaderHelper } from './shader/helper';
 import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
-import { Application } from '../app';
 import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { CopyBlitter } from '../blitter';
+import { getDevice } from '../app/api';
 
 type ClipmapTerrainDetailMapInfo = {
   detailMap: DRef<Texture2DArray>;
@@ -77,7 +77,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapSize = 256;
     this._splatMapSize = 512;
     this._levelDataBuffer = new DRef(
-      Application.instance.device.createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
+      getDevice().createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
     );
     this._detailMapInfo = this.createDetailMapInfo();
     this._terrainScale = Vector3.one();
@@ -141,7 +141,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       console.error('Invalid number of detail maps');
       return;
     }
-    if (Application.instance.device.type === 'webgl' && val > 4) {
+    if (getDevice().type === 'webgl' && val > 4) {
       console.error('Only 4 detail map layers is supported for WebGL1');
       return;
     }
@@ -237,9 +237,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailMapList[index].set(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
-    if (Application.instance.device.type !== 'webgl') {
+    if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
-      const fb = Application.instance.device.createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
+      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
       blitter.blit(
         albedoMap,
         fb,
@@ -270,12 +270,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailNormalMapList[index].set(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
-    if (Application.instance.device.type !== 'webgl') {
+    if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
-      const fb = Application.instance.device.createFrameBuffer(
-        [this._detailMapInfo.detailNormalMap.get()],
-        null
-      );
+      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap.get()], null);
       blitter.blit(
         normalMap,
         fb,
@@ -762,7 +759,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     }
   }
   private createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
-    const device = Application.instance.device;
+    const device = getDevice();
     const isWebGL1 = device.type === 'webgl';
     const detailMap = isWebGL1
       ? null
@@ -833,7 +830,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   static getDefaultDetailMap() {
     if (!ClipmapTerrainMaterial._defaultDetailMap.get()) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const tex = device.createTexture2D('rgba8unorm', 1, 1);
       tex.update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
       ClipmapTerrainMaterial._defaultDetailMap.set(tex);
@@ -842,7 +839,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   static getDefaultNormalMap() {
     if (!ClipmapTerrainMaterial._defaultNormalMap.get()) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const tex = device.createTexture2D('rgba8unorm', 1, 1);
       tex.update(new Uint8Array([128, 128, 255, 255]), 0, 0, 1, 1);
       ClipmapTerrainMaterial._defaultNormalMap.set(tex);

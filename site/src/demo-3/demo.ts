@@ -2,9 +2,8 @@ import type { HttpFS } from '@zephyr3d/base';
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
-import { BatchGroup, SceneNode } from '@zephyr3d/scene';
+import { BatchGroup, getDevice, getInput, SceneNode } from '@zephyr3d/scene';
 import {
-  Application,
   AssetManager,
   DirectionalLight,
   OrbitCameraController,
@@ -48,7 +47,7 @@ export class Demo {
     this._camera = this.createCamera(this._scene);
     this._camera.bloom = true;
     this._camera.FXAA = true;
-    Application.instance.device.setFont('24px arial');
+    getDevice().setFont('24px arial');
     this.render();
     this._loaded = false;
     this._loadPercent = 0;
@@ -130,8 +129,7 @@ export class Demo {
     const camera = new PerspectiveCamera(
       scene,
       Math.PI / 3,
-      Application.instance.device.getDrawingBufferWidth() /
-        Application.instance.device.getDrawingBufferHeight(),
+      getDevice().getDrawingBufferWidth() / getDevice().getDrawingBufferHeight(),
       1,
       1500
     );
@@ -143,7 +141,7 @@ export class Demo {
     const zipContent = await this.fetchAssetArchive('./assets/terrain_assets.zip', (percent) => {
       this._loadPercent = percent;
     });
-    Application.instance.device.runNextFrame(async () => {
+    getDevice().runNextFrame(async () => {
       const fileMap = await this.readZip(zipContent);
       (this._assetManager.vfs as HttpFS).urlResolver = (url) => fileMap.get(url) || url;
 
@@ -168,7 +166,7 @@ export class Demo {
       // loaded
       this._terrain.showState = 'visible';
       this._scene.env.sky.wind.setXY(700, 350);
-      Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+      getInput().use(this._camera.handleEvent.bind(this._camera));
       this._loaded = true;
     });
   }
@@ -419,7 +417,7 @@ export class Demo {
         Vector3.mul(this._character.group.position, new Vector3(1, 0, 1)),
         Vector3.mul(this._actorTarget, new Vector3(1, 0, 1))
       );
-      let movement = (Application.instance.device.frameInfo.elapsedFrame * this._actorSpeed) / 1000;
+      let movement = (getDevice().frameInfo.elapsedFrame * this._actorSpeed) / 1000;
       if (movement >= distance) {
         this._actorRunning = false;
         movement = distance;
@@ -448,7 +446,7 @@ export class Demo {
     }
     this._camera.render(this._scene);
     if (!this._loaded) {
-      Application.instance.device.drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
+      getDevice().drawText(`Loading: %${this._loadPercent}`, 20, 20, '#a00000');
     } else {
       if (!this._ui) {
         this._ui = new Panel();

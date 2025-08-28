@@ -25,12 +25,12 @@ import type {
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
-import { Application } from '../../app';
 import { fetchSampler } from '../../utility/misc';
 import type { AtmosphereParams } from '../../shaders';
 import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
 import type { HeightFogParams } from '../../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
+import { getDevice } from '../../app/api';
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
@@ -134,7 +134,7 @@ export class ShaderHelper {
     const hash = `${skinning ? 1 : 0}${morphing ? 1 : 0}${instancing ? 1 : 0}`;
     let bindGroupLayout = this._drawableBindGroupLayouts[hash];
     if (!bindGroupLayout) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const buildInfo = new ProgramBuilder(device).buildRender({
         vertex(pb) {
           ShaderHelper.vertexShaderDrawableStuff(this, skinning, morphing, instancing);
@@ -789,9 +789,9 @@ export class ShaderHelper {
         linear ? 0 : 1
       ),
       roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
-      frameDeltaTime: Application.instance.device.frameInfo.elapsedFrame * 0.001,
-      elapsedTime: Application.instance.device.frameInfo.elapsedOverall * 0.001,
-      framestamp: Application.instance.device.frameInfo.frameCounter
+      frameDeltaTime: getDevice().frameInfo.elapsedFrame * 0.001,
+      elapsedTime: getDevice().frameInfo.elapsedOverall * 0.001,
+      framestamp: getDevice().frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
       cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;

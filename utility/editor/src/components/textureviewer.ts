@@ -1,6 +1,6 @@
 import type { BaseTexture, FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 import { TextureDrawer } from './texturedrawer';
 import { Vector4 } from '@zephyr3d/base';
 
@@ -34,18 +34,18 @@ function textureToListName(tex: BaseTexture) {
 }
 
 export function renderTextureViewer() {
-  const textureList = Application.instance.device.getGPUObjects().textures;
+  const textureList = getDevice().getGPUObjects().textures;
   const textureNameList = textureList
     .filter((tex) => !tex.isTexture3D())
     .sort((a, b) => a.uid - b.uid)
     .map((tex) => textureToListName(tex));
   if (textureNameList.length > 0) {
     if (!frameBuffer) {
-      const renderTarget = Application.instance.device.createTexture2D('rgba8unorm', 512, 512, {
+      const renderTarget = getDevice().createTexture2D('rgba8unorm', 512, 512, {
         samplerOptions: { mipFilter: 'none' }
       });
       renderTarget.name = '!!textureviewer';
-      frameBuffer = Application.instance.device.createFrameBuffer([renderTarget], null);
+      frameBuffer = getDevice().createFrameBuffer([renderTarget], null);
       frameBuffer.setColorAttachmentGenerateMipmaps(0, false);
     }
     if (!textureDrawer) {
@@ -73,7 +73,7 @@ export function renderTextureViewer() {
     }
     const k = textureNameList[tindex].split('##');
     currentTextureUid = Number(k[k.length - 1]);
-    currentTexture = Application.instance.device.getGPUObjectById(currentTextureUid) as BaseTexture;
+    currentTexture = getDevice().getGPUObjectById(currentTextureUid) as BaseTexture;
     if (currentTexture) {
       const mipLevelCount = currentTexture.mipLevelCount;
       const miplevel = [currentTextureMipLevel] as [number];
@@ -139,9 +139,9 @@ export function renderTextureViewer() {
         return val;
       });
     }
-    Application.instance.device.pushDeviceStates();
-    Application.instance.device.setFramebuffer(frameBuffer);
-    Application.instance.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    getDevice().pushDeviceStates();
+    getDevice().setFramebuffer(frameBuffer);
+    getDevice().clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
     textureDrawer.draw(
       currentTexture,
       textureRepeat,
@@ -153,7 +153,7 @@ export function renderTextureViewer() {
       currentTextureMipLevel,
       currentTextureLayer
     );
-    Application.instance.device.popDeviceStates();
+    getDevice().popDeviceStates();
     const width = ImGui.GetContentRegionAvail().x;
     const height = currentTexture
       ? Math.floor((width / currentTexture.width) * currentTexture.height)

@@ -6,7 +6,8 @@ import {
   Application,
   PerspectiveCamera,
   OrbitCameraController,
-  panoramaToCubemap
+  panoramaToCubemap,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -29,7 +30,7 @@ myApp.ready().then(async () => {
     500
   );
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const assetManager = new AssetManager();
   // Load panorama

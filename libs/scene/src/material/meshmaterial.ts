@@ -21,11 +21,11 @@ import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef, DWeakRef, randomUUID } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
+import { getDevice } from '../app/api';
 
 /**
  * Blending mode for mesh materials.
@@ -338,7 +338,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (this.$isInstance) {
       return this.coreMaterial.createInstance();
     }
-    const isWebGL1 = Application.instance.device.type === 'webgl';
+    const isWebGL1 = getDevice().type === 'webgl';
     if (isWebGL1 || !this.supportInstancing) {
       return this.clone() as this;
     }

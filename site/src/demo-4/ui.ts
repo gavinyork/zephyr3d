@@ -1,5 +1,5 @@
 import { GUI } from 'lil-gui';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -14,9 +14,7 @@ export class Panel {
     this._deviceList = ['WebGL2', 'WebGPU'];
     this._params = {
       deviceType:
-        this._deviceList[
-          this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
-        ],
+        this._deviceList[this._deviceList.findIndex((val) => val.toLowerCase() === getDevice().type)],
       FPS: ''
     };
     this._gui = new GUI({ container: document.body });
@@ -35,7 +33,7 @@ export class Panel {
     const stats = this._gui.addFolder('Stats');
     stats.add(this._params, 'FPS').name('FPS').disable(true).listen();
     setInterval(() => {
-      this._params.FPS = Application.instance.device.frameInfo.FPS.toFixed(2);
+      this._params.FPS = getDevice().frameInfo.FPS.toFixed(2);
     }, 1000);
   }
 }

@@ -10,12 +10,12 @@ import type { SceneNode } from '../scene/scene_node';
 import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
-import { Application } from '../app/app';
 import type { AnimationSet } from '../animation/animationset';
 import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
+import { getDevice, getEngine } from '../app/api';
 
 /**
  * Options for texture fetching.
@@ -153,7 +153,7 @@ export class AssetManager {
    * Creates an instance of AssetManager
    */
   constructor(vfs?: VFS) {
-    this._vfs = vfs ?? Application.instance.engine.VFS;
+    this._vfs = vfs ?? getEngine().VFS;
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};
@@ -526,7 +526,7 @@ export class AssetManager {
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
   ): Promise<BaseTexture> {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (device.type !== 'webgl') {
       return await loader.load(mimeType, data, srgb, samplerOptions, texture);
     } else {

@@ -6,7 +6,7 @@
 
   **注意，使用@zephyr3d/scene框架的项目必需有且只有一个应用实例!**
 
-  当一个应用被创建以后，可以使用 ```Application.instance``` 静态属性来获取全局应用实例。
+  当一个应用被创建以后，可以使用 [getApp](/doc/markdown/./scene.getapp) 全局函数来获取全局应用实例。
 
   ```javascript
   import { Application } from '@zephyr3d/scene';
@@ -141,10 +141,10 @@
   都返回false，则通过```Application.on```注册的事件回调将被调用。下面是一个使用中间件的例子：
 
   ```javascript
-  app.inputManager.use(function(evt, type){
+  getInput().use(function(evt, type){
     return processGUIEvent(evt, type);
   });
-  app.inputManager.use(function(evt, type){
+  getInput().use(function(evt, type){
     if(type === 'pointerdown') {
       onPointerDown();
       return true;
@@ -232,7 +232,7 @@
   //...
 
   // 添加一个中间件用于更新摄像机控制器
-  app.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   //...
 

@@ -3,7 +3,6 @@ import { Vector3, Vector4, Ray, DRef, DWeakRef, makeObservable, Disposable } fro
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
-import { Application } from '../app/app';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
@@ -11,6 +10,7 @@ import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
+import { getDevice } from '../app/api';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -330,8 +330,7 @@ export class Scene extends makeObservable(Disposable)<{
   private updateEnvLight() {
     if (this.env.light.type === 'ibl' || this.env.light.type === 'ibl-sh') {
       const useSHFB =
-        Application.instance.device.type === 'webgl' ||
-        !Application.instance.device.getDeviceCaps().framebufferCaps.supportFloatBlending;
+        getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending;
       if (!this.env.light.radianceMap) {
         this.env.light.radianceMap = this.env.sky.radianceMap;
       }
@@ -368,7 +367,7 @@ export class Scene extends makeObservable(Disposable)<{
    *
    */
   frameUpdate() {
-    const frameInfo = Application.instance.device.frameInfo;
+    const frameInfo = getDevice().frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
       //this.updateAnimations();
@@ -402,7 +401,7 @@ export class Scene extends makeObservable(Disposable)<{
    */
   frameUpdatePerCamera(camera: Camera) {
     if (this._perCameraUpdateQueue.length > 0) {
-      const frameInfo = Application.instance.device.frameInfo;
+      const frameInfo = getDevice().frameInfo;
       const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
       const queue = this._perCameraUpdateQueue;

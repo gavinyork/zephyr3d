@@ -5,8 +5,8 @@ import type {
   SamplerOptions,
   TextureSampler
 } from '@zephyr3d/device';
-import { Application } from '../app/app';
 import { CopyBlitter } from '../blitter/copy';
+import { getDevice } from '../app/api';
 
 /**
  * Metadata interface for storing additional information
@@ -110,7 +110,7 @@ export function fetchSampler(type: SamplerType): TextureSampler {
   if (!sampler) {
     const opt = samplerOptions[type];
     if (opt) {
-      sampler = Application.instance.device.createSampler(opt);
+      sampler = getDevice().createSampler(opt);
       samplers[type] = sampler;
     }
   }

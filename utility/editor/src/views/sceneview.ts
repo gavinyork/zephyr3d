@@ -30,10 +30,11 @@ import {
   ClipmapTerrain,
   PerspectiveCamera,
   OrthoCamera,
-  TetrahedronShape
+  TetrahedronShape,
+  getDevice
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
-import { Application, DirectionalLight } from '@zephyr3d/scene';
+import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
@@ -863,7 +864,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._cameraAnimationTime = 0;
   }
   private posToViewport(pos: number[], viewport: ArrayLike<number>): boolean {
-    const cvs = Application.instance.device.canvas;
+    const cvs = getDevice().canvas;
     const vp = viewport;
     const vp_x = vp ? vp[0] : 0;
     const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
@@ -991,7 +992,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this.closeAllTrackEditors();
   }
   private renderDeviceInfo() {
-    const device = Application.instance.device;
+    const device = getDevice();
     const gpuObjectList = device.getGPUObjects();
     if (ImGui.Begin('DeviceInfo')) {
       if (ImGui.BeginTable('DeviceProperties', 2)) {

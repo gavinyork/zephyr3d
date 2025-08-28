@@ -1,7 +1,7 @@
 import { AbstractTextureLoader } from '../loader';
-import { Application } from '../../../app/app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';
+import { getDevice } from '../../../app/api';
 
 /**
  * TGA image loader
@@ -80,12 +80,7 @@ export class TGALoader extends AbstractTextureLoader {
       if (noMipmap) {
         opt.samplerOptions = { mipFilter: 'none' };
       }
-      const tex = Application.instance.device.createTexture2D(
-        sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm',
-        width,
-        height,
-        opt
-      );
+      const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
       tex.update(pixels, 0, 0, width, height);
       return tex;
     } while (false);

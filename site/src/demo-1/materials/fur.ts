@@ -2,11 +2,11 @@ import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, PBFunctionScope, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '@zephyr3d/scene';
 import {
-  Application,
   MeshMaterial,
   QUEUE_TRANSPARENT,
   ShaderHelper,
   applyMaterialMixins,
+  getDevice,
   mixinLambert
 } from '@zephyr3d/scene';
 
@@ -26,7 +26,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
     this._colorEnd = new Vector4(1, 1, 1, 0);
     this._alphaTexture = null;
     this._alphaRepeat = 1;
-    this._instancing = Application.instance.device.type !== 'webgl';
+    this._instancing = getDevice().type !== 'webgl';
     this.numPasses = this._instancing ? 2 : 1 + this._numLayers;
   }
   get thickness(): number {

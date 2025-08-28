@@ -46,7 +46,6 @@ import { Quaternion } from '@zephyr3d/base';
 import { Ray } from '@zephyr3d/base';
 import { RenderBundle } from '@zephyr3d/device';
 import { RenderStateSet } from '@zephyr3d/device';
-import { RuntimeManager } from '@zephyr3d/runtime';
 import { SamplerOptions } from '@zephyr3d/device';
 import { ShaderTypeFunc } from '@zephyr3d/device';
 import { StructuredBuffer } from '@zephyr3d/device';
@@ -222,6 +221,11 @@ export abstract class AnimationTrack<StateType = unknown> {
     reset(_target: object): void;
 }
 
+// Warning: (ae-internal-missing-underscore) The name "appInstance" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export let appInstance: Application;
+
 // Warning: (ae-forgotten-export) The symbol "appEventMap" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -229,17 +233,14 @@ export class Application extends Observable<appEventMap> {
     constructor(opt: AppOptions);
     get device(): AbstractDevice;
     get deviceType(): string;
+    // Warning: (ae-forgotten-export) The symbol "Engine" needs to be exported by the entry point index.d.ts
+    get engine(): Engine;
     focus(): void;
     frame(): void;
     get inputManager(): InputManager;
-    static get instance(): Application;
-    log(text: string, mode?: LogMode): void;
-    get logger(): Logger;
-    set logger(val: Logger);
     get options(): AppOptions;
     ready(): Promise<void>;
     run(): void;
-    get runtimeManager(): RuntimeManager;
     stop(): void;
 }
 
@@ -884,9 +885,10 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
         size: number;
         anchor: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
-    static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get type(): string;
 }
 
@@ -900,10 +902,11 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
         size: number;
         anchor: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
     get depth(): number;
-    static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: BoxCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get height(): number;
     get type(): string;
     get width(): number;
@@ -1295,7 +1298,6 @@ export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable, Nod
     copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     // @internal (undocumented)
     createHeightMapTexture(width: number, height: number): Texture2D<unknown>;
-    dispose(): void;
     draw(ctx: DrawContext): void;
     getMaterial(): MeshMaterial;
     getMorphData(): Texture2D;
@@ -1320,6 +1322,7 @@ export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable, Nod
     needSceneDepth(): boolean;
     get numDetailMaps(): number;
     set numDetailMaps(val: number);
+    protected onDispose(): void;
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
     setSize(sizeX: number, sizeZ: number): void;
@@ -1357,8 +1360,6 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
     get debugMode(): TerrainDebugMode;
     set debugMode(mode: TerrainDebugMode);
     // (undocumented)
-    dispose(): void;
-    // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
     static getDefaultDetailMap(): Texture2D<unknown>;
@@ -1390,6 +1391,8 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
     // (undocumented)
     get numDetailMaps(): number;
     set numDetailMaps(val: number);
+    // (undocumented)
+    protected onDispose(): void;
     // @internal (undocumented)
     get region(): Vector4;
     set region(val: Vector4);
@@ -1602,9 +1605,10 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         height: number;
         anchor: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
-    static generateData(options: CylinderCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: CylinderCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get type(): string;
 }
 
@@ -2264,6 +2268,9 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
 // @internal (undocumented)
 export function getAerialPerspectiveLut(): Texture2D<unknown>;
 
+// @public
+export function getApp(): Application;
+
 // Warning: (ae-internal-missing-underscore) The name "getAtmosphereParamsStruct" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -2284,10 +2291,16 @@ export function getCameraClass(): SerializableClass;
 // @internal (undocumented)
 export function getDefaultAtmosphereParams(): AtmosphereParams;
 
+// @public
+export function getDevice(): AbstractDevice;
+
 // Warning: (ae-internal-missing-underscore) The name "getDirectionalLightClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
 export function getDirectionalLightClass(): SerializableClass;
+
+// @public
+export function getEngine(): Engine;
 
 // Warning: (ae-internal-missing-underscore) The name "getGraphNodeClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2744,7 +2757,8 @@ export class InputManager {
     start(): void;
     // @internal
     stop(): void;
-    use(handler: InputEventHandler): this;
+    unuse(handler: InputEventHandler, ctx?: unknown): this;
+    use(handler: InputEventHandler, ctx?: unknown): this;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "InstanceBindGroupAllocator" should be prefixed with an underscore because the declaration is marked as @internal
@@ -2838,11 +2852,6 @@ export class LightPass extends RenderPass {
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp): any;
 
 // @public
-export interface Logger {
-    log(text: string, mode?: LogMode): void;
-}
-
-// @public
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
@@ -2880,6 +2889,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     // @internal
     protected _hash: string[];
     get instanceId(): number;
+    isBatchable(): boolean;
     isTransparentPass(_pass: number): boolean;
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
@@ -3840,9 +3850,10 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
         twoSided: boolean;
         anchor: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
-    static generateData(options: PlaneCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: PlaneCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get type(): string;
 }
 
@@ -4440,6 +4451,8 @@ export class Scene extends Scene_base {
     get rootNode(): SceneNode;
     // @internal
     protected _rootNode: DRef<SceneNode>;
+    get script(): string;
+    set script(fileName: string);
     // @internal
     protected _updateFrame: number;
     updateNodePlacement(octree: Octree, list: Set<GraphNode>): void;
@@ -4685,6 +4698,11 @@ export class SerializationManager {
     serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): any;
     get vfs(): VFS;
 }
+
+// Warning: (ae-internal-missing-underscore) The name "setApp" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function setApp(app: Application): void;
 
 // @public
 export class ShaderHelper {
@@ -5009,11 +5027,14 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     constructor(options?: T);
     // (undocumented)
     abstract clone(): Shape<T>;
+    // (undocumented)
+    protected static computeTangent(v0: number[], v1: number[], v2: number[], uv0: number[], uv1: number[], uv2: number[], normal: number[]): number[];
     // @internal (undocumented)
     protected _create(options?: T): boolean;
     // (undocumented)
     static _defaultOptions: {
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
     normalizeOptions(options?: T): T;
@@ -5029,6 +5050,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
 // @public
 export interface ShapeCreationOptions {
     needNormal?: boolean;
+    needTangent?: boolean;
     needUV?: boolean;
     transform?: Matrix4x4;
 }
@@ -5233,9 +5255,10 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         verticalDetail: number;
         horizonalDetail: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
-    static generateData(options: SphereCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: SphereCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get radius(): number;
     // @override
     raycast(ray: Ray): number;
@@ -5553,10 +5576,11 @@ export class TetrahedronFrameShape extends Shape<TetrahedronCreationOptions> imp
         sizeX: number;
         sizeZ: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
     // (undocumented)
-    static generateData(options: TetrahedronCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: TetrahedronCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     // (undocumented)
     get type(): string;
 }
@@ -5572,10 +5596,11 @@ export class TetrahedronShape extends Shape<TetrahedronCreationOptions> implemen
         sizeX: number;
         sizeZ: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
     // (undocumented)
-    static generateData(options: TetrahedronCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: TetrahedronCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     // (undocumented)
     get type(): string;
 }
@@ -5643,9 +5668,10 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
         innerRadius: number;
         radialDetail: number;
         needNormal: boolean;
+        needTangent: boolean;
         needUV: boolean;
     };
-    static generateData(options: TorusCreationOptions, vertices: number[], normals: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
+    static generateData(options: TorusCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get type(): string;
 }
 
@@ -5792,7 +5818,6 @@ export class Water extends Water_base implements Drawable, NodeClonable<Water> {
     computeBoundingVolume(): BoundingVolume;
     computeWorldBoundingVolume(): BoundingVolume;
     copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
-    dispose(): void;
     draw(ctx: DrawContext): void;
     getMaterial(): MeshMaterial;
     getMorphData(): Texture2D;
@@ -5809,6 +5834,7 @@ export class Water extends Water_base implements Drawable, NodeClonable<Water> {
     get material(): WaterMaterial;
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
+    protected onDispose(): void;
     // (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
     get TAAStrength(): number;
@@ -5897,8 +5923,8 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:2947:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:11621:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:2948:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:11629:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

@@ -12,7 +12,8 @@ import {
   AssetManager,
   applyMaterialMixins,
   mixinBlinnPhong,
-  DirectionalLight
+  DirectionalLight,
+  getInput
 } from '@zephyr3d/scene';
 
 // 自定义Blinn-phong材质
@@ -157,7 +158,7 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('resize', (width, height) => {
     camera.aspect = width / height;

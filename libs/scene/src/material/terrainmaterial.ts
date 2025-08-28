@@ -12,12 +12,12 @@ import type {
 import type { DrawContext } from '../render';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinLight } from './mixins/lit';
-import { Application } from '../app';
 import type { Clonable } from '@zephyr3d/base';
 import { retainObject, Vector4 } from '@zephyr3d/base';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { ShaderHelper } from './shader/helper';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+import { getDevice } from '../app/api';
 
 /**
  * Terrain detail map information
@@ -372,7 +372,7 @@ export class TerrainMaterial
     }
   }
   generateMetallicRoughnessMap(): Texture2D {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._options) {
       const tex = device.createTexture2D('rgba8unorm', 1, 1, {
         samplerOptions: { mipFilter: 'none' }

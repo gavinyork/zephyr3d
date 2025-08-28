@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import type { Material, OrbitCameraController, PerspectiveCamera, SceneNode } from '@zephyr3d/scene';
-import { Application, BoundingBox } from '@zephyr3d/scene';
+import { BoundingBox, getDevice } from '@zephyr3d/scene';
 import { FurMaterial } from './materials/fur';
 import type { ParallaxMappingMode } from './materials/parallax';
 import { ParallaxMapMaterial } from './materials/parallax';
@@ -62,9 +62,7 @@ export class Panel {
     this._index = 0;
     this._params = {
       deviceType:
-        this._deviceList[
-          this._deviceList.findIndex((val) => val.toLowerCase() === Application.instance.device.type)
-        ],
+        this._deviceList[this._deviceList.findIndex((val) => val.toLowerCase() === getDevice().type)],
       material: this._materialNames[this._index]
     };
     this._parallaxModes = ['basic', 'steep', 'occlusion', 'relief'];

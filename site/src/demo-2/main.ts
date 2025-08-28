@@ -13,7 +13,8 @@ import {
   Mesh,
   DirectionalLight,
   PerspectiveCamera,
-  SphereShape
+  SphereShape,
+  getInput
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -111,7 +112,7 @@ lightApp.ready().then(async () => {
   );
   camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
 
-  lightApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const assetManager = new AssetManager();
   scene.env.light.strength = 0.3;

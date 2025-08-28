@@ -2,10 +2,10 @@ import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
 import { Vector4, Vector3, HttpFS, DRef } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Mesh, PlaneShape, LambertMaterial } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial, getDevice, getInput } from '@zephyr3d/scene';
 import { BatchGroup, WeightedBlendedOIT, ABufferOIT, OrbitCameraController } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
-import { BoundingBox, AssetManager, DirectionalLight, Application, PerspectiveCamera } from '@zephyr3d/scene';
+import { BoundingBox, AssetManager, DirectionalLight, PerspectiveCamera } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
@@ -36,7 +36,7 @@ export class GLTFViewer {
   private _dracoModule: draco3d.DecoderModule;
   private _bboxNoScale: AABB;
   constructor(scene: Scene) {
-    const device = Application.instance.device;
+    const device = getDevice();
     this._currentAnimation = null;
     this._modelNode = new DRef();
     this._animationSet = new DRef();
@@ -93,7 +93,7 @@ export class GLTFViewer {
       DracoDecoderModule({
         onModuleLoaded: (module) => {
           this._dracoModule = module;
-          Application.instance.inputManager.use(this._camera.handleEvent.bind(this._camera));
+          getInput().use(this._camera.handleEvent.bind(this._camera));
           resolve();
         }
       });
@@ -278,7 +278,7 @@ export class GLTFViewer {
   render() {
     if (this._modelNode.get()) {
       if (this._autoRotate) {
-        const angle = Application.instance.device.frameInfo.elapsedOverall * 0.001;
+        const angle = getDevice().frameInfo.elapsedOverall * 0.001;
         this._modelNode.get().rotation.fromAxisAngle(Vector3.axisPY(), angle);
       }
       if (this._animationSet) {

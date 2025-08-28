@@ -3,7 +3,6 @@ import { Vector3, Vector4, DRef } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
-import { Application } from '../../app';
 import { GrassManager } from './grass';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
@@ -12,6 +11,7 @@ import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
 import type { NodeClonable, NodeCloneMethod } from '..';
+import { getDevice } from '../../app/api';
 
 /**
  * Terrain node
@@ -236,15 +236,7 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
     }
     this._grassManager
       .get()
-      .addGrassLayer(
-        Application.instance.device,
-        this,
-        density,
-        bladeWidth,
-        bladeHeight,
-        offset,
-        grassTexture
-      );
+      .addGrassLayer(getDevice(), this, density, bladeWidth, bladeHeight, offset, grassTexture);
   }
   /** Get elevation at specified position in terrain coordinate space */
   getElevation(x: number, z: number): number {

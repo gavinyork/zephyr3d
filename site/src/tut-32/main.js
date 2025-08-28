@@ -1,6 +1,13 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, AssetManager, Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d/scene';
+import {
+  Scene,
+  AssetManager,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  getInput
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -22,7 +29,7 @@ myApp.ready().then(async () => {
     500
   );
   camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // Load skybox texture
   const assetManager = new AssetManager();

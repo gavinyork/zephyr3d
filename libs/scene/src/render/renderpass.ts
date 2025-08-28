@@ -1,6 +1,5 @@
 import { Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
-import { Application } from '../app';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
@@ -9,6 +8,7 @@ import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
 import type { BindGroup } from '@zephyr3d/device';
+import { getDevice } from '../app/api';
 
 /**
  * Base class for any kind of render passes
@@ -262,7 +262,7 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   private clearFramebuffer() {
     if (this._clearColor || this._clearDepth || this._clearStencil) {
-      Application.instance.device.clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+      getDevice().clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
     }
   }
 }

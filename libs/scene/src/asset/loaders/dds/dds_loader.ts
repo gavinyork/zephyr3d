@@ -1,8 +1,8 @@
 import { getDDSMipLevelsInfo } from './dds';
 import { AbstractTextureLoader } from '../loader';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import { Application } from '../../../app/app';
 import type { TypedArray } from '@zephyr3d/base';
+import { getDevice } from '../../../app/api';
 
 /**
  * The DDS texture loader
@@ -29,6 +29,6 @@ export class DDSLoader extends AbstractTextureLoader {
       texture: texture,
       samplerOptions
     };
-    return Application.instance.device.createTextureFromMipmapData(mipmapLevelData, srgb, options);
+    return getDevice().createTextureFromMipmapData(mipmapLevelData, srgb, options);
   }
 }

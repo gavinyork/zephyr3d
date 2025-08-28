@@ -1,7 +1,7 @@
 import { AbstractTextureLoader } from '../loader';
-import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';
+import { getDevice } from '../../../app/api';
 
 /**
  * Web image loader
@@ -27,7 +27,7 @@ export class WebImageLoader extends AbstractTextureLoader {
 
     try {
       const bm = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
-      const tex = Application.instance.device.createTexture2DFromImage(bm, srgb, options);
+      const tex = getDevice().createTexture2DFromImage(bm, srgb, options);
       if (!tex) {
         throw new Error('create texture from ImageBitmap failed');
       }
@@ -45,7 +45,7 @@ export class WebImageLoader extends AbstractTextureLoader {
           throw new Error('2D context not available');
         }
         ctx.drawImage(img, 0, 0);
-        const tex = Application.instance.device.createTexture2DFromImage(cvs, srgb, options);
+        const tex = getDevice().createTexture2DFromImage(cvs, srgb, options);
         if (!tex) {
           throw new Error('create texture from canvas failed');
         }

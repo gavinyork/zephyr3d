@@ -11,7 +11,8 @@ import {
   Mesh,
   SphereShape,
   BatchGroup,
-  BoundingBox
+  BoundingBox,
+  getInput
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -75,7 +76,7 @@ PhysicsApp.ready().then(async () => {
   camera.lookAt(new Vector3(0, 40, 40), Vector3.zero(), Vector3.axisPY());
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
 
-  PhysicsApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
   PhysicsApp.on('resize', (width, height) => {
     camera.aspect = width / height;
   });

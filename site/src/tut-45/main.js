@@ -9,7 +9,8 @@ import {
   DirectionalLight,
   BoxShape,
   LambertMaterial,
-  BatchGroup
+  BatchGroup,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -56,7 +57,7 @@ myApp.ready().then(async () => {
   );
   camera.lookAt(new Vector3(0, 0, 60), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('resize', (width, height) => {
     camera.aspect = width / height;

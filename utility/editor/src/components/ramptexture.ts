@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { Texture2D } from '@zephyr3d/device';
-import { Application } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 import { Disposable, Interpolator, makeObservable } from '@zephyr3d/base';
 import { CurveEditor } from './curveeditor';
 
@@ -487,7 +487,7 @@ export class RampTextureCreator extends makeObservable(Disposable)<{
   private updateTexture(changTexture = true) {
     this.fillTextureData(this._showAlpha, this._textureData);
     if (!this._texture) {
-      this._texture = Application.instance.device.createTexture2D('rgba8unorm-srgb', this._textureWidth, 1, {
+      this._texture = getDevice().createTexture2D('rgba8unorm-srgb', this._textureWidth, 1, {
         samplerOptions: {
           mipFilter: 'none'
         }

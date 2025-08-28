@@ -7,7 +7,8 @@ import {
   AssetManager,
   Application,
   PerspectiveCamera,
-  Terrain
+  Terrain,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -76,7 +77,7 @@ myApp.ready().then(async () => {
   );
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   camera.lookAt(new Vector3(200, 40, 80), new Vector3(250, 0, 250), Vector3.axisPY());
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
   light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());

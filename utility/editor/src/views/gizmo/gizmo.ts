@@ -7,10 +7,10 @@ import type {
   TorusCreationOptions
 } from '@zephyr3d/scene';
 import {
-  Application,
   BoundingBox,
   BoxShape,
   CylinderShape,
+  getDevice,
   PlaneShape,
   Primitive,
   SphereShape,
@@ -25,14 +25,11 @@ export function createSelectGizmo(): Primitive {
   bbox.beginExtend();
   BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, uv, indices, bbox);
   const primitive = new Primitive();
-  const vertexBuffer = Application.instance.device.createVertexBuffer(
-    'position_f32x3',
-    new Float32Array(vertices)
-  );
+  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.setVertexBuffer(vertexBuffer);
-  const uvBuffer = Application.instance.device.createVertexBuffer('tex0_f32x2', new Float32Array(uv));
+  const uvBuffer = getDevice().createVertexBuffer('tex0_f32x2', new Float32Array(uv));
   primitive.setVertexBuffer(uvBuffer);
-  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
@@ -148,17 +145,11 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
     diffuse.push(255, 255, 255, 255)
   );
   const primitive = new Primitive();
-  const vertexBuffer = Application.instance.device.createVertexBuffer(
-    'position_f32x3',
-    new Float32Array(vertices)
-  );
+  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = Application.instance.device.createVertexBuffer(
-    'diffuse_u8normx4',
-    new Uint8Array(diffuse)
-  );
+  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
   primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
@@ -213,17 +204,11 @@ export function createRotationGizmo(outerRadius: number, innerRadius: number) {
     diffuse.push(...rgb[2])
   );
   const primitive = new Primitive();
-  const vertexBuffer = Application.instance.device.createVertexBuffer(
-    'position_f32x3',
-    new Float32Array(vertices)
-  );
+  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = Application.instance.device.createVertexBuffer(
-    'diffuse_u8normx4',
-    new Uint8Array(diffuse)
-  );
+  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
   primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
@@ -400,17 +385,11 @@ export function createTranslationGizmo(
     diffuse.push(...rgb[2])
   );
   const primitive = new Primitive();
-  const vertexBuffer = Application.instance.device.createVertexBuffer(
-    'position_f32x3',
-    new Float32Array(vertices)
-  );
+  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = Application.instance.device.createVertexBuffer(
-    'diffuse_u8normx4',
-    new Uint8Array(diffuse)
-  );
+  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
   primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
@@ -574,22 +553,13 @@ export function createRotationEditGizmo(
     () => diffuse.push(...rgb[3])
   );
   const primitive = new Primitive();
-  const vertexBuffer = Application.instance.device.createVertexBuffer(
-    'position_f32x3',
-    new Float32Array(vertices)
-  );
+  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.setVertexBuffer(vertexBuffer);
-  const normalBuffer = Application.instance.device.createVertexBuffer(
-    'normal_f32x3',
-    new Float32Array(normals)
-  );
+  const normalBuffer = getDevice().createVertexBuffer('normal_f32x3', new Float32Array(normals));
   primitive.setVertexBuffer(normalBuffer);
-  const diffuseBuffer = Application.instance.device.createVertexBuffer(
-    'diffuse_u8normx4',
-    new Uint8Array(diffuse)
-  );
+  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
   primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = Application.instance.device.createIndexBuffer(new Uint16Array(indices));
+  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
   primitive.setIndexBuffer(indexBuffer);
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;

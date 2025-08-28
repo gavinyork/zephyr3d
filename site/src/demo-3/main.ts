@@ -1,4 +1,4 @@
-import { Application } from '@zephyr3d/scene';
+import { Application, getDevice } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
@@ -44,7 +44,7 @@ terrainApp.ready().then(async () => {
   terrainApp.on('pointerup', (ev) => {
     demo.handlePointerUp(ev.button, ev.offsetX, ev.offsetY);
   });
-  Application.instance.device.canvas.addEventListener('contextmenu', function (ev) {
+  getDevice().canvas.addEventListener('contextmenu', function (ev) {
     ev.preventDefault();
     return false;
   });

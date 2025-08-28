@@ -3,6 +3,7 @@ import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { Engine } from './engine';
+import { getApp, setApp } from './api';
 
 type appEventMap = {
   /**
@@ -106,7 +107,7 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
  * - Hosting the runtime scripting system and input manager.
  *
  * Singleton:
- * - Only one instance may exist at a time. Access via `Application.instance`.
+ * - Only one instance may exist at a time. Access via `{@link getApp}`.
  *
  * Events:
  * - See `appEventMap` for all emitted events (resize, tick, pointer/keyboard/drag).
@@ -122,7 +123,6 @@ export class Application extends Observable<appEventMap> {
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
   private _ready: boolean;
-  private static _instance: Application;
   /**
    * Construct the Application singleton with the provided options.
    *
@@ -132,10 +132,11 @@ export class Application extends Observable<appEventMap> {
    */
   constructor(opt: AppOptions) {
     super();
-    if (Application._instance) {
+    if (getApp()) {
       throw new Error('It is not allowed to have multiple Application instances');
     }
-    Application._instance = this;
+    setApp(this);
+
     this._options = {
       backend: opt.backend,
       enableMSAA: opt.enableMSAA ?? false,
@@ -170,20 +171,6 @@ export class Application extends Observable<appEventMap> {
    */
   get options(): AppOptions {
     return this._options;
-  }
-  /**
-   * Singleton accessor for the current Application instance.
-   *
-   * @returns The Application singleton.
-   */
-  static get instance(): Application {
-    return this._instance;
-  }
-  /**
-   * Get the instance of {@link Engine}.
-   */
-  static get engine(): Engine {
-    return this._instance?._engine;
   }
   /**
    * The initialized rendering device.

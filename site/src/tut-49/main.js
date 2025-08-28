@@ -7,7 +7,8 @@ import {
   AssetManager,
   BatchGroup,
   FPSCameraController,
-  DirectionalLight
+  DirectionalLight,
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -49,7 +50,7 @@ myApp.ready().then(async () => {
 
   camera.FXAA = true;
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   myApp.on('tick', () => {
     camera.updateController();

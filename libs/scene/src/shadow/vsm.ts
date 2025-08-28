@@ -12,10 +12,10 @@ import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
+import { getDevice } from '../app/api';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -252,7 +252,7 @@ export class VSM extends ShadowImpl {
     depthFormat: TextureFormat,
     mipmapping?: boolean
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const useTextureArray = numCascades > 1 && device.type !== 'webgl';
     const colorAttachments = colorFormat
       ? useTextureArray
@@ -341,7 +341,7 @@ export class VSM extends ShadowImpl {
     return '';
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
       device.getDeviceCaps().textureCaps.supportLinearFloatTexture
       ? device.type === 'webgl'

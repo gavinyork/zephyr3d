@@ -1,6 +1,6 @@
 import { Vector2, Vector3 } from '@zephyr3d/base';
 import type { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
-import { Application, Primitive, decodeNormalizedFloatFromRGBA, linearToGamma } from '@zephyr3d/scene';
+import { Primitive, decodeNormalizedFloatFromRGBA, getDevice, linearToGamma } from '@zephyr3d/scene';
 
 type SampleType = 'depth' | 'float' | 'unfilterable-float' | 'int' | 'uint';
 
@@ -63,7 +63,7 @@ export class TextureDrawer {
   private _enableBlend: boolean;
   private _colorScale: number;
   constructor() {
-    const device = Application.instance.device;
+    const device = getDevice();
     this._program2D = [];
     this._programCube = [];
     this._programVideo = [];
@@ -129,7 +129,7 @@ export class TextureDrawer {
     faceOrLayer = 0
   ) {
     tex = tex ?? this._dummyTexture;
-    const device = Application.instance.device;
+    const device = getDevice();
     const sampler = device.createSampler({
       magFilter: linear ? 'linear' : 'nearest',
       minFilter: linear ? 'linear' : 'nearest',
@@ -192,7 +192,7 @@ export class TextureDrawer {
     this._rect.draw();
   }
   private create2DPrograms(encode: number): TextureViewProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     const normal = this.create2DProgram('float', encode);
     const nonfilterable = this.create2DProgram('unfilterable-float', encode);
     const depth = this.create2DProgram('depth', encode);
@@ -222,7 +222,7 @@ export class TextureDrawer {
     };
   }
   private createVideoPrograms(encode: number): TextureViewProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     const normal = this.createVideoProgram(encode);
     const bindgroup = device.createBindGroup(normal.bindGroupLayouts[0]);
     return {
@@ -249,7 +249,7 @@ export class TextureDrawer {
     };
   }
   private createCubePrograms(encode: number): TextureViewProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     const normal = this.createCubeProgram('float', encode);
     const nonfilterable = this.createCubeProgram('unfilterable-float', encode);
     const depth = this.createCubeProgram('depth', encode);
@@ -271,7 +271,7 @@ export class TextureDrawer {
     };
   }
   private create2DArrayPrograms(encode: number): TextureViewProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     const normal = this.create2DArrayProgram('float', encode);
     const nonfilterable = this.create2DArrayProgram('unfilterable-float', encode);
     const depth = this.create2DArrayProgram('depth', encode);
@@ -301,7 +301,7 @@ export class TextureDrawer {
     };
   }
   private create2DProgram(sampleType: SampleType, encode: number): GPUProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -454,7 +454,7 @@ export class TextureDrawer {
     });
   }
   private createVideoProgram(_encode: number): GPUProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -500,7 +500,7 @@ export class TextureDrawer {
     });
   }
   private createCubeProgram(sampleType: SampleType, encode: number): GPUProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -590,7 +590,7 @@ export class TextureDrawer {
     });
   }
   private create2DArrayProgram(sampleType: SampleType, encode: number): GPUProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -686,7 +686,7 @@ export class TextureDrawer {
     });
   }
   private createBkShader(): GPUProgram {
-    const device = Application.instance.device;
+    const device = getDevice();
     return device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');

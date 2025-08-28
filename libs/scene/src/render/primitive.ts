@@ -21,9 +21,9 @@ import {
   PBPrimitiveType,
   matchVertexBuffer
 } from '@zephyr3d/device';
-import { Application } from '../app/app';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
+import { getDevice } from '../app/api';
 
 /**
  * Holds vertex/index data and draw parameters for a mesh geometry.
@@ -348,7 +348,7 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     data: TypedArray,
     stepMode?: VertexStepMode
   ): StructuredBuffer {
-    const device = Application.instance.device;
+    const device = getDevice();
     const buffer = Array.isArray(format)
       ? device.createInterleavedVertexBuffer(format, data)
       : device.createVertexBuffer(format, data);
@@ -385,7 +385,7 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
     dynamic?: boolean
   ): IndexBuffer {
-    const device = Application.instance.device;
+    const device = getDevice();
     const buffer = device.createIndexBuffer(data, {
       dynamic: !!dynamic,
       managed: !dynamic
@@ -511,7 +511,7 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
   private checkVertexLayout() {
     if (this._vertexLayoutDirty) {
       this._vertexLayout?.dispose();
-      const device = Application.instance.device;
+      const device = getDevice();
       this._vertexLayout = device.createVertexLayout(this._vertexLayoutOptions);
       this._vertexLayoutDirty = false;
     }

@@ -7,8 +7,8 @@ import type {
   ProgramBuilder,
   TextureFormat
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import type { WaveGenerator } from '../render/wavegenerator';
+import { getDevice } from '../app/api';
 
 function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
   return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
@@ -109,7 +109,7 @@ export class WaterShaderImpl {
 
 /** @internal */
 export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: WaterShaderImpl) {
-  return Application.instance.device.buildRenderProgram({
+  return getDevice().buildRenderProgram({
     vertex(pb) {
       this.$inputs.position = pb.vec3().attrib('position');
       this.$outputs.outPos = pb.vec3();
@@ -260,12 +260,12 @@ export function createProgramPostFFT2(
     };
   }
   if (useComputeShader) {
-    return Application.instance.device.buildComputeProgram({
+    return getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -475,12 +475,12 @@ export function createProgramHk(
     };
   }
   if (useComputeShader) {
-    return Application.instance.device.buildComputeProgram({
+    return getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -636,12 +636,12 @@ export function createProgramH0(
     };
   }
   if (useComputeShader) {
-    return Application.instance.device.buildComputeProgram({
+    return getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -828,12 +828,12 @@ export function createProgramFFT2V(
     };
   }
   if (useComputeShader) {
-    return Application.instance.device.buildComputeProgram({
+    return getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -1020,12 +1020,12 @@ export function createProgramFFT2H(
     };
   }
   if (useComputeShader) {
-    return Application.instance.device.buildComputeProgram({
+    return getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
