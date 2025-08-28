@@ -28,7 +28,7 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  await application.runtimeManager.attachScript(null, '#/index');
+  await application.engine.attachScript(null, '#/index');
   application.run();
 });
 `;

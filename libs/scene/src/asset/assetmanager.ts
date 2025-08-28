@@ -153,7 +153,7 @@ export class AssetManager {
    * Creates an instance of AssetManager
    */
   constructor(vfs?: VFS) {
-    this._vfs = vfs ?? Application.instance.runtimeManager.VFS;
+    this._vfs = vfs ?? Application.instance.engine.VFS;
     this._textures = {};
     this._models = {};
     this._binaryDatas = {};

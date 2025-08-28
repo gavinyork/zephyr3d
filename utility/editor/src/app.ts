@@ -115,7 +115,7 @@ editorApp.ready().then(async () => {
     });
   } else {
     // load startup script
-    await editorApp.runtimeManager.attachScript(null, '#/index');
+    await editorApp.engine.attachScript(null, '#/index');
   }
   editorApp.run();
 });

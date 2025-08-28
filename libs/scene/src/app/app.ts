@@ -2,7 +2,7 @@ import type { VFS } from '@zephyr3d/base';
 import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
-import { RuntimeManager } from '@zephyr3d/runtime';
+import { Engine } from './engine';
 
 type appEventMap = {
   /**
@@ -97,20 +97,6 @@ export type AppOptions = {
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 /**
- * Minimal logger interface used by Application.
- * @public
- */
-export interface Logger {
-  /**
-   * Log a message with optional level.
-   *
-   * @param text - Message text to log.
-   * @param mode - Optional severity; defaults to standard console.log behavior.
-   */
-  log(text: string, mode?: LogMode): void;
-}
-
-/**
  * Application
  *
  * Entry-point and lifecycle coordinator for the engine. Responsible for:
@@ -134,9 +120,8 @@ export class Application extends Observable<appEventMap> {
   private readonly _options: AppOptions;
   private _device: AbstractDevice;
   private readonly _inputManager: InputManager;
-  private readonly _runtimeManager: RuntimeManager;
+  private readonly _engine: Engine;
   private _ready: boolean;
-  private _logger: Logger;
   private static _instance: Application;
   /**
    * Construct the Application singleton with the provided options.
@@ -158,28 +143,13 @@ export class Application extends Observable<appEventMap> {
       canvas: opt.canvas
     };
     this._inputManager = new InputManager(this);
-    this._runtimeManager = new RuntimeManager(
+    this._engine = new Engine(
       opt.runtimeOptions?.VFS,
       opt.runtimeOptions?.scriptsRoot,
       opt.runtimeOptions?.editorMode,
       opt.runtimeOptions?.enabled
     );
     this._ready = false;
-    this._logger = {
-      log(text: string, mode?: LogMode) {
-        if (mode === 'warn') {
-          console.warn(text);
-        } else if (mode === 'error') {
-          console.error(text);
-        } else if (mode === 'debug') {
-          console.debug(text);
-        } else if (mode === 'info') {
-          console.info(text);
-        } else {
-          console.log(text);
-        }
-      }
-    };
   }
   /**
    * The input manager instance handling pointer/keyboard event routing.
@@ -188,10 +158,10 @@ export class Application extends Observable<appEventMap> {
     return this._inputManager;
   }
   /**
-   * The runtime scripting system manager.
+   * Get the instanceof {@link Engine}.
    */
-  get runtimeManager(): RuntimeManager {
-    return this._runtimeManager;
+  get engine(): Engine {
+    return this._engine;
   }
   /**
    * The (sanitized) options used to create this application.
@@ -210,6 +180,12 @@ export class Application extends Observable<appEventMap> {
     return this._instance;
   }
   /**
+   * Get the instance of {@link Engine}.
+   */
+  static get engine(): Engine {
+    return this._instance?._engine;
+  }
+  /**
    * The initialized rendering device.
    *
    * Available after `await ready()`.
@@ -222,17 +198,6 @@ export class Application extends Observable<appEventMap> {
    */
   get deviceType(): string {
     return this._options.backend.typeName();
-  }
-  /**
-   * Logger used by the application to emit messages.
-   *
-   * Replaceable for custom logging sinks.
-   */
-  get logger(): Logger {
-    return this._logger;
-  }
-  set logger(val: Logger) {
-    this._logger = val;
   }
   /**
    * Set keyboard focus to the device's canvas element.
@@ -287,7 +252,7 @@ export class Application extends Observable<appEventMap> {
       this.device.setScissor(null);
       const dt = this.device.frameInfo.elapsedFrame;
       const elapsed = this.device.frameInfo.elapsedOverall;
-      this._runtimeManager.update(dt, elapsed);
+      this._engine.update(dt, elapsed);
       this.dispatchEvent('tick', dt, elapsed);
     }
   }
@@ -308,14 +273,5 @@ export class Application extends Observable<appEventMap> {
    */
   stop() {
     this.device.exitLoop();
-  }
-  /**
-   * Convenience message logging using the current logger.
-   *
-   * @param text - Message text to log.
-   * @param mode - Optional log severity (info, warn, error, debug).
-   */
-  log(text: string, mode?: LogMode) {
-    this._logger?.log(text, mode);
   }
 }

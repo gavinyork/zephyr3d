@@ -466,22 +466,7 @@ export class SerializationManager {
   async loadScene(filename: string): Promise<Scene> {
     const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
     const json = JSON.parse(content);
-    const scene = await this.deserializeObject<Scene>(null, json);
-    if (scene) {
-      if (scene.script) {
-        await Application.instance.runtimeManager.attachScript(scene, scene.script);
-      }
-      const P: Promise<any>[] = [];
-      scene.rootNode.iterate((node) => {
-        if (node.script) {
-          P.push(Application.instance.runtimeManager.attachScript(node, node.script));
-        }
-      });
-      if (P.length > 0) {
-        await Promise.all(P);
-      }
-    }
-    return scene;
+    return await this.deserializeObject<Scene>(null, json);
   }
   /**
    * Save a scene to a JSON file via VFS.
