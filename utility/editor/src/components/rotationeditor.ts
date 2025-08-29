@@ -126,7 +126,7 @@ export class RotationEditor {
     const scene = new Scene();
     const light = new DirectionalLight(scene);
     light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-    scene.env.sky.skyType = 'color';
+    scene.env.sky.skyType = 'image';
     scene.env.sky.skyColor = new Vector4(0, 0.5, 0.5, 1);
     scene.env.sky.fogType = 'none';
     scene.env.light.type = 'constant';

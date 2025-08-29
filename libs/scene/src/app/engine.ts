@@ -1,4 +1,5 @@
-import { DRef, ReadOptions } from '@zephyr3d/base';
+import type { ReadOptions } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';

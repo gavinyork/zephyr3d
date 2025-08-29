@@ -3,7 +3,8 @@ import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
-import { ProjectService, ProjectSettings } from './core/services/project';
+import type { ProjectSettings } from './core/services/project';
+import { ProjectService } from './core/services/project';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 

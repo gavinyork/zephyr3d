@@ -1030,6 +1030,7 @@ export class SkyRenderer extends Disposable {
         vertex(pb) {
           this.$inputs.pos = pb.vec2().attrib('position');
           this.$outputs.uv = pb.vec2();
+          this.flip = pb.int().uniform(0);
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
@@ -1044,8 +1045,8 @@ export class SkyRenderer extends Disposable {
           this.texture = pb.tex2D().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           pb.main(function () {
-            this.$l.sample = pb.textureSampleLevel(this.texture, this.$inputs.uv, 0);
-            this.$l.outColor = pb.mul(this.sample, this.color);
+            this.$l.sampleColor = pb.textureSampleLevel(this.texture, this.$inputs.uv, 0);
+            this.$l.outColor = pb.mul(this.sampleColor, this.color);
             this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.outColor.rgb, 1);
             }).$else(function () {
