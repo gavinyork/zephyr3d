@@ -29,6 +29,17 @@ export function getCameraClass(): SerializableClass {
     getProps() {
       return [
         {
+          name: 'HDR',
+          type: 'bool',
+          default: false,
+          get(this: Camera, value) {
+            value.bool[0] = this.HDR;
+          },
+          set(this: Camera, value) {
+            this.HDR = value.bool[0];
+          }
+        },
+        {
           name: 'HiZ',
           type: 'bool',
           default: false,

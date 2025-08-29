@@ -15,7 +15,7 @@ import {
   createAPLutProgram,
   atmosphereLUTRendered
 } from '../shaders';
-import { Disposable, DRef, Quaternion, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -23,15 +23,15 @@ import { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
 import type { BaseTexture, GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import {
-  type AbstractDevice,
-  type BindGroup,
-  type FrameBuffer,
-  type GPUProgram,
-  type RenderStateSet,
-  type TextureCube,
-  type TextureFormat,
-  type VertexLayout
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  TextureCube,
+  TextureFormat,
+  VertexLayout
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
@@ -41,6 +41,7 @@ import { Fog, uniformSphereSamples } from '../values';
 import type { HeightFogParams } from '../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../shaders/fog';
 import { getDevice } from '../app/api';
+import { drawFullscreenQuad } from './fullscreenquad';
 
 /**
  * Type of sky
@@ -53,7 +54,7 @@ import { getDevice } from '../app/api';
  *
  * @public
  */
-export type SkyType = 'color' | 'skybox' | 'scatter' | 'none';
+export type SkyType = 'image' | 'skybox' | 'scatter' | 'none';
 
 /**
  * Type of fog
@@ -93,8 +94,10 @@ export class SkyRenderer extends Disposable {
   private static _renderStatesFog: RenderStateSet = null;
   private static _renderStatesFogScatter: RenderStateSet = null;
   private static _renderStatesDistantLight: RenderStateSet = null;
+  private static _defaultSkyImage: DRef<Texture2D> = new DRef();
   private _skyType: SkyType;
   private readonly _skyColor: Vector4;
+  private readonly _skyImage: DRef<Texture2D>;
   private _bakedSkyboxDirty: boolean;
   private readonly _scatterSkyboxTextureWidth: number;
   private readonly _skyboxTexture: DRef<TextureCube>;
@@ -134,7 +137,8 @@ export class SkyRenderer extends Disposable {
   constructor() {
     super();
     this._skyType = 'scatter';
-    this._skyColor = Vector4.zero();
+    this._skyColor = Vector4.one();
+    this._skyImage = new DRef();
     this._skyboxTexture = new DRef();
     this._bakedSkyboxTexture = new DRef();
     this._bakedSkyboxFrameBuffer = new DRef();
@@ -199,7 +203,7 @@ export class SkyRenderer extends Disposable {
     return this._bakedSkyboxTexture.get();
   }
   /**
-   * The solid sky color
+   * The color used when sky type is `image`
    */
   get skyColor(): Vector4 {
     return this._skyColor;
@@ -209,6 +213,15 @@ export class SkyRenderer extends Disposable {
       this._skyColor.set(val);
       this.invalidate();
     }
+  }
+  /**
+   * The image used when sky type is `image`
+   */
+  get skyImage(): Texture2D {
+    return this._skyImage.get();
+  }
+  set skyImage(texture: Texture2D) {
+    this._skyImage.set(texture);
   }
   /**
    * Window weights for SH projection
@@ -770,23 +783,17 @@ export class SkyRenderer extends Disposable {
   /** @internal */
   private _drawSkyColor(camera: Camera, depthTest: boolean) {
     const device = getDevice();
-    const bindgroup = this._bindgroupSky.color.get();
-    const p = new Vector3();
-    const s = new Vector3();
-    const r = new Quaternion();
-    camera.viewMatrix.decompose(s, r, p);
-    camera.worldMatrix.decompose(s, r, p);
-    bindgroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
-    bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
-    bindgroup.setValue('cameraPos', camera.getWorldPosition());
+    const bindgroup = this._bindgroupSky.image.get();
     bindgroup.setValue('color', this._skyColor);
-    bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-    device.setProgram(SkyRenderer._programSky.color);
-    device.setBindGroup(0, bindgroup);
-    device.setRenderStates(
-      depthTest ? SkyRenderer._renderStatesSky : SkyRenderer._renderStatesSkyNoDepthTest
+    bindgroup.setTexture(
+      'texture',
+      this._skyImage.get() ?? SkyRenderer._defaultSkyImage.get(),
+      fetchSampler('clamp_linear_nomip')
     );
-    SkyRenderer._primitiveSky.draw();
+    bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+    device.setProgram(SkyRenderer._programSky.image);
+    device.setBindGroup(0, bindgroup);
+    drawFullscreenQuad(depthTest ? SkyRenderer._renderStatesSky : SkyRenderer._renderStatesSkyNoDepthTest);
   }
   /** @internal */
   private _drawSkybox(camera: Camera, depthTest: boolean) {
@@ -916,6 +923,11 @@ export class SkyRenderer extends Disposable {
   /** @internal */
   private _prepareSkyBox(device: AbstractDevice) {
     SkyRenderer._createAtmosphereLUTPrograms(device);
+    if (!SkyRenderer._defaultSkyImage.get()) {
+      const texture = device.createTexture2D('rgba8unorm', 1, 1, { samplerOptions: { mipFilter: 'none' } });
+      texture.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
+      SkyRenderer._defaultSkyImage.set(texture);
+    }
     if (!SkyRenderer._programDistantLight) {
       SkyRenderer._programDistantLight = device.buildRenderProgram({
         vertex(pb) {
@@ -1012,40 +1024,40 @@ export class SkyRenderer extends Disposable {
     if (!this._bindgroupFog.get()) {
       this._bindgroupFog.set(device.createBindGroup(SkyRenderer._programFog.bindGroupLayouts[0]));
     }
-    if (!SkyRenderer._programSky.color) {
-      SkyRenderer._programSky.color = device.buildRenderProgram({
-        label: 'SolidColorSky',
+    if (!SkyRenderer._programSky.image) {
+      SkyRenderer._programSky.image = device.buildRenderProgram({
+        label: 'ImageSky',
         vertex(pb) {
-          this.$inputs.pos = pb.vec3().attrib('position');
-          this.worldMatrix = pb.mat4().uniform(0);
-          this.viewProjMatrix = pb.mat4().uniform(0);
-          this.cameraPos = pb.vec3().uniform(0);
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
           pb.main(function () {
-            this.$l.worldDirection = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz;
-            this.$builtins.position = pb.mul(
-              this.viewProjMatrix,
-              pb.vec4(pb.add(this.worldDirection, this.cameraPos), 1)
-            );
-            this.$builtins.position.z = this.$builtins.position.w;
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+            if (device.type !== 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
           });
         },
         fragment(pb) {
           this.$outputs.outColor = pb.vec4();
           this.color = pb.vec4().uniform(0);
+          this.texture = pb.tex2D().uniform(0);
           this.srgbOut = pb.int().uniform(0);
           pb.main(function () {
+            this.$l.sample = pb.textureSampleLevel(this.texture, this.$inputs.uv, 0);
+            this.$l.outColor = pb.mul(this.sample, this.color);
             this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = pb.vec4(this.color.rgb, 1);
+              this.$outputs.outColor = pb.vec4(this.outColor.rgb, 1);
             }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), 1);
+              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.outColor.rgb), 1);
             });
           });
         }
       });
     }
-    if (!this._bindgroupSky.color) {
-      this._bindgroupSky.color = new DRef(
-        device.createBindGroup(SkyRenderer._programSky.color.bindGroupLayouts[0])
+    if (!this._bindgroupSky.image) {
+      this._bindgroupSky.image = new DRef(
+        device.createBindGroup(SkyRenderer._programSky.image.bindGroupLayouts[0])
       );
     }
     if (!SkyRenderer._programSky.scatter) {

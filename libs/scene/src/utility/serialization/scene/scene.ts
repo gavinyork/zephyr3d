@@ -174,8 +174,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           phase: 0,
           options: {
             enum: {
-              labels: ['None', 'Color', 'SkyBox', 'Scatter'],
-              values: ['none', 'color', 'skybox', 'scatter']
+              labels: ['None', 'Image', 'SkyBox', 'Scatter'],
+              values: ['none', 'image', 'skybox', 'scatter']
             }
           },
           default: 'scatter',
@@ -194,8 +194,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           options: {
             animatable: true
           },
-          isValid() {
-            return this.env.sky.skyType === 'color';
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'image';
           },
           get(this: Scene, value) {
             const color = this.env.sky.skyColor;
@@ -206,6 +206,52 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           set(this: Scene, value) {
             this.env.sky.skyColor = new Vector4(value.num[0], value.num[1], value.num[2], 1);
             this.env.sky.invalidate();
+          }
+        },
+        {
+          name: 'SkyImage',
+          type: 'object',
+          default: null,
+          options: {
+            mimeTypes: [
+              'image/jpeg',
+              'image/png',
+              'image/tga',
+              'image/vnd.radiance',
+              'image/x-dds',
+              'image/webp'
+            ]
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'image';
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.str[0] = manager.getAssetId(this.env.sky.skyImage) ?? '';
+          },
+          async set(this: Scene, value) {
+            if (!value) {
+              this.env.sky.skyImage = null;
+            } else {
+              if (value.str[0]) {
+                const assetId = value.str[0];
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(assetId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                const isValidTextureType = !!tex?.isTexture2D();
+                if (isValidTextureType) {
+                  this.env.sky.skyImage = tex;
+                } else {
+                  console.error('Invalid texture type');
+                }
+              }
+            }
           }
         },
         {

@@ -84,9 +84,8 @@ export class SceneRenderer {
    */
   static renderScene(scene: Scene, camera: Camera): void {
     const device = getDevice();
-    const colorFormat = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-      ? 'rgba16f'
-      : 'rgba8unorm';
+    const colorFormat =
+      camera.HDR && device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const depthFormat = device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8
       ? 'd32fs8'
       : 'd24s8';
@@ -192,7 +191,7 @@ export class SceneRenderer {
           : ctx.SSRCalcThickness
           ? 'rg32f'
           : 'r32f';
-      const mvFormat: TextureFormat = ctx.device.type === 'webgl' ? 'rgba16f' : 'rgba16f';
+      const mvFormat: TextureFormat = 'rgba16f';
       if (!ctx.finalFramebuffer) {
         depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
           true,

@@ -105,6 +105,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _commandBufferReuse: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
+  /** @internal If true, a float point backbuffer will be used. The default value is true */
+  protected _HDR: boolean;
   /** @internal Tonemap enable flag (via post effect). */
   protected _toneMap: boolean;
   /** @internal Tonemap post effect reference. */
@@ -237,6 +239,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._oit = new DRef();
     this._depthPrePass = false;
     this._HiZ = false;
+    this._HDR = true;
     this._toneMap = true;
     this._postEffectTonemap = new DRef();
     this._tonemapExposure = 1;
@@ -354,6 +357,17 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   }
   set HiZ(val: boolean) {
     this._HiZ = !!val;
+  }
+  /**
+   * Whether HDR backbuffer is enabled.
+   *
+   * Tonemap should be disabled when not using HDR backbuffer.
+   */
+  get HDR(): boolean {
+    return this._HDR;
+  }
+  set HDR(val: boolean) {
+    this._HDR = !!val;
   }
   /**
    * Whether tonemapping is enabled via the post effect.

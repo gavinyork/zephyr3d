@@ -7,6 +7,7 @@ import type {
   GPUProgram,
   RenderStateSet,
   Texture2D,
+  TextureFormat,
   VertexLayout
 } from '@zephyr3d/device';
 import type { AbstractPostEffect } from './posteffect';
@@ -38,6 +39,8 @@ export class Compositor {
   /** @internal */
   private _prevFrameBuffer: FrameBuffer;
   /** @internal */
+  private _textureFormat: TextureFormat;
+  /** @internal */
   private static _blitProgram: GPUProgram = null;
   /** @internal */
   private static _blitBindgroup: BindGroup = null;
@@ -56,6 +59,7 @@ export class Compositor {
     this._finalFramebuffer = null;
     this._prevInputTexture = null;
     this._prevFrameBuffer = null;
+    this._textureFormat = 'rgba16f';
   }
   /** @internal */
   requireLinearDepth(ctx: DrawContext): boolean {
@@ -114,12 +118,15 @@ export class Compositor {
   /** @internal */
   begin(ctx: DrawContext) {
     const device = ctx.device;
+    this._textureFormat =
+      ctx.camera.HDR && device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
+        ? 'rgba16f'
+        : 'rgba8unorm';
     this._finalFramebuffer = device.getFramebuffer();
     const ssr = !!(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS);
     if (this._postEffects.every((list) => list.length === 0)) {
       return;
     }
-    const format = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
     const depth = this._finalFramebuffer?.getDepthAttachment() as Texture2D;
     const w = depth ? depth.width : device.getDrawingBufferWidth();
     const h = depth ? depth.height : device.getDrawingBufferHeight();
@@ -128,7 +135,7 @@ export class Compositor {
       true,
       w,
       h,
-      ssr ? [format, ctx.SSRRoughnessTexture, ctx.SSRNormalTexture] : format,
+      ssr ? [this._textureFormat, ctx.SSRRoughnessTexture, ctx.SSRNormalTexture] : this._textureFormat,
       depth ?? ctx.depthFormat
     );
     device.setFramebuffer(tmpFramebuffer);
@@ -159,7 +166,7 @@ export class Compositor {
             false,
             inputFramebuffer.getWidth(),
             inputFramebuffer.getHeight(),
-            'rgba16f',
+            this._textureFormat,
             inputFramebuffer.getDepthAttachment() ?? null
           );
           device.setFramebuffer(this._prevFrameBuffer);
