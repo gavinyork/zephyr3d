@@ -47,7 +47,8 @@ export class DlgSaveFile extends DialogRenderer<string> {
       Math.max(0, Math.min(width / 2, 200)),
       {
         multiSelect: false,
-        allowDrop: false
+        allowDrop: false,
+        allowDblClickOpen: false
       }
     );
     this._name = [this._filterPatterns[this._selected[0]]];

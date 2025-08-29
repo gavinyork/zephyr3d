@@ -52,6 +52,7 @@ const enum DropZone {
 
 type VFSRendererOptions = {
   allowDrop?: boolean;
+  allowDblClickOpen?: boolean;
   multiSelect?: boolean;
 };
 
@@ -97,7 +98,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._filesystem = null;
     this._selectedDir = null;
     this._fileFilter = fileFilter?.slice() ?? [];
-    this._options = { allowDrop: true, multiSelect: true, ...options };
+    this._options = { allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
     this.loadFileSystem();
     if (this._options.allowDrop) {
       eventBus.on('external_dragenter', this.handleDragEvent, this);
@@ -729,7 +730,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (isDir) {
       this.selectDir(item as DirectoryInfo);
       item.open = true;
-    } else {
+    } else if (this._options.allowDblClickOpen) {
       if (item.meta.path.toLowerCase().endsWith('.scn')) {
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', item.meta.path);
