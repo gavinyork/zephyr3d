@@ -1,3 +1,4 @@
+import { uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, ReadOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
@@ -143,7 +144,7 @@ export class DataTransferVFS extends VFS {
       return new TextDecoder().decode(arrayBuffer);
     } else if (options?.encoding === 'base64') {
       const bytes = new Uint8Array(arrayBuffer);
-      return btoa(String.fromCharCode(...bytes));
+      return uint8ArrayToBase64(bytes);
     } else {
       return arrayBuffer;
     }

@@ -2,6 +2,7 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } f
 import { VFS, VFSError, GlobMatcher } from './vfs';
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './readers/reader';
 import { PathUtils } from './common';
+import { uint8ArrayToBase64 } from '../utils';
 
 /**
  * Options for {@link HttpFS}.
@@ -215,7 +216,7 @@ export class HttpFS extends VFS {
       } else if (options?.encoding === 'base64') {
         const arrayBuffer = await response.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
-        data = btoa(String.fromCodePoint(...bytes));
+        data = uint8ArrayToBase64(bytes);
       } else {
         data = await response.arrayBuffer();
       }

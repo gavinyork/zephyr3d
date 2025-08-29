@@ -356,6 +356,20 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
 }
 
 /**
+ * Converts a Uint8Array to Base64 (Supports emoji character)
+ * @param array - Uint8Array to convert
+ * @returns Base64 string
+ * @public
+ */
+export function uint8ArrayToBase64(array: Uint8Array): string {
+  let binaryString = '';
+  for (let i = 0; i < array.length; i++) {
+    binaryString += String.fromCharCode(array[i]);
+  }
+  return btoa(binaryString);
+}
+
+/**
  * Converts a string to Base64 (Supports emoji character)
  * @param text - String to convert
  * @returns Base64 string
@@ -364,12 +378,7 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
 export function textToBase64(text: string): string {
   const encoder = new TextEncoder();
   const uint8Array = encoder.encode(text);
-
-  let binaryString = '';
-  for (let i = 0; i < uint8Array.length; i++) {
-    binaryString += String.fromCharCode(uint8Array[i]);
-  }
-  return btoa(binaryString);
+  return uint8ArrayToBase64(uint8Array);
 }
 
 /**
@@ -379,14 +388,23 @@ export function textToBase64(text: string): string {
  * @public
  */
 export function base64ToText(base64: string): string {
+  const bytes = base64ToUint8Array(base64);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/**
+ * Converts a base64 string to Uint8Array (Supports emoji character)
+ * @param base64 - Base64 string to convert
+ * @returns Uint8Array
+ * @public
+ */
+export function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
-
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-
-  return new TextDecoder('utf-8').decode(bytes);
+  return bytes;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { base64ToUint8Array, uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
@@ -763,11 +764,7 @@ export class ZipFS extends VFS {
 
     if (options?.encoding === 'base64' && typeof fileData === 'string') {
       try {
-        const binaryString = atob(fileData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
+        const bytes = base64ToUint8Array(fileData);
         fileData = bytes.buffer;
       } catch {
         throw new VFSError('Invalid base64 data', 'EINVAL', path);
@@ -1119,10 +1116,10 @@ export class ZipFS extends VFS {
     } else if (requestedEncoding === 'base64') {
       if (processedData instanceof ArrayBuffer) {
         const bytes = new Uint8Array(processedData);
-        processedData = btoa(String.fromCodePoint(...bytes));
+        processedData = uint8ArrayToBase64(bytes);
       } else if (typeof processedData === 'string') {
         const bytes = new TextEncoder().encode(processedData);
-        processedData = btoa(String.fromCodePoint(...bytes));
+        processedData = uint8ArrayToBase64(bytes);
       }
     } else if (requestedEncoding === 'binary' || !requestedEncoding) {
       if (typeof processedData === 'string') {

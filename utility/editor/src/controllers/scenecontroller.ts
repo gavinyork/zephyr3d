@@ -84,7 +84,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           ProjectService.VFS,
           this._editor.currentProject,
           settings,
-          400
+          500
         );
         if (newSettings) {
           await this._editor.saveProjectSettings(newSettings);

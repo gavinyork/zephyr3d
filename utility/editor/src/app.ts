@@ -1,15 +1,16 @@
-import { Application, getDevice, getInput } from '@zephyr3d/scene';
+import { Application, getDevice, getEngine, getInput } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
-import { ProjectService } from './core/services/project';
+import { ProjectService, ProjectSettings } from './core/services/project';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 
 const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
 let rhiList: string[] = [];
+let settings: ProjectSettings = null;
 if (project) {
   const setFavicon = (href: string, options: { rels?: string[]; type: string; sizes?: string }) => {
     const { rels = ['icon', 'shortcut icon', 'apple-touch-icon'], type, sizes } = options;
@@ -37,7 +38,7 @@ if (project) {
     await ProjectService.openProject(project);
   }
   const info = await ProjectService.getCurrentProjectInfo();
-  const settings = await ProjectService.getCurrentProjectSettings();
+  settings = await ProjectService.getCurrentProjectSettings();
   rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
   document.title = settings.title ?? info.name;
   if (settings.favicon) {
@@ -114,8 +115,8 @@ editorApp.ready().then(async () => {
       editor.render();
     });
   } else {
-    // load startup script
-    await editorApp.engine.attachScript(null, '#/index');
+    // start engine
+    getEngine().startup(settings.startupScene, settings.splashScreen, settings.startupScript);
   }
   editorApp.run();
 });

@@ -239,8 +239,9 @@ export class Application extends Observable<appEventMap> {
       this.device.setScissor(null);
       const dt = this.device.frameInfo.elapsedFrame;
       const elapsed = this.device.frameInfo.elapsedOverall;
-      this._engine.update(dt, elapsed);
       this.dispatchEvent('tick', dt, elapsed);
+      this._engine.update(dt, elapsed);
+      this._engine.render();
     }
   }
   /**

@@ -58,10 +58,10 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       ImGui.SetTooltip('Double click to select file');
       if (ImGui.IsMouseDoubleClicked(0)) {
         DlgOpenFile.openFile(
-          'Select Image File',
+          'Select Scene File',
           this._vfs,
           this._info,
-          'Image (*.jpg;*.png;*.tga;*.webp;*.dds)|*.jpg;*.png;*.tga;*.webp;*.dds',
+          'Scene (*.scn)|*.scn',
           500,
           400
         ).then((value) => {
@@ -88,6 +88,27 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         ).then((value) => {
           if (value) {
             this._settings.startupScene = value;
+          }
+        });
+      }
+    }
+    const startupScript = [this._settings.startupScript ?? ''] as [string];
+    if (ImGui.InputText('Startup Script', startupScript, undefined, ImGui.InputTextFlags.None)) {
+      this._settings.startupScript = startupScript[0];
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Double click to select file');
+      if (ImGui.IsMouseDoubleClicked(0)) {
+        DlgOpenFile.openFile(
+          'Select Script File',
+          this._vfs,
+          this._info,
+          'Script file (*.ts;*.js)|*.ts;*.js',
+          500,
+          400
+        ).then((value) => {
+          if (value) {
+            this._settings.startupScript = value;
           }
         });
       }

@@ -1,4 +1,4 @@
-import type { DRef } from '@zephyr3d/base';
+import { DRef, ReadOptions } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
@@ -111,6 +111,56 @@ export class Engine {
       this._loadingScenes[path] = this._loadScene(path);
     }
     return this._loadingScenes[path];
+  }
+  setScene(scene: Scene, layer = 0) {
+    if (this._activeScenes[layer]) {
+      if (scene) {
+        this._activeScenes[layer].set(scene);
+      } else {
+        this._activeScenes[layer].dispose();
+        delete this._activeScenes[layer];
+      }
+    } else if (scene) {
+      this._activeScenes[layer] = new DRef(scene);
+    }
+  }
+  async readFile<T extends ReadOptions['encoding'] = 'binary'>(
+    path: string,
+    encoding?: T
+  ): Promise<T extends 'binary' ? ArrayBuffer : string> {
+    try {
+      const content = await this.VFS.readFile(path, { encoding: encoding ?? 'binary' });
+      return content as T extends 'binary' ? ArrayBuffer : string;
+    } catch (err) {
+      console.error(`Read file '${path}' failed: ${err}`);
+      return null;
+    }
+  }
+  async startup(startupScene: string, splashScreen: string, startupScript: string) {
+    const splashScreenLayer = 9999;
+    if (splashScreen) {
+      const splashScreenScene = await this.loadSceneFromFile(splashScreen);
+      if (splashScreen) {
+        this.setScene(splashScreenScene, splashScreenLayer);
+      }
+    }
+    if (startupScript) {
+      const path =
+        startupScript.toLowerCase().endsWith('.ts') || startupScript.toLowerCase().endsWith('.js')
+          ? startupScript.slice(0, -3)
+          : startupScript;
+      await this.attachScript(null, path);
+    }
+    if (startupScene) {
+      const scene = await this.loadSceneFromFile(startupScene);
+      this.setScene(scene, 0);
+    }
+    this.setScene(null, splashScreenLayer);
+  }
+  render() {
+    for (const k of Object.keys(this._activeScenes)) {
+      this._activeScenes[k].get().render();
+    }
   }
   private async _loadScene(path: string): Promise<Scene> {
     try {

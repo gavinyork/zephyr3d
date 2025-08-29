@@ -14,6 +14,7 @@ export type ProjectSettings = {
   favicon?: string;
   startupScene?: string;
   splashScreen?: string;
+  startupScript?: string;
   preferredRHI?: string[];
 };
 
@@ -75,7 +76,7 @@ export class ProjectService {
     try {
       await vfs.makeDirectory('/src');
       await vfs.makeDirectory('/assets');
-      await vfs.writeFile('/index.html', formatString(templateIndexHTML, name), {
+      await vfs.writeFile('/index.html', formatString(templateIndexHTML, name, ''), {
         encoding: 'utf8',
         create: true
       });

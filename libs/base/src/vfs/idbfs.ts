@@ -1,3 +1,4 @@
+import { base64ToUint8Array, uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
@@ -226,10 +227,10 @@ export class IndexedDBFS extends VFS {
           } else if (requestedEncoding === 'base64') {
             if (data instanceof ArrayBuffer) {
               const bytes = new Uint8Array(data);
-              data = btoa(String.fromCodePoint(...bytes));
+              data = uint8ArrayToBase64(bytes);
             } else if (typeof data === 'string') {
               const bytes = new TextEncoder().encode(data);
-              data = btoa(String.fromCodePoint(...bytes));
+              data = uint8ArrayToBase64(bytes);
             }
           } else if (requestedEncoding === 'binary' || !requestedEncoding) {
             if (typeof data === 'string') {
@@ -303,11 +304,7 @@ export class IndexedDBFS extends VFS {
 
           if (options?.encoding === 'base64' && typeof fileData === 'string') {
             try {
-              const binaryString = atob(fileData);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
+              const bytes = base64ToUint8Array(fileData);
               fileData = bytes.buffer;
             } catch {
               reject(new VFSError('Invalid base64 data', 'EINVAL', path));
