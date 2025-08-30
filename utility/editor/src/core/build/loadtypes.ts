@@ -71,6 +71,7 @@ export async function loadTypes(
       return vp;
     }
 
+    // dataURL
     if (finalUrl.startsWith('data:')) {
       const hash = simpleHash(finalUrl);
       vp = `file:///types/_data/${hash}.d.ts`;
@@ -80,8 +81,50 @@ export async function loadTypes(
 
     const u = tryNewUrl(finalUrl, 'https://esm.sh/');
     if (!u) {
+      // not a URL：fallback
       const hash = simpleHash(finalUrl);
       vp = `file:///types/_misc/${hash}.d.ts`;
+      urlToVirtualPath.set(finalUrl, vp);
+      return vp;
+    }
+
+    const host = u.host;
+    const isEsm = /(^|\.)esm\.sh$/i.test(host);
+    if (isEsm) {
+      const segments = u.pathname.split('/').filter(Boolean);
+      if (segments.length && /^v\d+$/i.test(segments[0])) {
+        segments.shift();
+      }
+
+      const first = segments[0] || '';
+      let pkgName = '';
+      let restSegments: string[] = [];
+
+      if (first.startsWith('@')) {
+        if (segments.length >= 2) {
+          const scope = segments[0]; // @scope
+          const nameWithMaybeVer = segments[1]; // pkg or pkg@x
+          const [nameOnly /*, ver*/] = nameWithMaybeVer.split('@');
+          pkgName = `${scope}/${nameOnly}`;
+          restSegments = segments.slice(2);
+        } else {
+          const hash = simpleHash(finalUrl);
+          vp = `file:///types/${host}/_misc/${hash}.d.ts`;
+          urlToVirtualPath.set(finalUrl, vp);
+          return vp;
+        }
+      } else {
+        const [nameOnly] = first.split('@');
+        pkgName = nameOnly;
+        restSegments = segments.slice(1);
+      }
+
+      const safeRest = restSegments.map((s) => encodeURIComponent(s)).join('/');
+      const safePkg = encodeURIComponent(pkgName);
+
+      const safePath = safeRest.length ? safeRest : 'index.d.ts';
+
+      vp = `file:///types/${host}/${safePkg}/${safePath}`;
       urlToVirtualPath.set(finalUrl, vp);
       return vp;
     }
@@ -320,14 +363,35 @@ export async function loadTypes(
     });
   }
 
+  function getBarePackageName(spec: string): string {
+    if (!spec) {
+      return spec;
+    }
+
+    const clean = spec.split('?')[0].split('#')[0];
+
+    if (clean.startsWith('@')) {
+      const m = clean.match(/^(@[^/]+)\/([^@/]+)(?:@.+)?$/);
+      if (m) {
+        return `${m[1]}/${m[2]}`;
+      }
+      return clean;
+    } else {
+      const [name] = clean.split('@');
+      return name || clean;
+    }
+  }
+
   function setCompilerOptionsMapping(pkgName: string, aliasEntry: string) {
     const defaults = monaco.languages.typescript.typescriptDefaults;
     const prev = defaults.getCompilerOptions?.() ?? {};
     const nextPaths = { ...(prev.paths || {}) };
 
+    const bare = getBarePackageName(pkgName);
+
     if (mapBareSpecifier) {
       const rel = aliasEntry.replace('file:///', '');
-      nextPaths[pkgName] = [rel];
+      nextPaths[bare] = [rel];
     }
 
     defaults.setCompilerOptions({
@@ -360,7 +424,8 @@ export async function loadTypes(
   const queue: string[] = [typesEntryUrl];
   let processed = 0;
 
-  const aliasEntryPath = `file:///types/${packageName}/index.d.ts`;
+  const bareName = getBarePackageName(packageName);
+  const aliasEntryPath = `file:///types/${bareName}/index.d.ts`;
   let entryFinalUrl: string | null = null;
 
   async function worker(extraLibs: Record<string, ExtraLib>) {
@@ -427,12 +492,12 @@ export { default } from "${realEntryVirtual}";
 `.trim();
 
     registerAtPath(aliasEntryPath, aliasContent, extraLibs);
-    setCompilerOptionsMapping(packageName, aliasEntryPath);
+    setCompilerOptionsMapping(bareName, aliasEntryPath);
 
     if (addModuleShim) {
-      const shimPath = `file:///types/${packageName}/shim.d.ts`;
+      const shimPath = `file:///types/${bareName}/shim.d.ts`;
       const shim = `
-declare module "${packageName}" {
+declare module "${bareName}" {
   export * from "${aliasEntryPath}";
   export { default } from "${aliasEntryPath}";
 }

@@ -1,6 +1,7 @@
 import {
   Disposable,
   DWeakRef,
+  makeObservable,
   randomUUID,
   releaseObject,
   retainObject,
@@ -45,7 +46,12 @@ import { getDevice } from '../app/api';
  *
  * @public
  */
-export class Primitive extends Disposable implements Clonable<Primitive> {
+export class Primitive
+  extends makeObservable(Disposable)<{
+    bv_changed: [];
+  }>()
+  implements Clonable<Primitive>
+{
   /** @internal Global weak registry keyed by persistentId for serialization/lookup. */
   private static readonly _registry: Map<string, DWeakRef<Primitive>> = new Map();
   /** @internal Current vertex layout object (created lazily from options). */
@@ -70,8 +76,6 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
   protected _persistentId: string;
   /** @internal Optional bounding volume for culling/raycast. */
   protected _bbox: BoundingVolume;
-  /** @internal Callbacks fired when bounding volume changes. */
-  protected _bboxChangeCallback: (() => void)[];
   /** @internal Change tag increments when draw-affecting state changes. */
   private _changeTag: number;
   /**
@@ -96,7 +100,6 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     this._persistentId = randomUUID();
     this._changeTag = 0;
     this._bbox = null;
-    this._bboxChangeCallback = [];
     Primitive._registry.set(this._persistentId, new DWeakRef(this));
   }
   /**
@@ -182,30 +185,6 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     this.primitiveType = other.primitiveType;
     this.indexStart = other.indexStart;
     this.indexCount = other.indexCount;
-  }
-  /**
-   * Register a callback that is invoked whenever the bounding volume changes.
-   *
-   * @param cb - The callback function to add.
-   * @returns void
-   * @internal
-   */
-  addBoundingboxChangeCallback(cb: () => void): void {
-    if (cb) {
-      this._bboxChangeCallback.push(cb);
-    }
-  }
-  /**
-   * Remove a previously registered bounding-volume change callback.
-   *
-   * @param cb - The callback function to remove.
-   * @returns void
-   */
-  removeBoundingboxChangeCallback(cb: () => void) {
-    const index = this._bboxChangeCallback.indexOf(cb);
-    if (index >= 0) {
-      this._bboxChangeCallback.splice(index, 1);
-    }
   }
   /**
    * Primitive topology.
@@ -492,9 +471,7 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
   setBoundingVolume(bv: BoundingVolume): void {
     if (bv !== this._bbox) {
       this._bbox = bv;
-      for (const cb of this._bboxChangeCallback) {
-        cb();
-      }
+      this.dispatchEvent('bv_changed');
     }
   }
   /**

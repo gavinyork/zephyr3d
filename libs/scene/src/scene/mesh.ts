@@ -25,8 +25,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
-  protected _bboxChangeCallback: () => void;
-  /** @internal */
   protected _animatedBoundingBox: BoundingBox;
   /** @internal */
   protected _boneMatrices: Texture2D;
@@ -71,7 +69,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._pickTarget = { node: this };
     this._boundingBoxNode = null;
     this._batchable = getDevice().type !== 'webgl';
-    this._bboxChangeCallback = this._onBoundingboxChange.bind(this);
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
     this._skinAnimation = false;
@@ -155,13 +152,18 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._primitive.get();
   }
   set primitive(prim: Primitive) {
-    if (prim !== this._primitive.get()) {
+    const currentPrimitive = this._primitive.get();
+    if (prim !== currentPrimitive) {
+      if (currentPrimitive) {
+        currentPrimitive.off('bv_changed', this._onBoundingboxChange, this);
+      }
       this._primitive.set(prim);
+      if (prim) {
+        prim.on('bv_changed', this._onBoundingboxChange, this);
+      }
       this._instanceHash =
-        this._primitive.get() && this._material.get()
-          ? `${this.constructor.name}:${this._scene.id}:${this._primitive.get().id}:${
-              this._material.get().instanceId
-            }`
+        prim && this._material.get()
+          ? `${this.constructor.name}:${this._scene.id}:${prim.id}:${this._material.get().instanceId}`
           : null;
       this.invalidateBoundingVolume();
       RenderBundleWrapper.drawableChanged(this);
@@ -367,6 +369,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** Disposes the mesh node */
   protected onDispose() {
     super.onDispose();
+    this._primitive.get()?.off('bv_changed', this._onBoundingboxChange, this);
     this._primitive.dispose();
     this._material.dispose();
     this._renderBundle = null;
