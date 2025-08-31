@@ -11,7 +11,7 @@ import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
-import { installDeps } from '../core/build/dep';
+import { installDeps, reinstallPackages } from '../core/build/dep';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -316,33 +316,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
     DlgMessage.messageBox('Properties', info);
   }
-  private async reinstallPackages() {
-    if (!(await this.VFS.exists('/deps.lock.json'))) {
-      return;
-    }
-    if (await this.VFS.exists('/deps')) {
-      await this.VFS.deleteDirectory('/deps', true);
-    }
-    const content = (await this.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
-    const entries = JSON.parse(content) as {
-      dependencies: Record<string, { version: string }>;
-    };
-    const deps = entries.dependencies ?? {};
-    for (const pkg of Object.keys(deps)) {
-      const packageName = `${pkg}@${deps[pkg].version}`;
-      const dlgMessageBoxEx = new DlgMessageBoxEx(
-        'Install package',
-        `Installing ${packageName}`,
-        [],
-        400,
-        0,
-        false
-      );
-      dlgMessageBoxEx.showModal();
-      await installDeps(ProjectService.currentProject, this.VFS, '/', [packageName], null, true);
-      dlgMessageBoxEx.close('');
-    }
-  }
   private renderToolbar() {
     const canGoUp = this._selectedDir && this._selectedDir.parent;
     if (canGoUp) {
@@ -390,7 +363,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       }
       ImGui.SameLine();
       if (ImGui.Button(convertEmojiString('♻️##ReinstallPackages'))) {
-        this.reinstallPackages();
+        reinstallPackages();
       }
       if (ImGui.IsItemHovered()) {
         ImGui.SetTooltip('Reinstalls all third party libraries');

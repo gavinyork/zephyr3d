@@ -1,6 +1,8 @@
 import { init, parse } from 'es-module-lexer';
 import type { VFS } from '@zephyr3d/base';
 import { loadTypes } from './loadtypes';
+import { ProjectService } from '../services/project';
+import { DlgMessageBoxEx } from '../../views/dlg/messageexdlg';
 
 async function sha256Base64(text: string): Promise<string> {
   const buf = new TextEncoder().encode(text);
@@ -292,6 +294,56 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
       await vfs.makeDirectory(dir, true);
     }
     await vfs.writeFile(localPath, out, { encoding: 'utf8', create: true });
+  }
+}
+
+export async function ensureDependencies() {
+  if (!(await checkDependencies())) {
+    await reinstallPackages();
+  }
+}
+
+export async function checkDependencies(): Promise<boolean> {
+  if (await ProjectService.VFS.exists('/deps.lock.json')) {
+    const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+    const deps = JSON.parse(content) as {
+      dependencies: Record<string, { version: string; entry: string }>;
+    };
+    for (const k in deps.dependencies) {
+      const path = ProjectService.VFS.join('/', deps.dependencies[k].entry);
+      if (!(await ProjectService.VFS.exists(path))) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+export async function reinstallPackages() {
+  if (!(await ProjectService.VFS.exists('/deps.lock.json'))) {
+    return;
+  }
+  if (await ProjectService.VFS.exists('/deps')) {
+    await ProjectService.VFS.deleteDirectory('/deps', true);
+  }
+  const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+  const entries = JSON.parse(content) as {
+    dependencies: Record<string, { version: string }>;
+  };
+  const deps = entries.dependencies ?? {};
+  for (const pkg of Object.keys(deps)) {
+    const packageName = `${pkg}@${deps[pkg].version}`;
+    const dlgMessageBoxEx = new DlgMessageBoxEx(
+      'Install package',
+      `Installing ${packageName}`,
+      [],
+      400,
+      0,
+      false
+    );
+    dlgMessageBoxEx.showModal();
+    await installDeps(ProjectService.currentProject, ProjectService.VFS, '/', [packageName], null, true);
+    dlgMessageBoxEx.close('');
   }
 }
 

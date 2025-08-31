@@ -69,6 +69,7 @@ import { ProjectService } from '../core/services/project';
 import { GraphEditor } from '../components/graph/grapheditor';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editocontroller';
+import { ensureDependencies } from '../core/build/dep';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -650,11 +651,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   play() {
-    const projectId = this.controller.editor.currentProject.uuid;
-    const url = new URL(window.location.href);
-    url.searchParams.append('project', projectId);
-    url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
-    window.open(url.href, '_blank');
+    ensureDependencies().then(() => {
+      const projectId = this.controller.editor.currentProject.uuid;
+      const url = new URL(window.location.href);
+      url.searchParams.append('project', projectId);
+      url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
+      window.open(url.href, '_blank');
+    });
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);

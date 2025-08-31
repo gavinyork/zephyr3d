@@ -22,6 +22,8 @@ import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
+import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
+import { ensureDependencies, installDeps, reinstallPackages } from './build/dep';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -85,6 +87,7 @@ export class Editor {
       this.deleteScriptDependence(k);
     }
   }
+
   handleEvent(ev: Event, type?: string): boolean {
     if (
       ev.type === 'keyup' &&
@@ -380,6 +383,7 @@ export class Editor {
     await ProjectService.deleteProject(uuid);
   }
   async buildProject() {
+    await ensureDependencies();
     await buildForEndUser({
       input: '/src/index.ts',
       distDir: '/dist'
