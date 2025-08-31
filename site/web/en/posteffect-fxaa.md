@@ -1,19 +1,10 @@
 # FXAA
 
-Fast Approximate Anti-Aliasing (FXAA) is a screen-space anti-aliasing technique. It is in the Transparent group.
+Fast Approximate Anti-Aliasing (FXAA) is a screen-space anti-aliasing technique.
 
 ```javascript
-
-// Create a Compostor instance
-const compositor = new Compositor();
-// Create a post-processing instance for SAO
-const fxaa = new FXAA();
-// Adds the effect to Compostor
-compositor.appendPostEffect(fxaa);
-// ...
-// Render the scene
-camera.render(scene, compositor);
-
+// Enable FXAA for a camera instance
+camera.FXAA = true;
 ```
 
 <div class="showcase" case="tut-30" style="width:600px;height:800px;"></div>

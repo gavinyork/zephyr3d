@@ -22,8 +22,7 @@ import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
-import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
-import { ensureDependencies, installDeps, reinstallPackages } from './build/dep';
+import { ensureDependencies } from './build/dep';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -344,8 +343,10 @@ export class Editor {
       includeFiles: true,
       recursive: true
     });
-    const files = fileList.filter((path) => path.type === 'file');
-    let directories = fileList.filter((path) => path.type === 'directory');
+    const files = fileList.filter((path) => path.type === 'file' && !path.path.startsWith('/dist/'));
+    let directories = fileList.filter(
+      (path) => path.type === 'directory' && path.path !== '/dist' && !path.path.startsWith('/dist/')
+    );
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
       const path = ProjectService.VFS.relative(file.path, '/');

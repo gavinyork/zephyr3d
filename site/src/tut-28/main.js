@@ -19,6 +19,7 @@ myApp.ready().then(function () {
   // Create scene and light
   const scene = new Scene();
   const light = new DirectionalLight(scene);
+  light.intensity = 30;
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   const assetManager = new AssetManager();

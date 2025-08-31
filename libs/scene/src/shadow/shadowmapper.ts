@@ -647,7 +647,7 @@ export class ShadowMapper {
     lightCamera.rotation.identity();
     lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
-      2 * (this._light as SpotLight).cutoff,
+      2 * Math.acos((this._light as SpotLight).cutoff),
       1,
       this._config.nearClip,
       Math.min((this._shadowDistance, this._light as SpotLight).range)

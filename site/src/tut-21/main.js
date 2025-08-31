@@ -36,6 +36,7 @@ myApp.ready().then(function () {
   const material = new LambertMaterial();
   material.albedoColor = new Vector4(1, 1, 0, 1);
   const torus = new Mesh(scene, new TorusShape(), material);
+  torus.scale.setXYZ(10, 10, 10);
   torus.position.setXYZ(0, 20, 0);
 
   // Create floor
@@ -71,7 +72,7 @@ myApp.ready().then(function () {
 
     camera.viewport = [0, height >> 1, width, height - (height >> 1)];
     dirLight.shadow.mode = 'vsm';
-    dirLight.shadow.vsmDarkness = 0.1;
+    dirLight.shadow.vsmDarkness = 0.3;
     dirLight.shadow.vsmBlurKernelSize = 7;
     dirLight.shadow.vsmBlurRadius = 2;
     camera.aspect = camera.viewport[2] / camera.viewport[3];

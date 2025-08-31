@@ -116,7 +116,7 @@ export class ScriptingSystem {
         return null;
       }
       const mod = await import(url + (this._importComment ?? ''));
-      let instance: RuntimeScript<T>;
+      let instance: RuntimeScript<T> = null;
       if (typeof mod?.default === 'function') {
         // default export
         instance = new mod.default();
@@ -127,8 +127,11 @@ export class ScriptingSystem {
               await P;
             }
           }
+        } else {
+          instance = null;
         }
-      } else {
+      }
+      if (!instance) {
         console.warn(`Script '${module}' does not have RuntimeScript class exported as default`);
         return null;
       }

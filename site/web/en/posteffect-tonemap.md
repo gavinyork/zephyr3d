@@ -1,15 +1,13 @@
 # Tone mapping
 
-Tone mapping is a process used to convert HDR images to LDR ones, and it's categorized under the Transparent group. Our tone mapping utilizes the ACES encoding system.
+Tone mapping is a process used to convert HDR images to LDR ones. Our tone mapping utilizes the ACES encoding system.
 
 ```javascript
 
 // Enable tonemap
 camera.toneMap = true;
-// ...
-// Render the scene
-camera.render(scene, compositor);
-
+// Exposure value
+camea.toneMapExposure = 1.5;
 ```
 
 <div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>

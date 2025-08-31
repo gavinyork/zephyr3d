@@ -205,6 +205,7 @@ export function guessMimeType(path: string): string {
     '.js': 'text/javascript',
     '.mjs': 'text/javascript',
     '.ts': 'text/x-typescript',
+    '.wasm': 'application/wasm',
     '.json': 'application/json',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',

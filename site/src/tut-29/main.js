@@ -36,6 +36,7 @@ myApp.ready().then(function () {
   box.position.setXYZ(16, 5, -12);
   new Mesh(scene, new PlaneShape({ size: 60 }), material);
   const torus = new Mesh(scene, new TorusShape(), material);
+  torus.scale.setXYZ(8, 8, 8);
   torus.position.setXYZ(0, 3, 0);
 
   // Create camera
@@ -48,8 +49,8 @@ myApp.ready().then(function () {
   );
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
-  camera.SSAOIntensity = 0.05;
-  camera.SSAOScale = 15;
+  camera.SSAOIntensity = 0.03;
+  camera.SSAORadius = 100;
 
   getInput().use(camera.handleEvent.bind(camera));
 
