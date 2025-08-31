@@ -130,7 +130,6 @@ class LogViewImpl {
   private isPatched = false;
 
   private scrollToBottomNextFrame = false;
-  private wasAtBottom = true;
 
   private levelEnabled: Record<LogLevel, boolean> = {
     log: true,
@@ -172,7 +171,6 @@ class LogViewImpl {
       ? `[${this.options.timeFormatter?.(ts)}] ${level.toUpperCase()}: `
       : '';
 
-    // 按行拆分。保留空行（常见于堆栈）
     const lines = (text ?? '').split(/\r\n|\n|\r/);
 
     for (let li = 0; li < lines.length; li++) {
@@ -180,8 +178,7 @@ class LogViewImpl {
       this.buffer.push({ ts, level, text: line });
     }
 
-    // 自动滚动判断
-    if (this.wasAtBottom && this.options.autoScroll) {
+    if (this.options.autoScroll) {
       this.scrollToBottomNextFrame = true;
     }
   }
@@ -226,10 +223,6 @@ class LogViewImpl {
         const contentRegionH = ImGui.GetContentRegionAvail().y;
         const scrollY = ImGui.GetScrollY();
         const contentHeight = total * lineH + ImGui.GetStyle().ItemSpacing.y;
-
-        const maxScrollY = Math.max(0, contentHeight - contentRegionH);
-        const atBottom = scrollY >= maxScrollY - 0.5; // 小容差
-        this.wasAtBottom = atBottom;
 
         const firstLine = Math.max(0, Math.floor(scrollY / lineH) - 3);
         const visibleLines = Math.ceil(contentRegionH / lineH) + 6;
