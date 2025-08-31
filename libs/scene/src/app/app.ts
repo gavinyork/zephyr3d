@@ -195,10 +195,6 @@ export class Application extends Observable<appEventMap> {
   /**
    * Initialize the rendering device and start input processing.
    *
-   * - Creates the GPU device with the provided DPR and MSAA settings.
-   * - Focuses the canvas and subscribes to device resize events to emit `resize`.
-   * - Idempotent: only performs initialization on first call.
-   *
    * @throws If device creation fails.
    */
   async ready() {
