@@ -459,15 +459,41 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         return hitInfo;
       }
     } else if (this._mode === 'rotation') {
-      const distance = rayLocal.intersectionTestSphere(this._axisLength);
+      const distance = rayLocal.intersectionTestSphere(this._axisLength + this._axisRadius);
       if (distance !== null) {
+        let axis = -1;
+        let minValue = this._axisRadius;
+        const t = distance[0];
+        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
+        for (let i = 0; i < 3; i++) {
+          if (Math.abs(pointLocal[i]) < this._axisRadius) {
+            axis = i;
+            minValue = Math.abs(pointLocal[i]);
+          }
+        }
+        if (axis < 0) {
+          minValue = this._axisRadius;
+          const normal = new Vector3();
+          const center = Vector3.zero();
+          const radius = this._axisLength;
+          for (let i = 0; i < 3; i++) {
+            normal.setXYZ(0, 0, 0);
+            normal[i] = 1;
+            const d = rayLocal.intersectionTestCircle(center, normal, radius, minValue);
+            if (d) {
+              minValue = d;
+              axis = i;
+            }
+          }
+        }
+        /*
         for (const t of distance) {
           let axis = -1;
-          let minValue = this._axisRadius;
+          let minValue = this._axisRadius * 2;
           const d = [
-            Math.abs(rayLocal.origin.x + rayLocal.direction.x * t),
-            Math.abs(rayLocal.origin.y + rayLocal.direction.y * t),
-            Math.abs(rayLocal.origin.z + rayLocal.direction.z * t)
+            -rayLocal.origin.x / rayLocal.direction.x,
+            -rayLocal.origin.y / rayLocal.direction.y,
+            -rayLocal.origin.z / rayLocal.direction.z
           ];
           for (let i = 0; i < 3; i++) {
             if (d[i] < minValue) {
@@ -475,22 +501,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               minValue = d[i];
             }
           }
-          if (axis >= 0) {
-            const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
-            return {
-              axis,
-              coord: t,
-              distance: t,
-              pointLocal,
-              pointWorld: worldMatrix.transformPointAffine(pointLocal)
-            };
-          }
-        }
-        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[0]));
+*/
         return {
-          axis: -1,
-          coord: distance[0],
-          distance: distance[0],
+          axis,
+          coord: t,
+          distance: t,
           pointLocal,
           pointWorld: worldMatrix.transformPointAffine(pointLocal)
         };
@@ -525,45 +540,54 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (!this._rotateInfo) {
       return;
     }
-    const velocity = new Vector2(x - this._rotateInfo.startX, y - this._rotateInfo.startY);
-    const movement = velocity.magnitude;
-    velocity.scaleBy(1 / movement).scaleBy(10);
-    const ray = this._camera.constructRay(
-      this._rotateInfo.startX + velocity.x,
-      this._rotateInfo.startY + velocity.y
-    );
+    const deltaX = x - this._rotateInfo.startX;
+    const deltaY = y - this._rotateInfo.startY;
+    const axis = new Vector3();
     const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
-    const rayLocal = ray.transform(invWorldMatrix);
-    const distance = rayLocal.intersectionTestSphere(this._axisLength);
-    if (!distance) {
-      return;
-    }
-    const nearestPoint = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[0]));
-    worldMatrix.transformPointAffine(nearestPoint, nearestPoint);
-    const delta = Vector3.distance(this._rotateInfo.startPosition, nearestPoint);
-    if (distance.length > 1) {
-      const nearestPoint2 = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[1]));
-      worldMatrix.transformPointAffine(nearestPoint2, nearestPoint2);
-      const delta2 = Vector3.distance(this._rotateInfo.startPosition, nearestPoint2);
-      if (delta2 < delta) {
-        nearestPoint.set(nearestPoint2);
-      }
-    }
-    const center = this._node.getWorldPosition();
-    const edge1 = Vector3.sub(this._rotateInfo.startPosition, center).inplaceNormalize();
-    const edge2 = Vector3.sub(nearestPoint, center).inplaceNormalize();
-    const axis = Vector3.cross(edge1, edge2).inplaceNormalize();
+    let angle = 0;
     if (this._rotateInfo.axis === 0) {
-      axis.setXYZ(axis.x > 0 ? 1 : -1, 0, 0);
+      axis.setXYZ(1, 0, 0);
+      angle = (deltaY * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 1) {
-      axis.setXYZ(0, axis.y > 0 ? 1 : -1, 0);
+      axis.setXYZ(0, 1, 0);
+      angle = (deltaX * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 2) {
-      axis.setXYZ(0, 0, axis.y > 0 ? 1 : -1);
+      axis.setXYZ(0, 0, 1);
+      angle = (deltaY * 0.5) / this._rotateInfo.speed;
+    } else {
+      const velocity = new Vector2(deltaX, deltaY);
+      const movement = velocity.magnitude;
+      velocity.scaleBy(1 / movement).scaleBy(10);
+      const ray = this._camera.constructRay(
+        this._rotateInfo.startX + velocity.x,
+        this._rotateInfo.startY + velocity.y
+      );
+      const rayLocal = ray.transform(invWorldMatrix);
+      const distance = rayLocal.intersectionTestSphere(this._axisLength);
+      if (!distance) {
+        return;
+      }
+      const nearestPoint = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[0]));
+      worldMatrix.transformPointAffine(nearestPoint, nearestPoint);
+      const delta = Vector3.distance(this._rotateInfo.startPosition, nearestPoint);
+      if (distance.length > 1) {
+        const nearestPoint2 = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, distance[1]));
+        worldMatrix.transformPointAffine(nearestPoint2, nearestPoint2);
+        const delta2 = Vector3.distance(this._rotateInfo.startPosition, nearestPoint2);
+        if (delta2 < delta) {
+          nearestPoint.set(nearestPoint2);
+        }
+      }
+      const center = this._node.getWorldPosition();
+      const edge1 = Vector3.sub(this._rotateInfo.startPosition, center).inplaceNormalize();
+      const edge2 = Vector3.sub(nearestPoint, center).inplaceNormalize();
+      Vector3.cross(edge1, edge2, axis).inplaceNormalize();
+      angle = movement / this._rotateInfo.speed;
     }
     invWorldMatrix.transformVectorAffine(axis, axis);
     axis.inplaceNormalize();
-    const deltaRotation = Quaternion.fromAxisAngle(axis, movement / this._rotateInfo.speed);
+    const deltaRotation = Quaternion.fromAxisAngle(axis, angle);
     this._node.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
   }
   private _endRotate() {
