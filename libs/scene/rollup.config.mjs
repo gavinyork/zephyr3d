@@ -2,7 +2,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import { swc } from 'rollup-plugin-swc3';
 import dts from 'rollup-plugin-dts';
 
-const externals = [/@zephyr3d\/base/, /@zephyr3d\/device/, /@zephyr3d\/runtime/];
+const externals = [/@zephyr3d\/base/, /@zephyr3d\/device/];
 
 function getTargetDts() {
   return {

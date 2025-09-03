@@ -70,10 +70,6 @@ export default defineConfig({
           dest: 'vendor/zephyr3d/scene'
         },
         {
-          src: 'node_modules/@zephyr3d/runtime/dist',
-          dest: 'vendor/zephyr3d/runtime'
-        },
-        {
           src: 'node_modules/@zephyr3d/imgui/dist',
           dest: 'vendor/zephyr3d/imgui'
         },

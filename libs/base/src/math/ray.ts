@@ -119,9 +119,14 @@ export class Ray {
     }
     return other;
   }
-  intersectionTestCircle(center: Vector3, normal: Vector3, radius: number, epsl: number): number | null {
+  intersectionTestCircle(
+    center: Vector3,
+    normal: Vector3,
+    radius: number,
+    epsl: number
+  ): { dist: number; epsl: number } | null {
     // 数值容差
-    const deltaParallel = 5e-3; // 接近平行阈值（可按场景调到 1e-3 ~ 1e-6）
+    const deltaParallel = 1e-1; // 接近平行阈值
     const deltaZero = 1e-12; // 避免除零用的小阈值
 
     const O = this.origin;
@@ -134,13 +139,13 @@ export class Ray {
     const w = Vector3.sub(O, C);
     const a = Vector3.dot(D, N); // 射线方向与法线的夹角余弦
     const b = Vector3.dot(w, N); // 起点到平面的有符号距离
-
+    /*
     // 将点 P 投影到平面 (N, 过 C)
     const projectPointToPlane = (P: Vector3) => {
       const h = Vector3.dot(Vector3.sub(P, C), N);
       return Vector3.sub(P, Vector3.scale(N, h));
     };
-
+*/
     // 已在平面内的点 Q 到圆周的平面内距离
     const closestOnCircleInPlane = (Q: Vector3) => {
       const u = Vector3.sub(Q, C);
@@ -155,28 +160,21 @@ export class Ray {
 
     // 近似平行/共面处理：更稳健
     if (Math.abs(a) < deltaParallel) {
-      const distPlane = Math.abs(b);
-      if (distPlane > epsl) return null;
-
-      // 在平面内计算
-      const Q = projectPointToPlane(O); // 对你的示例，Q == O
-      const Dpar = Vector3.sub(D, Vector3.scale(N, Vector3.dot(D, N))); // 平面内方向分量
-      const DparLenSq = Vector3.dot(Dpar, Dpar);
-
-      if (DparLenSq < deltaZero) {
-        // 几乎没有平面内分量：最近点就是 Q
-        const dCircle = closestOnCircleInPlane(Q);
-        const distance = Math.hypot(distPlane, dCircle);
-        return distance <= epsl ? distance : null;
-      } else {
-        // 平面内对到圆心的距离最小化：s* = clamp_{s>=0} ( - (Q-C)·Dpar / ||Dpar||^2 )
-        const QC = Vector3.sub(Q, C);
-        let s = -Vector3.dot(QC, Dpar) / DparLenSq;
-        if (s < 0) s = 0;
-        const Qs = Vector3.add(Q, Vector3.scale(Dpar, s));
-        const dCircle = closestOnCircleInPlane(Qs);
-        const distance = Math.hypot(distPlane, dCircle);
-        return distance <= epsl ? distance : null;
+      const distance = this.intersectionTestSphere(center, radius + Math.abs(epsl));
+      if (!distance) {
+        return null;
+      }
+      let t = epsl;
+      let d = -1;
+      for (const dist of distance) {
+        const distPlane = Vector3.dot(Vector3.sub(Vector3.add(O, Vector3.scale(D, dist)), center), N);
+        if (Math.abs(distPlane) < t) {
+          d = dist;
+          t = Math.abs(distPlane);
+        }
+      }
+      if (d >= 0) {
+        return { dist: d, epsl: t };
       }
     }
 
@@ -186,27 +184,33 @@ export class Ray {
       // 前方交平面：直接在交点上测平面内到圆周距离
       const P = Vector3.add(O, Vector3.scale(D, tp));
       const dCircle = closestOnCircleInPlane(P);
-      return dCircle <= epsl ? dCircle : null;
+      return dCircle <= epsl ? { dist: tp, epsl: dCircle } : null;
     }
 
+    return null;
+    /*
     // 平面在射线后方：最近点是 O（t=0），组合空间距离
     const distPlane = Math.abs(b);
-    if (distPlane > epsl) return null;
+    if (distPlane > epsl) {
+      return null;
+    }
 
     const Q = projectPointToPlane(O);
     const dCircle = closestOnCircleInPlane(Q);
     const distance = Math.hypot(distPlane, dCircle);
     return distance <= epsl ? distance : null;
+    */
   }
   /**
    * Do a ray sphere intersection test
    * @param radius - Sphere radius
    * @returns Distance from origin to the intersected point if the ray intersects with the sphere, otherwise null
    */
-  intersectionTestSphere(radius: number): number[] | null {
+  intersectionTestSphere(center: Vector3, radius: number): number[] | null {
+    const O = Vector3.sub(this._origin, center);
     const a = Vector3.dot(this._direction, this._direction);
-    const b = 2 * Vector3.dot(this._origin, this._direction);
-    const c = Vector3.dot(this._origin, this._origin) - radius * radius;
+    const b = 2 * Vector3.dot(O, this._direction);
+    const c = Vector3.dot(O, O) - radius * radius;
     const discriminant = b * b - 4 * a * c;
     if (discriminant < 0) {
       return null;

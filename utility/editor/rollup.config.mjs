@@ -1,9 +1,6 @@
-import { swc } from 'rollup-plugin-swc3';
-import importCss from 'rollup-plugin-import-css';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import sourcemaps from 'rollup-plugin-sourcemaps2';
 import path from 'path';
-import copy from 'rollup-plugin-copy';
 import { fileURLToPath } from 'url';
 import commonjs from '@rollup/plugin-commonjs';
 
@@ -46,7 +43,7 @@ function getTargetWeb(name) {
 }
 
 export default (args) => {
-  return ['base', 'device', 'scene', 'imgui', 'runtime', 'backend-webgl', 'backend-webgpu'].map((name) =>
+  return ['base', 'device', 'scene', 'imgui', 'backend-webgl', 'backend-webgpu'].map((name) =>
     getTargetWeb(name)
   );
 };

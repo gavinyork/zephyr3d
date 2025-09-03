@@ -78,7 +78,6 @@
     "@zephyr3d/imgui": "workspace:*",
     "@zephyr3d/backend-webgl": "workspace:*",
     "@zephyr3d/backend-webgpu": "workspace:*",
-    "@zephyr3d/runtime": "workspace:*",
     "@rollup/browser": "^4.46.2",
     "es-module-lexer": "^1.7.0",
     "typescript": "^5.7.3",

@@ -1,5 +1,5 @@
 export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
-import { RuntimeScript } from '@zephyr3d/runtime';
+import { RuntimeScript } from '@zephyr3d/scene';
 
 // Change HostType to your attachment type
 type HostType = IDisposable;

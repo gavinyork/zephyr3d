@@ -454,11 +454,6 @@
       "shouldPublish": true
     },
     {
-      "packageName": "@zephyr3d/runtime",
-      "projectFolder": "libs/runtime",
-      "shouldPublish": true
-    },
-    {
       "packageName": "@zephyr3d/editor",
       "projectFolder": "utility/editor"
     },

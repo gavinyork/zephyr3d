@@ -5,7 +5,7 @@ import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneController } from '../controllers/scenecontroller';
 import { FontGlyph } from './fontglyph';
-import { AssetManager } from '@zephyr3d/scene';
+import { AssetManager, ScriptingSystem } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
   analyzeGPUObjectGrowth,
@@ -17,7 +17,6 @@ import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/zipdownload';
-import { ScriptingSystem } from '@zephyr3d/runtime';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';

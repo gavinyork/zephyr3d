@@ -420,6 +420,64 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     return false;
   }
+  orthonormalTo(n: Vector3) {
+    // 返回与 n 正交的单位向量
+    const ax = Math.abs(n.x),
+      ay = Math.abs(n.y),
+      az = Math.abs(n.z);
+    let t =
+      ax <= ay && ax <= az
+        ? { x: 1, y: 0, z: 0 }
+        : ay <= ax && ay <= az
+        ? { x: 0, y: 1, z: 0 }
+        : { x: 0, y: 0, z: 1 };
+    const dot = t.x * n.x + t.y * n.y + t.z * n.z;
+    let ux = t.x - dot * n.x,
+      uy = t.y - dot * n.y,
+      uz = t.z - dot * n.z;
+    const len = Math.hypot(ux, uy, uz);
+    return { x: ux / len, y: uy / len, z: uz / len };
+  }
+  lineCircleMinDistance(P0: Vector3, v: Vector3, C: Vector3, nHat: Vector3, R: number) {
+    // P0, v, C, nHat: {x,y,z}, 其中 nHat 必须为单位向量；R > 0
+    const v2 = v.x * v.x + v.y * v.y + v.z * v.z;
+
+    // 1) 直线到圆心最近点
+    const cx = C.x - P0.x,
+      cy = C.y - P0.y,
+      cz = C.z - P0.z;
+    const t0 = (cx * v.x + cy * v.y + cz * v.z) / v2;
+    const Q0 = { x: P0.x + t0 * v.x, y: P0.y + t0 * v.y, z: P0.z + t0 * v.z };
+
+    // 2) r 分解
+    const rx = Q0.x - C.x,
+      ry = Q0.y - C.y,
+      rz = Q0.z - C.z;
+    const rDotN = rx * nHat.x + ry * nHat.y + rz * nHat.z;
+    const rPerp = Math.abs(rDotN);
+    const rpx = rx - rDotN * nHat.x;
+    const rpy = ry - rDotN * nHat.y;
+    const rpz = rz - rDotN * nHat.z;
+    const rPar = Math.hypot(rpx, rpy, rpz);
+
+    // 3) 距离
+    const dInPlane = Math.max(0, rPar - R);
+    const dmin = Math.hypot(rPerp, dInPlane);
+
+    // 4) 最近点对
+    const Q = Q0;
+    let S;
+    if (rPar > 1e-12) {
+      const ux = rpx / rPar,
+        uy = rpy / rPar,
+        uz = rpz / rPar;
+      S = { x: C.x + R * ux, y: C.y + R * uy, z: C.z + R * uz };
+    } else {
+      const u = this.orthonormalTo(nHat); // 任取与 nHat 正交的单位向量
+      S = { x: C.x + R * u.x, y: C.y + R * u.y, z: C.z + R * u.z };
+    }
+    return { dmin, Q, S, t0 };
+  }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
     const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
@@ -459,33 +517,35 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         return hitInfo;
       }
     } else if (this._mode === 'rotation') {
-      const distance = rayLocal.intersectionTestSphere(this._axisLength + this._axisRadius);
+      const distance = rayLocal.intersectionTestSphere(Vector3.zero(), this._axisLength + this._axisRadius);
       if (distance !== null) {
         let axis = -1;
         let minValue = this._axisRadius;
-        const t = distance[0];
-        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
+        let t = distance[0];
+        const normal = new Vector3();
+        const center = Vector3.zero();
+        const radius = this._axisLength;
         for (let i = 0; i < 3; i++) {
-          if (Math.abs(pointLocal[i]) < this._axisRadius) {
+          normal.setXYZ(0, 0, 0);
+          normal[i] = 1;
+          /*
+          const test = this.lineCircleMinDistance(
+            rayLocal.origin,
+            rayLocal.direction,
+            center,
+            normal,
+            radius
+          );
+          console.log(`MinDist[${i}] = ${test.dmin}`);
+          */
+          const d = rayLocal.intersectionTestCircle(center, normal, radius, minValue);
+          if (d) {
+            minValue = d.epsl;
+            t = d.dist;
             axis = i;
-            minValue = Math.abs(pointLocal[i]);
           }
         }
-        if (axis < 0) {
-          minValue = this._axisRadius;
-          const normal = new Vector3();
-          const center = Vector3.zero();
-          const radius = this._axisLength;
-          for (let i = 0; i < 3; i++) {
-            normal.setXYZ(0, 0, 0);
-            normal[i] = 1;
-            const d = rayLocal.intersectionTestCircle(center, normal, radius, minValue);
-            if (d) {
-              minValue = d;
-              axis = i;
-            }
-          }
-        }
+        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
         /*
         for (const t of distance) {
           let axis = -1;
@@ -548,13 +608,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     let angle = 0;
     if (this._rotateInfo.axis === 0) {
       axis.setXYZ(1, 0, 0);
-      angle = (deltaY * 0.5) / this._rotateInfo.speed;
+      angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 1) {
       axis.setXYZ(0, 1, 0);
       angle = (deltaX * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 2) {
       axis.setXYZ(0, 0, 1);
-      angle = (deltaY * 0.5) / this._rotateInfo.speed;
+      angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else {
       const velocity = new Vector2(deltaX, deltaY);
       const movement = velocity.magnitude;
@@ -564,7 +624,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this._rotateInfo.startY + velocity.y
       );
       const rayLocal = ray.transform(invWorldMatrix);
-      const distance = rayLocal.intersectionTestSphere(this._axisLength);
+      const distance = rayLocal.intersectionTestSphere(Vector3.zero(), this._axisLength);
       if (!distance) {
         return;
       }
