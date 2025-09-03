@@ -1072,6 +1072,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (selectedNode?.isCamera() && selectedNode !== this.controller.model.scene.mainCamera) {
       this._proxy.updateProxy(selectedNode);
     }
+    this._postGizmoRenderer.updateHitInfo(this._mousePosX, this._mousePosY);
     const placeNode = this._nodeToBePlaced.get();
     if (this._mousePosX >= 0 && this._mousePosY >= 0) {
       if (placeNode) {

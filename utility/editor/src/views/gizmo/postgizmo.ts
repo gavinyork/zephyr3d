@@ -9,7 +9,13 @@ import type {
 import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
 import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
-import { createTranslationGizmo, createRotationGizmo, createScaleGizmo, createSelectGizmo } from './gizmo';
+import {
+  createTranslationGizmo,
+  createRotationGizmo,
+  createScaleGizmo,
+  createSelectGizmo,
+  axisList
+} from './gizmo';
 import type { Ray } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
@@ -49,6 +55,8 @@ type TranslatePlaneInfo = {
 };
 
 type RotateInfo = {
+  centerX: number;
+  centerY: number;
   startX: number;
   startY: number;
   startPosition: Vector3;
@@ -113,6 +121,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _translatePlaneInfo: TranslatePlaneInfo;
   private _rotateInfo: RotateInfo;
   private _scaleInfo: ScaleInfo;
+  private _hitInfo: GizmoHitInfo;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
@@ -137,6 +146,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._translatePlaneInfo = null;
     this._rotateInfo = null;
     this._scaleInfo = null;
+    this._hitInfo = null;
     this._screenSize = 0.6;
     this._gridParams = new Vector4(10000, 500, 0, 0);
     this._gridSteps = new Float32Array([
@@ -334,6 +344,24 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         destFramebuffer.getDepthAttachment(),
         fetchSampler('clamp_nearest_nomip')
       );
+      if (!this._hitInfo) {
+        PostGizmoRenderer._bindGroup.setValue('axisMode', 0);
+      } else if (
+        this._hitInfo.type === 'move_axis' ||
+        this._hitInfo.type === 'rotate_axis' ||
+        this._hitInfo.type === 'scale_axis'
+      ) {
+        PostGizmoRenderer._bindGroup.setValue('axisMode', axisList[this._hitInfo.axis]);
+      } else if (this._hitInfo.type === 'move_plane') {
+        PostGizmoRenderer._bindGroup.setValue(
+          'axisMode',
+          axisList[0] + axisList[1] + axisList[2] - axisList[this._hitInfo.axis]
+        );
+      } else if (this._hitInfo.type === 'scale_uniform') {
+        PostGizmoRenderer._bindGroup.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
+      } else {
+        PostGizmoRenderer._bindGroup.setValue('axisMode', 0);
+      }
       ctx.device.setProgram(
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
@@ -357,6 +385,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.popDeviceStates();
     ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
   }
+  updateHitInfo(x: number, y: number) {
+    if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo) {
+      return;
+    }
+    if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
+      const ray = this._camera.constructRay(x, y);
+      this._hitInfo = this.rayIntersection(ray);
+    } else {
+      this._hitInfo = null;
+    }
+  }
   /**
    * Handle pointer input events
    * @param ev - Event object
@@ -372,19 +411,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
       if (type === 'pointerdown' && button === 0) {
-        const ray = this._camera.constructRay(x, y);
-        const hitInfo = this.rayIntersection(ray);
-        if (hitInfo) {
+        if (this._hitInfo) {
           if (this._mode === 'translation' && !this._translatePlaneInfo) {
-            this._beginTranslate(x, y, hitInfo.axis, hitInfo.type, hitInfo.pointLocal);
+            this._beginTranslate(x, y, this._hitInfo.axis, this._hitInfo.type, this._hitInfo.pointLocal);
             return true;
           }
           if (this._mode === 'rotation' && !this._rotateInfo) {
-            this._beginRotate(x, y, hitInfo.axis, hitInfo.pointWorld);
+            this._beginRotate(x, y, this._hitInfo.axis, this._hitInfo.pointWorld);
             return true;
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
-            this._beginScale(x, y, hitInfo.axis, hitInfo.type, hitInfo.pointLocal);
+            this._beginScale(x, y, this._hitInfo.axis, this._hitInfo.type, this._hitInfo.pointLocal);
             return true;
           }
         }
@@ -419,64 +456,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
     }
     return false;
-  }
-  orthonormalTo(n: Vector3) {
-    // 返回与 n 正交的单位向量
-    const ax = Math.abs(n.x),
-      ay = Math.abs(n.y),
-      az = Math.abs(n.z);
-    let t =
-      ax <= ay && ax <= az
-        ? { x: 1, y: 0, z: 0 }
-        : ay <= ax && ay <= az
-        ? { x: 0, y: 1, z: 0 }
-        : { x: 0, y: 0, z: 1 };
-    const dot = t.x * n.x + t.y * n.y + t.z * n.z;
-    let ux = t.x - dot * n.x,
-      uy = t.y - dot * n.y,
-      uz = t.z - dot * n.z;
-    const len = Math.hypot(ux, uy, uz);
-    return { x: ux / len, y: uy / len, z: uz / len };
-  }
-  lineCircleMinDistance(P0: Vector3, v: Vector3, C: Vector3, nHat: Vector3, R: number) {
-    // P0, v, C, nHat: {x,y,z}, 其中 nHat 必须为单位向量；R > 0
-    const v2 = v.x * v.x + v.y * v.y + v.z * v.z;
-
-    // 1) 直线到圆心最近点
-    const cx = C.x - P0.x,
-      cy = C.y - P0.y,
-      cz = C.z - P0.z;
-    const t0 = (cx * v.x + cy * v.y + cz * v.z) / v2;
-    const Q0 = { x: P0.x + t0 * v.x, y: P0.y + t0 * v.y, z: P0.z + t0 * v.z };
-
-    // 2) r 分解
-    const rx = Q0.x - C.x,
-      ry = Q0.y - C.y,
-      rz = Q0.z - C.z;
-    const rDotN = rx * nHat.x + ry * nHat.y + rz * nHat.z;
-    const rPerp = Math.abs(rDotN);
-    const rpx = rx - rDotN * nHat.x;
-    const rpy = ry - rDotN * nHat.y;
-    const rpz = rz - rDotN * nHat.z;
-    const rPar = Math.hypot(rpx, rpy, rpz);
-
-    // 3) 距离
-    const dInPlane = Math.max(0, rPar - R);
-    const dmin = Math.hypot(rPerp, dInPlane);
-
-    // 4) 最近点对
-    const Q = Q0;
-    let S;
-    if (rPar > 1e-12) {
-      const ux = rpx / rPar,
-        uy = rpy / rPar,
-        uz = rpz / rPar;
-      S = { x: C.x + R * ux, y: C.y + R * uy, z: C.z + R * uz };
-    } else {
-      const u = this.orthonormalTo(nHat); // 任取与 nHat 正交的单位向量
-      S = { x: C.x + R * u.x, y: C.y + R * u.y, z: C.z + R * u.z };
-    }
-    return { dmin, Q, S, t0 };
   }
   /** Ray intersection */
   rayIntersection(ray: Ray): GizmoHitInfo {
@@ -528,16 +507,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         for (let i = 0; i < 3; i++) {
           normal.setXYZ(0, 0, 0);
           normal[i] = 1;
-          /*
-          const test = this.lineCircleMinDistance(
-            rayLocal.origin,
-            rayLocal.direction,
-            center,
-            normal,
-            radius
-          );
-          console.log(`MinDist[${i}] = ${test.dmin}`);
-          */
           const d = rayLocal.intersectionTestCircle(center, normal, radius, minValue);
           if (d) {
             minValue = d.epsl;
@@ -546,24 +515,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           }
         }
         const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
-        /*
-        for (const t of distance) {
-          let axis = -1;
-          let minValue = this._axisRadius * 2;
-          const d = [
-            -rayLocal.origin.x / rayLocal.direction.x,
-            -rayLocal.origin.y / rayLocal.direction.y,
-            -rayLocal.origin.z / rayLocal.direction.z
-          ];
-          for (let i = 0; i < 3; i++) {
-            if (d[i] < minValue) {
-              axis = i;
-              minValue = d[i];
-            }
-          }
-*/
         return {
           axis,
+          type: axis >= 0 ? 'rotate_axis' : 'rotate_free',
           coord: t,
           distance: t,
           pointLocal,
@@ -586,9 +540,18 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endTranslation();
     this._endScale();
     getDevice().canvas.style.cursor = 'grab';
+    const center = new Vector3();
+    this._node.worldMatrix.decompose(null, null, center);
+    this._camera.viewProjectionMatrix.transformPointH(center, center);
+    const vpWidth = this._camera.viewport ? this._camera.viewport[2] : getDevice().getViewport().width;
+    const vpHeight = this._camera.viewport ? this._camera.viewport[3] : getDevice().getViewport().height;
+    const centerX = vpWidth * (center.x * 0.5 + 0.5);
+    const centerY = vpHeight - vpHeight * (center.y * 0.5 + 0.5);
     this._rotateInfo = {
       startX: startX,
       startY: startY,
+      centerX,
+      centerY,
       startPosition: hitPosition,
       startRotation: new Quaternion(this._node.rotation),
       axis,
@@ -606,15 +569,32 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     let angle = 0;
+    let cameraPos: Vector3;
+    if (this._rotateInfo.axis >= 0) {
+      const { startX, startY, centerX, centerY } = this._rotateInfo;
+      const edgeStart = new Vector2(startX - centerX, startY - centerY).inplaceNormalize();
+      const edgeEnd = new Vector2(x - centerX, y - centerY).inplaceNormalize();
+      angle = Math.atan2(Vector2.cross(edgeEnd, edgeStart), Vector2.dot(edgeStart, edgeEnd));
+      cameraPos = this._camera.getWorldPosition();
+    }
     if (this._rotateInfo.axis === 0) {
       axis.setXYZ(1, 0, 0);
-      angle = -(deltaY * 0.5) / this._rotateInfo.speed;
+      if (cameraPos.x < worldMatrix.m03) {
+        angle *= -1;
+      }
+      //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 1) {
       axis.setXYZ(0, 1, 0);
-      angle = (deltaX * 0.5) / this._rotateInfo.speed;
+      if (cameraPos.y < worldMatrix.m13) {
+        angle *= -1;
+      }
+      //angle = (deltaX * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 2) {
       axis.setXYZ(0, 0, 1);
-      angle = -(deltaY * 0.5) / this._rotateInfo.speed;
+      if (cameraPos.z < worldMatrix.m23) {
+        angle *= -1;
+      }
+      //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else {
       const velocity = new Vector2(deltaX, deltaY);
       const movement = velocity.magnitude;
@@ -1207,15 +1187,23 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.$inputs.pos = pb.vec3().attrib('position');
         if (selectMode) {
           this.$inputs.uv = pb.vec2().attrib('texCoord0');
+          this.$inputs.axis = pb.float().attrib('texCoord1');
         } else {
+          this.$inputs.axis = pb.float().attrib('texCoord0');
           this.$inputs.color = pb.vec4().attrib('diffuse');
         }
+        this.axisMode = pb.float().uniform(0);
         this.mvpMatrix = pb.mat4().uniform(0);
         this.flip = pb.float().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 1));
           if (!selectMode) {
-            this.$outputs.color = this.$inputs.color;
+            this.colorScale = this.$choice(
+              pb.equal(this.axisMode, this.$inputs.axis),
+              pb.float(1),
+              pb.float(0.5)
+            );
+            this.$outputs.color = pb.mul(this.$inputs.color, this.colorScale);
           } else {
             this.$outputs.uv = this.$inputs.uv;
           }
@@ -1229,40 +1217,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.cameraNearFar = pb.vec2().uniform(0);
         this.time = pb.float().uniform(0);
         if (selectMode) {
-          /*
-            this.$l.x = pb.add(this.co, this.halfSize);
-            if (pb.getDevice().type === 'webgpu') {
-              this.$l.gridDomain = pb.abs(
-                pb.sub(
-                  pb.sub(this.x, pb.mul(this.gridScale, pb.floor(pb.div(this.x, this.gridScale)))),
-                  this.halfSize
-                )
-              );
-            } else {
-              this.$l.gridDomain = pb.abs(pb.sub(pb.mod(this.x, this.gridScale), this.halfSize));
-            }
-            this.gridDomain = pb.div(this.gridDomain, this.fwidthCos);
-            this.$l.lineDist = pb.min(this.gridDomain.x, this.gridDomain.y);
-            this.$return(
-              pb.sub(
-                1,
-                pb.smoothStep(gridLineSmoothEnd, gridLineSmoothStart, pb.sub(this.lineDist, this.lineSize))
-              )
-            );
-          */
           pb.func('edge', [pb.vec2('uv'), pb.float('lineWidth')], function () {
             this.$l.fw = pb.add(pb.abs(pb.dpdx(this.uv)), pb.abs(pb.dpdy(this.uv)));
             this.$l.domain = pb.abs(pb.sub(pb.fract(pb.add(this.uv, pb.vec2(0.5))), pb.vec2(0.5)));
             this.domain = pb.div(this.domain, this.fw);
             this.$l.lineDist = pb.min(this.domain.x, this.domain.y);
             this.$return(pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.lineDist, this.lineWidth))));
-            /*
-            this.$l.d = pb.mul(
-              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), this.uv),
-              pb.smoothStep(pb.vec2(0), pb.mul(this.fw, this.lineWidth), pb.sub(pb.vec2(1), this.uv))
-            );
-            this.$return(pb.smoothStep(0, 0.5, pb.sub(1, pb.min(this.d.x, this.d.y))));
-            */
           });
         }
         pb.main(function () {

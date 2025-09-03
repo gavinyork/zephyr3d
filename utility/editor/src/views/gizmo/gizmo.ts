@@ -17,6 +17,10 @@ import {
   TorusShape
 } from '@zephyr3d/scene';
 
+export const AXIS_X = 1 << 0;
+export const AXIS_Y = 1 << 1;
+export const AXIS_Z = 1 << 2;
+export const axisList = [AXIS_X, AXIS_Y, AXIS_Z];
 export function createSelectGizmo(): Primitive {
   const vertices: number[] = [];
   const uv: number[] = [];
@@ -25,12 +29,10 @@ export function createSelectGizmo(): Primitive {
   bbox.beginExtend();
   BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, uv, indices, bbox);
   const primitive = new Primitive();
-  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
-  primitive.setVertexBuffer(vertexBuffer);
-  const uvBuffer = getDevice().createVertexBuffer('tex0_f32x2', new Float32Array(uv));
-  primitive.setVertexBuffer(uvBuffer);
-  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
-  primitive.setIndexBuffer(indexBuffer);
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uv));
+  primitive.createAndSetVertexBuffer('tex1_f32', new Float32Array(vertices.length / 3).fill(0));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
   primitive.setBoundingVolume(bbox);
@@ -83,11 +85,13 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
   };
   const vertices: number[] = [];
   const diffuse: number[] = [];
+  const axies: number[] = [];
   const rgb: number[][] = [
     [255, 0, 0, 255],
     [0, 255, 0, 255],
     [0, 0, 255, 255]
   ];
+
   const indices: number[] = [];
   const bbox = new BoundingBox();
   bbox.beginExtend();
@@ -102,12 +106,16 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[0])
+    () => {
+      diffuse.push(...rgb[0]);
+      axies.push(axisList[0]);
+    }
   );
   // X arrow
-  BoxShape.generateData(boxOptionsX, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[0])
-  );
+  BoxShape.generateData(boxOptionsX, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(...rgb[0]);
+    axies.push(axisList[0]);
+  });
   // Y axis
   CylinderShape.generateData(
     axisOptionsY,
@@ -118,12 +126,16 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[1])
+    () => {
+      diffuse.push(...rgb[1]);
+      axies.push(axisList[1]);
+    }
   );
   // Y arrow
-  BoxShape.generateData(boxOptionsY, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[1])
-  );
+  BoxShape.generateData(boxOptionsY, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(...rgb[1]);
+    axies.push(axisList[1]);
+  });
   // Z axis
   CylinderShape.generateData(
     axisOptionsZ,
@@ -134,23 +146,26 @@ export function createScaleGizmo(axisLength: number, axisRadius: number, boxRadi
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[2])
+    () => {
+      diffuse.push(...rgb[2]);
+      axies.push(axisList[2]);
+    }
   );
   // Z arrow
-  BoxShape.generateData(boxOptionsZ, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[2])
-  );
+  BoxShape.generateData(boxOptionsZ, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(...rgb[2]);
+    axies.push(axisList[2]);
+  });
   // center
-  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(255, 255, 255, 255)
-  );
+  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(255, 255, 255, 255);
+    axies.push(axisList[0] + axisList[1] + axisList[2]);
+  });
   const primitive = new Primitive();
-  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
-  primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
-  primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
-  primitive.setIndexBuffer(indexBuffer);
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
+  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
   primitive.setBoundingVolume(bbox);
@@ -182,6 +197,7 @@ export function createRotationGizmo(outerRadius: number, innerRadius: number) {
   };
   const vertices: number[] = [];
   const diffuse: number[] = [];
+  const axies: number[] = [];
   const rgb: number[][] = [
     [255, 0, 0, 255],
     [0, 255, 0, 255],
@@ -192,24 +208,55 @@ export function createRotationGizmo(outerRadius: number, innerRadius: number) {
   bbox.beginExtend();
 
   // X axis
-  TorusShape.generateData(torusOptionsX, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[0])
+  TorusShape.generateData(
+    torusOptionsX,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[0]);
+      axies.push(axisList[0]);
+    }
   );
   // Y arrow
-  TorusShape.generateData(torusOptionsY, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[1])
+  TorusShape.generateData(
+    torusOptionsY,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[1]);
+      axies.push(axisList[1]);
+    }
   );
   // Y axis
-  TorusShape.generateData(torusOptionsZ, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[2])
+  TorusShape.generateData(
+    torusOptionsZ,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[2]);
+      axies.push(axisList[2]);
+    }
   );
   const primitive = new Primitive();
-  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
-  primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
-  primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
-  primitive.setIndexBuffer(indexBuffer);
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
+  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
   primitive.setBoundingVolume(bbox);
@@ -291,6 +338,7 @@ export function createTranslationGizmo(
   };
   const vertices: number[] = [];
   const diffuse: number[] = [];
+  const axies: number[] = [];
   const rgb: number[][] = [
     [255, 0, 0, 255],
     [0, 255, 0, 255],
@@ -310,7 +358,10 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[0])
+    () => {
+      diffuse.push(...rgb[0]);
+      axies.push(axisList[0]);
+    }
   );
   // X arrow
   CylinderShape.generateData(
@@ -322,11 +373,25 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[0])
+    () => {
+      diffuse.push(...rgb[0]);
+      axies.push(axisList[0]);
+    }
   );
   // X plane
-  PlaneShape.generateData(planeOptionsX, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[0])
+  PlaneShape.generateData(
+    planeOptionsX,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[0]);
+      axies.push(axisList[1] + axisList[2]);
+    }
   );
   // Y axis
   CylinderShape.generateData(
@@ -338,7 +403,10 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[1])
+    () => {
+      diffuse.push(...rgb[1]);
+      axies.push(axisList[1]);
+    }
   );
   // Y arrow
   CylinderShape.generateData(
@@ -350,11 +418,25 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[1])
+    () => {
+      diffuse.push(...rgb[1]);
+      axies.push(axisList[1]);
+    }
   );
   // Y plane
-  PlaneShape.generateData(planeOptionsY, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[1])
+  PlaneShape.generateData(
+    planeOptionsY,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[1]);
+      axies.push(axisList[0] + axisList[2]);
+    }
   );
   // Z axis
   CylinderShape.generateData(
@@ -366,7 +448,10 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[2])
+    () => {
+      diffuse.push(...rgb[2]);
+      axies.push(axisList[2]);
+    }
   );
   // Z arrow
   CylinderShape.generateData(
@@ -378,19 +463,31 @@ export function createTranslationGizmo(
     indices,
     bbox,
     vertices.length / 3,
-    () => diffuse.push(...rgb[2])
+    () => {
+      diffuse.push(...rgb[2]);
+      axies.push(axisList[2]);
+    }
   );
   // Z plane
-  PlaneShape.generateData(planeOptionsZ, vertices, null, null, null, indices, bbox, vertices.length / 3, () =>
-    diffuse.push(...rgb[2])
+  PlaneShape.generateData(
+    planeOptionsZ,
+    vertices,
+    null,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    () => {
+      diffuse.push(...rgb[2]);
+      axies.push(axisList[0] + axisList[1]);
+    }
   );
   const primitive = new Primitive();
-  const vertexBuffer = getDevice().createVertexBuffer('position_f32x3', new Float32Array(vertices));
-  primitive.setVertexBuffer(vertexBuffer);
-  const diffuseBuffer = getDevice().createVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
-  primitive.setVertexBuffer(diffuseBuffer);
-  const indexBuffer = getDevice().createIndexBuffer(new Uint16Array(indices));
-  primitive.setIndexBuffer(indexBuffer);
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
+  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
   primitive.setBoundingVolume(bbox);
