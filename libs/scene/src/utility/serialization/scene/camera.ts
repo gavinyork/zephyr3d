@@ -670,6 +670,17 @@ export function getPerspectiveCameraClass(): SerializableClass {
           set(this: PerspectiveCamera, value) {
             this.far = value.num[0];
           }
+        },
+        {
+          name: 'AutoAspect',
+          type: 'bool',
+          default: true,
+          get(this: PerspectiveCamera, value) {
+            value.bool[0] = this.autoAspect;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.autoAspect = value.bool[0];
+          }
         }
       ];
     }

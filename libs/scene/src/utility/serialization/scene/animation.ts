@@ -146,7 +146,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
     ctor: AnimationClip,
     name: 'AnimationClip',
     createFunc(ctx: SceneNode, init: string) {
-      return { obj: ctx.animationSet.createAnimation(init, false) };
+      return { obj: ctx.animationSet.get(init) ?? ctx.animationSet.createAnimation(init, false) };
     },
     getInitParams(obj: AnimationClip) {
       return obj.name;

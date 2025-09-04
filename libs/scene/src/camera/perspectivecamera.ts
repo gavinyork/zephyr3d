@@ -14,6 +14,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
   private _far: number;
   private _fovY: number;
   private _aspect: number;
+  private _autoAspect: boolean;
   private _window: number[];
   /**
    * Creates an instance of PerspectiveCamera
@@ -29,6 +30,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
     this._aspect = aspect;
     this._near = near;
     this._far = far;
+    this._autoAspect = true;
     this._window = null;
     this._invalidate(true);
   }
@@ -53,6 +55,13 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
   set window(val: number[]) {
     this._window = val?.slice() ?? null;
     this._invalidate(true);
+  }
+  /** Automatically calculate aspect ratio before render according to current viewport */
+  get autoAspect() {
+    return this._autoAspect;
+  }
+  set autoAspect(val: boolean) {
+    this._autoAspect = !!val;
   }
   /** The near clip plane */
   get near(): number {
@@ -141,6 +150,13 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
         );
       }
     }
+  }
+  /** {@inheritDoc Camera.render} */
+  render(scene: Scene) {
+    if (this._autoAspect) {
+      this.adjustAspectRatio();
+    }
+    super.render(scene);
   }
   /** @internal */
   protected _computeProj(): void {

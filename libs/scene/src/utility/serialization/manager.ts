@@ -98,14 +98,16 @@ export class SerializationManager {
   private readonly _propNameMap: Map<PropertyAccessor, string>;
   private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
   private readonly _assetManager: AssetManager;
+  private readonly _editorMode: boolean;
   private _allocated: WeakMap<any, string>;
   /**
    * Create a SerializationManager bound to a virtual file system.
    *
    * @param vfs - Virtual file system used for reading/writing assets and scenes.
    */
-  constructor(vfs: VFS) {
+  constructor(vfs: VFS, editorMode = false) {
     this._vfs = vfs;
+    this._editorMode = editorMode;
     this._allocated = new WeakMap();
     this._assetManager = new AssetManager(this._vfs);
     this._propMap = {};
@@ -169,6 +171,15 @@ export class SerializationManager {
    */
   get vfs() {
     return this._vfs;
+  }
+  /**
+   * Wethether editor mode is enabled
+   *
+   * @remarks
+   * In editor mode, some properties will be disabled
+   */
+  get editorMode() {
+    return this._editorMode;
   }
   /**
    * Get the list of all registered serializable classes.

@@ -141,7 +141,7 @@ export class ProjectService {
     await this.writeManifest(manifest);
 
     this._vfs = new IndexedDBFS(info.uuid, '$');
-    this._serializationManager = new SerializationManager(this._vfs);
+    this._serializationManager = new SerializationManager(this._vfs, true);
     this._currentProject = uuid;
     console.log(`Project opened: ${uuid}`);
     return info;
@@ -151,7 +151,7 @@ export class ProjectService {
       throw new Error('Current project must be closed before opening another project');
     }
     this._vfs = new HttpFS(url, { directoryReader });
-    this._serializationManager = new SerializationManager(this._vfs);
+    this._serializationManager = new SerializationManager(this._vfs, true);
     console.log(`Remote project opened: ${url}`);
     return {
       name: url,

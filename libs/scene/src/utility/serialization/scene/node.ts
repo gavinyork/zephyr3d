@@ -346,6 +346,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
                   }
                 }
               }
+              if (!manager.editorMode && animation.autoPlay) {
+                this.animationSet.playAnimation(animation.name, { repeat: 0 });
+              }
             }
           },
           delete(this: SceneNode, index) {
