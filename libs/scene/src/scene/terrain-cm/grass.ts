@@ -192,8 +192,8 @@ export class GrassLayer extends Disposable {
    * Add grass blades to this layer in a region
    * @param instances - Grass blade instances to add
    */
-  addInstances(instances: GrassInstanceInfo[]) {
-    this._quadtree.get().addInstances(instances);
+  addInstances(instances: GrassInstanceInfo[]): number {
+    return this._quadtree.get().addInstances(instances);
   }
   /**
    * Remove grass blades to this layer in a region
@@ -339,6 +339,7 @@ export class GrassLayer extends Disposable {
  */
 export class GrassRenderer extends Disposable {
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
+  private _numGrassBlades: number;
   private _layers: GrassLayer[];
   /**
    * Creates an instance of GrassRenderer
@@ -347,6 +348,7 @@ export class GrassRenderer extends Disposable {
   constructor(terrain: ClipmapTerrain) {
     super();
     this._terrain = new DWeakRef(terrain);
+    this._numGrassBlades = 0;
     this._layers = [];
   }
   /** @internal */
@@ -354,6 +356,10 @@ export class GrassRenderer extends Disposable {
     for (const layer of this._layers) {
       layer.updateMaterial();
     }
+  }
+  /** How many grass blades */
+  get numGrassBlades() {
+    return this._numGrassBlades;
   }
   /** How many grass layers */
   get numLayers() {
@@ -440,7 +446,7 @@ export class GrassRenderer extends Disposable {
     if (!grassLayer) {
       console.error(`Invalid grass layer: ${layer}`);
     } else {
-      grassLayer.addInstances(instances);
+      this._numGrassBlades += grassLayer.addInstances(instances);
     }
   }
   /**
@@ -594,15 +600,17 @@ export class GrassQuadtreeNode extends Disposable {
         this._children[3]._maxX = this._maxX;
         this._children[3]._maxZ = this._maxZ;
       }
+      instances = instances.slice(n);
       for (const child of this._children) {
-        if (n < instances.length) {
-          n += child.addInstances(
-            instances
-              .slice(n)
-              .filter(
-                (val) =>
-                  val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
-              )
+        if (instances.length > 0) {
+          const childInstances = instances.filter(
+            (val) =>
+              val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ
+          );
+          n += child.addInstances(childInstances);
+          instances = instances.filter(
+            (val) =>
+              !(val.x >= child._minX && val.y >= child._minZ && val.x < child._maxX && val.y < child._maxZ)
           );
         }
       }

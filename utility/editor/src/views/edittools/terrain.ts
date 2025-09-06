@@ -343,10 +343,10 @@ export class TerrainEditTool extends Disposable implements EditTool {
   }
   applyGrassBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
     const region = this._terrain.get().worldRegion;
-    const posMinX = Math.max(hitPos.x - brushSize, region.x);
-    const posMaxX = Math.min(hitPos.x + brushSize, region.z);
-    const posMinZ = Math.max(hitPos.y - brushSize, region.y);
-    const posMaxZ = Math.min(hitPos.y + brushSize, region.w);
+    const posMinX = hitPos.x - brushSize;
+    const posMaxX = hitPos.x + brushSize;
+    const posMinZ = hitPos.y - brushSize;
+    const posMaxZ = hitPos.y + brushSize;
     const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
     const regionWidthInv = 1 / (region.z - region.x);
     const regionHeightInv = 1 / (region.w - region.y);
@@ -361,30 +361,34 @@ export class TerrainEditTool extends Disposable implements EditTool {
     const centerX = (posMinX + posMaxX) * 0.5;
     const centerZ = (posMinZ + posMaxZ) * 0.5;
     const radius = Math.min(posMaxX - centerX, posMaxZ - centerZ);
-    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map(() => {
-      let r: number;
-      const sigma = 0.4;
-      do {
-        let u = 0;
-        let v = 0;
-        while (u === 0) {
-          u = Math.random();
-        }
-        while (v === 0) {
-          v = Math.random();
-        }
-        const z0 = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-        r = Math.abs(z0 * sigma);
-      } while (r > 1);
-      const theta = Math.random() * 2 * Math.PI;
-      const x = r * Math.cos(theta) * radius + centerX;
-      const y = r * Math.sin(theta) * radius + centerZ;
-      return {
-        x: (x - region.x) * regionWidthInv,
-        y: (y - region.y) * regionHeightInv,
-        angle: Math.random() * Math.PI * 2
-      };
-    });
+    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances })
+      .map(() => {
+        let r: number;
+        const sigma = 0.4;
+        do {
+          let u = 0;
+          let v = 0;
+          while (u === 0) {
+            u = Math.random();
+          }
+          while (v === 0) {
+            v = Math.random();
+          }
+          const z0 = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+          r = Math.abs(z0 * sigma);
+        } while (r > 1);
+        const theta = Math.random() * 2 * Math.PI;
+        const x = r * Math.cos(theta) * radius + centerX;
+        const y = r * Math.sin(theta) * radius + centerZ;
+        return {
+          x: (x - region.x) * regionWidthInv,
+          y: (y - region.y) * regionHeightInv,
+          angle: Math.random() * Math.PI * 2
+        };
+      })
+      .filter((v) => {
+        return v.x >= 0 && v.x <= 1 && v.y >= 0 && v.y <= 1;
+      });
     this._terrain.get().grassRenderer.addInstances(grassIndex, instances);
     eventBus.dispatchEvent('scene_changed');
   }
