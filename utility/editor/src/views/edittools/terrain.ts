@@ -350,7 +350,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
     const regionWidthInv = 1 / (region.z - region.x);
     const regionHeightInv = 1 / (region.w - region.y);
-    const numInstances = Math.ceil(area * brushStrength * 0.1);
+    const numInstances = Math.ceil(area * brushStrength * 0.02);
     /*
     const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map(() => ({
       x: (posMinX + Math.random() * (posMaxX - posMinX) - region.x) * regionWidthInv,

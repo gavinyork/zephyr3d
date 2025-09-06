@@ -790,6 +790,7 @@ export class SkyRenderer extends Disposable {
       this._skyImage.get() ?? SkyRenderer._defaultSkyImage.get(),
       fetchSampler('clamp_linear_nomip')
     );
+    bindgroup.setValue('flip', device.getFramebuffer() && device.type === 'webgpu' ? -1 : 1);
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
     device.setProgram(SkyRenderer._programSky.image);
     device.setBindGroup(0, bindgroup);
