@@ -1389,7 +1389,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       rotation: new Quaternion(node.rotation),
       scale: new Vector3(node.scale)
     };
-    node.iterate((child) => (child.gpuPickable = false));
+    node.iterate((child) => {
+      child.gpuPickable = false;
+      return false;
+    });
     this._postGizmoCaptured = true;
   }
   private handleEndTransformNode(node: SceneNode, desc: string) {
@@ -1407,7 +1410,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         )
       );
       this._oldTransform = null;
-      node.iterate((child) => (child.gpuPickable = true));
+      node.iterate((child) => {
+        child.gpuPickable = true;
+        return false;
+      });
       this._transformNode.dispose();
       this.controller.model.scene.octree.prune();
     }
