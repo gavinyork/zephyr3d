@@ -4,26 +4,37 @@ import { Vector3, Vector4 } from './vector';
 export class HeightField {
   private _region: Vector4;
   private _scale: Vector3;
+  private _baseHeight: number;
   private _width: number;
   private _height: number;
   private _heightData: Float32Array;
-  constructor(width: number, height: number, scaleY?: number, region?: Vector4) {
+  private _v00: Vector3;
+  private _v01: Vector3;
+  private _v11: Vector3;
+  private _v10: Vector3;
+
+  constructor(width: number, height: number, scaleY?: number, baseHeight?: number, region?: Vector4) {
     this._width = width;
     this._height = height;
     this._region = region?.clone() ?? new Vector4(0, 0, 1, 1);
     this._scale = new Vector3();
-    this._scale.x = (this._region.z - this._region.x) / this._width;
+    this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
     this._scale.y = scaleY ?? 1;
-    this._scale.z = (this._region.w - this._region.y) / this._height;
+    this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
+    this._baseHeight = baseHeight ?? 0;
     this._heightData = new Float32Array(width * height);
+    this._v00 = new Vector3();
+    this._v01 = new Vector3();
+    this._v11 = new Vector3();
+    this._v10 = new Vector3();
   }
   get region(): Vector4 {
     return this._region;
   }
   set region(v: Vector4) {
     this._region.set(v);
-    this._scale.x = (this._region.z - this._region.x) / this._width;
-    this._scale.z = (this._region.w - this._region.y) / this._height;
+    this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
+    this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
   }
   get scaleY(): number {
     return this._scale.y;
@@ -38,7 +49,7 @@ export class HeightField {
     if (v !== this._width) {
       this._width = v;
       this._heightData = new Float32Array(this._width * this._height);
-      this._scale.x = (this._region.z - this._region.x) / this._width;
+      this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
     }
   }
   get height(): number {
@@ -48,14 +59,14 @@ export class HeightField {
     if (v !== this._height) {
       this._height = v;
       this._heightData = new Float32Array(this._width * this._height);
-      this._scale.z = (this._region.w - this._region.y) / this._height;
+      this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
     }
   }
   get heightData(): Float32Array {
     return this._heightData;
   }
   sampleHeight(x: number, y: number): number {
-    return this._heightData[y * this._width + x] * this._scale.y;
+    return this._heightData[y * this._width + x] * this._scale.y + this._baseHeight;
   }
   calculateHeight(worldX: number, worldZ: number) {
     const u = Math.max(
@@ -95,20 +106,20 @@ export class HeightField {
     }
   }
 
-  rayIntersect(ray: Ray, x: number, y: number, w: number, h: number): number | null {
-    let x0 = ray.origin.x;
-    let y0 = ray.origin.z;
-    let dx = ray.direction.x;
-    let dy = ray.direction.z;
+  rayIntersect(rayWorld: Ray): number | null {
+    let x0 = rayWorld.origin.x;
+    let y0 = rayWorld.origin.z;
+    let dx = rayWorld.direction.x;
+    let dy = rayWorld.direction.z;
     const scaleX = this._scale.x;
     const scaleY = this._scale.z;
     const epsl = 0.001;
     let tx = 0;
     let ty = 0;
-    const xmin = x * scaleX;
-    const xmax = xmin + w * scaleX;
-    const ymin = y * scaleY;
-    const ymax = ymin + h * scaleY;
+    const xmin = this._region.x;
+    const xmax = this._region.z;
+    const ymin = this._region.y;
+    const ymax = this._region.w;
     const xcenter = (xmin + xmax) / 2;
     const ycenter = (ymin + ymax) / 2;
     let mirrorx = false;
@@ -138,22 +149,22 @@ export class HeightField {
     y0 += t * dy;
     let u = Math.floor((x0 - xmin + epsl) / scaleX);
     let v = Math.floor((y0 - ymin + epsl) / scaleY);
-    while (u >= 0 && u < w && v >= 0 && v < h) {
-      if (u < w - 1 && v < h - 1) {
-        const m = x + (mirrorx ? w - u - 1 : u);
-        const n = y + (mirrory ? h - v - 1 : v);
-        const v00 = new Vector3(m * scaleX, this.sampleHeight(m, n), n * scaleY);
-        const v01 = new Vector3((m + 1) * scaleX, this.sampleHeight(m + 1, n), n * scaleY);
-        const v11 = new Vector3((m + 1) * scaleX, this.sampleHeight(m + 1, n + 1), (n + 1) * scaleY);
-        const v10 = new Vector3(m * scaleX, this.sampleHeight(m, n + 1), (n + 1) * scaleY);
+    while (u >= 0 && u < this._width && v >= 0 && v < this._height) {
+      if (u < this._width - 1 && v < this._height - 1) {
+        const m = mirrorx ? this._width - 1 - u - 1 : u;
+        const n = mirrory ? this._height - 1 - v - 1 : v;
+        this._v00.setXYZ(xmin + m * scaleX, this.sampleHeight(m, n), ymin + n * scaleY);
+        this._v01.setXYZ(xmin + (m + 1) * scaleX, this.sampleHeight(m + 1, n), ymin + n * scaleY);
+        this._v11.setXYZ(xmin + (m + 1) * scaleX, this.sampleHeight(m + 1, n + 1), ymin + (n + 1) * scaleY);
+        this._v10.setXYZ(xmin + m * scaleX, this.sampleHeight(m, n + 1), ymin + (n + 1) * scaleY);
         let intersected = false;
-        let dist1 = ray.intersectionTestTriangle(v00, v01, v10, false);
+        let dist1 = rayWorld.intersectionTestTriangle(this._v00, this._v01, this._v10, false);
         if (dist1 !== null && dist1 > 0) {
           intersected = true;
         } else {
           dist1 = Number.MAX_VALUE;
         }
-        let dist2 = ray.intersectionTestTriangle(v10, v01, v11, false);
+        let dist2 = rayWorld.intersectionTestTriangle(this._v10, this._v01, this._v11, false);
         if (dist2 !== null && dist2 > 0) {
           intersected = true;
         } else {
@@ -165,11 +176,11 @@ export class HeightField {
       }
       let d = Infinity;
       if (dx > 0) {
-        const x1 = (u + x + 1) * scaleX;
+        const x1 = xmin + (u + 1) * scaleX;
         d = Math.min(d, (x1 - x0) / dx);
       }
       if (dy !== 0) {
-        const y1 = (v + y + 1) * scaleY;
+        const y1 = ymin + (v + 1) * scaleY;
         d = Math.min(d, (y1 - y0) / dy);
       }
       x0 += d * dx;
