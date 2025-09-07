@@ -32,6 +32,7 @@ export interface ClipmapGatherContext {
   gridScale: number;
   minMaxWorldPos: Vector4;
   userData: unknown;
+  frustumCulling: boolean;
   calcAABB(
     userData: unknown,
     minX: number,
@@ -782,6 +783,7 @@ export class Clipmap extends Disposable {
     // draw cross
     snappedPos.setXY(Math.floor(posX), Math.floor(posY));
     if (
+      !context.frustumCulling ||
       this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale, 0)
     ) {
       const crossPrimitives: PrimitiveInstanceInfo = {
@@ -855,6 +857,7 @@ export class Clipmap extends Disposable {
             )
           ) {
             if (
+              !context.frustumCulling ||
               this.visible(
                 context,
                 this._tileMeshBBox,
@@ -873,6 +876,7 @@ export class Clipmap extends Disposable {
       }
       // draw filler
       if (
+        !context.frustumCulling ||
         this.visible(
           context,
           this._fillerMeshAABB,
@@ -900,6 +904,7 @@ export class Clipmap extends Disposable {
         r |= d.x >= scale ? 0 : 2;
         r |= d.y >= scale ? 0 : 1;
         if (
+          !context.frustumCulling ||
           this.visible(
             context,
             this._trimMeshAABB,
@@ -919,6 +924,7 @@ export class Clipmap extends Disposable {
           nextSnappedPos.y - (this._tileResolution << (l + 1))
         );
         if (
+          !context.frustumCulling ||
           this.visible(
             context,
             this._seamMeshAABB,
@@ -952,180 +958,6 @@ export class Clipmap extends Disposable {
         .bufferSubData(0, info.instanceDatas, 0, info.numInstances * 4);
     }
     return renderData;
-  }
-  draw(context: ClipmapDrawContext): number {
-    let drawn = 0;
-    const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);
-    context.camera.getWorldPosition(tmpV3);
-
-    const snappedPos = new Vector2();
-    const tileSize = new Vector2();
-    const base = new Vector2();
-    const offset = new Vector2();
-
-    const posX = tmpV3.x / context.gridScale;
-    const posY = tmpV3.z / context.gridScale;
-
-    // draw cross
-    snappedPos.setXY(Math.floor(posX), Math.floor(posY));
-    if (
-      this.visible(context, this._crossMeshAABB, context.camera, null, snappedPos, 1, context.gridScale, 0)
-    ) {
-      context.drawPrimitive(
-        this._wireframe ? this._crossMeshLines : this._crossMesh,
-        rotationValues[0],
-        snappedPos,
-        1,
-        context.gridScale,
-        0
-      );
-      drawn++;
-    }
-
-    for (let l = 0; l < mipLevels; l++) {
-      const scale = 1 << l;
-      snappedPos.setXY(Math.floor(posX / scale) * scale, Math.floor(posY / scale) * scale);
-      // draw tiles
-      tileSize.setXY(this._tileResolution << l, this._tileResolution << l);
-      base.setXY(
-        snappedPos.x - (this._tileResolution << (l + 1)),
-        snappedPos.y - (this._tileResolution << (l + 1))
-      );
-      for (let x = 0; x < 4; x++) {
-        for (let y = 0; y < 4; y++) {
-          if (l !== 0 && (x === 1 || x === 2) && (y === 1 || y === 2)) {
-            continue;
-          }
-          const fillX = x >= 2 ? scale : 0;
-          const fillY = y >= 2 ? scale : 0;
-          offset.setXY(base.x + x * tileSize.x + fillX, base.y + y * tileSize.y + fillY);
-          if (
-            this.intervalsOverlap(
-              offset.x * context.gridScale,
-              (offset.x + tileSize.x) * context.gridScale,
-              context.minMaxWorldPos.x,
-              context.minMaxWorldPos.z
-            ) &&
-            this.intervalsOverlap(
-              offset.y * context.gridScale,
-              (offset.y + tileSize.y) * context.gridScale,
-              context.minMaxWorldPos.y,
-              context.minMaxWorldPos.w
-            )
-          ) {
-            if (
-              this.visible(
-                context,
-                this._tileMeshBBox,
-                context.camera,
-                null,
-                offset,
-                scale,
-                context.gridScale,
-                l
-              )
-            ) {
-              context.drawPrimitive(
-                this._wireframe ? this._tileMeshLines : this._tileMesh,
-                rotationValues[0],
-                offset,
-                scale,
-                context.gridScale,
-                l
-              );
-              drawn++;
-            }
-          }
-        }
-      }
-      // draw filler
-      if (
-        this.visible(
-          context,
-          this._fillerMeshAABB,
-          context.camera,
-          null,
-          snappedPos,
-          scale,
-          context.gridScale,
-          l
-        )
-      ) {
-        context.drawPrimitive(
-          this._wireframe ? this._fillerMeshLines : this._fillerMesh,
-          rotationValues[0],
-          snappedPos,
-          scale,
-          context.gridScale,
-          l
-        );
-        drawn++;
-      }
-
-      if (l !== mipLevels - 1) {
-        const nextScale = scale * 2;
-        const nextSnappedPos = new Vector2(
-          Math.floor(posX / nextScale) * nextScale,
-          Math.floor(posY / nextScale) * nextScale
-        );
-        // draw trim
-        const tileCentre = new Vector2(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
-        const d = new Vector2(posX - nextSnappedPos.x, posY - nextSnappedPos.y);
-        let r = 0;
-        r |= d.x >= scale ? 0 : 2;
-        r |= d.y >= scale ? 0 : 1;
-        if (
-          this.visible(
-            context,
-            this._trimMeshAABB,
-            context.camera,
-            rotationValues[r],
-            tileCentre,
-            scale,
-            context.gridScale,
-            l
-          )
-        ) {
-          context.drawPrimitive(
-            this._wireframe ? this._trimMeshLines : this._trimMesh,
-            rotationValues[r],
-            tileCentre,
-            scale,
-            context.gridScale,
-            l
-          );
-          drawn++;
-        }
-        // draw seam
-        const nextBase = new Vector2(
-          nextSnappedPos.x - (this._tileResolution << (l + 1)),
-          nextSnappedPos.y - (this._tileResolution << (l + 1))
-        );
-        if (
-          this.visible(
-            context,
-            this._seamMeshAABB,
-            context.camera,
-            null,
-            nextBase,
-            scale,
-            context.gridScale,
-            l
-          )
-        ) {
-          context.drawPrimitive(
-            this._wireframe ? this._seamMeshLines : this._seamMesh,
-            rotationValues[0],
-            nextBase,
-            scale,
-            context.gridScale,
-            l
-          );
-          drawn++;
-        }
-      }
-    }
-    return drawn;
   }
   /** Disposes the clipmap and release all meshes */
   protected onDispose() {

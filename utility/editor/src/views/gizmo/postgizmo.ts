@@ -6,7 +6,7 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Camera, DrawContext, Primitive, SceneNode } from '@zephyr3d/scene';
+import type { Camera, DrawContext, PickResult, Primitive, SceneNode } from '@zephyr3d/scene';
 import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import {
@@ -33,6 +33,7 @@ const gridLineSmoothEnd = 0.5 - discRadius;
 export type HitType =
   | 'move_axis'
   | 'move_plane'
+  | 'move_free'
   | 'rotate_axis'
   | 'rotate_free'
   | 'scale_axis'
@@ -357,7 +358,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           'axisMode',
           axisList[0] + axisList[1] + axisList[2] - axisList[this._hitInfo.axis]
         );
-      } else if (this._hitInfo.type === 'scale_uniform') {
+      } else if (this._hitInfo.type === 'scale_uniform' || this._hitInfo.type === 'move_free') {
         PostGizmoRenderer._bindGroup.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
       } else {
         PostGizmoRenderer._bindGroup.setValue('axisMode', 0);
@@ -402,7 +403,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
    * @param type - Event type
    * @returns true if event was handled, otherwise false
    */
-  handlePointerEvent(type: string, x: number, y: number, button: number): boolean {
+  handlePointerEvent(type: string, x: number, y: number, button: number, pickResult: PickResult): boolean {
     if (!this.enabled || !this._node) {
       this._endRotate();
       this._endTranslation();
@@ -428,7 +429,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
       if (type === 'pointermove') {
         if (this._mode === 'translation' && this._translatePlaneInfo) {
-          this._updateTranslation(x, y);
+          this._updateTranslation(x, y, pickResult);
           return true;
         }
         if (this._mode === 'rotation' && this._rotateInfo) {
@@ -470,18 +471,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         pointWorld: null,
         pointLocal: null
       };
-      if (this._mode === 'scaling') {
-        const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
-        if (d > 0) {
-          hitInfo.type = 'scale_uniform';
-          hitInfo.distance = d;
-          hitInfo.pointLocal = Vector3.add(
-            rayLocal.origin,
-            Vector3.scale(rayLocal.direction, hitInfo.distance)
-          );
-          hitInfo.pointWorld = worldMatrix.transformPointAffine(hitInfo.pointLocal);
-          return hitInfo;
-        }
+      const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
+      if (d > 0) {
+        hitInfo.type = this._mode === 'scaling' ? 'scale_uniform' : 'move_free';
+        hitInfo.distance = d;
+        hitInfo.pointLocal = Vector3.add(
+          rayLocal.origin,
+          Vector3.scale(rayLocal.direction, hitInfo.distance)
+        );
+        hitInfo.pointWorld = worldMatrix.transformPointAffine(hitInfo.pointLocal);
+        return hitInfo;
       }
       const length =
         this._axisLength + (this._mode === 'translation' ? this._arrowLength : 2 * this._boxSize);
@@ -746,8 +745,27 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     };
     this.dispatchEvent('begin_translate', this._node);
   }
-  private _updateTranslation(x: number, y: number) {
+  private _updateTranslation(x: number, y: number, pickResult: PickResult) {
     if (!this._translatePlaneInfo) {
+      return;
+    }
+    if (this._translatePlaneInfo.type === 'move_free') {
+      const hitPos = pickResult?.intersectedPoint ?? null;
+      if (hitPos) {
+        console.log('PickTarget:', pickResult.target.label ?? pickResult.target.node.constructor.name);
+        const parentPos = this._node.parent.getWorldPosition();
+        this._node.position.set(Vector3.sub(hitPos, parentPos, parentPos));
+      } else {
+        const ray = this.camera.constructRay(x, y);
+        let hitDistance = -ray.origin.y / ray.direction.y;
+        if (Number.isNaN(hitDistance) || hitDistance < 0) {
+          hitDistance = 10;
+        }
+        const px = ray.origin.x + ray.direction.x * hitDistance;
+        const py = ray.origin.y + ray.direction.y * hitDistance;
+        const pz = ray.origin.z + ray.direction.z * hitDistance;
+        this._node.position.setXYZ(px, py, pz);
+      }
       return;
     }
     const ray = this._camera.constructRay(x, y);
@@ -1293,7 +1311,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this._axisLength,
           this._axisRadius,
           this._arrowLength,
-          this._arrowRadius
+          this._arrowRadius,
+          this._boxSize
         ),
         rotation: createRotationGizmo(this._axisLength, this._axisRadius),
         scaling: createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize),

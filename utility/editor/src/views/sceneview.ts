@@ -733,17 +733,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (ev instanceof PointerEvent) {
       const p = [ev.offsetX, ev.offsetY];
       const insideViewport = this.posToViewport(p, this.controller.model.scene.mainCamera.viewport);
+      this._mousePosX = insideViewport ? p[0] : -1;
+      this._mousePosY = insideViewport ? p[1] : -1;
       if (this._postGizmoCaptured) {
-        this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button);
+        this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button, this._pickResult);
         return true;
       }
       if (!insideViewport) {
-        this._mousePosX = -1;
-        this._mousePosY = -1;
         return false;
       }
-      this._mousePosX = p[0];
-      this._mousePosY = p[1];
       if (placeNode) {
         if (ev.type === 'pointerdown') {
           if (ev.button === 0) {
@@ -798,7 +796,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           }
         }
       }
-      if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button)) {
+      if (this._postGizmoRenderer.handlePointerEvent(ev.type, p[0], p[1], ev.button, this._pickResult)) {
         return true;
       }
       if (
@@ -1391,6 +1389,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       rotation: new Quaternion(node.rotation),
       scale: new Vector3(node.scale)
     };
+    node.iterate((child) => (child.gpuPickable = false));
     this._postGizmoCaptured = true;
   }
   private handleEndTransformNode(node: SceneNode, desc: string) {
@@ -1408,6 +1407,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         )
       );
       this._oldTransform = null;
+      node.iterate((child) => (child.gpuPickable = true));
       this._transformNode.dispose();
       this.controller.model.scene.octree.prune();
     }

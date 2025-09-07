@@ -151,6 +151,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       minMaxWorldPos: mat.region,
       gridScale: Math.max(0.01, this._gridScale),
       userData: this,
+      frustumCulling: true,
       calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
         const p = that.worldMatrix.transformPointAffine(Vector3.zero());
         if (that.waveGenerator) {

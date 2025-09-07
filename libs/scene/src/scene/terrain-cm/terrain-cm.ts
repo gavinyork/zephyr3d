@@ -456,6 +456,7 @@ export class ClipmapTerrain
       minMaxWorldPos: mat.region,
       gridScale: this._gridScale,
       userData: this,
+      frustumCulling: !this.castShadow,
       calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
         const p = that.worldMatrix.transformPointAffine(Vector3.zero());
         outAABB.minPoint.setXYZ(minX, bv ? bv.minPoint.y : p.y - 9999, minZ);

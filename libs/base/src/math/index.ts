@@ -6,6 +6,7 @@ export * from './plane';
 export * from './frustum';
 export * from './aabb';
 export * from './ray';
+export * from './heightfield';
 export * from './sh';
 export * from './noise';
 export * from './interpolator';

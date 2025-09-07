@@ -278,7 +278,8 @@ export function createTranslationGizmo(
   axisLength: number,
   axisRadius: number,
   arrowLength: number,
-  arrowRadius: number
+  arrowRadius: number,
+  boxRadius: number
 ): Primitive {
   const axisOptions: CylinderCreationOptions = {
     topRadius: axisRadius,
@@ -336,6 +337,10 @@ export function createTranslationGizmo(
       Quaternion.fromAxisAngle(new Vector3(1, 0, 0), Math.PI * 0.5)
     )
   };
+  const boxOptions: BoxCreationOptions = {
+    size: boxRadius * 2
+  };
+
   const vertices: number[] = [];
   const diffuse: number[] = [];
   const axies: number[] = [];
@@ -483,6 +488,11 @@ export function createTranslationGizmo(
       axies.push(axisList[0] + axisList[1]);
     }
   );
+  // center
+  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(255, 255, 255, 255);
+    axies.push(axisList[0] + axisList[1] + axisList[2]);
+  });
   const primitive = new Primitive();
   primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
