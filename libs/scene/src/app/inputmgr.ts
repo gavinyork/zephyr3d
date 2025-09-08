@@ -56,10 +56,12 @@ export class InputManager {
   private readonly _pointerUpHandler: PointerEventHandler;
   private readonly _pointerMoveHandler: PointerEventHandler;
   private readonly _pointerCancelHandler: PointerEventHandler;
+  private readonly _contextMenuHandler: PointerEventHandler;
   private readonly _keyboardHandler: KeyboardEventHandler;
   private readonly _dragHandler: DragEventHandler;
   private readonly _wheelHandler: WheelEventHandler;
   private readonly _compositionHandler: CompositionEventHandler;
+  private _enableContextMenu: boolean;
   private _captureId: number;
   private readonly _middlewares: { handler: InputEventHandler; ctx: unknown }[];
   private _lastEventDatas: PointerEventData[];
@@ -77,10 +79,12 @@ export class InputManager {
     this._dblclickDistTolerance = 4 * 4;
     this._dblclickTimeTolerance = 400;
     this._lastEventDatas = [];
+    this._enableContextMenu = false;
     this._pointerDownHandler = this._getPointerDownHandler();
     this._pointerUpHandler = this._getPointerUpHandler();
     this._pointerMoveHandler = this._getPointerMoveHander();
     this._pointerCancelHandler = this._getPointerCancelHandler();
+    this._contextMenuHandler = this._getContextMenuHandler();
     this._keyboardHandler = this._getKeyboardHandler();
     this._dragHandler = this._getDragHandler();
     this._wheelHandler = this._getWheelHandler();
@@ -102,6 +106,7 @@ export class InputManager {
       this._target.addEventListener('pointerup', this._pointerUpHandler);
       this._target.addEventListener('pointermove', this._pointerMoveHandler);
       this._target.addEventListener('pointercancel', this._pointerCancelHandler);
+      this._target.addEventListener('contextmenu', this._contextMenuHandler);
       this._target.addEventListener('keydown', this._keyboardHandler);
       this._target.addEventListener('keyup', this._keyboardHandler);
       this._target.addEventListener('keypress', this._keyboardHandler);
@@ -132,6 +137,7 @@ export class InputManager {
       this._target.removeEventListener('pointerup', this._pointerUpHandler);
       this._target.removeEventListener('pointermove', this._pointerMoveHandler);
       this._target.removeEventListener('pointercancel', this._pointerCancelHandler);
+      this._target.removeEventListener('contextmenu', this._contextMenuHandler);
       this._target.removeEventListener('keydown', this._keyboardHandler);
       this._target.removeEventListener('keyup', this._keyboardHandler);
       this._target.removeEventListener('keypress', this._keyboardHandler);
@@ -187,6 +193,9 @@ export class InputManager {
     }
     return this;
   }
+  enableSystemContextMenu(enable: boolean) {
+    this._enableContextMenu = !!enable;
+  }
   /**
    * Utility middleware that logs the event type to the console.
    *
@@ -217,6 +226,17 @@ export class InputManager {
       const eventData = that._getPointerEventData(ev.pointerId);
       eventData.lastDown = false;
       eventData.lastClick = false;
+      if (!that._callMiddlewares(ev)) {
+        that._app.dispatchEvent(ev.type as any, ev);
+      }
+    };
+  }
+  private _getContextMenuHandler() {
+    const that = this;
+    return function (ev: PointerEvent) {
+      if (!that._enableContextMenu) {
+        ev.preventDefault();
+      }
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev.type as any, ev);
       }

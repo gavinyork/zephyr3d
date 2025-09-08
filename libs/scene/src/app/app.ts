@@ -236,7 +236,7 @@ export class Application extends Observable<appEventMap> {
       const dt = this.device.frameInfo.elapsedFrame;
       const elapsed = this.device.frameInfo.elapsedOverall;
       this.dispatchEvent('tick', dt, elapsed);
-      this._engine.update(dt, elapsed);
+      this._engine.update(dt * 0.001, elapsed * 0.001);
       this._engine.render();
     }
   }

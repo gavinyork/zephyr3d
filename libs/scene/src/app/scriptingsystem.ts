@@ -147,6 +147,11 @@ export class ScriptingSystem {
       }
       hostList.push(host);
 
+      const P = instance.onAttached(host);
+      if (P instanceof Promise) {
+        await P;
+      }
+
       const attached: AttachedScript = {
         id: module,
         url,
@@ -165,10 +170,6 @@ export class ScriptingSystem {
       }
       list.push(attached);
 
-      const P = instance.onAttached(host);
-      if (P instanceof Promise) {
-        await P;
-      }
       return attached.instance;
     } catch (e) {
       const moduleName = module ? String(module).slice(0, 64) : '';
@@ -234,14 +235,25 @@ export class ScriptingSystem {
   }
 
   /**
+   * Get all script instances attached to a host.
+   *
+   * @typeParam T - Expected script type.
+   * @param host - The host whose scripts to retrieve.
+   * @returns Script instances attached to the host, or an empty array if none.
+   */
+  getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[] {
+    return (this._hostScripts.get(host as Host) as unknown as T[]) || [];
+  }
+
+  /**
    * Ticks all attached script instances.
    *
    * Calls `onUpdate(deltaTime, elapsedTime)` on every attached script instance
    * across all hosts. Exceptions thrown by a script are caught and logged,
    * allowing other scripts to continue updating.
    *
-   * @param deltaTime - Time (in seconds or milliseconds, depending on your engine) since last update.
-   * @param elapsedTime - Total time since start.
+   * @param deltaTime - Time in seconds since last update.
+   * @param elapsedTime - Total time in seconds since start.
    */
   update(deltaTime: number, elapsedTime: number): void {
     if (this._hostScripts.size === 0) {

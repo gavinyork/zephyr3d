@@ -94,12 +94,24 @@ export class Engine {
     }
   }
   /**
+   * Gets all scripts attached to a host.
+   *
+   * Delegates to {@link ScriptingSystem.getScriptObjects}.
+   *
+   * @typeParam T - Expected script type.
+   * @param host - Host object to query.
+   * @returns Script instances attached to the host, or an empty array.
+   */
+  getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[] {
+    return this._scriptingSystem.getScriptObjects(host) as T[];
+  }
+  /**
    * Ticks all attached scripts by calling their `onUpdate` hooks, if enabled.
    *
    * Delegates to {@link ScriptingSystem.update}. No-op when disabled.
    *
-   * @param deltaTime - Time since last update (engine-defined units).
-   * @param elapsedTime - Total elapsed time (engine-defined units).
+   * @param deltaTime - Time since last update in Seconds.
+   * @param elapsedTime - Total elapsed time in Seconds.
    */
   update(deltaTime: number, elapsedTime: number) {
     if (this._enabled) {

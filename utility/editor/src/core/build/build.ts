@@ -113,7 +113,7 @@ export async function buildForEndUser(options: {
   const { input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es' } = options;
   const vfs = ProjectService.VFS;
   if (await vfs.exists(distDir)) {
-    await vfs.deleteDirectory(distDir);
+    await vfs.deleteDirectory(distDir, true);
   }
 
   const bundle = await rollup({
