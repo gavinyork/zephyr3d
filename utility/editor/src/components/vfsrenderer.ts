@@ -1,4 +1,5 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
+import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, makeObservable } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
@@ -12,6 +13,7 @@ import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
+import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -51,6 +53,7 @@ const enum DropZone {
 }
 
 type VFSRendererOptions = {
+  rootDir?: string;
   allowDrop?: boolean;
   allowDblClickOpen?: boolean;
   multiSelect?: boolean;
@@ -98,7 +101,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._filesystem = null;
     this._selectedDir = null;
     this._fileFilter = fileFilter?.slice() ?? [];
-    this._options = { allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
+    this._options = { rootDir: '/', allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
     this.loadFileSystem();
     if (this._options.allowDrop) {
       eventBus.on('external_dragenter', this.handleDragEvent, this);
@@ -234,6 +237,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           this.renderDetailsView();
           break;
       }
+      this.handleContextMenu();
     } else {
       const windowSize = ImGui.GetWindowSize();
       const textSize = imGuiCalcTextSize('Select a folder to view its contents');
@@ -242,8 +246,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       );
       ImGui.TextDisabled('Select a folder to view its contents');
     }
-
-    this.handleContextMenu();
     ImGui.EndChild();
   }
 
@@ -770,9 +772,18 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           if (ImGui.MenuItem('Folder...')) {
             this.createNewFolder();
           }
-          ImGui.Separator();
-          if (ImGui.MenuItem('Typescript...')) {
-            this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
+          if (this._vfs.isParentOf('/assets', this._selectedDir.path)) {
+            ImGui.Separator();
+            if (ImGui.MenuItem('Typescript...')) {
+              this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
+            }
+            ImGui.Separator();
+            if (ImGui.BeginMenu('Texture')) {
+              if (ImGui.MenuItem('Ramp Texture...')) {
+                this.createRampTexture(this._selectedDir.path);
+              }
+              ImGui.EndMenu();
+            }
           }
           ImGui.EndMenu();
         }
@@ -1010,7 +1021,21 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       }
     });
   }
-
+  private async createRampTexture(path: string) {
+    const data = await DlgRampTextureCreator.createRampTexture(
+      'Create Ramp Texture',
+      true,
+      null,
+      null,
+      600,
+      400
+    );
+    if (data) {
+      const filePath = this._vfs.join(path, `${data.name}.png`);
+      const pngData = UPNG.encode([data.data.buffer], data.data.length >> 2, 1, 0);
+      await this._vfs.writeFile(filePath, pngData, { create: true, encoding: 'binary' });
+    }
+  }
   private async createNewFile(
     title: string,
     defaultName: string,
@@ -1179,10 +1204,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               }
             });
           }
-          ImGui.Separator();
-          if (ImGui.MenuItem('Scene...##VFSCreateScene')) {
-            console.log('Create scene');
-          }
           ImGui.EndMenu();
         }
         if (dir !== this._filesystem && dir.path !== '/assets' && dir.path !== '/src') {
@@ -1217,7 +1238,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (!this._project) {
       return;
     }
-    const rootDir = await this.loadDirectoryInfo('/');
+    const rootDir = await this.loadDirectoryInfo(this._options.rootDir);
     this._filesystem = rootDir;
 
     if (this._selectedDir) {

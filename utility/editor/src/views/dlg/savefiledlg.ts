@@ -15,13 +15,22 @@ export class DlgSaveFile extends DialogRenderer<string> {
     title: string,
     vfs: VFS,
     project: ProjectInfo,
+    rootDir: string,
     filter: string,
     width: number,
     height: number
   ) {
-    return new DlgSaveFile(title, vfs, project, filter, width, height).showModal();
+    return new DlgSaveFile(title, vfs, project, rootDir, filter, width, height).showModal();
   }
-  constructor(id: string, vfs: VFS, project: ProjectInfo, filter: string, width: number, height: number) {
+  constructor(
+    id: string,
+    vfs: VFS,
+    project: ProjectInfo,
+    rootDir: string,
+    filter: string,
+    width: number,
+    height: number
+  ) {
     super(id, width, height);
     this._filterLabels = [];
     this._filterPatterns = [];
@@ -46,6 +55,7 @@ export class DlgSaveFile extends DialogRenderer<string> {
       [this._filterPatterns[this._selected[0]]],
       Math.max(0, Math.min(width / 2, 200)),
       {
+        rootDir,
         multiSelect: false,
         allowDrop: false,
         allowDblClickOpen: false

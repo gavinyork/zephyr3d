@@ -52,21 +52,23 @@ export class Dialog {
     title: string,
     vfs: VFS,
     project: ProjectInfo,
+    rootDir: string,
     filter: string,
     width: number,
     height: number
   ) {
-    return DlgSaveFile.saveFile(title, vfs, project, filter, width, height);
+    return DlgSaveFile.saveFile(title, vfs, project, rootDir, filter, width, height);
   }
   public static async openFile(
     title: string,
     vfs: VFS,
     project: ProjectInfo,
+    rootDir: string,
     filter: string,
     width: number,
     height: number
   ) {
-    return DlgOpenFile.openFile(title, vfs, project, filter, width, height);
+    return DlgOpenFile.openFile(title, vfs, project, rootDir, filter, width, height);
   }
   public static async openFromList(
     title: string,

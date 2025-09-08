@@ -40,6 +40,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           'Select Image File',
           this._vfs,
           this._info,
+          '/assets',
           'Image (*.ico;*.jpg;*.png;*.webp)|*.ico;*.jpg;*.png;*.webp',
           500,
           400
@@ -61,6 +62,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           'Select Scene File',
           this._vfs,
           this._info,
+          '/assets',
           'Scene (*.scn)|*.scn',
           500,
           400
@@ -82,6 +84,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           'Select Scene File',
           this._vfs,
           this._info,
+          '/assets',
           'Scene (*.scn)|*.scn',
           500,
           400
@@ -103,6 +106,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           'Select Script File',
           this._vfs,
           this._info,
+          '/assets',
           'Script file (*.ts;*.js)|*.ts;*.js',
           500,
           400

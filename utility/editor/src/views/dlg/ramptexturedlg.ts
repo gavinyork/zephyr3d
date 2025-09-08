@@ -3,7 +3,10 @@ import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 import type { Interpolator } from '@zephyr3d/base';
 
-export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedArray; name: string }> {
+export class DlgRampTextureCreator extends DialogRenderer<{
+  data: Uint8ClampedArray<ArrayBuffer>;
+  name: string;
+}> {
   private _name: string;
   private readonly _creator: RampTextureCreator;
   constructor(
@@ -25,7 +28,7 @@ export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedAr
     alphaInterpolator: Interpolator,
     width?: number,
     height?: number
-  ): Promise<{ data: Uint8ClampedArray; name: string }> {
+  ): Promise<{ data: Uint8ClampedArray<ArrayBuffer>; name: string }> {
     return new DlgRampTextureCreator(
       title,
       useAlpha,
@@ -35,7 +38,7 @@ export class DlgRampTextureCreator extends DialogRenderer<{ data: Uint8ClampedAr
       height
     ).showModal();
   }
-  close(result: { data: Uint8ClampedArray; name: string }) {
+  close(result: { data: Uint8ClampedArray<ArrayBuffer>; name: string }) {
     this._creator.dispose();
     super.close(result);
   }
