@@ -15,6 +15,31 @@ import { RuntimeScript } from './runtimescript';
 export type Host = IDisposable;
 
 /**
+ * Options for configuring a `ScriptingSystem`.
+ *
+ * @public
+ */
+export type ScriptingSystemOptions = {
+  /** Virtual file system used by the script registry. Defaults to `new HttpFS('./')`. */
+  VFS?: VFS;
+  /** Root path for scripts within the VFS. Defaults to `/`. */
+  scriptsRoot?: string;
+  /** If true, enables editor-oriented behaviors in the registry. Defaults to `false`. */
+  editorMode?: boolean;
+  /**
+   * Optional string appended to dynamic import URLs (e.g., for cache busting).
+   * Example: `'?v=' + Date.now()`
+   */
+  importComment?: string;
+  /**
+   * Optional callback invoked when a module fails to load.
+   * @param e - The error that occurred.
+   * @param id - The module ID that failed to load.
+   */
+  onLoadError?: (e: unknown, id: string) => void;
+};
+
+/**
  * Information about a script attached to a host.
  *
  * @public
@@ -57,21 +82,8 @@ export class ScriptingSystem {
    * Constructs a new scripting system.
    *
    * @param opts - Optional configuration.
-   * @param opts.VFS - Virtual file system used by the `ScriptRegistry`. Defaults to `new HttpFS('./')`.
-   * @param opts.scriptsRoot - Root path for scripts within the VFS. Defaults to `/`.
-   * @param opts.editorMode - If true, enables editor-oriented behaviors in the registry. Defaults to `false`.
-   * @param opts.importComment - Optional string appended to dynamic import URLs (e.g., for cache busting).
-   * @param opts.onLoadError - Optional callback invoked when a module fails to load.
    */
-  constructor(
-    opts: {
-      VFS?: VFS;
-      scriptsRoot?: string;
-      editorMode?: boolean;
-      importComment?: string;
-      onLoadError?: (e: unknown, id: string) => void;
-    } = {}
-  ) {
+  constructor(opts: ScriptingSystemOptions = {}) {
     this._registry = new ScriptRegistry(
       opts.VFS ?? new HttpFS('./'),
       opts.scriptsRoot ?? '/',
@@ -273,7 +285,7 @@ export class ScriptingSystem {
   /**
    * Detaches all scripts from all hosts.
    *
-   * Iteratively calls {@link detachScript} on each host until no attachments remain.
+   * Iteratively calls {@link ScriptingSystem.detachScript} on each host until no attachments remain.
    */
   detachAllScripts() {
     while (this._hostScripts.size > 0) {

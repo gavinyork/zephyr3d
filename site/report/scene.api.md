@@ -44,6 +44,7 @@ import { PrimitiveType } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { Quaternion } from '@zephyr3d/base';
 import { Ray } from '@zephyr3d/base';
+import { ReadOptions } from '@zephyr3d/base';
 import { RenderBundle } from '@zephyr3d/device';
 import { RenderStateSet } from '@zephyr3d/device';
 import { SamplerOptions } from '@zephyr3d/device';
@@ -233,7 +234,6 @@ export class Application extends Observable<appEventMap> {
     constructor(opt: AppOptions);
     get device(): AbstractDevice;
     get deviceType(): string;
-    // Warning: (ae-forgotten-export) The symbol "Engine" needs to be exported by the entry point index.d.ts
     get engine(): Engine;
     focus(): void;
     frame(): void;
@@ -614,6 +614,13 @@ export type AtmosphereParams = {
 
 // @public
 export const ATMOSPHERIC_FOG_BIT: number;
+
+// @public
+export interface AttachedScript {
+    id: string;
+    instance: RuntimeScript<any>;
+    url: string;
+}
 
 // @public
 export class BaseCameraController {
@@ -1016,6 +1023,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     getRotationMatrix(): Matrix4x4;
     getTanHalfFovy(): number;
     handleEvent(ev: Event, type?: string): boolean;
+    get HDR(): boolean;
+    set HDR(val: boolean);
+    // @internal
+    protected _HDR: boolean;
     get HiZ(): boolean;
     set HiZ(val: boolean);
     // @internal
@@ -1237,8 +1248,6 @@ export class Clipmap extends Disposable {
     // (undocumented)
     calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number): AABB[];
     // (undocumented)
-    draw(context: ClipmapDrawContext): number;
-    // (undocumented)
     gather(context: ClipmapGatherContext): PrimitiveInstanceInfo[];
     // (undocumented)
     generateCrossMesh(): void;
@@ -1275,6 +1284,8 @@ export interface ClipmapGatherContext {
     calcAABB(userData: unknown, minX: number, maxX: number, minZ: number, maxZ: number, outAABB: AABB, level: number): any;
     // (undocumented)
     camera: Camera;
+    // (undocumented)
+    frustumCulling: boolean;
     // (undocumented)
     gridScale: number;
     // (undocumented)
@@ -1770,6 +1781,30 @@ export function encodeNormalizedFloatToRGBA(scope: PBInsideFunctionScope, value:
 
 // @public
 export function encodeRGBM(scope: PBInsideFunctionScope, rgb: PBShaderExp, maxRange: PBShaderExp | number): PBShaderExp;
+
+// @public
+export class Engine {
+    constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean);
+    // (undocumented)
+    protected _activeScenes: DRef<Scene>[];
+    attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>>;
+    detachAllScripts(): void;
+    detachScript<T extends Host>(host: T, idOrInstance: string | RuntimeScript<T>): void;
+    getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[];
+    // (undocumented)
+    loadSceneFromFile(path: string): Promise<Scene>;
+    // (undocumented)
+    readFile<T extends ReadOptions['encoding'] = 'binary'>(path: string, encoding?: T): Promise<T extends 'binary' ? ArrayBuffer : string>;
+    // (undocumented)
+    render(): void;
+    get serializationManager(): SerializationManager;
+    // (undocumented)
+    setScene(scene: Scene, layer?: number): void;
+    // (undocumented)
+    startup(startupScene: string, splashScreen: string, startupScript: string): Promise<void>;
+    update(deltaTime: number, elapsedTime: number): void;
+    get VFS(): VFS;
+}
 
 // @public
 export class EnvConstantAmbient extends EnvironmentLighting {
@@ -2307,6 +2342,9 @@ export function getEngine(): Engine;
 // @internal (undocumented)
 export function getGraphNodeClass(): SerializableClass;
 
+// @public
+export function getInput(): InputManager;
+
 // Warning: (ae-internal-missing-underscore) The name "getMeshClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -2432,7 +2470,7 @@ export class GrassInstances extends Disposable {
 // @public
 export class GrassLayer extends Disposable {
     constructor(terrain: ClipmapTerrain, bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D);
-    addInstances(instances: GrassInstanceInfo[]): void;
+    addInstances(instances: GrassInstanceInfo[]): number;
     get bladeHeight(): number;
     set bladeHeight(val: number);
     get bladeWidth(): number;
@@ -2508,6 +2546,7 @@ export class GrassRenderer extends Disposable {
     getBladeWidth(layer: number): number;
     getGrassTexture(layer: number): Texture2D<unknown>;
     getLayer(index: number): GrassLayer;
+    get numGrassBlades(): number;
     get numLayers(): number;
     // (undocumented)
     protected onDispose(): void;
@@ -2628,6 +2667,9 @@ export interface HeightfieldBBoxTreeNode {
     // (undocumented)
     right: HeightfieldBBoxTreeNode;
 }
+
+// @public
+export type Host = IDisposable;
 
 // @public
 export type IMixinAlbedoColor = {
@@ -2752,6 +2794,8 @@ export type InputEventHandler = (ev: Event, type?: string) => boolean;
 // @public
 export class InputManager {
     constructor(app: Application);
+    // (undocumented)
+    enableSystemContextMenu(enable: boolean): void;
     static log(ev: Event, type?: string): boolean;
     // @internal
     start(): void;
@@ -2968,8 +3012,6 @@ export class Mesh extends Mesh_base implements BatchDrawable, NodeClonable<Mesh>
     protected _animatedBoundingBox: BoundingBox;
     // @internal (undocumented)
     protected _batchable: boolean;
-    // @internal (undocumented)
-    protected _bboxChangeCallback: () => void;
     // @internal (undocumented)
     protected _boneMatrices: Texture2D;
     // @internal (undocumented)
@@ -3789,8 +3831,11 @@ export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any
 // @public
 export class PerspectiveCamera extends Camera implements NodeClonable<PerspectiveCamera> {
     constructor(scene: Scene, fovY?: number, aspect?: number, near?: number, far?: number);
+    adjustAspectRatio(): void;
     get aspect(): number;
     set aspect(val: number);
+    get autoAspect(): boolean;
+    set autoAspect(val: boolean);
     // (undocumented)
     clone(method: NodeCloneMethod, recursive: boolean): PerspectiveCamera;
     // @internal (undocumented)
@@ -3803,6 +3848,7 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
     set fovY(val: number);
     get near(): number;
     set near(val: number);
+    render(scene: Scene): void;
     setOrtho(_left: number, _right: number, _bottom: number, _top: number, _near: number, _far: number): this;
     setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this;
     setProjectionMatrix(matrix: Matrix4x4): void;
@@ -3899,15 +3945,13 @@ export enum PostEffectLayer {
 // @public
 export function prefilterCubemap(tex: TextureCube, type: DistributionType, destTexture: TextureCube | FrameBuffer, numSamples?: number): void;
 
+// Warning: (ae-forgotten-export) The symbol "Primitive_base" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class Primitive extends Disposable implements Clonable<Primitive> {
+export class Primitive extends Primitive_base implements Clonable<Primitive> {
     constructor();
     // @internal
-    addBoundingboxChangeCallback(cb: () => void): void;
-    // @internal
     protected _bbox: BoundingVolume;
-    // @internal
-    protected _bboxChangeCallback: (() => void)[];
     get changeTag(): number;
     clone(): Primitive;
     copyFrom(other: this): void;
@@ -3947,7 +3991,6 @@ export class Primitive extends Disposable implements Clonable<Primitive> {
     // @internal
     protected _primitiveType: PrimitiveType;
     raycast(ray: Ray): number;
-    removeBoundingboxChangeCallback(cb: () => void): void;
     removeVertexBuffer(semantic: VertexSemantic): void;
     setBoundingVolume(bv: BoundingVolume): void;
     setIndexBuffer(buffer: IndexBuffer): void;
@@ -4366,6 +4409,15 @@ export function renderSkyViewLut(params: AtmosphereParams): void;
 export function renderTransmittanceLut(params: AtmosphereParams): void;
 
 // @public
+export class RuntimeScript<T extends IDisposable | null> {
+    onAttached(_host: T): void | Promise<void>;
+    onCreated(): void | Promise<void>;
+    onDestroy(): void;
+    onDetached(_host: T): void;
+    onUpdate(_deltaTime: number, _elapsedTime: number): void;
+}
+
+// @public
 export type SamplerType = 'clamp_linear' | 'clamp_linear_nomip' | 'clamp_nearest' | 'clamp_nearest_nomip' | 'repeat_linear' | 'repeat_linear_nomip' | 'repeat_nearest' | 'repeat_nearest_nomip';
 
 // @public
@@ -4651,6 +4703,50 @@ export class SceneRenderer {
 }
 
 // @public
+export class ScriptingSystem {
+    constructor(opts?: ScriptingSystemOptions);
+    attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>>;
+    detachAllScripts(): void;
+    detachScript<T extends Host>(host: T, idOrInstance?: string | RuntimeScript<T>): void;
+    getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[];
+    get registry(): ScriptRegistry;
+    update(deltaTime: number, elapsedTime: number): void;
+}
+
+// @public
+export type ScriptingSystemOptions = {
+    VFS?: VFS;
+    scriptsRoot?: string;
+    editorMode?: boolean;
+    importComment?: string;
+    onLoadError?: (e: unknown, id: string) => void;
+};
+
+// @public
+export class ScriptRegistry {
+    constructor(vfs: VFS, scriptsRoot: string, editorMode: boolean);
+    get editorMode(): boolean;
+    set editorMode(val: boolean);
+    protected fetchSource(id: string): Promise<{
+        code: string;
+        path: string;
+        type: 'js' | 'ts';
+        sourceMap?: string;
+    } | undefined>;
+    getDependencies(entryId: string, fromId: string, dependencies: Record<string, string>): Promise<void>;
+    resolveLogicalId(spec: string, fromId?: string): Promise<string>;
+    resolveRuntimeUrl(entryId: string): Promise<string>;
+    resolveSourcePath(logicalId: string): Promise<{
+        type: "js" | "ts";
+        path: string;
+    }>;
+    get scriptsRoot(): string;
+    set scriptsRoot(path: string);
+    get VFS(): VFS;
+    set VFS(vfs: VFS);
+}
+
+// @public
 export type SerializableClass = {
     ctor: GenericConstructor;
     parent?: GenericConstructor;
@@ -4669,7 +4765,7 @@ export type SerializableClass = {
 
 // @public
 export class SerializationManager {
-    constructor(vfs: VFS);
+    constructor(vfs: VFS, editorMode?: boolean);
     clearCache(): void;
     deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
     // (undocumented)
@@ -4678,6 +4774,7 @@ export class SerializationManager {
     protected doFetchModel(path: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
     // (undocumented)
     protected doFetchTexture<T extends Texture2D | TextureCube>(path: string, options?: TextureFetchOptions<T>): Promise<T>;
+    get editorMode(): boolean;
     fetchBinary(id: string): Promise<ArrayBuffer>;
     fetchModel(id: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
     fetchTexture<T extends Texture2D | TextureCube>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
@@ -5211,6 +5308,8 @@ export class SkyRenderer extends Disposable {
     set skyboxTexture(tex: TextureCube);
     get skyColor(): Vector4;
     set skyColor(val: Vector4);
+    get skyImage(): Texture2D;
+    set skyImage(texture: Texture2D);
     get skyType(): SkyType;
     set skyType(val: SkyType);
     // @internal (undocumented)
@@ -5227,7 +5326,7 @@ export class SkyRenderer extends Disposable {
 }
 
 // @public
-export type SkyType = 'color' | 'skybox' | 'scatter' | 'none';
+export type SkyType = 'image' | 'skybox' | 'scatter' | 'none';
 
 // Warning: (ae-internal-missing-underscore) The name "skyViewLut" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -5923,8 +6022,8 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:2948:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:11629:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:3052:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:11753:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

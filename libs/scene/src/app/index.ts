@@ -4,3 +4,4 @@ export * from './api';
 export * from './runtimescript';
 export * from './engine';
 export * from './scriptingsystem';
+export * from './scriptregistry';

@@ -110,7 +110,7 @@ When the content of a texture changes, the texture interface's [generateMipmaps(
 
 // Update texture
 texture.update(pixels, 0, 0, textureWidth, textureHeight);
-// Generates mipmaps
+// Generates mipmaps, can be omitted here because generateMipmaps() will be miplicity called by texture.update()
 texture.generateMipmaps();
 
 ```

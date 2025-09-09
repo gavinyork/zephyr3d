@@ -554,6 +554,44 @@ interface FormatToken {
 
 const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc])/g;
 
+/**
+ * Simple sprintf implementation:
+ *
+ * @param format - The format string
+ * @param args - The format arguments
+ * @returns The formatted string
+ *
+ * Supported format:
+ * %%
+ * %s
+ * %c
+ * %d, %i, %u
+ * %f
+ * %x, %X, %o
+ *
+ * Supported flags:
+ * - (left align)
+ * + (always show sign for number)
+ *   (space if no sign for number)
+ * 0 (zero pad)
+ * # (alternate form, for x/X/o adds 0x/0X/0o prefix if value is non-zero)
+ * * (width or precision from argument)
+ * n$ (explicit argument index, 1-based)
+ * .precision for s (max length)
+ * .precision for d/i/u/x/X/o (min digits)
+ * .precision for f (number of digits after decimal point, default 6)
+ *
+ * @example
+ * ```ts
+ * formatString('Hello %s', 'World'); // 'Hello World'
+ * formatString('Hex: %#x', 255); // 'Hex: 0xff'
+ * formatString('Width: %*d', 5, 42); // 'Width:    42'
+ * formatString('Pi: %.2f', Math.PI); // 'Pi: 3.14'
+ * formatString('Index: %2$s %1$s', 'first', 'second'); // 'Index: second first'
+ * ```
+ *
+ * @public
+ */
 export function formatString(format: string, ...args: SprintfArg[]): string {
   let out = '';
   let lastIndex = 0;
@@ -635,7 +673,6 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
       token.precision = parseInt(precStr, 10);
     }
 
-    // 渲染该占位符
     const render = (): string => {
       // read * parameter of width/precision
       if (token.widthFromArg) {

@@ -52,6 +52,9 @@ export function ASSERT(condition: boolean, message?: string): asserts condition;
 export function base64ToText(base64: string): string;
 
 // @public
+export function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer>;
+
+// @public
 export enum BoxSide {
     BACK = 5,
     BOTTOM = 2,
@@ -223,7 +226,7 @@ export function flushPendingDisposals(): void;
 
 // Warning: (ae-forgotten-export) The symbol "SprintfArg" needs to be exported by the entry point index.d.ts
 //
-// @public (undocumented)
+// @public
 export function formatString(format: string, ...args: SprintfArg[]): string;
 
 // @public
@@ -303,6 +306,25 @@ export function halfToFloat(val: number): number;
 
 // @public
 export function halton23(length: number): [number, number][];
+
+// @public
+export class HeightField {
+    constructor(width: number, height: number, scaleY?: number, baseHeight?: number, region?: Vector4);
+    get baseHeight(): number;
+    set baseHeight(v: number);
+    calculateHeight(worldX: number, worldZ: number): number;
+    get height(): number;
+    set height(v: number);
+    get heightData(): Float32Array;
+    rayIntersect(rayWorld: Ray): number | null;
+    get region(): Vector4;
+    set region(v: Vector4);
+    sampleHeight(x: number, y: number): number;
+    get scaleY(): number;
+    set scaleY(v: number);
+    get width(): number;
+    set width(v: number);
+}
 
 // @public
 export interface HttpDirectoryReader {
@@ -966,7 +988,12 @@ export class Ray {
     bboxIntersectionTest: (bbox: AABB) => boolean;
     bboxIntersectionTestEx: (bbox: AABB) => number | null;
     get direction(): Vector3;
-    intersectionTestSphere(radius: number): number[] | null;
+    // (undocumented)
+    intersectionTestCircle(center: Vector3, normal: Vector3, radius: number, epsl: number): {
+        dist: number;
+        epsl: number;
+    } | null;
+    intersectionTestSphere(center: Vector3, radius: number): number[] | null;
     intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean): number | null;
     get origin(): Vector3;
     set(origin: Vector3, directionNormalized: Vector3): void;
@@ -1062,6 +1089,9 @@ export type TypedArrayConstructor<T extends TypedArray = any> = {
     new (buffer: ArrayBuffer, byteOffset: number, length: number): T;
     BYTES_PER_ELEMENT: number;
 };
+
+// @public
+export function uint8ArrayToBase64(array: Uint8Array): string;
 
 // @public
 export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
@@ -1452,7 +1482,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:312:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:364:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

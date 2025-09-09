@@ -1,6 +1,10 @@
 import type { Ray } from './ray';
 import { Vector3, Vector4 } from './vector';
 
+/**
+ * Height field class for height sampling and ray intersection
+ * @public
+ */
 export class HeightField {
   private _region: Vector4;
   private _scale: Vector3;
@@ -13,6 +17,15 @@ export class HeightField {
   private _v11: Vector3;
   private _v10: Vector3;
 
+  /**
+   * Create a height field
+   *
+   * @param width - number of height samples in x direction
+   * @param height - number of height samples in z direction
+   * @param scaleY - height scale factor
+   * @param baseHeight - base height offset
+   * @param region - region in xz plane covered by the height field
+   */
   constructor(width: number, height: number, scaleY?: number, baseHeight?: number, region?: Vector4) {
     this._width = width;
     this._height = height;
@@ -28,6 +41,9 @@ export class HeightField {
     this._v11 = new Vector3();
     this._v10 = new Vector3();
   }
+  /**
+   * Region in xz plane covered by the height field
+   */
   get region(): Vector4 {
     return this._region;
   }
@@ -36,12 +52,27 @@ export class HeightField {
     this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
     this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
   }
+  /**
+   * Base height offset
+   */
+  get baseHeight(): number {
+    return this._baseHeight;
+  }
+  set baseHeight(v: number) {
+    this._baseHeight = v;
+  }
+  /**
+   * Height scale factor
+   */
   get scaleY(): number {
     return this._scale.y;
   }
   set scaleY(v: number) {
     this._scale.y = v;
   }
+  /**
+   * Number of height samples in x direction
+   */
   get width(): number {
     return this._width;
   }
@@ -52,6 +83,9 @@ export class HeightField {
       this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
     }
   }
+  /**
+   * Number of height samples in z direction
+   */
   get height(): number {
     return this._height;
   }
@@ -62,12 +96,27 @@ export class HeightField {
       this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
     }
   }
+  /**
+   * Height data array (row major)
+   */
   get heightData(): Float32Array {
     return this._heightData;
   }
+  /**
+   * Sample height at grid point (x, y)
+   * @param x - x index
+   * @param y - y index
+   * @returns height value
+   */
   sampleHeight(x: number, y: number): number {
     return this._heightData[y * this._width + x] * this._scale.y + this._baseHeight;
   }
+  /**
+   * Calculate height at given world position (worldX, worldZ) by bilinear interpolation
+   * @param worldX - world x position
+   * @param worldZ - world z position
+   * @returns height value
+   */
   calculateHeight(worldX: number, worldZ: number) {
     const u = Math.max(
       0.5 / this._width,
@@ -106,6 +155,11 @@ export class HeightField {
     }
   }
 
+  /**
+   * Ray intersection test with the height field
+   * @param rayWorld - ray in world space
+   * @returns distance to intersection point, or null if no intersection
+   */
   rayIntersect(rayWorld: Ray): number | null {
     let x0 = rayWorld.origin.x;
     let y0 = rayWorld.origin.z;

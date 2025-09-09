@@ -111,7 +111,7 @@ texture.update(pixels, 10, 10, 20, 20);
 
 // 更新纹理
 texture.update(pixels, 0, 0, textureWidth, textureHeight);
-// 生成mipmap
+// 生成mipmap，在这里可以省略，因为texture.update()方法会隐式调用generateMipmaps()
 texture.generateMipmaps();
 
 ```

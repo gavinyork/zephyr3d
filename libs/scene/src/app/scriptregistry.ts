@@ -40,7 +40,7 @@ function isBareModule(spec: string): boolean {
 }
 
 /**
- * Resolves, builds, and serves runtime modules using a {@link VFS}.
+ * Resolves, builds, and serves runtime modules using a VFS.
  *
  * Responsibilities:
  * - Resolve logical module IDs to physical paths or URLs.
@@ -50,7 +50,7 @@ function isBareModule(spec: string): boolean {
  *
  * Modes:
  * - Editor mode (`editorMode === true`): modules are rewritten to data URLs after transpile/build.
- * - Runtime mode (`editorMode === false`): returns .js URLs directly (with .ts -> .js mapping).
+ * - Runtime mode (`editorMode === false`): returns .js URLs directly (with .ts -\> .js mapping).
  *
  * Caching:
  * - Built modules are memoized in `_built` map keyed by logical ID.
@@ -113,7 +113,7 @@ export class ScriptRegistry {
    * Fetches raw source for a logical module id by probing known extensions.
    *
    * Search order:
-   * - If `id` already ends with `.ts` or `.js` and is a file -> return it.
+   * - If `id` already ends with `.ts` or `.js` and is a file -\> return it.
    * - Else try `.id.ts`, then `.id.js`.
    *
    * @param id - Logical module identifier (absolute or logical path-like).
@@ -165,7 +165,7 @@ export class ScriptRegistry {
    * Resolves a module entry to a URL suitable for dynamic import.
    *
    * Behavior:
-   * - In editor mode, builds the module to a data URL via {@link build}.
+   * - In editor mode, builds the module to a data URL.
    * - Otherwise, returns `.js` URL directly:
    *   - If `id` ends with `.js`: return as-is.
    *   - If `id` ends with `.ts`: map to `.js` (assumes pre-built file exists).
@@ -193,7 +193,7 @@ export class ScriptRegistry {
    *
    * @param entryId - The starting (possibly relative) specifier from `fromId`.
    * @param fromId - The logical id of the module containing `entryId`.
-   * @param dependencies - Output map of `resolvedSourcePath -> file contents`.
+   * @param dependencies - Output map of `resolvedSourcePath -\> file contents`.
    */
   async getDependencies(
     entryId: string,
@@ -234,15 +234,14 @@ export class ScriptRegistry {
    * Builds a logical module id into a data URL (editor mode pipeline).
    *
    * Steps:
-   * - Resolve source path (.ts/.js) via {@link resolveSourcePath}.
+   * - Resolve source path (.ts/.js) via {@link ScriptRegistry.resolveSourcePath}.
    * - Read source code.
-   * - Rewrite import specifiers via {@link rewriteImports}.
-   * - Transpile TypeScript if needed via {@link transpile}.
+   * - Rewrite import specifiers via {@link ScriptRegistry.rewriteImports}.
+   * - Transpile TypeScript if needed via {@link ScriptRegistry.transpile}.
    * - Convert to `data:` URL and memoize in `_built`.
    *
    * @param id - Logical module id to build.
    * @returns Data URL string for dynamic import, or empty string if not found.
-   * @private
    */
   private async build(id: string): Promise<string> {
     const key = String(id);
