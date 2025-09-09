@@ -81,6 +81,12 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   protected _rotationMatrix: Matrix4x4;
   /** @internal Inverse view-projection matrix. */
   protected _invViewProjMatrix: Matrix4x4;
+  /** @internal Framebuffer clear color, disabled when null. Default is null */
+  protected _clearColor: Vector4;
+  /** @internal Framebuffer depth clear value, disabled when null. Default is 1 */
+  protected _clearDepth: number;
+  /** @internal Framebuffer stencil clear value, disabled when null. Default is 0 */
+  protected _clearStencil: number;
   /** @internal Optional clip plane in camera space. */
   protected _clipPlane: Plane;
   /** @internal Camera controller (input). */
@@ -229,6 +235,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._viewProjMatrix = Matrix4x4.identity();
     this._invViewProjMatrix = Matrix4x4.identity();
     this._clipPlane = null;
+    this._clearColor = null;
+    this._clearDepth = 1;
+    this._clearStencil = 0;
     this._dirty = true;
     this._controller = null;
     this._viewport = null;
@@ -303,6 +312,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
+    this.clearColor = other.clearColor;
+    this.clearDepth = other.clearDepth;
+    this.clearStencil = other.clearStencil;
+    this._HDR = other.HDR;
     this.HiZ = other.HiZ;
     this.toneMap = other.toneMap;
     this.toneMapExposure = other.toneMapExposure;
@@ -346,6 +359,33 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
   set clipPlane(plane: Plane) {
     this._clipPlane = plane;
     this._invalidate(false);
+  }
+  /**
+   * Framebuffer clear color, or `null` to disable.
+   */
+  get clearColor(): Vector4 {
+    return this._clearColor;
+  }
+  set clearColor(v: Vector4) {
+    this._clearColor = v?.clone() ?? null;
+  }
+  /**
+   * Framebuffer stencil clear value, disabled when null. Default is 0.
+   */
+  get clearDepth(): number {
+    return this._clearDepth;
+  }
+  set clearDepth(v: number) {
+    this._clearDepth = v;
+  }
+  /**
+   * Framebuffer stencil clear value, disabled when null. Default is 0.
+   */
+  get clearStencil(): number {
+    return this._clearStencil;
+  }
+  set clearStencil(v: number) {
+    this._clearStencil = v;
   }
   /**
    * Whether Hi-Z acceleration is enabled.

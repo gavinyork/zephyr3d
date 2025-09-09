@@ -10,7 +10,6 @@ import type { WebGPURenderPass } from './renderpass_webgpu';
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
     {};
-  private static readonly _clearBindGroup: WebGPUBindGroup = null;
   private static _clearStateSet: WebGPURenderStateSet = null;
   private static readonly _defaultClearColor = new Vector4(0, 0, 0, 1);
 
@@ -20,7 +19,7 @@ export class WebGPUClearQuad {
     clearDepth: number,
     clearStencil: number
   ) {
-    if (!this._clearBindGroup) {
+    if (!this._clearStateSet) {
       this.initClearQuad(renderPass);
     }
     const hash = renderPass.getFrameBufferInfo().clearHash;

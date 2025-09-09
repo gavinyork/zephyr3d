@@ -114,6 +114,7 @@ export class SceneRenderer {
         device.pushDeviceStates();
         device.setFramebuffer(tmpFramebuffer);
       }
+      device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
       const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
       const ctx: DrawContext = {
         device,
