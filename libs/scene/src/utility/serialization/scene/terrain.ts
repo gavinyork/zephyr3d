@@ -355,6 +355,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           name: 'Grass',
           type: 'embedded',
           default: null,
+          phase: 1,
           isHidden() {
             return true;
           },
