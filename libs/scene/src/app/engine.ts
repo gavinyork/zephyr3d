@@ -17,16 +17,19 @@ export interface IRenderable extends IDisposable {
 }
 
 /**
- * Lightweight facade over {@link ScriptingSystem} that adds feature gating.
+ * Core engine class managing scripting, serialization, and rendering.
  *
  * Responsibilities:
- * - Construct and expose a scripting system for script lifecycle management.
- * - Provide an `enabled` flag to globally gate attach/detach/update operations
- *   without tearing down the underlying registry or state.
+ * - Manages a {@link ScriptingSystem} for dynamic script attachment and lifecycle.
+ * - Manages a {@link SerializationManager} for loading scenes and assets.
+ * - Maintains a list of active renderable objects to be rendered each frame.
+ * - Provides methods to attach/detach scripts, update scripts, load scenes, and read files.
+ * - Supports enabling/disabling of runtime operations.
  *
- * Notes:
- * - When `enabled` is `false`, all mutating operations are no-ops and `attachScript`
- *   returns `null`. This is useful for pausing runtime behavior in editor or paused modes.
+ * @remarks
+ * The engine can be configured with a virtual file system (VFS) and script root path.
+ * It exposes methods to manage scripts on host objects, update scripts each frame,
+ * load scenes from files, and render active objects.
  *
  * @public
  */
@@ -77,8 +80,7 @@ export class Engine {
   /**
    * Attaches a script module to the given host, if enabled.
    *
-   * Delegates to {@link ScriptingSystem.attachScript}. When disabled,
-   * this method resolves to `null` without side effects.
+   * When disabled, this method resolves to `null` without side effects.
    *
    * @typeParam T - Host type.
    * @param host - Host object to attach the script to.
@@ -91,7 +93,7 @@ export class Engine {
   /**
    * Detaches a script from a host, by module ID or instance, if enabled.
    *
-   * Delegates to {@link ScriptingSystem.detachScript}. No-op when disabled.
+   * No-op when disabled.
    *
    * @typeParam T - Host type.
    * @param host - Host to detach from.

@@ -616,13 +616,6 @@ export type AtmosphereParams = {
 export const ATMOSPHERIC_FOG_BIT: number;
 
 // @public
-export interface AttachedScript {
-    id: string;
-    instance: RuntimeScript<any>;
-    url: string;
-}
-
-// @public
 export class BaseCameraController {
     constructor();
     // @internal
@@ -962,7 +955,19 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set bloomThresholdKnee(val: number);
     // @internal
     protected _bloomThresholdKnee: number;
+    get clearColor(): Vector4;
+    set clearColor(v: Vector4);
+    // @internal
+    protected _clearColor: Vector4;
+    get clearDepth(): number;
+    set clearDepth(v: number);
+    // @internal
+    protected _clearDepth: number;
     clearHistoryData(): void;
+    get clearStencil(): number;
+    set clearStencil(v: number);
+    // @internal
+    protected _clearStencil: number;
     get clipMask(): number;
     set clipMask(val: number);
     // @internal
@@ -1786,7 +1791,7 @@ export function encodeRGBM(scope: PBInsideFunctionScope, rgb: PBShaderExp, maxRa
 export class Engine {
     constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean);
     // (undocumented)
-    protected _activeScenes: DRef<Scene>[];
+    protected _activeRenderables: DRef<IRenderable>[];
     attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>>;
     detachAllScripts(): void;
     detachScript<T extends Host>(host: T, idOrInstance: string | RuntimeScript<T>): void;
@@ -1799,7 +1804,7 @@ export class Engine {
     render(): void;
     get serializationManager(): SerializationManager;
     // (undocumented)
-    setScene(scene: Scene, layer?: number): void;
+    setRenderable(renderable: IRenderable, layer?: number): void;
     // (undocumented)
     startup(startupScene: string, splashScreen: string, startupScript: string): Promise<void>;
     update(deltaTime: number, elapsedTime: number): void;
@@ -2672,6 +2677,13 @@ export interface HeightfieldBBoxTreeNode {
 export type Host = IDisposable;
 
 // @public
+export interface IAttachedScript {
+    id: string;
+    instance: RuntimeScript<any>;
+    url: string;
+}
+
+// @public
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
@@ -2842,6 +2854,12 @@ export function integralMultiScattering(scope: PBInsideFunctionScope, stParams: 
 
 // @public
 export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp;
+
+// @public
+export interface IRenderable extends IDisposable {
+    // (undocumented)
+    render(): void;
+}
 
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -4452,7 +4470,7 @@ export function scattering(scope: PBInsideFunctionScope, stParams: PBShaderExp, 
 // Warning: (ae-forgotten-export) The symbol "Scene_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class Scene extends Scene_base {
+export class Scene extends Scene_base implements IRenderable {
     constructor(name?: string);
     get boundingBox(): AABB;
     constructRay(camera: Camera, viewportWidth: number, viewportHeight: number, screenX: number, screenY: number, invModelMatrix?: Matrix4x4): Ray;
@@ -6023,7 +6041,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 // Warnings were encountered during analysis:
 //
 // dist/index.d.ts:3052:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:11753:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:12596:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
