@@ -1,4 +1,4 @@
-import type { ReadOptions } from '@zephyr3d/base';
+import type { IDisposable, ReadOptions } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
@@ -6,6 +6,15 @@ import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
 import { SerializationManager } from '../utility';
 import type { Scene } from '../scene';
+
+/**
+ * Interface for objects that can be rendered.
+ *
+ * @public
+ */
+export interface IRenderable extends IDisposable {
+  render(): void;
+}
 
 /**
  * Lightweight facade over {@link ScriptingSystem} that adds feature gating.
@@ -25,7 +34,7 @@ export class Engine {
   private _scriptingSystem: ScriptingSystem;
   private _serializationManager: SerializationManager;
   private _enabled: boolean;
-  protected _activeScenes: DRef<Scene>[];
+  protected _activeRenderables: DRef<IRenderable>[];
   private _loadingScenes: Record<string, Promise<Scene>>[];
   /**
    * Creates a new runtime manager.
@@ -40,7 +49,7 @@ export class Engine {
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });
     this._serializationManager = new SerializationManager(VFS);
     this._enabled = enabled ?? true;
-    this._activeScenes = [];
+    this._activeRenderables = [];
     this._loadingScenes = [];
   }
   /**
@@ -125,16 +134,16 @@ export class Engine {
     }
     return this._loadingScenes[path];
   }
-  setScene(scene: Scene, layer = 0) {
-    if (this._activeScenes[layer]) {
-      if (scene) {
-        this._activeScenes[layer].set(scene);
+  setRenderable(renderable: IRenderable, layer = 0) {
+    if (this._activeRenderables[layer]) {
+      if (renderable) {
+        this._activeRenderables[layer].set(renderable);
       } else {
-        this._activeScenes[layer].dispose();
-        delete this._activeScenes[layer];
+        this._activeRenderables[layer].dispose();
+        delete this._activeRenderables[layer];
       }
-    } else if (scene) {
-      this._activeScenes[layer] = new DRef(scene);
+    } else if (renderable) {
+      this._activeRenderables[layer] = new DRef(renderable);
     }
   }
   async readFile<T extends ReadOptions['encoding'] = 'binary'>(
@@ -154,7 +163,7 @@ export class Engine {
     if (splashScreen) {
       const splashScreenScene = await this.loadSceneFromFile(splashScreen);
       if (splashScreen) {
-        this.setScene(splashScreenScene, splashScreenLayer);
+        this.setRenderable(splashScreenScene, splashScreenLayer);
       }
     }
     if (startupScript) {
@@ -166,13 +175,13 @@ export class Engine {
     }
     if (startupScene) {
       const scene = await this.loadSceneFromFile(startupScene);
-      this.setScene(scene, 0);
+      this.setRenderable(scene, 0);
     }
-    this.setScene(null, splashScreenLayer);
+    this.setRenderable(null, splashScreenLayer);
   }
   render() {
-    for (const k of Object.keys(this._activeScenes)) {
-      this._activeScenes[k].get().render();
+    for (const k of Object.keys(this._activeRenderables)) {
+      this._activeRenderables[k].get().render();
     }
   }
   private async _loadScene(path: string): Promise<Scene> {

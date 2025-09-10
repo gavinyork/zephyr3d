@@ -11,6 +11,7 @@ import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
+import type { IRenderable } from '../app';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -29,14 +30,17 @@ import { getDevice } from '../app/api';
  *
  * @public
  */
-export class Scene extends makeObservable(Disposable)<{
-  /** Dispatched once per frame before render-related work. */
-  update: [Scene];
-  /** Dispatched immediately before rendering begins for a camera. */
-  startrender: [Scene, Camera, Compositor];
-  /** Dispatched immediately after rendering finishes for a camera. */
-  endrender: [Scene, Camera, Compositor];
-}>() {
+export class Scene
+  extends makeObservable(Disposable)<{
+    /** Dispatched once per frame before render-related work. */
+    update: [Scene];
+    /** Dispatched immediately before rendering begins for a camera. */
+    startrender: [Scene, Camera, Compositor];
+    /** Dispatched immediately after rendering finishes for a camera. */
+    endrender: [Scene, Camera, Compositor];
+  }>()
+  implements IRenderable
+{
   /** @internal */
   private static _nextId = 0;
   /** @internal Scene name. */

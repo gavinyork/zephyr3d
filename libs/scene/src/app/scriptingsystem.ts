@@ -44,7 +44,7 @@ export type ScriptingSystemOptions = {
  *
  * @public
  */
-export interface AttachedScript {
+export interface IAttachedScript {
   /** The logical module identifier used to resolve the script. */
   id: string;
   /** The resolved runtime URL used for dynamic import. */
@@ -73,7 +73,7 @@ export interface AttachedScript {
  */
 export class ScriptingSystem {
   private _registry: ScriptRegistry;
-  private _hostScripts: Map<Host, AttachedScript[]>;
+  private _hostScripts: Map<Host, IAttachedScript[]>;
   private _scriptHosts: Map<RuntimeScript<any>, Host[]>;
   private _onLoadError?: (e: unknown, id: string) => void;
   private _importComment?: string;
@@ -164,7 +164,7 @@ export class ScriptingSystem {
         await P;
       }
 
-      const attached: AttachedScript = {
+      const attached: IAttachedScript = {
         id: module,
         url,
         instance
