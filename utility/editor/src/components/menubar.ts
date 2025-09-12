@@ -13,7 +13,6 @@ export type MenuItemOptions = {
 };
 
 export type MenuBarOptions = {
-  autoSeparator?: boolean;
   items: MenuItemOptions[];
 };
 
@@ -23,10 +22,12 @@ export class MenubarView extends Observable<{
 }> {
   private _map: Map<string, { item: MenuItemOptions; parent: MenuItemOptions }>;
   private _options: MenuBarOptions;
+  private _space: ImGui.ImVec2;
   constructor(options?: MenuBarOptions) {
     super();
     this._map = null;
     this._options = null;
+    this._space = new ImGui.ImVec2(0, 0);
     this.create(options);
   }
   get height() {
@@ -41,7 +42,6 @@ export class MenubarView extends Observable<{
   private create(options: MenuBarOptions) {
     this._map = new Map();
     this._options = {
-      autoSeparator: options?.autoSeparator ?? true,
       items: (options?.items ?? []).map((val) => this.copyItem(val))
     };
     if (this._options.items.length > 0) {
@@ -148,8 +148,8 @@ export class MenubarView extends Observable<{
       if (ImGui.BeginMenu(`${item.label}##${item.id}`)) {
         for (let i = 0; i < item.subMenus.length; i++) {
           const subItem = item.subMenus[i];
-          if (i > 0 && this._options?.autoSeparator) {
-            ImGui.Separator();
+          if (i > 0) {
+            ImGui.Dummy(this._space);
           }
           this.renderItem(subItem);
         }

@@ -142,7 +142,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     ) {
       this._settings.preferredRHI = items.filter((val) => val.selected).map((val) => val.text);
     }
-    ImGui.Button('Ok');
+    ImGui.Button('Save');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
       this.close(this._settings);
     }

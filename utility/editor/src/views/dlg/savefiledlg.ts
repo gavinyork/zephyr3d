@@ -63,6 +63,10 @@ export class DlgSaveFile extends DialogRenderer<string> {
     );
     this._name = [this._filterPatterns[this._selected[0]]];
     this._renderer.on('selection_changed', this.updateSelection, this);
+    this._renderer.on('file_dbl_clicked', (file: FileInfo) => {
+      this._name[0] = file.meta.name;
+      this.saveFileAndClose();
+    });
   }
   updateSelection(selectedDir: DirectoryInfo, files: FileInfo[]) {
     if (files.length === 1) {
@@ -80,18 +84,21 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._renderer.fileFilter = [this._filterPatterns[this._selected[0]]];
     }
     if (ImGui.Button('Save')) {
-      if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
-        const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
-        this._renderer.off('selection_changed', this.updateSelection, this);
-        this._renderer.dispose();
-        this.close(name);
-      }
+      this.saveFileAndClose();
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
       this._renderer.off('selection_changed', this.updateSelection, this);
       this._renderer.dispose();
       this.close('');
+    }
+  }
+  saveFileAndClose() {
+    if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
+      const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
+      this._renderer.off('selection_changed', this.updateSelection, this);
+      this._renderer.dispose();
+      this.close(name);
     }
   }
 }

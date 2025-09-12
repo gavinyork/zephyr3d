@@ -56,6 +56,10 @@ export class DlgOpenFile extends DialogRenderer<string> {
         allowDblClickOpen: false
       }
     );
+    this._renderer.on('file_dbl_clicked', (file: FileInfo) => {
+      this._name[0] = file.meta.name;
+      this.openFileAndClose();
+    });
     this._renderer.on('selection_changed', this.updateSelection, this);
   }
   updateSelection(selectedDir: DirectoryInfo, files: FileInfo[]) {
@@ -76,26 +80,29 @@ export class DlgOpenFile extends DialogRenderer<string> {
       }
     }
     if (ImGui.Button('Open')) {
-      if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
-        const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
-        this._renderer.VFS.exists(name).then((exists) => {
-          if (exists) {
-            this._renderer.VFS.stat(name).then((stat) => {
-              if (stat.isFile) {
-                this._renderer.off('selection_changed', this.updateSelection, this);
-                this._renderer.dispose();
-                this.close(name);
-              }
-            });
-          }
-        });
-      }
+      this.openFileAndClose();
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
       this._renderer.off('selection_changed', this.updateSelection, this);
       this._renderer.dispose();
       this.close('');
+    }
+  }
+  private openFileAndClose() {
+    if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
+      const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
+      this._renderer.VFS.exists(name).then((exists) => {
+        if (exists) {
+          this._renderer.VFS.stat(name).then((stat) => {
+            if (stat.isFile) {
+              this._renderer.off('selection_changed', this.updateSelection, this);
+              this._renderer.dispose();
+              this.close(name);
+            }
+          });
+        }
+      });
     }
   }
 }

@@ -61,6 +61,7 @@ type VFSRendererOptions = {
 
 export class VFSRenderer extends makeObservable(Disposable)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
+  file_dbl_clicked: [file: FileInfo];
 }>() {
   private static readonly baseFlags =
     ImGui.TreeNodeFlags.SpanAvailWidth |
@@ -705,12 +706,19 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (isDir) {
       this.selectDir(item as DirectoryInfo);
       item.open = true;
-    } else if (this._options.allowDblClickOpen) {
-      if (item.meta.path.toLowerCase().endsWith('.scn')) {
+    } else {
+      this.fileDoubleClicked(item);
+    }
+  }
+
+  private fileDoubleClicked(file: FileInfo) {
+    if (this._options.allowDblClickOpen) {
+      if (file.meta.path.toLowerCase().endsWith('.scn')) {
         // open scene
-        eventBus.dispatchEvent('action', 'OPEN_DOC', item.meta.path);
+        eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
+        return;
       } else {
-        const mimeType = this._vfs.guessMIMEType(item.meta.path);
+        const mimeType = this._vfs.guessMIMEType(file.meta.path);
         if (
           mimeType === 'text/javascript' ||
           mimeType === 'text/x-typescript' ||
@@ -718,10 +726,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           mimeType === 'application/json' ||
           mimeType === 'text/plain'
         ) {
-          eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
+          eventBus.dispatchEvent('action', 'EDIT_CODE', file.meta.path, mimeType);
+          return;
         }
       }
     }
+    this.dispatchEvent('file_dbl_clicked', file);
   }
 
   private handleContextMenu() {

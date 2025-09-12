@@ -20,5 +20,6 @@
 - 配置项目设置
 - 预览和发布项目
 
-[图片占位：项目管理界面截图]
+<img src="media/project-menu.png">
+
 

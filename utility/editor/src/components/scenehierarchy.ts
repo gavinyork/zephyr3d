@@ -108,6 +108,7 @@ export class SceneHierarchy extends Observable<{
       if (ImGui.MenuItem('Create group')) {
         this.dispatchEvent('request_add_child', node, SceneNode);
       }
+      /*
       const animationSet = node.animationSet;
       if (animationSet && animationSet.getAnimationNames().length > 0) {
         ImGui.Separator();
@@ -139,6 +140,7 @@ export class SceneHierarchy extends Observable<{
           ImGui.EndMenu();
         }
       }
+      */
       if (node.isCamera() && node !== node.scene.mainCamera) {
         ImGui.Separator();
         if (ImGui.MenuItem('Make Active')) {

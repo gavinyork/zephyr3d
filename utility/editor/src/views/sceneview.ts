@@ -145,7 +145,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._trackId = 0;
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
-      autoSeparator: true,
       items: [
         {
           label: 'Project',
@@ -159,14 +158,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               action: () => eventBus.dispatchEvent('action', 'OPEN_PROJECT')
             },
             {
-              label: 'Project Settings...',
-              action: () => eventBus.dispatchEvent('action', 'PROJECT_SETTINGS')
-            },
-            {
-              label: 'Build Project',
-              action: () => eventBus.dispatchEvent('action', 'BUILD_PROJECT')
-            },
-            {
               label: 'Close Project',
               action: () => eventBus.dispatchEvent('action', 'CLOSE_PROJECT')
             },
@@ -177,6 +168,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Delete Project',
               action: () => eventBus.dispatchEvent('action', 'DELETE_PROJECT')
+            },
+            {
+              label: '-'
+            },
+            {
+              label: 'Project Settings...',
+              action: () => eventBus.dispatchEvent('action', 'PROJECT_SETTINGS')
+            },
+            {
+              label: 'Build Project',
+              action: () => eventBus.dispatchEvent('action', 'BUILD_PROJECT')
             }
           ]
         },
