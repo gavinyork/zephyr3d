@@ -25,7 +25,7 @@ export class EnvLightWrapper extends Disposable {
   /** @internal */
   constructor() {
     super();
-    this._envLight = new EnvIBL();
+    this._envLight = new EnvShIBL();
     this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1);
     this._ambientColor.callback = () => {
       if (this.type === 'constant') {

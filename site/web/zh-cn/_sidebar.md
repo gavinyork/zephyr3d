@@ -59,3 +59,24 @@
     - [多遍材质](zh-cn/user-material-multipass.md)
     - [Shader变体](zh-cn/user-material-var.md)
 
+- 使用编辑器
+
+  - 编辑器概述
+    - [概述](zh-cn/editor-introduction.md)
+    - [快速开始](zh-cn/editor-getting-start.md)
+  - 项目管理
+    - [概述](zh-cn/editor-project-introduction.md)
+  - 用户界面
+    - [概述](zh-cn/editor-layout-introduction.md)
+  - 资产管理
+    - [概述](zh-cn/editor-asset-introduction.md)
+  - 场景管理
+    - [基本操作](zh-cn/editor-scene-basic.md)
+    - [环境编辑](zh-cn/editor-scene-environment.md)
+    - [节点管理](zh-cn/editor-scene-graph.md)
+  - 脚本系统
+    - [概述](zh-cn/editor-scripting.md)
+  - 动画系统
+    - [概述](zh-cn/editor-animation.md)
+  - 项目预览与构建
+    - [概述](zh-cn/editor-deploy.md)
