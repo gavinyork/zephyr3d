@@ -1,3 +1,7 @@
 [submodule "doc-site"]
 	path = doc-site
 	url = https://github.com/gavinyork/zephyr3d-site.git
+[submodule "apps/doc"]
+	path = apps/doc
+	url = https://github.com/gavinyork/zephyr3d-site.git
+	branch = main
