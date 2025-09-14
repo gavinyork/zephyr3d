@@ -466,7 +466,7 @@
       "projectFolder": "test"
     },
     {
-      "packageName": "@zephyr3d/site",
+      "packageName": "@zephyr3d/doc",
       "projectFolder": "apps/doc"
     }
   ]

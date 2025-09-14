@@ -1,7 +1,7 @@
 {
-  "name": "@zephyr3d/site",
+  "name": "@zephyr3d/doc",
   "version": "0.0.1",
-  "description": "zephyr3d document site",
+  "description": "zephyr3d documentations and showcase",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "files": [
     "dist"
