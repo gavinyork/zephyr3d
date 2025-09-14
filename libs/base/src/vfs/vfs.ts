@@ -367,6 +367,14 @@ export abstract class VFS extends Observable<{
     return typeof url === 'string' && url.startsWith('blob:');
   }
   /**
+   * Checks wether a URL is absolute URL
+   * @param url - URL to check
+   * @returns true if the URL is absolute URL, otherwise false
+   */
+  isAbsoluteURL(url: string): boolean {
+    return typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+  }
+  /**
    * Disposes of this file system and cleans up resources. (for IndexedDB only).
    */
   async deleteFileSystem(): Promise<void> {

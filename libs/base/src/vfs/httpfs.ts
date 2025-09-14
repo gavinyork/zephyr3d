@@ -117,7 +117,7 @@ export class HttpFS extends VFS {
       path = this.options.urlResolver(path);
     }
     path = path.trim();
-    if (this.parseDataURI(path) || this.isObjectURL(path)) {
+    if (this.parseDataURI(path) || this.isObjectURL(path) || this.isAbsoluteURL(path)) {
       return path;
     }
     return super.normalizePath(path);
@@ -304,20 +304,15 @@ export class HttpFS extends VFS {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }
   private toAbsoluteURL(url: string): string {
-    url =
-      this.isObjectURL(url) || this.parseDataURI(url)
-        ? url
-        : new URL(this.join(this.basePath, url), this.baseOrigin).href;
-    return url;
+    return this.isObjectURL(url) || this.parseDataURI(url) || this.isAbsoluteURL(url)
+      ? url
+      : new URL(this.join(this.basePath, url), this.baseOrigin).href;
   }
 
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
-    url =
-      this.isObjectURL(url) || this.parseDataURI(url)
-        ? url
-        : new URL(this.join(this.basePath, url), this.baseOrigin).href;
+    url = this.toAbsoluteURL(url);
     try {
       const response = await fetch(url, {
         ...init,

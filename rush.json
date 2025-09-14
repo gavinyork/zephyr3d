@@ -467,7 +467,7 @@
     },
     {
       "packageName": "@zephyr3d/site",
-      "projectFolder": "site"
+      "projectFolder": "apps/doc"
     }
   ]
 }
