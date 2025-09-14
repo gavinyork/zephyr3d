@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "downlevelIteration": true,
+    "moduleResolution": "node",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["es2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitAny": false,
+    "preserveConstEnums": false,
+    "listEmittedFiles": true,
+    "noUnusedLocals": true,
+    "strictNullChecks": false,
+    "allowJs": true,
+    "checkJs": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "sourceMap": true,
+    "noEmit": true,
+    "outDir": "dist",
+    "stripInternal": true,
+    "sourceRoot": "./src",
+    "typeRoots": ["./node_modules/@webgpu/types", "./types"],
+    "types": ["ammo-wasm"]
+  },
+  "include": ["./src"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
+}
