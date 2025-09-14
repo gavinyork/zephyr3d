@@ -235,7 +235,7 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._viewProjMatrix = Matrix4x4.identity();
     this._invViewProjMatrix = Matrix4x4.identity();
     this._clipPlane = null;
-    this._clearColor = null;
+    this._clearColor = new Vector4(0, 0, 0, 1);
     this._clearDepth = 1;
     this._clearStencil = 0;
     this._dirty = true;

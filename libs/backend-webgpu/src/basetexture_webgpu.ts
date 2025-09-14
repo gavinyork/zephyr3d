@@ -554,6 +554,7 @@ export abstract class WebGPUBaseTexture<
     }
     if (!this._device.isTextureUploading(this as any)) {
       this.clearPendingUploads();
+      //this._device.textureUpload(this as WebGPUBaseTexture);
       const destination: GPUTexelCopyTextureInfo = {
         texture: this._object as GPUTexture,
         mipLevel: miplevel,

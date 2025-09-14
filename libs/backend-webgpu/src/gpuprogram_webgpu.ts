@@ -31,7 +31,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   constructor(device: WebGPUDevice, params: GPUProgramConstructParams) {
     super(device);
     this._type = params.type;
-    this._label = params.label;
+    this._label = params.label ?? `Program ${this.uid}`;
     this._bindGroupLayouts = [...params.params.bindGroupLayouts];
     this._error = '';
     if (params.type === 'render') {
@@ -149,7 +149,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   }
   private createShaderModule(code: string): GPUShaderModule {
     const t0 = Date.now();
-    let sm = this._device.device.createShaderModule({ code });
+    let sm = this._device.device.createShaderModule({ label: this._label, code });
     if (sm) {
       const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
         (sm as any).compilationInfo || (sm as any).getCompilationInfo;
