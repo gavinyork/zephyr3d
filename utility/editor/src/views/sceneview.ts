@@ -2,7 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
-import { Tab } from '../components/tab';
+import { LeftDockPanel } from '../components/tab';
 import type {
   Camera,
   Compositor,
@@ -76,7 +76,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoRenderer: PostGizmoRenderer;
   private readonly _propGrid: PropertyEditor;
   private readonly _toolbar: ToolBar;
-  private _tab: Tab;
+  private _leftDockPanel: LeftDockPanel;
   private readonly _menubar: MenubarView;
   private _assetView: BottomView;
   private readonly _statusbar: StatusBar;
@@ -228,7 +228,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Copy',
               shortCut: 'Ctrl+C',
               action: () => {
-                const node = this._tab.sceneHierarchy.selectedNode;
+                const node = this._leftDockPanel.sceneHierarchy.selectedNode;
                 if (node) {
                   this.handleCopyNode(node);
                 }
@@ -405,10 +405,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Delete',
           tooltip: () => 'Delete selected node',
           selected: () => {
-            return !!this._tab.sceneHierarchy.selectedNode;
+            return !!this._leftDockPanel.sceneHierarchy.selectedNode;
           },
           action: () => {
-            const node = this._tab.sceneHierarchy.selectedNode;
+            const node = this._leftDockPanel.sceneHierarchy.selectedNode;
             if (node) {
               this.handleDeleteNode(node);
             }
@@ -419,10 +419,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Ctrl+D',
           tooltip: () => 'Creatas an instance of current node',
           selected: () => {
-            return !!this._tab.sceneHierarchy.selectedNode;
+            return !!this._leftDockPanel.sceneHierarchy.selectedNode;
           },
           action: () => {
-            this.handleCloneNode(this._tab.sceneHierarchy.selectedNode, 'instance');
+            this.handleCloneNode(this._leftDockPanel.sceneHierarchy.selectedNode, 'instance');
           }
         },
         {
@@ -430,10 +430,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'F',
           tooltip: () => 'Focus on selected node',
           selected: () => {
-            return !!this._tab.sceneHierarchy.selectedNode;
+            return !!this._leftDockPanel.sceneHierarchy.selectedNode;
           },
           action: () => {
-            const node = this._tab.sceneHierarchy.selectedNode;
+            const node = this._leftDockPanel.sceneHierarchy.selectedNode;
             if (node) {
               this.lookAt(this.controller.model.scene.mainCamera, node);
             }
@@ -444,12 +444,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           tooltip: () => 'Edit selected node',
           visible: () =>
             !!this._currentEditTool.get() ||
-            (!this._currentEditTool.get() && isObjectEditable(this._tab.sceneHierarchy.selectedNode)),
+            (!this._currentEditTool.get() &&
+              isObjectEditable(this._leftDockPanel.sceneHierarchy.selectedNode)),
           selected: () => {
             return !!this._currentEditTool.get();
           },
           action: () => {
-            this.handleEditNode(this._tab.sceneHierarchy.selectedNode);
+            this.handleEditNode(this._leftDockPanel.sceneHierarchy.selectedNode);
           }
         },
         {
@@ -460,10 +461,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Ctrl+C',
           tooltip: () => 'Copy',
           selected: () => {
-            return !!this._tab.sceneHierarchy.selectedNode;
+            return !!this._leftDockPanel.sceneHierarchy.selectedNode;
           },
           action: () => {
-            const node = this._tab.sceneHierarchy.selectedNode;
+            const node = this._leftDockPanel.sceneHierarchy.selectedNode;
             if (node) {
               this.handleCopyNode(node);
             }
@@ -545,7 +546,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       0.4
     );
     this._postGizmoRenderer = null;
-    this._tab = null;
+    this._leftDockPanel = null;
     this._assetView = null;
   }
   get editor() {
@@ -578,18 +579,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._assetView.panel.top =
       ImGui.GetIO().DisplaySize.y - this._statusbar.height - this._assetView.panel.height;
     this._assetView.panel.width = Math.max(0, displaySize.x - this._propGrid.width);
-    this._tab.height =
+    this._leftDockPanel.height =
       displaySize.y -
       this._menubar.height -
       this._toolbar.height -
       this._statusbar.height -
       this._assetView.panel.height;
     this._menubar.render();
-    this._tab.render(this.controller.editor.sceneChanged);
+    this._leftDockPanel.render(this.controller.editor.sceneChanged);
     this._propGrid.render();
     this._toolbar.render();
     this._assetView.render();
-    const viewportWidth = displaySize.x - this._tab.width - this._propGrid.width;
+    const viewportWidth = displaySize.x - this._leftDockPanel.width - this._propGrid.width;
     const viewportHeight =
       displaySize.y -
       this._statusbar.height -
@@ -599,13 +600,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (viewportWidth > 0 && viewportHeight > 0) {
       const camera = this.controller.model.scene.mainCamera;
       camera.viewport = [
-        this._tab.width,
+        this._leftDockPanel.width,
         this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       ];
       camera.scissor = [
-        this._tab.width,
+        this._leftDockPanel.width,
         this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
@@ -621,7 +622,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       camera.render(this.controller.model.scene);
 
       // Render selected camera
-      const selectedNode = this._tab.sceneHierarchy.selectedNode;
+      const selectedNode = this._leftDockPanel.sceneHierarchy.selectedNode;
       if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
         selectedNode.viewport = [camera.viewport[0] + 20, camera.viewport[1] + 20, 300, 200];
         selectedNode.scissor = selectedNode.viewport;
@@ -631,7 +632,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
 
       if (this._renderDropZone) {
         this.renderDropZone(
-          this._tab.width,
+          this._leftDockPanel.width,
           this._menubar.height + this._toolbar.height,
           viewportWidth,
           viewportHeight
@@ -754,7 +755,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 this._cmdManager
                   .execute(new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos))
                   .then((node) => {
-                    this._tab.sceneHierarchy.selectNode(node);
+                    this._leftDockPanel.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
                     eventBus.dispatchEvent('scene_changed');
                   });
@@ -770,7 +771,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     )
                   )
                   .then((mesh) => {
-                    this._tab.sceneHierarchy.selectNode(mesh);
+                    this._leftDockPanel.sceneHierarchy.selectNode(mesh);
                     placeNode.parent = null;
                     eventBus.dispatchEvent('scene_changed');
                   });
@@ -788,7 +789,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     if (node instanceof DirectionalLight) {
                       node.sunLight = true;
                     }
-                    this._tab.sceneHierarchy.selectNode(node);
+                    this._leftDockPanel.sceneHierarchy.selectNode(node);
                     placeNode.parent = null;
                     this._proxy.createProxy(node);
                     eventBus.dispatchEvent('scene_changed');
@@ -840,7 +841,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             }
           }
           node = this._proxy.getProto(node);
-          this._tab.sceneHierarchy.selectNode(node);
+          this._leftDockPanel.sceneHierarchy.selectNode(node);
         }
       }
     }
@@ -902,7 +903,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.on('workspace_dragging', this.handleWorkspaceDragging, this);
     eventBus.on('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
     this.reset();
-    this._tab.sceneHierarchy.selectNode(this.controller.model.scene.rootNode);
+    this._leftDockPanel.sceneHierarchy.selectNode(this.controller.model.scene.rootNode);
   }
   protected onDeactivate(): void {
     super.onDeactivate();
@@ -929,20 +930,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy = new NodeProxy(this.controller.model.scene);
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera, null);
       this._postGizmoRenderer.mode = 'select';
-      this._tab = new Tab(
+      this._leftDockPanel = new LeftDockPanel(
         this.controller.model.scene,
         0,
         this._menubar.height + this._toolbar.height,
         300,
         0
       );
-      this._tab.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
-      this._tab.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
-      this._tab.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
-      this._tab.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
-      this._tab.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
-      this._tab.sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
-      this._tab.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
+      this._leftDockPanel.sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
+      this._leftDockPanel.sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
+      this._leftDockPanel.sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
+      this._leftDockPanel.sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
+      this._leftDockPanel.sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._leftDockPanel.sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
+      this._leftDockPanel.sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy.createProxy(node);
@@ -962,15 +963,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private sceneFinialize() {
-    if (this._tab) {
-      this._tab.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
-      this._tab.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
-      this._tab.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
-      this._tab.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
-      this._tab.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
-      this._tab.sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
-      this._tab.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
-      this._tab = null;
+    if (this._leftDockPanel) {
+      this._leftDockPanel.sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
+      this._leftDockPanel.sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
+      this._leftDockPanel.sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
+      this._leftDockPanel.sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
+      this._leftDockPanel.sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
+      this._leftDockPanel.sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
+      this._leftDockPanel.sceneHierarchy.off('request_add_child', this.handleAddChild, this);
+      this._leftDockPanel = null;
     }
     if (this.controller.model.scene) {
       this.controller.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
@@ -1068,7 +1069,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.dispatchEvent('scene_changed');
   }
   update(dt: number) {
-    const selectedNode = this._tab.sceneHierarchy.selectedNode;
+    const selectedNode = this._leftDockPanel.sceneHierarchy.selectedNode;
     if (selectedNode?.isCamera() && selectedNode !== this.controller.model.scene.mainCamera) {
       this._proxy.updateProxy(selectedNode);
     }
@@ -1192,7 +1193,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     this._cmdManager.execute(new NodeCloneCommand(node, method)).then((sceneNode) => {
       sceneNode.position.x += 1;
-      this._tab.sceneHierarchy.selectNode(sceneNode);
+      this._leftDockPanel.sceneHierarchy.selectNode(sceneNode);
     });
     eventBus.dispatchEvent('scene_changed');
   }
@@ -1218,8 +1219,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (editTarget instanceof SceneNode && editTarget.isParentOf(node)) {
       this._currentEditTool.dispose();
     }
-    if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
-      this._tab.sceneHierarchy.selectNode(null);
+    if (node.isParentOf(this._leftDockPanel.sceneHierarchy.selectedNode)) {
+      this._leftDockPanel.sceneHierarchy.selectNode(null);
     }
     if (this._propGrid.object instanceof SceneNode && node.isParentOf(this._propGrid.object)) {
       this._propGrid.object = null;
@@ -1274,7 +1275,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._cmdManager
         .execute(new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos))
         .then((node) => {
-          this._tab.sceneHierarchy.selectNode(node);
+          this._leftDockPanel.sceneHierarchy.selectNode(node);
           eventBus.dispatchEvent('scene_changed');
         });
     }
@@ -1372,7 +1373,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
-      this._tab.sceneHierarchy.selectNode(node);
+      this._leftDockPanel.sceneHierarchy.selectNode(node);
       eventBus.dispatchEvent('scene_changed');
     });
   }
@@ -1380,8 +1381,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
     }
-    if (node.isParentOf(this._tab.sceneHierarchy.selectedNode)) {
-      this._tab.sceneHierarchy.selectNode(null);
+    if (node.isParentOf(this._leftDockPanel.sceneHierarchy.selectedNode)) {
+      this._leftDockPanel.sceneHierarchy.selectNode(null);
     }
   }
   private handleBeginTransformNode(node: SceneNode) {

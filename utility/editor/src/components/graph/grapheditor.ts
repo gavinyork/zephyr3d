@@ -39,6 +39,19 @@ export class GraphEditor {
   private showContextMenu = false;
   private readonly gridSize = 20;
   private showGrid = true;
+  private selectedLinks: Set<number> = new Set();
+  private selectedSlot: SlotInfo | null = null;
+  private hoveredLinkId: number | null = null;
+  private readonly linkHitRadius = 6; // 鼠标选中连线的“命中阈值”（像素）
+  private readonly linkWidthNormal = 2.0;
+  private readonly linkWidthHover = 3.0;
+  private readonly linkWidthSelected = 4.0;
+
+  private readonly pinOuterRadius = SLOT_RADIUS + 3; // hover/选中时的外圈半径
+  private readonly pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0); // 金色
+  private readonly pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8); // 白色
+  private readonly linkSelectedColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
+  private readonly linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
 
   constructor() {
     this.initializeDefaultNodes();
@@ -131,6 +144,82 @@ export class GraphEditor {
     this.links.push(link);
   }
 
+  private isPointNearBezier(
+    p: ImGui.ImVec2,
+    p0: ImGui.ImVec2,
+    p1: ImGui.ImVec2,
+    p2: ImGui.ImVec2,
+    p3: ImGui.ImVec2,
+    threshold: number
+  ): boolean {
+    // 将贝塞尔分段采样为若干线段，计算点到各段的最小距离
+    const steps = 24; // 可调：更多步数更精细但更耗时
+    let prev = p0;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x =
+        Math.pow(1 - t, 3) * p0.x +
+        3 * Math.pow(1 - t, 2) * t * p1.x +
+        3 * (1 - t) * t * t * p2.x +
+        t * t * t * p3.x;
+      const y =
+        Math.pow(1 - t, 3) * p0.y +
+        3 * Math.pow(1 - t, 2) * t * p1.y +
+        3 * (1 - t) * t * t * p2.y +
+        t * t * t * p3.y;
+
+      const cur = new ImGui.ImVec2(x, y);
+      if (this.pointToSegmentDistance(p, prev, cur) <= threshold) {
+        return true;
+      }
+      prev = cur;
+    }
+    return false;
+  }
+
+  private getLinkUnderMouse(canvasPos: ImGui.ImVec2): number | null {
+    const mousePos = ImGui.GetMousePos();
+
+    // 遍历所有连线，检查近邻
+    for (let i = this.links.length - 1; i >= 0; i--) {
+      const link = this.links[i];
+      const startNode = this.nodes.get(link.startNodeId);
+      const endNode = this.nodes.get(link.endNodeId);
+      if (!startNode || !endNode) continue;
+
+      const startPos = this.worldToCanvas(startNode.getSlotPosition(link.startSlotId, true));
+      const endPos = this.worldToCanvas(endNode.getSlotPosition(link.endSlotId, false));
+
+      const p0 = new ImGui.ImVec2(canvasPos.x + startPos.x, canvasPos.y + startPos.y);
+      const p3 = new ImGui.ImVec2(canvasPos.x + endPos.x, canvasPos.y + endPos.y);
+      const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
+      const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
+
+      if (this.isPointNearBezier(mousePos, p0, p1, p2, p3, this.linkHitRadius)) {
+        return link.id;
+      }
+    }
+    return null;
+  }
+
+  private pointToSegmentDistance(p: ImGui.ImVec2, a: ImGui.ImVec2, b: ImGui.ImVec2): number {
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const wx = p.x - a.x;
+    const wy = p.y - a.y;
+
+    const c1 = vx * wx + vy * wy;
+    if (c1 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+
+    const c2 = vx * vx + vy * vy;
+    if (c2 <= c1) return Math.hypot(p.x - b.x, p.y - b.y);
+
+    const t = c1 / c2;
+    const projx = a.x + t * vx;
+    const projy = a.y + t * vy;
+    return Math.hypot(p.x - projx, p.y - projy);
+  }
+
   worldToCanvas(worldPos: ImGui.ImVec2): ImGui.ImVec2 {
     return new ImGui.ImVec2(
       (worldPos.x + this.canvasOffset.x) * this.canvasScale,
@@ -218,32 +307,32 @@ export class GraphEditor {
   private drawLink(drawList: ImGui.DrawList, link: GraphLink, canvasPos: ImGui.ImVec2) {
     const startNode = this.nodes.get(link.startNodeId);
     const endNode = this.nodes.get(link.endNodeId);
+    if (!startNode || !endNode) return;
 
-    if (!startNode || !endNode) {
-      return;
+    const startPos = this.worldToCanvas(startNode.getSlotPosition(link.startSlotId, true));
+    const endPos = this.worldToCanvas(endNode.getSlotPosition(link.endSlotId, false));
+
+    const p0 = new ImGui.ImVec2(canvasPos.x + startPos.x, canvasPos.y + startPos.y);
+    const p3 = new ImGui.ImVec2(canvasPos.x + endPos.x, canvasPos.y + endPos.y);
+    const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
+    const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
+
+    // 基础颜色
+    let color = link.color;
+    let width = this.linkWidthNormal;
+
+    const isSelected = this.selectedLinks.has(link.id);
+    const isHovered = this.hoveredLinkId === link.id;
+
+    if (isSelected) {
+      color = this.linkSelectedColor;
+      width = this.linkWidthSelected;
+    } else if (isHovered) {
+      color = this.linkHoverColor;
+      width = this.linkWidthHover;
     }
 
-    const startPos = startNode.getSlotPosition(link.startSlotId, true);
-    const endPos = endNode.getSlotPosition(link.endSlotId, false);
-
-    const startScreenPos = this.worldToCanvas(startPos);
-    const endScreenPos = this.worldToCanvas(endPos);
-
-    const startDrawPos = new ImGui.ImVec2(canvasPos.x + startScreenPos.x, canvasPos.y + startScreenPos.y);
-    const endDrawPos = new ImGui.ImVec2(canvasPos.x + endScreenPos.x, canvasPos.y + endScreenPos.y);
-
-    // 绘制贝塞尔曲线
-    const cp1 = new ImGui.ImVec2(startDrawPos.x + 50, startDrawPos.y);
-    const cp2 = new ImGui.ImVec2(endDrawPos.x - 50, endDrawPos.y);
-
-    drawList.AddBezierCubic(
-      startDrawPos,
-      cp1,
-      cp2,
-      endDrawPos,
-      ImGui.ColorConvertFloat4ToU32(link.color),
-      2.0
-    );
+    drawList.AddBezierCubic(p0, p1, p2, p3, ImGui.ColorConvertFloat4ToU32(color), width);
   }
 
   private handleInput(canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
@@ -262,8 +351,10 @@ export class GraphEditor {
     }
 
     // 检查鼠标悬停的插槽
-    console.log(worldMousePos.x, worldMousePos.y);
     this.hoveredSlot = this.getSlotAtPosition(worldMousePos);
+
+    // 检查鼠标下的连线（屏幕坐标）
+    this.hoveredLinkId = this.getLinkUnderMouse(canvasPos);
 
     // 左键点击
     if (ImGui.IsMouseClicked(0)) {
@@ -294,10 +385,28 @@ export class GraphEditor {
           this.isCreatingLink = false;
           this.linkStartSlot = null;
         } else {
-          // 开始创建连接
-          this.isCreatingLink = true;
-          this.linkStartSlot = this.hoveredSlot;
+          // 开始创建 or 仅选中该 pin
+          // 这里支持“仅选中不创建”的模式：按住 Ctrl 仅选中，不进入创建；不按 Ctrl 则进入创建
+          if (ImGui.GetIO().KeyCtrl) {
+            this.selectedSlot = this.hoveredSlot;
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
+          } else {
+            this.selectedSlot = this.hoveredSlot;
+            this.isCreatingLink = true;
+            this.linkStartSlot = this.hoveredSlot;
+          }
+          // 清理链接选择（不同选择域互斥）
+          this.selectedLinks.clear();
         }
+      } else if (this.hoveredLinkId !== null) {
+        if (!ImGui.GetIO().KeyCtrl) {
+          this.selectedLinks.clear();
+          this.selectedSlot = null;
+        }
+        this.selectedLinks.add(this.hoveredLinkId);
+        this.isCreatingLink = false;
+        this.linkStartSlot = null;
       } else {
         // 检查是否点击了节点
         let clickedNode: BaseGraphNode | null = null;
@@ -329,6 +438,8 @@ export class GraphEditor {
           );
         } else {
           // 点击空白区域
+          this.selectedLinks.clear();
+          this.selectedSlot = null;
           this.selectedNodes = [];
           this.nodes.forEach((n) => (n.selected = false));
           this.isDraggingCanvas = true;
@@ -386,6 +497,14 @@ export class GraphEditor {
       const scaleFactor = wheel > 0 ? 1.1 : 0.9;
       this.canvasScale = Math.max(0.1, Math.min(3.0, this.canvasScale * scaleFactor));
     }
+
+    if (ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
+      if (this.selectedLinks.size > 0) {
+        const idsToDelete = new Set(this.selectedLinks);
+        this.links = this.links.filter((link) => !idsToDelete.has(link.id));
+        this.selectedLinks.clear();
+      }
+    }
   }
 
   private drawContextMenu() {
@@ -406,6 +525,30 @@ export class GraphEditor {
     if (this.showContextMenu && this.contextMenuNode !== null) {
       ImGui.OpenPopup('NodeContextMenu');
     }
+  }
+
+  private drawPinHighlight(
+    drawList: ImGui.DrawList,
+    canvasPos: ImGui.ImVec2,
+    slot: SlotInfo,
+    selected: boolean
+  ) {
+    const node = this.nodes.get(slot.nodeId);
+    if (!node) return;
+    const posWorld = node.getSlotPosition(slot.slotId, slot.isOutput);
+    const posScreen = this.worldToCanvas(posWorld);
+    const center = new ImGui.ImVec2(canvasPos.x + posScreen.x, canvasPos.y + posScreen.y);
+
+    const color = selected ? this.pinHighlightColor : this.pinHoverColor;
+    const colU32 = ImGui.ColorConvertFloat4ToU32(color);
+
+    drawList.AddCircle(
+      center,
+      this.pinOuterRadius, // 外圈半径
+      colU32,
+      16,
+      2.0
+    );
   }
 
   public render() {
@@ -498,6 +641,13 @@ export class GraphEditor {
       // 绘制节点
       for (const node of this.nodes) {
         node[1].draw(drawList, canvasPos);
+      }
+
+      if (this.hoveredSlot) {
+        this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
+      }
+      if (this.selectedSlot) {
+        this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
       }
 
       // 处理输入

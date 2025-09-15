@@ -1,5 +1,6 @@
 import { ZipFS } from '@zephyr3d/base';
-import { AnimationSet, AssetManager, Scene, SceneNode } from '@zephyr3d/scene';
+import type { AnimationSet, Scene, SceneNode } from '@zephyr3d/scene';
+import { AssetManager } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 
 export class Character {

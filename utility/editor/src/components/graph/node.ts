@@ -109,7 +109,7 @@ export class BaseGraphNode {
       borderColor,
       4.0,
       0,
-      this.selected ? 2.0 : 1.0
+      1.0
     );
 
     // 节点标题

@@ -495,10 +495,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         return hitInfo;
       }
     } else if (this._mode === 'rotation') {
-      const distance = rayLocal.intersectionTestSphere(Vector3.zero(), this._axisLength + this._axisRadius);
+      const distance = rayLocal.intersectionTestSphere(
+        Vector3.zero(),
+        this._axisLength + this._axisRadius * 4
+      );
       if (distance !== null) {
         let axis = -1;
-        let minValue = this._axisRadius;
+        let minValue = this._axisRadius * 4;
         let t = distance[0];
         const normal = new Vector3();
         const center = Vector3.zero();

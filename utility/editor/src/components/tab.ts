@@ -1,9 +1,8 @@
-import { ImGui } from '@zephyr3d/imgui';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { SceneHierarchy } from './scenehierarchy';
 import type { Scene } from '@zephyr3d/scene';
 
-export class Tab {
+export class LeftDockPanel {
   private readonly _panel: DockPannel;
   private readonly _sceneHierarchy: SceneHierarchy;
   constructor(scene: Scene, left: number, top: number, width: number, height: number) {
@@ -27,13 +26,7 @@ export class Tab {
   }
   render(sceneChanged: boolean) {
     if (this._panel.begin('##SceneTabPanel')) {
-      if (ImGui.BeginTabBar('##SceneTabBar')) {
-        if (ImGui.BeginTabItem('Scene##SceneHierarchy')) {
-          this._sceneHierarchy.render(sceneChanged);
-          ImGui.EndTabItem();
-        }
-        ImGui.EndTabBar();
-      }
+      this._sceneHierarchy.render(sceneChanged);
     }
     this._panel.end();
   }
