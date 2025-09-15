@@ -6,12 +6,16 @@ export type NodeInfo = {
   ctor: GenericConstructor<BaseGraphNode>;
 };
 
-export type NodeCategory = {
-  name: string;
-  children: (NodeCategory | NodeInfo)[];
-};
+export type NodeCategoryList = (NodeCategory | NodeInfo)[];
+
+export type NodeCategory =
+  | NodeCategoryList
+  | {
+      name: string;
+      children: NodeCategoryList;
+    };
 
 export interface GraphEditorApi {
-  getNodeCategory(): NodeCategory;
+  getNodeCategory(): NodeCategoryList;
   getCompatibleNodeTypes(srcType: string): string[];
 }

@@ -105,7 +105,9 @@ export class DockPannel {
   set maxTop(val) {
     this._maxHeight = val;
   }
-
+  get padding() {
+    return this._padding;
+  }
   beginChild(id: string) {
     const windowPos = new ImGui.ImVec2(this._left, this._top);
     ImGui.SetCursorPos(windowPos);
@@ -207,7 +209,7 @@ export class DockPannel {
     switch (this._resizeDirection) {
       case ResizeDirection.Left:
         buttonSize = new ImGui.ImVec2(resizeBarSize, this._availableHeight);
-        buttonPos = new ImGui.ImVec2(0, initialCursorPos.y);
+        buttonPos = initialCursorPos;
         cursorType = ImGui.MouseCursor.ResizeEW;
         break;
 

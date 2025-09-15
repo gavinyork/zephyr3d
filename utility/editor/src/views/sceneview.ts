@@ -536,15 +536,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       16,
       10
     );
-    this._propGrid = new PropertyEditor(
-      this._menubar.height + this._toolbar.height,
-      this._statusbar.height,
-      400,
-      8,
-      600,
-      200,
-      0.4
-    );
+    this._propGrid = new PropertyEditor(0, 0, 400, 0, 600, 200, 0.4);
     this._postGizmoRenderer = null;
     this._leftDockPanel = null;
     this._assetView = null;
@@ -576,8 +568,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   render() {
     const displaySize = ImGui.GetIO().DisplaySize;
-    this._assetView.panel.top =
-      ImGui.GetIO().DisplaySize.y - this._statusbar.height - this._assetView.panel.height;
+    this._propGrid.left = displaySize.x - this._propGrid.width;
+    this._propGrid.top = this._menubar.height + this._toolbar.height;
+    this._propGrid.height =
+      displaySize.y - this._menubar.height - this._toolbar.height - this._statusbar.height;
+    this._assetView.panel.top = displaySize.y - this._statusbar.height - this._assetView.panel.height;
     this._assetView.panel.width = Math.max(0, displaySize.x - this._propGrid.width);
     this._leftDockPanel.height =
       displaySize.y -

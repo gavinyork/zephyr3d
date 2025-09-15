@@ -1,5 +1,5 @@
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
-import type { GraphEditor } from './grapheditor';
+import type { NodeEditor } from './nodeeditor';
 
 export type GraphNodeInput = { id: number; name: string; type: string; value?: any };
 export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
@@ -24,9 +24,9 @@ export class BaseGraphNode {
   selected: boolean;
   hovered: boolean;
   color: ImGui.ImVec4;
-  editor: GraphEditor;
+  editor: NodeEditor;
   constructor(
-    editor: GraphEditor,
+    editor: NodeEditor,
     title: string,
     position: ImGui.ImVec2,
     inputs: GraphNodeInput[],

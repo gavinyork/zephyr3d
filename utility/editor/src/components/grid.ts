@@ -14,6 +14,7 @@ import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
+import { DockPannel, ResizeDirection } from './dockpanel';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -212,33 +213,22 @@ export class PropertyEditor extends Observable<{
   object_property_changed: [object: object, prop: PropertyAccessor];
 }> {
   private _rootGroup: PropertyGroup;
-  private readonly _top: number;
-  private _bottom: number;
-  private _width: number;
-  private readonly _maxWidth: number;
-  private readonly _minWidth: number;
-  private readonly _padding: number;
+  private _panel: DockPannel;
   private readonly _labelPercent: number;
   private _dragging: boolean;
   private _dirty: boolean;
   constructor(
+    left: number,
     top: number,
-    bottom: number,
     width: number,
-    padding: number,
+    height: number,
     maxWidth: number,
     minWidth: number,
-    labelPercent = 0.4
+    labelPercent: number
   ) {
     super();
-
+    this._panel = new DockPannel(left, top, width, height, 8, minWidth, maxWidth, ResizeDirection.Left);
     this._rootGroup = new PropertyGroup('Root', this);
-    this._top = top;
-    this._bottom = bottom;
-    this._width = width;
-    this._maxWidth = maxWidth;
-    this._minWidth = minWidth;
-    this._padding = padding;
     this._labelPercent = labelPercent;
     this._dragging = false;
     this._dirty = false;
@@ -249,14 +239,29 @@ export class PropertyEditor extends Observable<{
   set object(value: any) {
     this._rootGroup.setObject(value);
   }
-  get width(): number {
-    return this._width;
+  get left() {
+    return this._panel.left;
   }
-  get bottom(): number {
-    return this._bottom;
+  set left(val: number) {
+    this._panel.left = val;
   }
-  set bottom(val: number) {
-    this._bottom = val;
+  get top() {
+    return this._panel.top;
+  }
+  set top(val: number) {
+    this._panel.top = val;
+  }
+  get width() {
+    return this._panel.width;
+  }
+  set width(val: number) {
+    this._panel.width = val;
+  }
+  get height() {
+    return this._panel.height;
+  }
+  set height(val: number) {
+    this._panel.height = val;
   }
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
@@ -271,30 +276,18 @@ export class PropertyEditor extends Observable<{
       this.clear();
       this.object = object;
     }
-    const displaySize = ImGui.GetIO().DisplaySize;
-    const windowPos = new ImGui.ImVec2(displaySize.x - this._width, this._top);
-    const windowSize = new ImGui.ImVec2(this._width, displaySize.y - this._top - this._bottom);
-    ImGui.SetNextWindowPos(windowPos, ImGui.Cond.Always);
-    ImGui.SetNextWindowSize(windowSize, ImGui.Cond.Always);
-    const flags =
-      ImGui.WindowFlags.NoMove |
-      ImGui.WindowFlags.NoResize |
-      ImGui.WindowFlags.NoCollapse |
-      ImGui.WindowFlags.NoTitleBar |
-      ImGui.WindowFlags.NoBringToFrontOnFocus;
-    if (ImGui.Begin('Property Editor', null, flags)) {
-      const initialCursorPos = ImGui.GetCursorPos();
+    if (this._panel.begin('Property Editor')) {
       this.renderContent();
-      this.renderResizeBar(initialCursorPos);
-      ImGui.End();
     }
+    this._panel.end();
   }
   private renderContent() {
     const resizeBarWidth = 4;
     const padding = 8;
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + resizeBarWidth + padding);
     const animateLabelWidth = ImGui.GetFrameHeight();
-    const availableWidth = this._width - this._padding * 2 - 4 - resizeBarWidth - padding - animateLabelWidth;
+    const availableWidth =
+      this.width - this._panel.padding * 2 - 4 - resizeBarWidth - padding - animateLabelWidth;
     const labelWidth = Math.max(0, availableWidth * this._labelPercent);
     const valueWidth = Math.max(0, availableWidth * (1 - this._labelPercent));
     const contentHeight = ImGui.GetContentRegionAvail().y;
@@ -345,30 +338,6 @@ export class PropertyEditor extends Observable<{
       ImGui.PushID(i);
       this.renderGroup(subgroup, level);
       ImGui.PopID();
-    }
-  }
-  private renderResizeBar(initialCursorPos: ImGui.ImVec2) {
-    const resizeBarWidth = 4;
-    const availableHeight = ImGui.GetContentRegionAvail().y;
-
-    ImGui.PushStyleColor(ImGui.Col.Button, ImGui.GetColorU32(ImGui.Col.ScrollbarGrab));
-    ImGui.PushStyleColor(ImGui.Col.ButtonHovered, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabHovered));
-    ImGui.PushStyleColor(ImGui.Col.ButtonActive, ImGui.GetColorU32(ImGui.Col.ScrollbarGrabActive));
-
-    ImGui.PushStyleVar(ImGui.StyleVar.FramePadding, new ImGui.ImVec2(0, 0));
-
-    ImGui.SetCursorPos(initialCursorPos);
-    ImGui.Button('##resize', new ImGui.ImVec2(resizeBarWidth, availableHeight));
-
-    ImGui.PopStyleVar();
-    ImGui.PopStyleColor(3);
-
-    if (ImGui.IsItemActive()) {
-      const mouseDelta = ImGui.GetIO().MouseDelta.x;
-      this._width = Math.max(Math.min(this._width - mouseDelta, this._maxWidth), this._minWidth);
-      ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
-    } else if (ImGui.IsItemHovered()) {
-      ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeEW);
     }
   }
   private renderGroup(group: PropertyGroup, level = 0, toplevel = false) {
