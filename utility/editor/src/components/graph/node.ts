@@ -86,7 +86,7 @@ export class BaseGraphNode {
       this.size.y * this.editor.canvasScale
     );
 
-    // 节点背景
+    // Node background
     const nodeColor = ImGui.ColorConvertFloat4ToU32(
       new ImGui.ImVec4(this.color.x * 0.7, this.color.y * 0.7, this.color.z * 0.7, 0.9)
     );
@@ -98,7 +98,7 @@ export class BaseGraphNode {
       4.0
     );
 
-    // 节点边框
+    // Node border
     const borderColor = this.selected
       ? ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0))
       : ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
@@ -112,7 +112,7 @@ export class BaseGraphNode {
       1.0
     );
 
-    // 节点标题
+    // Node title
     const titlePos = new ImGui.ImVec2(nodePos.x + 8, nodePos.y + 4);
     drawList.AddText(
       titlePos,
@@ -120,21 +120,21 @@ export class BaseGraphNode {
       this.title
     );
 
-    // 绘制输入插槽
+    // Input pins
     for (let i = 0; i < this.inputs.length; i++) {
       const input = this.inputs[i];
       const slotPos = this.getSlotPosition(input.id, false);
       const slotScreenPos = this.editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      // 插槽圆圈
+      // Slot circle
       drawList.AddCircleFilled(
         slotDrawPos,
         SLOT_RADIUS * this.editor.canvasScale,
         ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0))
       );
 
-      // 插槽标签
+      // Slot label
       const labelPos = new ImGui.ImVec2(
         slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS,
         slotDrawPos.y - SLOT_RADIUS
@@ -146,21 +146,21 @@ export class BaseGraphNode {
       );
     }
 
-    // 绘制输出插槽
+    // Output pins
     for (let i = 0; i < this.outputs.length; i++) {
       const output = this.outputs[i];
       const slotPos = this.getSlotPosition(output.id, true);
       const slotScreenPos = this.editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      // 插槽圆圈
+      // Slot circle
       drawList.AddCircleFilled(
         slotDrawPos,
         SLOT_RADIUS * this.editor.canvasScale,
         ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0))
       );
 
-      // 插槽标签
+      // Slot label
       const textSize = imGuiCalcTextSize(output.name);
       const labelPos = new ImGui.ImVec2(
         slotDrawPos.x - textSize.x - SLOT_RADIUS - SLOT_MARGIN,
@@ -175,7 +175,6 @@ export class BaseGraphNode {
   }
 }
 
-// 节点类型定义
 export interface GraphNode {
   id: number;
   title: string;
@@ -224,97 +223,4 @@ export function getSlotPosition(node: GraphNode, slotId: number, isOutput: boole
     : node.position.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
 
   return new ImGui.ImVec2(slotX, slotY);
-}
-
-export function drawNode(
-  drawList: ImGui.DrawList,
-  node: GraphNode,
-  canvasOffset: ImGui.ImVec2,
-  canvasPos: ImGui.ImVec2,
-  canvasScale: number
-) {
-  const nodeScreenPos = worldToCanvas(node.position, canvasOffset, canvasScale);
-  const nodePos = new ImGui.ImVec2(canvasPos.x + nodeScreenPos.x, canvasPos.y + nodeScreenPos.y);
-
-  const nodeSize = new ImGui.ImVec2(node.size.x * canvasScale, node.size.y * canvasScale);
-
-  // 节点背景
-  const nodeColor = ImGui.ColorConvertFloat4ToU32(
-    new ImGui.ImVec4(node.color.x * 0.7, node.color.y * 0.7, node.color.z * 0.7, 1.0)
-  );
-
-  drawList.AddRectFilled(
-    nodePos,
-    new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y),
-    nodeColor,
-    4.0
-  );
-
-  // 节点边框
-  const borderColor = node.selected
-    ? ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0))
-    : ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
-
-  drawList.AddRect(
-    nodePos,
-    new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y),
-    borderColor,
-    4.0,
-    0,
-    node.selected ? 2.0 : 1.0
-  );
-
-  // 节点标题
-  const titlePos = new ImGui.ImVec2(nodePos.x + 8, nodePos.y + 4);
-  drawList.AddText(titlePos, ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0)), node.title);
-
-  // 绘制输入插槽
-  for (let i = 0; i < node.inputs.length; i++) {
-    const input = node.inputs[i];
-    const slotPos = getSlotPosition(node, input.id, false);
-    const slotScreenPos = worldToCanvas(slotPos, canvasOffset, canvasScale);
-    const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
-
-    // 插槽圆圈
-    drawList.AddCircleFilled(
-      slotDrawPos,
-      SLOT_RADIUS * canvasScale,
-      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0))
-    );
-
-    // 插槽标签
-    const labelPos = new ImGui.ImVec2(slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS, slotDrawPos.y - SLOT_RADIUS);
-    drawList.AddText(
-      labelPos,
-      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)),
-      input.name
-    );
-  }
-
-  // 绘制输出插槽
-  for (let i = 0; i < node.outputs.length; i++) {
-    const output = node.outputs[i];
-    const slotPos = getSlotPosition(node, output.id, true);
-    const slotScreenPos = worldToCanvas(slotPos, canvasOffset, canvasScale);
-    const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
-
-    // 插槽圆圈
-    drawList.AddCircleFilled(
-      slotDrawPos,
-      SLOT_RADIUS * canvasScale,
-      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0))
-    );
-
-    // 插槽标签
-    const textSize = imGuiCalcTextSize(output.name);
-    const labelPos = new ImGui.ImVec2(
-      slotDrawPos.x - textSize.x - SLOT_RADIUS - SLOT_MARGIN,
-      slotDrawPos.y - SLOT_RADIUS
-    );
-    drawList.AddText(
-      labelPos,
-      ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)),
-      output.name
-    );
-  }
 }
