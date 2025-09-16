@@ -1,7 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DockPannel, ResizeDirection } from '../dockpanel';
 import { PropertyEditor } from '../grid';
-import type { GraphEditorApi, NodeCategoryList } from './api';
+import type { GraphEditorApi, NodeCategory, NodeCategoryList } from './api';
 import { NodeEditor } from './nodeeditor';
 import { Scene } from '@zephyr3d/scene';
 
@@ -59,5 +59,29 @@ export class GraphEditor implements GraphEditorApi {
   getCompatibleNodeTypes(_srcType: string): string[] {
     return [];
   }
-  private renderCategory() {}
+  private renderCategoryList(category: NodeCategoryList) {
+    /*
+    if (!('name' in category)) {
+      for (const item of category) {
+        if (!'name') const leaf = !('children' in item);
+        const isOpen = ImGui.TreeNodeEx(item.name, leaf ? ImGui.TreeNodeFlags.Leaf : 0);
+        if (leaf && ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
+          ImGui.OpenPopup('CategoryNodeContextMenu');
+        }
+        if (ImGui.BeginPopup('CategoryNodeContextMenu')) {
+          ImGui.MenuItem('Add Node');
+          ImGui.EndPopup();
+        }
+        if (isOpen) {
+          if (!leaf) {
+            for (const child of item.children) {
+              this.renderCategoryList(child);
+            }
+          }
+          ImGui.TreePop();
+        }
+      }
+    }
+    */
+  }
 }
