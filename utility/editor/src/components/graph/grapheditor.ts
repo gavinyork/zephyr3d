@@ -6,30 +6,40 @@ import { NodeEditor } from './nodeeditor';
 import { Scene } from '@zephyr3d/scene';
 
 export class GraphEditor implements GraphEditorApi {
-  private _category: DockPannel;
+  private _leftPanel: DockPannel;
+  private _rightPanel: DockPannel;
   private _nodePropGrid: PropertyEditor;
   private _nodeEditor: NodeEditor;
   constructor() {
-    this._category = new DockPannel(0, 0, 120, 0, 8, 100, 300, ResizeDirection.Right);
-    this._nodePropGrid = new PropertyEditor(0, 0, 300, 8, 400, 100, 0.4);
+    this._leftPanel = new DockPannel(0, 0, 120, 0, 8, 100, 300, ResizeDirection.Right);
+    this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
+    this._nodePropGrid = new PropertyEditor(0.4);
     this._nodePropGrid.object = new Scene();
     this._nodeEditor = new NodeEditor();
   }
   render() {
     if (ImGui.Begin('Graph Editor')) {
       const regionAvail = ImGui.GetContentRegionAvail();
-      const nodeEditorWidth = regionAvail.x - this._category.width - this._nodePropGrid.width;
+
+      this._leftPanel.left = ImGui.GetCursorPosX();
+      this._leftPanel.top = ImGui.GetCursorPosY();
+      this._leftPanel.height = regionAvail.y;
+      if (this._leftPanel.beginChild('##Category')) {
+        ImGui.Text('Category');
+      }
+      this._leftPanel.endChild();
+
+      this._rightPanel.left = regionAvail.x - this._rightPanel.width;
+      this._rightPanel.top = this._leftPanel.top;
+      this._rightPanel.height = this._leftPanel.height;
+      if (this._rightPanel.beginChild('##NodeProperies')) {
+        this._nodePropGrid.render();
+      }
+      this._rightPanel.endChild();
+
+      ImGui.SetCursorPos(new ImGui.ImVec2(this._leftPanel.width + this._leftPanel.left, this._leftPanel.top));
+      const nodeEditorWidth = this._rightPanel.left - this._leftPanel.width - this._leftPanel.left;
       const nodeEditorHeight = regionAvail.y;
-      this._category.left = ImGui.GetCursorPosX();
-      this._category.top = ImGui.GetCursorPosY();
-      this._category.height = regionAvail.y;
-      this._category.beginChild('##Category');
-      ImGui.Text('Category');
-      this._category.endChild();
-      this._nodePropGrid.render();
-      ImGui.SetCursorPos(
-        new ImGui.ImVec2(this._category.width + ImGui.GetStyle().WindowPadding.x, this._category.top)
-      );
       if (nodeEditorWidth > 0 && nodeEditorHeight > 0) {
         ImGui.BeginChild(
           '##NodeEditor',

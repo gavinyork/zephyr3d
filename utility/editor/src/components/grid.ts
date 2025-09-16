@@ -213,21 +213,11 @@ export class PropertyEditor extends Observable<{
   object_property_changed: [object: object, prop: PropertyAccessor];
 }> {
   private _rootGroup: PropertyGroup;
-  private _panel: DockPannel;
   private readonly _labelPercent: number;
   private _dragging: boolean;
   private _dirty: boolean;
-  constructor(
-    left: number,
-    top: number,
-    width: number,
-    height: number,
-    maxWidth: number,
-    minWidth: number,
-    labelPercent: number
-  ) {
+  constructor(labelPercent: number) {
     super();
-    this._panel = new DockPannel(left, top, width, height, 8, minWidth, maxWidth, ResizeDirection.Left);
     this._rootGroup = new PropertyGroup('Root', this);
     this._labelPercent = labelPercent;
     this._dragging = false;
@@ -238,30 +228,6 @@ export class PropertyEditor extends Observable<{
   }
   set object(value: any) {
     this._rootGroup.setObject(value);
-  }
-  get left() {
-    return this._panel.left;
-  }
-  set left(val: number) {
-    this._panel.left = val;
-  }
-  get top() {
-    return this._panel.top;
-  }
-  set top(val: number) {
-    this._panel.top = val;
-  }
-  get width() {
-    return this._panel.width;
-  }
-  set width(val: number) {
-    this._panel.width = val;
-  }
-  get height() {
-    return this._panel.height;
-  }
-  set height(val: number) {
-    this._panel.height = val;
   }
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
@@ -276,60 +242,41 @@ export class PropertyEditor extends Observable<{
       this.clear();
       this.object = object;
     }
-    if (this._panel.begin('Property Editor')) {
-      this.renderContent();
-    }
-    this._panel.end();
-  }
-  private renderContent() {
-    const resizeBarWidth = 4;
-    const padding = 8;
-    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + resizeBarWidth + padding);
     const animateLabelWidth = ImGui.GetFrameHeight();
-    const availableWidth =
-      this.width - this._panel.padding * 2 - 4 - resizeBarWidth - padding - animateLabelWidth;
+    const availableWidth = ImGui.GetContentRegionAvail().x;
     const labelWidth = Math.max(0, availableWidth * this._labelPercent);
     const valueWidth = Math.max(0, availableWidth * (1 - this._labelPercent));
-    const contentHeight = ImGui.GetContentRegionAvail().y;
-    const childFlags = ImGui.WindowFlags.None; // 允许在需要时显示滚动条
-
+    // Prevent unexpected scrolling
     if (
-      ImGui.BeginChild('ContentRegion', new ImGui.ImVec2(availableWidth, contentHeight), false, childFlags)
+      ImGui.IsWindowHovered(ImGui.HoveredFlags.AllowWhenBlockedByActiveItem) &&
+      ImGui.IsMouseClicked(ImGui.MouseButton.Left)
     ) {
-      // Prevent unexpected scrolling
-      if (
-        ImGui.IsWindowHovered(ImGui.HoveredFlags.AllowWhenBlockedByActiveItem) &&
-        ImGui.IsMouseClicked(ImGui.MouseButton.Left)
-      ) {
-        this._dragging = true;
-      }
-      if (!ImGui.IsMouseDown(ImGui.MouseButton.Left)) {
-        this._dragging = false;
-      }
-      if (!this._dragging) {
-        ImGui.SetScrollY(ImGui.GetScrollY());
-      }
-      // Draw properties
-      if (
-        ImGui.BeginTable(
-          'PropertyTable',
-          3,
-          ImGui.TableFlags.BordersInnerV | ImGui.TableFlags.PadOuterX | ImGui.TableFlags.SizingFixedFit
-        )
-      ) {
-        ImGui.TableSetupColumn(
-          'Animatable',
-          ImGui.TableColumnFlags.NoResize | ImGui.TableColumnFlags.WidthFixed,
-          animateLabelWidth
-        );
-        ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
-        ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
-        this.renderGroup(this._rootGroup, 0, true);
+      this._dragging = true;
+    }
+    if (!ImGui.IsMouseDown(ImGui.MouseButton.Left)) {
+      this._dragging = false;
+    }
+    if (!this._dragging) {
+      ImGui.SetScrollY(ImGui.GetScrollY());
+    }
+    // Draw properties
+    if (
+      ImGui.BeginTable(
+        'PropertyTable',
+        3,
+        ImGui.TableFlags.BordersInnerV | ImGui.TableFlags.PadOuterX | ImGui.TableFlags.SizingFixedFit
+      )
+    ) {
+      ImGui.TableSetupColumn(
+        'Animatable',
+        ImGui.TableColumnFlags.NoResize | ImGui.TableColumnFlags.WidthFixed,
+        animateLabelWidth
+      );
+      ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
+      ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
+      this.renderGroup(this._rootGroup, 0, true);
 
-        ImGui.EndTable();
-      }
-
-      ImGui.EndChild();
+      ImGui.EndTable();
     }
   }
   private renderSubGroups(group: PropertyGroup, level: number) {
