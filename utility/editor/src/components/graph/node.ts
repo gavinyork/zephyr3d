@@ -88,7 +88,7 @@ export class BaseGraphNode {
 
     // 节点背景
     const nodeColor = ImGui.ColorConvertFloat4ToU32(
-      new ImGui.ImVec4(this.color.x * 0.7, this.color.y * 0.7, this.color.z * 0.7, 1.0)
+      new ImGui.ImVec4(this.color.x * 0.7, this.color.y * 0.7, this.color.z * 0.7, 0.7)
     );
 
     drawList.AddRectFilled(

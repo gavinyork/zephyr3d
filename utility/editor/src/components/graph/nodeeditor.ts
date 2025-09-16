@@ -3,7 +3,6 @@ import { BaseGraphNode } from './node';
 
 const SLOT_RADIUS = 6;
 
-// 连接线类型定义
 interface GraphLink {
   id: number;
   startNodeId: number;
@@ -13,7 +12,6 @@ interface GraphLink {
   color: ImGui.ImVec4;
 }
 
-// 插槽位置信息
 interface SlotInfo {
   nodeId: number;
   slotId: number;
@@ -58,7 +56,6 @@ export class NodeEditor {
   }
 
   private initializeDefaultNodes() {
-    // 创建一些示例节点
     this.addNode(
       new BaseGraphNode(
         this,
@@ -108,18 +105,25 @@ export class NodeEditor {
   }
 
   private deleteNode(nodeId: number) {
-    // 删除相关的连接线
     this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
-
-    // 删除节点
     this.nodes.delete(nodeId);
-
-    // 清除选择
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
   }
 
+  private findLinkIntoInput(nodeId: number, slotId: number): GraphLink | null {
+    return this.links.find((lk) => lk.endNodeId === nodeId && lk.endSlotId === slotId) || null;
+  }
+
+  private removeLinksIntoInput(nodeId: number, slotId: number) {
+    const toDelete = this.links.filter((lk) => lk.endNodeId === nodeId && lk.endSlotId === slotId);
+    if (toDelete.length === 0) return;
+
+    const ids = new Set(toDelete.map((l) => l.id));
+    for (const id of ids) this.selectedLinks.delete(id);
+    this.links = this.links.filter((lk) => !ids.has(lk.id));
+  }
+
   private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number) {
-    // 检查是否已存在相同的连接
     const existingLink = this.links.find(
       (link) =>
         link.startNodeId === startNodeId &&
@@ -127,9 +131,14 @@ export class NodeEditor {
         link.endNodeId === endNodeId &&
         link.endSlotId === endSlotId
     );
-
     if (existingLink) {
       return;
+    }
+
+    const occupied = this.findLinkIntoInput(endNodeId, endSlotId);
+    if (occupied) {
+      this.selectedLinks.delete(occupied.id); // 清理选中状态
+      this.links = this.links.filter((lk) => lk.id !== occupied.id);
     }
 
     const link: GraphLink = {
@@ -140,8 +149,30 @@ export class NodeEditor {
       endSlotId,
       color: new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)
     };
-
     this.links.push(link);
+  }
+
+  private getNodesArray(): BaseGraphNode[] {
+    return Array.from(this.nodes.values());
+  }
+
+  private hitTestNodeAt(worldPos: ImGui.ImVec2): BaseGraphNode {
+    const nodesArray = this.getNodesArray();
+
+    for (let i = nodesArray.length - 1; i >= 0; i--) {
+      const node = nodesArray[i];
+
+      if (
+        worldPos.x >= node.position.x &&
+        worldPos.x <= node.position.x + node.size.x &&
+        worldPos.y >= node.position.y &&
+        worldPos.y <= node.position.y + node.size.y
+      ) {
+        return node;
+      }
+    }
+
+    return null;
   }
 
   private isPointNearBezier(
@@ -152,8 +183,7 @@ export class NodeEditor {
     p3: ImGui.ImVec2,
     threshold: number
   ): boolean {
-    // 将贝塞尔分段采样为若干线段，计算点到各段的最小距离
-    const steps = 24; // 可调：更多步数更精细但更耗时
+    const steps = 24;
     let prev = p0;
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
@@ -180,7 +210,6 @@ export class NodeEditor {
   private getLinkUnderMouse(canvasPos: ImGui.ImVec2): number | null {
     const mousePos = ImGui.GetMousePos();
 
-    // 遍历所有连线，检查近邻
     for (let i = this.links.length - 1; i >= 0; i--) {
       const link = this.links[i];
       const startNode = this.nodes.get(link.startNodeId);
@@ -234,34 +263,35 @@ export class NodeEditor {
     );
   }
 
-  private getSlotAtPosition(pos: ImGui.ImVec2): SlotInfo | null {
-    for (const node of this.nodes) {
-      // 检查输入插槽
-      for (const input of node[1].inputs) {
-        const slotPos = node[1].getSlotPosition(input.id, false);
-        const distance = Math.sqrt(Math.pow(pos.x - slotPos.x, 2) + Math.pow(pos.y - slotPos.y, 2));
-        if (distance <= SLOT_RADIUS + 3) {
-          return {
-            nodeId: node[1].id,
-            slotId: input.id,
-            position: slotPos,
-            isOutput: false,
-            type: input.type
-          };
-        }
-      }
+  private getSlotAtPosition(pos: ImGui.ImVec2): SlotInfo {
+    const nodesArray = this.getNodesArray();
+    for (let i = nodesArray.length - 1; i >= 0; i--) {
+      const node = nodesArray[i];
 
-      // 检查输出插槽
-      for (const output of node[1].outputs) {
-        const slotPos = node[1].getSlotPosition(output.id, true);
-        const distance = Math.sqrt(Math.pow(pos.x - slotPos.x, 2) + Math.pow(pos.y - slotPos.y, 2));
+      for (const output of node.outputs) {
+        const slotPos = node.getSlotPosition(output.id, true);
+        const distance = Math.hypot(pos.x - slotPos.x, pos.y - slotPos.y);
         if (distance <= SLOT_RADIUS + 3) {
           return {
-            nodeId: node[1].id,
+            nodeId: node.id,
             slotId: output.id,
             position: slotPos,
             isOutput: true,
             type: output.type
+          };
+        }
+      }
+
+      for (const input of node.inputs) {
+        const slotPos = node.getSlotPosition(input.id, false);
+        const distance = Math.hypot(pos.x - slotPos.x, pos.y - slotPos.y);
+        if (distance <= SLOT_RADIUS + 3) {
+          return {
+            nodeId: node.id,
+            slotId: input.id,
+            position: slotPos,
+            isOutput: false,
+            type: input.type
           };
         }
       }
@@ -277,11 +307,9 @@ export class NodeEditor {
     const gridColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.3, 0.3, 0.5));
     const gridStep = this.gridSize * this.canvasScale;
 
-    // 计算网格起始位置
-    const startX = 0; //Math.floor((-this.canvasOffset.x * this.canvasScale) / gridStep) * gridStep;
-    const startY = 0; //Math.floor((-this.canvasOffset.y * this.canvasScale) / gridStep) * gridStep;
+    const startX = 0;
+    const startY = 0;
 
-    // 绘制垂直线
     for (let x = startX; x < canvasSize.x; x += gridStep) {
       if (x >= 0) {
         drawList.AddLine(
@@ -292,7 +320,6 @@ export class NodeEditor {
       }
     }
 
-    // 绘制水平线
     for (let y = startY; y < canvasSize.y; y += gridStep) {
       if (y >= 0) {
         drawList.AddLine(
@@ -317,7 +344,6 @@ export class NodeEditor {
     const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
     const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
 
-    // 基础颜色
     let color = link.color;
     let width = this.linkWidthNormal;
 
@@ -335,6 +361,33 @@ export class NodeEditor {
     drawList.AddBezierCubic(p0, p1, p2, p3, ImGui.ColorConvertFloat4ToU32(color), width);
   }
 
+  private isPinOccludedOnScreen(slot: SlotInfo, canvasPos: ImGui.ImVec2): boolean {
+    const nodesArray = this.getNodesArray();
+    const ownerIndex = nodesArray.findIndex((n) => n.id === slot.nodeId);
+    if (ownerIndex < 0) return false;
+    const owner = this.nodes.get(slot.nodeId)!;
+    const posWorld = owner.getSlotPosition(slot.slotId, slot.isOutput);
+    const posScreen = this.worldToCanvas(posWorld);
+    const center = new ImGui.ImVec2(canvasPos.x + posScreen.x, canvasPos.y + posScreen.y);
+
+    for (let i = ownerIndex + 1; i < nodesArray.length; i++) {
+      const n = nodesArray[i];
+      const minWorld = new ImGui.ImVec2(n.position.x, n.position.y);
+      const maxWorld = new ImGui.ImVec2(n.position.x + n.size.x, n.position.y + n.size.y);
+      const min = this.worldToCanvas(minWorld);
+      const max = this.worldToCanvas(maxWorld);
+      const minScreen = new ImGui.ImVec2(canvasPos.x + min.x, canvasPos.y + min.y);
+      const maxScreen = new ImGui.ImVec2(canvasPos.x + max.x, canvasPos.y + max.y);
+      const inside =
+        center.x >= minScreen.x &&
+        center.x <= maxScreen.x &&
+        center.y >= minScreen.y &&
+        center.y <= maxScreen.y;
+      if (inside) return true;
+    }
+    return false;
+  }
+
   private handleInput(canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
@@ -350,17 +403,40 @@ export class NodeEditor {
       return;
     }
 
-    // 检查鼠标悬停的插槽
-    this.hoveredSlot = this.getSlotAtPosition(worldMousePos);
-
-    // 检查鼠标下的连线（屏幕坐标）
+    let hovered = this.getSlotAtPosition(worldMousePos);
+    if (hovered && this.isPinOccludedOnScreen(hovered, canvasPos)) {
+      hovered = null;
+    }
+    this.hoveredSlot = hovered;
     this.hoveredLinkId = this.getLinkUnderMouse(canvasPos);
 
-    // 左键点击
     if (ImGui.IsMouseClicked(0)) {
       if (this.hoveredSlot) {
+        if (ImGui.GetIO().KeyAlt) {
+          if (this.hoveredSlot.isOutput) {
+            const toDelete = this.links.filter(
+              (lk) =>
+                lk.startNodeId === this.hoveredSlot!.nodeId && lk.startSlotId === this.hoveredSlot!.slotId
+            );
+            if (toDelete.length > 0) {
+              const ids = new Set(toDelete.map((l) => l.id));
+              for (const id of ids) this.selectedLinks.delete(id);
+              this.links = this.links.filter((lk) => !ids.has(lk.id));
+            }
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
+            this.selectedSlot = this.hoveredSlot;
+            this.selectedLinks.clear();
+          } else {
+            this.removeLinksIntoInput(this.hoveredSlot.nodeId, this.hoveredSlot.slotId);
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
+            this.selectedSlot = this.hoveredSlot;
+            this.selectedLinks.clear();
+          }
+          return;
+        }
         if (this.isCreatingLink) {
-          // 完成连接
           if (
             this.linkStartSlot &&
             this.linkStartSlot.isOutput !== this.hoveredSlot.isOutput &&
@@ -385,8 +461,6 @@ export class NodeEditor {
           this.isCreatingLink = false;
           this.linkStartSlot = null;
         } else {
-          // 开始创建 or 仅选中该 pin
-          // 这里支持“仅选中不创建”的模式：按住 Ctrl 仅选中，不进入创建；不按 Ctrl 则进入创建
           if (ImGui.GetIO().KeyCtrl) {
             this.selectedSlot = this.hoveredSlot;
             this.isCreatingLink = false;
@@ -396,7 +470,6 @@ export class NodeEditor {
             this.isCreatingLink = true;
             this.linkStartSlot = this.hoveredSlot;
           }
-          // 清理链接选择（不同选择域互斥）
           this.selectedLinks.clear();
         }
       } else if (this.hoveredLinkId !== null) {
@@ -408,23 +481,9 @@ export class NodeEditor {
         this.isCreatingLink = false;
         this.linkStartSlot = null;
       } else {
-        // 检查是否点击了节点
-        let clickedNode: BaseGraphNode | null = null;
-        for (const node of this.nodes) {
-          if (
-            worldMousePos.x >= node[1].position.x &&
-            worldMousePos.x <= node[1].position.x + node[1].size.x &&
-            worldMousePos.y >= node[1].position.y &&
-            worldMousePos.y <= node[1].position.y + node[1].size.y
-          ) {
-            clickedNode = node[1];
-            break;
-          }
-        }
-
+        const clickedNode = this.hitTestNodeAt(worldMousePos);
         if (clickedNode) {
           if (!ImGui.GetIO().KeyCtrl) {
-            // 清除其他选择
             this.selectedNodes = [];
             this.nodes.forEach((n) => (n.selected = false));
           }
@@ -436,8 +495,12 @@ export class NodeEditor {
             worldMousePos.x - clickedNode.position.x,
             worldMousePos.y - clickedNode.position.y
           );
+
+          const nodeId = clickedNode.id;
+          const nodeObj = this.nodes.get(nodeId)!;
+          this.nodes.delete(nodeId);
+          this.nodes.set(nodeId, nodeObj);
         } else {
-          // 点击空白区域
           this.selectedLinks.clear();
           this.selectedSlot = null;
           this.selectedNodes = [];
@@ -450,7 +513,6 @@ export class NodeEditor {
       }
     }
 
-    // 右键点击
     if (ImGui.IsMouseClicked(1)) {
       let rightClickedNode: BaseGraphNode | null = null;
       for (const node of this.nodes) {
@@ -471,7 +533,6 @@ export class NodeEditor {
       }
     }
 
-    // 拖拽处理
     if (this.draggingNode !== null && ImGui.IsMouseDown(0)) {
       const node = this.nodes.get(this.draggingNode);
       if (node) {
@@ -485,13 +546,11 @@ export class NodeEditor {
       ImGui.ResetMouseDragDelta(0);
     }
 
-    // 释放鼠标
     if (ImGui.IsMouseReleased(0)) {
       this.draggingNode = null;
       this.isDraggingCanvas = false;
     }
 
-    // 鼠标滚轮缩放
     const wheel = ImGui.GetIO().MouseWheel;
     if (wheel !== 0 && isMouseInCanvas) {
       const scaleFactor = wheel > 0 ? 1.1 : 0.9;
@@ -542,13 +601,7 @@ export class NodeEditor {
     const color = selected ? this.pinHighlightColor : this.pinHoverColor;
     const colU32 = ImGui.ColorConvertFloat4ToU32(color);
 
-    drawList.AddCircle(
-      center,
-      this.pinOuterRadius, // 外圈半径
-      colU32,
-      16,
-      2.0
-    );
+    drawList.AddCircle(center, this.pinOuterRadius, colU32, 16, 2.0);
   }
 
   public render() {
@@ -596,27 +649,22 @@ export class NodeEditor {
 
     ImGui.Separator();
 
-    // 画布区域
     const canvasPos = ImGui.GetCursorScreenPos();
     const canvasSize = ImGui.GetContentRegionAvail();
     const drawList = ImGui.GetWindowDrawList();
 
-    // 画布背景
     drawList.AddRectFilled(
       canvasPos,
       new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y),
       ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1.0))
     );
 
-    // 绘制网格
     this.drawGrid(drawList, canvasPos, canvasSize);
 
-    // 绘制连接线
     for (const link of this.links) {
       this.drawLink(drawList, link, canvasPos);
     }
 
-    // 绘制正在创建的连接线
     if (this.isCreatingLink && this.linkStartSlot) {
       const mousePos = ImGui.GetMousePos();
       const node = this.nodes.get(this.linkStartSlot!.nodeId)!;
@@ -637,35 +685,19 @@ export class NodeEditor {
       );
     }
 
-    // 绘制节点
-    for (const node of this.nodes) {
-      node[1].draw(drawList, canvasPos);
+    const nodesArrayForDraw = this.getNodesArray();
+    for (const node of nodesArrayForDraw) {
+      node.draw(drawList, canvasPos);
+      if (this.hoveredSlot && this.hoveredSlot.nodeId === node.id) {
+        this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
+      }
+      if (this.selectedSlot && this.selectedSlot.nodeId === node.id) {
+        this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
+      }
     }
-
-    if (this.hoveredSlot) {
-      this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
-    }
-    if (this.selectedSlot) {
-      this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
-    }
-
-    // 处理输入
     this.handleInput(canvasPos, canvasSize);
-
-    // 不可见按钮用于捕获输入
     ImGui.SetCursorScreenPos(canvasPos);
     ImGui.InvisibleButton('Canvas', canvasSize);
-
-    // 绘制上下文菜单
     this.drawContextMenu();
-    /*
-      // 状态信息
-      ImGui.Text(`Nodes: ${this.nodes.length}, Links: ${this.links.length}`);
-      ImGui.Text(
-        `Scale: ${this.canvasScale.toFixed(2)}, Offset: (${this.canvasOffset.x.toFixed(
-          0
-        )}, ${this.canvasOffset.y.toFixed(0)})`
-      );
-*/
   }
 }
