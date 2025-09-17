@@ -47,13 +47,6 @@ export class GraphEditor implements GraphEditorApi {
           false,
           ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
         );
-        if (ImGui.IsMouseClicked(ImGui.MouseButton.Right) && ImGui.IsWindowHovered()) {
-          ImGui.OpenPopup('NodeEditorContextMenu');
-        }
-        if (ImGui.BeginPopup('NodeEditorContextMenu')) {
-          ImGui.MenuItem('Add Node');
-          ImGui.EndPopup();
-        }
         this._nodeEditor.render();
         ImGui.EndChild();
       }

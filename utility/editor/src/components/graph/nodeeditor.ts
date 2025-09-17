@@ -40,6 +40,10 @@ export class NodeEditor {
   private selectedLinks: Set<number> = new Set();
   private selectedSlot: SlotInfo | null = null;
   private hoveredLinkId: number | null = null;
+  private showCanvasContextMenu = false;
+  private canvasContextClickPos: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 屏幕
+  private canvasContextClickLocal: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 画布本地
+  private canvasContextClickWorld: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 世界
   private readonly linkHitRadius = 6; // 鼠标选中连线的“命中阈值”（像素）
   private readonly linkWidthNormal = 2.0;
   private readonly linkWidthHover = 3.0;
@@ -489,7 +493,9 @@ export class NodeEditor {
           }
 
           clickedNode.selected = true;
-          this.selectedNodes.push(clickedNode.id);
+          if (!this.selectedNodes.includes(clickedNode.id)) {
+            this.selectedNodes.push(clickedNode.id);
+          }
           this.draggingNode = clickedNode.id;
           this.dragOffset = new ImGui.ImVec2(
             worldMousePos.x - clickedNode.position.x,
@@ -514,6 +520,8 @@ export class NodeEditor {
     }
 
     if (ImGui.IsMouseClicked(1)) {
+      this.clearInteractionState();
+
       let rightClickedNode: BaseGraphNode | null = null;
       for (const node of this.nodes) {
         if (
@@ -530,6 +538,22 @@ export class NodeEditor {
       if (rightClickedNode) {
         this.contextMenuNode = rightClickedNode.id;
         this.showContextMenu = true;
+        rightClickedNode.selected = true;
+        this.selectedNodes.push(rightClickedNode.id);
+      } else {
+        const hitLink = this.getLinkUnderMouse(canvasPos);
+        let hitSlot = this.getSlotAtPosition(worldMousePos);
+        if (hitSlot && this.isPinOccludedOnScreen(hitSlot, canvasPos)) hitSlot = null;
+
+        if (!hitLink && !hitSlot) {
+          this.canvasContextClickPos = ImGui.GetMousePos();
+          this.canvasContextClickLocal = new ImGui.ImVec2(
+            this.canvasContextClickPos.x - canvasPos.x,
+            this.canvasContextClickPos.y - canvasPos.y
+          );
+          this.canvasContextClickWorld = this.canvasToWorld(this.canvasContextClickLocal);
+          this.showCanvasContextMenu = true;
+        }
       }
     }
 
@@ -567,22 +591,72 @@ export class NodeEditor {
   }
 
   private drawContextMenu() {
-    if (this.showContextMenu) {
-      if (ImGui.BeginPopup('NodeContextMenu')) {
-        if (this.contextMenuNode !== null) {
-          if (ImGui.MenuItem('Delete Node')) {
-            this.deleteNode(this.contextMenuNode);
-            this.contextMenuNode = null;
-          }
+    if (this.showContextMenu && !!this.contextMenuNode) {
+      this.showContextMenu = false;
+      ImGui.OpenPopup('NodeContextMenu');
+    }
+    if (ImGui.BeginPopup('NodeContextMenu')) {
+      if (this.contextMenuNode !== null) {
+        if (ImGui.MenuItem('Delete Node')) {
+          this.deleteNode(this.contextMenuNode);
+          this.contextMenuNode = null;
         }
-        ImGui.EndPopup();
-      } else {
-        this.showContextMenu = false;
       }
+      ImGui.EndPopup();
     }
 
-    if (this.showContextMenu && this.contextMenuNode !== null) {
-      ImGui.OpenPopup('NodeContextMenu');
+    if (this.showCanvasContextMenu) {
+      this.showCanvasContextMenu = false;
+      ImGui.OpenPopup('CanvasContextMenu');
+    }
+    if (ImGui.BeginPopup('CanvasContextMenu')) {
+      if (ImGui.MenuItem('Add Input Node')) {
+        this.addNode(
+          new BaseGraphNode(
+            this,
+            'Input',
+            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
+            [],
+            [{ id: 1, name: 'Out', type: 'float' }],
+            new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
+          )
+        );
+      }
+      if (ImGui.MenuItem('Add Math Node')) {
+        this.addNode(
+          new BaseGraphNode(
+            this,
+            'Math',
+            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
+            [
+              { id: 1, name: 'A', type: 'float' },
+              { id: 2, name: 'B', type: 'float' }
+            ],
+            [{ id: 1, name: 'Result', type: 'float' }],
+            new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
+          )
+        );
+      }
+      if (ImGui.MenuItem('Add Output Node')) {
+        this.addNode(
+          new BaseGraphNode(
+            this,
+            'Output',
+            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
+            [{ id: 1, name: 'In', type: 'float' }],
+            [],
+            new ImGui.ImVec4(0.8, 0.2, 0.2, 1.0)
+          )
+        );
+      }
+      ImGui.Separator();
+      if (ImGui.MenuItem('Clear Selection')) {
+        this.selectedLinks.clear();
+        this.selectedSlot = null;
+        this.selectedNodes = [];
+        this.nodes.forEach((n) => (n.selected = false));
+      }
+      ImGui.EndPopup();
     }
   }
 
@@ -602,6 +676,33 @@ export class NodeEditor {
     const colU32 = ImGui.ColorConvertFloat4ToU32(color);
 
     drawList.AddCircle(center, this.pinOuterRadius, colU32, 16, 2.0);
+  }
+
+  private clearInteractionState() {
+    // 终止进行中的拖拽与连线创建
+    this.isCreatingLink = false;
+    this.linkStartSlot = null;
+    this.draggingNode = null;
+    this.isDraggingCanvas = false;
+
+    // 清空选择
+    this.selectedNodes = [];
+    this.nodes.forEach((n) => (n.selected = false));
+    this.selectedLinks.clear();
+    this.selectedSlot = null;
+
+    // 清空悬停（可选）
+    this.hoveredSlot = null;
+    this.hoveredLinkId = null;
+
+    // 清空上下文菜单关联状态（可选）
+    this.contextMenuNode = null;
+    this.showContextMenu = false;
+
+    // 如有其它临时变量（例如右键点击记录位置），也可在此处归位
+    // this.canvasContextClickPos = new ImGui.ImVec2(0, 0);
+    // this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
+    // this.canvasContextClickWorld = new ImGui.ImVec2(0, 0);
   }
 
   public render() {
