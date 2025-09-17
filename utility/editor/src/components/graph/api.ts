@@ -1,21 +1,14 @@
-import { GenericConstructor } from '@zephyr3d/base';
 import { BaseGraphNode } from './node';
+import type { ImGui } from '@zephyr3d/imgui';
+import type { NodeEditor } from './nodeeditor';
 
-export type NodeInfo = {
+export type NodeCategory = {
   name: string;
-  ctor: GenericConstructor<BaseGraphNode>;
+  create?: (editor: NodeEditor, position: ImGui.ImVec2, color: ImGui.ImVec4) => BaseGraphNode;
+  children?: NodeCategory[];
 };
 
-export type NodeCategoryList = (NodeCategory | NodeInfo)[];
-
-export type NodeCategory =
-  | NodeCategoryList
-  | {
-      name: string;
-      children: NodeCategoryList;
-    };
-
 export interface GraphEditorApi {
-  getNodeCategory(): NodeCategoryList;
+  getNodeCategory(): NodeCategory[];
   getCompatibleNodeTypes(srcType: string): string[];
 }

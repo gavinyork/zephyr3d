@@ -1,10 +1,12 @@
-import type { GraphEditorApi, NodeCategory } from '../api';
+import type { NodeCategory } from '../api';
+import { getConstantNodeCategories } from '../common/constants';
+import { GraphEditor } from '../grapheditor';
 
-export class PBRMaterialEditor implements GraphEditorApi {
-  getNodeCategory(): NodeCategory {
-    return null;
+export class PBRMaterialEditor extends GraphEditor {
+  getNodeCategory(): NodeCategory[] {
+    return getConstantNodeCategories();
   }
-  getCompatibleNodeTypes(_srcType: string): string[] {
-    return [];
+  getCompatibleNodeTypes(srcType: string): string[] {
+    return [srcType];
   }
 }

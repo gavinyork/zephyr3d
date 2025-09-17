@@ -65,12 +65,13 @@ import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
-import { GraphEditor } from '../components/graph/grapheditor';
+import type { GraphEditor } from '../components/graph/grapheditor';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
+import { PBRMaterialEditor } from '../components/graph/material/pbr';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -349,7 +350,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Graph Editor',
               id: 'SHOW_GRAPH_EDITOR',
-              action: () => (this._graphEditor = this._graphEditor ? null : new GraphEditor()),
+              action: () => (this._graphEditor = this._graphEditor ? null : new PBRMaterialEditor()),
               checked: () => !!this._graphEditor
             }
           ]
