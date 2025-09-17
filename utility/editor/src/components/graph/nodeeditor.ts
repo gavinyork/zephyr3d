@@ -1,5 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { BaseGraphNode } from './node';
+import type { GraphEditor } from './grapheditor';
+import type { NodeCategory } from './api';
 
 const SLOT_RADIUS = 6;
 
@@ -21,84 +23,72 @@ interface SlotInfo {
 }
 
 export class NodeEditor {
-  private nodes: Map<number, BaseGraphNode> = new Map();
-  private links: GraphLink[] = [];
-  private nextLinkId = 1;
-  private selectedNodes: number[] = [];
-  private draggingNode: number | null = null;
-  private dragOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
-  private isDraggingCanvas = false;
-  private readonly canvasOffset: ImGui.ImVec2 = new ImGui.ImVec2(0, 0);
-  public canvasScale = 1.0;
-  private isCreatingLink = false;
-  private linkStartSlot: SlotInfo | null = null;
-  private hoveredSlot: SlotInfo | null = null;
-  private contextMenuNode: number | null = null;
-  private showContextMenu = false;
-  private readonly gridSize = 20;
-  private showGrid = true;
-  private selectedLinks: Set<number> = new Set();
-  private selectedSlot: SlotInfo | null = null;
-  private hoveredLinkId: number | null = null;
-  private showCanvasContextMenu = false;
-  private canvasContextClickPos: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 屏幕
-  private canvasContextClickLocal: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 画布本地
-  private canvasContextClickWorld: ImGui.ImVec2 = new ImGui.ImVec2(0, 0); // 世界
-  private readonly linkHitRadius = 6; // 鼠标选中连线的“命中阈值”（像素）
-  private readonly linkWidthNormal = 2.0;
-  private readonly linkWidthHover = 3.0;
-  private readonly linkWidthSelected = 4.0;
+  private graphEditor: GraphEditor;
+  private nodes: Map<number, BaseGraphNode>;
+  private links: GraphLink[];
+  private nextLinkId: number;
+  private selectedNodes: number[];
+  private draggingNode: number;
+  private dragOffset: ImGui.ImVec2;
+  private isDraggingCanvas: boolean;
+  private readonly canvasOffset: ImGui.ImVec2;
+  public canvasScale: number;
+  private isCreatingLink: boolean;
+  private linkStartSlot: SlotInfo;
+  private hoveredSlot: SlotInfo;
+  private contextMenuNode: number;
+  private showContextMenu: boolean;
+  private readonly gridSize: number;
+  private showGrid: boolean;
+  private selectedLinks: Set<number>;
+  private selectedSlot: SlotInfo;
+  private hoveredLinkId: number;
+  private showCanvasContextMenu: boolean;
+  private canvasContextClickPos: ImGui.ImVec2;
+  private canvasContextClickLocal: ImGui.ImVec2;
+  private readonly linkHitRadius: number;
+  private readonly linkWidthNormal: number;
+  private readonly linkWidthHover: number;
+  private readonly linkWidthSelected: number;
+  private readonly pinOuterRadius: number;
+  private readonly pinHighlightColor: ImGui.ImVec4;
+  private readonly pinHoverColor: ImGui.ImVec4;
+  private readonly linkSelectedColor: ImGui.ImVec4;
+  private readonly linkHoverColor: ImGui.ImVec4;
 
-  private readonly pinOuterRadius = SLOT_RADIUS + 3; // hover/选中时的外圈半径
-  private readonly pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0); // 金色
-  private readonly pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8); // 白色
-  private readonly linkSelectedColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
-  private readonly linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
-
-  constructor() {
-    this.initializeDefaultNodes();
-  }
-
-  private initializeDefaultNodes() {
-    this.addNode(
-      new BaseGraphNode(
-        this,
-        'Input',
-        new ImGui.ImVec2(50, 50),
-        [],
-        [{ id: 1, name: 'Out', type: 'float' }],
-        new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
-      )
-    );
-
-    this.addNode(
-      new BaseGraphNode(
-        this,
-        'Math',
-        new ImGui.ImVec2(250, 50),
-        [
-          { id: 1, name: 'x', type: 'float' },
-          { id: 2, name: 'xxxxxxafeidkfeikakk', type: 'float' },
-          { id: 3, name: 'Cxxxxx', type: 'float' },
-          { id: 4, name: 'D', type: 'float' },
-          { id: 5, name: 'E', type: 'float' },
-          { id: 6, name: 'F', type: 'float' }
-        ],
-        [{ id: 1, name: 'Result', type: 'float' }],
-        new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
-      )
-    );
-
-    this.addNode(
-      new BaseGraphNode(
-        this,
-        'Output',
-        new ImGui.ImVec2(450, 50),
-        [{ id: 1, name: 'In', type: 'float' }],
-        [],
-        new ImGui.ImVec4(0.8, 0.2, 0.2, 1.0)
-      )
-    );
+  constructor(graphEditor: GraphEditor) {
+    this.graphEditor = graphEditor;
+    this.nodes = new Map();
+    this.links = [];
+    this.nextLinkId = 1;
+    this.selectedNodes = [];
+    this.draggingNode = null;
+    this.dragOffset = new ImGui.ImVec2(0, 0);
+    this.isDraggingCanvas = false;
+    this.canvasOffset = new ImGui.ImVec2(0, 0);
+    this.canvasScale = 1.0;
+    this.isCreatingLink = false;
+    this.linkStartSlot = null;
+    this.hoveredSlot = null;
+    this.contextMenuNode = null;
+    this.showContextMenu = false;
+    this.gridSize = 20;
+    this.showGrid = true;
+    this.selectedLinks = new Set();
+    this.selectedSlot = null;
+    this.hoveredLinkId = null;
+    this.showCanvasContextMenu = false;
+    this.canvasContextClickPos = new ImGui.ImVec2(0, 0);
+    this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
+    this.linkHitRadius = 6;
+    this.linkWidthNormal = 2.0;
+    this.linkWidthHover = 3.0;
+    this.linkWidthSelected = 4.0;
+    this.pinOuterRadius = SLOT_RADIUS + 3;
+    this.pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
+    this.pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
+    this.linkSelectedColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
+    this.linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
   }
 
   private addNode(node: BaseGraphNode) {
@@ -551,7 +541,6 @@ export class NodeEditor {
             this.canvasContextClickPos.x - canvasPos.x,
             this.canvasContextClickPos.y - canvasPos.y
           );
-          this.canvasContextClickWorld = this.canvasToWorld(this.canvasContextClickLocal);
           this.showCanvasContextMenu = true;
         }
       }
@@ -610,53 +599,32 @@ export class NodeEditor {
       ImGui.OpenPopup('CanvasContextMenu');
     }
     if (ImGui.BeginPopup('CanvasContextMenu')) {
-      if (ImGui.MenuItem('Add Input Node')) {
-        this.addNode(
-          new BaseGraphNode(
-            this,
-            'Input',
-            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
-            [],
-            [{ id: 1, name: 'Out', type: 'float' }],
-            new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
-          )
-        );
-      }
-      if (ImGui.MenuItem('Add Math Node')) {
-        this.addNode(
-          new BaseGraphNode(
-            this,
-            'Math',
-            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
-            [
-              { id: 1, name: 'A', type: 'float' },
-              { id: 2, name: 'B', type: 'float' }
-            ],
-            [{ id: 1, name: 'Result', type: 'float' }],
-            new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
-          )
-        );
-      }
-      if (ImGui.MenuItem('Add Output Node')) {
-        this.addNode(
-          new BaseGraphNode(
-            this,
-            'Output',
-            new ImGui.ImVec2(this.canvasContextClickWorld.x, this.canvasContextClickWorld.y),
-            [{ id: 1, name: 'In', type: 'float' }],
-            [],
-            new ImGui.ImVec4(0.8, 0.2, 0.2, 1.0)
-          )
-        );
-      }
-      ImGui.Separator();
-      if (ImGui.MenuItem('Clear Selection')) {
-        this.selectedLinks.clear();
-        this.selectedSlot = null;
-        this.selectedNodes = [];
-        this.nodes.forEach((n) => (n.selected = false));
-      }
+      const category = this.graphEditor.getNodeCategory();
+      this.renderCategoryList(category);
       ImGui.EndPopup();
+    }
+  }
+
+  private renderCategoryList(category: NodeCategory[]) {
+    for (const item of category) {
+      const leaf = !item.children;
+      const isOpen = ImGui.TreeNodeEx(item.name, leaf ? ImGui.TreeNodeFlags.Leaf : 0);
+      if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+        const node = item.create(
+          this,
+          this.canvasToWorld(this.canvasContextClickLocal),
+          //this.canvasContextClickLocal,
+          new ImGui.ImVec4(Math.random(), Math.random(), Math.random(), 1)
+        );
+        this.addNode(node);
+        ImGui.CloseCurrentPopup();
+      }
+      if (isOpen) {
+        if (!leaf) {
+          this.renderCategoryList(item.children);
+        }
+        ImGui.TreePop();
+      }
     }
   }
 
@@ -679,30 +647,21 @@ export class NodeEditor {
   }
 
   private clearInteractionState() {
-    // 终止进行中的拖拽与连线创建
     this.isCreatingLink = false;
     this.linkStartSlot = null;
     this.draggingNode = null;
     this.isDraggingCanvas = false;
 
-    // 清空选择
     this.selectedNodes = [];
     this.nodes.forEach((n) => (n.selected = false));
     this.selectedLinks.clear();
     this.selectedSlot = null;
 
-    // 清空悬停（可选）
     this.hoveredSlot = null;
     this.hoveredLinkId = null;
 
-    // 清空上下文菜单关联状态（可选）
     this.contextMenuNode = null;
     this.showContextMenu = false;
-
-    // 如有其它临时变量（例如右键点击记录位置），也可在此处归位
-    // this.canvasContextClickPos = new ImGui.ImVec2(0, 0);
-    // this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
-    // this.canvasContextClickWorld = new ImGui.ImVec2(0, 0);
   }
 
   public render() {

@@ -6,40 +6,34 @@ import { NodeEditor } from './nodeeditor';
 import { Scene } from '@zephyr3d/scene';
 
 export class GraphEditor implements GraphEditorApi {
-  private _leftPanel: DockPannel;
   private _rightPanel: DockPannel;
   private _nodePropGrid: PropertyEditor;
   private _nodeEditor: NodeEditor;
   constructor() {
-    this._leftPanel = new DockPannel(0, 0, 120, 0, 8, 100, 300, ResizeDirection.Right);
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
     this._nodePropGrid = new PropertyEditor(0.4);
     this._nodePropGrid.object = new Scene();
-    this._nodeEditor = new NodeEditor();
+    this._nodeEditor = new NodeEditor(this);
   }
   render() {
     if (ImGui.Begin('Graph Editor')) {
       const regionAvail = ImGui.GetContentRegionAvail();
 
-      this._leftPanel.left = ImGui.GetCursorPosX();
-      this._leftPanel.top = ImGui.GetCursorPosY();
-      this._leftPanel.height = regionAvail.y;
-      if (this._leftPanel.beginChild('##Category')) {
-        this.renderCategoryList(this.getNodeCategory());
-      }
-      this._leftPanel.endChild();
+      const cursorPos = ImGui.GetCursorPos();
+      const width = regionAvail.x;
+      const height = regionAvail.y;
 
-      this._rightPanel.left = regionAvail.x - this._rightPanel.width;
-      this._rightPanel.top = this._leftPanel.top;
-      this._rightPanel.height = this._leftPanel.height;
+      this._rightPanel.left = width - this._rightPanel.width;
+      this._rightPanel.top = cursorPos.y;
+      this._rightPanel.height = height;
       if (this._rightPanel.beginChild('##NodeProperies')) {
         this._nodePropGrid.render();
       }
       this._rightPanel.endChild();
 
-      ImGui.SetCursorPos(new ImGui.ImVec2(this._leftPanel.width + this._leftPanel.left, this._leftPanel.top));
-      const nodeEditorWidth = this._rightPanel.left - this._leftPanel.width - this._leftPanel.left;
-      const nodeEditorHeight = regionAvail.y;
+      ImGui.SetCursorPos(cursorPos);
+      const nodeEditorWidth = this._rightPanel.left - cursorPos.x;
+      const nodeEditorHeight = height;
       if (nodeEditorWidth > 0 && nodeEditorHeight > 0) {
         ImGui.BeginChild(
           '##NodeEditor',
@@ -58,24 +52,5 @@ export class GraphEditor implements GraphEditorApi {
   }
   getCompatibleNodeTypes(_srcType: string): string[] {
     return [];
-  }
-  private renderCategoryList(category: NodeCategory[]) {
-    for (const item of category) {
-      const leaf = !item.children;
-      const isOpen = ImGui.TreeNodeEx(item.name, leaf ? ImGui.TreeNodeFlags.Leaf : 0);
-      if (leaf && ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
-        ImGui.OpenPopup('CategoryNodeContextMenu');
-      }
-      if (ImGui.BeginPopup('CategoryNodeContextMenu')) {
-        ImGui.MenuItem('Add Node');
-        ImGui.EndPopup();
-      }
-      if (isOpen) {
-        if (!leaf) {
-          this.renderCategoryList(item.children);
-        }
-        ImGui.TreePop();
-      }
-    }
   }
 }
