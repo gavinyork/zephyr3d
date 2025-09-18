@@ -473,10 +473,20 @@ export class NodeEditor {
         this.isCreatingLink = false;
         this.linkStartSlot = null;
       } else {
-        if (this.isCreatingLink && this.linkStartSlot && !this.canvasContextClickLocal) {
-          const mousePos = ImGui.GetMousePos();
-          this.canvasContextClickLocal = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
-          this.showCanvasContextMenu = true;
+        if (this.isCreatingLink && this.linkStartSlot) {
+          if (this.canvasContextClickLocal) {
+            this.canvasContextClickLocal = null;
+            this.showCanvasContextMenu = false;
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
+          } else {
+            const mousePos = ImGui.GetMousePos();
+            this.canvasContextClickLocal = new ImGui.ImVec2(
+              mousePos.x - canvasPos.x,
+              mousePos.y - canvasPos.y
+            );
+            this.showCanvasContextMenu = true;
+          }
         } else {
           const clickedNode = this.hitTestNodeAt(worldMousePos);
           if (clickedNode) {
@@ -601,8 +611,13 @@ export class NodeEditor {
       this.showCanvasContextMenu = false;
       ImGui.OpenPopup('CanvasContextMenu');
     }
-    if (ImGui.BeginPopup('CanvasContextMenu')) {
-      const category = this.api.getNodeCategory();
+    if (this.canvasContextClickLocal && ImGui.BeginPopup('CanvasContextMenu')) {
+      let category = this.api.getNodeCategory();
+      if (this.linkStartSlot) {
+        category = this.linkStartSlot.isOutput
+          ? this.filterCategoryOutput(this.linkStartSlot.type, category)
+          : this.filterCategoryInput(this.linkStartSlot.type, category);
+      }
       this.renderCategoryList(category);
       ImGui.EndPopup();
     } else {
@@ -650,7 +665,7 @@ export class NodeEditor {
         copy.inTypes = null;
         copy.outTypes = null;
       }
-      if (copy.children || copy.create) {
+      if (copy.children?.length > 0 || !!copy.create) {
         outCategory.push(copy);
       }
     }
@@ -674,7 +689,7 @@ export class NodeEditor {
         copy.inTypes = null;
         copy.outTypes = null;
       }
-      if (copy.children || copy.create) {
+      if (copy.children?.length > 0 || !!copy.create) {
         outCategory.push(copy);
       }
     }
