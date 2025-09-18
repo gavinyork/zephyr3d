@@ -3,7 +3,6 @@ import { DockPannel, ResizeDirection } from '../dockpanel';
 import { PropertyEditor } from '../grid';
 import type { GraphEditorApi, NodeCategory } from './api';
 import { NodeEditor } from './nodeeditor';
-import { Scene } from '@zephyr3d/scene';
 
 export class GraphEditor implements GraphEditorApi {
   private _rightPanel: DockPannel;
@@ -12,10 +11,18 @@ export class GraphEditor implements GraphEditorApi {
   constructor() {
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
     this._nodePropGrid = new PropertyEditor(0.4);
-    this._nodePropGrid.object = new Scene();
     this._nodeEditor = new NodeEditor(this);
   }
   render() {
+    if (this._nodeEditor.selectedNodes.length === 1) {
+      const selectedNode = this._nodeEditor.nodes.get(this._nodeEditor.selectedNodes[0]);
+      if (selectedNode && selectedNode.impl !== this._nodePropGrid.object) {
+        this._nodePropGrid.object = selectedNode.impl;
+      }
+    } else if (this._nodePropGrid.object) {
+      this._nodePropGrid.object = null;
+    }
+
     if (ImGui.Begin('Graph Editor')) {
       const regionAvail = ImGui.GetContentRegionAvail();
 

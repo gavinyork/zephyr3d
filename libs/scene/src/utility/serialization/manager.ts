@@ -47,6 +47,12 @@ import {
   getJSONStringClass,
   getJSONArrayClass
 } from './json';
+import {
+  getMaterialConstantScalarClass,
+  getMaterialConstantVec2Class,
+  getMaterialConstantVec3Class,
+  getMaterialConstantVec4Class
+} from './blueprint/material/constants';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -156,7 +162,11 @@ export class SerializationManager {
         getSphereShapeClass(),
         getTorusShapeClass(),
         getCylinderShapeClass(),
-        getPlaneShapeClass()
+        getPlaneShapeClass(),
+        getMaterialConstantScalarClass(),
+        getMaterialConstantVec2Class(),
+        getMaterialConstantVec3Class(),
+        getMaterialConstantVec4Class()
       ].map((val) => [val.ctor, val])
     );
     for (const k of this._classMap) {

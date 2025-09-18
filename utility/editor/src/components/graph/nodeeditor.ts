@@ -24,10 +24,10 @@ interface SlotInfo {
 
 export class NodeEditor {
   private api: GraphEditorApi;
-  private nodes: Map<number, BaseGraphNode>;
+  public nodes: Map<number, BaseGraphNode>;
   private links: GraphLink[];
   private nextLinkId: number;
-  private selectedNodes: number[];
+  public selectedNodes: number[];
   private draggingNode: number;
   private dragOffset: ImGui.ImVec2;
   private isDraggingCanvas: boolean;
@@ -108,10 +108,14 @@ export class NodeEditor {
 
   private removeLinksIntoInput(nodeId: number, slotId: number) {
     const toDelete = this.links.filter((lk) => lk.endNodeId === nodeId && lk.endSlotId === slotId);
-    if (toDelete.length === 0) return;
+    if (toDelete.length === 0) {
+      return;
+    }
 
     const ids = new Set(toDelete.map((l) => l.id));
-    for (const id of ids) this.selectedLinks.delete(id);
+    for (const id of ids) {
+      this.selectedLinks.delete(id);
+    }
     this.links = this.links.filter((lk) => !ids.has(lk.id));
   }
 
@@ -206,7 +210,9 @@ export class NodeEditor {
       const link = this.links[i];
       const startNode = this.nodes.get(link.startNodeId);
       const endNode = this.nodes.get(link.endNodeId);
-      if (!startNode || !endNode) continue;
+      if (!startNode || !endNode) {
+        continue;
+      }
 
       const startPos = this.worldToCanvas(startNode.getSlotPosition(link.startSlotId, true));
       const endPos = this.worldToCanvas(endNode.getSlotPosition(link.endSlotId, false));
@@ -230,10 +236,14 @@ export class NodeEditor {
     const wy = p.y - a.y;
 
     const c1 = vx * wx + vy * wy;
-    if (c1 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    if (c1 <= 0) {
+      return Math.hypot(p.x - a.x, p.y - a.y);
+    }
 
     const c2 = vx * vx + vy * vy;
-    if (c2 <= c1) return Math.hypot(p.x - b.x, p.y - b.y);
+    if (c2 <= c1) {
+      return Math.hypot(p.x - b.x, p.y - b.y);
+    }
 
     const t = c1 / c2;
     const projx = a.x + t * vx;
@@ -326,7 +336,9 @@ export class NodeEditor {
   private drawLink(drawList: ImGui.DrawList, link: GraphLink, canvasPos: ImGui.ImVec2) {
     const startNode = this.nodes.get(link.startNodeId);
     const endNode = this.nodes.get(link.endNodeId);
-    if (!startNode || !endNode) return;
+    if (!startNode || !endNode) {
+      return;
+    }
 
     const startPos = this.worldToCanvas(startNode.getSlotPosition(link.startSlotId, true));
     const endPos = this.worldToCanvas(endNode.getSlotPosition(link.endSlotId, false));
@@ -356,7 +368,9 @@ export class NodeEditor {
   private isPinOccludedOnScreen(slot: SlotInfo, canvasPos: ImGui.ImVec2): boolean {
     const nodesArray = this.getNodesArray();
     const ownerIndex = nodesArray.findIndex((n) => n.id === slot.nodeId);
-    if (ownerIndex < 0) return false;
+    if (ownerIndex < 0) {
+      return false;
+    }
     const owner = this.nodes.get(slot.nodeId)!;
     const posWorld = owner.getSlotPosition(slot.slotId, slot.isOutput);
     const posScreen = this.worldToCanvas(posWorld);
@@ -375,7 +389,9 @@ export class NodeEditor {
         center.x <= maxScreen.x &&
         center.y >= minScreen.y &&
         center.y <= maxScreen.y;
-      if (inside) return true;
+      if (inside) {
+        return true;
+      }
     }
     return false;
   }
@@ -412,7 +428,9 @@ export class NodeEditor {
             );
             if (toDelete.length > 0) {
               const ids = new Set(toDelete.map((l) => l.id));
-              for (const id of ids) this.selectedLinks.delete(id);
+              for (const id of ids) {
+                this.selectedLinks.delete(id);
+              }
               this.links = this.links.filter((lk) => !ids.has(lk.id));
             }
             this.isCreatingLink = false;
@@ -549,7 +567,9 @@ export class NodeEditor {
       } else {
         const hitLink = this.getLinkUnderMouse(canvasPos);
         let hitSlot = this.getSlotAtPosition(worldMousePos);
-        if (hitSlot && this.isPinOccludedOnScreen(hitSlot, canvasPos)) hitSlot = null;
+        if (hitSlot && this.isPinOccludedOnScreen(hitSlot, canvasPos)) {
+          hitSlot = null;
+        }
 
         if (!hitLink && !hitSlot) {
           const mousePos = ImGui.GetMousePos();
@@ -630,11 +650,7 @@ export class NodeEditor {
       const leaf = !item.children;
       const isOpen = ImGui.TreeNodeEx(item.name, leaf ? ImGui.TreeNodeFlags.Leaf : 0);
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-        const node = item.create(
-          this,
-          this.canvasToWorld(this.canvasContextClickLocal),
-          new ImGui.ImVec4(Math.random(), Math.random(), Math.random(), 1)
-        );
+        const node = new BaseGraphNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
         this.addNode(node);
         this.clearInteractionState();
         ImGui.CloseCurrentPopup();
@@ -703,7 +719,9 @@ export class NodeEditor {
     selected: boolean
   ) {
     const node = this.nodes.get(slot.nodeId);
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     const posWorld = node.getSlotPosition(slot.slotId, slot.isOutput);
     const posScreen = this.worldToCanvas(posWorld);
     const center = new ImGui.ImVec2(canvasPos.x + posScreen.x, canvasPos.y + posScreen.y);
@@ -735,32 +753,11 @@ export class NodeEditor {
   public render() {
     // 工具栏
     if (ImGui.Button('Add Input Node')) {
-      this.addNode(
-        new BaseGraphNode(
-          this,
-          'Input',
-          new ImGui.ImVec2(100, 100),
-          [],
-          [{ id: 1, name: 'Out', type: 'float' }],
-          new ImGui.ImVec4(0.2, 0.8, 0.2, 1.0)
-        )
-      );
+      console.log('Add Input Node');
     }
     ImGui.SameLine();
     if (ImGui.Button('Add Math Node')) {
-      this.addNode(
-        new BaseGraphNode(
-          this,
-          'Math',
-          new ImGui.ImVec2(100, 100),
-          [
-            { id: 1, name: 'A', type: 'float' },
-            { id: 2, name: 'B', type: 'float' }
-          ],
-          [{ id: 1, name: 'Result', type: 'float' }],
-          new ImGui.ImVec4(0.8, 0.4, 0.2, 1.0)
-        )
-      );
+      console.log('Add Math Node');
     }
     ImGui.SameLine();
     if (ImGui.Button('Clear All')) {

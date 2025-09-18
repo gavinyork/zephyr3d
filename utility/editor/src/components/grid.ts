@@ -14,7 +14,6 @@ import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
-import { DockPannel, ResizeDirection } from './dockpanel';
 
 interface Property<T extends {}> {
   objectPath: string;

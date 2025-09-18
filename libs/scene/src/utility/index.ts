@@ -8,3 +8,5 @@ export * from './debug';
 export * from './serialization';
 export * from './textures/gradientnoise';
 export * from './textures/randomnoise';
+export * from './blueprint/node';
+export * from './blueprint/material/constants';

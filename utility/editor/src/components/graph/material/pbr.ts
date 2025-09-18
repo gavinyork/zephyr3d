@@ -1,6 +1,6 @@
 import type { NodeCategory } from '../api';
-import { getConstantNodeCategories } from '../common/constants';
 import { GraphEditor } from '../grapheditor';
+import { getConstantNodeCategories } from './nodes/constants';
 
 export class PBRMaterialEditor extends GraphEditor {
   getNodeCategory(): NodeCategory[] {
