@@ -50,7 +50,7 @@ export class GraphEditor implements GraphEditorApi {
   getNodeCategory(): NodeCategory[] {
     return [];
   }
-  getCompatibleNodeTypes(_srcType: string): string[] {
-    return [];
+  isCompatiblePin(_inType: string, _outType: string): boolean {
+    return false;
   }
 }

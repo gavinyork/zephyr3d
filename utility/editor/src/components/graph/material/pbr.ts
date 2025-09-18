@@ -6,7 +6,7 @@ export class PBRMaterialEditor extends GraphEditor {
   getNodeCategory(): NodeCategory[] {
     return getConstantNodeCategories();
   }
-  getCompatibleNodeTypes(srcType: string): string[] {
-    return [srcType];
+  isCompatiblePin(inType: string, outType: string): boolean {
+    return inType === outType;
   }
 }

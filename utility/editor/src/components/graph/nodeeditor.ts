@@ -1,6 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { BaseGraphNode } from './node';
-import type { GraphEditor } from './grapheditor';
+import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
 
 const SLOT_RADIUS = 6;
@@ -23,7 +23,7 @@ interface SlotInfo {
 }
 
 export class NodeEditor {
-  private graphEditor: GraphEditor;
+  private api: GraphEditorApi;
   private nodes: Map<number, BaseGraphNode>;
   private links: GraphLink[];
   private nextLinkId: number;
@@ -44,7 +44,6 @@ export class NodeEditor {
   private selectedSlot: SlotInfo;
   private hoveredLinkId: number;
   private showCanvasContextMenu: boolean;
-  private canvasContextClickPos: ImGui.ImVec2;
   private canvasContextClickLocal: ImGui.ImVec2;
   private readonly linkHitRadius: number;
   private readonly linkWidthNormal: number;
@@ -56,8 +55,8 @@ export class NodeEditor {
   private readonly linkSelectedColor: ImGui.ImVec4;
   private readonly linkHoverColor: ImGui.ImVec4;
 
-  constructor(graphEditor: GraphEditor) {
-    this.graphEditor = graphEditor;
+  constructor(api: GraphEditorApi) {
+    this.api = api;
     this.nodes = new Map();
     this.links = [];
     this.nextLinkId = 1;
@@ -78,7 +77,6 @@ export class NodeEditor {
     this.selectedSlot = null;
     this.hoveredLinkId = null;
     this.showCanvasContextMenu = false;
-    this.canvasContextClickPos = new ImGui.ImVec2(0, 0);
     this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
     this.linkHitRadius = 6;
     this.linkWidthNormal = 2.0;
@@ -475,37 +473,45 @@ export class NodeEditor {
         this.isCreatingLink = false;
         this.linkStartSlot = null;
       } else {
-        const clickedNode = this.hitTestNodeAt(worldMousePos);
-        if (clickedNode) {
-          if (!ImGui.GetIO().KeyCtrl) {
+        if (this.isCreatingLink && this.linkStartSlot && !this.canvasContextClickLocal) {
+          const mousePos = ImGui.GetMousePos();
+          this.canvasContextClickLocal = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+          this.showCanvasContextMenu = true;
+        } else {
+          const clickedNode = this.hitTestNodeAt(worldMousePos);
+          if (clickedNode) {
+            if (!ImGui.GetIO().KeyCtrl) {
+              this.selectedNodes = [];
+              this.nodes.forEach((n) => (n.selected = false));
+            }
+
+            clickedNode.selected = true;
+            if (!this.selectedNodes.includes(clickedNode.id)) {
+              this.selectedNodes.push(clickedNode.id);
+            }
+            this.draggingNode = clickedNode.id;
+            this.dragOffset = new ImGui.ImVec2(
+              worldMousePos.x - clickedNode.position.x,
+              worldMousePos.y - clickedNode.position.y
+            );
+
+            const nodeId = clickedNode.id;
+            const nodeObj = this.nodes.get(nodeId)!;
+            this.nodes.delete(nodeId);
+            this.nodes.set(nodeId, nodeObj);
+          } else {
+            this.selectedLinks.clear();
+            this.selectedSlot = null;
             this.selectedNodes = [];
             this.nodes.forEach((n) => (n.selected = false));
+            this.isDraggingCanvas = true;
           }
 
-          clickedNode.selected = true;
-          if (!this.selectedNodes.includes(clickedNode.id)) {
-            this.selectedNodes.push(clickedNode.id);
+          if (!this.canvasContextClickLocal) {
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
           }
-          this.draggingNode = clickedNode.id;
-          this.dragOffset = new ImGui.ImVec2(
-            worldMousePos.x - clickedNode.position.x,
-            worldMousePos.y - clickedNode.position.y
-          );
-
-          const nodeId = clickedNode.id;
-          const nodeObj = this.nodes.get(nodeId)!;
-          this.nodes.delete(nodeId);
-          this.nodes.set(nodeId, nodeObj);
-        } else {
-          this.selectedLinks.clear();
-          this.selectedSlot = null;
-          this.selectedNodes = [];
-          this.nodes.forEach((n) => (n.selected = false));
-          this.isDraggingCanvas = true;
         }
-
-        this.isCreatingLink = false;
-        this.linkStartSlot = null;
       }
     }
 
@@ -536,11 +542,8 @@ export class NodeEditor {
         if (hitSlot && this.isPinOccludedOnScreen(hitSlot, canvasPos)) hitSlot = null;
 
         if (!hitLink && !hitSlot) {
-          this.canvasContextClickPos = ImGui.GetMousePos();
-          this.canvasContextClickLocal = new ImGui.ImVec2(
-            this.canvasContextClickPos.x - canvasPos.x,
-            this.canvasContextClickPos.y - canvasPos.y
-          );
+          const mousePos = ImGui.GetMousePos();
+          this.canvasContextClickLocal = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
           this.showCanvasContextMenu = true;
         }
       }
@@ -599,9 +602,11 @@ export class NodeEditor {
       ImGui.OpenPopup('CanvasContextMenu');
     }
     if (ImGui.BeginPopup('CanvasContextMenu')) {
-      const category = this.graphEditor.getNodeCategory();
+      const category = this.api.getNodeCategory();
       this.renderCategoryList(category);
       ImGui.EndPopup();
+    } else {
+      this.canvasContextClickLocal = null;
     }
   }
 
@@ -613,10 +618,10 @@ export class NodeEditor {
         const node = item.create(
           this,
           this.canvasToWorld(this.canvasContextClickLocal),
-          //this.canvasContextClickLocal,
           new ImGui.ImVec4(Math.random(), Math.random(), Math.random(), 1)
         );
         this.addNode(node);
+        this.clearInteractionState();
         ImGui.CloseCurrentPopup();
       }
       if (isOpen) {
@@ -626,6 +631,54 @@ export class NodeEditor {
         ImGui.TreePop();
       }
     }
+  }
+
+  private filterCategoryOutput(outputPinType: string, category: NodeCategory[]) {
+    if (!outputPinType) {
+      return category;
+    }
+    const outCategory: NodeCategory[] = [];
+    for (const v of category) {
+      const copy: NodeCategory = { ...v };
+      copy.children = copy.children ? this.filterCategoryOutput(outputPinType, copy.children) : null;
+      if (
+        !v.inTypes ||
+        v.inTypes.length === 0 ||
+        v.inTypes.every((val) => !this.api.isCompatiblePin(val, outputPinType))
+      ) {
+        copy.create = null;
+        copy.inTypes = null;
+        copy.outTypes = null;
+      }
+      if (copy.children || copy.create) {
+        outCategory.push(copy);
+      }
+    }
+    return outCategory;
+  }
+
+  private filterCategoryInput(inputPinType: string, category: NodeCategory[]) {
+    if (!inputPinType) {
+      return category;
+    }
+    const outCategory: NodeCategory[] = [];
+    for (const v of category) {
+      const copy: NodeCategory = { ...v };
+      copy.children = copy.children ? this.filterCategoryInput(inputPinType, copy.children) : null;
+      if (
+        !v.outTypes ||
+        v.outTypes.length === 0 ||
+        v.outTypes.every((val) => !this.api.isCompatiblePin(inputPinType, val))
+      ) {
+        copy.create = null;
+        copy.inTypes = null;
+        copy.outTypes = null;
+      }
+      if (copy.children || copy.create) {
+        outCategory.push(copy);
+      }
+    }
+    return outCategory;
   }
 
   private drawPinHighlight(
@@ -726,7 +779,12 @@ export class NodeEditor {
     }
 
     if (this.isCreatingLink && this.linkStartSlot) {
-      const mousePos = ImGui.GetMousePos();
+      const mousePos = this.canvasContextClickLocal
+        ? new ImGui.ImVec2(
+            this.canvasContextClickLocal.x + canvasPos.x,
+            this.canvasContextClickLocal.y + canvasPos.y
+          )
+        : ImGui.GetMousePos();
       const node = this.nodes.get(this.linkStartSlot!.nodeId)!;
       const startPos = node.getSlotPosition(this.linkStartSlot.slotId, this.linkStartSlot.isOutput);
       const startScreenPos = this.worldToCanvas(startPos);
