@@ -11,7 +11,7 @@ export class ConstantScalarNode extends Observable<{ changed: [] }> implements I
     this._value = 0;
     this._isUniform = false;
     this._inputs = [];
-    this._outputs = [{ id: 1, name: 'value', type: 'float' }];
+    this._outputs = [{ id: 1, name: '', type: 'float' }];
   }
   toString() {
     return `${Math.round(this._value * 1000) / 1000}`;

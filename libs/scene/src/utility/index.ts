@@ -11,3 +11,4 @@ export * from './textures/randomnoise';
 export * from './blueprint/node';
 export * from './blueprint/common/constants';
 export * from './blueprint/common/math';
+export * from './blueprint/material/texture';

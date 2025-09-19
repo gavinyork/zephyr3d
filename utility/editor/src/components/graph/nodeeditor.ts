@@ -123,7 +123,9 @@ export class NodeEditor {
 
   // Rebuild graph structure
   private rebuildGraphStructure() {
-    if (!this.structureDirty) return;
+    if (!this.structureDirty) {
+      return;
+    }
 
     this.graphStructure.outgoing.clear();
     this.graphStructure.incoming.clear();
@@ -172,7 +174,9 @@ export class NodeEditor {
         return true; // cycle found
       }
 
-      if (visited.has(currentId)) continue;
+      if (visited.has(currentId)) {
+        continue;
+      }
       visited.add(currentId);
 
       // Add successors to stack
@@ -324,7 +328,6 @@ export class NodeEditor {
     this.structureDirty = true;
   }
 
-  // 修改：添加环路检测
   private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number): boolean {
     const existingLink = this.links.find(
       (link) =>
@@ -337,7 +340,6 @@ export class NodeEditor {
       return false;
     }
 
-    // 检查是否会形成环路
     if (this.wouldCreateCycle(startNodeId, endNodeId)) {
       console.warn(`Cannot create link: would form a cycle between nodes ${startNodeId} and ${endNodeId}`);
       return false;
@@ -673,7 +675,6 @@ export class NodeEditor {
                 ? this.hoveredSlot.type
                 : [this.hoveredSlot.type];
               if (inTypes.includes(this.linkStartSlot.type as string)) {
-                // 修改：使用新的 addLink 方法，包含 DAG 检测
                 linkok = this.addLink(
                   this.linkStartSlot.nodeId,
                   this.linkStartSlot.slotId,
@@ -686,7 +687,6 @@ export class NodeEditor {
                 ? this.linkStartSlot.type
                 : [this.linkStartSlot.type];
               if (inTypes.includes(this.hoveredSlot.type as string)) {
-                // 修改：使用新的 addLink 方法，包含 DAG 检测
                 linkok = this.addLink(
                   this.hoveredSlot.nodeId,
                   this.hoveredSlot.slotId,
@@ -881,7 +881,11 @@ export class NodeEditor {
   private renderCategoryList(category: NodeCategory[]) {
     for (const item of category) {
       const leaf = !item.children;
-      const isOpen = ImGui.TreeNodeEx(item.name, leaf ? ImGui.TreeNodeFlags.Leaf : 0);
+      let flags = ImGui.TreeNodeFlags.SpanFullWidth;
+      if (leaf) {
+        flags |= ImGui.TreeNodeFlags.Leaf;
+      }
+      const isOpen = ImGui.TreeNodeEx(item.name, flags);
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
         const node = new BaseGraphNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
         this.addNode(node);

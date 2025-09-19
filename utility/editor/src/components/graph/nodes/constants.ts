@@ -1,5 +1,12 @@
-import { ConstantScalarNode, ConstantVec2Node, ConstantVec3Node, ConstantVec4Node } from '@zephyr3d/scene';
-import type { NodeCategory } from '../../api';
+import {
+  ConstantScalarNode,
+  ConstantTexture2DNode,
+  ConstantTextureCubeNode,
+  ConstantVec2Node,
+  ConstantVec3Node,
+  ConstantVec4Node
+} from '@zephyr3d/scene';
+import type { NodeCategory } from '../api';
 
 export function getConstantNodeCategories(): NodeCategory[] {
   return [
@@ -25,6 +32,16 @@ export function getConstantNodeCategories(): NodeCategory[] {
           name: 'Vec4',
           create: () => new ConstantVec4Node(),
           outTypes: ['float', 'vec4']
+        },
+        {
+          name: 'Texture2D',
+          create: () => new ConstantTexture2DNode(),
+          outTypes: ['texture2d']
+        },
+        {
+          name: 'TextureCube',
+          create: () => new ConstantTextureCubeNode(),
+          outTypes: ['textureCube']
         }
       ]
     }

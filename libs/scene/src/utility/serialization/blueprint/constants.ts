@@ -3,10 +3,10 @@ import {
   ConstantVec2Node,
   ConstantVec3Node,
   ConstantVec4Node
-} from '../../../blueprint/common/constants';
-import type { SerializableClass } from '../../types';
+} from '../../blueprint/common/constants';
+import type { SerializableClass } from '../types';
 
-export function getMaterialConstantScalarClass(): SerializableClass {
+export function getConstantScalarClass(): SerializableClass {
   return {
     ctor: ConstantScalarNode,
     name: 'MaterialConstantScalar',
@@ -40,7 +40,7 @@ export function getMaterialConstantScalarClass(): SerializableClass {
   };
 }
 
-export function getMaterialConstantVec2Class(): SerializableClass {
+export function getConstantVec2Class(): SerializableClass {
   return {
     ctor: ConstantVec2Node,
     name: 'MaterialConstantVec2',
@@ -85,7 +85,7 @@ export function getMaterialConstantVec2Class(): SerializableClass {
   };
 }
 
-export function getMaterialConstantVec3Class(): SerializableClass {
+export function getConstantVec3Class(): SerializableClass {
   return {
     ctor: ConstantVec3Node,
     name: 'MaterialConstantVec3',
@@ -141,7 +141,7 @@ export function getMaterialConstantVec3Class(): SerializableClass {
   };
 }
 
-export function getMaterialConstantVec4Class(): SerializableClass {
+export function getConstantVec4Class(): SerializableClass {
   return {
     ctor: ConstantVec4Node,
     name: 'MaterialConstantVec4',

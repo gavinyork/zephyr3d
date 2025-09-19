@@ -177,14 +177,61 @@ export class GenericMathNode1 extends Observable<{ changed: [] }> implements IGr
   private _nodeName: string;
   readonly inputs: GraphNodeInput[];
   readonly outputs: GraphNodeOutput[];
-  constructor(nodeName: string, inputName: string) {
+  constructor(nodeName: string, inputName?: string) {
     super();
     this._inputName = inputName;
     this._nodeName = nodeName;
     this.inputs = [
       {
         id: 1,
-        name: this._inputName,
+        name: this._inputName ?? '',
+        type: ['float', 'vec2', 'vec3', 'vec4']
+      }
+    ];
+    this.outputs = [
+      {
+        id: 1,
+        name: 'float',
+        type: 'float'
+      },
+      {
+        id: 2,
+        name: 'vec2',
+        type: 'vec2'
+      },
+      {
+        id: 3,
+        name: 'vec3',
+        type: 'vec3'
+      },
+      {
+        id: 4,
+        name: 'vec4',
+        type: 'vec4'
+      }
+    ];
+  }
+  toString() {
+    return this._nodeName;
+  }
+}
+
+export class GenericMathNode2 extends Observable<{ changed: [] }> implements IGraphNode {
+  private _nodeName: string;
+  readonly inputs: GraphNodeInput[];
+  readonly outputs: GraphNodeOutput[];
+  constructor(nodeName: string) {
+    super();
+    this._nodeName = nodeName;
+    this.inputs = [
+      {
+        id: 1,
+        name: 'a',
+        type: ['float', 'vec2', 'vec3', 'vec4']
+      },
+      {
+        id: 2,
+        name: 'b',
         type: ['float', 'vec2', 'vec3', 'vec4']
       }
     ];
@@ -218,78 +265,192 @@ export class GenericMathNode1 extends Observable<{ changed: [] }> implements IGr
 
 export class Degrees2RadiansNode extends GenericMathNode1 {
   constructor() {
-    super('DegreesToRadians', 'degrees');
+    super('degrees2radians');
   }
 }
 
 export class Radians2DegreesNode extends GenericMathNode1 {
   constructor() {
-    super('RadiansToDegrees', 'radians');
+    super('radians2degrees');
   }
 }
 
 export class SinNode extends GenericMathNode1 {
   constructor() {
-    super('Sine', 'value');
+    super('sin');
   }
 }
 
 export class CosNode extends GenericMathNode1 {
   constructor() {
-    super('Cosine', 'value');
+    super('cos');
   }
 }
 
 export class TanNode extends GenericMathNode1 {
   constructor() {
-    super('Tangent', 'value');
+    super('tan');
   }
 }
 
 export class ArcSinNode extends GenericMathNode1 {
   constructor() {
-    super('Arcsine', 'value');
+    super('asin');
   }
 }
 
 export class ArcCosNode extends GenericMathNode1 {
   constructor() {
-    super('Arccosine', 'value');
+    super('acos');
   }
 }
 
 export class ArcTanNode extends GenericMathNode1 {
   constructor() {
-    super('Arctangent', 'value');
+    super('atan');
   }
 }
 
 export class SinHNode extends GenericMathNode1 {
   constructor() {
-    super('Hypsine', 'value');
+    super('sinh');
   }
 }
 
 export class CosHNode extends GenericMathNode1 {
   constructor() {
-    super('Hypcosine', 'value');
+    super('cosh');
   }
 }
 
 export class TanHNode extends GenericMathNode1 {
   constructor() {
-    super('Hyptangent', 'value');
+    super('tanh');
   }
 }
 
 export class ArcsineHNode extends GenericMathNode1 {
   constructor() {
-    super('Hyparcsine', 'value');
+    super('asinh');
   }
 }
 
 export class ArccosineHNode extends GenericMathNode1 {
   constructor() {
-    super('Hyparccosine', 'value');
+    super('acosh');
+  }
+}
+
+export class ArctangentHNode extends GenericMathNode1 {
+  constructor() {
+    super('atanh');
+  }
+}
+
+export class ExpNode extends GenericMathNode1 {
+  constructor() {
+    super('exp');
+  }
+}
+
+export class Exp2Node extends GenericMathNode1 {
+  constructor() {
+    super('exp2');
+  }
+}
+
+export class LogNode extends GenericMathNode1 {
+  constructor() {
+    super('log');
+  }
+}
+
+export class Log2Node extends GenericMathNode1 {
+  constructor() {
+    super('log2');
+  }
+}
+
+export class SqrtNode extends GenericMathNode1 {
+  constructor() {
+    super('sqrt');
+  }
+}
+
+export class InvSqrtNode extends GenericMathNode1 {
+  constructor() {
+    super('invSqrt');
+  }
+}
+
+export class AbsNode extends GenericMathNode1 {
+  constructor() {
+    super('abs');
+  }
+}
+
+export class SignNode extends GenericMathNode1 {
+  constructor() {
+    super('sign');
+  }
+}
+
+export class FloorNode extends GenericMathNode1 {
+  constructor() {
+    super('floor');
+  }
+}
+
+export class CeilNode extends GenericMathNode1 {
+  constructor() {
+    super('ceil');
+  }
+}
+
+export class FractNode extends GenericMathNode1 {
+  constructor() {
+    super('fract');
+  }
+}
+
+export class DDXNode extends GenericMathNode1 {
+  constructor() {
+    super('ddx');
+  }
+}
+
+export class DDYNode extends GenericMathNode1 {
+  constructor() {
+    super('ddy');
+  }
+}
+
+export class FWidthNode extends GenericMathNode1 {
+  constructor() {
+    super('fwidth');
+  }
+}
+
+export class ModNode extends GenericMathNode2 {
+  constructor() {
+    super('mod');
+  }
+}
+
+export class MinNode extends GenericMathNode2 {
+  constructor() {
+    super('min');
+  }
+}
+
+export class MaxNode extends GenericMathNode2 {
+  constructor() {
+    super('max');
+  }
+}
+
+export class StepNode extends GenericMathNode2 {
+  constructor() {
+    super('step');
   }
 }
