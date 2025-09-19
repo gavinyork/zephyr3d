@@ -22,11 +22,36 @@ interface SlotInfo {
   type: string[] | string;
 }
 
+// Adjacency List
+interface NodeConnection {
+  targetNodeId: number;
+  linkId: number;
+  startSlotId: number;
+  endSlotId: number;
+}
+
+interface GraphStructure {
+  // Forward Adjacency List: nodeId -> Output links
+  outgoing: Map<number, NodeConnection[]>;
+  // Backward Adjacency List: nodeId -> Input links
+  incoming: Map<number, NodeConnection[]>;
+}
+
+// Traversal Result
+interface TraversalResult {
+  order: number[];
+  levels: number[][]; // Node id grouped by level
+}
+
 export class NodeEditor {
   private api: GraphEditorApi;
   public nodes: Map<number, BaseGraphNode>;
   private links: GraphLink[];
   private nextLinkId: number;
+
+  private graphStructure: GraphStructure;
+  private structureDirty: boolean = true;
+
   public selectedNodes: number[];
   private draggingNode: number;
   private dragOffset: ImGui.ImVec2;
@@ -61,6 +86,11 @@ export class NodeEditor {
     this.nodes = new Map();
     this.links = [];
     this.nextLinkId = 1;
+    this.graphStructure = {
+      outgoing: new Map(),
+      incoming: new Map()
+    };
+
     this.selectedNodes = [];
     this.draggingNode = null;
     this.dragOffset = new ImGui.ImVec2(0, 0);
@@ -91,9 +121,180 @@ export class NodeEditor {
     this.linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
   }
 
+  // Rebuild graph structure
+  private rebuildGraphStructure() {
+    if (!this.structureDirty) return;
+
+    this.graphStructure.outgoing.clear();
+    this.graphStructure.incoming.clear();
+
+    // Initialize adjacency lists
+    for (const nodeId of this.nodes.keys()) {
+      this.graphStructure.outgoing.set(nodeId, []);
+      this.graphStructure.incoming.set(nodeId, []);
+    }
+
+    // Fill with links
+    for (const link of this.links) {
+      const outConnection: NodeConnection = {
+        targetNodeId: link.endNodeId,
+        linkId: link.id,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      const inConnection: NodeConnection = {
+        targetNodeId: link.startNodeId,
+        linkId: link.id,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      this.graphStructure.outgoing.get(link.startNodeId)?.push(outConnection);
+      this.graphStructure.incoming.get(link.endNodeId)?.push(inConnection);
+    }
+
+    this.structureDirty = false;
+  }
+
+  // Test for cycling links
+  private wouldCreateCycle(startNodeId: number, endNodeId: number): boolean {
+    this.rebuildGraphStructure();
+
+    // Check if startNodeId can be reached from endNodeId by using DFS
+    const visited = new Set<number>();
+    const stack = [endNodeId];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+
+      if (currentId === startNodeId) {
+        return true; // cycle found
+      }
+
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      // Add successors to stack
+      const outgoing = this.graphStructure.outgoing.get(currentId) || [];
+      for (const conn of outgoing) {
+        if (!visited.has(conn.targetNodeId)) {
+          stack.push(conn.targetNodeId);
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // Topological sort (Kahn's algorithm)
+  public getTopologicalOrder(): TraversalResult {
+    this.rebuildGraphStructure();
+
+    const inDegree = new Map<number, number>();
+    const result: number[] = [];
+    const levels: number[][] = [];
+
+    for (const nodeId of this.nodes.keys()) {
+      const incoming = this.graphStructure.incoming.get(nodeId) || [];
+      inDegree.set(nodeId, incoming.length);
+    }
+
+    let currentLevel = Array.from(inDegree.entries())
+      .filter(([_, degree]) => degree === 0)
+      .map(([nodeId, _]) => nodeId);
+
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+      const nextLevel: number[] = [];
+
+      for (const nodeId of currentLevel) {
+        const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+        for (const conn of outgoing) {
+          const targetDegree = inDegree.get(conn.targetNodeId)! - 1;
+          inDegree.set(conn.targetNodeId, targetDegree);
+
+          if (targetDegree === 0) {
+            nextLevel.push(conn.targetNodeId);
+          }
+        }
+      }
+
+      currentLevel = nextLevel;
+    }
+
+    if (result.length !== this.nodes.size) {
+      return null;
+    }
+
+    return { order: result, levels };
+  }
+
+  // Reverse topological sort (Kahn's algorithm)
+  public getReverseTopologicalOrder(): TraversalResult {
+    this.rebuildGraphStructure();
+
+    const outDegree = new Map<number, number>();
+    const result: number[] = [];
+    const levels: number[][] = [];
+
+    for (const nodeId of this.nodes.keys()) {
+      const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+      outDegree.set(nodeId, outgoing.length);
+    }
+
+    let currentLevel = Array.from(outDegree.entries())
+      .filter(([_, degree]) => degree === 0)
+      .map(([nodeId, _]) => nodeId);
+
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+      const nextLevel: number[] = [];
+
+      for (const nodeId of currentLevel) {
+        const incoming = this.graphStructure.incoming.get(nodeId) || [];
+        for (const conn of incoming) {
+          const targetDegree = outDegree.get(conn.targetNodeId)! - 1;
+          outDegree.set(conn.targetNodeId, targetDegree);
+
+          if (targetDegree === 0) {
+            nextLevel.push(conn.targetNodeId);
+          }
+        }
+      }
+
+      currentLevel = nextLevel;
+    }
+
+    if (result.length !== this.nodes.size) {
+      return null;
+    }
+
+    return { order: result, levels };
+  }
+
+  public getNodePredecessors(nodeId: number): number[] {
+    this.rebuildGraphStructure();
+    const incoming = this.graphStructure.incoming.get(nodeId) || [];
+    return incoming.map((conn) => conn.targetNodeId);
+  }
+
+  public getNodeSuccessors(nodeId: number): number[] {
+    this.rebuildGraphStructure();
+    const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+    return outgoing.map((conn) => conn.targetNodeId);
+  }
+
+  public getConnectionsBetween(startNodeId: number, endNodeId: number): GraphLink[] {
+    return this.links.filter((link) => link.startNodeId === startNodeId && link.endNodeId === endNodeId);
+  }
+
   private addNode(node: BaseGraphNode) {
     if (!this.nodes.get(node.id)) {
       this.nodes.set(node.id, node);
+      this.structureDirty = true;
     }
     return node;
   }
@@ -102,6 +303,7 @@ export class NodeEditor {
     this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
+    this.structureDirty = true;
   }
 
   private findLinkIntoInput(nodeId: number, slotId: number): GraphLink | null {
@@ -119,9 +321,11 @@ export class NodeEditor {
       this.selectedLinks.delete(id);
     }
     this.links = this.links.filter((lk) => !ids.has(lk.id));
+    this.structureDirty = true;
   }
 
-  private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number) {
+  // 修改：添加环路检测
+  private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number): boolean {
     const existingLink = this.links.find(
       (link) =>
         link.startNodeId === startNodeId &&
@@ -130,12 +334,18 @@ export class NodeEditor {
         link.endSlotId === endSlotId
     );
     if (existingLink) {
-      return;
+      return false;
+    }
+
+    // 检查是否会形成环路
+    if (this.wouldCreateCycle(startNodeId, endNodeId)) {
+      console.warn(`Cannot create link: would form a cycle between nodes ${startNodeId} and ${endNodeId}`);
+      return false;
     }
 
     const occupied = this.findLinkIntoInput(endNodeId, endSlotId);
     if (occupied) {
-      this.selectedLinks.delete(occupied.id); // 清理选中状态
+      this.selectedLinks.delete(occupied.id);
       this.links = this.links.filter((lk) => lk.id !== occupied.id);
     }
 
@@ -148,6 +358,8 @@ export class NodeEditor {
       color: new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)
     };
     this.links.push(link);
+    this.structureDirty = true;
+    return true;
   }
 
   private getNodesArray(): BaseGraphNode[] {
@@ -434,6 +646,7 @@ export class NodeEditor {
                 this.selectedLinks.delete(id);
               }
               this.links = this.links.filter((lk) => !ids.has(lk.id));
+              this.structureDirty = true;
             }
             this.isCreatingLink = false;
             this.linkStartSlot = null;
@@ -460,8 +673,8 @@ export class NodeEditor {
                 ? this.hoveredSlot.type
                 : [this.hoveredSlot.type];
               if (inTypes.includes(this.linkStartSlot.type as string)) {
-                linkok = true;
-                this.addLink(
+                // 修改：使用新的 addLink 方法，包含 DAG 检测
+                linkok = this.addLink(
                   this.linkStartSlot.nodeId,
                   this.linkStartSlot.slotId,
                   this.hoveredSlot.nodeId,
@@ -473,8 +686,8 @@ export class NodeEditor {
                 ? this.linkStartSlot.type
                 : [this.linkStartSlot.type];
               if (inTypes.includes(this.hoveredSlot.type as string)) {
-                linkok = true;
-                this.addLink(
+                // 修改：使用新的 addLink 方法，包含 DAG 检测
+                linkok = this.addLink(
                   this.hoveredSlot.nodeId,
                   this.hoveredSlot.slotId,
                   this.linkStartSlot.nodeId,
@@ -625,6 +838,7 @@ export class NodeEditor {
         const idsToDelete = new Set(this.selectedLinks);
         this.links = this.links.filter((link) => !idsToDelete.has(link.id));
         this.selectedLinks.clear();
+        this.structureDirty = true;
       }
     }
   }
@@ -778,12 +992,26 @@ export class NodeEditor {
       this.nodes.clear();
       this.links = [];
       this.selectedNodes = [];
+      this.structureDirty = true;
     }
 
     ImGui.SameLine();
     const showGrid = [this.showGrid] as [boolean];
     if (ImGui.Checkbox('Show Grid', showGrid)) {
       this.showGrid = showGrid[0];
+    }
+
+    // 新增：调试按钮
+    ImGui.SameLine();
+    if (ImGui.Button('Check DAG')) {
+      const topo = this.getTopologicalOrder();
+      if (topo) {
+        console.log('Graph is a valid DAG');
+        console.log('Topological order:', topo.order);
+        console.log('Levels:', topo.levels);
+      } else {
+        console.log('Graph contains cycles!');
+      }
     }
 
     ImGui.Separator();

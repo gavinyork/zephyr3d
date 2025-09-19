@@ -18,6 +18,13 @@ export class BaseGraphNode {
   readonly _id: number;
   readonly _position: ImGui.ImVec2;
   private _titleRect: ImGui.ImVec2;
+  private _titleBg: number;
+  private _textColor: number;
+  private _bodyBg: number;
+  private _bodyBorderColor: number;
+  private _bodyBorderColorSel: number;
+  private _inputCircleColor: number;
+  private _outputCircleColor: number;
   private _size: ImGui.ImVec2;
   private _selected: boolean;
   private _hovered: boolean;
@@ -33,6 +40,13 @@ export class BaseGraphNode {
     this._hovered = false;
     this._locked = false;
     this._size = null;
+    this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
+    this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
+    this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
+    this._bodyBorderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
+    this._bodyBorderColorSel = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0));
+    this._inputCircleColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0));
+    this._outputCircleColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0));
     this._impl.on('changed', this.changed, this);
   }
   toString() {
@@ -132,13 +146,7 @@ export class BaseGraphNode {
     const nodeRounding = 10.0; // 圆角半径
     const borderThickness = 1.0;
 
-    const titleBg = new ImGui.ImVec4(0.4, 0.4, 0.1, 0.95);
-    const bodyBg = new ImGui.ImVec4(0.1, 0.1, 0.1, 0.9);
-
-    const titleTextColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
-    const bodyBorderColor = this.selected
-      ? new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0)
-      : new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0);
+    const bodyBorderColor = this.selected ? this._bodyBorderColorSel : this._bodyBorderColor;
 
     const nodeRectMin = nodePos;
     const nodeRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
@@ -147,29 +155,16 @@ export class BaseGraphNode {
     const titleRectMin = nodePos;
     const titleRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + titleHeight);
 
-    drawList.AddRectFilled(nodeRectMin, nodeRectMax, ImGui.ColorConvertFloat4ToU32(bodyBg), nodeRounding, 15);
+    drawList.AddRectFilled(nodeRectMin, nodeRectMax, this._bodyBg, nodeRounding, 15);
 
-    drawList.AddRectFilled(
-      titleRectMin,
-      titleRectMax,
-      ImGui.ColorConvertFloat4ToU32(titleBg),
-      nodeRounding,
-      3
-    );
+    drawList.AddRectFilled(titleRectMin, titleRectMax, this._titleBg, nodeRounding, 3);
 
-    drawList.AddRect(
-      nodeRectMin,
-      nodeRectMax,
-      ImGui.ColorConvertFloat4ToU32(bodyBorderColor),
-      nodeRounding,
-      15,
-      borderThickness
-    );
+    drawList.AddRect(nodeRectMin, nodeRectMax, bodyBorderColor, nodeRounding, 15, borderThickness);
 
     const titlePaddingX = 10 * this._editor.canvasScale;
     const titlePaddingY = 6 * this._editor.canvasScale;
     const titlePos = new ImGui.ImVec2(nodePos.x + titlePaddingX, nodePos.y + titlePaddingY);
-    drawList.AddText(titlePos, ImGui.ColorConvertFloat4ToU32(titleTextColor), this.toString());
+    drawList.AddText(titlePos, this._textColor, this.toString());
 
     for (let i = 0; i < this.inputs.length; i++) {
       const input = this.inputs[i];
@@ -177,21 +172,13 @@ export class BaseGraphNode {
       const slotScreenPos = this._editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      drawList.AddCircleFilled(
-        slotDrawPos,
-        SLOT_RADIUS * this._editor.canvasScale,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0))
-      );
+      drawList.AddCircleFilled(slotDrawPos, SLOT_RADIUS * this._editor.canvasScale, this._inputCircleColor);
 
       const labelPos = new ImGui.ImVec2(
         slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS,
         slotDrawPos.y - SLOT_RADIUS
       );
-      drawList.AddText(
-        labelPos,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.95, 0.95, 0.98, 1.0)),
-        input.name
-      );
+      drawList.AddText(labelPos, this._textColor, input.name);
     }
 
     for (let i = 0; i < this.outputs.length; i++) {
@@ -200,22 +187,14 @@ export class BaseGraphNode {
       const slotScreenPos = this._editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      drawList.AddCircleFilled(
-        slotDrawPos,
-        SLOT_RADIUS * this._editor.canvasScale,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0))
-      );
+      drawList.AddCircleFilled(slotDrawPos, SLOT_RADIUS * this._editor.canvasScale, this._outputCircleColor);
 
       const textSize = imGuiCalcTextSize(output.name);
       const labelPos = new ImGui.ImVec2(
         slotDrawPos.x - textSize.x - SLOT_RADIUS - SLOT_MARGIN,
         slotDrawPos.y - SLOT_RADIUS
       );
-      drawList.AddText(
-        labelPos,
-        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.95, 0.95, 0.98, 1.0)),
-        output.name
-      );
+      drawList.AddText(labelPos, this._textColor, output.name);
     }
   }
 }
