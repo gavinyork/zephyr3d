@@ -413,7 +413,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           },
           action: () => {
             const node = this._sceneHierarchy.selectedNode;
-            if (node) {
+            if (node?.parent) {
               this.handleDeleteNode(node);
             }
           }

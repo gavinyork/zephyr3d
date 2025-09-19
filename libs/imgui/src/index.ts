@@ -133,3 +133,11 @@ export function imGuiGetCharCodeMap() {
 export function imGuiSetCharCodeMap(map: Record<number, string>) {
   ImGui_Impl.setCharCodeMap(map);
 }
+
+/**
+ * Manual set keyboard capture
+ * @param capture - Whether keyboard should be captured by ImGUI
+ */
+export function imGuiWantCaptureKeyboard(capture: boolean) {
+  ImGui_Impl.captureKeyboard(capture);
+}

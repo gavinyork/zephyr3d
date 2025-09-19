@@ -9,6 +9,7 @@ let renderer: Renderer = null;
 let prev_time = 0;
 let g_FontTexture: Texture2D = null;
 let glyphManager: GlyphManager = null;
+let wantKeyboard = false;
 const fonts: Record<string, DeviceFont> = {};
 
 export class Input {
@@ -152,7 +153,7 @@ export function canvas_on_keydown(event: KeyboardEvent): boolean {
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = true;
     // forward to the keypress event
-    if (key_index == 9 || io.WantCaptureKeyboard || io.WantTextInput) {
+    if (key_index == 9 || wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
       return true;
     }
   }
@@ -169,7 +170,7 @@ export function canvas_on_keyup(event: KeyboardEvent): boolean {
   if (key_index) {
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = false;
-    if (io.WantCaptureKeyboard || io.WantTextInput || key_index == 9) {
+    if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput || key_index == 9) {
       return true;
     }
   }
@@ -179,7 +180,7 @@ export function canvas_on_keyup(event: KeyboardEvent): boolean {
 export function canvas_on_keypress(event: KeyboardEvent): boolean {
   const io = ImGui.GetIO();
   io.AddInputCharacter(event.charCode);
-  if (io.WantCaptureKeyboard || io.WantTextInput) {
+  if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
     return true;
   }
   return false;
@@ -917,6 +918,10 @@ export function CreateDeviceObjects(): void {
 
 export function DestroyDeviceObjects(): void {
   DestroyFontsTexture();
+}
+
+export function captureKeyboard(capture: boolean) {
+  wantKeyboard = !!capture;
 }
 
 export interface ITextureParam {

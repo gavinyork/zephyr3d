@@ -16,7 +16,7 @@ const SLOT_RADIUS = 6;
 export class BaseGraphNode {
   private static _nextId = 1;
   readonly _id: number;
-  readonly _position: ImGui.ImVec2;
+  private _position: ImGui.ImVec2;
   private _titleRect: ImGui.ImVec2;
   private _titleBg: number;
   private _textColor: number;
@@ -35,7 +35,7 @@ export class BaseGraphNode {
     this._id = BaseGraphNode._nextId++;
     this._editor = editor;
     this._impl = impl;
-    this._position = new ImGui.ImVec2(position.x, position.y);
+    this._position = position ? new ImGui.ImVec2(position.x, position.y) : null;
     this._selected = false;
     this._hovered = false;
     this._locked = false;
@@ -65,6 +65,13 @@ export class BaseGraphNode {
     return this._size;
   }
   get position() {
+    if (!this._position) {
+      const canvasSize = this._editor.canvasSize;
+      const size = this.size;
+      const x = Math.max(10, (canvasSize.x - size.x) >> 1);
+      const y = Math.max(10, (canvasSize.y - size.y) >> 1);
+      this._position = new ImGui.ImVec2(x, y);
+    }
     return this._position;
   }
   get inputs() {

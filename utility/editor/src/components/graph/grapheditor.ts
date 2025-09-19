@@ -13,6 +13,9 @@ export class GraphEditor implements GraphEditorApi {
     this._nodePropGrid = new PropertyEditor(0.4);
     this._nodeEditor = new NodeEditor(this);
   }
+  get nodeEditor() {
+    return this._nodeEditor;
+  }
   render() {
     if (this._nodeEditor.selectedNodes.length === 1) {
       const selectedNode = this._nodeEditor.nodes.get(this._nodeEditor.selectedNodes[0]);

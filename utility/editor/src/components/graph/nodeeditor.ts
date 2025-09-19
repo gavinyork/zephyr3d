@@ -1,4 +1,4 @@
-import { ImGui } from '@zephyr3d/imgui';
+import { ImGui, imGuiWantCaptureKeyboard } from '@zephyr3d/imgui';
 import { BaseGraphNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
@@ -58,19 +58,20 @@ export class NodeEditor {
   private isDraggingCanvas: boolean;
   private isHoveringMenu: boolean;
   private readonly canvasOffset: ImGui.ImVec2;
+  public canvasSize: ImGui.ImVec2;
   public canvasScale: number;
   private isCreatingLink: boolean;
   private linkStartSlot: SlotInfo;
   private hoveredSlot: SlotInfo;
   private contextMenuNode: number;
   private showContextMenu: boolean;
-  private readonly gridSize: number;
   private showGrid: boolean;
   private selectedLinks: Set<number>;
   private selectedSlot: SlotInfo;
   private hoveredLinkId: number;
   private showCanvasContextMenu: boolean;
   private canvasContextClickLocal: ImGui.ImVec2;
+  private justOpened: boolean;
   private readonly linkHitRadius: number;
   private readonly linkWidthNormal: number;
   private readonly linkWidthHover: number;
@@ -103,13 +104,13 @@ export class NodeEditor {
     this.hoveredSlot = null;
     this.contextMenuNode = null;
     this.showContextMenu = false;
-    this.gridSize = 20;
     this.showGrid = true;
     this.selectedLinks = new Set();
     this.selectedSlot = null;
     this.hoveredLinkId = null;
     this.showCanvasContextMenu = false;
     this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
+    this.justOpened = true;
     this.linkHitRadius = 6;
     this.linkWidthNormal = 2.0;
     this.linkWidthHover = 3.0;
@@ -295,7 +296,7 @@ export class NodeEditor {
     return this.links.filter((link) => link.startNodeId === startNodeId && link.endNodeId === endNodeId);
   }
 
-  private addNode(node: BaseGraphNode) {
+  public addNode(node: BaseGraphNode) {
     if (!this.nodes.get(node.id)) {
       this.nodes.set(node.id, node);
       this.structureDirty = true;
@@ -304,6 +305,15 @@ export class NodeEditor {
   }
 
   private deleteNode(nodeId: number) {
+    const node = this.nodes.get(nodeId);
+    if (!node) {
+      console.error('Cannot delete non-exist node');
+      return;
+    }
+    if (node.locked) {
+      console.info('Cannot delete locked node');
+      return;
+    }
     this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
@@ -517,38 +527,79 @@ export class NodeEditor {
     return null;
   }
 
-  private drawGrid(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
-    if (!this.showGrid) {
-      return;
+  private drawGrid(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2) {
+    if (!this.showGrid) return;
+
+    // 屏幕像素中的网格步长（固定像素，不随缩放）
+    const stepScreen = 20; // 可改为 this.gridPixelStep
+    if (stepScreen < 2) return;
+
+    // 颜色
+    const minorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.25, 0.25, 0.25, 0.55));
+    const majorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.35, 0.35, 0.85));
+
+    // 每 N 条为主网格
+    const majorEvery = 5;
+
+    // 关键：用“世界格子索引”决定主/次
+    // 定义一个“世界网格步长”，其单位是世界单位（例如 1.0 表示每个世界单位一格）
+    // 因为我们让网格不缩放，只平移，所以用 canvasScale 来将世界格子映射到屏幕像素：
+    // worldStep * canvasScale ≈ stepScreen
+    // 简便起见，用精确对应：worldStep = stepScreen / canvasScale
+    const worldStep = stepScreen / this.canvasScale;
+
+    // 画布左上角对应的世界坐标（用于计算格子索引）
+    const worldMin = this.canvasToWorld(new ImGui.ImVec2(0, 0)); // 世界坐标
+
+    // 当前视口覆盖的世界范围（仅用于边界）
+    const worldMax = this.canvasToWorld(this.canvasSize);
+
+    // 计算起始/结束的网格索引（世界格子索引）
+    const startWorldX = Math.floor(worldMin.x / worldStep);
+    const endWorldX = Math.ceil(worldMax.x / worldStep);
+    const startWorldY = Math.floor(worldMin.y / worldStep);
+    const endWorldY = Math.ceil(worldMax.y / worldStep);
+
+    // 将世界网格线位置映射到屏幕：screen = canvasPos + (world + offset) * scale
+    // 你已经定义了 worldToCanvas = (world + canvasOffset) * canvasScale（相对 canvas 内）
+    // 因此屏幕坐标 = canvasPos + worldToCanvas(...)
+    // 注意：下面我们用 worldIndex * worldStep 计算世界坐标线的位置
+
+    // 纵向网格线（变化 X，画垂直线）
+    for (let gx = startWorldX; gx <= endWorldX; gx++) {
+      const worldX = gx * worldStep;
+      const xCanvas = this.worldToCanvas(new ImGui.ImVec2(worldX, 0)).x; // 相对 canvas 的 X
+      const xScreen = canvasPos.x + xCanvas;
+
+      const isMajor = gx % majorEvery === 0; // 基于世界格子索引判断主/次，不会跳
+      const col = isMajor ? majorCol : minorCol;
+
+      drawList.AddLine(
+        new ImGui.ImVec2(xScreen, canvasPos.y),
+        new ImGui.ImVec2(xScreen, canvasPos.y + this.canvasSize.y),
+        col
+      );
     }
 
-    const gridColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.3, 0.3, 0.3, 0.5));
-    const gridStep = this.gridSize * this.canvasScale;
-
-    const startX = 0;
-    const startY = 0;
-
-    for (let x = startX; x < canvasSize.x; x += gridStep) {
-      if (x >= 0) {
-        drawList.AddLine(
-          new ImGui.ImVec2(canvasPos.x + x, canvasPos.y),
-          new ImGui.ImVec2(canvasPos.x + x, canvasPos.y + canvasSize.y),
-          gridColor
-        );
+    // 横向网格线（变化 Y，画水平线）
+    for (let gy = startWorldY; gy <= endWorldY; gy++) {
+      const worldY = gy * worldStep;
+      const yCanvas = this.worldToCanvas(new ImGui.ImVec2(0, worldY)).y; // 相对 canvas 的 Y
+      if (yCanvas < 0) {
+        continue;
       }
-    }
+      const yScreen = canvasPos.y + yCanvas;
 
-    for (let y = startY; y < canvasSize.y; y += gridStep) {
-      if (y >= 0) {
-        drawList.AddLine(
-          new ImGui.ImVec2(canvasPos.x, canvasPos.y + y),
-          new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + y),
-          gridColor
-        );
-      }
+      const isMajor = gy % majorEvery === 0; // 基于世界格子索引判断主/次，不会跳
+      const col = isMajor ? majorCol : minorCol;
+
+      drawList.AddLine(
+        new ImGui.ImVec2(canvasPos.x, yScreen),
+        new ImGui.ImVec2(canvasPos.x + this.canvasSize.x, yScreen),
+        col
+      );
     }
   }
-
   private drawLink(drawList: ImGui.DrawList, link: GraphLink, canvasPos: ImGui.ImVec2) {
     const startNode = this.nodes.get(link.startNodeId);
     const endNode = this.nodes.get(link.endNodeId);
@@ -612,31 +663,30 @@ export class NodeEditor {
     return false;
   }
 
-  private handleInput(canvasPos: ImGui.ImVec2, canvasSize: ImGui.ImVec2) {
+  private handleInput(canvasPos: ImGui.ImVec2, isCanvasHovered: boolean, isCanvasFocused: boolean) {
+    const io = ImGui.GetIO();
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
     const worldMousePos = this.canvasToWorld(relativeMousePos);
+    const canProcessThisFrame =
+      isCanvasHovered || this.isDraggingCanvas || this.draggingNode !== null || this.isCreatingLink;
 
-    const isMouseInCanvas =
-      mousePos.x >= canvasPos.x &&
-      mousePos.x <= canvasPos.x + canvasSize.x &&
-      mousePos.y >= canvasPos.y &&
-      mousePos.y <= canvasPos.y + canvasSize.y;
-
-    if (!isMouseInCanvas) {
+    if (!canProcessThisFrame) {
       return;
     }
 
-    let hovered = this.getSlotAtPosition(worldMousePos);
-    if (hovered && this.isPinOccludedOnScreen(hovered, canvasPos)) {
-      hovered = null;
+    if (isCanvasHovered) {
+      let hovered = this.getSlotAtPosition(worldMousePos);
+      if (hovered && this.isPinOccludedOnScreen(hovered, canvasPos)) {
+        hovered = null;
+      }
+      this.hoveredSlot = hovered;
+      this.hoveredLinkId = this.getLinkUnderMouse(canvasPos);
     }
-    this.hoveredSlot = hovered;
-    this.hoveredLinkId = this.getLinkUnderMouse(canvasPos);
 
-    if (ImGui.IsMouseClicked(0)) {
+    if (isCanvasHovered && ImGui.IsMouseClicked(0)) {
       if (this.hoveredSlot) {
-        if (ImGui.GetIO().KeyAlt) {
+        if (io.KeyAlt) {
           if (this.hoveredSlot.isOutput) {
             const toDelete = this.links.filter(
               (lk) =>
@@ -644,9 +694,7 @@ export class NodeEditor {
             );
             if (toDelete.length > 0) {
               const ids = new Set(toDelete.map((l) => l.id));
-              for (const id of ids) {
-                this.selectedLinks.delete(id);
-              }
+              for (const id of ids) this.selectedLinks.delete(id);
               this.links = this.links.filter((lk) => !ids.has(lk.id));
               this.structureDirty = true;
             }
@@ -663,6 +711,7 @@ export class NodeEditor {
           }
           return;
         }
+
         if (this.isCreatingLink) {
           let linkok = false;
           if (
@@ -701,7 +750,7 @@ export class NodeEditor {
             this.linkStartSlot = null;
           }
         } else {
-          if (ImGui.GetIO().KeyCtrl) {
+          if (io.KeyCtrl) {
             this.selectedSlot = this.hoveredSlot;
             this.isCreatingLink = false;
             this.linkStartSlot = null;
@@ -713,7 +762,7 @@ export class NodeEditor {
           this.selectedLinks.clear();
         }
       } else if (this.hoveredLinkId !== null) {
-        if (!ImGui.GetIO().KeyCtrl) {
+        if (!io.KeyCtrl) {
           this.selectedLinks.clear();
           this.selectedSlot = null;
         }
@@ -723,11 +772,8 @@ export class NodeEditor {
       } else {
         if (this.isCreatingLink && this.linkStartSlot) {
           if (!this.canvasContextClickLocal) {
-            const mousePos = ImGui.GetMousePos();
-            this.canvasContextClickLocal = new ImGui.ImVec2(
-              mousePos.x - canvasPos.x,
-              mousePos.y - canvasPos.y
-            );
+            const mpos = ImGui.GetMousePos();
+            this.canvasContextClickLocal = new ImGui.ImVec2(mpos.x - canvasPos.x, mpos.y - canvasPos.y);
             this.showCanvasContextMenu = true;
           } else if (!this.isHoveringMenu) {
             this.canvasContextClickLocal = null;
@@ -738,11 +784,10 @@ export class NodeEditor {
         } else {
           const clickedNode = this.hitTestNodeAt(worldMousePos);
           if (clickedNode) {
-            if (!ImGui.GetIO().KeyCtrl) {
+            if (!io.KeyCtrl) {
               this.selectedNodes = [];
               this.nodes.forEach((n) => (n.selected = false));
             }
-
             clickedNode.selected = true;
             if (!this.selectedNodes.includes(clickedNode.id)) {
               this.selectedNodes.push(clickedNode.id);
@@ -773,7 +818,7 @@ export class NodeEditor {
       }
     }
 
-    if (ImGui.IsMouseClicked(1)) {
+    if (isCanvasHovered && ImGui.IsMouseClicked(1)) {
       this.clearInteractionState();
 
       let rightClickedNode: BaseGraphNode | null = null;
@@ -802,43 +847,51 @@ export class NodeEditor {
         }
 
         if (!hitLink && !hitSlot) {
-          const mousePos = ImGui.GetMousePos();
-          this.canvasContextClickLocal = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+          const mpos = ImGui.GetMousePos();
+          this.canvasContextClickLocal = new ImGui.ImVec2(mpos.x - canvasPos.x, mpos.y - canvasPos.y);
           this.showCanvasContextMenu = true;
         }
       }
     }
 
-    if (this.draggingNode !== null && ImGui.IsMouseDown(0)) {
-      const node = this.nodes.get(this.draggingNode);
-      if (node) {
-        node.position.x = worldMousePos.x - this.dragOffset.x;
-        node.position.y = worldMousePos.y - this.dragOffset.y;
+    if (ImGui.IsMouseDown(0)) {
+      if (isCanvasHovered && !this.draggingNode && !this.isCreatingLink) {
+        this.isDraggingCanvas = this.isDraggingCanvas || true;
       }
-    } else if (this.isDraggingCanvas && ImGui.IsMouseDown(0)) {
-      const mouseDelta = ImGui.GetMouseDragDelta(0);
-      this.canvasOffset.x += mouseDelta.x / this.canvasScale;
-      this.canvasOffset.y += mouseDelta.y / this.canvasScale;
-      ImGui.ResetMouseDragDelta(0);
-    }
-
-    if (ImGui.IsMouseReleased(0)) {
+      if (this.isDraggingCanvas) {
+        const mouseDelta = ImGui.GetMouseDragDelta(0);
+        this.canvasOffset.x += mouseDelta.x / this.canvasScale;
+        this.canvasOffset.y += mouseDelta.y / this.canvasScale;
+        ImGui.ResetMouseDragDelta(0);
+      } else if (this.draggingNode !== null) {
+        const node = this.nodes.get(this.draggingNode);
+        if (node) {
+          node.position.x = worldMousePos.x - this.dragOffset.x;
+          node.position.y = worldMousePos.y - this.dragOffset.y;
+        }
+      }
+    } else {
       this.draggingNode = null;
       this.isDraggingCanvas = false;
     }
 
-    const wheel = ImGui.GetIO().MouseWheel;
-    if (wheel !== 0 && isMouseInCanvas) {
+    const wheel = io.MouseWheel;
+    if (wheel !== 0 && isCanvasHovered) {
       const scaleFactor = wheel > 0 ? 1.1 : 0.9;
       this.canvasScale = Math.max(0.1, Math.min(3.0, this.canvasScale * scaleFactor));
     }
 
-    if (ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
+    if (isCanvasFocused && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
       if (this.selectedLinks.size > 0) {
         const idsToDelete = new Set(this.selectedLinks);
         this.links = this.links.filter((link) => !idsToDelete.has(link.id));
         this.selectedLinks.clear();
         this.structureDirty = true;
+      }
+      if (this.selectedNodes.length > 0) {
+        for (const nodeId of this.selectedNodes.slice()) {
+          this.deleteNode(nodeId);
+        }
       }
     }
   }
@@ -1021,19 +1074,46 @@ export class NodeEditor {
     ImGui.Separator();
 
     const canvasPos = ImGui.GetCursorScreenPos();
-    const canvasSize = ImGui.GetContentRegionAvail();
+    this.canvasSize = ImGui.GetContentRegionAvail();
     const drawList = ImGui.GetWindowDrawList();
+
+    const viewMinWorld = this.canvasToWorld(new ImGui.ImVec2(0, 0));
+    const viewMaxWorld = this.canvasToWorld(this.canvasSize);
+    const viewRect = {
+      min: new ImGui.ImVec2(
+        Math.min(viewMinWorld.x, viewMaxWorld.x),
+        Math.min(viewMinWorld.y, viewMaxWorld.y)
+      ),
+      max: new ImGui.ImVec2(
+        Math.max(viewMinWorld.x, viewMaxWorld.x),
+        Math.max(viewMinWorld.y, viewMaxWorld.y)
+      )
+    };
 
     drawList.AddRectFilled(
       canvasPos,
-      new ImGui.ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y),
+      new ImGui.ImVec2(canvasPos.x + this.canvasSize.x, canvasPos.y + this.canvasSize.y),
       ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1.0))
     );
 
-    this.drawGrid(drawList, canvasPos, canvasSize);
+    this.drawGrid(drawList, canvasPos);
 
     for (const link of this.links) {
-      this.drawLink(drawList, link, canvasPos);
+      const startNode = this.nodes.get(link.startNodeId);
+      const endNode = this.nodes.get(link.endNodeId);
+      if (!startNode || !endNode) continue;
+
+      const startWorld = startNode.getSlotPosition(link.startSlotId, true);
+      const endWorld = endNode.getSlotPosition(link.endSlotId, false);
+
+      const bb = this.getLinkBoundingBox(
+        startWorld,
+        endWorld,
+        Math.max(this.linkHitRadius, this.linkWidthSelected)
+      );
+      if (this.rectIntersects(bb.min, bb.max, viewRect.min, viewRect.max)) {
+        this.drawLink(drawList, link, canvasPos);
+      }
     }
 
     if (this.isCreatingLink && this.linkStartSlot) {
@@ -1063,17 +1143,58 @@ export class NodeEditor {
 
     const nodesArrayForDraw = this.getNodesArray();
     for (const node of nodesArrayForDraw) {
-      node.draw(drawList, canvasPos);
-      if (this.hoveredSlot && this.hoveredSlot.nodeId === node.id) {
-        this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
-      }
-      if (this.selectedSlot && this.selectedSlot.nodeId === node.id) {
-        this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
+      const nMin = node.position; // world
+      const nMax = new ImGui.ImVec2(node.position.x + node.size.x, node.position.y + node.size.y);
+      if (this.rectIntersects(nMin, nMax, viewRect.min, viewRect.max)) {
+        node.draw(drawList, canvasPos);
+        if (this.hoveredSlot && this.hoveredSlot.nodeId === node.id) {
+          this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
+        }
+        if (this.selectedSlot && this.selectedSlot.nodeId === node.id) {
+          this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
+        }
       }
     }
-    this.handleInput(canvasPos, canvasSize);
     ImGui.SetCursorScreenPos(canvasPos);
-    ImGui.InvisibleButton('Canvas', canvasSize);
+    ImGui.InvisibleButton('Canvas', this.canvasSize);
+    if (this.justOpened) {
+      this.justOpened = false;
+      ImGui.SetItemDefaultFocus();
+    }
+    const isCanvasHovered = ImGui.IsItemHovered(
+      ImGui.HoveredFlags.AllowWhenBlockedByActiveItem | ImGui.HoveredFlags.AllowWhenBlockedByPopup
+    );
+    const isCanvasFocused = ImGui.IsItemFocused();
+    imGuiWantCaptureKeyboard(isCanvasFocused);
+    this.handleInput(canvasPos, isCanvasHovered, isCanvasFocused);
     this.drawContextMenu();
+  }
+  private rectIntersects(
+    aMin: ImGui.ImVec2,
+    aMax: ImGui.ImVec2,
+    bMin: ImGui.ImVec2,
+    bMax: ImGui.ImVec2
+  ): boolean {
+    return !(aMax.x < bMin.x || aMin.x > bMax.x || aMax.y < bMin.y || aMin.y > bMax.y);
+  }
+
+  private getLinkBoundingBox(
+    startWorld: ImGui.ImVec2,
+    endWorld: ImGui.ImVec2,
+    padding = 6
+  ): { min: ImGui.ImVec2; max: ImGui.ImVec2 } {
+    // 控制点（世界坐标）
+    const p0 = startWorld;
+    const p3 = endWorld;
+    const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
+    const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
+
+    // 粗略包围盒：取四点 min/max，再加一个 padding 用于线宽/命中半径
+    const minX = Math.min(p0.x, p1.x, p2.x, p3.x) - padding;
+    const minY = Math.min(p0.y, p1.y, p2.y, p3.y) - padding;
+    const maxX = Math.max(p0.x, p1.x, p2.x, p3.x) + padding;
+    const maxY = Math.max(p0.y, p1.y, p2.y, p3.y) + padding;
+
+    return { min: new ImGui.ImVec2(minX, minY), max: new ImGui.ImVec2(maxX, maxY) };
   }
 }
