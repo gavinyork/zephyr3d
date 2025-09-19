@@ -8,19 +8,23 @@ export function getConstantNodeCategories(): NodeCategory[] {
       children: [
         {
           name: 'Scalar',
-          create: () => new ConstantScalarNode()
+          create: () => new ConstantScalarNode(),
+          outTypes: ['float']
         },
         {
           name: 'Vec2',
-          create: () => new ConstantVec2Node()
+          create: () => new ConstantVec2Node(),
+          outTypes: ['float', 'vec2']
         },
         {
           name: 'Vec3',
-          create: () => new ConstantVec3Node()
+          create: () => new ConstantVec3Node(),
+          outTypes: ['float', 'vec3']
         },
         {
           name: 'Vec4',
-          create: () => new ConstantVec4Node()
+          create: () => new ConstantVec4Node(),
+          outTypes: ['float', 'vec4']
         }
       ]
     }

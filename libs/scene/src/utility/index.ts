@@ -9,4 +9,5 @@ export * from './serialization';
 export * from './textures/gradientnoise';
 export * from './textures/randomnoise';
 export * from './blueprint/node';
-export * from './blueprint/material/constants';
+export * from './blueprint/common/constants';
+export * from './blueprint/common/math';

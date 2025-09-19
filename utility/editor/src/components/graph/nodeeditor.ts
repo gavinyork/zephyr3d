@@ -19,7 +19,7 @@ interface SlotInfo {
   slotId: number;
   position: ImGui.ImVec2;
   isOutput: boolean;
-  type: string;
+  type: string[] | string;
 }
 
 export class NodeEditor {
@@ -31,6 +31,7 @@ export class NodeEditor {
   private draggingNode: number;
   private dragOffset: ImGui.ImVec2;
   private isDraggingCanvas: boolean;
+  private isHoveringMenu: boolean;
   private readonly canvasOffset: ImGui.ImVec2;
   public canvasScale: number;
   private isCreatingLink: boolean;
@@ -67,6 +68,7 @@ export class NodeEditor {
     this.canvasOffset = new ImGui.ImVec2(0, 0);
     this.canvasScale = 1.0;
     this.isCreatingLink = false;
+    this.isHoveringMenu = false;
     this.linkStartSlot = null;
     this.hoveredSlot = null;
     this.contextMenuNode = null;
@@ -447,29 +449,44 @@ export class NodeEditor {
           return;
         }
         if (this.isCreatingLink) {
+          let linkok = false;
           if (
             this.linkStartSlot &&
             this.linkStartSlot.isOutput !== this.hoveredSlot.isOutput &&
             this.linkStartSlot.nodeId !== this.hoveredSlot.nodeId
           ) {
             if (this.linkStartSlot.isOutput) {
-              this.addLink(
-                this.linkStartSlot.nodeId,
-                this.linkStartSlot.slotId,
-                this.hoveredSlot.nodeId,
-                this.hoveredSlot.slotId
-              );
+              const inTypes = Array.isArray(this.hoveredSlot.type)
+                ? this.hoveredSlot.type
+                : [this.hoveredSlot.type];
+              if (inTypes.includes(this.linkStartSlot.type as string)) {
+                linkok = true;
+                this.addLink(
+                  this.linkStartSlot.nodeId,
+                  this.linkStartSlot.slotId,
+                  this.hoveredSlot.nodeId,
+                  this.hoveredSlot.slotId
+                );
+              }
             } else {
-              this.addLink(
-                this.hoveredSlot.nodeId,
-                this.hoveredSlot.slotId,
-                this.linkStartSlot.nodeId,
-                this.linkStartSlot.slotId
-              );
+              const inTypes = Array.isArray(this.linkStartSlot.type)
+                ? this.linkStartSlot.type
+                : [this.linkStartSlot.type];
+              if (inTypes.includes(this.hoveredSlot.type as string)) {
+                linkok = true;
+                this.addLink(
+                  this.hoveredSlot.nodeId,
+                  this.hoveredSlot.slotId,
+                  this.linkStartSlot.nodeId,
+                  this.linkStartSlot.slotId
+                );
+              }
             }
           }
-          this.isCreatingLink = false;
-          this.linkStartSlot = null;
+          if (linkok) {
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
+          }
         } else {
           if (ImGui.GetIO().KeyCtrl) {
             this.selectedSlot = this.hoveredSlot;
@@ -492,18 +509,18 @@ export class NodeEditor {
         this.linkStartSlot = null;
       } else {
         if (this.isCreatingLink && this.linkStartSlot) {
-          if (this.canvasContextClickLocal) {
-            this.canvasContextClickLocal = null;
-            this.showCanvasContextMenu = false;
-            this.isCreatingLink = false;
-            this.linkStartSlot = null;
-          } else {
+          if (!this.canvasContextClickLocal) {
             const mousePos = ImGui.GetMousePos();
             this.canvasContextClickLocal = new ImGui.ImVec2(
               mousePos.x - canvasPos.x,
               mousePos.y - canvasPos.y
             );
             this.showCanvasContextMenu = true;
+          } else if (!this.isHoveringMenu) {
+            this.canvasContextClickLocal = null;
+            this.showCanvasContextMenu = false;
+            this.isCreatingLink = false;
+            this.linkStartSlot = null;
           }
         } else {
           const clickedNode = this.hitTestNodeAt(worldMousePos);
@@ -627,15 +644,17 @@ export class NodeEditor {
       ImGui.EndPopup();
     }
 
+    this.isHoveringMenu = false;
     if (this.showCanvasContextMenu) {
       this.showCanvasContextMenu = false;
       ImGui.OpenPopup('CanvasContextMenu');
     }
     if (this.canvasContextClickLocal && ImGui.BeginPopup('CanvasContextMenu')) {
+      this.isHoveringMenu = ImGui.IsWindowHovered();
       let category = this.api.getNodeCategory();
       if (this.linkStartSlot) {
         category = this.linkStartSlot.isOutput
-          ? this.filterCategoryOutput(this.linkStartSlot.type, category)
+          ? this.filterCategoryOutput(this.linkStartSlot.type as string, category)
           : this.filterCategoryInput(this.linkStartSlot.type, category);
       }
       this.renderCategoryList(category);
@@ -652,7 +671,9 @@ export class NodeEditor {
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
         const node = new BaseGraphNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
         this.addNode(node);
-        this.clearInteractionState();
+        if (!this.isCreatingLink) {
+          this.clearInteractionState();
+        }
         ImGui.CloseCurrentPopup();
       }
       if (isOpen) {
@@ -672,11 +693,7 @@ export class NodeEditor {
     for (const v of category) {
       const copy: NodeCategory = { ...v };
       copy.children = copy.children ? this.filterCategoryOutput(outputPinType, copy.children) : null;
-      if (
-        !v.inTypes ||
-        v.inTypes.length === 0 ||
-        v.inTypes.every((val) => !this.api.isCompatiblePin(val, outputPinType))
-      ) {
+      if (!v.inTypes || v.inTypes.length === 0 || !v.inTypes.includes(outputPinType)) {
         copy.create = null;
         copy.inTypes = null;
         copy.outTypes = null;
@@ -688,19 +705,16 @@ export class NodeEditor {
     return outCategory;
   }
 
-  private filterCategoryInput(inputPinType: string, category: NodeCategory[]) {
+  private filterCategoryInput(inputPinType: string[] | string, category: NodeCategory[]) {
     if (!inputPinType) {
       return category;
     }
+    const inputTypes = Array.isArray(inputPinType) ? inputPinType : [inputPinType];
     const outCategory: NodeCategory[] = [];
     for (const v of category) {
       const copy: NodeCategory = { ...v };
       copy.children = copy.children ? this.filterCategoryInput(inputPinType, copy.children) : null;
-      if (
-        !v.outTypes ||
-        v.outTypes.length === 0 ||
-        v.outTypes.every((val) => !this.api.isCompatiblePin(inputPinType, val))
-      ) {
+      if (!v.outTypes || v.outTypes.length === 0 || v.outTypes.every((val) => !inputTypes.includes(val))) {
         copy.create = null;
         copy.inTypes = null;
         copy.outTypes = null;

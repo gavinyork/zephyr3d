@@ -1,6 +1,6 @@
-import { IEventTarget } from '@zephyr3d/base';
+import type { IEventTarget } from '@zephyr3d/base';
 
-export type GraphNodeInput = { id: number; name: string; type: string; value?: any };
+export type GraphNodeInput = { id: number; name: string; type: string[] | string; value?: any };
 export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
 
 export interface IGraphNode extends IEventTarget<{ changed: [] }> {

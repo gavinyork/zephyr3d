@@ -10,5 +10,4 @@ export type NodeCategory = {
 
 export interface GraphEditorApi {
   getNodeCategory(): NodeCategory[];
-  isCompatiblePin(inType: string, outType: string): boolean;
 }

@@ -1,5 +1,5 @@
 import { Observable } from '@zephyr3d/base';
-import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../../blueprint/node';
+import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../node';
 
 export class ConstantScalarNode extends Observable<{ changed: [] }> implements IGraphNode {
   private _value: number;
