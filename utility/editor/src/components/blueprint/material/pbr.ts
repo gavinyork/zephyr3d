@@ -21,7 +21,6 @@ export class PBRMaterialEditor extends GraphEditor {
   getNodeCategory(): NodeCategory[] {
     return [...getConstantNodeCategories(), ...getTextureNodeCategories(), ...getMathNodeCategories()];
   }
-
   createDAG(): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};
     for (const [k, v] of this.nodeEditor.nodes) {
