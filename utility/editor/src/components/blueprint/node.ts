@@ -40,6 +40,7 @@ export class GNode {
     this._hovered = false;
     this._locked = false;
     this._size = null;
+    this._titleRect = null;
     this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
     this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
     this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
@@ -63,6 +64,12 @@ export class GNode {
       this.calculateSize();
     }
     return this._size;
+  }
+  get titleRect() {
+    if (!this._titleRect) {
+      this.calculateSize();
+    }
+    return this._titleRect;
   }
   get position() {
     if (!this._position) {
@@ -110,7 +117,7 @@ export class GNode {
     }
 
     const slotY =
-      this.position.y + this._titleRect.y + NODE_PADDING_BOTTOM + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
+      this.position.y + this.titleRect.y + NODE_PADDING_BOTTOM + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
     const slotX = isOutput
       ? this.position.x + this.size.x - NODE_PADDING_RIGHT - SLOT_MARGIN - SLOT_RADIUS
       : this.position.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
@@ -158,7 +165,7 @@ export class GNode {
     const nodeRectMin = nodePos;
     const nodeRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
 
-    const titleHeight = this._titleRect.y * this._editor.canvasScale;
+    const titleHeight = this.titleRect.y * this._editor.canvasScale;
     const titleRectMin = nodePos;
     const titleRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + titleHeight);
 

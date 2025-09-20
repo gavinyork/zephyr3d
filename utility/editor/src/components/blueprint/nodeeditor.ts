@@ -188,7 +188,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return false;
   }
 
-  // 提取从 roots 出发在正向（outgoing）方向上的可达子图
   private collectReachableForward(roots: number[]): Set<number> {
     this.rebuildGraphStructure();
     const reachable = new Set<number>();
@@ -214,7 +213,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return reachable;
   }
 
-  // 提取从 roots 出发在反向（incoming）方向上的可达子图（即所有前驱依赖）
   private collectReachableBackward(roots: number[]): Set<number> {
     this.rebuildGraphStructure();
     const reachable = new Set<number>();
@@ -240,7 +238,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return reachable;
   }
 
-  // 从 roots 出发的“正向”拓扑排序：只排序正向可达子图
   public getTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
@@ -248,21 +245,18 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     this.rebuildGraphStructure();
 
-    // 1) 计算正向可达子图
     const sub = this.collectReachableForward(roots);
 
     if (sub.size === 0) {
       return { order: [], levels: [] };
     }
 
-    // 2) 在子图上计算入度
     const inDegree = new Map<number, number>();
     for (const id of sub) {
       const incoming = (this.graphStructure.incoming[id] || []).filter((c) => sub.has(c.targetNodeId));
       inDegree.set(id, incoming.length);
     }
 
-    // 3) Kahn: 子图内入度为 0 的作为第一层
     let currentLevel = Array.from(inDegree.entries())
       .filter(([_, deg]) => deg === 0)
       .map(([id]) => id);
@@ -270,7 +264,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     const result: number[] = [];
     const levels: number[][] = [];
 
-    // 4) 只沿子图内的边松弛
     while (currentLevel.length > 0) {
       levels.push([...currentLevel]);
       result.push(...currentLevel);
@@ -294,7 +287,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       currentLevel = nextLevel;
     }
 
-    // 5) 若子图中还有入度未清零的节点，说明子图内有环
     if (result.length !== sub.size) {
       console.warn('Subgraph contains cycles (from given roots).');
       return null;
@@ -303,8 +295,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return { order: result, levels };
   }
 
-  // 从 roots 出发的“反向”拓扑排序：按依赖方向排序（适合 Output 子图）
-  // 语义：返回的序列，保证“被依赖者”在“使用者”之前
   public getReverseTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
@@ -312,21 +302,17 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     this.rebuildGraphStructure();
 
-    // 1) 计算反向可达子图（所有前驱依赖）
     const sub = this.collectReachableBackward(roots);
     if (sub.size === 0) {
       return { order: [], levels: [] };
     }
 
-    // 2) 在子图上计算“出度”（针对反向 Kahn）
-    // 等价做法：把边反向后按入度 Kahn。这里直接用 outDegree 降低心智负担。
     const outDegree = new Map<number, number>();
     for (const id of sub) {
       const outs = (this.graphStructure.outgoing[id] || []).filter((c) => sub.has(c.targetNodeId));
       outDegree.set(id, outs.length);
     }
 
-    // 3) 子图内出度为 0 的作为第一层（即“终端消费者”，通常是 roots 或终端）
     let currentLevel = Array.from(outDegree.entries())
       .filter(([_, deg]) => deg === 0)
       .map(([id]) => id);
@@ -334,7 +320,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     const result: number[] = [];
     const levels: number[][] = [];
 
-    // 4) Kahn 反向：沿 incoming（前驱）减少它们的出度
     while (currentLevel.length > 0) {
       levels.push([...currentLevel]);
       result.push(...currentLevel);
@@ -366,7 +351,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return { order: result, levels };
   }
 
-  // Topological sort (Kahn's algorithm)
   public getTopologicalOrder(): TraversalResult {
     this.rebuildGraphStructure();
 
@@ -410,7 +394,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return { order: result, levels };
   }
 
-  // Reverse topological sort (Kahn's algorithm)
   public getReverseTopologicalOrder(): TraversalResult {
     this.rebuildGraphStructure();
 
@@ -706,50 +689,30 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       return;
     }
 
-    // 屏幕像素中的网格步长（固定像素，不随缩放）
-    const stepScreen = 20; // 可改为 this.gridPixelStep
+    const stepScreen = 20;
     if (stepScreen < 2) {
       return;
     }
 
-    // 颜色
     const minorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.25, 0.25, 0.25, 0.55));
     const majorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.35, 0.35, 0.85));
 
-    // 每 N 条为主网格
     const majorEvery = 5;
-
-    // 关键：用“世界格子索引”决定主/次
-    // 定义一个“世界网格步长”，其单位是世界单位（例如 1.0 表示每个世界单位一格）
-    // 因为我们让网格不缩放，只平移，所以用 canvasScale 来将世界格子映射到屏幕像素：
-    // worldStep * canvasScale ≈ stepScreen
-    // 简便起见，用精确对应：worldStep = stepScreen / canvasScale
     const worldStep = stepScreen / this.canvasScale;
-
-    // 画布左上角对应的世界坐标（用于计算格子索引）
-    const worldMin = this.canvasToWorld(new ImGui.ImVec2(0, 0)); // 世界坐标
-
-    // 当前视口覆盖的世界范围（仅用于边界）
+    const worldMin = this.canvasToWorld(new ImGui.ImVec2(0, 0));
     const worldMax = this.canvasToWorld(this.canvasSize);
 
-    // 计算起始/结束的网格索引（世界格子索引）
     const startWorldX = Math.floor(worldMin.x / worldStep);
     const endWorldX = Math.ceil(worldMax.x / worldStep);
     const startWorldY = Math.floor(worldMin.y / worldStep);
     const endWorldY = Math.ceil(worldMax.y / worldStep);
 
-    // 将世界网格线位置映射到屏幕：screen = canvasPos + (world + offset) * scale
-    // 你已经定义了 worldToCanvas = (world + canvasOffset) * canvasScale（相对 canvas 内）
-    // 因此屏幕坐标 = canvasPos + worldToCanvas(...)
-    // 注意：下面我们用 worldIndex * worldStep 计算世界坐标线的位置
-
-    // 纵向网格线（变化 X，画垂直线）
     for (let gx = startWorldX; gx <= endWorldX; gx++) {
       const worldX = gx * worldStep;
-      const xCanvas = this.worldToCanvas(new ImGui.ImVec2(worldX, 0)).x; // 相对 canvas 的 X
+      const xCanvas = this.worldToCanvas(new ImGui.ImVec2(worldX, 0)).x;
       const xScreen = canvasPos.x + xCanvas;
 
-      const isMajor = gx % majorEvery === 0; // 基于世界格子索引判断主/次，不会跳
+      const isMajor = gx % majorEvery === 0;
       const col = isMajor ? majorCol : minorCol;
 
       drawList.AddLine(
@@ -759,16 +722,15 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       );
     }
 
-    // 横向网格线（变化 Y，画水平线）
     for (let gy = startWorldY; gy <= endWorldY; gy++) {
       const worldY = gy * worldStep;
-      const yCanvas = this.worldToCanvas(new ImGui.ImVec2(0, worldY)).y; // 相对 canvas 的 Y
+      const yCanvas = this.worldToCanvas(new ImGui.ImVec2(0, worldY)).y;
       if (yCanvas < 0) {
         continue;
       }
       const yScreen = canvasPos.y + yCanvas;
 
-      const isMajor = gy % majorEvery === 0; // 基于世界格子索引判断主/次，不会跳
+      const isMajor = gy % majorEvery === 0;
       const col = isMajor ? majorCol : minorCol;
 
       drawList.AddLine(
@@ -1124,9 +1086,25 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
         const node = new GNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
         this.addNode(node);
-        if (!this.isCreatingLink) {
-          this.clearInteractionState();
+        if (this.isCreatingLink && this.linkStartSlot) {
+          if (this.linkStartSlot.isOutput) {
+            const inputSlot = node.inputs.find((value) =>
+              value.type?.includes(this.linkStartSlot.type as string)
+            );
+            if (inputSlot) {
+              this.addLink(this.linkStartSlot.nodeId, this.linkStartSlot.slotId, node.id, inputSlot.id);
+            }
+          } else {
+            const types = Array.isArray(this.linkStartSlot.type)
+              ? this.linkStartSlot.type
+              : [this.linkStartSlot.type];
+            const outputSlot = node.outputs.find((value) => types.includes(value.type as string));
+            if (outputSlot) {
+              this.addLink(node.id, outputSlot.id, this.linkStartSlot.nodeId, this.linkStartSlot.slotId);
+            }
+          }
         }
+        this.clearInteractionState();
         ImGui.CloseCurrentPopup();
       }
       if (isOpen) {
@@ -1218,7 +1196,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   }
 
   public render() {
-    // 工具栏
+    // Toolbar
     if (ImGui.Button('Add Input Node')) {
       console.log('Add Input Node');
     }
@@ -1240,7 +1218,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       this.showGrid = showGrid[0];
     }
 
-    // 新增：调试按钮
+    // For debug
     ImGui.SameLine();
     if (ImGui.Button('Check DAG')) {
       const topo = this.getReverseTopologicalOrderFromRoots([1]);
@@ -1331,7 +1309,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     const nodesArrayForDraw = this.getNodesArray();
     for (const node of nodesArrayForDraw) {
-      const nMin = node.position; // world
+      const nMin = node.position;
       const nMax = new ImGui.ImVec2(node.position.x + node.size.x, node.position.y + node.size.y);
       if (this.rectIntersects(nMin, nMax, viewRect.min, viewRect.max)) {
         node.draw(drawList, canvasPos);
@@ -1373,13 +1351,11 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     endWorld: ImGui.ImVec2,
     padding = 6
   ): { min: ImGui.ImVec2; max: ImGui.ImVec2 } {
-    // 控制点（世界坐标）
     const p0 = startWorld;
     const p3 = endWorld;
     const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
     const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
 
-    // 粗略包围盒：取四点 min/max，再加一个 padding 用于线宽/命中半径
     const minX = Math.min(p0.x, p1.x, p2.x, p3.x) - padding;
     const minY = Math.min(p0.y, p1.y, p2.y, p3.y) - padding;
     const maxX = Math.max(p0.x, p1.x, p2.x, p3.x) + padding;

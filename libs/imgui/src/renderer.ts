@@ -62,8 +62,8 @@ export class Renderer extends Disposable {
     this._bindGroup = this._device.createBindGroup(this._program.bindGroupLayouts[0]);
     this._bindGroupTexture = this._device.createBindGroup(this._programTexture.bindGroupLayouts[0]);
     this._textureSampler = this._device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
+      magFilter: 'linear',
+      minFilter: 'linear',
       mipFilter: 'none'
     });
     this._renderStateSet = this.createStateSet();
