@@ -2,6 +2,8 @@ import { ImGui, imGuiWantCaptureKeyboard } from '@zephyr3d/imgui';
 import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
+import type { NodeConnection, GraphStructure } from './dag';
+import { Observable } from '@zephyr3d/base';
 
 const SLOT_RADIUS = 6;
 
@@ -22,35 +24,20 @@ interface SlotInfo {
   type: string[] | string;
 }
 
-// Adjacency List
-interface NodeConnection {
-  targetNodeId: number;
-  linkId: number;
-  startSlotId: number;
-  endSlotId: number;
-}
-
-interface GraphStructure {
-  // Forward Adjacency List: nodeId -> Output links
-  outgoing: Map<number, NodeConnection[]>;
-  // Backward Adjacency List: nodeId -> Input links
-  incoming: Map<number, NodeConnection[]>;
-}
-
 // Traversal Result
 interface TraversalResult {
   order: number[];
   levels: number[][]; // Node id grouped by level
 }
 
-export class NodeEditor {
+export class NodeEditor extends Observable<{ changed: [] }> {
   private api: GraphEditorApi;
   public nodes: Map<number, GNode>;
   private links: GraphLink[];
   private nextLinkId: number;
 
   private graphStructure: GraphStructure;
-  private structureDirty: boolean = true;
+  private structureDirty: boolean;
 
   public selectedNodes: number[];
   private draggingNode: number;
@@ -83,15 +70,16 @@ export class NodeEditor {
   private readonly linkHoverColor: ImGui.ImVec4;
 
   constructor(api: GraphEditorApi) {
+    super();
     this.api = api;
     this.nodes = new Map();
     this.links = [];
     this.nextLinkId = 1;
     this.graphStructure = {
-      outgoing: new Map(),
-      incoming: new Map()
+      outgoing: {},
+      incoming: {}
     };
-
+    this.structureDirty = true;
     this.selectedNodes = [];
     this.draggingNode = null;
     this.dragOffset = new ImGui.ImVec2(0, 0);
@@ -122,39 +110,47 @@ export class NodeEditor {
     this.linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
   }
 
+  get graph(): GraphStructure {
+    this.rebuildGraphStructure();
+    return this.graphStructure;
+  }
+
+  private invalidateStructure() {
+    this.structureDirty = true;
+    this.dispatchEvent('changed');
+  }
+
   // Rebuild graph structure
   private rebuildGraphStructure() {
     if (!this.structureDirty) {
       return;
     }
 
-    this.graphStructure.outgoing.clear();
-    this.graphStructure.incoming.clear();
+    this.graphStructure.outgoing = {};
+    this.graphStructure.incoming = {};
 
     // Initialize adjacency lists
     for (const nodeId of this.nodes.keys()) {
-      this.graphStructure.outgoing.set(nodeId, []);
-      this.graphStructure.incoming.set(nodeId, []);
+      this.graphStructure.outgoing[nodeId] = [];
+      this.graphStructure.incoming[nodeId] = [];
     }
 
     // Fill with links
     for (const link of this.links) {
       const outConnection: NodeConnection = {
         targetNodeId: link.endNodeId,
-        linkId: link.id,
         startSlotId: link.startSlotId,
         endSlotId: link.endSlotId
       };
 
       const inConnection: NodeConnection = {
         targetNodeId: link.startNodeId,
-        linkId: link.id,
         startSlotId: link.startSlotId,
         endSlotId: link.endSlotId
       };
 
-      this.graphStructure.outgoing.get(link.startNodeId)?.push(outConnection);
-      this.graphStructure.incoming.get(link.endNodeId)?.push(inConnection);
+      this.graphStructure.outgoing[link.startNodeId]?.push(outConnection);
+      this.graphStructure.incoming[link.endNodeId]?.push(inConnection);
     }
 
     this.structureDirty = false;
@@ -181,7 +177,7 @@ export class NodeEditor {
       visited.add(currentId);
 
       // Add successors to stack
-      const outgoing = this.graphStructure.outgoing.get(currentId) || [];
+      const outgoing = this.graphStructure.outgoing[currentId] || [];
       for (const conn of outgoing) {
         if (!visited.has(conn.targetNodeId)) {
           stack.push(conn.targetNodeId);
@@ -190,6 +186,184 @@ export class NodeEditor {
     }
 
     return false;
+  }
+
+  // 提取从 roots 出发在正向（outgoing）方向上的可达子图
+  private collectReachableForward(roots: number[]): Set<number> {
+    this.rebuildGraphStructure();
+    const reachable = new Set<number>();
+    const q: number[] = [];
+
+    for (const r of roots) {
+      if (this.nodes.has(r)) {
+        reachable.add(r);
+        q.push(r);
+      }
+    }
+    while (q.length > 0) {
+      const u = q.shift()!;
+      const outs = this.graphStructure.outgoing[u] || [];
+      for (const conn of outs) {
+        const v = conn.targetNodeId;
+        if (!reachable.has(v)) {
+          reachable.add(v);
+          q.push(v);
+        }
+      }
+    }
+    return reachable;
+  }
+
+  // 提取从 roots 出发在反向（incoming）方向上的可达子图（即所有前驱依赖）
+  private collectReachableBackward(roots: number[]): Set<number> {
+    this.rebuildGraphStructure();
+    const reachable = new Set<number>();
+    const q: number[] = [];
+
+    for (const r of roots) {
+      if (this.nodes.has(r)) {
+        reachable.add(r);
+        q.push(r);
+      }
+    }
+    while (q.length > 0) {
+      const u = q.shift()!;
+      const ins = this.graphStructure.incoming[u] || [];
+      for (const conn of ins) {
+        const v = conn.targetNodeId; // 前驱
+        if (!reachable.has(v)) {
+          reachable.add(v);
+          q.push(v);
+        }
+      }
+    }
+    return reachable;
+  }
+
+  // 从 roots 出发的“正向”拓扑排序：只排序正向可达子图
+  public getTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
+    if (!roots || roots.length === 0) {
+      return { order: [], levels: [] };
+    }
+
+    this.rebuildGraphStructure();
+
+    // 1) 计算正向可达子图
+    const sub = this.collectReachableForward(roots);
+
+    if (sub.size === 0) {
+      return { order: [], levels: [] };
+    }
+
+    // 2) 在子图上计算入度
+    const inDegree = new Map<number, number>();
+    for (const id of sub) {
+      const incoming = (this.graphStructure.incoming[id] || []).filter((c) => sub.has(c.targetNodeId));
+      inDegree.set(id, incoming.length);
+    }
+
+    // 3) Kahn: 子图内入度为 0 的作为第一层
+    let currentLevel = Array.from(inDegree.entries())
+      .filter(([_, deg]) => deg === 0)
+      .map(([id]) => id);
+
+    const result: number[] = [];
+    const levels: number[][] = [];
+
+    // 4) 只沿子图内的边松弛
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+
+      const nextLevel: number[] = [];
+      for (const u of currentLevel) {
+        const outs = this.graphStructure.outgoing[u] || [];
+        for (const conn of outs) {
+          const v = conn.targetNodeId;
+          if (!sub.has(v)) {
+            continue;
+          }
+
+          const deg = inDegree.get(v)! - 1;
+          inDegree.set(v, deg);
+          if (deg === 0) {
+            nextLevel.push(v);
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+
+    // 5) 若子图中还有入度未清零的节点，说明子图内有环
+    if (result.length !== sub.size) {
+      console.warn('Subgraph contains cycles (from given roots).');
+      return null;
+    }
+
+    return { order: result, levels };
+  }
+
+  // 从 roots 出发的“反向”拓扑排序：按依赖方向排序（适合 Output 子图）
+  // 语义：返回的序列，保证“被依赖者”在“使用者”之前
+  public getReverseTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
+    if (!roots || roots.length === 0) {
+      return { order: [], levels: [] };
+    }
+
+    this.rebuildGraphStructure();
+
+    // 1) 计算反向可达子图（所有前驱依赖）
+    const sub = this.collectReachableBackward(roots);
+    if (sub.size === 0) {
+      return { order: [], levels: [] };
+    }
+
+    // 2) 在子图上计算“出度”（针对反向 Kahn）
+    // 等价做法：把边反向后按入度 Kahn。这里直接用 outDegree 降低心智负担。
+    const outDegree = new Map<number, number>();
+    for (const id of sub) {
+      const outs = (this.graphStructure.outgoing[id] || []).filter((c) => sub.has(c.targetNodeId));
+      outDegree.set(id, outs.length);
+    }
+
+    // 3) 子图内出度为 0 的作为第一层（即“终端消费者”，通常是 roots 或终端）
+    let currentLevel = Array.from(outDegree.entries())
+      .filter(([_, deg]) => deg === 0)
+      .map(([id]) => id);
+
+    const result: number[] = [];
+    const levels: number[][] = [];
+
+    // 4) Kahn 反向：沿 incoming（前驱）减少它们的出度
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+
+      const nextLevel: number[] = [];
+      for (const u of currentLevel) {
+        const ins = this.graphStructure.incoming[u] || [];
+        for (const conn of ins) {
+          const v = conn.targetNodeId; // 前驱
+          if (!sub.has(v)) {
+            continue;
+          }
+
+          const deg = outDegree.get(v)! - 1;
+          outDegree.set(v, deg);
+          if (deg === 0) {
+            nextLevel.push(v);
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+
+    if (result.length !== sub.size) {
+      console.warn('Subgraph contains cycles (from given roots).');
+      return null;
+    }
+
+    return { order: result, levels };
   }
 
   // Topological sort (Kahn's algorithm)
@@ -201,7 +375,7 @@ export class NodeEditor {
     const levels: number[][] = [];
 
     for (const nodeId of this.nodes.keys()) {
-      const incoming = this.graphStructure.incoming.get(nodeId) || [];
+      const incoming = this.graphStructure.incoming[nodeId] || [];
       inDegree.set(nodeId, incoming.length);
     }
 
@@ -215,7 +389,7 @@ export class NodeEditor {
       const nextLevel: number[] = [];
 
       for (const nodeId of currentLevel) {
-        const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+        const outgoing = this.graphStructure.outgoing[nodeId] || [];
         for (const conn of outgoing) {
           const targetDegree = inDegree.get(conn.targetNodeId)! - 1;
           inDegree.set(conn.targetNodeId, targetDegree);
@@ -245,7 +419,7 @@ export class NodeEditor {
     const levels: number[][] = [];
 
     for (const nodeId of this.nodes.keys()) {
-      const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+      const outgoing = this.graphStructure.outgoing[nodeId] || [];
       outDegree.set(nodeId, outgoing.length);
     }
 
@@ -259,7 +433,7 @@ export class NodeEditor {
       const nextLevel: number[] = [];
 
       for (const nodeId of currentLevel) {
-        const incoming = this.graphStructure.incoming.get(nodeId) || [];
+        const incoming = this.graphStructure.incoming[nodeId] || [];
         for (const conn of incoming) {
           const targetDegree = outDegree.get(conn.targetNodeId)! - 1;
           outDegree.set(conn.targetNodeId, targetDegree);
@@ -282,13 +456,13 @@ export class NodeEditor {
 
   public getNodePredecessors(nodeId: number): number[] {
     this.rebuildGraphStructure();
-    const incoming = this.graphStructure.incoming.get(nodeId) || [];
+    const incoming = this.graphStructure.incoming[nodeId] || [];
     return incoming.map((conn) => conn.targetNodeId);
   }
 
   public getNodeSuccessors(nodeId: number): number[] {
     this.rebuildGraphStructure();
-    const outgoing = this.graphStructure.outgoing.get(nodeId) || [];
+    const outgoing = this.graphStructure.outgoing[nodeId] || [];
     return outgoing.map((conn) => conn.targetNodeId);
   }
 
@@ -299,7 +473,7 @@ export class NodeEditor {
   public addNode(node: GNode) {
     if (!this.nodes.get(node.id)) {
       this.nodes.set(node.id, node);
-      this.structureDirty = true;
+      this.invalidateStructure();
     }
     return node;
   }
@@ -317,7 +491,7 @@ export class NodeEditor {
     this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
-    this.structureDirty = true;
+    this.invalidateStructure();
   }
 
   private findLinkIntoInput(nodeId: number, slotId: number): GraphLink | null {
@@ -335,7 +509,7 @@ export class NodeEditor {
       this.selectedLinks.delete(id);
     }
     this.links = this.links.filter((lk) => !ids.has(lk.id));
-    this.structureDirty = true;
+    this.invalidateStructure();
   }
 
   private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number): boolean {
@@ -370,7 +544,7 @@ export class NodeEditor {
       color: new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)
     };
     this.links.push(link);
-    this.structureDirty = true;
+    this.invalidateStructure();
     return true;
   }
 
@@ -702,12 +876,14 @@ export class NodeEditor {
                 this.selectedLinks.delete(id);
               }
               this.links = this.links.filter((lk) => !ids.has(lk.id));
-              this.structureDirty = true;
             }
             this.isCreatingLink = false;
             this.linkStartSlot = null;
             this.selectedSlot = this.hoveredSlot;
             this.selectedLinks.clear();
+            if (toDelete.length > 0) {
+              this.invalidateStructure();
+            }
           } else {
             this.removeLinksIntoInput(this.hoveredSlot.nodeId, this.hoveredSlot.slotId);
             this.isCreatingLink = false;
@@ -892,7 +1068,7 @@ export class NodeEditor {
         const idsToDelete = new Set(this.selectedLinks);
         this.links = this.links.filter((link) => !idsToDelete.has(link.id));
         this.selectedLinks.clear();
-        this.structureDirty = true;
+        this.invalidateStructure();
       }
       if (this.selectedNodes.length > 0) {
         for (const nodeId of this.selectedNodes.slice()) {
@@ -1055,7 +1231,7 @@ export class NodeEditor {
       this.nodes.clear();
       this.links = [];
       this.selectedNodes = [];
-      this.structureDirty = true;
+      this.invalidateStructure();
     }
 
     ImGui.SameLine();
@@ -1067,7 +1243,7 @@ export class NodeEditor {
     // 新增：调试按钮
     ImGui.SameLine();
     if (ImGui.Button('Check DAG')) {
-      const topo = this.getTopologicalOrder();
+      const topo = this.getReverseTopologicalOrderFromRoots([1]);
       if (topo) {
         console.log('Graph is a valid DAG');
         console.log('Topological order:', topo.order);
@@ -1095,6 +1271,10 @@ export class NodeEditor {
         Math.max(viewMinWorld.y, viewMaxWorld.y)
       )
     };
+    drawList.PushClipRect(
+      canvasPos,
+      new ImGui.ImVec2(canvasPos.x + this.canvasSize.x, canvasPos.y + this.canvasSize.y)
+    );
 
     drawList.AddRectFilled(
       canvasPos,
@@ -1163,6 +1343,8 @@ export class NodeEditor {
         }
       }
     }
+    drawList.PopClipRect();
+
     ImGui.SetCursorScreenPos(canvasPos);
     ImGui.InvisibleButton('Canvas', this.canvasSize);
     if (this.justOpened) {

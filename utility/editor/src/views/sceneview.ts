@@ -65,13 +65,13 @@ import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
-import type { GraphEditor } from '../components/graph/grapheditor';
+import type { GraphEditor } from '../components/blueprint/grapheditor';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
-import { PBRMaterialEditor } from '../components/graph/material/pbr';
+import { PBRMaterialEditor } from '../components/blueprint/material/pbr';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
