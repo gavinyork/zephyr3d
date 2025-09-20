@@ -817,7 +817,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     let dy = pos2.y / pos2.w - pos1.y / pos1.w;
     dx *= 0.5 * width;
     dy *= 0.5 * height;
-    return Math.sqrt(dx * dx + dy * dy);
+    return Math.hypot(dx, dy);
   }
   private _calcGizmoMVPMatrix(mode: GizmoMode, noScale: boolean, matrix?: Matrix4x4) {
     matrix = this._calcGizmoWorldMatrix(mode, noScale, matrix);

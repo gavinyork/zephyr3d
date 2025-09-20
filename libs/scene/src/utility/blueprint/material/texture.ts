@@ -1,15 +1,11 @@
-import { Observable } from '@zephyr3d/base';
-import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../node';
-import { getParamName } from './common';
+import { BaseGraphNode } from '../node';
+import { getParamName } from '../common';
 
-export class ConstantTexture2DNode extends Observable<{ changed: [] }> implements IGraphNode {
-  private _name: string;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
+export class ConstantTexture2DNode extends BaseGraphNode {
+  private _paramName: string;
   constructor() {
     super();
-    this._name = getParamName();
-    this._inputs = [];
+    this._paramName = getParamName();
     this._outputs = [
       {
         id: 1,
@@ -19,35 +15,37 @@ export class ConstantTexture2DNode extends Observable<{ changed: [] }> implement
     ];
   }
   toString() {
-    return this._name;
+    return this._paramName;
   }
   get paramName() {
-    return this._name;
+    return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._name) {
-      this._name = val;
+    if (val !== this._paramName) {
+      this._paramName = val;
       this.dispatchEvent('changed');
     }
-  }
-  get inputs() {
-    return this._inputs;
-  }
-  get outputs() {
-    return this._outputs;
   }
   get isUniform() {
     return true;
   }
+  protected getProps(): Record<string, unknown> {
+    return {
+      paramName: this._paramName
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['paramName'] === 'string') {
+      this._paramName = props['paramName'];
+    }
+  }
 }
 
-export class ConstantTextureCubeNode extends Observable<{ changed: [] }> implements IGraphNode {
-  private _name: string;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
+export class ConstantTextureCubeNode extends BaseGraphNode {
+  private _paramName: string;
   constructor() {
     super();
-    this._name = getParamName();
+    this._paramName = getParamName();
     this._inputs = [];
     this._outputs = [
       {
@@ -58,24 +56,28 @@ export class ConstantTextureCubeNode extends Observable<{ changed: [] }> impleme
     ];
   }
   toString() {
-    return this._name;
+    return this._paramName;
   }
   get paramName() {
-    return this._name;
+    return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._name) {
-      this._name = val;
+    if (val !== this._paramName) {
+      this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
-  get inputs() {
-    return this._inputs;
-  }
-  get outputs() {
-    return this._outputs;
-  }
   get isUniform() {
     return true;
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      paramName: this._paramName
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['paramName'] === 'string') {
+      this._paramName = props['paramName'];
+    }
   }
 }

@@ -1,14 +1,11 @@
-import { Observable } from '@zephyr3d/base';
-import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../node';
+import { BaseGraphNode } from '../node';
 
-export class DotProductNode extends Observable<{ changed: [] }> implements IGraphNode {
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
-  private _type: 'vec2' | 'vec3' | 'vec4';
-  constructor(type: 'vec2' | 'vec3' | 'vec4') {
+export class DotProductNode extends BaseGraphNode {
+  private _type: string;
+  constructor(type: string) {
     super();
     this._type = type;
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
         name: 'a',
@@ -22,7 +19,7 @@ export class DotProductNode extends Observable<{ changed: [] }> implements IGrap
         value: [1, 1, 1, 1]
       }
     ];
-    this.outputs = [
+    this._outputs = [
       {
         id: 1,
         name: 'float',
@@ -32,6 +29,16 @@ export class DotProductNode extends Observable<{ changed: [] }> implements IGrap
   }
   toString() {
     return `DotProduct${this._type[3]}`;
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      type: this._type
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['type'] === 'string') {
+      this._type = props['type'];
+    }
   }
 }
 
@@ -53,14 +60,12 @@ export class DotProduct4Node extends DotProductNode {
   }
 }
 
-export class CrossProductNode extends Observable<{ changed: [] }> implements IGraphNode {
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
-  private _type: 'vec2' | 'vec3' | 'vec4';
-  constructor(type: 'vec2' | 'vec3' | 'vec4') {
+export class CrossProductNode extends BaseGraphNode {
+  private _type: string;
+  constructor(type: string) {
     super();
     this._type = type;
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
         name: 'a',
@@ -74,7 +79,7 @@ export class CrossProductNode extends Observable<{ changed: [] }> implements IGr
         value: [1, 1, 1, 1]
       }
     ];
-    this.outputs = [
+    this._outputs = [
       {
         id: 1,
         name: this._type,
@@ -84,6 +89,16 @@ export class CrossProductNode extends Observable<{ changed: [] }> implements IGr
   }
   toString() {
     return `CrossProduct${this._type[3]}`;
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      type: this._type
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['type'] === 'string') {
+      this._type = props['type'];
+    }
   }
 }
 
@@ -99,14 +114,12 @@ export class CrossProduct3Node extends CrossProductNode {
   }
 }
 
-export class CompOpNode extends Observable<{ changed: [] }> implements IGraphNode {
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
+export class CompOpNode extends BaseGraphNode {
   private _op: string;
   constructor(op: string) {
     super();
     this._op = op;
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
         name: 'a',
@@ -120,7 +133,7 @@ export class CompOpNode extends Observable<{ changed: [] }> implements IGraphNod
         value: 0
       }
     ];
-    this.outputs = [
+    this._outputs = [
       {
         id: 1,
         name: 'float',
@@ -145,6 +158,16 @@ export class CompOpNode extends Observable<{ changed: [] }> implements IGraphNod
   }
   toString() {
     return this._op;
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      op: this._op
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['op'] === 'string') {
+      this._op = props['op'];
+    }
   }
 }
 
@@ -172,23 +195,19 @@ export class CompDivNode extends CompOpNode {
   }
 }
 
-export class GenericMathNode1 extends Observable<{ changed: [] }> implements IGraphNode {
-  private _inputName: string;
+export class GenericMathNode1 extends BaseGraphNode {
   private _nodeName: string;
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
-  constructor(nodeName: string, inputName?: string) {
+  constructor(nodeName: string) {
     super();
-    this._inputName = inputName;
     this._nodeName = nodeName;
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
-        name: this._inputName ?? '',
+        name: '',
         type: ['float', 'vec2', 'vec3', 'vec4']
       }
     ];
-    this.outputs = [
+    this._outputs = [
       {
         id: 1,
         name: 'float',
@@ -214,16 +233,24 @@ export class GenericMathNode1 extends Observable<{ changed: [] }> implements IGr
   toString() {
     return this._nodeName;
   }
+  protected getProps(): Record<string, unknown> {
+    return {
+      name: this._nodeName
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['name'] === 'string') {
+      this._nodeName = props['name'];
+    }
+  }
 }
 
-export class GenericMathNode2 extends Observable<{ changed: [] }> implements IGraphNode {
+export class GenericMathNode2 extends BaseGraphNode {
   private _nodeName: string;
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
   constructor(nodeName: string) {
     super();
     this._nodeName = nodeName;
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
         name: 'a',
@@ -235,7 +262,7 @@ export class GenericMathNode2 extends Observable<{ changed: [] }> implements IGr
         type: ['float', 'vec2', 'vec3', 'vec4']
       }
     ];
-    this.outputs = [
+    this._outputs = [
       {
         id: 1,
         name: 'float',
@@ -260,6 +287,16 @@ export class GenericMathNode2 extends Observable<{ changed: [] }> implements IGr
   }
   toString() {
     return this._nodeName;
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      name: this._nodeName
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props && typeof props['name'] === 'string') {
+      this._nodeName = props['name'];
+    }
   }
 }
 

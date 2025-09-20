@@ -1,26 +1,39 @@
-import { Observable } from '@zephyr3d/base';
-import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../node';
+import { getParamName } from '../common';
+import { BaseGraphNode } from '../node';
 
-export class ConstantScalarNode extends Observable<{ changed: [] }> implements IGraphNode {
+export class ConstantScalarNode extends BaseGraphNode {
   private _value: number;
   private _isUniform: boolean;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
+  private _paramName: string;
   constructor() {
     super();
     this._value = 0;
     this._isUniform = false;
-    this._inputs = [];
+    this._paramName = '';
     this._outputs = [{ id: 1, name: '', type: 'float' }];
   }
   toString() {
-    return `${Math.round(this._value * 1000) / 1000}`;
+    return this._isUniform ? this._paramName : `${Math.round(this._value * 1000) / 1000}`;
   }
   get isUniform() {
     return this._isUniform;
   }
   set isUniform(val: boolean) {
-    this._isUniform = val;
+    if (this._isUniform !== !!val) {
+      this._isUniform = !!val;
+      if (!this._paramName) {
+        this._paramName = getParamName();
+      }
+    }
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (val !== this.paramName) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
   }
   get x() {
     return this._value;
@@ -31,38 +44,67 @@ export class ConstantScalarNode extends Observable<{ changed: [] }> implements I
       this.dispatchEvent('changed');
     }
   }
-  get inputs() {
-    return this._inputs;
+  protected getProps(): Record<string, unknown> {
+    return {
+      value: this._value,
+      paramName: this._paramName,
+      isUniform: this._isUniform
+    };
   }
-  get outputs() {
-    return this._outputs;
+  protected setProps(props: Record<string, unknown>): void {
+    if (props) {
+      if (typeof props['value'] === 'number') {
+        this._value = props['value'];
+      }
+      if (typeof props['paramName'] === 'string') {
+        this._paramName = props['paramName'];
+      }
+      if (typeof props['isUniform'] === 'boolean') {
+        this._isUniform = props['isUniform'];
+      }
+    }
   }
 }
 
-export class ConstantVec2Node extends Observable<{ changed: [] }> implements IGraphNode {
+export class ConstantVec2Node extends BaseGraphNode {
   private _value: number[];
   private _isUniform: boolean;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
+  private _paramName: string;
   constructor() {
     super();
     this._value = [0, 0];
     this._isUniform = false;
-    this._inputs = [];
+    this._paramName = '';
     this._outputs = [
-      { id: 1, name: 'value', type: 'vec2' },
+      { id: 1, name: '', type: 'vec2' },
       { id: 2, name: 'x', type: 'float' },
       { id: 3, name: 'y', type: 'float' }
     ];
   }
   toString() {
-    return `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000}`;
+    return this._isUniform
+      ? this._paramName
+      : `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000}`;
   }
   get isUniform() {
     return this._isUniform;
   }
   set isUniform(val: boolean) {
-    this._isUniform = val;
+    if (this._isUniform !== !!val) {
+      this._isUniform = !!val;
+      if (!this._paramName) {
+        this._paramName = getParamName();
+      }
+    }
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (val !== this._paramName) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
   }
 
   get x() {
@@ -83,26 +125,39 @@ export class ConstantVec2Node extends Observable<{ changed: [] }> implements IGr
       this.dispatchEvent('changed');
     }
   }
-  get inputs() {
-    return this._inputs;
+  protected getProps(): Record<string, unknown> {
+    return {
+      value: this._value,
+      paramName: this._paramName,
+      isUniform: this._isUniform
+    };
   }
-  get outputs() {
-    return this._outputs;
+  protected setProps(props: Record<string, unknown>): void {
+    if (props) {
+      if (Array.isArray(props['value'])) {
+        this._value = props['value'];
+      }
+      if (typeof props['paramName'] === 'string') {
+        this._paramName = props['paramName'];
+      }
+      if (typeof props['isUniform'] === 'boolean') {
+        this._isUniform = props['isUniform'];
+      }
+    }
   }
 }
 
-export class ConstantVec3Node extends Observable<{ changed: [] }> implements IGraphNode {
+export class ConstantVec3Node extends BaseGraphNode {
   private _value: number[];
   private _isUniform: boolean;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
+  private _paramName: string;
   constructor() {
     super();
     this._value = [0, 0, 0];
     this._isUniform = false;
-    this._inputs = [];
+    this._paramName = '';
     this._outputs = [
-      { id: 1, name: 'value', type: 'vec3' },
+      { id: 1, name: '', type: 'vec3' },
       { id: 2, name: 'x', type: 'float' },
       { id: 3, name: 'y', type: 'float' },
       { id: 4, name: 'z', type: 'float' }
@@ -110,15 +165,31 @@ export class ConstantVec3Node extends Observable<{ changed: [] }> implements IGr
   }
 
   toString() {
-    return `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000},${
-      Math.round(this._value[2] * 1000) / 1000
-    }`;
+    return this._isUniform
+      ? this._paramName
+      : `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000},${
+          Math.round(this._value[2] * 1000) / 1000
+        }`;
   }
   get isUniform() {
     return this._isUniform;
   }
   set isUniform(val: boolean) {
-    this._isUniform = val;
+    if (this._isUniform !== !!val) {
+      this._isUniform = !!val;
+      if (!this._paramName) {
+        this._paramName = getParamName();
+      }
+    }
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (val !== this._paramName) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
   }
 
   get x() {
@@ -148,26 +219,39 @@ export class ConstantVec3Node extends Observable<{ changed: [] }> implements IGr
       this.dispatchEvent('changed');
     }
   }
-  get inputs() {
-    return this._inputs;
+  protected getProps(): Record<string, unknown> {
+    return {
+      value: this._value,
+      paramName: this._paramName,
+      isUniform: this._isUniform
+    };
   }
-  get outputs() {
-    return this._outputs;
+  protected setProps(props: Record<string, unknown>): void {
+    if (props) {
+      if (Array.isArray(props['value'])) {
+        this._value = props['value'];
+      }
+      if (typeof props['paramName'] === 'string') {
+        this._paramName = props['paramName'];
+      }
+      if (typeof props['isUniform'] === 'boolean') {
+        this._isUniform = props['isUniform'];
+      }
+    }
   }
 }
 
-export class ConstantVec4Node extends Observable<{ changed: [] }> implements IGraphNode {
+export class ConstantVec4Node extends BaseGraphNode {
   private _value: number[];
+  private _paramName: string;
   private _isUniform: boolean;
-  private _inputs: GraphNodeInput[];
-  private _outputs: GraphNodeOutput[];
   constructor() {
     super();
     this._value = [0, 0, 0, 0];
     this._isUniform = false;
-    this._inputs = [];
+    this._paramName = '';
     this._outputs = [
-      { id: 1, name: 'value', type: 'vec4' },
+      { id: 1, name: '', type: 'vec4' },
       { id: 2, name: 'x', type: 'float' },
       { id: 3, name: 'y', type: 'float' },
       { id: 4, name: 'z', type: 'float' },
@@ -175,21 +259,31 @@ export class ConstantVec4Node extends Observable<{ changed: [] }> implements IGr
     ];
   }
   toString() {
-    return `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000},${
-      Math.round(this._value[2] * 1000) / 1000
-    },${Math.round(this._value[3] * 1000) / 1000}`;
-  }
-  get inputs() {
-    return this._inputs;
-  }
-  get outputs() {
-    return this._outputs;
+    return this._isUniform
+      ? this._paramName
+      : `${Math.round(this._value[0] * 1000) / 1000},${Math.round(this._value[1] * 1000) / 1000},${
+          Math.round(this._value[2] * 1000) / 1000
+        },${Math.round(this._value[3] * 1000) / 1000}`;
   }
   get isUniform() {
     return this._isUniform;
   }
   set isUniform(val: boolean) {
-    this._isUniform = val;
+    if (this._isUniform !== !!val) {
+      this._isUniform = !!val;
+      if (!this._paramName) {
+        this._paramName = getParamName();
+      }
+    }
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (val !== this._paramName) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
   }
 
   get x() {
@@ -226,6 +320,26 @@ export class ConstantVec4Node extends Observable<{ changed: [] }> implements IGr
     if (val !== this._value[3]) {
       this._value[3] = val;
       this.dispatchEvent('changed');
+    }
+  }
+  protected getProps(): Record<string, unknown> {
+    return {
+      value: this._value,
+      paramName: this._paramName,
+      isUniform: this._isUniform
+    };
+  }
+  protected setProps(props: Record<string, unknown>): void {
+    if (props) {
+      if (Array.isArray(props['value'])) {
+        this._value = props['value'];
+      }
+      if (typeof props['paramName'] === 'string') {
+        this._paramName = props['paramName'];
+      }
+      if (typeof props['isUniform'] === 'boolean') {
+        this._isUniform = props['isUniform'];
+      }
     }
   }
 }

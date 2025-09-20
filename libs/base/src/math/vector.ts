@@ -147,7 +147,7 @@ export class Vector2 extends VectorBase {
   }
   /** Get the length of the vector. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1]);
+    return Math.hypot(this[0], this[1]);
   }
   /** Get the squared length of the vector. */
   get magnitudeSq(): number {
@@ -171,7 +171,7 @@ export class Vector2 extends VectorBase {
    * @returns self
    */
   setAndNormalize(x: number, y: number): this {
-    const mag = Math.sqrt(x * x + y * y);
+    const mag = Math.hypot(x, y);
     return this.setXY(x / mag, y / mag);
   }
   /**
@@ -313,7 +313,7 @@ export class Vector2 extends VectorBase {
    * @returns distance between v1 and v2
    */
   static distance(v1: Vector2, v2: Vector2): number {
-    return Math.sqrt(this.distanceSq(v1, v2));
+    return Math.hypot(v1.x - v2.x, v1.y - v2.y);
   }
   /**
    * Calculates the squared distance between two Vector2's.
@@ -654,7 +654,7 @@ export class Vector3 extends VectorBase {
   }
   /** Get the length of the vector. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2]);
+    return Math.hypot(this[0], this[1], this[2]);
   }
   /** Get the squared length of the vector. */
   get magnitudeSq(): number {
@@ -688,7 +688,7 @@ export class Vector3 extends VectorBase {
    * @returns self
    */
   setAndNormalize(x: number, y: number, z: number): this {
-    const mag = Math.sqrt(x * x + y * y + z * z);
+    const mag = Math.hypot(x, y, z);
     return this.setXYZ(x / mag, y / mag, z / mag);
   }
   /**
@@ -844,7 +844,7 @@ export class Vector3 extends VectorBase {
    * @returns distance between v1 and v2
    */
   static distance(v1: Vector3, v2: Vector3): number {
-    return Math.sqrt(this.distanceSq(v1, v2));
+    return Math.hypot(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
   }
   /**
    * Calculates the squared distance between two Vector3's.
@@ -1230,7 +1230,7 @@ export class Vector4 extends VectorBase {
   }
   /** Get the length of the vector. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2] + this[3] * this[3]);
+    return Math.hypot(this[0], this[1], this[2], this[3]);
   }
   /** Get the squared length of the vector. */
   get magnitudeSq(): number {
@@ -1274,7 +1274,7 @@ export class Vector4 extends VectorBase {
    * @returns self
    */
   setAndNormalize(x: number, y: number, z: number, w: number): this {
-    const mag = Math.sqrt(x * x + y * y + z * z + w * w);
+    const mag = Math.hypot(x, y, z, w);
     return this.setXYZW(x / mag, y / mag, z / mag, w / mag);
   }
   /**
@@ -1860,12 +1860,12 @@ export class Quaternion extends VectorBase {
    * @returns self
    */
   setAndNormalize(x: number, y: number, z: number, w: number): this {
-    const mag = Math.sqrt(x * x + y * y + z * z + w * w);
+    const mag = Math.hypot(x, y, z, w);
     return this.setXYZW(x / mag, y / mag, z / mag, w / mag);
   }
   /** Get the length of the quaternion. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2] + this[3] * this[3]);
+    return Math.hypot(this[0], this[1], this[2], this[3]);
   }
   /** Get the squared length of the quaternion. */
   get magnitudeSq(): number {
@@ -2970,7 +2970,7 @@ export class Matrix3x3 extends VectorBase {
     let x = axis.x;
     let y = axis.y;
     let z = axis.z;
-    const n = Math.sqrt(x * x + y * y + z * z);
+    const n = Math.hypot(x, y, z);
     x /= n;
     y /= n;
     z /= n;
@@ -4127,7 +4127,7 @@ export class Matrix4x4 extends VectorBase {
     let x = axis.x;
     let y = axis.y;
     let z = axis.z;
-    const n = Math.sqrt(x * x + y * y + z * z);
+    const n = Math.hypot(x, y, z);
     x /= n;
     y /= n;
     z /= n;
@@ -5330,9 +5330,9 @@ export class Matrix4x4 extends VectorBase {
       translation.setXYZ(this[12], this[13], this[14]);
     }
     const sign = this.det() <= 0 ? -1 : 1;
-    const sx = Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2]);
-    const sy = Math.sqrt(this[4] * this[4] + this[5] * this[5] + this[6] * this[6]) * sign;
-    const sz = Math.sqrt(this[8] * this[8] + this[9] * this[9] + this[10] * this[10]);
+    const sx = Math.hypot(this[0], this[1], this[2]);
+    const sy = Math.hypot(this[4], this[5], this[6]) * sign;
+    const sz = Math.hypot(this[8], this[9], this[10]);
     if (scale) {
       scale.setXYZ(sx, sy, sz);
     }

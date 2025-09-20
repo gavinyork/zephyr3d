@@ -13,7 +13,7 @@ const NODE_SPACING = 20;
 const SLOT_MARGIN = 5;
 const SLOT_RADIUS = 6;
 
-export class BaseGraphNode {
+export class GNode {
   private static _nextId = 1;
   readonly _id: number;
   private _position: ImGui.ImVec2;
@@ -32,7 +32,7 @@ export class BaseGraphNode {
   private _editor: NodeEditor;
   private _impl: IGraphNode;
   constructor(editor: NodeEditor, position: ImGui.ImVec2, impl: IGraphNode) {
-    this._id = BaseGraphNode._nextId++;
+    this._id = GNode._nextId++;
     this._editor = editor;
     this._impl = impl;
     this._position = position ? new ImGui.ImVec2(position.x, position.y) : null;

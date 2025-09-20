@@ -9,15 +9,7 @@ export function getMaterialConstantTexture2DClass(): SerializableClass {
     getProps() {
       return [
         {
-          name: 'IsUniform',
-          type: 'bool',
-          default: false,
-          get(this: ConstantTexture2DNode, value) {
-            value.bool[0] = this.isUniform;
-          }
-        },
-        {
-          name: 'ParamName',
+          name: 'Name',
           type: 'string',
           isNullable() {
             return false;
@@ -42,15 +34,7 @@ export function getMaterialConstantTextureCubeClass(): SerializableClass {
     getProps() {
       return [
         {
-          name: 'IsUniform',
-          type: 'bool',
-          default: false,
-          get(this: ConstantTextureCubeNode, value) {
-            value.bool[0] = this.isUniform;
-          }
-        },
-        {
-          name: 'ParamName',
+          name: 'Name',
           type: 'string',
           isNullable() {
             return false;

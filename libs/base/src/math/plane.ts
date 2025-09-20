@@ -256,7 +256,7 @@ export class Plane extends VectorBase {
    * @returns The result plane.
    */
   static normalize(plane: Plane, result?: Plane): Plane {
-    const len = Math.sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
+    const len = Math.hypot(plane[0], plane[1], plane[2]);
     return (result || new Plane()).setEquation(
       plane[0] / len,
       plane[1] / len,

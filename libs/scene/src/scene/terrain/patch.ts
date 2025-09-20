@@ -372,10 +372,10 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   sqrDistanceToPoint(point: Vector3) {
     const bbox = this.getBoundingBox();
-    const radius = Math.sqrt(bbox.extents.x * bbox.extents.x + bbox.extents.z * bbox.extents.z);
+    const radius = Math.hypot(bbox.extents.x, bbox.extents.z);
     const dx = point.x - bbox.center.x;
     const dz = point.z - bbox.center.z;
-    const s = Math.max(0, Math.sqrt(dx * dx + dz * dz) - radius);
+    const s = Math.max(0, Math.hypot(dx, dz) - radius);
     const t =
       point.y > bbox.maxPoint.y
         ? point.y - bbox.maxPoint.y

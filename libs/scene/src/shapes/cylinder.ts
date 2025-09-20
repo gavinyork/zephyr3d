@@ -109,7 +109,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         const theta = u * Math.PI * 2;
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
-        const m = 1 / Math.sqrt(sinTheta * sinTheta + slope * slope + cosTheta * cosTheta);
+        const m = 1 / Math.hypot(sinTheta, slope, cosTheta);
         vertices?.push(radius * sinTheta, (v - options.anchor) * options.height, radius * cosTheta);
         normals?.push(sinTheta * m, slope * m, cosTheta * m);
         uvs?.push(u, 1 - v);

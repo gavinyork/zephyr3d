@@ -1,12 +1,9 @@
-import { Observable } from '@zephyr3d/base';
-import type { GraphNodeInput, GraphNodeOutput, IGraphNode } from '../node';
+import { BaseGraphNode } from '../node';
 
-export class PBRBlockNode extends Observable<{ changed: [] }> implements IGraphNode {
-  readonly inputs: GraphNodeInput[];
-  readonly outputs: GraphNodeOutput[];
+export class PBRBlockNode extends BaseGraphNode {
   constructor() {
     super();
-    this.inputs = [
+    this._inputs = [
       {
         id: 1,
         name: 'BaseColor',
@@ -56,7 +53,6 @@ export class PBRBlockNode extends Observable<{ changed: [] }> implements IGraphN
         value: 1
       }
     ];
-    this.outputs = [];
   }
   toString(): string {
     return 'Output';

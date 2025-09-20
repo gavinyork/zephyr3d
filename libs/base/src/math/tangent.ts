@@ -76,7 +76,7 @@ export function calculateTangentVectors(
     t0 -= n0 * dot;
     t1 -= n1 * dot;
     t2 -= n2 * dot;
-    const l = Math.sqrt(t0 * t0 + t1 * t1 + t2 * t2);
+    const l = Math.hypot(t0, t1, t2);
     t0 /= l;
     t1 /= l;
     t2 /= l;

@@ -764,7 +764,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       for (let j = 0; j < size; j++) {
         const u = (2 * j) / size - 1;
         const v = (2 * i) / size - 1;
-        const d = Math.sqrt(u * u + v * v) * 0.9;
+        const d = Math.hypot(u, v) * 0.9;
         const val = ((1 - smoothStep(0, 1, d)) * 255) >> 0;
         data[k++] = val;
         data[k++] = val;

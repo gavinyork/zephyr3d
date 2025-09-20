@@ -1,5 +1,5 @@
 import { ImGui, imGuiWantCaptureKeyboard } from '@zephyr3d/imgui';
-import { BaseGraphNode } from './node';
+import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
 
@@ -45,7 +45,7 @@ interface TraversalResult {
 
 export class NodeEditor {
   private api: GraphEditorApi;
-  public nodes: Map<number, BaseGraphNode>;
+  public nodes: Map<number, GNode>;
   private links: GraphLink[];
   private nextLinkId: number;
 
@@ -296,7 +296,7 @@ export class NodeEditor {
     return this.links.filter((link) => link.startNodeId === startNodeId && link.endNodeId === endNodeId);
   }
 
-  public addNode(node: BaseGraphNode) {
+  public addNode(node: GNode) {
     if (!this.nodes.get(node.id)) {
       this.nodes.set(node.id, node);
       this.structureDirty = true;
@@ -374,11 +374,11 @@ export class NodeEditor {
     return true;
   }
 
-  private getNodesArray(): BaseGraphNode[] {
+  private getNodesArray(): GNode[] {
     return Array.from(this.nodes.values());
   }
 
-  private hitTestNodeAt(worldPos: ImGui.ImVec2): BaseGraphNode {
+  private hitTestNodeAt(worldPos: ImGui.ImVec2): GNode {
     const nodesArray = this.getNodesArray();
 
     for (let i = nodesArray.length - 1; i >= 0; i--) {
@@ -528,11 +528,15 @@ export class NodeEditor {
   }
 
   private drawGrid(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2) {
-    if (!this.showGrid) return;
+    if (!this.showGrid) {
+      return;
+    }
 
     // 屏幕像素中的网格步长（固定像素，不随缩放）
     const stepScreen = 20; // 可改为 this.gridPixelStep
-    if (stepScreen < 2) return;
+    if (stepScreen < 2) {
+      return;
+    }
 
     // 颜色
     const minorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.25, 0.25, 0.25, 0.55));
@@ -694,7 +698,9 @@ export class NodeEditor {
             );
             if (toDelete.length > 0) {
               const ids = new Set(toDelete.map((l) => l.id));
-              for (const id of ids) this.selectedLinks.delete(id);
+              for (const id of ids) {
+                this.selectedLinks.delete(id);
+              }
               this.links = this.links.filter((lk) => !ids.has(lk.id));
               this.structureDirty = true;
             }
@@ -821,7 +827,7 @@ export class NodeEditor {
     if (isCanvasHovered && ImGui.IsMouseClicked(1)) {
       this.clearInteractionState();
 
-      let rightClickedNode: BaseGraphNode | null = null;
+      let rightClickedNode: GNode | null = null;
       for (const node of this.nodes) {
         if (
           worldMousePos.x >= node[1].position.x &&
@@ -940,7 +946,7 @@ export class NodeEditor {
       }
       const isOpen = ImGui.TreeNodeEx(item.name, flags);
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-        const node = new BaseGraphNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
+        const node = new GNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
         this.addNode(node);
         if (!this.isCreatingLink) {
           this.clearInteractionState();
@@ -1101,7 +1107,9 @@ export class NodeEditor {
     for (const link of this.links) {
       const startNode = this.nodes.get(link.startNodeId);
       const endNode = this.nodes.get(link.endNodeId);
-      if (!startNode || !endNode) continue;
+      if (!startNode || !endNode) {
+        continue;
+      }
 
       const startWorld = startNode.getSlotPosition(link.startSlotId, true);
       const endWorld = endNode.getSlotPosition(link.endSlotId, false);

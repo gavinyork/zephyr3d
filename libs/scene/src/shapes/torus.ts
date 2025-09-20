@@ -111,7 +111,7 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
           const nx = x - cx;
           const ny = y - cy;
           const nz = z - cz;
-          const mag = Math.sqrt(nx * nx + ny * ny + nz * nz);
+          const mag = Math.hypot(nx, ny, nz);
           normals.push(nx / mag, ny / mag, nz / mag);
         }
         if (uvs) {

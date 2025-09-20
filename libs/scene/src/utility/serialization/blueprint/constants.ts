@@ -25,6 +25,19 @@ export function getConstantScalarClass(): SerializableClass {
           }
         },
         {
+          name: 'Name',
+          type: 'string',
+          isValid(this: ConstantScalarNode) {
+            return this.isUniform;
+          },
+          get(this: ConstantScalarNode, value) {
+            value.str[0] = this.paramName;
+          },
+          set(this: ConstantScalarNode, value) {
+            this.paramName = value.str[0];
+          }
+        },
+        {
           name: 'X',
           type: 'float',
           default: 0,
@@ -56,6 +69,19 @@ export function getConstantVec2Class(): SerializableClass {
           },
           set(this: ConstantScalarNode, value) {
             this.isUniform = value.bool[0];
+          }
+        },
+        {
+          name: 'Name',
+          type: 'string',
+          isValid(this: ConstantVec2Node) {
+            return this.isUniform;
+          },
+          get(this: ConstantVec2Node, value) {
+            value.str[0] = this.paramName;
+          },
+          set(this: ConstantVec2Node, value) {
+            this.paramName = value.str[0];
           }
         },
         {
@@ -101,6 +127,19 @@ export function getConstantVec3Class(): SerializableClass {
           },
           set(this: ConstantVec3Node, value) {
             this.isUniform = value.bool[0];
+          }
+        },
+        {
+          name: 'Name',
+          type: 'string',
+          isValid(this: ConstantVec3Node) {
+            return this.isUniform;
+          },
+          get(this: ConstantVec3Node, value) {
+            value.str[0] = this.paramName;
+          },
+          set(this: ConstantVec3Node, value) {
+            this.paramName = value.str[0];
           }
         },
         {
@@ -157,6 +196,19 @@ export function getConstantVec4Class(): SerializableClass {
           },
           set(this: ConstantVec4Node, value) {
             this.isUniform = value.bool[0];
+          }
+        },
+        {
+          name: 'Name',
+          type: 'string',
+          isValid(this: ConstantVec4Node) {
+            return this.isUniform;
+          },
+          get(this: ConstantVec4Node, value) {
+            value.str[0] = this.paramName;
+          },
+          set(this: ConstantVec4Node, value) {
+            this.paramName = value.str[0];
           }
         },
         {

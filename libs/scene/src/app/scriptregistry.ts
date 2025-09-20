@@ -1,3 +1,4 @@
+import type * as TS from 'typescript';
 import type { VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';
@@ -284,7 +285,7 @@ export class ScriptRegistry {
       return `${code}\n//# sourceURL=${logicalId}`;
     }
 
-    const ts = (window as any).ts as typeof import('typescript');
+    const ts = (window as any).ts as typeof TS;
     if (!ts) {
       throw new Error('TypeScript runtime (window.ts) not found. Load typescript.js first.');
     }

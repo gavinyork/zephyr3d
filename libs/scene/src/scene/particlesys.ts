@@ -549,7 +549,7 @@ export class ParticleSystem
           pos.x = s * scale * shapeSizeX;
           pos.y = (2 - 2 * scale) * shapeSizeY;
           pos.z = c * scale * shapeSizeZ;
-          const t = (shapeSizeY * shapeSizeY) / Math.sqrt(shapeSizeY * shapeSizeY + shapeSizeX + shapeSizeX);
+          const t = (shapeSizeY * shapeSizeY) / Math.hypot(shapeSizeY * shapeSizeY + shapeSizeX + shapeSizeX);
           vel.x = s * shapeSizeX * t;
           vel.y = -t * shapeSizeY;
           vel.z = c * shapeSizeX * t;
