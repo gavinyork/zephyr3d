@@ -8,13 +8,11 @@ export function getTextureNodeCategories(): NodeCategory[] {
       children: [
         {
           name: 'Texture2D',
-          create: () => new ConstantTexture2DNode(),
-          outTypes: ['texture2d']
+          create: () => new ConstantTexture2DNode()
         },
         {
           name: 'TextureCube',
-          create: () => new ConstantTextureCubeNode(),
-          outTypes: ['textureCube']
+          create: () => new ConstantTextureCubeNode()
         }
       ]
     }

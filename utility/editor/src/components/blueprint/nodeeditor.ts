@@ -3,7 +3,7 @@ import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
 import type { NodeConnection, GraphStructure } from './dag';
-import { Observable } from '@zephyr3d/base';
+import { ASSERT, Observable } from '@zephyr3d/base';
 
 const SLOT_RADIUS = 6;
 
@@ -21,7 +21,6 @@ interface SlotInfo {
   slotId: number;
   position: ImGui.ImVec2;
   isOutput: boolean;
-  type: string[] | string;
 }
 
 // Traversal Result
@@ -461,6 +460,18 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return node;
   }
 
+  private deleteLink(index: number) {
+    const link = this.links[index];
+    const node = this.nodes.get(link.endNodeId).impl;
+    ASSERT(!!node, 'Node not exists');
+    const pin = node.inputs.find((pin) => pin.id === link.endSlotId);
+    ASSERT(!!pin, 'Pin not exists');
+    pin.inputNode = null;
+    pin.inputId = null;
+    this.selectedLinks.delete(link.id);
+    this.links.splice(index, 1);
+  }
+
   private deleteNode(nodeId: number) {
     const node = this.nodes.get(nodeId);
     if (!node) {
@@ -471,7 +482,13 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       console.info('Cannot delete locked node');
       return;
     }
-    this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
+    for (let i = this.links.length - 1; i >= 0; i--) {
+      const link = this.links[i];
+      if (link.startNodeId === nodeId || link.endNodeId === nodeId) {
+        this.deleteLink(i);
+      }
+    }
+    //this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
     this.invalidateStructure();
@@ -482,17 +499,17 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   }
 
   private removeLinksIntoInput(nodeId: number, slotId: number) {
-    const toDelete = this.links.filter((lk) => lk.endNodeId === nodeId && lk.endSlotId === slotId);
-    if (toDelete.length === 0) {
-      return;
+    let deleted = 0;
+    for (let i = this.links.length - 1; i >= 0; i--) {
+      const lk = this.links[i];
+      if (lk.endNodeId === nodeId && lk.endSlotId === slotId) {
+        this.deleteLink(i);
+        deleted++;
+      }
     }
-
-    const ids = new Set(toDelete.map((l) => l.id));
-    for (const id of ids) {
-      this.selectedLinks.delete(id);
+    if (deleted) {
+      this.invalidateStructure();
     }
-    this.links = this.links.filter((lk) => !ids.has(lk.id));
-    this.invalidateStructure();
   }
 
   private addLink(startNodeId: number, startSlotId: number, endNodeId: number, endSlotId: number): boolean {
@@ -514,8 +531,8 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     const occupied = this.findLinkIntoInput(endNodeId, endSlotId);
     if (occupied) {
-      this.selectedLinks.delete(occupied.id);
-      this.links = this.links.filter((lk) => lk.id !== occupied.id);
+      const index = this.links.indexOf(occupied);
+      this.deleteLink(index);
     }
 
     const link: GraphLink = {
@@ -527,6 +544,10 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       color: new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)
     };
     this.links.push(link);
+    const inputPin = this.nodes.get(endNodeId).inputs.find((pin) => pin.id === endSlotId);
+    ASSERT(!!inputPin, 'Input pin not found');
+    inputPin.inputNode = this.nodes.get(startNodeId).impl;
+    inputPin.inputId = startSlotId;
     this.invalidateStructure();
     return true;
   }
@@ -661,8 +682,8 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             nodeId: node.id,
             slotId: output.id,
             position: slotPos,
-            isOutput: true,
-            type: output.type
+            isOutput: true
+            //type: output.type
           };
         }
       }
@@ -675,8 +696,8 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             nodeId: node.id,
             slotId: input.id,
             position: slotPos,
-            isOutput: false,
-            type: input.type
+            isOutput: false
+            //type: input.type
           };
         }
       }
@@ -828,22 +849,22 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       if (this.hoveredSlot) {
         if (io.KeyAlt) {
           if (this.hoveredSlot.isOutput) {
-            const toDelete = this.links.filter(
-              (lk) =>
-                lk.startNodeId === this.hoveredSlot!.nodeId && lk.startSlotId === this.hoveredSlot!.slotId
-            );
-            if (toDelete.length > 0) {
-              const ids = new Set(toDelete.map((l) => l.id));
-              for (const id of ids) {
-                this.selectedLinks.delete(id);
+            let deleted = 0;
+            for (let i = this.links.length - 1; i >= 0; i--) {
+              const lk = this.links[i];
+              if (
+                lk.startNodeId === this.hoveredSlot!.nodeId &&
+                lk.startSlotId === this.hoveredSlot!.slotId
+              ) {
+                this.deleteLink(i);
+                deleted++;
               }
-              this.links = this.links.filter((lk) => !ids.has(lk.id));
             }
             this.isCreatingLink = false;
             this.linkStartSlot = null;
             this.selectedSlot = this.hoveredSlot;
             this.selectedLinks.clear();
-            if (toDelete.length > 0) {
+            if (deleted) {
               this.invalidateStructure();
             }
           } else {
@@ -864,10 +885,9 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             this.linkStartSlot.nodeId !== this.hoveredSlot.nodeId
           ) {
             if (this.linkStartSlot.isOutput) {
-              const inTypes = Array.isArray(this.hoveredSlot.type)
-                ? this.hoveredSlot.type
-                : [this.hoveredSlot.type];
-              if (inTypes.includes(this.linkStartSlot.type as string)) {
+              const inTypes = this.getSlotInputType(this.hoveredSlot);
+              const outputType = this.getSlotOutputType(this.linkStartSlot);
+              if (!outputType || inTypes.includes(outputType)) {
                 linkok = this.addLink(
                   this.linkStartSlot.nodeId,
                   this.linkStartSlot.slotId,
@@ -876,10 +896,9 @@ export class NodeEditor extends Observable<{ changed: [] }> {
                 );
               }
             } else {
-              const inTypes = Array.isArray(this.linkStartSlot.type)
-                ? this.linkStartSlot.type
-                : [this.linkStartSlot.type];
-              if (inTypes.includes(this.hoveredSlot.type as string)) {
+              const inTypes = this.getSlotInputType(this.linkStartSlot);
+              const outputType = this.getSlotOutputType(this.hoveredSlot);
+              if (!outputType || inTypes.includes(outputType)) {
                 linkok = this.addLink(
                   this.hoveredSlot.nodeId,
                   this.hoveredSlot.slotId,
@@ -1027,9 +1046,12 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     if (isCanvasFocused && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
       if (this.selectedLinks.size > 0) {
-        const idsToDelete = new Set(this.selectedLinks);
-        this.links = this.links.filter((link) => !idsToDelete.has(link.id));
-        this.selectedLinks.clear();
+        for (let i = this.links.length - 1; i >= 0; i--) {
+          const lk = this.links[i];
+          if (this.selectedLinks.has(lk.id)) {
+            this.deleteLink(i);
+          }
+        }
         this.invalidateStructure();
       }
       if (this.selectedNodes.length > 0) {
@@ -1062,12 +1084,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     }
     if (this.canvasContextClickLocal && ImGui.BeginPopup('CanvasContextMenu')) {
       this.isHoveringMenu = ImGui.IsWindowHovered();
-      let category = this.api.getNodeCategory();
-      if (this.linkStartSlot) {
-        category = this.linkStartSlot.isOutput
-          ? this.filterCategoryOutput(this.linkStartSlot.type as string, category)
-          : this.filterCategoryInput(this.linkStartSlot.type, category);
-      }
+      const category = this.api.getNodeCategory();
       this.renderCategoryList(category);
       ImGui.EndPopup();
     } else {
@@ -1088,17 +1105,17 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         this.addNode(node);
         if (this.isCreatingLink && this.linkStartSlot) {
           if (this.linkStartSlot.isOutput) {
-            const inputSlot = node.inputs.find((value) =>
-              value.type?.includes(this.linkStartSlot.type as string)
-            );
+            const outputType = this.getSlotOutputType(this.linkStartSlot);
+            const inputSlot = node.inputs.find((value) => !outputType || value.type?.includes(outputType));
             if (inputSlot) {
               this.addLink(this.linkStartSlot.nodeId, this.linkStartSlot.slotId, node.id, inputSlot.id);
             }
           } else {
-            const types = Array.isArray(this.linkStartSlot.type)
-              ? this.linkStartSlot.type
-              : [this.linkStartSlot.type];
-            const outputSlot = node.outputs.find((value) => types.includes(value.type as string));
+            const types = this.getSlotInputType(this.linkStartSlot);
+            const outputSlot = node.outputs.find((value) => {
+              const outputType = node.impl.getOutputType(value.id);
+              return !!outputType && types.includes(outputType);
+            });
             if (outputSlot) {
               this.addLink(node.id, outputSlot.id, this.linkStartSlot.nodeId, this.linkStartSlot.slotId);
             }
@@ -1114,47 +1131,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         ImGui.TreePop();
       }
     }
-  }
-
-  private filterCategoryOutput(outputPinType: string, category: NodeCategory[]) {
-    if (!outputPinType) {
-      return category;
-    }
-    const outCategory: NodeCategory[] = [];
-    for (const v of category) {
-      const copy: NodeCategory = { ...v };
-      copy.children = copy.children ? this.filterCategoryOutput(outputPinType, copy.children) : null;
-      if (!v.inTypes || v.inTypes.length === 0 || !v.inTypes.includes(outputPinType)) {
-        copy.create = null;
-        copy.inTypes = null;
-        copy.outTypes = null;
-      }
-      if (copy.children?.length > 0 || !!copy.create) {
-        outCategory.push(copy);
-      }
-    }
-    return outCategory;
-  }
-
-  private filterCategoryInput(inputPinType: string[] | string, category: NodeCategory[]) {
-    if (!inputPinType) {
-      return category;
-    }
-    const inputTypes = Array.isArray(inputPinType) ? inputPinType : [inputPinType];
-    const outCategory: NodeCategory[] = [];
-    for (const v of category) {
-      const copy: NodeCategory = { ...v };
-      copy.children = copy.children ? this.filterCategoryInput(inputPinType, copy.children) : null;
-      if (!v.outTypes || v.outTypes.length === 0 || v.outTypes.every((val) => !inputTypes.includes(val))) {
-        copy.create = null;
-        copy.inTypes = null;
-        copy.outTypes = null;
-      }
-      if (copy.children?.length > 0 || !!copy.create) {
-        outCategory.push(copy);
-      }
-    }
-    return outCategory;
   }
 
   private drawPinHighlight(
@@ -1362,5 +1338,14 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     const maxY = Math.max(p0.y, p1.y, p2.y, p3.y) + padding;
 
     return { min: new ImGui.ImVec2(minX, minY), max: new ImGui.ImVec2(maxX, maxY) };
+  }
+  private getSlotInputType(slot: SlotInfo) {
+    const node = this.nodes.get(slot.nodeId).impl;
+    const inTypes = node.inputs.find((pin) => pin.id === slot.slotId)?.type ?? [];
+    return Array.isArray(inTypes) ? inTypes : [inTypes];
+  }
+  private getSlotOutputType(slot: SlotInfo) {
+    const node = this.nodes.get(slot.nodeId).impl;
+    return node.getOutputType(slot.slotId);
   }
 }

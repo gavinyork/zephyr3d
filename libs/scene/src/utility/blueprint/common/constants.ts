@@ -10,7 +10,7 @@ export class ConstantScalarNode extends BaseGraphNode {
     this._value = 0;
     this._isUniform = false;
     this._paramName = '';
-    this._outputs = [{ id: 1, name: '', type: 'float' }];
+    this._outputs = [{ id: 1, name: '' }];
   }
   toString() {
     return this._isUniform ? this._paramName : `${Math.round(this._value * 1000) / 1000}`;
@@ -44,25 +44,11 @@ export class ConstantScalarNode extends BaseGraphNode {
       this.dispatchEvent('changed');
     }
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      value: this._value,
-      paramName: this._paramName,
-      isUniform: this._isUniform
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props) {
-      if (typeof props['value'] === 'number') {
-        this._value = props['value'];
-      }
-      if (typeof props['paramName'] === 'string') {
-        this._paramName = props['paramName'];
-      }
-      if (typeof props['isUniform'] === 'boolean') {
-        this._isUniform = props['isUniform'];
-      }
-    }
+  protected getType(): string {
+    return 'float';
   }
 }
 
@@ -76,9 +62,9 @@ export class ConstantVec2Node extends BaseGraphNode {
     this._isUniform = false;
     this._paramName = '';
     this._outputs = [
-      { id: 1, name: '', type: 'vec2' },
-      { id: 2, name: 'x', type: 'float' },
-      { id: 3, name: 'y', type: 'float' }
+      { id: 1, name: '' },
+      { id: 2, name: 'x' },
+      { id: 3, name: 'y' }
     ];
   }
   toString() {
@@ -125,25 +111,11 @@ export class ConstantVec2Node extends BaseGraphNode {
       this.dispatchEvent('changed');
     }
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      value: this._value,
-      paramName: this._paramName,
-      isUniform: this._isUniform
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props) {
-      if (Array.isArray(props['value'])) {
-        this._value = props['value'];
-      }
-      if (typeof props['paramName'] === 'string') {
-        this._paramName = props['paramName'];
-      }
-      if (typeof props['isUniform'] === 'boolean') {
-        this._isUniform = props['isUniform'];
-      }
-    }
+  protected getType(id: number): string {
+    return id === 1 ? 'vec2' : 'float';
   }
 }
 
@@ -157,10 +129,10 @@ export class ConstantVec3Node extends BaseGraphNode {
     this._isUniform = false;
     this._paramName = '';
     this._outputs = [
-      { id: 1, name: '', type: 'vec3' },
-      { id: 2, name: 'x', type: 'float' },
-      { id: 3, name: 'y', type: 'float' },
-      { id: 4, name: 'z', type: 'float' }
+      { id: 1, name: '' },
+      { id: 2, name: 'x' },
+      { id: 3, name: 'y' },
+      { id: 4, name: 'z' }
     ];
   }
 
@@ -219,25 +191,11 @@ export class ConstantVec3Node extends BaseGraphNode {
       this.dispatchEvent('changed');
     }
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      value: this._value,
-      paramName: this._paramName,
-      isUniform: this._isUniform
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props) {
-      if (Array.isArray(props['value'])) {
-        this._value = props['value'];
-      }
-      if (typeof props['paramName'] === 'string') {
-        this._paramName = props['paramName'];
-      }
-      if (typeof props['isUniform'] === 'boolean') {
-        this._isUniform = props['isUniform'];
-      }
-    }
+  protected getType(id: number): string {
+    return id === 1 ? 'vec3' : 'float';
   }
 }
 
@@ -251,11 +209,11 @@ export class ConstantVec4Node extends BaseGraphNode {
     this._isUniform = false;
     this._paramName = '';
     this._outputs = [
-      { id: 1, name: '', type: 'vec4' },
-      { id: 2, name: 'x', type: 'float' },
-      { id: 3, name: 'y', type: 'float' },
-      { id: 4, name: 'z', type: 'float' },
-      { id: 5, name: 'w', type: 'float' }
+      { id: 1, name: '' },
+      { id: 2, name: 'x' },
+      { id: 3, name: 'y' },
+      { id: 4, name: 'z' },
+      { id: 5, name: 'w' }
     ];
   }
   toString() {
@@ -322,24 +280,10 @@ export class ConstantVec4Node extends BaseGraphNode {
       this.dispatchEvent('changed');
     }
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      value: this._value,
-      paramName: this._paramName,
-      isUniform: this._isUniform
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props) {
-      if (Array.isArray(props['value'])) {
-        this._value = props['value'];
-      }
-      if (typeof props['paramName'] === 'string') {
-        this._paramName = props['paramName'];
-      }
-      if (typeof props['isUniform'] === 'boolean') {
-        this._isUniform = props['isUniform'];
-      }
-    }
+  protected getType(id: number): string {
+    return id === 1 ? 'vec4' : 'float';
   }
 }

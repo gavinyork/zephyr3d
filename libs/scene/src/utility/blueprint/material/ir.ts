@@ -1,4 +1,5 @@
-import { PBScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
+import type { PBScope, ProgramBuilder } from '@zephyr3d/device';
+import { PBShaderExp } from '@zephyr3d/device';
 
 abstract class IRExpression {
   protected ref: number;
@@ -76,7 +77,7 @@ class IRUniformfv extends IRExpression {
 
 class IRUniformTex2D extends IRExpression {
   readonly name: string;
-  constructor(name: string, value: number[]) {
+  constructor(name: string) {
     super();
     this.name = name;
   }
@@ -113,7 +114,7 @@ class IRHash extends IRExpression {
       } else {
         this.exp = [];
         for (const ch of this.hash) {
-          let index = ch === 'x' ? 0 : ch === 'y' ? 1 : ch === 'z' ? 2 : ch === 'w' ? 3 : -1;
+          const index = ch === 'x' ? 0 : ch === 'y' ? 1 : ch === 'z' ? 2 : ch === 'w' ? 3 : -1;
           if (index < 0) {
             throw new Error(`Invalid hash: ${this.hash}`);
           }
@@ -154,27 +155,12 @@ export class BlueprintMaterialIR {
     this._expressions[this._id] = new IRUniformfv(name, value);
     return this._id++;
   }
-  uniformTexture2D(name: string, value: number[]) {
-    this._expressions[this._id] = new IRUniformTex2D(name, value);
+  uniformTexture2D(name: string) {
+    this._expressions[this._id] = new IRUniformTex2D(name);
     return this._id++;
   }
   hash(src: number, hash: string): number {
     this._expressions[this._id] = new IRHash(this._expressions[src], hash);
-    return this._id++;
-  }
-  add(a: number, b: number): number {
-    return this._id++;
-  }
-  sub(a: number, b: number): number {
-    return this._id++;
-  }
-  mul(a: number, b: number): number {
-    return this._id++;
-  }
-  div(a: number, b: number): number {
-    return this._id++;
-  }
-  func(name: string, src: number[]): number {
     return this._id++;
   }
   addOutput(src: number, name: string): void {

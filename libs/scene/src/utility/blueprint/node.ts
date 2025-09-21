@@ -1,28 +1,36 @@
 import { Observable, type IEventTarget } from '@zephyr3d/base';
 
-export type GraphNodeInput = { id: number; name: string; type: string[] | string; value?: any };
-export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
+export type GraphNodeInput = {
+  id: number;
+  name: string;
+  type: string[];
+  inputNode?: IGraphNode;
+  inputId?: number;
+};
+export type GraphNodeOutput = { id: number; name: string };
 
 export interface IGraphNode extends IEventTarget<{ changed: [] }> {
   readonly inputs: GraphNodeInput[];
   readonly outputs: GraphNodeOutput[];
-  props: Record<string, unknown>;
+  readonly error: string;
+  getOutputType(id: number): string;
   toString(): string;
+  check(): void;
+  reset(): void;
 }
 
-export class BaseGraphNode extends Observable<{ changed: [] }> implements IGraphNode {
+export abstract class BaseGraphNode extends Observable<{ changed: [] }> implements IGraphNode {
   protected _inputs: GraphNodeInput[];
   protected _outputs: GraphNodeOutput[];
+  protected _error: string;
   constructor() {
     super();
     this._inputs = [];
     this._outputs = [];
+    this._error = '';
   }
-  get props() {
-    return this.getProps();
-  }
-  set props(props: Record<string, unknown>) {
-    this.setProps(props);
+  getOutputType(id: number) {
+    return this.getType(id);
   }
   get inputs() {
     return this._inputs;
@@ -30,11 +38,26 @@ export class BaseGraphNode extends Observable<{ changed: [] }> implements IGraph
   get outputs() {
     return this._outputs;
   }
+  get error() {
+    return this._error;
+  }
   toString() {
     return '';
   }
-  protected getProps(): Record<string, unknown> {
-    return null;
+  check() {
+    this._error = this.validate();
   }
-  protected setProps(_props: Record<string, unknown>) {}
+  reset() {
+    this._error = '';
+  }
+  setInput(id: number, node: BaseGraphNode, inputId: number) {
+    const input = this._inputs.find((input) => input.id === id);
+    if (!input) {
+      throw new Error(`Input with id ${id} not found`);
+    }
+    input.inputNode = node;
+    input.inputId = inputId;
+  }
+  protected abstract getType(_id?: number): string;
+  protected abstract validate(): string;
 }

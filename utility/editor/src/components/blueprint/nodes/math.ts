@@ -1,13 +1,10 @@
 import {
   CompAddNode,
-  CompSubtractNode,
-  CompMultiplyNode,
+  CompSubNode,
+  CompMulNode,
   CompDivNode,
-  DotProduct2Node,
-  DotProduct3Node,
-  DotProduct4Node,
-  CrossProduct2Node,
-  CrossProduct3Node,
+  DotProductNode,
+  CrossProductNode,
   Degrees2RadiansNode,
   Radians2DegreesNode,
   SinNode,
@@ -50,249 +47,155 @@ export function getMathNodeCategories(): NodeCategory[] {
       children: [
         {
           name: 'CompAdd',
-          create: () => new CompAddNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CompAddNode()
         },
         {
           name: 'CompSubtract',
-          create: () => new CompSubtractNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CompSubNode()
         },
         {
           name: 'CompMultiply',
-          create: () => new CompMultiplyNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CompMulNode()
         },
         {
           name: 'CompDiv',
-          create: () => new CompDivNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CompDivNode()
         },
         {
-          name: 'DotProductVec2',
-          create: () => new DotProduct2Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float']
+          name: 'DotProduct',
+          create: () => new DotProductNode()
         },
         {
-          name: 'DotProductVec3',
-          create: () => new DotProduct3Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float']
-        },
-        {
-          name: 'DotProductVec4',
-          create: () => new DotProduct4Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float']
-        },
-        {
-          name: 'CrossProductVec2',
-          create: () => new CrossProduct2Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['vec2']
-        },
-        {
-          name: 'CrossProductVec3',
-          create: () => new CrossProduct3Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['vec3']
+          name: 'CrossProduct',
+          create: () => new CrossProductNode()
         },
         {
           name: 'DegreesToRadians',
-          create: () => new Degrees2RadiansNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new Degrees2RadiansNode()
         },
         {
           name: 'RadiansToDegrees',
-          create: () => new Radians2DegreesNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new Radians2DegreesNode()
         },
         {
           name: 'Sin',
-          create: () => new SinNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new SinNode()
         },
         {
           name: 'Cos',
-          create: () => new CosNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CosNode()
         },
         {
           name: 'Tan',
-          create: () => new TanNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new TanNode()
         },
         {
           name: 'ArcSin',
-          create: () => new ArcSinNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArcSinNode()
         },
         {
           name: 'ArcCos',
-          create: () => new ArcCosNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArcCosNode()
         },
         {
           name: 'ArcTan',
-          create: () => new ArcTanNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArcTanNode()
         },
         {
           name: 'Sinh',
-          create: () => new SinHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new SinHNode()
         },
         {
           name: 'Cosh',
-          create: () => new CosHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CosHNode()
         },
         {
           name: 'Tanh',
-          create: () => new TanHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new TanHNode()
         },
         {
           name: 'ArcSinh',
-          create: () => new ArcsineHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArcsineHNode()
         },
         {
           name: 'ArcCosh',
-          create: () => new ArccosineHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArccosineHNode()
         },
         {
           name: 'ArcTanh',
-          create: () => new ArctangentHNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ArctangentHNode()
         },
         {
           name: 'Exp',
-          create: () => new ExpNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ExpNode()
         },
         {
           name: 'Exp2',
-          create: () => new Exp2Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new Exp2Node()
         },
         {
           name: 'Log',
-          create: () => new LogNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new LogNode()
         },
         {
           name: 'Log2',
-          create: () => new Log2Node(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new Log2Node()
         },
         {
           name: 'Sqrt',
-          create: () => new SqrtNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new SqrtNode()
         },
         {
           name: 'InvSqrt',
-          create: () => new InvSqrtNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new InvSqrtNode()
         },
         {
           name: 'Abs',
-          create: () => new AbsNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new AbsNode()
         },
         {
           name: 'Sign',
-          create: () => new SignNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new SignNode()
         },
         {
           name: 'Floor',
-          create: () => new FloorNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new FloorNode()
         },
         {
           name: 'Ceil',
-          create: () => new CeilNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new CeilNode()
         },
         {
           name: 'Fract',
-          create: () => new FractNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new FractNode()
         },
         {
           name: 'DDX',
-          create: () => new DDXNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new DDXNode()
         },
         {
           name: 'DDY',
-          create: () => new DDYNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new DDYNode()
         },
         {
           name: 'FWidth',
-          create: () => new FWidthNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new FWidthNode()
         },
         {
           name: 'Mod',
-          create: () => new ModNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new ModNode()
         },
         {
           name: 'Min',
-          create: () => new MinNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new MinNode()
         },
         {
           name: 'Max',
-          create: () => new MaxNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new MaxNode()
         },
         {
           name: 'Step',
-          create: () => new StepNode(),
-          inTypes: ['float', 'vec2', 'vec3', 'vec4'],
-          outTypes: ['float', 'vec2', 'vec3', 'vec4']
+          create: () => new StepNode()
         }
       ]
     }

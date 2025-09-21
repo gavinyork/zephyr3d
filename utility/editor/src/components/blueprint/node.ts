@@ -31,6 +31,7 @@ export class GNode {
   private _locked: boolean;
   private _editor: NodeEditor;
   private _impl: IGraphNode;
+
   constructor(editor: NodeEditor, position: ImGui.ImVec2, impl: IGraphNode) {
     this._id = GNode._nextId++;
     this._editor = editor;

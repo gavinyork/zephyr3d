@@ -30,11 +30,21 @@ export class PBRMaterialEditor extends GraphEditor {
       graph: this.nodeEditor.graph,
       nodeMap,
       roots: [this._outputNodeId],
-      order: this.nodeEditor.getReverseTopologicalOrderFromRoots([this._outputNodeId]).order
+      order: this.nodeEditor.getReverseTopologicalOrderFromRoots([this._outputNodeId]).order.reverse()
     };
   }
   private graphChanged() {
     const dag = this.createDAG();
+    for (const [, v] of this.nodeEditor.nodes) {
+      v.impl.reset();
+    }
+    for (const i of dag.order) {
+      const node = this.nodeEditor.nodes.get(i);
+      node.impl.check();
+      if (node.impl.error) {
+        console.error(node.impl.error);
+      }
+    }
     console.log(dag.order);
   }
 }

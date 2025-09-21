@@ -1,493 +1,469 @@
 import { BaseGraphNode } from '../node';
 
-export class DotProductNode extends BaseGraphNode {
-  private _type: string;
-  constructor(type: string) {
+export class MakeVectorNode extends BaseGraphNode {
+  constructor() {
     super();
-    this._type = type;
     this._inputs = [
       {
         id: 1,
         name: 'a',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
+        type: ['float', 'vec2', 'vec3']
       },
       {
         id: 2,
         name: 'b',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
-      }
-    ];
-    this._outputs = [
-      {
-        id: 1,
-        name: 'float',
-        type: 'float'
-      }
-    ];
-  }
-  toString() {
-    return `DotProduct${this._type[3]}`;
-  }
-  protected getProps(): Record<string, unknown> {
-    return {
-      type: this._type
-    };
-  }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['type'] === 'string') {
-      this._type = props['type'];
-    }
-  }
-}
-
-export class DotProduct2Node extends DotProductNode {
-  constructor() {
-    super('vec2');
-  }
-}
-
-export class DotProduct3Node extends DotProductNode {
-  constructor() {
-    super('vec3');
-  }
-}
-
-export class DotProduct4Node extends DotProductNode {
-  constructor() {
-    super('vec4');
-  }
-}
-
-export class CrossProductNode extends BaseGraphNode {
-  private _type: string;
-  constructor(type: string) {
-    super();
-    this._type = type;
-    this._inputs = [
-      {
-        id: 1,
-        name: 'a',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
-      },
-      {
-        id: 2,
-        name: 'b',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
-      }
-    ];
-    this._outputs = [
-      {
-        id: 1,
-        name: this._type,
-        type: this._type
-      }
-    ];
-  }
-  toString() {
-    return `CrossProduct${this._type[3]}`;
-  }
-  protected getProps(): Record<string, unknown> {
-    return {
-      type: this._type
-    };
-  }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['type'] === 'string') {
-      this._type = props['type'];
-    }
-  }
-}
-
-export class CrossProduct2Node extends CrossProductNode {
-  constructor() {
-    super('vec2');
-  }
-}
-
-export class CrossProduct3Node extends CrossProductNode {
-  constructor() {
-    super('vec3');
-  }
-}
-
-export class CompOpNode extends BaseGraphNode {
-  private _op: string;
-  constructor(op: string) {
-    super();
-    this._op = op;
-    this._inputs = [
-      {
-        id: 1,
-        name: 'a',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: 0
-      },
-      {
-        id: 2,
-        name: 'b',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: 0
-      }
-    ];
-    this._outputs = [
-      {
-        id: 1,
-        name: 'float',
-        type: 'float'
-      },
-      {
-        id: 2,
-        name: 'vec2',
-        type: 'vec2'
+        type: ['float', 'vec2', 'vec3']
       },
       {
         id: 3,
-        name: 'vec3',
-        type: 'vec3'
+        name: 'c',
+        type: ['float', 'vec2', 'vec3']
       },
       {
         id: 4,
-        name: 'vec4',
-        type: 'vec4'
-      }
-    ];
-  }
-  toString() {
-    return this._op;
-  }
-  protected getProps(): Record<string, unknown> {
-    return {
-      op: this._op
-    };
-  }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['op'] === 'string') {
-      this._op = props['op'];
-    }
-  }
-}
-
-export class CompAddNode extends CompOpNode {
-  constructor() {
-    super('Add');
-  }
-}
-
-export class CompSubtractNode extends CompOpNode {
-  constructor() {
-    super('Subtract');
-  }
-}
-
-export class CompMultiplyNode extends CompOpNode {
-  constructor() {
-    super('Multiply');
-  }
-}
-
-export class CompDivNode extends CompOpNode {
-  constructor() {
-    super('Div');
-  }
-}
-
-export class GenericMathNode1 extends BaseGraphNode {
-  private _nodeName: string;
-  constructor(nodeName: string) {
-    super();
-    this._nodeName = nodeName;
-    this._inputs = [
-      {
-        id: 1,
-        name: '',
-        type: ['float', 'vec2', 'vec3', 'vec4']
+        name: 'd',
+        type: ['float', 'vec2', 'vec3']
       }
     ];
     this._outputs = [
       {
         id: 1,
-        name: 'float',
-        type: 'float'
-      },
-      {
-        id: 2,
-        name: 'vec2',
-        type: 'vec2'
-      },
-      {
-        id: 3,
-        name: 'vec3',
-        type: 'vec3'
-      },
-      {
-        id: 4,
-        name: 'vec4',
-        type: 'vec4'
+        name: ''
       }
     ];
   }
-  toString() {
-    return this._nodeName;
+  toString(): string {
+    return 'MakeVector';
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      name: this._nodeName
-    };
-  }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['name'] === 'string') {
-      this._nodeName = props['name'];
+  protected validate(): string {
+    let index = this._inputs.length - 1;
+    while (index >= 0 && !this._inputs[index].inputNode) {
+      index--;
     }
+    if (index < 0) {
+      return 'Missing arguments';
+    }
+    let n = 0;
+    const types: string[] = [];
+    for (let i = 0; i <= index; i++) {
+      const name = this._inputs[i].name;
+      if (!this._inputs[i].inputNode) {
+        return `Missing argument \`${name}\``;
+      }
+      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!type) {
+        return `Cannot determine type of argument \`${name}\``;
+      }
+      if (!this._inputs[i].type.includes(type)) {
+        return `Invalid input type ${type}`;
+      }
+      types.push(type);
+      n += type === 'float' ? 1 : type === 'vec2' ? 2 : type === 'vec3' ? 3 : 0;
+    }
+    if (n < 2 || n > 4) {
+      return `Invalid type combination ${types.join(',')}`;
+    }
+    return '';
+  }
+  protected getType() {
+    let index = this._inputs.length - 1;
+    while (index >= 0 && !this._inputs[index].inputNode) {
+      index--;
+    }
+    if (index < 0) {
+      return '';
+    }
+    let n = 0;
+    for (let i = 0; i <= index; i++) {
+      if (!this._inputs[i].inputNode) {
+        return '';
+      }
+      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!type) {
+        return '';
+      }
+      n += type === 'float' ? 1 : type === 'vec2' ? 2 : type === 'vec3' ? 3 : 0;
+    }
+    if (n < 2 || n > 4) {
+      return '';
+    }
+    return `vec${n}`;
   }
 }
 
-export class GenericMathNode2 extends BaseGraphNode {
-  private _nodeName: string;
-  constructor(nodeName: string) {
+export class GenericMathNode extends BaseGraphNode {
+  readonly func: string;
+  readonly outType: string;
+  readonly explicitInTypes: Record<number, string[]>;
+  readonly additionalInTypes: Record<number, string[]>;
+  constructor(
+    func: string,
+    numArgs: number,
+    outType?: string,
+    inTypes?: string[],
+    explicitInTypes?: Record<number, string[]>,
+    additionalInTypes?: Record<number, string[]>
+  ) {
     super();
-    this._nodeName = nodeName;
-    this._inputs = [
-      {
-        id: 1,
-        name: 'a',
-        type: ['float', 'vec2', 'vec3', 'vec4']
-      },
-      {
-        id: 2,
-        name: 'b',
-        type: ['float', 'vec2', 'vec3', 'vec4']
-      }
-    ];
+    this.func = func;
+    this.outType = outType ?? '';
+    this.explicitInTypes = explicitInTypes ?? null;
+    this.additionalInTypes = additionalInTypes ?? null;
+    inTypes = inTypes ?? ['float', 'vec2', 'vec3', 'vec4'];
+    this._inputs = Array.from({ length: numArgs }).map((_, index) => ({
+      id: index + 1,
+      name: 'abcdefghijklmn'[index],
+      type: this.explicitInTypes?.[index + 1] ?? [
+        ...new Set([...inTypes, ...(this.additionalInTypes?.[index + 1] ?? [])])
+      ]
+    }));
     this._outputs = [
       {
         id: 1,
-        name: 'float',
-        type: 'float'
-      },
-      {
-        id: 2,
-        name: 'vec2',
-        type: 'vec2'
-      },
-      {
-        id: 3,
-        name: 'vec3',
-        type: 'vec3'
-      },
-      {
-        id: 4,
-        name: 'vec4',
-        type: 'vec4'
+        name: ''
       }
     ];
   }
   toString() {
-    return this._nodeName;
+    return this.func;
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      name: this._nodeName
-    };
-  }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['name'] === 'string') {
-      this._nodeName = props['name'];
+  validate() {
+    let type: string = '';
+    for (let i = 0; i < this._inputs.length; i++) {
+      const name = 'abcdefghijklmn'[i];
+      if (!this._inputs[i].inputNode) {
+        return `Missing argument \`${name}\``;
+      }
+      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!t) {
+        return `Cannot determine type of argument \`${name}\``;
+      }
+      if (!this._inputs[i].type.includes(t)) {
+        return `Invalid input type ${t}`;
+      }
+      if (!this.explicitInTypes || !this.explicitInTypes[this._inputs[i].id]) {
+        if (!this.additionalInTypes || !this.additionalInTypes[this._inputs[i].id]?.includes(t)) {
+          if (type && t !== type) {
+            return 'Invalid Arguments types';
+          } else {
+            type = t;
+          }
+        }
+      }
     }
+    return '';
+  }
+  protected getType(): string {
+    if (this.outType) {
+      return this.outType;
+    }
+    let type: string = '';
+    for (let i = 0; i < this._inputs.length; i++) {
+      if (!this._inputs[i].inputNode) {
+        return '';
+      }
+      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!t) {
+        return '';
+      }
+      if (!this.explicitInTypes || !this.explicitInTypes[this._inputs[i].id]) {
+        if (type && t !== type) {
+          return '';
+        } else {
+          type = t;
+        }
+      }
+    }
+    return type;
   }
 }
 
-export class Degrees2RadiansNode extends GenericMathNode1 {
+export class Degrees2RadiansNode extends GenericMathNode {
   constructor() {
-    super('degrees2radians');
+    super('degrees2radians', 1);
   }
 }
 
-export class Radians2DegreesNode extends GenericMathNode1 {
+export class Radians2DegreesNode extends GenericMathNode {
   constructor() {
-    super('radians2degrees');
+    super('radians2degrees', 1);
   }
 }
 
-export class SinNode extends GenericMathNode1 {
+export class SinNode extends GenericMathNode {
   constructor() {
-    super('sin');
+    super('sin', 1);
   }
 }
 
-export class CosNode extends GenericMathNode1 {
+export class CosNode extends GenericMathNode {
   constructor() {
-    super('cos');
+    super('cos', 1);
   }
 }
 
-export class TanNode extends GenericMathNode1 {
+export class TanNode extends GenericMathNode {
   constructor() {
-    super('tan');
+    super('tan', 1);
   }
 }
 
-export class ArcSinNode extends GenericMathNode1 {
+export class ArcSinNode extends GenericMathNode {
   constructor() {
-    super('asin');
+    super('asin', 1);
   }
 }
 
-export class ArcCosNode extends GenericMathNode1 {
+export class ArcCosNode extends GenericMathNode {
   constructor() {
-    super('acos');
+    super('acos', 1);
   }
 }
 
-export class ArcTanNode extends GenericMathNode1 {
+export class ArcTanNode extends GenericMathNode {
   constructor() {
-    super('atan');
+    super('atan', 1);
   }
 }
 
-export class SinHNode extends GenericMathNode1 {
+export class ArcTan2Node extends GenericMathNode {
   constructor() {
-    super('sinh');
+    super('atan2', 2);
   }
 }
 
-export class CosHNode extends GenericMathNode1 {
+export class SinHNode extends GenericMathNode {
   constructor() {
-    super('cosh');
+    super('sinh', 1);
   }
 }
 
-export class TanHNode extends GenericMathNode1 {
+export class CosHNode extends GenericMathNode {
   constructor() {
-    super('tanh');
+    super('cosh', 1);
   }
 }
 
-export class ArcsineHNode extends GenericMathNode1 {
+export class TanHNode extends GenericMathNode {
   constructor() {
-    super('asinh');
+    super('tanh', 1);
   }
 }
 
-export class ArccosineHNode extends GenericMathNode1 {
+export class ArcsineHNode extends GenericMathNode {
   constructor() {
-    super('acosh');
+    super('asinh', 1);
   }
 }
 
-export class ArctangentHNode extends GenericMathNode1 {
+export class ArccosineHNode extends GenericMathNode {
   constructor() {
-    super('atanh');
+    super('acosh', 1);
   }
 }
 
-export class ExpNode extends GenericMathNode1 {
+export class ArctangentHNode extends GenericMathNode {
   constructor() {
-    super('exp');
+    super('atanh', 1);
   }
 }
 
-export class Exp2Node extends GenericMathNode1 {
+export class ExpNode extends GenericMathNode {
   constructor() {
-    super('exp2');
+    super('exp', 1);
   }
 }
 
-export class LogNode extends GenericMathNode1 {
+export class Exp2Node extends GenericMathNode {
   constructor() {
-    super('log');
+    super('exp2', 1);
   }
 }
 
-export class Log2Node extends GenericMathNode1 {
+export class LogNode extends GenericMathNode {
   constructor() {
-    super('log2');
+    super('log', 1);
   }
 }
 
-export class SqrtNode extends GenericMathNode1 {
+export class Log2Node extends GenericMathNode {
   constructor() {
-    super('sqrt');
+    super('log2', 1);
   }
 }
 
-export class InvSqrtNode extends GenericMathNode1 {
+export class SqrtNode extends GenericMathNode {
   constructor() {
-    super('invSqrt');
+    super('sqrt', 1);
   }
 }
 
-export class AbsNode extends GenericMathNode1 {
+export class InvSqrtNode extends GenericMathNode {
   constructor() {
-    super('abs');
+    super('inverseSqrt', 1);
   }
 }
 
-export class SignNode extends GenericMathNode1 {
+export class AbsNode extends GenericMathNode {
   constructor() {
-    super('sign');
+    super('abs', 1);
   }
 }
 
-export class FloorNode extends GenericMathNode1 {
+export class SignNode extends GenericMathNode {
   constructor() {
-    super('floor');
+    super('sign', 1);
   }
 }
 
-export class CeilNode extends GenericMathNode1 {
+export class FloorNode extends GenericMathNode {
   constructor() {
-    super('ceil');
+    super('floor', 1);
   }
 }
 
-export class FractNode extends GenericMathNode1 {
+export class CeilNode extends GenericMathNode {
   constructor() {
-    super('fract');
+    super('ceil', 1);
   }
 }
 
-export class DDXNode extends GenericMathNode1 {
+export class FractNode extends GenericMathNode {
   constructor() {
-    super('ddx');
+    super('fract', 1);
   }
 }
 
-export class DDYNode extends GenericMathNode1 {
+export class DDXNode extends GenericMathNode {
   constructor() {
-    super('ddy');
+    super('dpdx', 1);
   }
 }
 
-export class FWidthNode extends GenericMathNode1 {
+export class DDYNode extends GenericMathNode {
   constructor() {
-    super('fwidth');
+    super('dpdy', 1);
   }
 }
 
-export class ModNode extends GenericMathNode2 {
+export class FWidthNode extends GenericMathNode {
   constructor() {
-    super('mod');
+    super('fwidth', 1);
   }
 }
 
-export class MinNode extends GenericMathNode2 {
+export class CompAddNode extends GenericMathNode {
   constructor() {
-    super('min');
+    super('add', 2);
+  }
+}
+export class CompSubNode extends GenericMathNode {
+  constructor() {
+    super('sub', 2);
+  }
+}
+export class CompMulNode extends GenericMathNode {
+  constructor() {
+    super('mul', 2);
+  }
+}
+export class CompDivNode extends GenericMathNode {
+  constructor() {
+    super('div', 2);
   }
 }
 
-export class MaxNode extends GenericMathNode2 {
+export class ModNode extends GenericMathNode {
   constructor() {
-    super('max');
+    super('mod', 2);
   }
 }
 
-export class StepNode extends GenericMathNode2 {
+export class MinNode extends GenericMathNode {
   constructor() {
-    super('step');
+    super('min', 2);
+  }
+}
+
+export class MaxNode extends GenericMathNode {
+  constructor() {
+    super('max', 2);
+  }
+}
+
+export class PowNode extends GenericMathNode {
+  constructor() {
+    super('pow', 2);
+  }
+}
+export class StepNode extends GenericMathNode {
+  constructor() {
+    super('step', 2);
+  }
+}
+
+export class FmaNode extends GenericMathNode {
+  constructor() {
+    super('fma', 3);
+  }
+}
+
+export class ClampNode extends GenericMathNode {
+  constructor() {
+    super('clamp', 3);
+  }
+}
+
+export class MixNode extends GenericMathNode {
+  constructor() {
+    super('mix', 3, null, null, { '2': ['float'] });
+  }
+}
+
+export class NormalizeNode extends GenericMathNode {
+  constructor() {
+    super('normalize', 1, null, ['vec2', 'vec3', 'vec4']);
+  }
+}
+
+export class FaceForwardNode extends GenericMathNode {
+  constructor() {
+    super('faceForward', 3, null, ['vec2', 'vec3']);
+  }
+}
+
+export class ReflectNode extends GenericMathNode {
+  constructor() {
+    super('reflect', 2, null, ['vec2', 'vec3']);
+  }
+}
+
+export class RefractNode extends GenericMathNode {
+  constructor() {
+    super('refract', 3, null, ['vec2', 'vec3'], { '2': ['float'] });
+  }
+}
+
+export class LengthNode extends GenericMathNode {
+  constructor() {
+    super('length', 1, 'float');
+  }
+}
+
+export class DistanceNode extends GenericMathNode {
+  constructor() {
+    super('distance', 2, 'float');
+  }
+}
+
+export class DotProductNode extends GenericMathNode {
+  constructor() {
+    super('dot', 2, 'float', ['vec2', 'vec3', 'vec4']);
+  }
+}
+
+export class CrossProductNode extends GenericMathNode {
+  constructor() {
+    super('cross', 2, null, ['vec3']);
   }
 }

@@ -9,8 +9,7 @@ export class ConstantTexture2DNode extends BaseGraphNode {
     this._outputs = [
       {
         id: 1,
-        name: '',
-        type: 'texture2d'
+        name: ''
       }
     ];
   }
@@ -29,15 +28,11 @@ export class ConstantTexture2DNode extends BaseGraphNode {
   get isUniform() {
     return true;
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      paramName: this._paramName
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['paramName'] === 'string') {
-      this._paramName = props['paramName'];
-    }
+  protected getType(): string {
+    return 'texture2d';
   }
 }
 
@@ -50,8 +45,7 @@ export class ConstantTextureCubeNode extends BaseGraphNode {
     this._outputs = [
       {
         id: 1,
-        name: '',
-        type: 'textureCube'
+        name: ''
       }
     ];
   }
@@ -70,14 +64,10 @@ export class ConstantTextureCubeNode extends BaseGraphNode {
   get isUniform() {
     return true;
   }
-  protected getProps(): Record<string, unknown> {
-    return {
-      paramName: this._paramName
-    };
+  protected validate(): string {
+    return '';
   }
-  protected setProps(props: Record<string, unknown>): void {
-    if (props && typeof props['paramName'] === 'string') {
-      this._paramName = props['paramName'];
-    }
+  protected getType(): string {
+    return 'textureCube';
   }
 }

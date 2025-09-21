@@ -7,54 +7,52 @@ export class PBRBlockNode extends BaseGraphNode {
       {
         id: 1,
         name: 'BaseColor',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
+        type: ['float', 'vec2', 'vec3', 'vec4']
       },
       {
         id: 2,
         name: 'Metallic',
-        type: ['float'],
-        value: 0
+        type: ['float']
       },
       {
         id: 3,
         name: 'Roughness',
-        type: ['float'],
-        value: 1
+        type: ['float']
       },
       {
         id: 4,
         name: 'Specular',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [1, 1, 1, 1]
+        type: ['float', 'vec2', 'vec3', 'vec4']
       },
       {
         id: 5,
         name: 'Emissive',
-        type: ['float', 'vec2', 'vec3', 'vec4'],
-        value: [0, 0, 0, 0]
+        type: ['float', 'vec2', 'vec3', 'vec4']
       },
       {
         id: 6,
         name: 'Normal',
-        type: ['vec3'],
-        value: [0, 0, 0]
+        type: ['vec3']
       },
       {
         id: 7,
         name: 'Tangent',
-        type: ['vec3'],
-        value: [0, 0, 0]
+        type: ['vec3']
       },
       {
         id: 8,
         name: 'Opacity',
-        type: ['float'],
-        value: 1
+        type: ['float']
       }
     ];
   }
   toString(): string {
     return 'Output';
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return '';
   }
 }
