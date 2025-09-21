@@ -19,10 +19,12 @@ export class GNode {
   private _position: ImGui.ImVec2;
   private _titleRect: ImGui.ImVec2;
   private _titleBg: number;
+  private _errorTitleBg: number;
   private _textColor: number;
   private _bodyBg: number;
   private _bodyBorderColor: number;
   private _bodyBorderColorSel: number;
+  private _errorBorderColor: ImGui.ImVec4;
   private _inputCircleColor: number;
   private _outputCircleColor: number;
   private _size: ImGui.ImVec2;
@@ -43,7 +45,9 @@ export class GNode {
     this._size = null;
     this._titleRect = null;
     this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
+    this._errorTitleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.0, 0.0, 1.0));
     this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
+    this._errorBorderColor = new ImGui.ImVec4(1, 0.2, 0.2, 1);
     this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._bodyBorderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
     this._bodyBorderColorSel = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0));
@@ -158,10 +162,14 @@ export class GNode {
       this.size.y * this._editor.canvasScale
     );
 
-    const nodeRounding = 10.0; // 圆角半径
-    const borderThickness = 1.0;
+    const nodeRounding = 6.0;
+    const baseBorderThickness = 1.0;
 
-    const bodyBorderColor = this.selected ? this._bodyBorderColorSel : this._bodyBorderColor;
+    const errorMsg = this._impl.error;
+    const hasError = !!errorMsg;
+
+    const bodyBorderColorNormal = this._bodyBorderColor;
+    const bodyBorderColorSel = this._bodyBorderColorSel;
 
     const nodeRectMin = nodePos;
     const nodeRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
@@ -172,9 +180,18 @@ export class GNode {
 
     drawList.AddRectFilled(nodeRectMin, nodeRectMax, this._bodyBg, nodeRounding, 15);
 
-    drawList.AddRectFilled(titleRectMin, titleRectMax, this._titleBg, nodeRounding, 3);
+    const titleBg = hasError ? this._errorTitleBg : this._titleBg;
+    drawList.AddRectFilled(titleRectMin, titleRectMax, titleBg, nodeRounding, 3);
 
-    drawList.AddRect(nodeRectMin, nodeRectMax, bodyBorderColor, nodeRounding, 15, borderThickness);
+    if (hasError) {
+      const t = ImGui.GetTime();
+      this._errorBorderColor.w = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 4.0));
+      const col = ImGui.ColorConvertFloat4ToU32(this._errorBorderColor);
+      drawList.AddRect(nodeRectMin, nodeRectMax, col, nodeRounding, 15, baseBorderThickness);
+    } else {
+      const bodyBorderColor = this.selected ? bodyBorderColorSel : bodyBorderColorNormal;
+      drawList.AddRect(nodeRectMin, nodeRectMax, bodyBorderColor, nodeRounding, 15, baseBorderThickness);
+    }
 
     const titlePaddingX = 10 * this._editor.canvasScale;
     const titlePaddingY = 6 * this._editor.canvasScale;
@@ -187,7 +204,11 @@ export class GNode {
       const slotScreenPos = this._editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      drawList.AddCircleFilled(slotDrawPos, SLOT_RADIUS * this._editor.canvasScale, this._inputCircleColor);
+      drawList.AddCircleFilled(
+        slotDrawPos,
+        4 /*SLOT_RADIUS*/ * this._editor.canvasScale,
+        this._inputCircleColor
+      );
 
       const labelPos = new ImGui.ImVec2(
         slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS,
@@ -202,7 +223,11 @@ export class GNode {
       const slotScreenPos = this._editor.worldToCanvas(slotPos);
       const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
 
-      drawList.AddCircleFilled(slotDrawPos, SLOT_RADIUS * this._editor.canvasScale, this._outputCircleColor);
+      drawList.AddCircleFilled(
+        slotDrawPos,
+        4 /*SLOT_RADIUS*/ * this._editor.canvasScale,
+        this._outputCircleColor
+      );
 
       const textSize = imGuiCalcTextSize(output.name);
       const labelPos = new ImGui.ImVec2(
@@ -210,6 +235,14 @@ export class GNode {
         slotDrawPos.y - SLOT_RADIUS
       );
       drawList.AddText(labelPos, this._textColor, output.name);
+    }
+
+    if (hasError && this._hovered) {
+      ImGui.BeginTooltip();
+      ImGui.TextColored(new ImGui.ImVec4(1.0, 0.4, 0.4, 1.0), 'Error');
+      ImGui.Separator();
+      ImGui.TextUnformatted(errorMsg!);
+      ImGui.EndTooltip();
     }
   }
 }

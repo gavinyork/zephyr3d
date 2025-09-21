@@ -26,7 +26,7 @@ interface SlotInfo {
 // Traversal Result
 interface TraversalResult {
   order: number[];
-  levels: number[][]; // Node id grouped by level
+  levels: number[][];
 }
 
 export class NodeEditor extends Observable<{ changed: [] }> {
@@ -40,7 +40,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
   public selectedNodes: number[];
   private draggingNode: number;
-  private dragOffset: ImGui.ImVec2;
   private isDraggingCanvas: boolean;
   private isHoveringMenu: boolean;
   private readonly canvasOffset: ImGui.ImVec2;
@@ -52,21 +51,23 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   private contextMenuNode: number;
   private showContextMenu: boolean;
   private showGrid: boolean;
-  private selectedLinks: Set<number>;
-  private selectedSlot: SlotInfo;
-  private hoveredLinkId: number;
+  private gridSizePx: number;
+  private gridCellCount: number;
   private showCanvasContextMenu: boolean;
   private canvasContextClickLocal: ImGui.ImVec2;
+  private dragOffsetsForSelection: Map<number, ImGui.ImVec2>;
+  private pendingSingleSelectNodeId: number | null;
+  private dragStartedOnThisClick: boolean;
+  private mouseDownPosWorld: ImGui.ImVec2 | null;
   private justOpened: boolean;
+  private nodeSearchBuf: [string];
+  private filteredCategory: NodeCategory[];
   private readonly linkHitRadius: number;
   private readonly linkWidthNormal: number;
-  private readonly linkWidthHover: number;
   private readonly linkWidthSelected: number;
   private readonly pinOuterRadius: number;
   private readonly pinHighlightColor: ImGui.ImVec4;
   private readonly pinHoverColor: ImGui.ImVec4;
-  private readonly linkSelectedColor: ImGui.ImVec4;
-  private readonly linkHoverColor: ImGui.ImVec4;
 
   constructor(api: GraphEditorApi) {
     super();
@@ -81,32 +82,33 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.structureDirty = true;
     this.selectedNodes = [];
     this.draggingNode = null;
-    this.dragOffset = new ImGui.ImVec2(0, 0);
     this.isDraggingCanvas = false;
     this.canvasOffset = new ImGui.ImVec2(0, 0);
     this.canvasScale = 1.0;
     this.isCreatingLink = false;
-    this.isHoveringMenu = false;
     this.linkStartSlot = null;
+    this.isHoveringMenu = false;
     this.hoveredSlot = null;
     this.contextMenuNode = null;
     this.showContextMenu = false;
     this.showGrid = true;
-    this.selectedLinks = new Set();
-    this.selectedSlot = null;
-    this.hoveredLinkId = null;
+    this.gridSizePx = 10;
+    this.gridCellCount = 8;
     this.showCanvasContextMenu = false;
     this.canvasContextClickLocal = new ImGui.ImVec2(0, 0);
+    this.dragOffsetsForSelection = new Map();
+    this.pendingSingleSelectNodeId = null;
+    this.dragStartedOnThisClick = false;
+    this.mouseDownPosWorld = null;
     this.justOpened = true;
+    this.nodeSearchBuf = [''];
+    this.filteredCategory = [];
     this.linkHitRadius = 6;
     this.linkWidthNormal = 2.0;
-    this.linkWidthHover = 3.0;
     this.linkWidthSelected = 4.0;
-    this.pinOuterRadius = SLOT_RADIUS + 3;
+    this.pinOuterRadius = 7; //SLOT_RADIUS + 3;
     this.pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
     this.pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
-    this.linkSelectedColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
-    this.linkHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
   }
 
   get graph(): GraphStructure {
@@ -313,7 +315,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     }
 
     let currentLevel = Array.from(outDegree.entries())
-      .filter(([_, deg]) => deg === 0)
+      .filter(([, deg]) => deg === 0)
       .map(([id]) => id);
 
     const result: number[] = [];
@@ -468,7 +470,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     ASSERT(!!pin, 'Pin not exists');
     pin.inputNode = null;
     pin.inputId = null;
-    this.selectedLinks.delete(link.id);
     this.links.splice(index, 1);
   }
 
@@ -488,7 +489,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         this.deleteLink(i);
       }
     }
-    //this.links = this.links.filter((link) => link.startNodeId !== nodeId && link.endNodeId !== nodeId);
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
     this.invalidateStructure();
@@ -683,7 +683,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             slotId: output.id,
             position: slotPos,
             isOutput: true
-            //type: output.type
           };
         }
       }
@@ -697,7 +696,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             slotId: input.id,
             position: slotPos,
             isOutput: false
-            //type: input.type
           };
         }
       }
@@ -710,16 +708,14 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       return;
     }
 
-    const stepScreen = 20;
-    if (stepScreen < 2) {
+    if (this.gridSizePx < 2) {
       return;
     }
 
     const minorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.25, 0.25, 0.25, 0.55));
     const majorCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.35, 0.35, 0.85));
 
-    const majorEvery = 5;
-    const worldStep = stepScreen / this.canvasScale;
+    const worldStep = this.gridSizePx / this.canvasScale;
     const worldMin = this.canvasToWorld(new ImGui.ImVec2(0, 0));
     const worldMax = this.canvasToWorld(this.canvasSize);
 
@@ -733,7 +729,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       const xCanvas = this.worldToCanvas(new ImGui.ImVec2(worldX, 0)).x;
       const xScreen = canvasPos.x + xCanvas;
 
-      const isMajor = gx % majorEvery === 0;
+      const isMajor = gx % this.gridCellCount === 0;
       const col = isMajor ? majorCol : minorCol;
 
       drawList.AddLine(
@@ -751,7 +747,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       }
       const yScreen = canvasPos.y + yCanvas;
 
-      const isMajor = gy % majorEvery === 0;
+      const isMajor = gy % this.gridCellCount === 0;
       const col = isMajor ? majorCol : minorCol;
 
       drawList.AddLine(
@@ -776,19 +772,8 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     const p1 = new ImGui.ImVec2(p0.x + 50, p0.y);
     const p2 = new ImGui.ImVec2(p3.x - 50, p3.y);
 
-    let color = link.color;
-    let width = this.linkWidthNormal;
-
-    const isSelected = this.selectedLinks.has(link.id);
-    const isHovered = this.hoveredLinkId === link.id;
-
-    if (isSelected) {
-      color = this.linkSelectedColor;
-      width = this.linkWidthSelected;
-    } else if (isHovered) {
-      color = this.linkHoverColor;
-      width = this.linkWidthHover;
-    }
+    const color = link.color;
+    const width = this.linkWidthNormal;
 
     drawList.AddBezierCubic(p0, p1, p2, p3, ImGui.ColorConvertFloat4ToU32(color), width);
   }
@@ -829,6 +814,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     const mousePos = ImGui.GetMousePos();
     const relativeMousePos = new ImGui.ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
     const worldMousePos = this.canvasToWorld(relativeMousePos);
+
     const canProcessThisFrame =
       isCanvasHovered || this.isDraggingCanvas || this.draggingNode !== null || this.isCreatingLink;
 
@@ -842,7 +828,14 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         hovered = null;
       }
       this.hoveredSlot = hovered;
-      this.hoveredLinkId = this.getLinkUnderMouse(canvasPos);
+    }
+
+    const hoveredNode = isCanvasHovered ? this.hitTestNodeAt(worldMousePos) : null;
+    for (const node of this.nodes.values()) {
+      node.hovered = false;
+    }
+    if (hoveredNode) {
+      hoveredNode.hovered = true;
     }
 
     if (isCanvasHovered && ImGui.IsMouseClicked(0)) {
@@ -862,8 +855,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             }
             this.isCreatingLink = false;
             this.linkStartSlot = null;
-            this.selectedSlot = this.hoveredSlot;
-            this.selectedLinks.clear();
             if (deleted) {
               this.invalidateStructure();
             }
@@ -871,8 +862,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
             this.removeLinksIntoInput(this.hoveredSlot.nodeId, this.hoveredSlot.slotId);
             this.isCreatingLink = false;
             this.linkStartSlot = null;
-            this.selectedSlot = this.hoveredSlot;
-            this.selectedLinks.clear();
           }
           return;
         }
@@ -914,24 +903,13 @@ export class NodeEditor extends Observable<{ changed: [] }> {
           }
         } else {
           if (io.KeyCtrl) {
-            this.selectedSlot = this.hoveredSlot;
             this.isCreatingLink = false;
             this.linkStartSlot = null;
           } else {
-            this.selectedSlot = this.hoveredSlot;
             this.isCreatingLink = true;
             this.linkStartSlot = this.hoveredSlot;
           }
-          this.selectedLinks.clear();
         }
-      } else if (this.hoveredLinkId !== null) {
-        if (!io.KeyCtrl) {
-          this.selectedLinks.clear();
-          this.selectedSlot = null;
-        }
-        this.selectedLinks.add(this.hoveredLinkId);
-        this.isCreatingLink = false;
-        this.linkStartSlot = null;
       } else {
         if (this.isCreatingLink && this.linkStartSlot) {
           if (!this.canvasContextClickLocal) {
@@ -947,36 +925,131 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         } else {
           const clickedNode = this.hitTestNodeAt(worldMousePos);
           if (clickedNode) {
-            if (!io.KeyCtrl) {
-              this.selectedNodes = [];
-              this.nodes.forEach((n) => (n.selected = false));
+            const isAlreadySelected = this.selectedNodes.includes(clickedNode.id);
+
+            this.mouseDownPosWorld = worldMousePos;
+            this.dragStartedOnThisClick = false;
+
+            if (io.KeyCtrl) {
+              if (!isAlreadySelected) {
+                clickedNode.selected = true;
+                this.selectedNodes.push(clickedNode.id);
+              } else {
+                clickedNode.selected = false;
+                this.selectedNodes = this.selectedNodes.filter((id) => id !== clickedNode.id);
+              }
+              this.pendingSingleSelectNodeId = null;
+            } else {
+              if (!isAlreadySelected) {
+                this.selectedNodes = [];
+                this.nodes.forEach((n) => (n.selected = false));
+                clickedNode.selected = true;
+                this.selectedNodes.push(clickedNode.id);
+                this.pendingSingleSelectNodeId = null;
+              } else {
+                this.pendingSingleSelectNodeId = clickedNode.id;
+              }
             }
-            clickedNode.selected = true;
-            if (!this.selectedNodes.includes(clickedNode.id)) {
-              this.selectedNodes.push(clickedNode.id);
-            }
+
             this.draggingNode = clickedNode.id;
-            this.dragOffset = new ImGui.ImVec2(
-              worldMousePos.x - clickedNode.position.x,
-              worldMousePos.y - clickedNode.position.y
-            );
+
+            this.dragOffsetsForSelection.clear();
+            for (const id of this.selectedNodes) {
+              const n = this.nodes.get(id);
+              if (!n) {
+                continue;
+              }
+              this.dragOffsetsForSelection.set(
+                id,
+                new ImGui.ImVec2(worldMousePos.x - n.position.x, worldMousePos.y - n.position.y)
+              );
+            }
 
             const nodeId = clickedNode.id;
             const nodeObj = this.nodes.get(nodeId)!;
             this.nodes.delete(nodeId);
             this.nodes.set(nodeId, nodeObj);
           } else {
-            this.selectedLinks.clear();
-            this.selectedSlot = null;
             this.selectedNodes = [];
             this.nodes.forEach((n) => (n.selected = false));
             this.isDraggingCanvas = true;
-          }
 
-          if (!this.canvasContextClickLocal) {
-            this.isCreatingLink = false;
-            this.linkStartSlot = null;
+            if (!this.canvasContextClickLocal) {
+              this.isCreatingLink = false;
+              this.linkStartSlot = null;
+            }
           }
+        }
+      }
+    }
+
+    if (ImGui.IsMouseDown(0)) {
+      if (isCanvasHovered && !this.draggingNode && !this.isCreatingLink) {
+        this.isDraggingCanvas = this.isDraggingCanvas || true;
+      }
+      if (this.isDraggingCanvas) {
+        const mouseDelta = ImGui.GetMouseDragDelta(0);
+        this.canvasOffset.x += mouseDelta.x / this.canvasScale;
+        this.canvasOffset.y += mouseDelta.y / this.canvasScale;
+        ImGui.ResetMouseDragDelta(0);
+      } else if (this.draggingNode !== null) {
+        if (!this.dragStartedOnThisClick && this.mouseDownPosWorld) {
+          const downScreen = new ImGui.ImVec2(
+            (this.mouseDownPosWorld.x + this.canvasOffset.x) * this.canvasScale + canvasPos.x,
+            (this.mouseDownPosWorld.y + this.canvasOffset.y) * this.canvasScale + canvasPos.y
+          );
+          const dx = mousePos.x - downScreen.x;
+          const dy = mousePos.y - downScreen.y;
+          const dist2 = dx * dx + dy * dy;
+          const startDragThresholdPx = 4;
+          if (dist2 >= startDragThresholdPx * startDragThresholdPx) {
+            this.dragStartedOnThisClick = true;
+          }
+        }
+
+        if (this.dragStartedOnThisClick) {
+          for (const id of this.selectedNodes) {
+            const n = this.nodes.get(id);
+            const off = this.dragOffsetsForSelection.get(id);
+            if (!n || !off) {
+              continue;
+            }
+            const candidate = new ImGui.ImVec2(worldMousePos.x - off.x, worldMousePos.y - off.y);
+            const snapped = this.snapWorldToScreenGrid(candidate, this.canvasScale);
+            n.position.x = snapped.x;
+            n.position.y = snapped.y;
+          }
+        }
+      }
+    } else {
+      if (!this.dragStartedOnThisClick && this.pendingSingleSelectNodeId !== null) {
+        const keepId = this.pendingSingleSelectNodeId;
+        this.nodes.forEach((n) => (n.selected = false));
+        this.selectedNodes = [keepId];
+        const keepNode = this.nodes.get(keepId);
+        if (keepNode) {
+          keepNode.selected = true;
+        }
+      }
+
+      this.draggingNode = null;
+      this.isDraggingCanvas = false;
+      this.dragOffsetsForSelection.clear();
+      this.pendingSingleSelectNodeId = null;
+      this.dragStartedOnThisClick = false;
+      this.mouseDownPosWorld = null;
+    }
+
+    const wheel = io.MouseWheel;
+    if (wheel !== 0 && isCanvasHovered) {
+      const scaleFactor = wheel > 0 ? 1.1 : 0.9;
+      this.canvasScale = Math.max(0.1, Math.min(3.0, this.canvasScale * scaleFactor));
+    }
+
+    if (isCanvasFocused && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
+      if (this.selectedNodes.length > 0) {
+        for (const nodeId of this.selectedNodes.slice()) {
+          this.deleteNode(nodeId);
         }
       }
     }
@@ -1016,50 +1089,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         }
       }
     }
-
-    if (ImGui.IsMouseDown(0)) {
-      if (isCanvasHovered && !this.draggingNode && !this.isCreatingLink) {
-        this.isDraggingCanvas = this.isDraggingCanvas || true;
-      }
-      if (this.isDraggingCanvas) {
-        const mouseDelta = ImGui.GetMouseDragDelta(0);
-        this.canvasOffset.x += mouseDelta.x / this.canvasScale;
-        this.canvasOffset.y += mouseDelta.y / this.canvasScale;
-        ImGui.ResetMouseDragDelta(0);
-      } else if (this.draggingNode !== null) {
-        const node = this.nodes.get(this.draggingNode);
-        if (node) {
-          node.position.x = worldMousePos.x - this.dragOffset.x;
-          node.position.y = worldMousePos.y - this.dragOffset.y;
-        }
-      }
-    } else {
-      this.draggingNode = null;
-      this.isDraggingCanvas = false;
-    }
-
-    const wheel = io.MouseWheel;
-    if (wheel !== 0 && isCanvasHovered) {
-      const scaleFactor = wheel > 0 ? 1.1 : 0.9;
-      this.canvasScale = Math.max(0.1, Math.min(3.0, this.canvasScale * scaleFactor));
-    }
-
-    if (isCanvasFocused && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Delete))) {
-      if (this.selectedLinks.size > 0) {
-        for (let i = this.links.length - 1; i >= 0; i--) {
-          const lk = this.links[i];
-          if (this.selectedLinks.has(lk.id)) {
-            this.deleteLink(i);
-          }
-        }
-        this.invalidateStructure();
-      }
-      if (this.selectedNodes.length > 0) {
-        for (const nodeId of this.selectedNodes.slice()) {
-          this.deleteNode(nodeId);
-        }
-      }
-    }
   }
 
   private drawContextMenu() {
@@ -1077,21 +1106,59 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       ImGui.EndPopup();
     }
 
+    let focusOnSearch = false;
     this.isHoveringMenu = false;
     if (this.showCanvasContextMenu) {
       this.showCanvasContextMenu = false;
+      this.filteredCategory = this.api.getNodeCategory();
+      focusOnSearch = true;
       ImGui.OpenPopup('CanvasContextMenu');
     }
     if (this.canvasContextClickLocal && ImGui.BeginPopup('CanvasContextMenu')) {
       this.isHoveringMenu = ImGui.IsWindowHovered();
-      const category = this.api.getNodeCategory();
-      this.renderCategoryList(category);
+      const maxHeight = 500;
+      if (ImGui.BeginChild('##CanvasContextMenuSearch', new ImGui.ImVec2(300, maxHeight), false)) {
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputTextWithHint('##CanvasContextMenuSearch', 'Search', this.nodeSearchBuf, undefined)) {
+          if (this.nodeSearchBuf[0]) {
+            this.filteredCategory = this.filterCategory(this.nodeSearchBuf[0], this.api.getNodeCategory());
+          } else {
+            this.filteredCategory = this.api.getNodeCategory();
+          }
+        }
+        if (focusOnSearch) {
+          ImGui.SetKeyboardFocusHere();
+        }
+        ImGui.Separator();
+        if (ImGui.BeginChild('##CanvasContextMenuScrollArea', ImGui.GetContentRegionAvail(), false)) {
+          this.renderCategoryList(this.filteredCategory);
+        }
+        ImGui.EndChild();
+      }
+      ImGui.EndChild();
       ImGui.EndPopup();
     } else {
       this.canvasContextClickLocal = null;
+      this.nodeSearchBuf[0] = '';
     }
   }
 
+  private filterCategory(str: string, category: NodeCategory[]): NodeCategory[] {
+    const newCategory: NodeCategory[] = [];
+    for (const k of category) {
+      const v = { ...k };
+      if (!v.name.includes(str)) {
+        v.create = null;
+      }
+      if (v.children) {
+        v.children = this.filterCategory(str, v.children);
+      }
+      if (!!v.create || v.children?.length > 0) {
+        newCategory.push(v);
+      }
+    }
+    return newCategory;
+  }
   private renderCategoryList(category: NodeCategory[]) {
     for (const item of category) {
       const leaf = !item.children;
@@ -1101,21 +1168,25 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       }
       const isOpen = ImGui.TreeNodeEx(item.name, flags);
       if (leaf && item.create && ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-        const node = new GNode(this, this.canvasToWorld(this.canvasContextClickLocal), item.create());
+        const world = this.canvasToWorld(this.canvasContextClickLocal!);
+        const snapped = this.snapWorldToScreenGrid(world, this.canvasScale);
+        const node = new GNode(this, snapped, item.create());
         this.addNode(node);
         if (this.isCreatingLink && this.linkStartSlot) {
           if (this.linkStartSlot.isOutput) {
             const outputType = this.getSlotOutputType(this.linkStartSlot);
-            const inputSlot = node.inputs.find((value) => !outputType || value.type?.includes(outputType));
+            const inputSlot =
+              node.inputs.find((value) => !outputType || value.type?.includes(outputType)) ?? node.inputs[0];
             if (inputSlot) {
               this.addLink(this.linkStartSlot.nodeId, this.linkStartSlot.slotId, node.id, inputSlot.id);
             }
           } else {
             const types = this.getSlotInputType(this.linkStartSlot);
-            const outputSlot = node.outputs.find((value) => {
-              const outputType = node.impl.getOutputType(value.id);
-              return !!outputType && types.includes(outputType);
-            });
+            const outputSlot =
+              node.outputs.find((value) => {
+                const outputType = node.impl.getOutputType(value.id);
+                return !!outputType && types.includes(outputType);
+              }) ?? node.outputs[0];
             if (outputSlot) {
               this.addLink(node.id, outputSlot.id, this.linkStartSlot.nodeId, this.linkStartSlot.slotId);
             }
@@ -1161,14 +1232,16 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
     this.selectedNodes = [];
     this.nodes.forEach((n) => (n.selected = false));
-    this.selectedLinks.clear();
-    this.selectedSlot = null;
 
     this.hoveredSlot = null;
-    this.hoveredLinkId = null;
 
     this.contextMenuNode = null;
     this.showContextMenu = false;
+
+    this.dragOffsetsForSelection.clear();
+    this.pendingSingleSelectNodeId = null;
+    this.dragStartedOnThisClick = false;
+    this.mouseDownPosWorld = null;
   }
 
   public render() {
@@ -1292,8 +1365,8 @@ export class NodeEditor extends Observable<{ changed: [] }> {
         if (this.hoveredSlot && this.hoveredSlot.nodeId === node.id) {
           this.drawPinHighlight(drawList, canvasPos, this.hoveredSlot, false);
         }
-        if (this.selectedSlot && this.selectedSlot.nodeId === node.id) {
-          this.drawPinHighlight(drawList, canvasPos, this.selectedSlot, true);
+        if (this.isCreatingLink && this.linkStartSlot && this.linkStartSlot.nodeId === node.id) {
+          this.drawPinHighlight(drawList, canvasPos, this.linkStartSlot, true);
         }
       }
     }
@@ -1347,5 +1420,9 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   private getSlotOutputType(slot: SlotInfo) {
     const node = this.nodes.get(slot.nodeId).impl;
     return node.getOutputType(slot.slotId);
+  }
+  snapWorldToScreenGrid(pos: ImGui.ImVec2, canvasScale: number): ImGui.ImVec2 {
+    const gWorld = this.gridSizePx / Math.max(1e-6, canvasScale);
+    return new ImGui.ImVec2(Math.round(pos.x / gWorld) * gWorld, Math.round(pos.y / gWorld) * gWorld);
   }
 }
