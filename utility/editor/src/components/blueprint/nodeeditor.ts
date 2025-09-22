@@ -1145,9 +1145,10 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
   private filterCategory(str: string, category: NodeCategory[]): NodeCategory[] {
     const newCategory: NodeCategory[] = [];
+    str = str.toLowerCase();
     for (const k of category) {
       const v = { ...k };
-      if (!v.name.includes(str)) {
+      if (!v.name.toLowerCase().includes(str)) {
         v.create = null;
       }
       if (v.children) {

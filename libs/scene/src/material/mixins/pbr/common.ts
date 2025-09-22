@@ -15,6 +15,8 @@ import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../../../values';
+import type { IMixinPBRBRDF } from './brdf';
+import { mixinPBRBRDF } from './brdf';
 
 /**
  * Interface for common PBR mixin
@@ -57,14 +59,6 @@ export type IMixinPBRCommon = {
     TBN: PBShaderExp,
     data: PBShaderExp
   ): void;
-  fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
-  distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
-  visGGX(
-    scope: PBInsideFunctionScope,
-    NdotV: PBShaderExp,
-    NdotL: PBShaderExp,
-    alphaRoughness: PBShaderExp
-  ): PBShaderExp;
   getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
   calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
   getF0(scope: PBInsideFunctionScope): PBShaderExp;
@@ -99,7 +93,8 @@ export type IMixinPBRCommon = {
     'iridescence',
     'iridescenceThickness'
   ]
->;
+> &
+  IMixinPBRBRDF;
 
 /**
  * PBR common stuff mixin
@@ -114,6 +109,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   }
   const S = applyMaterialMixins(
     BaseCls,
+    mixinPBRBRDF,
     mixinTextureProps('occlusion'),
     mixinTextureProps('emissive'),
     mixinTextureProps('sheenColor'),
@@ -1339,68 +1335,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       } else {
         scope.$g[funcName](normal, viewVec, commonData, outColor);
       }
-    }
-    fresnelSchlick(
-      scope: PBInsideFunctionScope,
-      cosTheta: PBShaderExp,
-      F0: PBShaderExp,
-      F90: PBShaderExp
-    ): PBShaderExp {
-      const pb = scope.$builder;
-      const funcName = 'Z_fresnelSchlick';
-      pb.func(funcName, [pb.float('cosTheta'), pb.vec3('f0'), pb.vec3('f90')], function () {
-        this.$return(
-          pb.add(
-            this.f0,
-            pb.mul(pb.sub(this.f90, this.f0), pb.pow(pb.clamp(pb.sub(1, this.cosTheta), 0, 1), 5))
-          )
-        );
-      });
-      return scope.$g[funcName](cosTheta, F0, F90);
-    }
-    distributionGGX(
-      scope: PBInsideFunctionScope,
-      NdotH: PBShaderExp,
-      alphaRoughness: PBShaderExp
-    ): PBShaderExp {
-      const pb = scope.$builder;
-      const funcName = 'Z_distributionGGX';
-      pb.func(funcName, [pb.float('NdotH'), pb.float('roughness')], function () {
-        this.$l.a2 = pb.mul(this.roughness, this.roughness);
-        this.$l.NdotH2 = pb.mul(this.NdotH, this.NdotH);
-        this.$l.num = this.a2;
-        this.$l.denom = pb.add(pb.mul(this.NdotH2, pb.sub(this.a2, 1)), 1);
-        this.denom = pb.mul(pb.mul(3.14159265, this.denom), this.denom);
-        this.$return(pb.div(this.num, this.denom));
-      });
-      return scope.$g[funcName](NdotH, alphaRoughness);
-    }
-    visGGX(
-      scope: PBInsideFunctionScope,
-      NdotV: PBShaderExp,
-      NdotL: PBShaderExp,
-      alphaRoughness: PBShaderExp
-    ): PBShaderExp {
-      const pb = scope.$builder;
-      const funcName = 'Z_visGGX';
-      pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
-        this.$l.a = this.roughness;
-        this.$l.ggxV = pb.mul(
-          this.NdotL,
-          pb.sqrt(pb.add(pb.mul(this.NdotV, this.NdotV, pb.sub(1, this.a)), this.a))
-        );
-        this.$l.ggxL = pb.mul(
-          this.NdotV,
-          pb.sqrt(pb.add(pb.mul(this.NdotL, this.NdotL, pb.sub(1, this.a)), this.a))
-        );
-        this.$l.ggx = pb.add(this.ggxV, this.ggxL, 1e-5);
-        this.$if(pb.greaterThan(this.ggx, 0), function () {
-          this.$return(pb.div(0.5, this.ggx));
-        }).$else(function () {
-          this.$return(pb.float(0));
-        });
-      });
-      return scope.$g[funcName](NdotV, NdotL, alphaRoughness);
     }
   } as unknown as T & { new (...args: any[]): IMixinPBRCommon };
   FEATURE_SHEEN = cls.defineFeature();
