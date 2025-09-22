@@ -53,10 +53,7 @@ import {
   getConstantVec3Class,
   getConstantVec4Class
 } from './blueprint/constants';
-import {
-  getMaterialConstantTexture2DClass,
-  getMaterialConstantTextureCubeClass
-} from './blueprint/material/texture';
+import { getMaterialBaseTextureClass } from './blueprint/material/texture';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -171,8 +168,7 @@ export class SerializationManager {
         getConstantVec2Class(),
         getConstantVec3Class(),
         getConstantVec4Class(),
-        getMaterialConstantTexture2DClass(),
-        getMaterialConstantTextureCubeClass()
+        getMaterialBaseTextureClass()
       ].map((val) => [val.ctor, val])
     );
     for (const k of this._classMap) {

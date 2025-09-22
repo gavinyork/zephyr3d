@@ -2,8 +2,8 @@ import { ImGui, imGuiWantCaptureKeyboard } from '@zephyr3d/imgui';
 import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
-import type { NodeConnection, GraphStructure } from './dag';
 import { ASSERT, Observable } from '@zephyr3d/base';
+import type { GraphStructure, NodeConnection } from '@zephyr3d/scene';
 
 const SLOT_RADIUS = 6;
 
