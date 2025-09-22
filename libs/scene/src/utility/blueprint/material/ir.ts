@@ -1,23 +1,28 @@
 import type { PBScope, ProgramBuilder, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 import { PBShaderExp } from '@zephyr3d/device';
-import { BaseGraphNode, BlueprintDAG, IGraphNode } from '../node';
+import type { BaseGraphNode, BlueprintDAG, IGraphNode } from '../node';
 import {
   ConstantScalarNode,
   ConstantVec2Node,
   ConstantVec3Node,
   ConstantVec4Node
 } from '../common/constants';
-import { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 
 abstract class IRExpression {
-  protected ref: number;
+  protected _ref: number;
+  protected _outputs: IRExpression[];
   constructor() {
-    this.ref = 0;
+    this._ref = 0;
+    this._outputs = [];
   }
   abstract create(pb: ProgramBuilder): number | PBShaderExp;
+  get outputs() {
+    return this._outputs;
+  }
   addRef(): this {
-    this.ref++;
+    this._ref++;
     return this;
   }
   getTmpName(scope: PBScope) {
@@ -31,7 +36,7 @@ abstract class IRExpression {
   }
 }
 
-class IRConstantExpressionf extends IRExpression {
+class IRConstantf extends IRExpression {
   readonly value: number;
   readonly name: string;
   constructor(value: number, paramName: string) {
@@ -50,7 +55,7 @@ class IRConstantExpressionf extends IRExpression {
   }
 }
 
-class IRConstantExpressionfv extends IRExpression {
+class IRConstantfv extends IRExpression {
   readonly value: number[];
   readonly name: string;
   constructor(value: number[], paramName: string) {
@@ -66,6 +71,35 @@ class IRConstantExpressionfv extends IRExpression {
       return pb.getGlobalScope()[this.name];
     }
     return Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value;
+  }
+}
+
+class IRSwizzle extends IRExpression {
+  readonly src: IRExpression;
+  readonly hash: string;
+  constructor(src: IRExpression, hash: string) {
+    super();
+    this.src = src.addRef();
+    this.hash = hash;
+  }
+  create(pb: ProgramBuilder): number | PBShaderExp {
+    const src = this.src.create(pb);
+    return typeof src === 'number' ? pb[`vec${this.hash.length}`](src) : src[this.hash];
+  }
+}
+
+class IRCast extends IRExpression {
+  readonly src: IRExpression;
+  readonly type: string;
+  readonly cast: number;
+  constructor(src: IRExpression, type: string, cast: number) {
+    super();
+    this.src = src.addRef();
+    this.cast = cast;
+    this.type = type;
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    return pb[this.type](this.src.create(pb), ...Array.from({ length: this.cast }).fill(0));
   }
 }
 
@@ -130,97 +164,95 @@ class IRConstantTexture extends IRExpression {
   }
 }
 
-class IRHash extends IRExpression {
-  readonly src: IRExpression;
-  readonly hash: string;
-  exp: PBShaderExp | number;
-  constructor(src: IRExpression, hash: string) {
-    super();
-    this.src = src.addRef();
-    this.hash = hash;
-    this.exp = null;
-  }
-  create(pb: ProgramBuilder): number | PBShaderExp {
-    if (this.exp === null) {
-      const src = this.src.create(pb);
-      if (src instanceof PBShaderExp) {
-        this.exp = src[this.hash];
-      } else {
-        if (this.hash.length === 1) {
-          this.exp = src;
-        } else {
-          this.exp = pb[`vec${this.hash.length}`](src);
-        }
-      }
-    }
-    return this.exp;
-  }
-}
-
-export class BlueprintMaterialIR {
+export class MaterialBlueprintIR {
   private _expressions: IRExpression[];
   private _expressionMap: Map<BaseGraphNode, number>;
-  private _outputs: Record<string, number>;
+  private _outputs: Record<string, PBShaderExp | number>;
   constructor() {
     this._expressions = [];
     this._expressionMap = new Map();
     this._outputs = {};
   }
-  create(dag: BlueprintDAG) {
+  create(pb: ProgramBuilder, dag: BlueprintDAG) {
+    const irMap: Record<string, IRExpression> = {};
     for (const root of dag.roots) {
+      const connections = dag.graph.incoming[root];
+      const rootNode = dag.nodeMap[root];
+      for (const conn of connections) {
+        const name = rootNode.inputs[conn.endSlotId].name;
+        irMap[name] = this.ir(dag.nodeMap[conn.targetNodeId], conn.startSlotId);
+      }
+    }
+    for (const k in irMap) {
+      this._outputs[k] = irMap[k].create(pb);
     }
   }
   processNode(node: IGraphNode) {
     if (node instanceof ConstantScalarNode) {
     }
   }
-  ir(node: IGraphNode): IRExpression {
+  ir(node: IGraphNode, output: number): IRExpression {
     if (node instanceof ConstantScalarNode) {
-      return this.constantf(node);
+      return this.constantf(node, output);
     }
     if (
       node instanceof ConstantVec2Node ||
       node instanceof ConstantVec3Node ||
       node instanceof ConstantVec4Node
     ) {
-      return this.constantfv(node);
+      return this.constantfv(node, output);
     }
     if (node instanceof BaseTextureNode) {
-      return this.constantTexture(node);
+      return this.constantTexture(node, output);
     }
     if (node instanceof TextureSampleNode) {
-      return this.textureSample(node);
+      return this.textureSample(node, output);
     }
     return null;
   }
   getOrCreateIRExpression<T extends GenericConstructor<IRExpression>, F extends ConstructorParameters<T>>(
     node: BaseGraphNode,
+    outputId: number,
     ctor: T,
     ...args: F
-  ): InstanceType<T> {
+  ): IRExpression {
+    let ir: IRExpression;
     if (!this._expressionMap.has(node)) {
-      const ir = new ctor(...args);
+      ir = new ctor(...args);
       this._expressions.push(ir);
       this._expressionMap.set(node, this._expressions.length - 1);
-      return ir as InstanceType<T>;
+    } else {
+      ir = this._expressions[this._expressionMap.get(node)] as InstanceType<T>;
     }
-    return this._expressions[this._expressionMap.get(node)] as InstanceType<T>;
+    if (!ir.outputs[outputId]) {
+      const output = node.outputs[outputId];
+      let outputIR: IRExpression = null;
+      if (typeof output.cast === 'number') {
+        outputIR = new IRCast(ir, node.getOutputType(outputId), output.cast);
+      }
+      if (output.swizzle) {
+        outputIR = new IRSwizzle(outputIR, output.swizzle);
+      }
+      ir.outputs[outputId] = outputIR ?? ir;
+    }
+    return ir.outputs[outputId];
   }
-  constantf(node: ConstantScalarNode): IRConstantExpressionf {
-    return this.getOrCreateIRExpression(node, IRConstantExpressionf, node.x, node.paramName);
+  constantf(node: ConstantScalarNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);
   }
-  constantfv(node: ConstantVec2Node | ConstantVec3Node | ConstantVec4Node): IRConstantExpressionfv {
+  constantfv(node: ConstantVec2Node | ConstantVec3Node | ConstantVec4Node, output: number): IRExpression {
     const value =
       node instanceof ConstantVec2Node
         ? [node.x, node.y]
         : node instanceof ConstantVec3Node
         ? [node.x, node.y, node.z]
         : [node.x, node.y, node.z, node.w];
-    return this.getOrCreateIRExpression(node, IRConstantExpressionfv, value, node.paramName);
+    return this.getOrCreateIRExpression(node, output, IRConstantfv, value, node.paramName);
   }
-  constantTexture(node: BaseTextureNode): IRConstantTexture {
+  constantTexture(node: BaseTextureNode, output: number): IRConstantTexture {
     return this.getOrCreateIRExpression(
       node,
+      output,
       IRConstantTexture,
       node.paramName,
       node.getOutputType(1),
@@ -229,13 +261,13 @@ export class BlueprintMaterialIR {
       node.filterMin,
       node.filterMag,
       node.filterMip
-    );
+    ) as IRConstantTexture;
   }
-  textureSample(node: TextureSampleNode): IRSampleTexture {
-    const tex = this.ir(node.inputs[0].inputNode) as IRConstantTexture;
-    const coord = this.ir(node.inputs[1].inputNode);
-    const lod = this.ir(node.inputs[2].inputNode);
-    return new IRSampleTexture(tex, coord, lod);
+  textureSample(node: TextureSampleNode, output: number): IRExpression {
+    const tex = this.ir(node.inputs[0].inputNode, node.inputs[0].inputId) as IRConstantTexture;
+    const coord = this.ir(node.inputs[1].inputNode, node.inputs[1].inputId);
+    const lod = this.ir(node.inputs[2].inputNode, node.inputs[2].inputId);
+    return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, lod);
   }
   addOutput(src: number, name: string): void {
     this._outputs[name] = src;

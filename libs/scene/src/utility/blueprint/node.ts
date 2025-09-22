@@ -28,7 +28,12 @@ export type GraphNodeInput = {
   inputNode?: IGraphNode;
   inputId?: number;
 };
-export type GraphNodeOutput = { id: number; name: string };
+export type GraphNodeOutput = {
+  id: number;
+  name: string;
+  swizzle?: string;
+  cast?: number;
+};
 
 export interface IGraphNode extends IEventTarget<{ changed: [] }> {
   readonly inputs: GraphNodeInput[];

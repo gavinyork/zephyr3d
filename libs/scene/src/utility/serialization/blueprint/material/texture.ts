@@ -1,4 +1,4 @@
-import { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
+import type { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 import { BaseTextureNode } from '../../../blueprint/material/texture';
 import type { SerializableClass } from '../../types';
 

@@ -63,8 +63,8 @@ export class ConstantVec2Node extends BaseGraphNode {
     this._paramName = '';
     this._outputs = [
       { id: 1, name: '' },
-      { id: 2, name: 'x' },
-      { id: 3, name: 'y' }
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' }
     ];
   }
   toString() {
@@ -115,7 +115,7 @@ export class ConstantVec2Node extends BaseGraphNode {
     return '';
   }
   protected getType(id: number): string {
-    return id === 1 ? 'vec2' : 'float';
+    return id > 1 ? 'float' : 'vec2';
   }
 }
 
@@ -130,9 +130,9 @@ export class ConstantVec3Node extends BaseGraphNode {
     this._paramName = '';
     this._outputs = [
       { id: 1, name: '' },
-      { id: 2, name: 'x' },
-      { id: 3, name: 'y' },
-      { id: 4, name: 'z' }
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
     ];
   }
 
@@ -195,7 +195,7 @@ export class ConstantVec3Node extends BaseGraphNode {
     return '';
   }
   protected getType(id: number): string {
-    return id === 1 ? 'vec3' : 'float';
+    return id > 1 ? 'float' : 'vec3';
   }
 }
 
@@ -210,10 +210,10 @@ export class ConstantVec4Node extends BaseGraphNode {
     this._paramName = '';
     this._outputs = [
       { id: 1, name: '' },
-      { id: 2, name: 'x' },
-      { id: 3, name: 'y' },
-      { id: 4, name: 'z' },
-      { id: 5, name: 'w' }
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' },
+      { id: 5, name: 'w', swizzle: 'w' }
     ];
   }
   toString() {
@@ -284,6 +284,6 @@ export class ConstantVec4Node extends BaseGraphNode {
     return '';
   }
   protected getType(id: number): string {
-    return id === 1 ? 'vec4' : 'float';
+    return id > 1 ? 'float' : 'vec4';
   }
 }

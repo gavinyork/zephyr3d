@@ -1,6 +1,6 @@
 import { BaseGraphNode } from '../node';
 import { getParamName } from '../common';
-import { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
+import type { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 
 export class BaseTextureNode extends BaseGraphNode {
   private _paramName: string;
@@ -36,7 +36,7 @@ export class BaseTextureNode extends BaseGraphNode {
   protected validate(): string {
     return '';
   }
-  protected getType(_id?: number): string {
+  protected getType(): string {
     return '';
   }
 }
@@ -141,7 +141,7 @@ export class TextureSampleNode extends BaseGraphNode {
     if (!type1) {
       return `Cannot determine type of argument \`${this._inputs[1].name}\``;
     }
-    let expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
+    const expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
     if (type1 !== expectedType1) {
       return `Texture coordinate type should be ${expectedType1}`;
     }
