@@ -148,7 +148,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     });
   }
   private createShaderModule(code: string): GPUShaderModule {
-    const t0 = Date.now();
     let sm = this._device.device.createShaderModule({ label: this._label, code });
     if (sm) {
       const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
@@ -157,10 +156,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
         return sm;
       }
       func.call(sm).then((compilationInfo) => {
-        const elapsed = Date.now() - t0;
-        if (false && elapsed > 1000) {
-          console.log(`compile shader took ${elapsed}ms: \n${code}`);
-        }
         let err = false;
         if (compilationInfo?.messages?.length > 0) {
           let msg = '';

@@ -1,8 +1,7 @@
+import type { BlueprintDAG, IGraphNode } from '@zephyr3d/scene';
 import {
-  BlueprintDAG,
   DirectionalLight,
   getDevice,
-  IGraphNode,
   Mesh,
   PerspectiveCamera,
   Scene,
@@ -18,7 +17,7 @@ import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
 import { DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import { FrameBuffer } from '@zephyr3d/device';
+import type { FrameBuffer } from '@zephyr3d/device';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _outputNodeId: number;

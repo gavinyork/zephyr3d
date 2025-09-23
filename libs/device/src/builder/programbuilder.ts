@@ -2445,7 +2445,7 @@ export class ProgramBuilder {
           minBindingSize: uniformInfo.block.bindingSize,
           hasDynamicOffset: !!uniformInfo.block.bindingSize,
           uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
-          dynamicOffsetIndex: !!uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
+          dynamicOffsetIndex: uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
       } else if (uniformInfo.texture) {
@@ -3438,9 +3438,7 @@ export class PBGlobalScope extends PBScope {
   }
   /** @internal */
   $createFunctionIfNotExists(name: string, params: PBShaderExp[], body?: (this: PBFunctionScope) => void) {
-    if (true || !this.$builder.getFunction(name)) {
-      this.$internalCreateFunction(name, params, false, body);
-    }
+    this.$internalCreateFunction(name, params, false, body);
   }
   /** @internal */
   $getFunctions(name: string): AST.ASTFunction[] {

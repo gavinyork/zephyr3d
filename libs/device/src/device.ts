@@ -812,6 +812,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       case 'unpack-pixel':
         usageFlag = GPUResourceUsageFlags.BF_UNPACK_PIXEL;
         options.managed = false;
+        break;
       default:
         usageFlag = 0;
         break;

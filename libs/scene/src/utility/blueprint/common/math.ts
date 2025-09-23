@@ -132,7 +132,7 @@ export class GenericMathNode extends BaseGraphNode {
     return this.func;
   }
   validate() {
-    let err = super.validate();
+    const err = super.validate();
     if (err) {
       return err;
     }

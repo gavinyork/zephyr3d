@@ -324,16 +324,8 @@ export class WebGLDevice extends BaseDevice {
     } else if (texture && sampler && this._textureSamplerMap.get(texture) !== sampler) {
       const fallback = texture.isWebGL1Fallback;
       this._textureSamplerMap.set(texture, sampler);
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_WRAP_S,
-        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
-      );
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_WRAP_T,
-        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
-      );
+      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_S, textureWrappingMap[sampler.addressModeU]);
+      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_T, textureWrappingMap[sampler.addressModeV]);
       gl.texParameteri(target, WebGLEnum.TEXTURE_MAG_FILTER, textureMagFilterToWebGL(sampler.magFilter));
       gl.texParameteri(
         target,
@@ -1258,7 +1250,9 @@ export class WebGLDevice extends BaseDevice {
   }
   /** @internal */
   clearErrors() {
-    while (this._context.getError()) {}
+    while (this._context.getError()) {
+      // eat errors
+    }
   }
   /** @internal */
   getCurrentSamplerForTexture(tex: BaseTexture) {

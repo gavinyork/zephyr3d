@@ -888,12 +888,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       let comparison = 0;
 
       switch (this._sortBy) {
-        case SortBy.Name:
+        case SortBy.Name: {
           const nameA = isADir ? a.path.slice(a.path.lastIndexOf('/') + 1) : (a as FileInfo).meta.name;
           const nameB = isBDir ? b.path.slice(b.path.lastIndexOf('/') + 1) : (b as FileInfo).meta.name;
           comparison = nameA.localeCompare(nameB);
           break;
-
+        }
         case SortBy.Size:
           if (!isADir && !isBDir) {
             comparison = (a as FileInfo).meta.size - (b as FileInfo).meta.size;
@@ -1413,6 +1413,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       const sourceDir = asset.path;
       const parentDir = vfs.dirname(sourceDir);
       if (vfs.isParentOf(parentDir, targetDir) && vfs.isParentOf(targetDir, parentDir)) {
+        // no-op
       } else if (!asset.isDir) {
         const targetPath = vfs.join(targetDir, vfs.basename(sourceDir));
         if (copy) {

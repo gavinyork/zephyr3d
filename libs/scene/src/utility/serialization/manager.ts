@@ -519,7 +519,7 @@ export class SerializationManager {
     this._allocated = new WeakMap();
     this._assetManager.clearCache();
   }
-  private static readonly _pathPattern = /^([^\[\]]+)(?:\[(\d+)\])?$/;
+  private static readonly _pathPattern = /^([^\][]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {
     const match = str.match(this._pathPattern);
     if (match) {

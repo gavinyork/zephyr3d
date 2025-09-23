@@ -934,7 +934,7 @@ export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
   if (checkResult.transmittance || !transmittanceLUT) {
     renderTransmittanceLut(currentAtmosphereParams);
   }
-  if (true || checkResult.multiScattering || !multiScatteringLUT) {
+  if (checkResult.multiScattering || !multiScatteringLUT) {
     renderMultiScatteringLut(currentAtmosphereParams);
   }
   if (checkResult.skyView || !skyViewLUT) {

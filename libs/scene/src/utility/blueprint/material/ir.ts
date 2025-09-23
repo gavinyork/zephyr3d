@@ -18,7 +18,7 @@ import type { GenericConstructor } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
-import { GenericMathNode } from '../common/math';
+import { GenericMathNode, MakeVectorNode } from '../common/math';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number };
 export type IRUniformTexture = {
@@ -44,7 +44,7 @@ abstract class IRExpression {
   }
   getTmpName(scope: PBScope) {
     let tmp = 0;
-    while (true) {
+    for (;;) {
       const name = `tmp${tmp++}`;
       if (!scope[name]) {
         return name;
@@ -329,21 +329,19 @@ export class MaterialBlueprintIR {
     let expr: IRExpression = null;
     if (node instanceof ConstantScalarNode) {
       expr = this.constantf(node, output);
-    }
-    if (
+    } else if (
       node instanceof ConstantVec2Node ||
       node instanceof ConstantVec3Node ||
       node instanceof ConstantVec4Node
     ) {
       expr = this.constantfv(node, output);
-    }
-    if (node instanceof BaseTextureNode) {
+    } else if (node instanceof BaseTextureNode) {
       expr = this.constantTexture(node, output);
-    }
-    if (node instanceof TextureSampleNode) {
+    } else if (node instanceof TextureSampleNode) {
       expr = this.textureSample(node, output);
-    }
-    if (node instanceof GenericMathNode) {
+    } else if (node instanceof MakeVectorNode) {
+      expr = this.makeVector(node, output);
+    } else if (node instanceof GenericMathNode) {
       expr = this.func(node, output);
     }
     if (expr && originType) {
@@ -406,6 +404,16 @@ export class MaterialBlueprintIR {
       }
     }
     return ir.outputs[outputId];
+  }
+  private makeVector(node: MakeVectorNode, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    for (const input of node.inputs) {
+      if (input.inputNode) {
+        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+      }
+    }
+    const funcName = node.getOutputType(output);
+    return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
   }
   private func(node: GenericMathNode, output: number): IRExpression {
     const params: IRExpression[] = [];

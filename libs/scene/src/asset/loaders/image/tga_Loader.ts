@@ -21,17 +21,17 @@ export class TGALoader extends AbstractTextureLoader {
     const offset = content instanceof ArrayBuffer ? 0 : content.byteOffset;
     const dataView = new DataView(arrayBuffer, offset);
     const p: number[] = [0, 0, 0, 0];
-    do {
+    parse: {
       let skip = 0;
       const idLength = dataView.getUint8(0);
       skip += idLength;
       const colorMapType = dataView.getUint8(1);
       if (colorMapType !== 0 && colorMapType !== 1) {
-        break;
+        break parse;
       }
       const dataTypeCode = dataView.getUint8(2);
       if (dataTypeCode !== 2 && dataTypeCode !== 10) {
-        break;
+        break parse;
       }
       const colorMapLength = dataView.getUint16(5, true);
       skip += colorMapLength * colorMapType;
@@ -39,7 +39,7 @@ export class TGALoader extends AbstractTextureLoader {
       const height = dataView.getUint16(14, true);
       const bpp = dataView.getUint8(16);
       if (bpp !== 16 && bpp !== 24 && bpp !== 32) {
-        break;
+        break parse;
       }
       let dataOffset = 18 + skip;
       const bytesPerPixel = bpp / 8;
@@ -83,7 +83,7 @@ export class TGALoader extends AbstractTextureLoader {
       const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
       tex.update(pixels, 0, 0, width, height);
       return tex;
-    } while (false);
+    }
     throw new Error(`Unsupported TGA file format`);
   }
   private mergeBytes(dest: Uint8Array<ArrayBuffer>, offset: number, pixel: number[], numBytes: number) {

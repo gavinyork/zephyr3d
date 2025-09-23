@@ -218,6 +218,7 @@ export class GlobMatcher {
             reStr += '.';
             break;
           }
+        /* falls through */
 
         case '[':
         case ']':
@@ -225,6 +226,7 @@ export class GlobMatcher {
             reStr += c;
             break;
           }
+        /* falls through */
 
         case '{':
           if (extended) {
@@ -232,6 +234,7 @@ export class GlobMatcher {
             reStr += '(';
             break;
           }
+        /* falls through */
 
         case '}':
           if (extended) {
@@ -239,6 +242,7 @@ export class GlobMatcher {
             reStr += ')';
             break;
           }
+        /* falls through */
 
         case ',':
           if (inGroup) {
@@ -248,7 +252,7 @@ export class GlobMatcher {
           reStr += '\\' + c;
           break;
 
-        case '*':
+        case '*': {
           // Move over all consecutive "*"'s.
           // Also store the previous and next characters
           const prevChar = str[i - 1];
@@ -279,7 +283,7 @@ export class GlobMatcher {
             }
           }
           break;
-
+        }
         default:
           reStr += c;
       }

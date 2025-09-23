@@ -787,7 +787,9 @@ export class ZipFS extends VFS {
         const existingStat = await this._stat(path);
         createdTime = existingStat.created;
         isExistingFile = true;
-      } catch {}
+      } catch {
+        // intentionally ignore
+      }
     }
 
     if (options?.append && isExistingFile) {
@@ -795,7 +797,9 @@ export class ZipFS extends VFS {
 
       try {
         existingData = await this._readFile(path);
-      } catch {}
+      } catch {
+        // intentionally ignore
+      }
 
       if (existingData) {
         if (typeof fileData === 'string' && typeof existingData === 'string') {

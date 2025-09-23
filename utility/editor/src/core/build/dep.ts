@@ -164,7 +164,7 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
 
   const u = new URL(res.url);
   const decodedPath = decodeURIComponent(u.pathname).replace(/^\/v\d+\//, '/');
-  const direct = decodedPath.match(/\/(@?[^/@]+)@(\d+\.\d+\.\d+(?:[-+][^\/]+)?)(?:\/|$)/);
+  const direct = decodedPath.match(/\/(@?[^/@]+)@(\d+\.\d+\.\d+(?:[-+][^/]+)?)(?:\/|$)/);
 
   if (direct) {
     const version = direct[2];

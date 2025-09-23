@@ -293,7 +293,9 @@ class LogViewImpl {
               const lines = e.stack.split('\n').slice(2, 5).join('\n');
               msg += `\n${lines}`;
             }
-          } catch {}
+          } catch {
+            // no-op
+          }
         }
         this.appendLog(level, msg);
         try {

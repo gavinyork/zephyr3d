@@ -333,6 +333,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_2D_ARRAY:
       case WebGLEnum.SAMPLER_2D_ARRAY_SHADOW:
@@ -344,6 +345,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D_ARRAY, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_CUBE:
       case WebGLEnum.SAMPLER_CUBE_SHADOW:
@@ -355,6 +357,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_CUBE_MAP, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_3D:
       case WebGLEnum.INT_SAMPLER_3D:

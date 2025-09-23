@@ -450,14 +450,14 @@ export class WebGLFrameBuffer
     if (this._device.isContextLost()) {
       return;
     }
-    do {
+    load: {
       if (this._options.sampleCount > 1) {
         this._framebufferAA = this._device.context.createFramebuffer();
         this._colorAttachmentsAA = [];
         this._depthAttachmentAA = null;
         if (!this._bindBuffersAA()) {
           this.dispose();
-          break;
+          break load;
         }
       }
       this._object = this._device.context.createFramebuffer();
@@ -465,7 +465,7 @@ export class WebGLFrameBuffer
       if (!this._bindBuffers()) {
         this.dispose();
       }
-    } while (0);
+    }
     this._lastDrawTag = -1;
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
     this._device.context._currentFramebuffer = null;

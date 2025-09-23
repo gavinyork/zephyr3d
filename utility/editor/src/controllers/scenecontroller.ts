@@ -96,7 +96,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           await this._editor.exportProject();
         }
         break;
-      case 'DELETE_PROJECT': {
+      case 'DELETE_PROJECT':
         if (this._editor.currentProject) {
           const uuid = this._editor.currentProject.uuid;
           if (
@@ -113,7 +113,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
             }
           }
         }
-      }
+        break;
       case 'NEW_DOC':
         if (await this.ensureSceneSaved()) {
           this.createScene(true);

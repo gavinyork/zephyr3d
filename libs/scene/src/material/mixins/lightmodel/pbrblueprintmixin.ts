@@ -1,10 +1,5 @@
-import {
-  BindGroup,
-  PBFunctionScope,
-  PBInsideFunctionScope,
-  PBShaderExp,
-  ShaderTypeFunc
-} from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, ShaderTypeFunc } from '@zephyr3d/device';
+import { PBShaderExp } from '@zephyr3d/device';
 import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
@@ -13,7 +8,7 @@ import type { IMixinPBRBRDF } from '../pbr/brdf';
 import { mixinPBRBRDF } from '../pbr/brdf';
 import type { MaterialBlueprintIR } from '../../../utility/blueprint/material/ir';
 import { ShaderHelper } from '../../shader/helper';
-import { DrawContext } from '../../../render';
+import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
 
 /**

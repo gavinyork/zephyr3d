@@ -36,7 +36,8 @@ import {
   ModNode,
   MinNode,
   MaxNode,
-  StepNode
+  StepNode,
+  MakeVectorNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -45,6 +46,10 @@ export function getMathNodeCategories(): NodeCategory[] {
     {
       name: 'Math',
       children: [
+        {
+          name: 'MakeVector',
+          create: () => new MakeVectorNode()
+        },
         {
           name: 'CompAdd',
           create: () => new CompAddNode()

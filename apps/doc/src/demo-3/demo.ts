@@ -1,8 +1,8 @@
 import type { HttpFS } from '@zephyr3d/base';
 import { PRNG, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
-import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel } from '@zephyr3d/scene';
-import { BatchGroup, getDevice, getInput, SceneNode } from '@zephyr3d/scene';
+import type { AssetHierarchyNode, MeshMaterial, ModelInfo, SharedModel, SceneNode } from '@zephyr3d/scene';
+import { BatchGroup, getDevice, getInput } from '@zephyr3d/scene';
 import {
   AssetManager,
   DirectionalLight,
@@ -43,7 +43,7 @@ export class Demo {
     this._actorRunning = false;
     this._assetManager = new AssetManager();
     this._scene = this.createScene();
-    this._root = new BatchGroup(this._scene) ?? new SceneNode(this._scene);
+    this._root = new BatchGroup(this._scene);
     this._camera = this.createCamera(this._scene);
     this._camera.bloom = true;
     this._camera.FXAA = true;

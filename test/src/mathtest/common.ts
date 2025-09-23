@@ -26,7 +26,7 @@ export function randInt(minval = -999999, maxval = 999999) {
 }
 
 export function randNonZero(minval = -10, maxval = 10) {
-  while (true) {
+  for (;;) {
     const r = rand(minval, maxval);
     if (Math.abs(r) > Number.EPSILON) {
       return r;

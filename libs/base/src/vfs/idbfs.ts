@@ -793,19 +793,15 @@ export class IndexedDBFS extends VFS {
       return this.db;
     }
 
-    try {
-      const { version, storeExists } = await this.getDatabaseInfo();
+    const { version, storeExists } = await this.getDatabaseInfo();
 
-      if (storeExists) {
-        this.db = await this.openDatabase(version);
-        await this.ensureRootDirectoryAsync();
-        return this.db;
-      } else {
-        this.db = await this.createObjectStoreAsync(version + 1);
-        return this.db;
-      }
-    } catch (error) {
-      throw error;
+    if (storeExists) {
+      this.db = await this.openDatabase(version);
+      await this.ensureRootDirectoryAsync();
+      return this.db;
+    } else {
+      this.db = await this.createObjectStoreAsync(version + 1);
+      return this.db;
     }
   }
 

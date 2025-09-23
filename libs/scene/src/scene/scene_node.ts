@@ -452,11 +452,11 @@ export class SceneNode
    * @returns true if iteration was aborted early.
    */
   iterate(callback: NodeIterateFunc): boolean {
-    if (!!callback(this)) {
+    if (callback(this)) {
       return true;
     }
     for (const child of this._children) {
-      if (!!child.get().iterate(callback)) {
+      if (child.get().iterate(callback)) {
         return true;
       }
     }
@@ -473,11 +473,11 @@ export class SceneNode
   iterateBottomToTop(callback: NodeIterateFunc): boolean {
     for (let i = this._children.length - 1; i >= 0; i--) {
       const child = this._children[i];
-      if (!!child.get().iterateBottomToTop(callback)) {
+      if (child.get().iterateBottomToTop(callback)) {
         return true;
       }
     }
-    if (!!callback(this)) {
+    if (callback(this)) {
       return true;
     }
     return false;

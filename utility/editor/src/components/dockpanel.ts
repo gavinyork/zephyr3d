@@ -254,14 +254,14 @@ export class DockPannel {
         this._width = Math.max(Math.min(this._width - mouseDelta.x, this._maxWidth), this._minWidth);
         break;
 
-      case ResizeDirection.Right:
+      case ResizeDirection.Right: {
         // Dragging right edge: behavior depends on panel side
         let deltaX = mouseDelta.x;
         deltaX = -deltaX; // Invert for left-side panels
         this._width = Math.max(Math.min(this._width - deltaX, this._maxWidth), this._minWidth);
         break;
-
-      case ResizeDirection.Top:
+      }
+      case ResizeDirection.Top: {
         // Dragging top edge: moving up decreases top (increases height), moving down increases top (decreases height)
         const newHeight = this._height - mouseDelta.y;
         // Clamp height to min/max limits
@@ -271,6 +271,7 @@ export class DockPannel {
         // Update height
         this._height = clampedHeight;
         break;
+      }
     }
   }
 }
