@@ -18,8 +18,6 @@ export class PBRBluePrintMaterial
   /** @internal */
   private static readonly FEATURE_VERTEX_COLOR = this.defineFeature();
   /** @internal */
-  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
-  /** @internal */
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /** @internal */
   private _ir: MaterialBlueprintIR;
@@ -29,7 +27,6 @@ export class PBRBluePrintMaterial
   constructor(ir: MaterialBlueprintIR) {
     super();
     this._ir = ir;
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_NORMAL, this._ir.behaviors.useVertexNormal);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._ir.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._ir.behaviors.useVertexColor);
   }
@@ -54,27 +51,33 @@ export class PBRBluePrintMaterial
       scope.$inputs.vertexColor = pb.vec4().attrib('diffuse');
       scope.$outputs.zVertexColor = scope.$inputs.vertexColor;
     }
-    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_NORMAL)) {
-      scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
-      scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-      if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)) {
-        scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
-        scope.$outputs.zVertexTangent = pb.mul(
-          ShaderHelper.getNormalMatrix(scope),
-          pb.vec4(scope.oTangent.xyz, 0)
-        ).xyz;
-        scope.$outputs.zVertexBinormal = pb.mul(
-          pb.cross(scope.$outputs.zVertexNormal, scope.$outputs.zVertexTangent),
-          scope.oTangent.w
-        );
-      }
+    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)) {
+      scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
+      scope.$outputs.zVertexTangent = pb.mul(
+        ShaderHelper.getNormalMatrix(scope),
+        pb.vec4(scope.oTangent.xyz, 0)
+      ).xyz;
+      scope.$outputs.zVertexBinormal = pb.mul(
+        pb.cross(scope.$outputs.zVertexNormal, scope.$outputs.zVertexTangent),
+        scope.oTangent.w
+      );
     }
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
-      scope.$l.commonData = this.getCommonData(scope, scope.$inputs.worldPos, this._ir);
+      scope.$l.commonData = this.getCommonData(
+        scope,
+        scope.$inputs.worldPos,
+        scope.$inputs.zVertexNormal,
+        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexTangent : null,
+        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexBinormal : null,
+        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.zVertexColor : null,
+        this._ir
+      );
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {

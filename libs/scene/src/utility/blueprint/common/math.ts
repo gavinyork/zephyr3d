@@ -369,7 +369,19 @@ export class CompSubNode extends GenericMathNode {
 }
 export class CompMulNode extends GenericMathNode {
   constructor() {
-    super('mul', 2);
+    super('mul', 2, null, null, null, { '1': ['float'], '2': ['float'] });
+  }
+  protected getType(): string {
+    const type1 = this.inputs[0].inputNode
+      ? this.inputs[0].inputNode.getOutputType(this.inputs[0].inputId)
+      : '';
+    const type2 = this.inputs[1].inputNode
+      ? this.inputs[1].inputNode.getOutputType(this.inputs[1].inputId)
+      : '';
+    if (!type1 || !type2) {
+      return '';
+    }
+    return type1 === 'float' ? type2 : type1;
   }
 }
 export class CompDivNode extends GenericMathNode {
@@ -421,7 +433,7 @@ export class ClampNode extends GenericMathNode {
 
 export class MixNode extends GenericMathNode {
   constructor() {
-    super('mix', 3, null, null, { '2': ['float'] });
+    super('mix', 3, null, null, null, { '3': ['float'] });
   }
 }
 
@@ -445,7 +457,7 @@ export class ReflectNode extends GenericMathNode {
 
 export class RefractNode extends GenericMathNode {
   constructor() {
-    super('refract', 3, null, ['vec2', 'vec3'], { '2': ['float'] });
+    super('refract', 3, null, ['vec2', 'vec3'], { '3': ['float'] });
   }
 }
 

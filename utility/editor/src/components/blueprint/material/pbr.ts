@@ -18,6 +18,7 @@ import { GNode } from '../node';
 import { DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer } from '@zephyr3d/device';
+import { getInputNodeCategories } from './inputs';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _outputNodeId: number;
@@ -29,6 +30,8 @@ export class PBRMaterialEditor extends GraphEditor {
     super();
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
     block.locked = true;
+    block.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+    block.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
     this._outputNodeId = block.id;
     this.nodeEditor.on('changed', this.graphChanged, this);
     const scene = new Scene();
@@ -53,7 +56,12 @@ export class PBRMaterialEditor extends GraphEditor {
   }
 
   getNodeCategory(): NodeCategory[] {
-    return [...getConstantNodeCategories(), ...getTextureNodeCategories(), ...getMathNodeCategories()];
+    return [
+      ...getConstantNodeCategories(),
+      ...getInputNodeCategories(),
+      ...getTextureNodeCategories(),
+      ...getMathNodeCategories()
+    ];
   }
   createDAG(): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};

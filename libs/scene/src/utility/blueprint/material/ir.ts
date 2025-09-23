@@ -19,6 +19,7 @@ import { DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
 import { GenericMathNode, MakeVectorNode } from '../common/math';
+import { VertexBinormalNode, VertexColorNode, VertexNormalNode, VertexTangentNode } from './inputs';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number };
 export type IRUniformTexture = {
@@ -105,6 +106,17 @@ class IRConstantfv extends IRExpression {
   }
   asUniformValue(): IRUniformValue {
     return this.name ? { name: this.name, value: new Float32Array(this.value) } : null;
+  }
+}
+
+class IRInput extends IRExpression {
+  readonly name: string;
+  constructor(name: string) {
+    super();
+    this.name = name;
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    return pb.getCurrentScope()[this.name];
   }
 }
 
@@ -242,7 +254,6 @@ class IRConstantTexture extends IRExpression {
 
 export interface MaterialBlueprintIRBehaviors {
   useVertexColor: boolean;
-  useVertexNormal: boolean;
   useVertexTangent: boolean;
 }
 
@@ -321,7 +332,6 @@ export class MaterialBlueprintIR {
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
-      useVertexNormal: false,
       useVertexTangent: false
     };
   }
@@ -343,6 +353,14 @@ export class MaterialBlueprintIR {
       expr = this.makeVector(node, output);
     } else if (node instanceof GenericMathNode) {
       expr = this.func(node, output);
+    } else if (node instanceof VertexColorNode) {
+      expr = this.vertexColor(node, output);
+    } else if (node instanceof VertexNormalNode) {
+      expr = this.vertexNormal(node, output);
+    } else if (node instanceof VertexTangentNode) {
+      expr = this.vertexTangent(node, output);
+    } else if (node instanceof VertexBinormalNode) {
+      expr = this.vertexBinormal(node, output);
     }
     if (expr && originType) {
       const outputType = node.getOutputType(output);
@@ -424,6 +442,21 @@ export class MaterialBlueprintIR {
     }
     const funcName = node.func;
     return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
+  }
+  private vertexColor(node: VertexColorNode, output: number): IRExpression {
+    this._behaviors.useVertexColor = true;
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexColor');
+  }
+  private vertexNormal(node: VertexNormalNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexNormal');
+  }
+  private vertexTangent(node: VertexTangentNode, output: number): IRExpression {
+    this._behaviors.useVertexTangent = true;
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexTangent');
+  }
+  private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {
+    this._behaviors.useVertexTangent = true;
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexBinormal');
   }
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);

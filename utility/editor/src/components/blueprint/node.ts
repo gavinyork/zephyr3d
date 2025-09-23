@@ -20,6 +20,7 @@ export class GNode {
   private _titleRect: ImGui.ImVec2;
   private _titleBg: number;
   private _errorTitleBg: number;
+  private _titleTextColor: number;
   private _textColor: number;
   private _bodyBg: number;
   private _bodyBorderColor: number;
@@ -48,6 +49,7 @@ export class GNode {
     this._errorTitleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.0, 0.0, 1.0));
     this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
     this._errorBorderColor = new ImGui.ImVec4(1, 0.2, 0.2, 1);
+    this._titleTextColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._bodyBorderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
     this._bodyBorderColorSel = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0));
@@ -69,6 +71,18 @@ export class GNode {
       this.calculateSize();
     }
     return this._size;
+  }
+  get titleBg() {
+    return this._titleBg;
+  }
+  set titleBg(col: number) {
+    this._titleBg = col;
+  }
+  get titleTextCol() {
+    return this._titleTextColor;
+  }
+  set titleTextCol(col: number) {
+    this._titleTextColor = col;
   }
   get titleRect() {
     if (!this._titleRect) {
@@ -196,7 +210,7 @@ export class GNode {
     const titlePaddingX = 10 * this._editor.canvasScale;
     const titlePaddingY = 6 * this._editor.canvasScale;
     const titlePos = new ImGui.ImVec2(nodePos.x + titlePaddingX, nodePos.y + titlePaddingY);
-    drawList.AddText(titlePos, this._textColor, this.toString());
+    drawList.AddText(titlePos, this._titleTextColor, this.toString());
 
     for (let i = 0; i < this.inputs.length; i++) {
       const input = this.inputs[i];

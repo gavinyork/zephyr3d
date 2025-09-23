@@ -23,11 +23,23 @@ export type IMixinPBRBluePrint = {
     commonData: PBShaderExp,
     outRoughness?: PBShaderExp
   ): PBShaderExp;
-  getCommonData(scope: PBInsideFunctionScope, worldPos: PBShaderExp, ir: MaterialBlueprintIR): PBShaderExp;
+  getCommonData(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    worldNorm: PBShaderExp,
+    worldTangent: PBShaderExp,
+    worldBinormal: PBShaderExp,
+    vertexColor: PBShaderExp,
+    ir: MaterialBlueprintIR
+  ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     ir: MaterialBlueprintIR,
     worldPos: PBShaderExp,
+    worldNorm: PBShaderExp,
+    worldTangent: PBShaderExp,
+    worldBinormal: PBShaderExp,
+    vertexColor: PBShaderExp,
     data: PBShaderExp
   ): void;
   directLighting(
@@ -69,13 +81,30 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       super.copyFrom(other);
     }
 
-    getCommonData(scope: PBInsideFunctionScope, worldPos: PBShaderExp, ir: MaterialBlueprintIR): PBShaderExp {
+    getCommonData(
+      scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
+      worldNorm: PBShaderExp,
+      worldTangent: PBShaderExp,
+      worldBinormal: PBShaderExp,
+      vertexColor: PBShaderExp,
+      ir: MaterialBlueprintIR
+    ): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'Z_getCommonData';
       pb.func(funcName, [], function () {
         this.$l.data = that.getCommonDatasStruct(this)();
-        that.calculateCommonData(this, ir, worldPos, this.data);
+        that.calculateCommonData(
+          this,
+          ir,
+          worldPos,
+          worldNorm,
+          worldTangent,
+          worldBinormal,
+          vertexColor,
+          this.data
+        );
         this.$return(this.data);
       });
       return scope.$g[funcName]();
@@ -170,6 +199,10 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       scope: PBInsideFunctionScope,
       ir: MaterialBlueprintIR,
       worldPos: PBShaderExp,
+      worldNorm: PBShaderExp,
+      worldTangent: PBShaderExp,
+      worldBinormal: PBShaderExp,
+      vertexColor: PBShaderExp,
       data: PBShaderExp
     ): void {
       const that = this;
@@ -177,20 +210,17 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       const funcName = 'zCalculateCommonDataPBRBluePrint';
       const params: PBShaderExp[] = [
         this.getCommonDatasStruct(scope)('zCommonData').out(),
-        pb.vec3('zWorldPos')
+        pb.vec3('zWorldPos'),
+        pb.vec3('zVertexNormal')
       ];
-      const paramValues: PBShaderExp[] = [data, worldPos];
-      if (ir.behaviors.useVertexColor) {
+      const paramValues: PBShaderExp[] = [data, worldPos, worldNorm];
+      if (worldTangent) {
+        params.push(pb.vec3('zVertexTangent'), pb.vec3('zVertexBinormal'));
+        paramValues.push(worldTangent, worldBinormal);
+      }
+      if (vertexColor) {
         params.push(pb.vec4('zVertexColor'));
-        paramValues.push(scope.$inputs.zVertexColor);
-      }
-      if (ir.behaviors.useVertexNormal) {
-        params.push(pb.vec3('zVertexNormal'));
-        paramValues.push(scope.$inputs.zVertexNormal);
-      }
-      if (ir.behaviors.useVertexTangent) {
-        params.push(pb.vec3('zVertexTangent'));
-        paramValues.push(scope.$inputs.zVertexTangent);
+        paramValues.push(vertexColor);
       }
       pb.func(funcName, params, function () {
         const outputs = ir.create(pb);
@@ -220,9 +250,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.normalInfo = that.calculateNormalAndTBN(
             this,
             this.zWorldPos,
-            ir.behaviors.useVertexNormal ? this.$inputs.zVertexNormal : undefined,
-            ir.behaviors.useVertexTangent ? this.$inputs.zVertexTangent : undefined,
-            ir.behaviors.useVertexTangent ? this.$inputs.zVertexBinormal : undefined
+            this.zVertexNormal,
+            worldTangent ? this.zVertexTangent : undefined,
+            worldBinormal ? this.zVertexBinormal : undefined
           );
           this.zCommonData.normal = this.normalInfo.normal;
           this.zCommonData.TBN = this.normalInfo.TBN;
