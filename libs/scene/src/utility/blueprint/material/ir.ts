@@ -290,11 +290,11 @@ export class MaterialBlueprintIR {
       for (const input of rootNode.inputs) {
         const name = input.name;
         if (input.inputNode) {
-          this._outputs[name] = this.ir(input.inputNode, input.inputId, input.originType);
+          this._outputs[name] = this.ir(input.inputNode, input.inputId, input.originType).addRef();
         } else if (typeof input.defaultValue === 'number') {
-          this._outputs[name] = new IRConstantf(input.defaultValue, '');
+          this._outputs[name] = new IRConstantf(input.defaultValue, '').addRef();
         } else if (Array.isArray(input.defaultValue)) {
-          this._outputs[name] = new IRConstantfv(input.defaultValue, '');
+          this._outputs[name] = new IRConstantfv(input.defaultValue, '').addRef();
         } else if (input.required) {
           this._outputs = null;
           return false;
