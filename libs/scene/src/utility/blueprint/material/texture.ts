@@ -109,12 +109,14 @@ export class TextureSampleNode extends BaseGraphNode {
       {
         id: 1,
         name: 'texture',
-        type: ['tex2D', 'tex2DArray', 'texCube']
+        type: ['tex2D', 'tex2DArray', 'texCube'],
+        required: true
       },
       {
         id: 2,
         name: 'coord',
-        type: ['vec2', 'vec3']
+        type: ['vec2', 'vec3'],
+        required: true
       },
       {
         id: 3,
@@ -124,18 +126,12 @@ export class TextureSampleNode extends BaseGraphNode {
     ];
   }
   protected validate(): string {
-    if (!this._inputs[0].inputNode) {
-      return `Missing argument \`${this._inputs[0].name}\``;
-    }
     const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
     }
     if (!this._inputs[0].type.includes(type0)) {
       return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
-    }
-    if (!this._inputs[1].inputNode) {
-      return `Missing argument \`${this._inputs[1].name}\``;
     }
     const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
     if (!type1) {

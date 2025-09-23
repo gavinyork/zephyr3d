@@ -300,6 +300,9 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     this._pickPosY = 0;
     this._compositor = new Compositor();
     this.updatePostProcessing();
+    if (scene && !scene.mainCamera) {
+      scene.mainCamera = this;
+    }
   }
   /** {@inheritDoc SceneNode.clone} */
   clone(method: NodeCloneMethod, recursive: boolean): Camera {

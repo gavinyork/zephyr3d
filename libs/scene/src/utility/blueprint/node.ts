@@ -27,6 +27,9 @@ export type GraphNodeInput = {
   type: string[];
   inputNode?: IGraphNode;
   inputId?: number;
+  defaultValue?: number[] | number;
+  required?: boolean;
+  originType?: string;
 };
 export type GraphNodeOutput = {
   id: number;
@@ -85,5 +88,13 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
     input.inputId = inputId;
   }
   protected abstract getType(_id?: number): string;
-  protected abstract validate(): string;
+  protected validate(): string {
+    for (let i = 0; i < this._inputs.length; i++) {
+      const input = this._inputs[i];
+      if (input.required && !input.inputNode) {
+        return `Missing required argument: input[${i}]`;
+      }
+    }
+    return '';
+  }
 }

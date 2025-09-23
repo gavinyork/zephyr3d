@@ -1,4 +1,10 @@
-import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp, ShaderTypeFunc } from '@zephyr3d/device';
+import {
+  BindGroup,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  ShaderTypeFunc
+} from '@zephyr3d/device';
 import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
@@ -6,7 +12,9 @@ import { mixinLight } from '../lit';
 import type { IMixinPBRBRDF } from '../pbr/brdf';
 import { mixinPBRBRDF } from '../pbr/brdf';
 import type { MaterialBlueprintIR } from '../../../utility/blueprint/material/ir';
-import { ShaderHelper } from '../..';
+import { ShaderHelper } from '../../shader/helper';
+import { DrawContext } from '../../../render';
+import { getGGXLUT } from '../../../utility/textures/ggxlut';
 
 /**
  * Interface for mixinPBRBluePrint lighting model mixin
@@ -20,8 +28,13 @@ export type IMixinPBRBluePrint = {
     commonData: PBShaderExp,
     outRoughness?: PBShaderExp
   ): PBShaderExp;
-  getCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR): PBShaderExp;
-  calculateCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR, data: PBShaderExp): void;
+  getCommonData(scope: PBInsideFunctionScope, worldPos: PBShaderExp, ir: MaterialBlueprintIR): PBShaderExp;
+  calculateCommonData(
+    scope: PBInsideFunctionScope,
+    ir: MaterialBlueprintIR,
+    worldPos: PBShaderExp,
+    data: PBShaderExp
+  ): void;
   directLighting(
     scope: PBInsideFunctionScope,
     lightDir: PBShaderExp,
@@ -61,13 +74,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       super.copyFrom(other);
     }
 
-    getCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR): PBShaderExp {
+    getCommonData(scope: PBInsideFunctionScope, worldPos: PBShaderExp, ir: MaterialBlueprintIR): PBShaderExp {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'Z_getCommonData';
       pb.func(funcName, [], function () {
         this.$l.data = that.getCommonDatasStruct(this)();
-        that.calculateCommonData(this, ir, this.data);
+        that.calculateCommonData(this, ir, worldPos, this.data);
         this.$return(this.data);
       });
       return scope.$g[funcName]();
@@ -125,7 +138,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               dirCutoff
             );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-            this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+            this.$l.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.lightDir), 0, 1);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
             if (shadow) {
               this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
@@ -150,13 +163,28 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       super.vertexShader(scope);
     }
     fragmentShader(scope: PBFunctionScope): void {
+      const pb = scope.$builder;
       super.fragmentShader(scope);
+      if (this.needFragmentColor()) {
+        if (this.drawContext.drawEnvLight) {
+          scope.zGGXLut = pb.tex2D().uniform(2);
+        }
+      }
     }
-    calculateCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR, data: PBShaderExp): void {
+    calculateCommonData(
+      scope: PBInsideFunctionScope,
+      ir: MaterialBlueprintIR,
+      worldPos: PBShaderExp,
+      data: PBShaderExp
+    ): void {
+      const that = this;
       const pb = scope.$builder;
       const funcName = 'zCalculateCommonDataPBRBluePrint';
-      const params: PBShaderExp[] = [this.getCommonDatasStruct(scope)('zCommonData')];
-      const paramValues: PBShaderExp[] = [data];
+      const params: PBShaderExp[] = [
+        this.getCommonDatasStruct(scope)('zCommonData').out(),
+        pb.vec3('zWorldPos')
+      ];
+      const paramValues: PBShaderExp[] = [data, worldPos];
       if (ir.behaviors.useVertexColor) {
         params.push(pb.vec4('zVertexColor'));
         paramValues.push(scope.$inputs.zVertexColor);
@@ -171,11 +199,11 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         const outputs = ir.create(pb);
-        this.zCommonData.albedo = outputs.baseColor;
-        this.zCommonData.metallic = outputs.metallic;
-        this.zCommonData.roughness = outputs.roughness;
-        this.zCommonData.specular = outputs.specular;
-        this.zCommonData.emissive = outputs.emissive;
+        this.zCommonData.albedo = outputs.BaseColor;
+        this.zCommonData.metallic = outputs.Metallic;
+        this.zCommonData.roughness = outputs.Roughness;
+        this.zCommonData.specular = outputs.Specular;
+        this.zCommonData.emissive = outputs.Emissive;
         this.zCommonData.f90 = pb.vec3(1);
         this.zCommonData.f0 = pb.vec4(
           pb.mix(
@@ -183,18 +211,27 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.zCommonData.albedo.rgb,
             this.zCommonData.metallic
           ),
-          this.getF0(scope).a
+          1.5
         );
-        this.zCommonData.normal = outputs.normal;
-        this.$l.zTangent = outputs.tangent;
-        this.zTangent = pb.normalize(
-          pb.sub(
-            this.zTangent,
-            pb.mul(this.zCommonData.normal, pb.dot(this.zCommonData.normal, this.zTangent))
-          )
-        );
-        this.$l.zBinormal = pb.cross(this.zCommonData.normal, this.zTangent);
-        this.zCommonData.TBN = pb.mat3(this.zTangent, this.zBinormal, this.zCommonData.normal);
+        if (outputs.Normal) {
+          this.zCommonData.normal = outputs.Normal;
+          this.zCommonData.TBN = that.calculateTBN(
+            this,
+            this.zWorldPos,
+            this.zCommonData.normal,
+            outputs.Tangent instanceof PBShaderExp ? outputs.Tangent : undefined
+          );
+        } else {
+          this.$l.normalInfo = that.calculateNormalAndTBN(
+            this,
+            this.zWorldPos,
+            ir.behaviors.useVertexNormal ? this.$inputs.zVertexNormal : undefined,
+            ir.behaviors.useVertexTangent ? this.$inputs.zVertexTangent : undefined,
+            ir.behaviors.useVertexTangent ? this.$inputs.zVertexBinormal : undefined
+          );
+          this.zCommonData.normal = this.normalInfo.normal;
+          this.zCommonData.TBN = this.normalInfo.TBN;
+        }
         this.zCommonData.diffuse = pb.vec4(
           pb.mix(this.zCommonData.albedo.rgb, pb.vec3(0), this.zCommonData.metallic),
           this.zCommonData.albedo.a
@@ -236,10 +273,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
             this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F);
             this.outColor = pb.add(this.outColor, this.specular);
-            this.$l.diffuseBRDF = pb.mul(
-              pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
-              pb.div(this.data.diffuse.rgb, Math.PI)
-            );
+            this.$l.diffuseBRDF = pb.mul(pb.sub(pb.vec3(1), this.F), pb.div(this.data.diffuse.rgb, Math.PI));
             this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)));
             this.outColor = pb.add(this.outColor, this.diffuse);
           });
@@ -325,6 +359,14 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.$g[funcName](viewVec, commonData, outColor, outRoughness);
       } else {
         scope.$g[funcName](viewVec, commonData, outColor);
+      }
+    }
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      super.applyUniformValues(bindGroup, ctx, pass);
+      if (this.needFragmentColor(ctx)) {
+        if (ctx.drawEnvLight) {
+          bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
+        }
       }
     }
   } as unknown as T & { new (...args: any[]): IMixinPBRBluePrint };

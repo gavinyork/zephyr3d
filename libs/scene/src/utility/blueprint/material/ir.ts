@@ -17,7 +17,8 @@ import {
 import type { GenericConstructor } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
-import { getDevice } from '../../../app';
+import { getDevice } from '../../../app/api';
+import { GenericMathNode } from '../common/math';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number };
 export type IRUniformTexture = {
@@ -104,6 +105,33 @@ class IRConstantfv extends IRExpression {
   }
   asUniformValue(): IRUniformValue {
     return this.name ? { name: this.name, value: new Float32Array(this.value) } : null;
+  }
+}
+
+class IRFunc extends IRExpression {
+  readonly params: (number | IRExpression)[];
+  readonly func: string;
+  private tmpName: string;
+  constructor(params: (number | IRExpression)[], func: string) {
+    super();
+    this.params = params.map((param) => (param instanceof IRExpression ? param.addRef() : param));
+    this.func = func;
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const exp = pb[this.func](
+      ...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param))
+    );
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
   }
 }
 
@@ -226,10 +254,14 @@ export class MaterialBlueprintIR {
   private _uniformValues: IRUniformValue[];
   private _uniformTextures: IRUniformTexture[];
   private _behaviors: MaterialBlueprintIRBehaviors;
+  private _outputs: Record<string, IRExpression>;
   constructor(dag: BlueprintDAG, hash: string) {
     this._dag = dag;
     this._hash = hash;
-    this.reset();
+    this.compile();
+  }
+  get ok() {
+    return !!this._outputs;
   }
   get hash() {
     return this._hash;
@@ -249,20 +281,35 @@ export class MaterialBlueprintIR {
   get uniformTextures() {
     return this._uniformTextures;
   }
-  create(pb: ProgramBuilder): Record<string, PBShaderExp | number> {
-    const irMap: Record<string, IRExpression> = {};
+  compile(): boolean {
     this.reset();
+    this._outputs = {};
     for (const root of this._dag.roots) {
-      const connections = this._dag.graph.incoming[root];
+      //const connections = this._dag.graph.incoming[root];
       const rootNode = this._dag.nodeMap[root];
-      for (const conn of connections) {
-        const name = rootNode.inputs[conn.endSlotId].name;
-        irMap[name] = this.ir(this._dag.nodeMap[conn.targetNodeId], conn.startSlotId);
+      for (const input of rootNode.inputs) {
+        const name = input.name;
+        if (input.inputNode) {
+          this._outputs[name] = this.ir(input.inputNode, input.inputId, input.originType);
+        } else if (typeof input.defaultValue === 'number') {
+          this._outputs[name] = new IRConstantf(input.defaultValue, '');
+        } else if (Array.isArray(input.defaultValue)) {
+          this._outputs[name] = new IRConstantfv(input.defaultValue, '');
+        } else if (input.required) {
+          this._outputs = null;
+          return false;
+        }
       }
     }
+    return true;
+  }
+  create(pb: ProgramBuilder): Record<string, PBShaderExp | number> {
+    if (!this._outputs) {
+      return null;
+    }
     const outputs: Record<string, PBShaderExp | number> = {};
-    for (const k in irMap) {
-      outputs[k] = irMap[k].create(pb);
+    for (const k in this._outputs) {
+      outputs[k] = this._outputs[k].create(pb);
     }
     return outputs;
   }
@@ -271,30 +318,62 @@ export class MaterialBlueprintIR {
     this._expressionMap = new Map();
     this._uniformTextures = [];
     this._uniformValues = [];
+    this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
       useVertexNormal: false,
       useVertexTangent: false
     };
   }
-  private ir(node: IGraphNode, output: number): IRExpression {
+  private ir(node: IGraphNode, output: number, originType?: string): IRExpression {
+    let expr: IRExpression = null;
     if (node instanceof ConstantScalarNode) {
-      return this.constantf(node, output);
+      expr = this.constantf(node, output);
     }
     if (
       node instanceof ConstantVec2Node ||
       node instanceof ConstantVec3Node ||
       node instanceof ConstantVec4Node
     ) {
-      return this.constantfv(node, output);
+      expr = this.constantfv(node, output);
     }
     if (node instanceof BaseTextureNode) {
-      return this.constantTexture(node, output);
+      expr = this.constantTexture(node, output);
     }
     if (node instanceof TextureSampleNode) {
-      return this.textureSample(node, output);
+      expr = this.textureSample(node, output);
     }
-    return null;
+    if (node instanceof GenericMathNode) {
+      expr = this.func(node, output);
+    }
+    if (expr && originType) {
+      const outputType = node.getOutputType(output);
+      if (originType !== outputType) {
+        if (originType === 'float') {
+          if (outputType !== 'vec2' && outputType !== 'vec3' && outputType !== 'vec4') {
+            throw new Error(`Cannot cast type \`${outputType}\` to \`${originType}`);
+          }
+          return new IRSwizzle(expr, 'x');
+        } else if (outputType === 'float') {
+          if (originType !== 'vec2' && originType !== 'vec3' && originType !== 'vec4') {
+            throw new Error(`Cannot cast type \`${outputType}\` to \`${originType}`);
+          }
+          return new IRCast(expr, originType, 0);
+        } else if (outputType === 'vec2' || outputType === 'vec3' || outputType === 'vec4') {
+          const nOut = Number(outputType[outputType.length - 1]);
+          const nOrg = Number(originType[originType.length - 1]);
+          if (nOut > nOrg) {
+            return new IRSwizzle(expr, 'xyzw'.slice(0, nOrg));
+          } else {
+            return new IRCast(expr, originType, nOrg - nOut);
+          }
+        } else {
+          throw new Error(`Cannot cast type \`${outputType}\` to \`${originType}`);
+        }
+      }
+    }
+
+    return expr;
   }
   private getOrCreateIRExpression<
     T extends GenericConstructor<IRExpression>,
@@ -317,17 +396,26 @@ export class MaterialBlueprintIR {
       ir = this._expressions[this._expressionMap.get(node)] as InstanceType<T>;
     }
     if (!ir.outputs[outputId]) {
-      const output = node.outputs[outputId];
-      let outputIR: IRExpression = null;
+      const output = node.outputs.find((v) => v.id === outputId);
+      ir.outputs[outputId] = ir;
       if (typeof output.cast === 'number') {
-        outputIR = new IRCast(ir, node.getOutputType(outputId), output.cast);
+        ir.outputs[outputId] = new IRCast(ir, node.getOutputType(outputId), output.cast);
       }
       if (output.swizzle) {
-        outputIR = new IRSwizzle(outputIR, output.swizzle);
+        ir.outputs[outputId] = new IRSwizzle(ir.outputs[outputId], output.swizzle);
       }
-      ir.outputs[outputId] = outputIR ?? ir;
     }
     return ir.outputs[outputId];
+  }
+  private func(node: GenericMathNode, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    for (const input of node.inputs) {
+      if (input.inputNode) {
+        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+      }
+    }
+    const funcName = node.func;
+    return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
   }
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);

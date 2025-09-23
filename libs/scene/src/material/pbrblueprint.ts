@@ -5,7 +5,7 @@ import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
 import type { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
-import type { DrawContext } from '../render';
+import type { DrawContext } from '../render/drawable';
 
 /**
  * PBRBluePrintMaterial class
@@ -74,7 +74,7 @@ export class PBRBluePrintMaterial
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
-      scope.$l.commonData = this.getCommonData(scope, this._ir);
+      scope.$l.commonData = this.getCommonData(scope, scope.$inputs.worldPos, this._ir);
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {

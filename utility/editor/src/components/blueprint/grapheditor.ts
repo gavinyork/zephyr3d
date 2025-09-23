@@ -16,6 +16,11 @@ export class GraphEditor implements GraphEditorApi {
   get nodeEditor() {
     return this._nodeEditor;
   }
+
+  get nodePropEditor() {
+    return this._nodePropGrid;
+  }
+
   render() {
     if (this._nodeEditor.selectedNodes.length === 1) {
       const selectedNode = this._nodeEditor.nodes.get(this._nodeEditor.selectedNodes[0]);
@@ -37,7 +42,7 @@ export class GraphEditor implements GraphEditorApi {
       this._rightPanel.top = cursorPos.y;
       this._rightPanel.height = height;
       if (this._rightPanel.beginChild('##NodeProperies')) {
-        this._nodePropGrid.render();
+        this.renderRightPanel();
       }
       this._rightPanel.endChild();
 
@@ -62,5 +67,8 @@ export class GraphEditor implements GraphEditorApi {
   }
   isCompatiblePin(_inType: string, _outType: string): boolean {
     return false;
+  }
+  protected renderRightPanel() {
+    this._nodePropGrid.render();
   }
 }

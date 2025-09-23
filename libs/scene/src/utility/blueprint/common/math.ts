@@ -7,7 +7,8 @@ export class MakeVectorNode extends BaseGraphNode {
       {
         id: 1,
         name: 'a',
-        type: ['float', 'vec2', 'vec3']
+        type: ['float', 'vec2', 'vec3'],
+        required: true
       },
       {
         id: 2,
@@ -102,7 +103,8 @@ export class GenericMathNode extends BaseGraphNode {
     outType?: string,
     inTypes?: string[],
     explicitInTypes?: Record<number, string[]>,
-    additionalInTypes?: Record<number, string[]>
+    additionalInTypes?: Record<number, string[]>,
+    originTypes?: string[]
   ) {
     super();
     this.func = func;
@@ -115,7 +117,9 @@ export class GenericMathNode extends BaseGraphNode {
       name: 'abcdefghijklmn'[index],
       type: this.explicitInTypes?.[index + 1] ?? [
         ...new Set([...inTypes, ...(this.additionalInTypes?.[index + 1] ?? [])])
-      ]
+      ],
+      required: true,
+      originType: originTypes?.[index]
     }));
     this._outputs = [
       {
@@ -128,12 +132,13 @@ export class GenericMathNode extends BaseGraphNode {
     return this.func;
   }
   validate() {
+    let err = super.validate();
+    if (err) {
+      return err;
+    }
     let type: string = '';
     for (let i = 0; i < this._inputs.length; i++) {
       const name = 'abcdefghijklmn'[i];
-      if (!this._inputs[i].inputNode) {
-        return `Missing argument \`${name}\``;
-      }
       const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
       if (!t) {
         return `Cannot determine type of argument \`${name}\``;

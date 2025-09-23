@@ -13,3 +13,4 @@ export * from './blueprint/common/constants';
 export * from './blueprint/common/math';
 export * from './blueprint/material/texture';
 export * from './blueprint/material/pbr';
+export * from './blueprint/material/ir';
