@@ -461,6 +461,24 @@ const builtinFunctionsAll = {
       ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2, 2])
     ]
   },
+  saturate: {
+    overloads: [],
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('saturate');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        throw new PBParamValueError('saturate', 'x');
+      }
+      const argType = args[0].$ast.getType();
+      if (!argType.isPrimitiveType() || (!argType.isScalarType() && !argType.isVectorType())) {
+        throw new PBParamTypeError('saturate', 'x');
+      }
+      const a = argType.isScalarType() ? 0 : pb[`vec${argType.cols}`](0);
+      const b = argType.isScalarType() ? 1 : pb[`vec${argType.cols}`](1);
+      return pb.clamp(args[0], a, b);
+    }
+  },
   mix: {
     overloads: [
       ...genType('mix', MASK_ALL, 0, [0, 0, 0]),

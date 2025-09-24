@@ -114,7 +114,7 @@ export class PBRBluePrintMaterial
         bindGroup.setValue(u.name, u.value);
       }
       for (const u of this._ir.uniformTextures) {
-        bindGroup.setTexture(u.name, u.defaultTexture.get(), u.sampler.get());
+        bindGroup.setTexture(u.name, u.texture.get(), u.sampler.get());
       }
     }
   }

@@ -38,7 +38,7 @@ import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
-import type { Texture2D, TextureCube } from '@zephyr3d/device';
+import type { Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
 import {
   getJSONBoolClass,
   getJSONObjectClass,
@@ -53,7 +53,12 @@ import {
   getConstantVec3Class,
   getConstantVec4Class
 } from './blueprint/constants';
-import { getMaterialBaseTextureClass } from './blueprint/material/texture';
+import {
+  getMaterialBaseTextureClass,
+  getMaterialTexture2DArrayClass,
+  getMaterialTexture2DClass,
+  getMaterialTextureCubeClass
+} from './blueprint/material/texture';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -168,7 +173,10 @@ export class SerializationManager {
         getConstantVec2Class(),
         getConstantVec3Class(),
         getConstantVec4Class(),
-        getMaterialBaseTextureClass()
+        getMaterialBaseTextureClass(),
+        getMaterialTexture2DClass(this),
+        getMaterialTexture2DArrayClass(this),
+        getMaterialTextureCubeClass(this)
       ].map((val) => [val.ctor, val])
     );
     for (const k of this._classMap) {
@@ -437,7 +445,7 @@ export class SerializationManager {
   protected async doFetchModel(path: string, scene: Scene, options?: ModelFetchOptions) {
     return await this._assetManager.fetchModel(scene, path, options);
   }
-  protected async doFetchTexture<T extends Texture2D | TextureCube>(
+  protected async doFetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(
     path: string,
     options?: TextureFetchOptions<T>
   ) {
@@ -467,7 +475,10 @@ export class SerializationManager {
    *
    * @returns A Promise resolving to the loaded texture, or `null` if failed.
    */
-  async fetchTexture<T extends Texture2D | TextureCube>(id: string, options?: TextureFetchOptions<T>) {
+  async fetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(
+    id: string,
+    options?: TextureFetchOptions<T>
+  ) {
     const texture = await this.doFetchTexture(id, options);
     if (texture) {
       this._allocated.set(texture, id);

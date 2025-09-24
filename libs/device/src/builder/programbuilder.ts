@@ -707,6 +707,8 @@ export interface ProgramBuilder {
   max(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** Same as clamp builtin function in GLSL and WGSL */
   clamp(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
+  /** Clamp to [0, 1] */
+  saturate(x: PBShaderExp): PBShaderExp;
   /** Same as mix builtin function in GLSL and WGSL */
   mix(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
   /** Same as step builtin function in GLSL and WGSL */

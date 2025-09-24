@@ -172,10 +172,12 @@ export class GenericMathNode extends BaseGraphNode {
         return '';
       }
       if (!this.explicitInTypes || !this.explicitInTypes[this._inputs[i].id]) {
-        if (type && t !== type) {
-          return '';
-        } else {
-          type = t;
+        if (!this.additionalInTypes || !this.additionalInTypes[this._inputs[i].id]?.includes(t)) {
+          if (type && t !== type) {
+            return 'Invalid Arguments types';
+          } else {
+            type = t;
+          }
         }
       }
     }
@@ -428,6 +430,12 @@ export class FmaNode extends GenericMathNode {
 export class ClampNode extends GenericMathNode {
   constructor() {
     super('clamp', 3);
+  }
+}
+
+export class SaturateNode extends GenericMathNode {
+  constructor() {
+    super('saturate', 1);
   }
 }
 

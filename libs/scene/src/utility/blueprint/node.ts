@@ -41,7 +41,7 @@ export type GraphNodeOutput = {
 export interface IGraphNode extends IEventTarget<{ changed: [] }> {
   readonly inputs: GraphNodeInput[];
   readonly outputs: GraphNodeOutput[];
-  readonly error: string;
+  error: string;
   getOutputType(id: number): string;
   toString(): string;
   check(): void;
@@ -69,6 +69,9 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
   }
   get error() {
     return this._error;
+  }
+  set error(str: string) {
+    this._error = str;
   }
   toString() {
     return '';

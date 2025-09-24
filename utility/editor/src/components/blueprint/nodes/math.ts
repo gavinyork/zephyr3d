@@ -37,7 +37,18 @@ import {
   MinNode,
   MaxNode,
   StepNode,
-  MakeVectorNode
+  MakeVectorNode,
+  MixNode,
+  NormalizeNode,
+  FaceForwardNode,
+  ReflectNode,
+  RefractNode,
+  LengthNode,
+  DistanceNode,
+  PowNode,
+  FmaNode,
+  ClampNode,
+  SaturateNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -197,6 +208,50 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Max',
           create: () => new MaxNode()
+        },
+        {
+          name: 'Mix',
+          create: () => new MixNode()
+        },
+        {
+          name: 'NormalizeVector',
+          create: () => new NormalizeNode()
+        },
+        {
+          name: 'FaceForward',
+          create: () => new FaceForwardNode()
+        },
+        {
+          name: 'Reflect',
+          create: () => new ReflectNode()
+        },
+        {
+          name: 'Refract',
+          create: () => new RefractNode()
+        },
+        {
+          name: 'VectorLength',
+          create: () => new LengthNode()
+        },
+        {
+          name: 'Distance',
+          create: () => new DistanceNode()
+        },
+        {
+          name: 'Power',
+          create: () => new PowNode()
+        },
+        {
+          name: 'MultiplyAdd',
+          create: () => new FmaNode()
+        },
+        {
+          name: 'Clamp',
+          create: () => new ClampNode()
+        },
+        {
+          name: 'Saturate',
+          create: () => new SaturateNode()
         },
         {
           name: 'Step',

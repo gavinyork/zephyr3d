@@ -984,9 +984,11 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     }
 
     if (ImGui.IsMouseDown(0)) {
+      /*
       if (isCanvasHovered && !this.draggingNode && !this.isCreatingLink) {
         this.isDraggingCanvas = this.isDraggingCanvas || true;
       }
+      */
       if (this.isDraggingCanvas) {
         const mouseDelta = ImGui.GetMouseDragDelta(0);
         this.canvasOffset.x += mouseDelta.x / this.canvasScale;

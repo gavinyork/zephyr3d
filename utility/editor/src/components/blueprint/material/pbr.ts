@@ -36,9 +36,10 @@ export class PBRMaterialEditor extends GraphEditor {
     this.nodeEditor.on('changed', this.graphChanged, this);
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
+    scene.env.sky.cameraHeightScale = 5000;
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
-    camera.lookAt(new Vector3(0, 0, 10), Vector3.zero(), Vector3.axisPY());
+    camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
     this._previewScene = new DRef(scene);
     this._framebuffer = new DRef();
     const light = new DirectionalLight(scene);
@@ -144,6 +145,20 @@ export class PBRMaterialEditor extends GraphEditor {
       this._previewMesh.get().material = this._defaultMaterial.get();
     } else {
       const ir = new MaterialBlueprintIR(dag, randomUUID());
+      const uniformNames: Set<string> = new Set();
+      for (const u of [...ir.uniformValues, ...ir.uniformTextures]) {
+        if (uniformNames.has(u.name)) {
+          for (const i of dag.order) {
+            const node = this.nodeEditor.nodes.get(i);
+            if (node.impl === u.node) {
+              node.impl.error = `Duplicated uniform name: ${u.name}`;
+              return;
+            }
+          }
+        } else {
+          uniformNames.add(u.name);
+        }
+      }
       this._previewMesh.get().material = new PBRBluePrintMaterial(ir);
     }
   }

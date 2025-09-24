@@ -174,6 +174,21 @@ export function getConstantVec3Class(): SerializableClass {
           set(this: ConstantVec3Node, value) {
             this.z = value.num[0];
           }
+        },
+        {
+          name: 'RGB',
+          type: 'rgb',
+          default: [0, 0, 0],
+          get(this: ConstantVec3Node, value) {
+            value.num[0] = this.x;
+            value.num[1] = this.y;
+            value.num[2] = this.z;
+          },
+          set(this: ConstantVec3Node, value) {
+            this.x = value.num[0];
+            this.y = value.num[1];
+            this.z = value.num[2];
+          }
         }
       ];
     }
@@ -253,6 +268,23 @@ export function getConstantVec4Class(): SerializableClass {
           },
           set(this: ConstantVec4Node, value) {
             this.w = value.num[0];
+          }
+        },
+        {
+          name: 'RGBA',
+          type: 'rgba',
+          default: [0, 0, 0, 0],
+          get(this: ConstantVec4Node, value) {
+            value.num[0] = this.x;
+            value.num[1] = this.y;
+            value.num[2] = this.z;
+            value.num[3] = this.z;
+          },
+          set(this: ConstantVec4Node, value) {
+            this.x = value.num[0];
+            this.y = value.num[1];
+            this.z = value.num[2];
+            this.w = value.num[3];
           }
         }
       ];

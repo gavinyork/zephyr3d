@@ -21,6 +21,27 @@ export class VertexColorNode extends BaseGraphNode {
   }
 }
 
+export class VertexPositionNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  toString() {
+    return 'world position';
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(id: number): string {
+    return id > 1 ? 'float' : 'vec3';
+  }
+}
+
 export class VertexNormalNode extends BaseGraphNode {
   constructor() {
     super();
@@ -75,6 +96,27 @@ export class VertexBinormalNode extends BaseGraphNode {
   }
   toString() {
     return 'vertex binormal';
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(id: number): string {
+    return id > 1 ? 'float' : 'vec3';
+  }
+}
+
+export class CameraPositionNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  toString() {
+    return 'camera position';
   }
   protected validate(): string {
     return '';

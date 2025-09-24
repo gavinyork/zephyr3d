@@ -19,13 +19,21 @@ import { DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
 import { GenericMathNode, MakeVectorNode } from '../common/math';
-import { VertexBinormalNode, VertexColorNode, VertexNormalNode, VertexTangentNode } from './inputs';
+import {
+  CameraPositionNode,
+  VertexBinormalNode,
+  VertexColorNode,
+  VertexNormalNode,
+  VertexPositionNode,
+  VertexTangentNode
+} from './inputs';
 
-export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number };
+export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number; node: IGraphNode };
 export type IRUniformTexture = {
   name: string;
-  defaultTexture: DRef<BaseTexture>;
+  texture: DRef<BaseTexture>;
   sampler: DRef<TextureSampler>;
+  node: IGraphNode;
 };
 
 abstract class IRExpression {
@@ -52,10 +60,10 @@ abstract class IRExpression {
       }
     }
   }
-  asUniformValue(): IRUniformValue {
+  asUniformValue(_node: IGraphNode): IRUniformValue {
     return null;
   }
-  asUniformTexture(): IRUniformTexture {
+  asUniformTexture(_node: IGraphNode): IRUniformTexture {
     return null;
   }
 }
@@ -77,11 +85,12 @@ class IRConstantf extends IRExpression {
     }
     return this.value;
   }
-  asUniformValue(): IRUniformValue {
+  asUniformValue(node: IGraphNode): IRUniformValue {
     return this.name
       ? {
           name: this.name,
-          value: this.value
+          value: this.value,
+          node
         }
       : null;
   }
@@ -104,8 +113,8 @@ class IRConstantfv extends IRExpression {
     }
     return Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value;
   }
-  asUniformValue(): IRUniformValue {
-    return this.name ? { name: this.name, value: new Float32Array(this.value) } : null;
+  asUniformValue(node: IGraphNode): IRUniformValue {
+    return this.name ? { name: this.name, value: new Float32Array(this.value), node } : null;
   }
 }
 
@@ -235,10 +244,10 @@ class IRConstantTexture extends IRExpression {
     }
     return pb.getGlobalScope()[this.name];
   }
-  asUniformTexture(): IRUniformTexture {
+  asUniformTexture(node: BaseTextureNode): IRUniformTexture {
     return {
       name: this.name,
-      defaultTexture: new DRef(),
+      texture: new DRef(node.texture.get()),
       sampler: new DRef(
         getDevice().createSampler({
           addressU: this.addressU,
@@ -247,7 +256,8 @@ class IRConstantTexture extends IRExpression {
           magFilter: this.filterMag,
           mipFilter: this.filterMip
         })
-      )
+      ),
+      node
     };
   }
 }
@@ -255,6 +265,7 @@ class IRConstantTexture extends IRExpression {
 export interface MaterialBlueprintIRBehaviors {
   useVertexColor: boolean;
   useVertexTangent: boolean;
+  useCameraPosition: boolean;
 }
 
 export class MaterialBlueprintIR {
@@ -332,7 +343,8 @@ export class MaterialBlueprintIR {
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
-      useVertexTangent: false
+      useVertexTangent: false,
+      useCameraPosition: false
     };
   }
   private ir(node: IGraphNode, output: number, originType?: string): IRExpression {
@@ -355,12 +367,16 @@ export class MaterialBlueprintIR {
       expr = this.func(node, output);
     } else if (node instanceof VertexColorNode) {
       expr = this.vertexColor(node, output);
+    } else if (node instanceof VertexPositionNode) {
+      expr = this.vertexPosition(node, output);
     } else if (node instanceof VertexNormalNode) {
       expr = this.vertexNormal(node, output);
     } else if (node instanceof VertexTangentNode) {
       expr = this.vertexTangent(node, output);
     } else if (node instanceof VertexBinormalNode) {
       expr = this.vertexBinormal(node, output);
+    } else if (node instanceof CameraPositionNode) {
+      expr = this.cameraPosition(node, output);
     }
     if (expr && originType) {
       const outputType = node.getOutputType(output);
@@ -400,11 +416,11 @@ export class MaterialBlueprintIR {
       ir = new ctor(...args);
       this._expressions.push(ir);
       this._expressionMap.set(node, this._expressions.length - 1);
-      const uniformValue = ir.asUniformValue();
+      const uniformValue = ir.asUniformValue(node);
       if (uniformValue) {
         this._uniformValues.push(uniformValue);
       }
-      const uniformTexture = ir.asUniformTexture();
+      const uniformTexture = ir.asUniformTexture(node);
       if (uniformTexture) {
         this._uniformTextures.push(uniformTexture);
       }
@@ -457,6 +473,13 @@ export class MaterialBlueprintIR {
   private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {
     this._behaviors.useVertexTangent = true;
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexBinormal');
+  }
+  private vertexPosition(node: VertexPositionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zWorldPos');
+  }
+  private cameraPosition(node: CameraPositionNode, output: number): IRExpression {
+    this._behaviors.useCameraPosition = true;
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zCameraPos');
   }
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);

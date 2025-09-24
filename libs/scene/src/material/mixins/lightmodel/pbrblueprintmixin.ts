@@ -223,8 +223,11 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         paramValues.push(vertexColor);
       }
       pb.func(funcName, params, function () {
+        if (ir.behaviors.useCameraPosition) {
+          this.$l.zCameraPos = ShaderHelper.getCameraPosition(this);
+        }
         const outputs = ir.create(pb);
-        this.zCommonData.albedo = outputs.BaseColor;
+        this.zCommonData.albedo = pb.vec4((outputs.BaseColor as PBShaderExp).rgb, outputs.Opacity);
         this.zCommonData.metallic = outputs.Metallic;
         this.zCommonData.roughness = outputs.Roughness;
         this.zCommonData.specular = outputs.Specular;

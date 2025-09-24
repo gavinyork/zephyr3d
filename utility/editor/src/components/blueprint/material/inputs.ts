@@ -1,4 +1,11 @@
-import { VertexColorNode, VertexNormalNode, VertexTangentNode, VertexBinormalNode } from '@zephyr3d/scene';
+import {
+  VertexColorNode,
+  VertexNormalNode,
+  VertexTangentNode,
+  VertexBinormalNode,
+  CameraPositionNode,
+  VertexPositionNode
+} from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
 export function getInputNodeCategories(): NodeCategory[] {
@@ -21,6 +28,14 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'VertexBinormalWS',
           create: () => new VertexBinormalNode()
+        },
+        {
+          name: 'WorldPosition',
+          create: () => new VertexPositionNode()
+        },
+        {
+          name: 'CameraPositionWS',
+          create: () => new CameraPositionNode()
         }
       ]
     }

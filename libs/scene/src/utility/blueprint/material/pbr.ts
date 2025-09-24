@@ -50,6 +50,13 @@ export class PBRBlockNode extends BaseGraphNode {
         name: 'Tangent',
         type: ['vec3'],
         originType: 'vec3'
+      },
+      {
+        id: 8,
+        name: 'Opacity',
+        type: ['float'],
+        defaultValue: 1,
+        originType: 'float'
       }
     ];
   }
