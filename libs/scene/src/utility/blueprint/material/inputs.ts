@@ -1,3 +1,4 @@
+import type { SerializableClass } from '../../serialization';
 import { BaseGraphNode } from '../node';
 export class VertexColorNode extends BaseGraphNode {
   constructor() {
@@ -9,6 +10,15 @@ export class VertexColorNode extends BaseGraphNode {
       { id: 4, name: 'b', swizzle: 'z' },
       { id: 5, name: 'a', swizzle: 'w' }
     ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexColorNode,
+      name: 'VertexColorNode',
+      getProps() {
+        return [];
+      }
+    };
   }
   toString() {
     return 'vertex color';
@@ -34,6 +44,15 @@ export class VertexPositionNode extends BaseGraphNode {
   toString() {
     return 'world position';
   }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexPositionNode,
+      name: 'VertexPositionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
   protected validate(): string {
     return '';
   }
@@ -54,6 +73,15 @@ export class VertexNormalNode extends BaseGraphNode {
   }
   toString() {
     return 'vertex normal';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexNormalNode,
+      name: 'VertexNormalNode',
+      getProps() {
+        return [];
+      }
+    };
   }
   protected validate(): string {
     return '';
@@ -76,6 +104,15 @@ export class VertexTangentNode extends BaseGraphNode {
   toString() {
     return 'vertex tangent';
   }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexTangentNode,
+      name: 'VertexTangentNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
   protected validate(): string {
     return '';
   }
@@ -97,6 +134,15 @@ export class VertexBinormalNode extends BaseGraphNode {
   toString() {
     return 'vertex binormal';
   }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexBinormalNode,
+      name: 'VertexBinormalNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
   protected validate(): string {
     return '';
   }
@@ -117,6 +163,15 @@ export class CameraPositionNode extends BaseGraphNode {
   }
   toString() {
     return 'camera position';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: CameraPositionNode,
+      name: 'CameraPositionNode',
+      getProps() {
+        return [];
+      }
+    };
   }
   protected validate(): string {
     return '';

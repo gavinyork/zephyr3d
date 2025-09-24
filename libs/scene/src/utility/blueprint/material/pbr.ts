@@ -1,3 +1,4 @@
+import type { SerializableClass } from '../../serialization';
 import { BaseGraphNode } from '../node';
 
 export class PBRBlockNode extends BaseGraphNode {
@@ -59,6 +60,15 @@ export class PBRBlockNode extends BaseGraphNode {
         originType: 'float'
       }
     ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: PBRBlockNode,
+      name: 'PBRBlockNode',
+      getProps() {
+        return [];
+      }
+    };
   }
   toString(): string {
     return 'Output';

@@ -307,7 +307,6 @@ export class MaterialBlueprintIR {
     this.reset();
     this._outputs = {};
     for (const root of this._dag.roots) {
-      //const connections = this._dag.graph.incoming[root];
       const rootNode = this._dag.nodeMap[root];
       for (const input of rootNode.inputs) {
         const name = input.name;

@@ -10,6 +10,7 @@ import type {
 } from '@zephyr3d/device';
 import { DRef } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
+import type { PropertyAccessor, SerializableClass, SerializationManager } from '../../serialization';
 
 const defaultTexture2D: DRef<Texture2D> = new DRef();
 const defaultTextureCube: DRef<TextureCube> = new DRef();
@@ -53,7 +54,125 @@ export function getDefaultTextureCube(): TextureCube {
   return defaultTextureCube.get();
 }
 
-export class BaseTextureNode<T extends BaseTexture = BaseTexture> extends BaseGraphNode {
+const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseTextureNode>[] {
+  return [
+    {
+      name: 'Name',
+      type: 'string',
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.paramName;
+      },
+      set(this: BaseTextureNode, value) {
+        this.paramName = value.str[0];
+      }
+    },
+    {
+      name: 'AddressU',
+      type: 'string',
+      default: 'clamp',
+      options: {
+        enum: {
+          labels: ['clamp', 'repeat', 'mirrored-repeat'],
+          values: ['clamp', 'repeat', 'mirrored-repeat']
+        }
+      },
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.addressU;
+      },
+      set(this: BaseTextureNode, value) {
+        this.addressU = value.str[0] as TextureAddressMode;
+      }
+    },
+    {
+      name: 'AddressV',
+      type: 'string',
+      default: 'clamp',
+      options: {
+        enum: {
+          labels: ['clamp', 'repeat', 'mirrored-repeat'],
+          values: ['clamp', 'repeat', 'mirrored-repeat']
+        }
+      },
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.addressV;
+      },
+      set(this: BaseTextureNode, value) {
+        this.addressV = value.str[0] as TextureAddressMode;
+      }
+    },
+    {
+      name: 'MinFilter',
+      type: 'string',
+      default: 'nearest',
+      options: {
+        enum: {
+          labels: ['nearest', 'linear'],
+          values: ['nearest', 'linear']
+        }
+      },
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.filterMin;
+      },
+      set(this: BaseTextureNode, value) {
+        this.filterMin = value.str[0] as TextureFilterMode;
+      }
+    },
+    {
+      name: 'MagFilter',
+      type: 'string',
+      default: 'nearest',
+      options: {
+        enum: {
+          labels: ['nearest', 'linear'],
+          values: ['nearest', 'linear']
+        }
+      },
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.filterMag;
+      },
+      set(this: BaseTextureNode, value) {
+        this.filterMag = value.str[0] as TextureFilterMode;
+      }
+    },
+    {
+      name: 'MipFilter',
+      type: 'string',
+      default: 'none',
+      options: {
+        enum: {
+          labels: ['nearest', 'linear', 'none'],
+          values: ['nearest', 'linear', 'none']
+        }
+      },
+      isNullable() {
+        return false;
+      },
+      get(this: BaseTextureNode, value) {
+        value.str[0] = this.filterMip;
+      },
+      set(this: BaseTextureNode, value) {
+        this.filterMip = value.str[0] as TextureFilterMode;
+      }
+    }
+  ];
+})();
+
+export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> extends BaseGraphNode {
   private _paramName: string;
   addressU: TextureAddressMode;
   addressV: TextureAddressMode;
@@ -107,6 +226,62 @@ export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
       }
     ];
   }
+  static getSerializationCls(manager: SerializationManager): SerializableClass {
+    return {
+      ctor: ConstantTexture2DNode,
+      name: 'Texture2DNode',
+      noTitle: true,
+      getProps() {
+        return [
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: ConstantTexture2DNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: ConstantTexture2DNode, value) {
+              if (value?.str[0]) {
+                this.textureId = value.str[0];
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(this.textureId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                const isValidTextureType = tex?.isTexture2D();
+                if (isValidTextureType) {
+                  this.texture.set(tex);
+                } else {
+                  console.error('Invalid texture type');
+                }
+              } else {
+                this.textureId = '';
+              }
+              if (!this.texture.get()) {
+                this.texture.set(getDefaultTexture2D());
+              }
+            }
+          },
+          ...textureNodeProps
+        ];
+      }
+    };
+  }
   protected validate(): string {
     return '';
   }
@@ -126,6 +301,56 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> 
       }
     ];
   }
+  static getSerializationCls(manager: SerializationManager): SerializableClass {
+    return {
+      ctor: ConstantTexture2DArrayNode,
+      name: 'Texture2DArrayNode',
+      noTitle: true,
+      getProps() {
+        return [
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: ['image/x-dds']
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: ConstantTexture2DArrayNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: ConstantTexture2DArrayNode, value) {
+              if (value?.str[0]) {
+                this.textureId = value.str[0];
+                let tex: Texture2DArray;
+                try {
+                  tex = await manager.fetchTexture<Texture2DArray>(this.textureId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                const isValidTextureType = tex?.isTexture2DArray();
+                if (isValidTextureType) {
+                  this.texture.set(tex);
+                } else {
+                  console.error('Invalid texture type');
+                }
+              } else {
+                this.textureId = '';
+              }
+              if (!this.texture.get()) {
+                this.texture.set(getDefaultTexture2DArray());
+              }
+            }
+          },
+          ...textureNodeProps
+        ];
+      }
+    };
+  }
+
   protected validate(): string {
     return '';
   }
@@ -146,6 +371,56 @@ export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
       }
     ];
   }
+  static getSerializationCls(manager: SerializationManager): SerializableClass {
+    return {
+      ctor: ConstantTextureCubeNode,
+      name: 'TextureCubeNode',
+      noTitle: true,
+      getProps() {
+        return [
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: ['image/x-dds']
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: ConstantTextureCubeNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: ConstantTextureCubeNode, value) {
+              if (value?.str[0]) {
+                this.textureId = value.str[0];
+                let tex: TextureCube;
+                try {
+                  tex = await manager.fetchTexture<TextureCube>(this.textureId);
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                const isValidTextureType = tex?.isTextureCube();
+                if (isValidTextureType) {
+                  this.texture.set(tex);
+                } else {
+                  console.error('Invalid texture type');
+                }
+              } else {
+                this.textureId = '';
+              }
+              if (!this.texture.get()) {
+                this.texture.set(getDefaultTextureCube());
+              }
+            }
+          },
+          ...textureNodeProps
+        ];
+      }
+    };
+  }
+
   protected validate(): string {
     return '';
   }
@@ -182,6 +457,15 @@ export class TextureSampleNode extends BaseGraphNode {
         type: ['float']
       }
     ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: TextureSampleNode,
+      name: 'TextureSampleNode',
+      getProps() {
+        return [];
+      }
+    };
   }
   protected validate(): string {
     const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
