@@ -33,36 +33,33 @@ export class GraphEditor implements GraphEditorApi {
       this._nodePropGrid.object = null;
     }
 
-    if (ImGui.Begin(this._label)) {
-      const regionAvail = ImGui.GetContentRegionAvail();
+    const regionAvail = ImGui.GetContentRegionAvail();
 
-      const cursorPos = ImGui.GetCursorPos();
-      const width = regionAvail.x;
-      const height = regionAvail.y;
+    const cursorPos = ImGui.GetCursorPos();
+    const width = regionAvail.x;
+    const height = regionAvail.y;
 
-      this._rightPanel.left = width - this._rightPanel.width;
-      this._rightPanel.top = cursorPos.y;
-      this._rightPanel.height = height;
-      if (this._rightPanel.beginChild('##NodeProperies')) {
-        this.renderRightPanel();
-      }
-      this._rightPanel.endChild();
-
-      ImGui.SetCursorPos(cursorPos);
-      const nodeEditorWidth = this._rightPanel.left - cursorPos.x;
-      const nodeEditorHeight = height;
-      if (nodeEditorWidth > 0 && nodeEditorHeight > 0) {
-        ImGui.BeginChild(
-          '##NodeEditor',
-          new ImGui.ImVec2(nodeEditorWidth, nodeEditorHeight),
-          false,
-          ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
-        );
-        this._nodeEditor.render();
-        ImGui.EndChild();
-      }
+    this._rightPanel.left = width - this._rightPanel.width;
+    this._rightPanel.top = cursorPos.y;
+    this._rightPanel.height = height;
+    if (this._rightPanel.beginChild('##NodeProperies')) {
+      this.renderRightPanel();
     }
-    ImGui.End();
+    this._rightPanel.endChild();
+
+    ImGui.SetCursorPos(cursorPos);
+    const nodeEditorWidth = this._rightPanel.left - cursorPos.x;
+    const nodeEditorHeight = height;
+    if (nodeEditorWidth > 0 && nodeEditorHeight > 0) {
+      ImGui.BeginChild(
+        '##NodeEditor',
+        new ImGui.ImVec2(nodeEditorWidth, nodeEditorHeight),
+        false,
+        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+      );
+      this._nodeEditor.render();
+      ImGui.EndChild();
+    }
   }
   getNodeCategory(): NodeCategory[] {
     return [];

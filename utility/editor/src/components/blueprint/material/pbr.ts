@@ -19,12 +19,16 @@ import { DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
+import { ProjectService } from '../../../core/services/project';
+import { Dialog } from '../../../views/dlg/dlg';
+import { NodeEditorState } from '../nodeeditor';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
   private _previewMesh: DRef<Mesh>;
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
+  private _version: number;
   constructor(label: string, outputName: string) {
     super(label);
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
@@ -32,13 +36,13 @@ export class PBRMaterialEditor extends GraphEditor {
     block.locked = true;
     block.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
     block.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
-    this.nodeEditor.on('changed', this.graphChanged, this);
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
     scene.env.sky.cameraHeightScale = 5000;
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
+    this._version = 0;
     this._previewScene = new DRef(scene);
     this._framebuffer = new DRef();
     const light = new DirectionalLight(scene);
@@ -53,6 +57,8 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewMesh = new DRef(previewMesh);
     this.applyPreviewMaterial();
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
+    this.nodeEditor.on('changed', this.graphChanged, this);
+    this.nodeEditor.on('save', this.save, this);
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -61,6 +67,37 @@ export class PBRMaterialEditor extends GraphEditor {
       ...getTextureNodeCategories(),
       ...getMathNodeCategories()
     ];
+  }
+  get saved() {
+    return this._version === this.nodeEditor.version;
+  }
+  async save(path: string) {
+    if (path) {
+      const state = this.nodeEditor.saveState();
+      try {
+        await ProjectService.VFS.writeFile(path, JSON.stringify(state, null, '  '), {
+          encoding: 'utf8',
+          create: true
+        });
+        this._version = this.nodeEditor.version;
+      } catch (err) {
+        const msg = `Save material failed: ${err}`;
+        console.error(msg);
+        Dialog.messageBox('Error', msg);
+      }
+    }
+  }
+  async load(path: string) {
+    try {
+      const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+      const state = JSON.parse(content) as NodeEditorState;
+      await this.nodeEditor.loadState(state);
+      this._version = this.nodeEditor.version;
+    } catch (err) {
+      const msg = `Load material failed: ${err}`;
+      console.error(msg);
+      Dialog.messageBox('Error', msg);
+    }
   }
   createDAG(): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};

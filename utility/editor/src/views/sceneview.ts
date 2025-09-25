@@ -65,13 +65,11 @@ import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
-import type { GraphEditor } from '../components/blueprint/grapheditor';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
-import { PBRMaterialEditor } from '../components/blueprint/material/pbr';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -100,7 +98,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
-  private _graphEditor: GraphEditor;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
@@ -134,7 +131,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._graphEditor = null;
     this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
@@ -350,8 +346,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Graph Editor',
               id: 'SHOW_GRAPH_EDITOR',
-              action: () => (this._graphEditor = this._graphEditor ? null : new PBRMaterialEditor()),
-              checked: () => !!this._graphEditor
+              action: () => Dialog.editMaterial('Edit material', 'Out', 'test.mat')
             }
           ]
         }
@@ -566,7 +561,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._graphEditor = null;
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
@@ -658,9 +652,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
-    }
-    if (this._graphEditor) {
-      this._graphEditor.render();
     }
   }
   play() {
@@ -912,6 +903,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.on('workspace_drag_end', this.handleWorkspaceDragEnd, this);
     eventBus.on('workspace_dragging', this.handleWorkspaceDragging, this);
     eventBus.on('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
+    eventBus.on('edit_material', this.editMaterial, this);
     this.reset();
     this._sceneHierarchy.selectNode(this.controller.model.scene.rootNode);
   }
@@ -1294,6 +1286,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           eventBus.dispatchEvent('scene_changed');
         });
     }
+  }
+  private editMaterial(label: string, name: string, path: string) {
+    Dialog.editMaterial(label, name, path);
   }
   private handleWorkspaceDragEnd() {
     if (!this._workspaceDragging) {

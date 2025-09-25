@@ -48,10 +48,11 @@ interface TraversalResult {
 
 export class NodeEditor extends Observable<{
   changed: [];
-  save: [];
+  save: [path: string];
   close: [changed: boolean];
 }> {
   private nodeId: number;
+  public version: number;
   private api: GraphEditorApi;
   private emitChange: boolean;
   public nodes: Map<number, GNode>;
@@ -95,6 +96,7 @@ export class NodeEditor extends Observable<{
   constructor(api: GraphEditorApi) {
     super();
     this.nodeId = 1;
+    this.version = 1;
     this.emitChange = true;
     this.api = api;
     this.nodes = new Map();
@@ -142,6 +144,7 @@ export class NodeEditor extends Observable<{
 
   private invalidateStructure() {
     this.structureDirty = true;
+    this.version++;
     if (this.emitChange) {
       this.dispatchEvent('changed');
     }
@@ -1351,15 +1354,6 @@ export class NodeEditor extends Observable<{
   }
 
   public render() {
-    // Toolbar
-    if (ImGui.Button('Save')) {
-      this.dispatchEvent('save');
-    }
-    ImGui.SameLine();
-    if (ImGui.Button('Close')) {
-      this.dispatchEvent('close', this.structureDirty);
-    }
-    ImGui.SameLine();
     if (ImGui.Button('Clear')) {
       const emit = this.emitChange;
       this.emitChange = false;

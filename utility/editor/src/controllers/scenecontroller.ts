@@ -116,7 +116,8 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         break;
       case 'NEW_DOC':
         if (await this.ensureSceneSaved()) {
-          this.createScene(true);
+          const path = typeof args[0] === 'string' ? args[0] : undefined;
+          this.createScene(true, path);
         }
         break;
       case 'SAVE_DOC':
@@ -188,8 +189,8 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
     this._sceneChanged = false;
     this.reset(scene, resetView);
   }
-  createScene(resetView: boolean) {
-    this._scenePath = '';
+  createScene(resetView: boolean, path?: string) {
+    this._scenePath = path ?? '';
     this._sceneChanged = true;
     this.reset(null, resetView);
   }

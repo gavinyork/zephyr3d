@@ -20,6 +20,7 @@ type EventBusEventMap = {
   external_dragover: [ev: DragEvent];
   external_drop: [ev: DragEvent];
   action: [action: string, ...args: any];
+  edit_material: [label: string, outputName: string, path: string];
 };
 
 export class EventBus extends Observable<EventBusEventMap> {}

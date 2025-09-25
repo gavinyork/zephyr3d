@@ -717,6 +717,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
         return;
+      } else if (file.meta.path.toLowerCase().endsWith('.mat')) {
+        const name = this._vfs.basename(file.meta.path).slice(0, -4);
+        eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(file.meta.path);
         if (
@@ -784,8 +787,32 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           }
           if (this._vfs.isParentOf('/assets', this._selectedDir.path)) {
             ImGui.Separator();
+            if (ImGui.MenuItem('Scene...')) {
+              this.createNewFile('Create Scene', 'Scene Name', (path) => {
+                if (!path.toLowerCase().endsWith('.scn')) {
+                  path = `${path}.scn`;
+                }
+                eventBus.dispatchEvent('action', 'NEW_DOC', path);
+              });
+            }
+            ImGui.Separator();
+            if (ImGui.MenuItem('Material...')) {
+              this.createNewFile('Create Material', 'Material Name', (path) => {
+                if (!path.toLowerCase().endsWith('.mat')) {
+                  path = `${path}.mat`;
+                }
+                const name = path.slice(0, -4);
+                eventBus.dispatchEvent('edit_material', name, name, path);
+              });
+            }
+            ImGui.Separator();
             if (ImGui.MenuItem('Typescript...')) {
-              this.createNewFile('Create Typescript', 'NewScript.ts', 'utf8', templateScript);
+              this.createNewFile('Create Typescript', 'Script Name', async (path) => {
+                if (!path.toLowerCase().endsWith('.ts') && !path.toLowerCase().endsWith('.js')) {
+                  path = `${path}.ts`;
+                }
+                await this._vfs.writeFile(path, templateScript ?? '', { encoding: 'utf8', create: true });
+              });
             }
             ImGui.Separator();
             if (ImGui.BeginMenu('Texture')) {
@@ -1049,8 +1076,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private async createNewFile(
     title: string,
     defaultName: string,
-    encoding: 'utf8' | 'binary',
-    content?: string
+    content: (path: string) => void | Promise<void>
   ) {
     if (!this._selectedDir) {
       return;
@@ -1080,7 +1106,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           }
         }
         try {
-          await this._vfs.writeFile(newPath, content ?? '', { encoding, create: true });
+          await content(newPath);
         } catch (err) {
           DlgMessage.messageBox('Error', `Create file failed: ${err}`);
         }
