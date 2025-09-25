@@ -21,7 +21,7 @@ import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
-import { NodeEditorState } from '../nodeeditor';
+import type { NodeEditorState } from '../nodeeditor';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
