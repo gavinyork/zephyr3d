@@ -3,7 +3,8 @@ import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
 import { ASSERT, Observable } from '@zephyr3d/base';
-import type { GraphStructure, NodeConnection } from '@zephyr3d/scene';
+import type { IGraphNode, GraphStructure, NodeConnection } from '@zephyr3d/scene';
+import { getEngine } from '@zephyr3d/scene';
 
 const SLOT_RADIUS = 6;
 
@@ -42,7 +43,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   private draggingNode: number;
   private isDraggingCanvas: boolean;
   private isHoveringMenu: boolean;
-  private readonly canvasOffset: ImGui.ImVec2;
+  private canvasOffset: ImGui.ImVec2;
   public canvasSize: ImGui.ImVec2;
   public canvasScale: number;
   private isCreatingLink: boolean;
@@ -239,6 +240,59 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return reachable;
   }
 
+  public saveState() {
+    const nodes = [...this.nodes.values()].map((node) => {
+      const impl = getEngine().serializationManager.serializeObject(node.impl);
+      return {
+        id: node.id,
+        position: [node.position.x, node.position.y],
+        titleBg: node.titleBg,
+        titleTextCol: node.titleTextCol,
+        locked: node.locked,
+        impl
+      };
+    });
+    const links = this.links.map((link) => ({
+      startNodeId: link.startNodeId,
+      startSlotId: link.startSlotId,
+      endNodeId: link.endNodeId,
+      endSlotId: link.endSlotId
+    }));
+    return {
+      nodes,
+      links,
+      canvasOffset: [this.canvasOffset.x, this.canvasOffset.y],
+      canvasScale: this.canvasScale
+    };
+  }
+
+  public async loadState(state: ReturnType<NodeEditor['saveState']>) {
+    // clear interaction states
+    this.clearInteractionState();
+    // clear nodes
+    const nodes = [...this.nodes.values()];
+    for (const node of nodes) {
+      this.deleteNode(node.id, true);
+    }
+    // load nodes
+    for (const node of state.nodes) {
+      const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.impl);
+      const n = new GNode(this, new ImGui.ImVec2(node.position[0], node.position[1]), impl);
+      n.id = node.id;
+      n.titleBg = node.titleBg;
+      n.titleTextCol = node.titleTextCol;
+      n.locked = node.locked;
+      this.addNode(n);
+    }
+    // load links
+    for (const link of state.links) {
+      this.addLink(link.startNodeId, link.startSlotId, link.endNodeId, link.endSlotId);
+    }
+    // apply canvas states
+    this.canvasOffset.x = state.canvasOffset[0];
+    this.canvasOffset.y = state.canvasOffset[1];
+    this.canvasScale = state.canvasScale;
+  }
   public getTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
@@ -473,13 +527,13 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.links.splice(index, 1);
   }
 
-  private deleteNode(nodeId: number) {
+  private deleteNode(nodeId: number, force = false) {
     const node = this.nodes.get(nodeId);
     if (!node) {
       console.error('Cannot delete non-exist node');
       return;
     }
-    if (node.locked) {
+    if (node.locked && !force) {
       console.info('Cannot delete locked node');
       return;
     }
@@ -1281,6 +1335,12 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       } else {
         console.log('Graph contains cycles!');
       }
+    }
+    ImGui.SameLine();
+    if (ImGui.Button('Check save')) {
+      const state = this.saveState();
+      console.log(JSON.stringify(state, null, ' '));
+      this.loadState(state);
     }
 
     ImGui.Separator();

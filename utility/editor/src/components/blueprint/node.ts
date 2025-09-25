@@ -15,7 +15,7 @@ const SLOT_RADIUS = 6;
 
 export class GNode {
   private static _nextId = 1;
-  readonly _id: number;
+  private _id: number;
   private _position: ImGui.ImVec2;
   private _titleRect: ImGui.ImVec2;
   private _titleBg: number;
@@ -65,6 +65,9 @@ export class GNode {
   }
   get id() {
     return this._id;
+  }
+  set id(val: number) {
+    this._id = val;
   }
   get size() {
     if (!this._size) {

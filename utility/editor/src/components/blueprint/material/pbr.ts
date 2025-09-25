@@ -21,7 +21,6 @@ import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
 
 export class PBRMaterialEditor extends GraphEditor {
-  private _outputNodeId: number;
   private _previewScene: DRef<Scene>;
   private _previewMesh: DRef<Mesh>;
   private _defaultMaterial: DRef<UnlitMaterial>;
@@ -32,7 +31,6 @@ export class PBRMaterialEditor extends GraphEditor {
     block.locked = true;
     block.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
     block.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
-    this._outputNodeId = block.id;
     this.nodeEditor.on('changed', this.graphChanged, this);
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
@@ -66,14 +64,18 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   createDAG(): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};
+    const roots: number[] = [];
     for (const [k, v] of this.nodeEditor.nodes) {
       nodeMap[k] = v.impl;
+      if (v.locked) {
+        roots.push(v.id);
+      }
     }
     return {
       graph: this.nodeEditor.graph,
       nodeMap,
-      roots: [this._outputNodeId],
-      order: this.nodeEditor.getReverseTopologicalOrderFromRoots([this._outputNodeId]).order.reverse()
+      roots,
+      order: this.nodeEditor.getReverseTopologicalOrderFromRoots(roots).order.reverse()
     };
   }
   protected renderRightPanel() {
