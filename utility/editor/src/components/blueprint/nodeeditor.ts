@@ -13,6 +13,7 @@ export type NodeEditorState = {
   nodes: {
     id: number;
     position: number[];
+    title: string;
     titleBg: number;
     titleTextCol: number;
     locked: boolean;
@@ -45,9 +46,14 @@ interface TraversalResult {
   levels: number[][];
 }
 
-export class NodeEditor extends Observable<{ changed: [] }> {
+export class NodeEditor extends Observable<{
+  changed: [];
+  save: [];
+  close: [changed: boolean];
+}> {
   private nodeId: number;
   private api: GraphEditorApi;
+  private emitChange: boolean;
   public nodes: Map<number, GNode>;
   private links: GraphLink[];
   private nextLinkId: number;
@@ -89,6 +95,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   constructor(api: GraphEditorApi) {
     super();
     this.nodeId = 1;
+    this.emitChange = true;
     this.api = api;
     this.nodes = new Map();
     this.links = [];
@@ -135,7 +142,9 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
   private invalidateStructure() {
     this.structureDirty = true;
-    this.dispatchEvent('changed');
+    if (this.emitChange) {
+      this.dispatchEvent('changed');
+    }
   }
 
   // Rebuild graph structure
@@ -265,6 +274,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       return {
         id: node.id,
         position: [node.position.x, node.position.y],
+        title: node.title,
         titleBg: node.titleBg,
         titleTextCol: node.titleTextCol,
         locked: node.locked,
@@ -286,19 +296,17 @@ export class NodeEditor extends Observable<{ changed: [] }> {
   }
 
   public async loadState(state: NodeEditorState) {
-    // clear interaction states
-    this.clearInteractionState();
-    // clear nodes
-    const nodes = [...this.nodes.values()];
-    for (const node of nodes) {
-      this.deleteNode(node.id, true);
-    }
+    const emit = this.emitChange;
+    this.emitChange = false;
+    // clear
+    this.clear(true);
     // load nodes
     let maxId = 0;
     for (const node of state.nodes) {
       const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.impl);
       const n = new GNode(this, new ImGui.ImVec2(node.position[0], node.position[1]), impl);
       n.id = node.id;
+      n.title = node.title;
       n.titleBg = node.titleBg;
       n.titleTextCol = node.titleTextCol;
       n.locked = node.locked;
@@ -316,6 +324,22 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.canvasOffset.x = state.canvasOffset[0];
     this.canvasOffset.y = state.canvasOffset[1];
     this.canvasScale = state.canvasScale;
+    //
+    this.emitChange = emit;
+    this.invalidateStructure();
+  }
+  public clear(force: boolean): boolean {
+    let changed = false;
+    if (this.nodes.size > 0) {
+      // clear interaction states
+      this.clearInteractionState();
+      // clear nodes
+      const nodes = [...this.nodes.values()];
+      for (const node of nodes) {
+        changed ||= this.deleteNode(node.id, force);
+      }
+    }
+    return changed;
   }
   public getTopologicalOrderFromRoots(roots: number[]): TraversalResult | null {
     if (!roots || roots.length === 0) {
@@ -551,15 +575,15 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.links.splice(index, 1);
   }
 
-  private deleteNode(nodeId: number, force = false) {
+  private deleteNode(nodeId: number, force = false): boolean {
     const node = this.nodes.get(nodeId);
     if (!node) {
       console.error('Cannot delete non-exist node');
-      return;
+      return false;
     }
     if (node.locked && !force) {
       console.info('Cannot delete locked node');
-      return;
+      return false;
     }
     for (let i = this.links.length - 1; i >= 0; i--) {
       const link = this.links[i];
@@ -570,6 +594,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.nodes.delete(nodeId);
     this.selectedNodes = this.selectedNodes.filter((id) => id !== nodeId);
     this.invalidateStructure();
+    return true;
   }
 
   private findLinkIntoInput(nodeId: number, slotId: number): GraphLink | null {
@@ -1327,27 +1352,25 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
   public render() {
     // Toolbar
-    if (ImGui.Button('Add Input Node')) {
-      console.log('Add Input Node');
+    if (ImGui.Button('Save')) {
+      this.dispatchEvent('save');
     }
     ImGui.SameLine();
-    if (ImGui.Button('Add Math Node')) {
-      console.log('Add Math Node');
+    if (ImGui.Button('Close')) {
+      this.dispatchEvent('close', this.structureDirty);
     }
     ImGui.SameLine();
-    if (ImGui.Button('Clear All')) {
-      this.nodes.clear();
-      this.links = [];
-      this.selectedNodes = [];
-      this.invalidateStructure();
+    if (ImGui.Button('Clear')) {
+      const emit = this.emitChange;
+      this.emitChange = false;
+      const changed = this.clear(false);
+      this.emitChange = emit;
+      if (changed) {
+        this.invalidateStructure();
+      }
     }
 
-    ImGui.SameLine();
-    const showGrid = [this.showGrid] as [boolean];
-    if (ImGui.Checkbox('Show Grid', showGrid)) {
-      this.showGrid = showGrid[0];
-    }
-
+    /*
     // For debug
     ImGui.SameLine();
     if (ImGui.Button('Check DAG')) {
@@ -1366,6 +1389,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       console.log(JSON.stringify(state, null, ' '));
       this.loadState(state);
     }
+    */
 
     ImGui.Separator();
 

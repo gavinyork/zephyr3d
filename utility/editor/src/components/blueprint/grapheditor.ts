@@ -8,10 +8,12 @@ export class GraphEditor implements GraphEditorApi {
   private _rightPanel: DockPannel;
   private _nodePropGrid: PropertyEditor;
   private _nodeEditor: NodeEditor;
-  constructor() {
+  protected _label: string;
+  constructor(label: string) {
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
     this._nodePropGrid = new PropertyEditor(0.4);
     this._nodeEditor = new NodeEditor(this);
+    this._label = label ?? 'Graph Editor';
   }
   get nodeEditor() {
     return this._nodeEditor;
@@ -31,7 +33,7 @@ export class GraphEditor implements GraphEditorApi {
       this._nodePropGrid.object = null;
     }
 
-    if (ImGui.Begin('Graph Editor')) {
+    if (ImGui.Begin(this._label)) {
       const regionAvail = ImGui.GetContentRegionAvail();
 
       const cursorPos = ImGui.GetCursorPos();

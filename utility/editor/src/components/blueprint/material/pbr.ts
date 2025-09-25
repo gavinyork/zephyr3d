@@ -25,9 +25,10 @@ export class PBRMaterialEditor extends GraphEditor {
   private _previewMesh: DRef<Mesh>;
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
-  constructor() {
-    super();
+  constructor(label: string, outputName: string) {
+    super(label);
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
+    block.title = outputName;
     block.locked = true;
     block.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
     block.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));

@@ -14,7 +14,6 @@ const SLOT_MARGIN = 5;
 const SLOT_RADIUS = 6;
 
 export class GNode {
-  private static _nextId = 1;
   private _id: number;
   private _position: ImGui.ImVec2;
   private _titleRect: ImGui.ImVec2;
@@ -34,6 +33,7 @@ export class GNode {
   private _locked: boolean;
   private _editor: NodeEditor;
   private _impl: IGraphNode;
+  private _title: string;
 
   constructor(editor: NodeEditor, position: ImGui.ImVec2, impl: IGraphNode) {
     this._id = editor.nextNodeId();
@@ -44,6 +44,7 @@ export class GNode {
     this._hovered = false;
     this._locked = false;
     this._size = null;
+    this._title = '';
     this._titleRect = null;
     this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
     this._errorTitleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.0, 0.0, 1.0));
@@ -126,6 +127,12 @@ export class GNode {
   }
   set locked(val: boolean) {
     this._locked = val;
+  }
+  get title() {
+    return this._title;
+  }
+  set title(val: string) {
+    this._title = val;
   }
   get impl() {
     return this._impl;
@@ -213,7 +220,7 @@ export class GNode {
     const titlePaddingX = 10 * this._editor.canvasScale;
     const titlePaddingY = 6 * this._editor.canvasScale;
     const titlePos = new ImGui.ImVec2(nodePos.x + titlePaddingX, nodePos.y + titlePaddingY);
-    drawList.AddText(titlePos, this._titleTextColor, this.toString());
+    drawList.AddText(titlePos, this._titleTextColor, this._title || this.toString());
 
     for (let i = 0; i < this.inputs.length; i++) {
       const input = this.inputs[i];
