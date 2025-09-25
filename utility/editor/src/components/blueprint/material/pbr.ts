@@ -53,7 +53,6 @@ export class PBRMaterialEditor extends GraphEditor {
     this.applyPreviewMaterial();
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
   }
-
   getNodeCategory(): NodeCategory[] {
     return [
       ...getConstantNodeCategories(),

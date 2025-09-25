@@ -8,6 +8,21 @@ import { getEngine } from '@zephyr3d/scene';
 
 const SLOT_RADIUS = 6;
 
+/** @internal */
+export type NodeEditorState = {
+  nodes: {
+    id: number;
+    position: number[];
+    titleBg: number;
+    titleTextCol: number;
+    locked: boolean;
+    impl: object;
+  }[];
+  links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+  canvasOffset: number[];
+  canvasScale: number;
+};
+
 interface GraphLink {
   id: number;
   startNodeId: number;
@@ -31,6 +46,7 @@ interface TraversalResult {
 }
 
 export class NodeEditor extends Observable<{ changed: [] }> {
+  private nodeId: number;
   private api: GraphEditorApi;
   public nodes: Map<number, GNode>;
   private links: GraphLink[];
@@ -72,6 +88,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
 
   constructor(api: GraphEditorApi) {
     super();
+    this.nodeId = 1;
     this.api = api;
     this.nodes = new Map();
     this.links = [];
@@ -111,7 +128,6 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     this.pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
     this.pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
   }
-
   get graph(): GraphStructure {
     this.rebuildGraphStructure();
     return this.graphStructure;
@@ -240,7 +256,10 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     return reachable;
   }
 
-  public saveState() {
+  public nextNodeId() {
+    return this.nodeId++;
+  }
+  public saveState(): NodeEditorState {
     const nodes = [...this.nodes.values()].map((node) => {
       const impl = getEngine().serializationManager.serializeObject(node.impl);
       return {
@@ -266,7 +285,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
     };
   }
 
-  public async loadState(state: ReturnType<NodeEditor['saveState']>) {
+  public async loadState(state: NodeEditorState) {
     // clear interaction states
     this.clearInteractionState();
     // clear nodes
@@ -275,6 +294,7 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       this.deleteNode(node.id, true);
     }
     // load nodes
+    let maxId = 0;
     for (const node of state.nodes) {
       const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.impl);
       const n = new GNode(this, new ImGui.ImVec2(node.position[0], node.position[1]), impl);
@@ -283,7 +303,11 @@ export class NodeEditor extends Observable<{ changed: [] }> {
       n.titleTextCol = node.titleTextCol;
       n.locked = node.locked;
       this.addNode(n);
+      if (n.id > maxId) {
+        maxId = n.id;
+      }
     }
+    this.nodeId = maxId + 1;
     // load links
     for (const link of state.links) {
       this.addLink(link.startNodeId, link.startSlotId, link.endNodeId, link.endSlotId);
