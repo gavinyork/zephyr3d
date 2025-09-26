@@ -78,7 +78,7 @@ export class TGALoader extends AbstractTextureLoader {
       }
       const opt: TextureCreationOptions = { texture };
       if (noMipmap) {
-        opt.samplerOptions = { mipFilter: 'none' };
+        opt.mipmapping = false;
       }
       const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
       tex.update(pixels, 0, 0, width, height);

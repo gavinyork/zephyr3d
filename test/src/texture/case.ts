@@ -401,7 +401,7 @@ export class TestTexture3D extends TextureTestCase {
       ...purple
     ]);
     const tex = getDevice().createTexture3D('rgba8unorm', 4, 4, 4, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
@@ -465,7 +465,7 @@ export class TestTextureCube extends TextureTestCase {
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
     this.prefilteredTex = getDevice().createCubeTexture('rgba16f', 128, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefilteredTex, 300);
     return this.srcTex;

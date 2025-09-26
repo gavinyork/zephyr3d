@@ -488,9 +488,7 @@ export class RampTextureCreator extends makeObservable(Disposable)<{
     this.fillTextureData(this._showAlpha, this._textureData);
     if (!this._texture) {
       this._texture = getDevice().createTexture2D('rgba8unorm-srgb', this._textureWidth, 1, {
-        samplerOptions: {
-          mipFilter: 'none'
-        }
+        mipmapping: false
       });
       changTexture = true;
     }

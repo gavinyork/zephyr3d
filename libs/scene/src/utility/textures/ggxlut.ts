@@ -224,7 +224,7 @@ function createGGXLUT(size: number) {
   const rs = device.createRenderStateSet();
   rs.useRasterizerState().setCullMode('none');
   rs.useDepthState().enableTest(false).enableWrite(false);
-  const tex = device.createTexture2D('rgba8unorm', size, size, { samplerOptions: { mipFilter: 'none' } });
+  const tex = device.createTexture2D('rgba8unorm', size, size, { mipmapping: false });
   tex.name = 'GGXLUT';
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();

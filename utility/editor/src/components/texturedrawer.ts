@@ -92,7 +92,7 @@ export class TextureDrawer {
     this._renderStates.useRasterizerState().setCullMode('none');
     this._renderStates.useDepthState().enableTest(false).enableWrite(false);
     this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     this.alphaBlend = true;
     this._colorScale = 1;

@@ -20,7 +20,7 @@ class RimColorMaterial extends MeshMaterial {
     this.color = new Vector3(1, 1, 1);
   }
   // 不透明材质
-  isTransparentPass(pass) {
+  isTransparentPass() {
     return false;
   }
   // 不受光照影响

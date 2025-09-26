@@ -143,11 +143,11 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
   const textures = [
     device.createTexture2D('rgba8unorm', texture.width, texture.height, {
       writable: true,
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     }),
     device.createTexture2D('rgba8unorm', texture.width, texture.height, {
       writable: true,
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     })
   ];
   const computeUniforms = device.createBindGroup(blurProgram.bindGroupLayouts[0]);

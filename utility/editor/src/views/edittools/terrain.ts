@@ -159,9 +159,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     this.ensureTerrainHeightMap();
     const heightMap = this._terrain.get().heightMap;
     const heightMapCopy = getDevice().createTexture2D(heightMap.format, heightMap.width, heightMap.height, {
-      samplerOptions: {
-        mipFilter: 'none'
-      }
+      mipmapping: false
     });
     heightMapCopy.name = 'heightMapCopy';
     blitter.blit(heightMap, heightMapCopy, fetchSampler('clamp_nearest_nomip'));
@@ -212,7 +210,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
           this._terrain.get().heightMap.width,
           this._terrain.get().heightMap.height,
           {
-            samplerOptions: { mipFilter: 'none' }
+            mipmapping: false
           }
         )
       );
@@ -603,7 +601,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       return null;
     }
     const tmpTexture = getDevice().createTexture2D('r32f', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     const texels = new Float32Array(width * height);
     let dstOffset = 0;
@@ -773,7 +771,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       }
     }
     const texture = getDevice().createTexture2D('rgba8unorm', size, size, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     texture.name = 'DefaultBrush';
     texture.update(data, 0, 0, size, size);

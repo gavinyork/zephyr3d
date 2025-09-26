@@ -42,6 +42,7 @@ importers:
       eslint-plugin-import: ^2.31.0
       eslint-plugin-prettier: ^4.2.1
       eslint-plugin-tsdoc: ^0.2.17
+      globals: ^16.4.0
       highlight.js: ^11.8.0
       lil-gui: ^0.19.2
       prettier: ^2.8.4
@@ -97,6 +98,7 @@ importers:
       eslint-plugin-import: 2.32.0_eslint@8.57.1
       eslint-plugin-prettier: 4.2.5_f5b2a100bd1161e3cccc9d3939fee791
       eslint-plugin-tsdoc: 0.2.17
+      globals: 16.4.0
       prettier: 2.8.8
       replace: 1.2.2
       rollup: 4.30.1
@@ -5214,6 +5216,11 @@ packages:
     engines: {node: '>=8'}
     dependencies:
       type-fest: 0.20.2
+    dev: true
+
+  /globals/16.4.0:
+    resolution: {integrity: sha512-ob/2LcVVaVGCYN+r14cnwnoDPUufjiYgSqRhiFD0Q1iI4Odora5RE8Iv1D24hAz5oMophRGkGz+yuvQmmUMnMw==}
+    engines: {node: '>=18'}
     dev: true
 
   /globalthis/1.0.4:

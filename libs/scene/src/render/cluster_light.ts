@@ -329,7 +329,7 @@ export class ClusteredLight {
       device.type === 'webgl' ? 'rgba32f' : 'rgba32ui',
       textureWidth,
       textureHeight,
-      { samplerOptions: { mipFilter: 'none' } }
+      { mipmapping: false }
     );
     this._lightIndexTexture.name = 'ClusterLightIndex';
     this._lightIndexFramebuffer?.dispose();

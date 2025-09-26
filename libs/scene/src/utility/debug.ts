@@ -17,9 +17,7 @@ export function debugTexture(tex: BaseTexture, label: string) {
     fb = tex.device.createFrameBuffer(
       [
         tex.device.createTexture2D(tex.format, tex.width, tex.height, {
-          samplerOptions: {
-            mipFilter: 'none'
-          }
+          mipmapping: false
         })
       ],
       null

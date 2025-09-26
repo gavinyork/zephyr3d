@@ -42,7 +42,7 @@ export function renderTextureViewer() {
   if (textureNameList.length > 0) {
     if (!frameBuffer) {
       const renderTarget = getDevice().createTexture2D('rgba8unorm', 512, 512, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       renderTarget.name = '!!textureviewer';
       frameBuffer = getDevice().createFrameBuffer([renderTarget], null);

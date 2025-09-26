@@ -543,7 +543,7 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
                 const irradianceMap =
                   this.env.light.irradianceMap ??
                   device.createCubeTexture('rgba16f', 64, {
-                    samplerOptions: { mipFilter: 'none' }
+                    mipmapping: false
                   });
                 panoramaToCubemap(tex, skyBoxTexture);
                 prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);

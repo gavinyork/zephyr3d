@@ -16,7 +16,7 @@ interface MicrofacetDistributionSample {
 export function testCubemapLoader(): TextureCube {
   const device = getDevice();
   const tex = device.createCubeTexture('rgba8unorm', 32, {
-    samplerOptions: { mipFilter: 'none' }
+    mipmapping: false
   });
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();

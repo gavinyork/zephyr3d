@@ -68,7 +68,7 @@ export class EnvMaps {
       getDevice().createCubeTexture('rgba16f', 512),
       getDevice().createCubeTexture('rgba16f', 256),
       getDevice().createCubeTexture('rgba16f', 64, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       })
     ];
   }

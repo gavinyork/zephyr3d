@@ -56,10 +56,10 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
     }
   }
   const morphTexture = device.createTexture2D('rgba32f', textureSize, textureSize, {
+    mipmapping: false,
     samplerOptions: {
       minFilter: 'nearest',
-      magFilter: 'nearest',
-      mipFilter: 'none'
+      magFilter: 'nearest'
     }
   });
   morphTexture.update(textureData, 0, 0, textureSize, textureSize);

@@ -23,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // 给定像素格式和宽高，创建可写入的2D纹理(仅WebGPU)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  samplerOptions: { mipFilter: 'none' },
+  mipmapping: false,
   writable: true
 });
 

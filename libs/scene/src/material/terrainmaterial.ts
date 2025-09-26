@@ -375,7 +375,7 @@ export class TerrainMaterial
     const device = getDevice();
     if (!this._options) {
       const tex = device.createTexture2D('rgba8unorm', 1, 1, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       tex.update(new Uint8Array([0, 1, 0, 0]), 0, 0, 1, 1);
       tex.name = 'TerrainMetallicRoughnessMap';

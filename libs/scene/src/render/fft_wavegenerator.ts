@@ -403,7 +403,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let tex = FFTWaveGenerator._globals.butterflyTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D('rgba32f', Math.log2(size), size, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       tex.name = `butterfly${size}`;
       tex.update(this.createButterflyTexture(size), 0, 0, tex.width, tex.height);
@@ -455,7 +455,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let tex = FFTWaveGenerator._globals.noiseTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       tex.name = `noiseTex${size}`;
       tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);

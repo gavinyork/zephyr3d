@@ -17,7 +17,7 @@
     "build:web": "npm run build:copy && cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "build:site": "shx rm -rf dist && shx rm -f .buildcache.json && shx rm -f .buildcache.tmp.json && npm run build:web && npm run build:doc",
     "build:check": "tsc -p . --noEmit",
-    "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
+    "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.js\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
     "serve": "web-dev-server --no-cache --watch --open dist/web/index.html"
   },
@@ -50,6 +50,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-import-resolver-typescript": "^3.7.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "globals": "^16.4.0",
     "prettier": "^2.8.4",
     "eslint-plugin-tsdoc": "^0.2.17",
     "typescript-eslint": "^8.44.1",

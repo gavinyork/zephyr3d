@@ -15,7 +15,7 @@ const myApp = new Application({
 // Wait for the rendering device to be ready
 myApp.ready().then(function () {
   // Frame event handler
-  myApp.on('tick', function(){
+  myApp.on('tick', function () {
     // device is the rendering device, and we call its clearFrameBuffer method to clear the screen to green
     myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), 1, 0);
   });

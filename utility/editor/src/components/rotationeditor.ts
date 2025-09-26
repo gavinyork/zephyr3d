@@ -39,7 +39,7 @@ export class RotationEditor {
       this._fb = device.createFrameBuffer(
         [
           device.createTexture2D('rgba8unorm', canvasSize.x, canvasSize.y, {
-            samplerOptions: { mipFilter: 'none' }
+            mipmapping: false
           })
         ],
         device.createTexture2D('d24', canvasSize.x, canvasSize.y)

@@ -274,10 +274,10 @@ export class Skeleton extends Disposable {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
     const device = getDevice();
     this._jointTexture = device.createTexture2D('rgba32f', textureWidth, textureWidth, {
+      mipmapping: false,
       samplerOptions: {
         magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none'
+        minFilter: 'nearest'
       }
     });
     this._jointMatrixArray = new Float32Array(textureWidth * textureWidth * 4);

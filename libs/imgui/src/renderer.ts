@@ -123,7 +123,7 @@ export class Renderer extends Disposable {
   /** @internal */
   createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     if (color) {
       this.clearTexture(tex, color);

@@ -23,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // Create writable 2D textures with a given pixel format and width and height (WebGPU only)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  samplerOptions: { mipFilter: 'none' },
+  mipmapping: false,
   writable: true
 });
 

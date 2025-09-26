@@ -339,10 +339,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       const fb = this._feedbackRenderTarget.get();
       if (!fb || fb.getColorAttachment(0).width < points.length) {
         const rt0 = device.createTexture2D('rgba32f', points.length, 1, {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         });
         const rt1 = device.createTexture2D('rgba32f', points.length, 1, {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         });
         if (fb) {
           fb.getColorAttachment(0).dispose();

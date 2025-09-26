@@ -419,7 +419,7 @@ export class SkyRenderer extends Disposable {
     if (!this._irradianceMap.get()) {
       this._irradianceMap.set(
         getDevice().createCubeTexture('rgba16f', this._irradianceMapWidth, {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         })
       );
       this._irradianceMap.get().name = 'SkyIrradianceMap';
@@ -447,7 +447,7 @@ export class SkyRenderer extends Disposable {
         3,
         3,
         {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         }
       );
       this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
@@ -542,7 +542,7 @@ export class SkyRenderer extends Disposable {
         ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending ? 'rgba32f' : 'rgba16f',
         1,
         1,
-        { samplerOptions: { mipFilter: 'none' } }
+        { mipmapping: false }
       );
       tex.name = 'DistantSkyLut';
       this._skyDistantLightLut.set(ctx.device.createFrameBuffer([tex], null));
@@ -649,7 +649,7 @@ export class SkyRenderer extends Disposable {
         this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get() !== this.skyboxTexture
           ? this._bakedSkyboxTexture.get()
           : device.createCubeTexture(format, this._scatterSkyboxTextureWidth, {
-              samplerOptions: { mipFilter: 'none' }
+              mipmapping: false
             });
       tex.name = 'BakedSkyboxTexture';
       if (tex !== this._bakedSkyboxTexture.get()) {
@@ -925,7 +925,7 @@ export class SkyRenderer extends Disposable {
   private _prepareSkyBox(device: AbstractDevice) {
     SkyRenderer._createAtmosphereLUTPrograms(device);
     if (!SkyRenderer._defaultSkyImage.get()) {
-      const texture = device.createTexture2D('rgba8unorm', 1, 1, { samplerOptions: { mipFilter: 'none' } });
+      const texture = device.createTexture2D('rgba8unorm', 1, 1, { mipmapping: false });
       texture.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
       SkyRenderer._defaultSkyImage.set(texture);
     }

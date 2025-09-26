@@ -708,6 +708,7 @@ export interface BaseCreationOptions {
 export interface TextureCreationOptions extends BaseCreationOptions {
   writable?: boolean;
   texture?: BaseTexture;
+  mipmapping?: boolean;
   samplerOptions?: SamplerOptions;
 }
 /**

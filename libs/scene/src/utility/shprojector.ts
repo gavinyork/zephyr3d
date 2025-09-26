@@ -165,7 +165,7 @@ export class CubemapSHProjector extends Disposable {
 
     if (!this._renderTarget.get()) {
       const texture = device.createTexture2D('rgba32f', 3, 3, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       this._renderTarget.set(device.createFrameBuffer([texture], null));
     }

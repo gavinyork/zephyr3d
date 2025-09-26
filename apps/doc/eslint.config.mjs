@@ -5,18 +5,29 @@ import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import'; // 新增
 import prettierPlugin from 'eslint-plugin-prettier'; // 建议显式导入
 import eslintConfigPrettier from 'eslint-config-prettier'; // 可选：扁平化接入
+import globals from 'globals';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default [
   {
-    ignores: ['**/*.d.ts', '**/dist/**', '.rush/**', 'common/temp/**']
+    ignores: ['**/*.d.ts', '**/dist/**', '.rush/**', 'common/temp/**', '**/vendor/**', 'web/**']
   },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ...js.configs.recommended,
+    files: ['src/**/*.{js,jsx}']
+  },
+
+  // TS 推荐规则：加上 files 限定
+  ...tseslint.configs.recommended.map((cfg) => ({
+    ...cfg,
+    files: ['src/**/*.{ts,tsx}']
+  })),
+  //js.configs.recommended,
+  //...tseslint.configs.recommended,
+  {
+    files: ['src/**/*.{js,ts}'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -24,6 +35,10 @@ export default [
         sourceType: 'module',
         tsconfigRootDir: __dirname,
         project: ['./tsconfig.json']
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.es2021
       }
     },
     plugins: {
@@ -62,9 +77,7 @@ export default [
     },
     settings: {
       'import/resolver': {
-        typescript: {
-          project: ['./tsconfig.json']
-        }
+        typescript: true
       }
     }
   }

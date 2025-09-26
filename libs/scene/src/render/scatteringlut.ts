@@ -82,7 +82,7 @@ export class ScatteringLut {
         this._multiScatteringLutWidth,
         this._multiScatteringLutHeight,
         {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         }
       );
       this._multiScatteringLut.name = 'MultiScatteringLUT';
@@ -119,7 +119,7 @@ export class ScatteringLut {
             this._aerialPerspectiveTextureWidth,
             this._aerialPerspectiveTextureHeight,
             {
-              samplerOptions: { mipFilter: 'none' }
+              mipmapping: false
             }
           );
           this._aerialPerspectiveLut.name = 'AerialPerspectiveLUT';
@@ -155,7 +155,7 @@ export class ScatteringLut {
             ? 'rgba16f'
             : 'rgba8unorm';
         const skyViewLut = device.createTexture2D(format, this._skyViewLutWidth, this._skyViewLutHeight, {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         });
         skyViewLut.name = 'SkyViewLut';
         this._skyViewFramebuffer = device.createFrameBuffer([skyViewLut], null);
@@ -190,7 +190,7 @@ export class ScatteringLut {
         this._transmittanceLutWidth,
         this._transmittanceLutHeight,
         {
-          samplerOptions: { mipFilter: 'none' }
+          mipmapping: false
         }
       );
       this._transmittanceLut.name = 'TransmittanceLUT';

@@ -89,12 +89,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createTexture2D(
-        format,
-        width,
-        height,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createTexture2D(format, width, height, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();
@@ -130,13 +125,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createTexture2DArray(
-        format,
-        width,
-        height,
-        numLayers,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createTexture2DArray(format, width, height, numLayers, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();
@@ -168,11 +157,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createCubeTexture(
-        format,
-        size,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createCubeTexture(format, size, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();

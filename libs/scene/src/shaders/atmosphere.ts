@@ -1040,7 +1040,7 @@ export function renderTransmittanceLut(params: AtmosphereParams) {
       transmittanceLutProgram = createTransmittanceLutProgram(device);
       transmittanceLutBindGroup = device.createBindGroup(transmittanceLutProgram.bindGroupLayouts[0]);
       transmittanceLUT = device.createTexture2D('rgba16f', 256, 64, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       transmittanceLUT.name = 'DebugTransmittanceLut';
       transmittanceFramebuffer = device.createFrameBuffer([transmittanceLUT], null);
@@ -1104,7 +1104,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
       multiScatteringLutProgram = createMultiScatteringLutProgram(device);
       multiScatteringLutBindGroup = device.createBindGroup(multiScatteringLutProgram.bindGroupLayouts[0]);
       multiScatteringLUT = device.createTexture2D('rgba16f', 32, 32, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       multiScatteringLUT.name = 'DebugMultiScatteringLut';
       multiScatteringFramebuffer = device.createFrameBuffer([multiScatteringLUT], null);
@@ -1184,7 +1184,7 @@ export function renderSkyViewLut(params: AtmosphereParams) {
       skyViewLutProgram = createSkyViewLutProgram(device);
       skyViewLutBindGroup = device.createBindGroup(skyViewLutProgram.bindGroupLayouts[0]);
       skyViewLUT = device.createTexture2D('rgba16f', 256, 128, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       skyViewLUT.name = 'DebugSkyViewLut';
       skyViewFramebuffer = device.createFrameBuffer([skyViewLUT], null);
@@ -1255,7 +1255,7 @@ export function renderAPLut(params: AtmosphereParams) {
     try {
       APLutProgram = createAPLutProgram(device);
       APLutBindGroup = device.createBindGroup(APLutProgram.bindGroupLayouts[0]);
-      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { samplerOptions: { mipFilter: 'none' } });
+      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { mipmapping: false });
       ApLut.name = 'DebugAPLut';
       APFramebuffer = device.createFrameBuffer([ApLut], null);
     } catch (err) {

@@ -142,7 +142,7 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     if (!this._framebuffer.get()) {
       const tex = device.createTexture2D('rgba16f', size.x, size.y, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       const depth = device.createTexture2D('d24s8', size.x, size.y);
       this._framebuffer.set(device.createFrameBuffer([tex], depth));

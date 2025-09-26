@@ -885,7 +885,7 @@ export function CreateFontsTexture(): void {
     });
     // Upload texture to graphics system
     g_FontTexture = renderer.device.createTexture2D('rgba8unorm', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     g_FontTexture.update(rgba8, 0, 0, width, height);
     //gl && gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -976,7 +976,7 @@ export class Texture {
     if (!this._texture || this._texture.width !== w || this._texture.height !== h) {
       this._texture?.dispose();
       this._texture = renderer.device.createTexture2D('rgba8unorm', w, h, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       this._width = w;
       this._height = h;

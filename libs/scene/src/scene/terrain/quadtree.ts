@@ -278,7 +278,7 @@ export class Quadtree extends Disposable {
     }
     this._normalMap.set(
       device.createTexture2D('rgba8unorm', rootSizeX, rootSizeZ, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       })
     );
     this._normalMap.get().name = `TerrainNormalMap-${this._normalMap.get().uid}`;

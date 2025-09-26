@@ -776,10 +776,12 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     return;
   }
   protected parseTextureOptions(options?: TextureCreationOptions): number {
-    const noMipmapFlag =
-      options?.samplerOptions?.mipFilter === 'none' ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
+    const noMipmapFlag = options?.mipmapping === false ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
     const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
     const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
+    if (noMipmapFlag && options?.samplerOptions) {
+      options.samplerOptions.mipFilter = 'none';
+    }
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
   protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number {

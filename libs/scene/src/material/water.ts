@@ -498,7 +498,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const width = 128;
     const height = 1;
     const texture = device.createTexture2D('rgba8unorm', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     const numTexels = width * height;
     const data = new Uint8Array(numTexels * 4);

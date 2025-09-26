@@ -20,7 +20,7 @@ const defaultTexture2DArray: DRef<Texture2DArray> = new DRef();
 export function getDefaultTexture2D(): Texture2D {
   if (!defaultTexture2D.get()) {
     const defaultTex = getDevice().createTexture2D('rgba8unorm', 1, 1, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
     defaultTexture2D.set(defaultTex);
@@ -32,7 +32,7 @@ export function getDefaultTexture2D(): Texture2D {
 export function getDefaultTexture2DArray(): Texture2DArray {
   if (!defaultTexture2DArray.get()) {
     const defaultTex = getDevice().createTexture2DArray('rgba8unorm', 1, 1, 1, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 0, 1, 1, 1);
     defaultTexture2DArray.set(defaultTex);
@@ -44,7 +44,7 @@ export function getDefaultTexture2DArray(): Texture2DArray {
 export function getDefaultTextureCube(): TextureCube {
   if (!defaultTextureCube.get()) {
     const defaultTex = getDevice().createCubeTexture('rgba8unorm', 1, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     for (let i = 0; i < 6; i++) {
       defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1, i);

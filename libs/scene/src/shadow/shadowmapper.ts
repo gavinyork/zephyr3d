@@ -521,7 +521,7 @@ export class ShadowMapper {
   ): Texture2D | TextureCube | Texture2DArray {
     const device = getDevice();
     const options: TextureCreationOptions = {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     };
     switch (target) {
       case '2d':
