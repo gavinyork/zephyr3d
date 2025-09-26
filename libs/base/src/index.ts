@@ -4,6 +4,7 @@
  * @packageDocumentation
  */
 export * from './utils';
+export * from './diff';
 export * from './event';
 export * from './linkedlist';
 export * from './math';
