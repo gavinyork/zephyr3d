@@ -190,7 +190,7 @@ export class DialogRenderer<T> extends Observable<{
       const displaySize = ImGui.GetIO().DisplaySize;
       ImGui.SetNextWindowPos(
         new ImGui.ImVec2(displaySize.x * 0.5, displaySize.y * 0.5),
-        ImGui.Cond.Always,
+        this._noMove ? ImGui.Cond.Always : ImGui.Cond.Appearing,
         new ImGui.ImVec2(0.5, 0.5)
       );
     }
