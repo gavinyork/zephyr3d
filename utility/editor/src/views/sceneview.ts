@@ -1288,7 +1288,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private editMaterial(label: string, name: string, path: string) {
-    Dialog.editMaterial(label, name, path);
+    Dialog.editMaterial(label, name, path, 800, 600);
   }
   private handleWorkspaceDragEnd() {
     if (!this._workspaceDragging) {

@@ -17,7 +17,7 @@ export type NodeEditorState = {
     titleBg: number;
     titleTextCol: number;
     locked: boolean;
-    impl: object;
+    node: object;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
   canvasOffset: number[];
@@ -281,7 +281,7 @@ export class NodeEditor extends Observable<{
         titleBg: node.titleBg,
         titleTextCol: node.titleTextCol,
         locked: node.locked,
-        impl
+        node: impl
       };
     });
     const links = this.links.map((link) => ({
@@ -306,7 +306,7 @@ export class NodeEditor extends Observable<{
     // load nodes
     let maxId = 0;
     for (const node of state.nodes) {
-      const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.impl);
+      const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.node);
       const n = new GNode(this, new ImGui.ImVec2(node.position[0], node.position[1]), impl);
       n.id = node.id;
       n.title = node.title;

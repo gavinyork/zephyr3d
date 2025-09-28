@@ -6,6 +6,7 @@ import {
   Material,
   MeshMaterial,
   ParticleMaterial,
+  PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
@@ -460,6 +461,7 @@ function getLitMaterialProps(manager: SerializationManager): PropertyAccessor<Li
     ...getTextureProps<LitPropTypes>(manager, 'normalTexture', '2D', 0)
   ];
 }
+
 function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<UnlitPropTypes>[] {
   return [
     {
@@ -715,6 +717,57 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
                 console.error('Invalid albedo texture');
               }
             }
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getPBRBluePrintMaterialClass(_manager: SerializationManager): SerializableClass {
+  return {
+    ctor: PBRBluePrintMaterial,
+    parent: MeshMaterial,
+    name: 'PBRBluePrintMaterial',
+    createFunc(ctx, initParams) {
+      let mat = Material.findMaterialById(initParams.persistentId);
+      if (mat) {
+        return { obj: mat, loadProps: false };
+      } else if (initParams.persistentId === initParams.corePersistentId) {
+        mat = new UnlitMaterial();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
+      } else {
+        const coreMaterial = Material.findMaterialById(initParams.corePersistentId);
+        if (!coreMaterial) {
+          throw new Error('Load material failed: core material not found');
+        }
+        mat = coreMaterial.createInstance();
+        mat.persistentId = initParams.persistentId;
+        return { obj: mat, loadProps: true };
+      }
+    },
+    getInitParams(obj: MeshMaterial) {
+      return {
+        persistentId: obj.persistentId,
+        corePersistentId: obj.coreMaterial.persistentId
+      };
+    },
+    getProps() {
+      return [
+        {
+          name: 'BluePrint',
+          type: 'string',
+          default: '',
+          get(this: PBRBluePrintMaterial, value) {
+            value.str[0] = this.IR.hash;
+          },
+          async set(this: PBRBluePrintMaterial, _value) {
+            //this.IR.hash = value.str[0];
+          },
+          isValid() {
+            return !this.$isInstance;
           }
         }
       ];

@@ -185,7 +185,7 @@ export class DialogRenderer<T> extends Observable<{
     }
   }
   private setWindowPlacement() {
-    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.FirstUseEver);
+    ImGui.SetNextWindowSize(this._size, this._noResize ? ImGui.Cond.Always : ImGui.Cond.Appearing);
     if (this._center) {
       const displaySize = ImGui.GetIO().DisplaySize;
       ImGui.SetNextWindowPos(

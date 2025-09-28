@@ -4,7 +4,7 @@ import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
-import type { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import type { DrawContext } from '../render/drawable';
 
 /**
@@ -26,9 +26,18 @@ export class PBRBluePrintMaterial
    */
   constructor(ir: MaterialBlueprintIR) {
     super();
-    this._ir = ir;
+    this._ir = ir ?? new MaterialBlueprintIR(null, '');
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._ir.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._ir.behaviors.useVertexColor);
+  }
+  get IR() {
+    return this._ir;
+  }
+  set IR(ir: MaterialBlueprintIR) {
+    if (ir !== this._ir) {
+      this._ir = ir;
+      this.optionChanged(true);
+    }
   }
   clone(): PBRBluePrintMaterial {
     const other = new PBRBluePrintMaterial(this._ir);

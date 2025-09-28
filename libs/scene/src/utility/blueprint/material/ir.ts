@@ -278,7 +278,15 @@ export class MaterialBlueprintIR {
   private _behaviors: MaterialBlueprintIRBehaviors;
   private _outputs: Record<string, IRExpression>;
   constructor(dag: BlueprintDAG, hash: string) {
-    this._dag = dag;
+    this._dag = dag ?? {
+      nodeMap: {},
+      roots: [],
+      graph: {
+        outgoing: {},
+        incoming: {}
+      },
+      order: []
+    };
     this._hash = hash;
     this.compile();
   }

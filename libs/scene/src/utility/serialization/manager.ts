@@ -121,6 +121,7 @@ import {
   VertexTangentNode
 } from '../blueprint/material/inputs';
 import { PBRBlockNode } from '../blueprint/material/pbr';
+import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -639,6 +640,159 @@ export class SerializationManager {
       encoding: 'utf8',
       create: true
     });
+  }
+  private rebuildGraphStructure(
+    nodes: Record<number, IGraphNode>,
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): GraphStructure {
+    const gs: GraphStructure = {
+      outgoing: {},
+      incoming: {}
+    };
+    // Initialize adjacency lists
+    for (const nodeId in nodes) {
+      gs.outgoing[nodeId] = [];
+      gs.incoming[nodeId] = [];
+    }
+    // Fill with links
+    for (const link of links) {
+      const outConnection: NodeConnection = {
+        targetNodeId: link.endNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      const inConnection: NodeConnection = {
+        targetNodeId: link.startNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      gs.outgoing[link.startNodeId]?.push(outConnection);
+      gs.incoming[link.endNodeId]?.push(inConnection);
+    }
+    return gs;
+  }
+  private collectReachableBackward(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): Set<number> {
+    const reachable = new Set<number>();
+    const q: number[] = [];
+
+    for (const r of roots) {
+      if (nodes[r]) {
+        reachable.add(r);
+        q.push(r);
+      }
+    }
+    while (q.length > 0) {
+      const u = q.shift()!;
+      const ins = gs.incoming[u] || [];
+      for (const conn of ins) {
+        const v = conn.targetNodeId; // 前驱
+        if (!reachable.has(v)) {
+          reachable.add(v);
+          q.push(v);
+        }
+      }
+    }
+    return reachable;
+  }
+  private getReverseTopologicalOrderFromRoots(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): {
+    order: number[];
+    levels: number[][];
+  } {
+    if (!roots || roots.length === 0) {
+      return { order: [], levels: [] };
+    }
+    const sub = this.collectReachableBackward(gs, nodes, roots);
+    if (sub.size === 0) {
+      return { order: [], levels: [] };
+    }
+    const outDegree = new Map<number, number>();
+    for (const id of sub) {
+      const outs = (gs.outgoing[id] || []).filter((c) => sub.has(c.targetNodeId));
+      outDegree.set(id, outs.length);
+    }
+    let currentLevel = Array.from(outDegree.entries())
+      .filter(([, deg]) => deg === 0)
+      .map(([id]) => id);
+    const result: number[] = [];
+    const levels: number[][] = [];
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+      const nextLevel: number[] = [];
+      for (const u of currentLevel) {
+        const ins = gs.incoming[u] || [];
+        for (const conn of ins) {
+          const v = conn.targetNodeId; // 前驱
+          if (!sub.has(v)) {
+            continue;
+          }
+          const deg = outDegree.get(v)! - 1;
+          outDegree.set(v, deg);
+          if (deg === 0) {
+            nextLevel.push(v);
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+    if (result.length !== sub.size) {
+      console.warn('Subgraph contains cycles (from given roots).');
+      return null;
+    }
+    return { order: result, levels };
+  }
+  private async createBluePrintDAG(state: {
+    nodes: {
+      id: number;
+      locked: boolean;
+      node: object;
+    }[];
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+  }): Promise<BlueprintDAG> {
+    const nodeMap: Record<number, IGraphNode> = {};
+    const roots: number[] = [];
+    for (const node of state.nodes) {
+      const impl = await this.deserializeObject<IGraphNode>(null, node.node);
+      nodeMap[node.id] = impl;
+      if (node.locked) {
+        roots.push(node.id);
+      }
+    }
+    const gs = this.rebuildGraphStructure(nodeMap, state.links);
+    return {
+      graph: gs,
+      nodeMap,
+      roots,
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+    };
+  }
+  async loadBluePrint(path: string) {
+    try {
+      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
+      const state = JSON.parse(content) as {
+        nodes: {
+          id: number;
+          locked: boolean;
+          node: object;
+        }[];
+        links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+      };
+      return await this.createBluePrintDAG(state);
+    } catch (err) {
+      const msg = `Load material failed: ${err}`;
+      console.error(msg);
+      return null;
+    }
   }
   /**
    * Clear cached allocations and asset-manager caches.
