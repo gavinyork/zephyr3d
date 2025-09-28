@@ -17,7 +17,8 @@ import {
   getBlinnMaterialClass,
   getPBRMetallicRoughnessMaterialClass,
   getPBRSpecularGlossinessMaterialClass,
-  getParticleMaterialClass
+  getParticleMaterialClass,
+  getPBRBluePrintMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -224,6 +225,7 @@ export class SerializationManager {
         getBlinnMaterialClass(this),
         getPBRMetallicRoughnessMaterialClass(this),
         getPBRSpecularGlossinessMaterialClass(this),
+        getPBRBluePrintMaterialClass(this),
         getParticleMaterialClass(this),
         getPrimitiveClass(),
         getBoxShapeClass(),
@@ -751,24 +753,20 @@ export class SerializationManager {
     }
     return { order: result, levels };
   }
-  private async createBluePrintDAG(state: {
-    nodes: {
-      id: number;
-      locked: boolean;
-      node: object;
-    }[];
-    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-  }): Promise<BlueprintDAG> {
-    const nodeMap: Record<number, IGraphNode> = {};
-    const roots: number[] = [];
-    for (const node of state.nodes) {
-      const impl = await this.deserializeObject<IGraphNode>(null, node.node);
-      nodeMap[node.id] = impl;
-      if (node.locked) {
-        roots.push(node.id);
+  createBluePrintDAG(
+    nodeMap: Record<number, IGraphNode>,
+    roots: number[],
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): BlueprintDAG {
+    const gs = this.rebuildGraphStructure(nodeMap, links);
+    for (const k in gs.incoming) {
+      const node = nodeMap[k];
+      for (const conn of gs.incoming[k]) {
+        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        input.inputNode = nodeMap[conn.targetNodeId];
+        input.inputId = conn.startSlotId;
       }
     }
-    const gs = this.rebuildGraphStructure(nodeMap, state.links);
     return {
       graph: gs,
       nodeMap,
@@ -787,7 +785,16 @@ export class SerializationManager {
         }[];
         links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
       };
-      return await this.createBluePrintDAG(state);
+      const nodeMap: Record<number, IGraphNode> = {};
+      const roots: number[] = [];
+      for (const node of state.nodes) {
+        const impl = await this.deserializeObject<IGraphNode>(null, node.node);
+        nodeMap[node.id] = impl;
+        if (node.locked) {
+          roots.push(node.id);
+        }
+      }
+      return await this.createBluePrintDAG(nodeMap, roots, state.links);
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);

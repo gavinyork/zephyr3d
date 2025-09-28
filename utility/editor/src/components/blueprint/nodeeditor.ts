@@ -56,7 +56,7 @@ export class NodeEditor extends Observable<{
   private api: GraphEditorApi;
   private emitChange: boolean;
   public nodes: Map<number, GNode>;
-  private links: GraphLink[];
+  public links: GraphLink[];
   private nextLinkId: number;
 
   private graphStructure: GraphStructure;

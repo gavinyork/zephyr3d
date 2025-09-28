@@ -3,6 +3,7 @@ import {
   LambertMaterial,
   Material,
   MeshMaterial,
+  PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
@@ -91,7 +92,8 @@ export function getMeshClass(): SerializableClass {
               LambertMaterial,
               BlinnMaterial,
               PBRMetallicRoughnessMaterial,
-              PBRSpecularGlossinessMaterial
+              PBRSpecularGlossinessMaterial,
+              PBRBluePrintMaterial
             ]
           },
           get(this: Mesh, value) {

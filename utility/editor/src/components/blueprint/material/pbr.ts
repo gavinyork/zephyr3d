@@ -110,12 +110,15 @@ export class PBRMaterialEditor extends GraphEditor {
         roots.push(v.id);
       }
     }
+    return ProjectService.serializationManager.createBluePrintDAG(nodeMap, roots, this.nodeEditor.links);
+    /*
     return {
       graph: this.nodeEditor.graph,
       nodeMap,
       roots,
       order: this.nodeEditor.getReverseTopologicalOrderFromRoots(roots).order.reverse()
     };
+    */
   }
   protected renderRightPanel() {
     const v = new ImGui.ImVec2();

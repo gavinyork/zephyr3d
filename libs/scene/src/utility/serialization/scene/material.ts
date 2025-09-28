@@ -15,6 +15,7 @@ import type { PropertyAccessor, SerializableClass } from '../types';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { SerializationManager } from '../manager';
+import { MaterialBlueprintIR } from '../../blueprint/material/ir';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
@@ -725,7 +726,7 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
 }
 
 /** @internal */
-export function getPBRBluePrintMaterialClass(_manager: SerializationManager): SerializableClass {
+export function getPBRBluePrintMaterialClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: PBRBluePrintMaterial,
     parent: MeshMaterial,
@@ -760,11 +761,21 @@ export function getPBRBluePrintMaterialClass(_manager: SerializationManager): Se
           name: 'BluePrint',
           type: 'string',
           default: '',
+          options: {
+            mimeTypes: ['application/octet-stream']
+          },
           get(this: PBRBluePrintMaterial, value) {
             value.str[0] = this.IR.hash;
           },
-          async set(this: PBRBluePrintMaterial, _value) {
-            //this.IR.hash = value.str[0];
+          async set(this: PBRBluePrintMaterial, value) {
+            try {
+              const path = manager.vfs.normalizePath(value.str[0]);
+              const dag = await manager.loadBluePrint(path);
+              const IR = new MaterialBlueprintIR(dag, path);
+              this.IR = IR;
+            } catch (err) {
+              console.error(`Load blueprint failed: ${err}`);
+            }
           },
           isValid() {
             return !this.$isInstance;

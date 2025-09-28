@@ -660,29 +660,6 @@ export class PropertyEditor extends Observable<{
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
-          if (value.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
-            const peekPayload = ImGui.AcceptDragDropPayload(
-              'ASSET',
-              ImGui.DragDropFlags.AcceptBeforeDelivery
-            );
-            if (peekPayload) {
-              const data = peekPayload.Data as { isDir: boolean; path: string }[];
-              if (data.length === 1 && !data[0].isDir) {
-                const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
-                if (value.options.mimeTypes.includes(mimeType)) {
-                  const payload = ImGui.AcceptDragDropPayload('ASSET');
-                  if (payload) {
-                    tmpProperty.str[0] = data[0].path;
-                    Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
-                      this.refresh();
-                    });
-                    this.dispatchEvent('object_property_changed', object, value);
-                  }
-                }
-              }
-            }
-            ImGui.EndDragDropTarget();
-          }
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
@@ -704,6 +681,28 @@ export class PropertyEditor extends Observable<{
               }
             }
           }
+        }
+      }
+      if (value.set && (value.type === 'string' || value.type === 'object')) {
+        if (value.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
+          const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
+          if (peekPayload) {
+            const data = peekPayload.Data as { isDir: boolean; path: string }[];
+            if (data.length === 1 && !data[0].isDir) {
+              const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
+              if (value.options.mimeTypes.includes(mimeType)) {
+                const payload = ImGui.AcceptDragDropPayload('ASSET');
+                if (payload) {
+                  tmpProperty.str[0] = data[0].path;
+                  Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                    this.refresh();
+                  });
+                  this.dispatchEvent('object_property_changed', object, value);
+                }
+              }
+            }
+          }
+          ImGui.EndDragDropTarget();
         }
       }
       if (changed && value.set) {
