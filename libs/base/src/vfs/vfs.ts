@@ -74,6 +74,20 @@ export interface ListOptions {
 }
 
 /**
+ * Options for mounting a VFS.
+ *
+ * @public
+ */
+export interface MountOptions {
+  /** Auto-create mount directory when it does not exist (default: true) */
+  autoCreate?: boolean;
+  /** If auto-created by this mount, remove the directory on unmount when still empty (default: true) */
+  cleanupOnUnmount?: boolean;
+  /** Require the mount path to be empty to avoid overlay semantics (default: true) */
+  requireEmpty?: boolean;
+}
+
+/**
  * Represents an error that occurred during a VFS operation.
  *
  * @public
@@ -321,6 +335,12 @@ export abstract class VFS extends Observable<{
   // Simple mounting support
   private readonly simpleMounts: Map<string, VFS>;
   private sortedMountPaths: string[];
+  private autoCreatedMounts: Set<string>;
+  private cleanupOnUnmountFlags: Map<string, boolean>;
+  private mountChangeCallbacks: Map<
+    string,
+    (type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory') => void
+  >;
 
   /**
    * Creates a new VFS instance.
@@ -334,6 +354,9 @@ export abstract class VFS extends Observable<{
     this.simpleMounts = new Map();
     this._cwd = '/';
     this.sortedMountPaths = [];
+    this.autoCreatedMounts = new Set();
+    this.cleanupOnUnmountFlags = new Map();
+    this.mountChangeCallbacks = new Map();
   }
 
   /**
@@ -685,7 +708,12 @@ export abstract class VFS extends Observable<{
     const normalizedPath = this.normalizePath(path);
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
-      return mounted.vfs.readDirectory(mounted.relativePath, options);
+      const childEntries = await mounted.vfs.readDirectory(mounted.relativePath, options);
+      // Rewrite child paths back to host namespace: <mountPath>/<childPath>
+      return childEntries.map((e) => ({
+        ...e,
+        path: PathUtils.normalize(PathUtils.join(mounted.mountPath, e.path === '/' ? '' : e.path))
+      }));
     }
 
     return this._readDirectory(normalizedPath, options);
@@ -693,6 +721,16 @@ export abstract class VFS extends Observable<{
 
   async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
     const normalizedPath = this.normalizePath(path);
+    for (const mountPath of this.sortedMountPaths) {
+      if (mountPath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/')) {
+        // Attempt to delete a mounted path or it's parent
+        throw new VFSError(
+          'Cannot delete a directory that contains mounted subdirectories. Unmount them first.',
+          'EBUSY',
+          normalizedPath
+        );
+      }
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
@@ -1004,7 +1042,7 @@ export abstract class VFS extends Observable<{
       }
 
       try {
-        const entries = await this._readDirectory(dirPath, {
+        const entries = await this.readDirectory(dirPath, {
           includeHidden: true
         });
 
@@ -1102,48 +1140,121 @@ export abstract class VFS extends Observable<{
   /**
    * Mounts another VFS at the specified path.
    *
-   * Simple mounting functionality for backward compatibility.
-   * For complex mounting requirements, consider using a dedicated MountFS implementation.
+   * Constraints/Behavior:
+   * - By default, mount path must be an existing empty directory.
+   * - If `autoCreate` is true, it will create the directory if it does not exist.
+   * - If the path exists but is not a directory -> ENOTDIR
+   * - If `requireEmpty` is true and the directory is not empty -> ENOTEMPTY
+   * - Changes from child VFS will bubble to host namespace (path is rewritten with mount prefix)
    *
    * @param path - The path where to mount the VFS
    * @param vfs - The VFS instance to mount
-   *
-   * @example
-   * ```typescript
-   * const mainFS = new MyVFS('main');
-   * const dataFS = new MyVFS('data');
-   * mainFS.mount('/data', dataFS);
-   *
-   * // Now operations on /data/* will be handled by dataFS
-   * await mainFS.writeFile('/data/file.txt', 'content');
-   * ```
+   * @param options - Mount options controlling auto-creation and cleanup behavior
    */
-  mount(path: string, vfs: VFS): void {
+  async mount(path: string, vfs: VFS, options: MountOptions = {}): Promise<void> {
+    const { autoCreate = true, cleanupOnUnmount = true, requireEmpty = true } = options;
     const normalizedPath = PathUtils.normalize(path);
+
+    // Prepare mount directory
+    let exists = await this._exists(normalizedPath);
+    if (!exists) {
+      if (!autoCreate) {
+        throw new VFSError('Mount path does not exist', 'ENOENT', normalizedPath);
+      }
+      if (this.readOnly) {
+        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+      }
+      await this._makeDirectory(normalizedPath, true);
+      exists = true;
+      this.autoCreatedMounts.add(normalizedPath);
+      this.cleanupOnUnmountFlags.set(normalizedPath, cleanupOnUnmount);
+    }
+
+    // Must be a directory
+    const st = await this._stat(normalizedPath).catch(() => null);
+    if (!st || !st.isDirectory) {
+      // Rollback auto-created marks if present
+      this.autoCreatedMounts.delete(normalizedPath);
+      this.cleanupOnUnmountFlags.delete(normalizedPath);
+      throw new VFSError('Mount path must be a directory', 'ENOTDIR', normalizedPath);
+    }
+
+    // Must be empty if requireEmpty
+    if (requireEmpty) {
+      const entries = await this._readDirectory(normalizedPath, { includeHidden: true }).catch(() => []);
+      if (Array.isArray(entries) && entries.length > 0) {
+        // Not empty: refuse to mount and rollback marks
+        this.autoCreatedMounts.delete(normalizedPath);
+        this.cleanupOnUnmountFlags.delete(normalizedPath);
+        throw new VFSError('Mount path must be empty', 'ENOTEMPTY', normalizedPath);
+      }
+    }
+
+    // Register mount
     this.simpleMounts.set(normalizedPath, vfs);
-
-    // Sort mount paths
     this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
-  }
 
+    // Bubble child's events with host mount prefix
+    const callback = (type, subPath, itemType) => {
+      const rel = subPath === '/' ? '' : subPath;
+      const hostPath = PathUtils.normalize(PathUtils.join(normalizedPath, rel));
+      this.onChange(type, hostPath, itemType);
+    };
+    this.mountChangeCallbacks.set(normalizedPath, callback);
+    vfs.on('changed', callback, this);
+  }
   /**
    * Unmounts a VFS from the specified path.
    *
+   * Behavior:
+   * - Removes the mount record.
+   * - If the mount directory was auto-created by this VFS and `cleanupOnUnmount` is true,
+   *   it will be removed only if it is still empty.
+   *
    * @param path - The path to unmount
-   * @returns True if a VFS was unmounted, false if no VFS was mounted at that path
+   * @returns True if a VFS was unmounted, false otherwise
    */
-  unmount(path: string): boolean {
+  async unmount(path: string): Promise<boolean> {
     const normalizedPath = PathUtils.normalize(path);
-    const result = this.simpleMounts.delete(normalizedPath);
+    const vfs = this.simpleMounts.get(normalizedPath);
+    if (!vfs) {
+      return false;
+    }
+    vfs.off('changed', this.mountChangeCallbacks.get(normalizedPath));
+    this.simpleMounts.delete(normalizedPath);
+    this.mountChangeCallbacks.delete(normalizedPath);
 
-    if (result) {
-      // Sort mount paths
-      this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
+    // Rebuild sorted mount paths
+    this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
+
+    const wasAutoCreated = this.autoCreatedMounts.has(normalizedPath);
+    const shouldCleanup = this.cleanupOnUnmountFlags.get(normalizedPath) ?? false;
+
+    // Clear flags immediately
+    this.autoCreatedMounts.delete(normalizedPath);
+    this.cleanupOnUnmountFlags.delete(normalizedPath);
+
+    // Conditional cleanup: only for auto-created mounts, and when still empty
+    if (wasAutoCreated && shouldCleanup) {
+      try {
+        const st = await this._stat(normalizedPath).catch(() => null);
+        if (st?.isDirectory) {
+          const entries = await this._readDirectory(normalizedPath, { includeHidden: true }).catch(() => []);
+          if ((entries?.length ?? 0) === 0) {
+            if (this.readOnly) {
+              // do nothing in read-only
+            } else {
+              await this._deleteDirectory(normalizedPath, false);
+            }
+          }
+        }
+      } catch {
+        // Ignore cleanup errors; unmount succeeded
+      }
     }
 
-    return result;
+    return true;
   }
-
   /**
    * Closes file system and release resources
    */

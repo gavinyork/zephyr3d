@@ -158,15 +158,27 @@ async function testMountOperations() {
   await subFS.writeFile('/sub-file.txt', 'sub content');
 
   // 挂载子文件系统
-  rootFS.mount('/mnt', subFS);
+  await rootFS.mount('/mnt', subFS);
   assert(rootFS.hasMounts(), '应该有挂载点');
 
   // 通过根文件系统访问挂载的文件
   const content = await rootFS.readFile('/mnt/sub-file.txt', { encoding: 'utf8' });
   assertEqual(content, 'sub content', '挂载文件内容应该匹配');
 
+  // glob操作
+  const list = await rootFS.glob('**/*');
+  assert(list.length === 1 && list[0].name === 'sub-file.txt', '应搜索到一个项目');
+
+  // 不允许删除
+  try {
+    await rootFS.deleteDirectory('/mnt');
+    throw new VFSError('应该抛出错误');
+  } catch (error) {
+    assert(error instanceof VFSError, '应该抛出 VFSError');
+  }
+
   // 卸载
-  const result = rootFS.unmount('/mnt');
+  const result = await rootFS.unmount('/mnt');
   assert(result, '卸载应该成功');
   assert(!rootFS.hasMounts(), '卸载后不应该有挂载点');
 
@@ -307,8 +319,8 @@ async function testMountPriority() {
   await fs2.writeFile('/file.txt', 'from fs2');
 
   // 创建嵌套挂载
-  rootFS.mount('/mnt', fs1);
-  rootFS.mount('/mnt/deep', fs2);
+  await rootFS.mount('/mnt', fs1);
+  await rootFS.mount('/mnt/deep', fs2);
 
   // 测试路径优先级
   const deepContent = await rootFS.readFile('/mnt/deep/file.txt', { encoding: 'utf8' });
@@ -328,8 +340,8 @@ async function testCrossMountOperations() {
   const fs1 = createVFS('child1');
   const fs2 = createVFS('child2');
 
-  rootFS.mount('/fs1', fs1);
-  rootFS.mount('/fs2', fs2);
+  await rootFS.mount('/fs1', fs1);
+  await rootFS.mount('/fs2', fs2);
 
   // 在第一个挂载点创建文件
   await rootFS.writeFile('/fs1/source.txt', 'cross mount data');
@@ -672,8 +684,8 @@ async function testMoveCrossVFSRestriction() {
   await subFS2.writeFile('/file2.txt', 'content2');
 
   // 挂载两个VFS
-  rootFS.mount('/vfs1', subFS1);
-  rootFS.mount('/vfs2', subFS2);
+  await rootFS.mount('/vfs1', subFS1);
+  await rootFS.mount('/vfs2', subFS2);
 
   // 测试跨VFS移动应该失败
   try {
@@ -1966,7 +1978,7 @@ async function testCwdWithMounts() {
   await subFS.writeFile('/data/files/config.json', '{"key": "value"}');
 
   // 挂载子文件系统
-  rootFS.mount('/mnt/external', subFS);
+  await rootFS.mount('/mnt/external', subFS);
 
   // 在根文件系统中设置 CWD
   await rootFS.chdir('/mnt/external/data');
