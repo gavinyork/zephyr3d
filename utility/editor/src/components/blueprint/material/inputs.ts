@@ -4,7 +4,8 @@ import {
   VertexTangentNode,
   VertexBinormalNode,
   CameraPositionNode,
-  VertexPositionNode
+  VertexPositionNode,
+  VertexUVNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -16,6 +17,10 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'VertexColor',
           create: () => new VertexColorNode()
+        },
+        {
+          name: 'VertexUV',
+          create: () => new VertexUVNode()
         },
         {
           name: 'VertexNormalWS',

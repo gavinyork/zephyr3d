@@ -1,5 +1,6 @@
 import type { SerializableClass } from '../../serialization';
 import { BaseGraphNode } from '../node';
+
 export class VertexColorNode extends BaseGraphNode {
   constructor() {
     super();
@@ -28,6 +29,35 @@ export class VertexColorNode extends BaseGraphNode {
   }
   protected getType(id: number): string {
     return id > 1 ? 'float' : 'vec4';
+  }
+}
+
+export class VertexUVNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' }
+    ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexUVNode,
+      name: 'VertexUVNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  toString() {
+    return 'vertex UV';
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(id: number): string {
+    return id > 1 ? 'float' : 'vec2';
   }
 }
 

@@ -20,6 +20,8 @@ export class PBRBluePrintMaterial
   /** @internal */
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /** @internal */
+  private static readonly FEATURE_VERTEX_UV = this.defineFeature();
+  /** @internal */
   private _ir: MaterialBlueprintIR;
   /**
    * Creates an instance of PBRMetallicRoughnessMaterial class
@@ -29,6 +31,7 @@ export class PBRBluePrintMaterial
     this._ir = ir ?? new MaterialBlueprintIR(null, '');
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._ir.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._ir.behaviors.useVertexColor);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._ir.behaviors.useVertexUV);
   }
   get IR() {
     return this._ir;
@@ -60,6 +63,10 @@ export class PBRBluePrintMaterial
       scope.$inputs.vertexColor = pb.vec4().attrib('diffuse');
       scope.$outputs.zVertexColor = scope.$inputs.vertexColor;
     }
+    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV)) {
+      scope.$inputs.vertexUV = pb.vec2().attrib('texCoord0');
+      scope.$outputs.zVertexUV = scope.$inputs.vertexUV;
+    }
     scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)) {
@@ -85,6 +92,7 @@ export class PBRBluePrintMaterial
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexTangent : null,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexBinormal : null,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.zVertexColor : null,
+        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.zVertexUV : null,
         this._ir
       );
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {

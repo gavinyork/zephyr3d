@@ -47,6 +47,10 @@ export class MakeVectorNode extends BaseGraphNode {
     };
   }
   protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
     let index = this._inputs.length - 1;
     while (index >= 0 && !this._inputs[index].inputNode) {
       index--;
@@ -141,7 +145,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
   toString() {
     return this.func;
   }
-  protected validate() {
+  protected validate(): string {
     const err = super.validate();
     if (err) {
       return err;

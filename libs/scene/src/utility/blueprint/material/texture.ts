@@ -430,8 +430,10 @@ export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
 }
 
 export class TextureSampleNode extends BaseGraphNode {
+  samplerType: 'Color' | 'Normal';
   constructor() {
     super();
+    this.samplerType = 'Color';
     this._outputs = [
       {
         id: 1,
@@ -450,11 +452,6 @@ export class TextureSampleNode extends BaseGraphNode {
         name: 'coord',
         type: ['vec2', 'vec3'],
         required: true
-      },
-      {
-        id: 3,
-        name: 'lod',
-        type: ['float']
       }
     ];
   }
@@ -462,12 +459,36 @@ export class TextureSampleNode extends BaseGraphNode {
     return {
       ctor: TextureSampleNode,
       name: 'TextureSampleNode',
-      getProps() {
-        return [];
+      getProps(): PropertyAccessor<TextureSampleNode>[] {
+        return [
+          {
+            name: 'SamplerType',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['Color', 'Normal'],
+                values: ['Color', 'Normal']
+              }
+            },
+            get(this: TextureSampleNode, value) {
+              value.str[0] = this.samplerType;
+            },
+            set(this: TextureSampleNode, value) {
+              this.samplerType = value.str[0] as any;
+            }
+          }
+        ];
       }
     };
   }
+  toString(): string {
+    return 'textureSample';
+  }
   protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
     const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
@@ -482,15 +503,6 @@ export class TextureSampleNode extends BaseGraphNode {
     const expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
     if (type1 !== expectedType1) {
       return `Texture coordinate type should be ${expectedType1}`;
-    }
-    if (this._inputs[2].inputNode) {
-      const type2 = this._inputs[2].inputNode.getOutputType(this._inputs[2].inputId);
-      if (!type2) {
-        return `Cannot determine typeof argument \`${this._inputs[2].name}\``;
-      }
-      if (!this._inputs[2].type.includes(type2)) {
-        return `Invalid input type of argument \`${this._inputs[2].name}\`: ${type2}`;
-      }
     }
     return '';
   }

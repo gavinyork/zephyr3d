@@ -1291,11 +1291,10 @@ export class NodeEditor extends Observable<{
             }
           } else {
             const types = this.getSlotInputType(this.linkStartSlot);
-            const outputSlot =
-              node.outputs.find((value) => {
-                const outputType = node.impl.getOutputType(value.id);
-                return !!outputType && types.includes(outputType);
-              }) ?? node.outputs[0];
+            const outputSlot = node.outputs.find((value) => {
+              const outputType = node.impl.getOutputType(value.id);
+              return !!outputType && types.includes(outputType);
+            });
             if (outputSlot) {
               this.addLink(node.id, outputSlot.id, this.linkStartSlot.nodeId, this.linkStartSlot.slotId);
             }

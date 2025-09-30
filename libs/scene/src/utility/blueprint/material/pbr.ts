@@ -43,7 +43,7 @@ export class PBRBlockNode extends BaseGraphNode {
       {
         id: 6,
         name: 'Normal',
-        type: ['vec3'],
+        type: ['vec3', 'vec4'],
         originType: 'vec3'
       },
       {

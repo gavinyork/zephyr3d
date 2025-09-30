@@ -119,7 +119,8 @@ import {
   VertexColorNode,
   VertexNormalNode,
   VertexPositionNode,
-  VertexTangentNode
+  VertexTangentNode,
+  VertexUVNode
 } from '../blueprint/material/inputs';
 import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
@@ -293,6 +294,7 @@ export class SerializationManager {
         DotProductNode.getSerializationCls(),
         CrossProductNode.getSerializationCls(),
         VertexColorNode.getSerializationCls(),
+        VertexUVNode.getSerializationCls(),
         VertexPositionNode.getSerializationCls(),
         VertexNormalNode.getSerializationCls(),
         VertexTangentNode.getSerializationCls(),

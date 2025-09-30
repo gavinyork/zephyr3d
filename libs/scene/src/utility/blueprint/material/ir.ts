@@ -25,7 +25,8 @@ import {
   VertexColorNode,
   VertexNormalNode,
   VertexPositionNode,
-  VertexTangentNode
+  VertexTangentNode,
+  VertexUVNode
 } from './inputs';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number; node: IGraphNode };
@@ -188,12 +189,12 @@ class IRCast extends IRExpression {
 class IRSampleTexture extends IRExpression {
   tex: IRConstantTexture;
   coord: IRExpression;
-  lod: IRExpression;
-  constructor(tex: IRConstantTexture, coord: IRExpression, lod: IRExpression) {
+  samplerType: 'Color' | 'Normal';
+  constructor(tex: IRConstantTexture, coord: IRExpression, samplerType: 'Color' | 'Normal') {
     super();
     this.tex = tex.addRef();
     this.coord = coord.addRef();
-    this.lod = lod?.addRef() ?? null;
+    this.samplerType = samplerType;
   }
   create(pb: ProgramBuilder): PBShaderExp {
     const tex = this.tex.create(pb);
@@ -206,9 +207,12 @@ class IRSampleTexture extends IRExpression {
     } else {
       throw new Error('Invalid texture coordinate');
     }
-    return this.lod === null
-      ? pb.textureSample(tex, coordExp)
-      : pb.textureSampleLevel(tex, coordExp, this.lod.create(pb) as number | PBShaderExp);
+    const result = pb.textureSample(tex, coordExp);
+    if (this.samplerType === 'Normal') {
+      return pb.sub(pb.mul(result, pb.vec4(2, 2, 2, 1)), pb.vec4(1, 1, 1, 0));
+    } else {
+      return result;
+    }
   }
 }
 
@@ -264,6 +268,7 @@ class IRConstantTexture extends IRExpression {
 
 export interface MaterialBlueprintIRBehaviors {
   useVertexColor: boolean;
+  useVertexUV: boolean;
   useVertexTangent: boolean;
   useCameraPosition: boolean;
 }
@@ -350,6 +355,7 @@ export class MaterialBlueprintIR {
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
+      useVertexUV: false,
       useVertexTangent: false,
       useCameraPosition: false
     };
@@ -374,6 +380,8 @@ export class MaterialBlueprintIR {
       expr = this.func(node, output);
     } else if (node instanceof VertexColorNode) {
       expr = this.vertexColor(node, output);
+    } else if (node instanceof VertexUVNode) {
+      expr = this.vertexUV(node, output);
     } else if (node instanceof VertexPositionNode) {
       expr = this.vertexPosition(node, output);
     } else if (node instanceof VertexNormalNode) {
@@ -470,6 +478,10 @@ export class MaterialBlueprintIR {
     this._behaviors.useVertexColor = true;
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexColor');
   }
+  private vertexUV(node: VertexUVNode, output: number): IRExpression {
+    this._behaviors.useVertexUV = true;
+    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexUV');
+  }
   private vertexNormal(node: VertexNormalNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexNormal');
   }
@@ -520,7 +532,6 @@ export class MaterialBlueprintIR {
   private textureSample(node: TextureSampleNode, output: number): IRExpression {
     const tex = this.ir(node.inputs[0].inputNode, node.inputs[0].inputId) as IRConstantTexture;
     const coord = this.ir(node.inputs[1].inputNode, node.inputs[1].inputId);
-    const lod = this.ir(node.inputs[2].inputNode, node.inputs[2].inputId);
-    return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, lod);
+    return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, node.samplerType);
   }
 }

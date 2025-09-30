@@ -30,6 +30,7 @@ export type IMixinPBRBluePrint = {
     worldTangent: PBShaderExp,
     worldBinormal: PBShaderExp,
     vertexColor: PBShaderExp,
+    vertexUV: PBShaderExp,
     ir: MaterialBlueprintIR
   ): PBShaderExp;
   calculateCommonData(
@@ -40,6 +41,7 @@ export type IMixinPBRBluePrint = {
     worldTangent: PBShaderExp,
     worldBinormal: PBShaderExp,
     vertexColor: PBShaderExp,
+    vertexUV: PBShaderExp,
     data: PBShaderExp
   ): void;
   directLighting(
@@ -88,6 +90,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       worldTangent: PBShaderExp,
       worldBinormal: PBShaderExp,
       vertexColor: PBShaderExp,
+      vertexUV: PBShaderExp,
       ir: MaterialBlueprintIR
     ): PBShaderExp {
       const pb = scope.$builder;
@@ -103,6 +106,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           worldTangent,
           worldBinormal,
           vertexColor,
+          vertexUV,
           this.data
         );
         this.$return(this.data);
@@ -203,6 +207,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       worldTangent: PBShaderExp,
       worldBinormal: PBShaderExp,
       vertexColor: PBShaderExp,
+      vertexUV: PBShaderExp,
       data: PBShaderExp
     ): void {
       const that = this;
@@ -221,6 +226,10 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       if (vertexColor) {
         params.push(pb.vec4('zVertexColor'));
         paramValues.push(vertexColor);
+      }
+      if (vertexUV) {
+        params.push(pb.vec2('zVertexUV'));
+        paramValues.push(vertexUV);
       }
       pb.func(funcName, params, function () {
         if (ir.behaviors.useCameraPosition) {
@@ -244,24 +253,19 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           ),
           1.5
         );
-        if (outputs.Normal) {
-          this.zCommonData.normal = outputs.Normal;
-          this.zCommonData.TBN = that.calculateTBN(
-            this,
-            this.zWorldPos,
-            this.zCommonData.normal,
-            outputs.Tangent instanceof PBShaderExp ? outputs.Tangent : undefined
-          );
+        if (outputs.Tangent instanceof PBShaderExp) {
+          this.$l.ng = pb.normalize(this.zVertexNormal);
+          this.$l.t_ = outputs.Tangent;
+          this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
+          this.$l.b = pb.cross(this.ng, this.t);
+          this.zCommonData.TBN = pb.mat3(this.t, this.b, this.ng);
         } else {
-          this.$l.normalInfo = that.calculateNormalAndTBN(
-            this,
-            this.zWorldPos,
-            this.zVertexNormal,
-            worldTangent ? this.zVertexTangent : undefined,
-            worldBinormal ? this.zVertexBinormal : undefined
-          );
-          this.zCommonData.normal = this.normalInfo.normal;
-          this.zCommonData.TBN = this.normalInfo.TBN;
+          this.zCommonData.TBN = that.calculateTBN(this, this.zWorldPos, this.zVertexNormal);
+        }
+        if (outputs.Normal) {
+          this.zCommonData.normal = pb.normalize(pb.mul(this.zCommonData.TBN, outputs.Normal));
+        } else {
+          this.zCommonData.normal = this.zVertexNormal;
         }
         this.zCommonData.diffuse = pb.vec4(
           pb.mix(this.zCommonData.albedo.rgb, pb.vec3(0), this.zCommonData.metallic),
