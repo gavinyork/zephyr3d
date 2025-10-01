@@ -1,4 +1,4 @@
-import type { GenericConstructor, VFS } from '@zephyr3d/base';
+import type { GenericConstructor, TypedArray, VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass } from './scene/node';
@@ -39,7 +39,7 @@ import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
-import type { Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
+import type { BaseTexture, SamplerOptions, Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
 import {
   getJSONBoolClass,
   getJSONObjectClass,
@@ -591,6 +591,29 @@ export class SerializationManager {
       this._allocated.set(model.group, id);
     }
     return model;
+  }
+  /**
+   * Load a texture directly from an ArrayBuffer or typed array.
+   *
+   * - Chooses an appropriate loader based on the provided MIME type.
+   * - Can upload into an existing texture if `texture` is specified.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param arrayBuffer - Raw texture data buffer.
+   * @param mimeType - MIME type of the texture (must be supported by a registered loader).
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options passed to the loader path.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   */
+  async loadTextureFromBuffer<T extends BaseTexture>(
+    arrayBuffer: ArrayBuffer | TypedArray,
+    mimeType: string,
+    srgb?: boolean,
+    samplerOptions?: SamplerOptions,
+    texture?: BaseTexture
+  ): Promise<T> {
+    return this._assetManager.loadTextureFromBuffer(arrayBuffer, mimeType, srgb, samplerOptions, texture);
   }
   /**
    * Load a texture by ID and track the allocation for reverse lookup.

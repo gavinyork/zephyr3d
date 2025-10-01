@@ -6,6 +6,7 @@ export * from './bounding_volume';
 export * from './misc';
 export * from './debug';
 export * from './serialization';
+export * from './draco/decoder';
 export * from './textures/gradientnoise';
 export * from './textures/randomnoise';
 export * from './blueprint/node';
