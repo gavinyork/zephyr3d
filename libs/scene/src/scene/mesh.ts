@@ -1,17 +1,18 @@
 import { applyMixins, DRef } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
-import { BoxFrameShape } from '../shapes';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial } from '../material';
 import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
 import type { GPUDataBuffer, RenderBundle, Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';
-import type { BoundingBox, BoundingVolume } from '../utility/bounding_volume';
+import type { BoundingVolume } from '../utility/bounding_volume';
+import { BoundingBox } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
+import type { Skeleton, SkinnedBoundingBox } from '../animation';
 
 /**
  * Mesh node
@@ -25,21 +26,23 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _castShadow: boolean;
   /** @internal */
+  protected _skinnedBoundingInfo: SkinnedBoundingBox;
+  /** @internal */
   protected _animatedBoundingBox: BoundingBox;
   /** @internal */
-  protected _boneMatrices: Texture2D;
+  protected _skeleton: DRef<Skeleton>;
   /** @internal */
-  protected _morphData: Texture2D;
+  protected _boneMatrices: DRef<Texture2D>;
   /** @internal */
-  protected _morphInfo: GPUDataBuffer;
+  protected _morphData: DRef<Texture2D>;
+  /** @internal */
+  protected _morphInfo: DRef<GPUDataBuffer>;
   /** @internal */
   protected _instanceHash: string;
   /** @internal */
   protected _batchable: boolean;
   /** @internal */
   protected _pickTarget: PickTarget;
-  /** @internal */
-  protected _boundingBoxNode: Mesh;
   /** @internal */
   protected _skinAnimation: boolean;
   /** @internal */
@@ -61,13 +64,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive = new DRef();
     this._material = new DRef();
     this._castShadow = true;
+    this._skeleton = new DRef();
+    this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
-    this._boneMatrices = null;
-    this._morphData = null;
-    this._morphInfo = null;
+    this._boneMatrices = new DRef();
+    this._morphData = new DRef();
+    this._morphInfo = new DRef();
     this._instanceHash = null;
     this._pickTarget = { node: this };
-    this._boundingBoxNode = null;
     this._batchable = getDevice().type !== 'webgl';
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
@@ -90,14 +94,21 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     super.copyFrom(other, method, recursive);
     this.castShadow = other.castShadow;
     this.primitive = method === 'deep' ? other.primitive.clone() : other.primitive;
-    this.drawBoundingBox = other.drawBoundingBox;
-    this._boneMatrices = other._boneMatrices;
-    this._morphData = other._morphData;
-    this._morphInfo = other._morphInfo;
     this.material =
       !this._skinAnimation && !this._morphAnimation && method === 'instance'
         ? other.material?.createInstance()
         : other.material?.clone();
+    this._skinnedBoundingInfo = other._skinnedBoundingInfo
+      ? {
+          boundingVertices: other._skinnedBoundingInfo.boundingVertices,
+          boundingVertexBlendIndices: other._skinnedBoundingInfo.boundingVertexBlendIndices,
+          boundingVertexJointWeights: other._skinnedBoundingInfo.boundingVertexJointWeights,
+          boundingBox: new BoundingBox(other._skinnedBoundingInfo.boundingBox)
+        }
+      : null;
+    this.skeleton = other.skeleton;
+    this.setMorphData(other.getMorphData());
+    this.setMorphInfo(other.getMorphInfo());
   }
   /**
    * {@inheritDoc Drawable.getName}
@@ -125,6 +136,18 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   setPickTarget(node: SceneNode, label?: string) {
     this._pickTarget = { node, label };
+  }
+  get skeleton() {
+    return this._skeleton.get();
+  }
+  set skeleton(sk: Skeleton) {
+    if (sk !== this.skeleton) {
+      this._skeleton.set(sk);
+      this.updateSkeletonState();
+      if (sk) {
+        this.scene.queueUpdateNode(this);
+      }
+    }
   }
   /** @internal */
   get skinAnimation() {
@@ -188,26 +211,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       this._materialChangeTag = null;
     }
   }
-  /** Wether to draw the bounding box of the mesh node */
-  get drawBoundingBox(): boolean {
-    return !!this._boundingBoxNode;
-  }
-  set drawBoundingBox(val: boolean) {
-    if (!!this._boundingBoxNode !== !!val) {
-      if (!val) {
-        this._boundingBoxNode.remove();
-        this._boundingBoxNode = null;
-      } else {
-        if (!Mesh._defaultBoxFrame) {
-          Mesh._defaultBoxFrame = new BoxFrameShape({ size: 1 });
-        }
-        this._boundingBoxNode = new Mesh(this._scene, Mesh._defaultBoxFrame);
-        this._boundingBoxNode.parent = this;
-        this._boundingBoxNode.scale.set(this.getBoundingVolume().toAABB().size);
-        this._boundingBoxNode.position.set(this.getBoundingVolume().toAABB().minPoint);
-      }
-    }
-  }
   /**
    * {@inheritDoc SceneNode.isMesh}
    */
@@ -227,8 +230,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param matrices - The texture that contains the bone matrices
    */
   setBoneMatrices(matrices: Texture2D) {
-    if (this._boneMatrices !== matrices) {
-      this._boneMatrices = matrices;
+    if (this._boneMatrices.get() !== matrices) {
+      this._boneMatrices.set(matrices);
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -238,25 +241,29 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * @param data - The texture that contains the morph target data
    */
   setMorphData(data: Texture2D) {
-    if (this._morphData !== data) {
-      this._morphData = data;
+    if (this._morphData.get() !== data) {
+      this._morphData.set(data);
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
+  }
+  /** @internal */
+  setSkinnedBoundingInfo(info: SkinnedBoundingBox) {
+    this._skinnedBoundingInfo = info;
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
   getMorphData(): Texture2D {
-    return this._morphData;
+    return this._morphData.get();
   }
   /**
    * Sets the buffer that contains the morph target information
    * @param info - The buffer that contains the morph target information
    */
   setMorphInfo(info: GPUDataBuffer) {
-    if (this._morphInfo !== info) {
-      this._morphInfo = info;
+    if (this._morphInfo.get() !== info) {
+      this._morphInfo.set(info);
       RenderBundleWrapper.drawableChanged(this);
     }
   }
@@ -264,13 +271,33 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * {@inheritDoc Drawable.getMorphInfo}
    */
   getMorphInfo(): GPUDataBuffer<unknown> {
-    return this._morphInfo;
+    return this._morphInfo.get();
+  }
+  /** {@inheritDoc SceneNode.update} */
+  update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
+    super.update(frameId, elapsedInSeconds, deltaInSeconds);
+    if (this.skeleton) {
+      if (this.skeleton.playing) {
+        this.setBoneMatrices(this.skeleton.jointTexture);
+        this.skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
+        this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
+      } else {
+        this.setBoneMatrices(null);
+        this.setAnimatedBoundingBox(null);
+      }
+      this.scene.queueUpdateNode(this);
+    }
   }
   /**
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && !this._boneMatrices && !this._morphData && this._material.get()?.isBatchable();
+    return (
+      this._batchable &&
+      !this._boneMatrices.get() &&
+      !this._morphData.get() &&
+      this._material.get()?.isBatchable()
+    );
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
@@ -295,6 +322,17 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   needSceneDepth(): boolean {
     return this.material?.needSceneDepth();
+  }
+  /** @internal */
+  private updateSkeletonState() {
+    if (this.skeleton?.playing) {
+      this.setBoneMatrices(this.skeleton.jointTexture);
+      this.skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
+      this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
+    } else {
+      this.setBoneMatrices(null);
+      this.setAnimatedBoundingBox(null);
+    }
   }
   /**
    * {@inheritDoc Drawable.draw}
@@ -343,7 +381,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * {@inheritDoc Drawable.getBoneMatrices}
    */
   getBoneMatrices(): Texture2D {
-    return this._boneMatrices;
+    return this._boneMatrices.get();
   }
   /**
    * {@inheritDoc Drawable.getNode}
@@ -360,10 +398,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     } else {
       bbox = this._primitive.get()?.getBoundingVolume() ?? null;
     }
-    if (bbox && this._boundingBoxNode) {
-      this._boundingBoxNode.scale.set(bbox.toAABB().size);
-      this._boundingBoxNode.position.set(bbox.toAABB().minPoint);
-    }
     return bbox;
   }
   /** Disposes the mesh node */
@@ -372,6 +406,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive.get()?.off('bv_changed', this._onBoundingboxChange, this);
     this._primitive.dispose();
     this._material.dispose();
+    this._skeleton.dispose();
+    this._boneMatrices.dispose();
+    this._morphData.dispose();
+    this._morphInfo.dispose();
     this._renderBundle = null;
     RenderBundleWrapper.drawableChanged(this);
   }
@@ -381,8 +419,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** @internal */
   private static _defaultMaterial: MeshMaterial = null;
-  /** @internal */
-  private static _defaultBoxFrame: Primitive = null;
   /** @internal */
   private static _getDefaultMaterial(): MeshMaterial {
     if (!this._defaultMaterial) {

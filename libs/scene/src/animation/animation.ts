@@ -188,6 +188,22 @@ export class AnimationClip extends Disposable {
     track.reset(target);
     return this;
   }
+  /** @internal */
+  resample(frames: number, callback: (frame: number) => void) {
+    for (let frame = 0; frame <= frames; frame++) {
+      const t = frame / this.timeDuration;
+      for (const [k, v] of this.tracks) {
+        for (const track of v) {
+          const state = track.calculateState(k, t);
+          track.applyState(k, state);
+        }
+      }
+      for (const sk of this.skeletons) {
+        sk.computeJoints();
+      }
+      callback(frame);
+    }
+  }
   /**
    * Dispose internal resources/references held by this clip.
    *

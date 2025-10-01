@@ -345,6 +345,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         } else {
           this._activeSkeletons.set(k, 1);
         }
+        k.playing = true;
       });
     }
   }

@@ -1,6 +1,5 @@
 import { AnimationTrack } from './animationtrack';
 import type { Mesh, SceneNode } from '../scene';
-import type { AssetAnimationTrack, AssetSubMeshData } from '../asset';
 import { BoundingBox } from '../utility/bounding_volume';
 import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
@@ -27,18 +26,23 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   /**
    * Create an instance of MorphTargetTrack
    */
-  constructor(assetTrack: AssetAnimationTrack, subMesh: AssetSubMeshData, embedded?: boolean) {
+  constructor(
+    interpolator: Interpolator,
+    defaultMorphWeights: number[],
+    targetBox: BoundingBox[],
+    originBox: AABB,
+    embedded?: boolean
+  ) {
     super(embedded);
-    this._interpolator = assetTrack.interpolator;
+    this._interpolator = interpolator;
     this._state = {
-      numTargets: assetTrack.interpolator.stride,
+      numTargets: interpolator.stride,
       boundingBox: new BoundingBox(),
       weights: new Float32Array(MAX_MORPH_TARGETS)
     };
-    this._boundingBox = subMesh.targetBox;
-    this._originBox = subMesh.mesh.getBoundingVolume().toAABB();
-    this._defaultWeights =
-      assetTrack.defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
+    this._boundingBox = targetBox;
+    this._originBox = originBox;
+    this._defaultWeights = defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
 

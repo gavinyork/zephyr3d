@@ -6,4 +6,5 @@ export * from './rotationtrack';
 export * from './eulerrotationtrack';
 export * from './scaletrack';
 export * from './proptrack';
+export * from './morphtrack';
 export * from './skeleton';

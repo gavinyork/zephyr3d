@@ -1,12 +1,13 @@
+import type { TypedArray } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
-import type { Mesh } from '../scene';
 import { BoundingBox } from '../utility/bounding_volume';
-import type { AssetSubMeshData } from '../asset';
 import { getDevice } from '../app/api';
 
-interface SkinnedBoundingBox {
+/** @internal */
+export interface SkinnedBoundingBox {
   /**
    * Representative vertices used to bound a skinned mesh (extreme points along axes).
    */
@@ -56,8 +57,6 @@ const tmpV3 = new Vector3();
  */
 export class Skeleton extends Disposable {
   /** @internal */
-  protected _meshes: { mesh: Mesh; bounding: SkinnedBoundingBox; box: BoundingBox }[];
-  /** @internal */
   protected _joints: SceneNode[];
   /** @internal */
   protected _inverseBindMatrices: Matrix4x4[];
@@ -70,23 +69,17 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _jointMatrixArray: Float32Array<ArrayBuffer>;
   /** @internal */
-  protected _jointTexture: Texture2D;
+  protected _jointTexture: DRef<Texture2D>;
+  /** @internal */
+  protected _playing: boolean;
   /**
    * Create a skeleton instance.
    *
    * @param joints - Joint scene nodes (one per joint), ordered to match skin data.
    * @param inverseBindMatrices - Inverse bind matrices for each joint.
    * @param bindPoseMatrices - Bind pose matrices for each joint (model-space).
-   * @param meshes - Mesh instances influenced by this skeleton.
-   * @param bounding - Sub-mesh raw data used to derive representative bounding vertices.
    */
-  constructor(
-    joints: SceneNode[],
-    inverseBindMatrices: Matrix4x4[],
-    bindPoseMatrices: Matrix4x4[],
-    meshes: Mesh[],
-    bounding: AssetSubMeshData[]
-  ) {
+  constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[]) {
     super();
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
@@ -94,15 +87,16 @@ export class Skeleton extends Disposable {
     this._jointMatrixArray = null;
     this._jointMatrices = null;
     this._jointOffsets = null;
-    this._jointTexture = null;
+    this._jointTexture = new DRef();
+    this._playing = false;
     this.updateJointMatrices();
-    this._meshes = meshes.map((mesh, index) => {
-      return {
-        mesh,
-        bounding: this.getBoundingInfo(bounding[index]),
-        box: new BoundingBox()
-      };
-    });
+  }
+  /** @internal */
+  get playing() {
+    return this._playing;
+  }
+  set playing(b: boolean) {
+    this._playing = b;
   }
   /**
    * Texture containing joint matrices for GPU skinning.
@@ -110,7 +104,7 @@ export class Skeleton extends Disposable {
    * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
    */
   get jointTexture(): Texture2D {
-    return this._jointTexture;
+    return this._jointTexture.get();
   }
   /**
    * Update joint matrices from either provided transforms or the joints' world matrices.
@@ -129,7 +123,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
-    if (!this._jointTexture) {
+    if (!this._jointTexture.get()) {
       this._createJointTexture();
     }
     if (this._jointOffsets[0] === 0) {
@@ -160,13 +154,8 @@ export class Skeleton extends Disposable {
   computeBindPose(model: SceneNode) {
     this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
     this._jointOffsets[1] = this._jointOffsets[0];
-    this._jointTexture.update(
-      this._jointMatrixArray,
-      0,
-      0,
-      this._jointTexture.width,
-      this._jointTexture.height
-    );
+    const tex = this._jointTexture.get();
+    tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
    * Compute current joint matrices from the nodes and upload them to the joint texture.
@@ -175,13 +164,8 @@ export class Skeleton extends Disposable {
    */
   computeJoints() {
     this.updateJointMatrices();
-    this._jointTexture.update(
-      this._jointMatrixArray,
-      0,
-      0,
-      this._jointTexture.width,
-      this._jointTexture.height
-    );
+    const tex = this._jointTexture.get();
+    tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
    * Apply current skeleton state to all meshes:
@@ -193,11 +177,6 @@ export class Skeleton extends Disposable {
    */
   apply() {
     this.computeJoints();
-    for (const mesh of this._meshes) {
-      this.computeBoundingBox(mesh.bounding, mesh.mesh.invWorldMatrix);
-      mesh.mesh.setBoneMatrices(this.jointTexture);
-      mesh.mesh.setAnimatedBoundingBox(mesh.bounding.boundingBox);
-    }
   }
   /**
    * Reset all meshes to an unskinned state and clear animated bounds.
@@ -205,10 +184,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   reset() {
-    for (const mesh of this._meshes) {
-      mesh.mesh.setBoneMatrices(null);
-      mesh.mesh.setAnimatedBoundingBox(null);
-    }
+    this._playing = false;
   }
   /**
    * Compute the animated bounding box for a single mesh using its representative vertices.
@@ -250,8 +226,7 @@ export class Skeleton extends Disposable {
    */
   protected onDispose() {
     super.onDispose();
-    this._jointTexture?.dispose();
-    this._jointTexture = null;
+    this._jointTexture.dispose();
     this._joints = null;
     this._inverseBindMatrices = null;
     this._bindPoseMatrices = null;
@@ -273,13 +248,15 @@ export class Skeleton extends Disposable {
   private _createJointTexture() {
     const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this._joints.length * 2 + 1) * 4))));
     const device = getDevice();
-    this._jointTexture = device.createTexture2D('rgba32f', textureWidth, textureWidth, {
-      mipmapping: false,
-      samplerOptions: {
-        magFilter: 'nearest',
-        minFilter: 'nearest'
-      }
-    });
+    this._jointTexture.set(
+      device.createTexture2D('rgba32f', textureWidth, textureWidth, {
+        mipmapping: false,
+        samplerOptions: {
+          magFilter: 'nearest',
+          minFilter: 'nearest'
+        }
+      })
+    );
     this._jointMatrixArray = new Float32Array(textureWidth * textureWidth * 4);
     const buffer = this._jointMatrixArray.buffer;
     this._jointOffsets = new Float32Array(buffer);
@@ -304,7 +281,11 @@ export class Skeleton extends Disposable {
    * @returns Skinned bounding box info used during per-frame updates.
    * @internal
    */
-  private getBoundingInfo(meshData: AssetSubMeshData): SkinnedBoundingBox {
+  getBoundingInfo(data: {
+    positions: Float32Array;
+    blendIndices: TypedArray;
+    weights: TypedArray;
+  }): SkinnedBoundingBox {
     const indices = [0, 0, 0, 0, 0, 0];
     let minx = Number.MAX_VALUE;
     let maxx = -Number.MAX_VALUE;
@@ -312,7 +293,7 @@ export class Skeleton extends Disposable {
     let maxy = -Number.MAX_VALUE;
     let minz = Number.MAX_VALUE;
     let maxz = -Number.MAX_VALUE;
-    const v = meshData.rawPositions;
+    const v = data.positions;
     const vert = new Vector3();
     const tmpV0 = new Vector3();
     const tmpV1 = new Vector3();
@@ -321,18 +302,18 @@ export class Skeleton extends Disposable {
     const numVertices = Math.floor(v.length / 3);
     for (let i = 0; i < numVertices; i++) {
       vert.setXYZ(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
-      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
+      this._jointMatrices[data.blendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV0)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 0]);
-      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
+        .scaleBy(data.weights[i * 4 + 0]);
+      this._jointMatrices[data.blendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV1)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 1]);
-      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
+        .scaleBy(data.weights[i * 4 + 1]);
+      this._jointMatrices[data.blendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV2)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 2]);
-      this._jointMatrices[meshData.rawBlendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
+        .scaleBy(data.weights[i * 4 + 2]);
+      this._jointMatrices[data.blendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
         .transformPointAffine(vert, tmpV3)
-        .scaleBy(meshData.rawJointWeights[i * 4 + 3]);
+        .scaleBy(data.weights[i * 4 + 3]);
       tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
       if (tmpV0.x < minx) {
         minx = tmpV0.x;
@@ -359,23 +340,62 @@ export class Skeleton extends Disposable {
         indices[5] = i;
       }
     }
+    /*
+    let minx_j = Number.MAX_VALUE;
+    let maxx_j = -Number.MAX_VALUE;
+    let miny_j = Number.MAX_VALUE;
+    let maxy_j = -Number.MAX_VALUE;
+    let minz_j = Number.MAX_VALUE;
+    let maxz_j = -Number.MAX_VALUE;
+    for (let i = 0; i < this._joints.length; i++) {
+      const m = this._jointMatrices[i + this._jointOffsets[0]];
+      const x = m.m03;
+      const y = m.m13;
+      const z = m.m23;
+      if (x < minx_j) {
+        minx_j = x;
+      }
+      if (x > maxx_j) {
+        maxx_j = x;
+      }
+      if (y < miny_j) {
+        miny_j = y;
+      }
+      if (y > maxy_j) {
+        maxy_j = y;
+      }
+      if (z < minz_j) {
+        minz_j = z;
+      }
+      if (z > maxz_j) {
+        maxz_j = z;
+      }
+    }
+    const dx = Math.max(Math.abs(minx - minx_j), Math.abs(maxx - maxx_j));
+    const dy = Math.max(Math.abs(miny - miny_j), Math.abs(maxy - maxy_j));
+    const dz = Math.max(Math.abs(minz - minz_j), Math.abs(maxz - maxz_j));
+    const diff = Math.max(dx, dy, dz);
+    const bbox = new AABB(
+      new Vector3(minx_j - diff, miny_j - diff, minz_j - diff),
+      new Vector3(maxx_j + diff, maxy_j + diff, maxz_j + diff)
+    );
+    console.log(`Skinned bounding diff: (${dx}, ${dy}, ${dz})`);
+    */
     const info: SkinnedBoundingBox = {
       boundingVertexBlendIndices: new Float32Array(
         Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawBlendIndices[indices[index >> 2] * 4 + (index % 4)]
+          (val, index) => data.blendIndices[indices[index >> 2] * 4 + (index % 4)]
         )
       ),
       boundingVertexJointWeights: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => meshData.rawJointWeights[indices[index >> 2] * 4 + (index % 4)]
-        )
+        Array.from({ length: 6 * 4 }).map((val, index) => data.weights[indices[index >> 2] * 4 + (index % 4)])
       ),
       boundingVertices: Array.from({ length: 6 }).map(
         (val, index) =>
           new Vector3(
-            meshData.rawPositions[indices[index] * 3],
-            meshData.rawPositions[indices[index] * 3 + 1],
-            meshData.rawPositions[indices[index] * 3 + 2]
+            data.positions[indices[index] * 3],
+            data.positions[indices[index] * 3 + 1],
+            data.positions[indices[index] * 3 + 2]
           )
       ),
       boundingBox: new BoundingBox()

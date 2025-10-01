@@ -1,16 +1,36 @@
-import type { Vector4, TypedArray, Interpolator, DRef } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import { type Texture2D, type TextureSampler } from '@zephyr3d/device';
-import type { Primitive } from '../render/primitive';
-import type { MeshMaterial } from '../material/meshmaterial';
-import { Mesh } from '../scene/mesh';
-import type { BoundingBox } from '../utility';
-import type { Scene } from '../scene';
-import { SceneNode } from '../scene/scene_node';
-import { NodeRotationTrack, NodeScaleTrack, Skeleton, NodeTranslationTrack } from '../animation';
-import { processMorphData } from '../animation/morphtarget';
-import { MAX_MORPH_TARGETS } from '../values';
-import { MorphTargetTrack } from '../animation/morphtrack';
+import type {
+  PrimitiveType,
+  TextureAddressMode,
+  TextureFilterMode,
+  VertexAttribFormat,
+  VertexSemantic
+} from '@zephyr3d/device';
+import {
+  getVertexFormatComponentCount,
+  PBArrayTypeInfo,
+  PBPrimitiveType,
+  PBPrimitiveTypeInfo,
+  PBStructTypeInfo
+} from '@zephyr3d/device';
+import type { Scene } from '@zephyr3d/scene';
+import {
+  Mesh,
+  SceneNode,
+  NodeRotationTrack,
+  NodeScaleTrack,
+  Skeleton,
+  NodeTranslationTrack,
+  getDevice,
+  MAX_MORPH_ATTRIBUTES,
+  ShaderHelper,
+  MORPH_WEIGHTS_VECTOR_COUNT,
+  MORPH_ATTRIBUTE_VECTOR_COUNT,
+  BoundingBox,
+  MAX_MORPH_TARGETS,
+  MorphTargetTrack
+} from '@zephyr3d/scene';
 
 /**
  * Named object interface for model loading
@@ -27,13 +47,41 @@ export class NamedObject {
   }
 }
 
+export interface AssetSamplerInfo {
+  wrapS: TextureAddressMode;
+  wrapT: TextureAddressMode;
+  magFilter: TextureFilterMode;
+  mipFilter: TextureFilterMode;
+  minFilter: TextureFilterMode;
+}
+
+export interface AssetImageInfo {
+  uri?: string;
+  data?: Uint8Array;
+  mimeType?: string;
+}
+
+export interface AssetVertexBufferInfo {
+  attrib: VertexAttribFormat;
+  data: TypedArray;
+}
+
+export interface AssetPrimitiveInfo {
+  vertices: Record<VertexSemantic, { format: VertexAttribFormat; data: TypedArray }>;
+  indices: Uint16Array | Uint32Array;
+  indexCount: number;
+  type: PrimitiveType;
+  boxMin: Vector3;
+  boxMax: Vector3;
+}
+
 /**
  * Texture information for model loading
  * @public
  */
 export interface MaterialTextureInfo {
-  texture: Texture2D;
-  sampler: TextureSampler;
+  image: AssetImageInfo;
+  sampler: AssetSamplerInfo;
   texCoord: number;
   transform: Matrix4x4;
 }
@@ -167,8 +215,8 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
  * @public
  */
 export interface AssetSubMeshData {
-  primitive: DRef<Primitive>;
-  material: DRef<MeshMaterial>;
+  primitive: AssetPrimitiveInfo;
+  material: AssetMaterial;
   mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
@@ -644,23 +692,10 @@ export class SharedModel extends Disposable {
         child.sealed = true;
       }
     });
-    group.sharedModel = this;
     return group;
   }
   protected onDispose() {
     super.onDispose();
-    const nodes = [...this._nodes];
-    while (nodes.length > 0) {
-      const node = nodes.shift();
-      nodes.push(...node.children);
-      const mesh = node.mesh;
-      if (mesh) {
-        for (const subMesh of mesh.subMeshes) {
-          subMesh.primitive?.dispose();
-          subMesh.material?.dispose();
-        }
-      }
-    }
     this._nodes = [];
     this._skeletons = [];
     this._scenes = [];
@@ -694,11 +729,11 @@ export class SharedModel extends Disposable {
           meshNode.showState = 'inherit';
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
-          meshNode.primitive = subMesh.primitive.get();
+          meshNode.primitive = null; //subMesh.primitive.get();
           meshNode.material =
             instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
-              ? subMesh.material.get().createInstance()
-              : subMesh.material.get().clone();
+              ? null //subMesh.material.get().createInstance()
+              : null; //subMesh.material.get().clone();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);
@@ -717,5 +752,114 @@ export class SharedModel extends Disposable {
     for (const child of assetNode.children) {
       this.setAssetNodeToSceneNode(scene, node, child, skeletonMeshMap, nodeMap, instancing);
     }
+  }
+}
+
+/** @internal */
+function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
+  const device = getDevice();
+  const numTargets = subMesh.numTargets;
+  if (numTargets === 0) {
+    return;
+  }
+  const attributes = Object.getOwnPropertyNames(subMesh.targets);
+  const positionInfo = subMesh.primitive.vertices['position'];
+  const numVertices = positionInfo
+    ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
+    : 0;
+  const weightsAndOffsets = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
+  for (let i = 0; i < numTargets; i++) {
+    weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;
+  }
+  const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
+  if (textureSize > device.getDeviceCaps().textureCaps.maxTextureSize) {
+    // TODO: reduce morph attributes
+    throw new Error(`Morph target data too large`);
+  }
+  weightsAndOffsets[0] = textureSize;
+  weightsAndOffsets[1] = textureSize;
+  weightsAndOffsets[2] = numVertices;
+  weightsAndOffsets[3] = numTargets;
+  let offset = 0;
+  const textureData = new Float32Array(textureSize * textureSize * 4);
+  for (let attrib = 0; attrib < MAX_MORPH_ATTRIBUTES; attrib++) {
+    const index = attributes.indexOf(String(attrib));
+    if (index < 0) {
+      weightsAndOffsets[4 + MAX_MORPH_TARGETS + attrib] = -1;
+      continue;
+    }
+    weightsAndOffsets[4 + MAX_MORPH_TARGETS + attrib] = offset >> 2;
+    const info = subMesh.targets[attrib];
+    if (info.data.length !== numTargets) {
+      console.error(`Invalid morph target data`);
+      return;
+    }
+    for (let t = 0; t < numTargets; t++) {
+      const data = info.data[t];
+      for (let i = 0; i < numVertices; i++) {
+        for (let j = 0; j < 4; j++) {
+          textureData[offset++] = j < info.numComponents ? data[i * info.numComponents + j] : 1;
+        }
+      }
+    }
+  }
+  const morphTexture = device.createTexture2D('rgba32f', textureSize, textureSize, {
+    mipmapping: false,
+    samplerOptions: {
+      minFilter: 'nearest',
+      magFilter: 'nearest'
+    }
+  });
+  morphTexture.update(textureData, 0, 0, textureSize, textureSize);
+  const bufferType = new PBStructTypeInfo('dummy', 'std140', [
+    {
+      name: ShaderHelper.getMorphInfoUniformName(),
+      type: new PBArrayTypeInfo(
+        new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
+        1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
+      )
+    }
+  ]);
+  const morphUniformBuffer = device.createStructuredBuffer(
+    bufferType,
+    {
+      usage: 'uniform'
+    },
+    weightsAndOffsets
+  );
+  const morphBoundingBox = new BoundingBox();
+  calculateMorphBoundingBox(
+    morphBoundingBox,
+    subMesh.targetBox,
+    weightsAndOffsets.subarray(4, 4 + MAX_MORPH_TARGETS),
+    numTargets
+  );
+  const meshAABB = subMesh.mesh.getBoundingVolume().toAABB();
+  morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
+  morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
+
+  subMesh.mesh.setMorphData(morphTexture);
+  subMesh.mesh.setMorphInfo(morphUniformBuffer);
+  subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
+}
+
+/** @internal */
+function calculateMorphBoundingBox(
+  morphBoundingBox: BoundingBox,
+  keyframeBoundingBox: BoundingBox[],
+  weights: Float32Array,
+  numTargets: number
+) {
+  morphBoundingBox.minPoint.setXYZ(0, 0, 0);
+  morphBoundingBox.maxPoint.setXYZ(0, 0, 0);
+  for (let i = 0; i < numTargets; i++) {
+    const weight = weights[i];
+    const keyframeBox = keyframeBoundingBox[i];
+    morphBoundingBox.minPoint.x += keyframeBox.minPoint.x * weight;
+    morphBoundingBox.minPoint.y += keyframeBox.minPoint.y * weight;
+    morphBoundingBox.minPoint.y += keyframeBox.minPoint.z * weight;
+    morphBoundingBox.maxPoint.x += keyframeBox.maxPoint.x * weight;
+    morphBoundingBox.maxPoint.y += keyframeBox.maxPoint.y * weight;
+    morphBoundingBox.maxPoint.y += keyframeBox.maxPoint.z * weight;
   }
 }
