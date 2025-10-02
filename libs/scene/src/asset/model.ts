@@ -1,4 +1,5 @@
-import type { Vector4, TypedArray, Interpolator, DRef } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
+import { DRef } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { type Texture2D, type TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
@@ -633,8 +634,9 @@ export class SharedModel extends Disposable {
                 mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
                 mesh.skeleton = nodes.skeleton;
               }
+              animationSet.skeletons.push(new DRef(nodes.skeleton));
             }
-            animation.addSkeleton(nodes.skeleton);
+            animation.addSkeleton(nodes.skeleton.persistentId);
           }
         }
       }

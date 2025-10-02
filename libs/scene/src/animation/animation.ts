@@ -1,7 +1,7 @@
 import { Disposable } from '@zephyr3d/base';
 import type { AnimationSet } from './animationset';
 import type { AnimationTrack } from './animationtrack';
-import type { Skeleton } from './skeleton';
+import { Skeleton } from './skeleton';
 
 /**
  * Animation clip
@@ -34,7 +34,7 @@ export class AnimationClip extends Disposable {
   protected _tracks: Map<object, AnimationTrack[]>;
   protected _weight: number;
   /** @internal */
-  protected _skeletons: Set<Skeleton>;
+  protected _skeletons: Set<string>;
   /**
    * Creates an animation instance
    * @param name - Name of the animation
@@ -103,6 +103,9 @@ export class AnimationClip extends Disposable {
   get skeletons() {
     return this._skeletons;
   }
+  set skeletons(val: Set<string>) {
+    this._skeletons = val;
+  }
   /**
    * Total time span of the clip in seconds.
    *
@@ -117,10 +120,10 @@ export class AnimationClip extends Disposable {
   /**
    * Add a skeleton used by this clip.
    *
-   * @param skeleton - Skeleton to register for this clip.
+   * @param skeletonId - Persistent ID of Skeleton to register for this clip.
    */
-  addSkeleton(skeleton: Skeleton) {
-    this._skeletons.add(skeleton);
+  addSkeleton(skeletonId: string) {
+    this._skeletons.add(skeletonId);
   }
   /**
    * Remove a specific track from this clip.
@@ -199,7 +202,10 @@ export class AnimationClip extends Disposable {
         }
       }
       for (const sk of this.skeletons) {
-        sk.computeJoints();
+        const skeleton = Skeleton.findSkeletonById(sk);
+        if (skeleton) {
+          skeleton.computeJoints();
+        }
       }
       callback(frame);
     }
@@ -214,7 +220,6 @@ export class AnimationClip extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._tracks = null;
-    this._skeletons?.forEach((val, key) => key.dispose());
     this._skeletons = null;
   }
 }

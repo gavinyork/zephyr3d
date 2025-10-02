@@ -1,5 +1,5 @@
+import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
 import type { TypedArray } from '@zephyr3d/base';
-import { DRef } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -56,6 +56,10 @@ const tmpV3 = new Vector3();
  * @public
  */
 export class Skeleton extends Disposable {
+  /** @internal Global weak registry keyed by persistentId for serialization/lookup. */
+  private static readonly _registry: Map<string, DWeakRef<Skeleton>> = new Map();
+  /** @internal */
+  protected _id: string;
   /** @internal */
   protected _joints: SceneNode[];
   /** @internal */
@@ -81,6 +85,7 @@ export class Skeleton extends Disposable {
    */
   constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[]) {
     super();
+    this._id = randomUUID();
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
     this._bindPoseMatrices = bindPoseMatrices;
@@ -90,6 +95,34 @@ export class Skeleton extends Disposable {
     this._jointTexture = new DRef();
     this._playing = false;
     this.updateJointMatrices();
+    Skeleton._registry.set(this._id, new DWeakRef(this));
+  }
+  /**
+   * Lookup a skeleton from the global registry by persistent id.
+   *
+   * @param id - The persistent UUID to search for.
+   * @returns The skeleton if alive, otherwise `null`.
+   * @internal
+   */
+  static findSkeletonById(id: string) {
+    const m = this._registry.get(id);
+    if (m && !m.get()) {
+      this._registry.delete(id);
+      return null;
+    }
+    return m ? m.get() : null;
+  }
+  /** @internal */
+  get joints() {
+    return this._joints;
+  }
+  /** @internal */
+  get inverseBindMatrices() {
+    return this._inverseBindMatrices;
+  }
+  /** @internal */
+  get bindPoseMatrices() {
+    return this._bindPoseMatrices;
   }
   /** @internal */
   get playing() {
@@ -97,6 +130,21 @@ export class Skeleton extends Disposable {
   }
   set playing(b: boolean) {
     this._playing = b;
+  }
+  /** @internal */
+  get persistentId() {
+    return this._id;
+  }
+  set persistentId(val) {
+    if (val !== this._id) {
+      const m = Skeleton._registry.get(this._id);
+      if (!m || m.get() !== this) {
+        throw new Error('Registry skeleton mismatch');
+      }
+      Skeleton._registry.delete(this._id);
+      this._id = val;
+      Skeleton._registry.set(this._id, m);
+    }
   }
   /**
    * Texture containing joint matrices for GPU skinning.
@@ -232,6 +280,11 @@ export class Skeleton extends Disposable {
     this._bindPoseMatrices = null;
     this._jointMatrices = null;
     this._jointMatrixArray = null;
+    const m = Skeleton._registry.get(this._id);
+    if (m?.get() === this) {
+      Skeleton._registry.delete(this._id);
+      m.dispose();
+    }
   }
   /**
    * Initialize joint texture and CPU-side matrix storage.

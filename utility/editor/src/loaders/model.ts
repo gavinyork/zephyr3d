@@ -1,5 +1,5 @@
 import type { TypedArray, Interpolator } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DRef, Vector4 } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
   PrimitiveType,
@@ -699,8 +699,9 @@ export class SharedModel extends Disposable {
                 mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
                 mesh.skeleton = nodes.skeleton;
               }
+              animationSet.skeletons.push(new DRef(nodes.skeleton));
             }
-            animation.addSkeleton(nodes.skeleton);
+            animation.addSkeleton(nodes.skeleton.persistentId);
           }
         }
       }

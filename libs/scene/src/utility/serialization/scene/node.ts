@@ -2,12 +2,13 @@ import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { degree2radian, radian2degree } from '@zephyr3d/base';
+import { degree2radian, DRef, radian2degree } from '@zephyr3d/base';
 import type { Mesh, ParticleSystem, Visitor } from '../../../scene';
 import { GraphNode } from '../../../scene';
 import type { Material } from '../../../material';
 import type { Primitive } from '../../../render';
 import type { SerializationManager } from '../manager';
+import type { Skeleton } from '../../../animation';
 import { AnimationClip } from '../../../animation';
 import { JSONData } from '../json';
 
@@ -360,6 +361,23 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             if (animation) {
               animationSet.deleteAnimation(name);
             }
+          }
+        },
+        {
+          name: 'Skeletons',
+          type: 'object_array',
+          isHidden() {
+            return true;
+          },
+          get(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            value.object = animationSet.skeletons.map((v) => v.get());
+          },
+          set(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            animationSet.skeletons.forEach((v) => v.dispose());
+            animationSet.skeletons.splice(0, animationSet.skeletons.length);
+            animationSet.skeletons.push(...(value.object as Skeleton[]).map((v) => new DRef(v)));
           }
         },
         {

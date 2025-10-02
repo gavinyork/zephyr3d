@@ -1,9 +1,9 @@
 import { weightedAverage, DWeakRef, Disposable } from '@zephyr3d/base';
-import type { IDisposable } from '@zephyr3d/base';
+import type { DRef, IDisposable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
-import type { Skeleton } from './skeleton';
+import { Skeleton } from './skeleton';
 
 /**
  * Options for playing an animation.
@@ -79,6 +79,8 @@ export class AnimationSet extends Disposable implements IDisposable {
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
+  private _skeletons: DRef<Skeleton>[];
+  /** @internal */
   private readonly _activeTracks: Map<object, Map<unknown, AnimationTrack[]>>;
   /** @internal */
   private readonly _activeSkeletons: Map<Skeleton, number>;
@@ -110,6 +112,7 @@ export class AnimationSet extends Disposable implements IDisposable {
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
     this._activeAnimations = new Map();
+    this._skeletons = [];
   }
   /**
    * The model (SceneNode) controlled by this animation set.
@@ -122,6 +125,10 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   get numAnimations(): number {
     return Object.getOwnPropertyNames(this._animations).length;
+  }
+  /** @internal */
+  get skeletons() {
+    return this._skeletons;
   }
   /**
    * Retrieve an animation clip by name.
@@ -339,13 +346,16 @@ export class AnimationSet extends Disposable implements IDisposable {
         }
       });
       ani.skeletons?.forEach((v, k) => {
-        const refcount = this._activeSkeletons.get(k);
-        if (refcount) {
-          this._activeSkeletons.set(k, refcount + 1);
-        } else {
-          this._activeSkeletons.set(k, 1);
+        const skeleton = Skeleton.findSkeletonById(k);
+        if (skeleton) {
+          const refcount = this._activeSkeletons.get(skeleton);
+          if (refcount) {
+            this._activeSkeletons.set(skeleton, refcount + 1);
+          } else {
+            this._activeSkeletons.set(skeleton, 1);
+          }
+          skeleton.playing = true;
         }
-        k.playing = true;
       });
     }
   }
@@ -381,12 +391,15 @@ export class AnimationSet extends Disposable implements IDisposable {
           });
         });
         ani.skeletons?.forEach((v, k) => {
-          const refcount = this._activeSkeletons.get(k);
-          if (refcount === 1) {
-            k.reset();
-            this._activeSkeletons.delete(k);
-          } else {
-            this._activeSkeletons.set(k, refcount - 1);
+          const skeleton = Skeleton.findSkeletonById(k);
+          if (skeleton) {
+            const refcount = this._activeSkeletons.get(skeleton);
+            if (refcount === 1) {
+              skeleton.reset();
+              this._activeSkeletons.delete(skeleton);
+            } else {
+              this._activeSkeletons.set(skeleton, refcount - 1);
+            }
           }
         });
       }

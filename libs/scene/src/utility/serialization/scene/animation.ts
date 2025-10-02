@@ -1,6 +1,7 @@
 import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import { Matrix4x4 } from '@zephyr3d/base';
 import { Interpolator, Vector3 } from '@zephyr3d/base';
-import { AnimationTrack } from '../../../animation';
+import { AnimationTrack, Skeleton } from '../../../animation';
 import {
   AnimationClip,
   MorphTargetTrack,
@@ -398,6 +399,47 @@ export function getPropTrackClass(manager: SerializationManager): SerializableCl
 }
 
 /** @internal */
+export function getSkeletonClass(): SerializableClass {
+  return {
+    ctor: Skeleton,
+    name: 'Skeleton',
+    createFunc(
+      ctx: SceneNode,
+      init: { joints: string[]; inverseBindMatrices: number[]; bindPoseMatrices: number[]; id: string }
+    ) {
+      const joints = init.joints.map((id) => ctx.scene.findNodeById(id));
+      const inverseBindMatrices: Matrix4x4[] = [];
+      const bindPoseMatrices: Matrix4x4[] = [];
+      for (let i = 0; i < joints.length; i++) {
+        const ibMatrix = new Matrix4x4();
+        ibMatrix.set(init.inverseBindMatrices.slice(i * 16, i * 16 + 16));
+        inverseBindMatrices.push(ibMatrix);
+        const bpMatrix = new Matrix4x4();
+        bpMatrix.set(init.bindPoseMatrices.slice(i * 16, i * 16 + 16));
+        bindPoseMatrices.push(bpMatrix);
+      }
+      const skeleton = new Skeleton(joints, inverseBindMatrices, bindPoseMatrices);
+      skeleton.persistentId = init.id;
+      return {
+        obj: skeleton,
+        loadProps: false
+      };
+    },
+    getInitParams(obj: Skeleton) {
+      return {
+        joints: obj.joints,
+        inverseBindMatrices: obj.inverseBindMatrices,
+        bindPoseMatrices: obj.bindPoseMatrices,
+        id: obj.persistentId
+      };
+    },
+    getProps() {
+      return [];
+    }
+  };
+}
+
+/** @internal */
 export function getAnimationClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: AnimationClip,
@@ -448,6 +490,24 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
           },
           set(this: AnimationClip, value) {
             this.autoPlay = value.bool[0];
+          }
+        },
+        {
+          name: 'Skeletons',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: AnimationClip, value) {
+            value.object[0] = [...this.skeletons];
+          },
+          set(this: AnimationClip, value) {
+            if (!this.skeletons) {
+              this.skeletons = new Set();
+            }
+            for (const val of (value.object[0] as string[]) ?? []) {
+              this.skeletons.add(val);
+            }
           }
         },
         {

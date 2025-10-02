@@ -42,7 +42,8 @@ import {
   getNodeRotationTrackClass,
   getNodeScaleTrackClass,
   getNodeTranslationTrackClass,
-  getPropTrackClass
+  getPropTrackClass,
+  getSkeletonClass
 } from './scene/animation';
 import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
@@ -210,6 +211,7 @@ export class SerializationManager {
         getAABBClass(),
         getInterpolatorClass(),
         getNodeHierarchyClass(),
+        getSkeletonClass(),
         getAnimationClass(this),
         getPropTrackClass(this),
         getNodeRotationTrackClass(),
