@@ -24,7 +24,6 @@ import { Interpolator } from '@zephyr3d/base';
 export class PropertyTrack extends AnimationTrack<PropertyValue> {
   private readonly _state: PropertyValue;
   private _stateAlpha: PropertyValue;
-  private _target: string;
   private readonly _prop: PropertyAccessor;
   private readonly _count: number;
   private _interpolator: Interpolator;
@@ -44,7 +43,6 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   constructor(prop: PropertyAccessor, value?: number[], embedded?: boolean) {
     super(embedded);
     this._prop = prop;
-    this._target = '';
     this._state = { num: [0, 0, 0, 0] };
     this._stateAlpha = null;
     this._interpolator = null;
@@ -109,18 +107,6 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
       default:
         throw new Error(`Property '${this._prop.name}' cannot be animated`);
     }
-  }
-  /**
-   * Logical target identifier for this track (optional metadata).
-   *
-   * This does not affect application; it can be used by tooling or higher-level
-   * systems to label/group tracks.
-   */
-  get target() {
-    return this._target;
-  }
-  set target(val: string) {
-    this._target = val;
   }
   /**
    * The primary interpolator for the property components.

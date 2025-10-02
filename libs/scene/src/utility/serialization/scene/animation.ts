@@ -1,10 +1,19 @@
 import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
-import { Interpolator } from '@zephyr3d/base';
-import type { AnimationTrack } from '../../../animation';
-import { AnimationClip, PropertyTrack } from '../../../animation';
+import { Interpolator, Vector3 } from '@zephyr3d/base';
+import { AnimationTrack } from '../../../animation';
+import {
+  AnimationClip,
+  MorphTargetTrack,
+  NodeEulerRotationTrack,
+  NodeRotationTrack,
+  NodeScaleTrack,
+  NodeTranslationTrack,
+  PropertyTrack
+} from '../../../animation';
 import type { SerializationManager } from '../manager';
 import type { SerializableClass } from '../types';
-import type { SceneNode } from '../../../scene';
+import { SceneNode } from '../../../scene';
+import { BoundingBox } from '../../bounding_volume';
 
 /** @internal */
 export function getInterpolatorClass(): SerializableClass {
@@ -63,6 +72,254 @@ export function getInterpolatorClass(): SerializableClass {
           set(this: Interpolator, value) {
             const data = JSON.parse(value.str[0]) as number[];
             this.outputs = new Float32Array(data);
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getMorphTrackClass(): SerializableClass {
+  return {
+    ctor: MorphTargetTrack,
+    name: 'MorphTargetTrack',
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: MorphTargetTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: MorphTargetTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: MorphTargetTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: MorphTargetTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        },
+        {
+          name: 'DefaultWeights',
+          type: 'object',
+          get(this: MorphTargetTrack, value) {
+            value.object[0] = this.defaultWeights ?? null;
+          },
+          set(this: MorphTargetTrack, value) {
+            this.defaultWeights = (value.object[0] as number[]) ?? null;
+          }
+        },
+        {
+          name: 'BoundingBox',
+          type: 'object',
+          get(this: MorphTargetTrack, value) {
+            if (!this.boundingBox) {
+              value.object[0] = null;
+            } else {
+              const arr: number[] = [];
+              for (const box of this.boundingBox) {
+                arr.push(...box.minPoint);
+                arr.push(...box.maxPoint);
+              }
+              value.object[0] = arr;
+            }
+          },
+          set(this: MorphTargetTrack, value) {
+            if (!value.object[0]) {
+              this.boundingBox = null;
+            } else {
+              const arr: BoundingBox[] = [];
+              const values = value.object[0] as number[];
+              for (let i = 0; i < values.length / 6; i++) {
+                arr.push(
+                  new BoundingBox(
+                    new Vector3(values[i * 6 + 0], values[i * 6 + 1], values[i * 6 + 2]),
+                    new Vector3(values[i * 6 + 3], values[i * 6 + 4], values[i * 6 + 5])
+                  )
+                );
+              }
+              this.boundingBox = arr;
+            }
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getNodeRotationTrackClass(): SerializableClass {
+  return {
+    ctor: NodeRotationTrack,
+    name: 'NodeRotationTrack',
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: NodeRotationTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: NodeRotationTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: NodeRotationTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: NodeRotationTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getNodeEulerRotationTrackClass(): SerializableClass {
+  return {
+    ctor: NodeEulerRotationTrack,
+    name: 'NodeEulerRotationTrack',
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: NodeEulerRotationTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: NodeEulerRotationTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: NodeEulerRotationTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: NodeEulerRotationTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getNodeTranslationTrackClass(): SerializableClass {
+  return {
+    ctor: NodeTranslationTrack,
+    name: 'NodeTranslationTrack',
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: NodeTranslationTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: NodeTranslationTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: NodeTranslationTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: NodeTranslationTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getNodeScaleTrackClass(): SerializableClass {
+  return {
+    ctor: NodeScaleTrack,
+    name: 'NodeScaleTrack',
+    getProps() {
+      return [
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: NodeScaleTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: NodeScaleTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: NodeScaleTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: NodeScaleTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
           }
         }
       ];
@@ -201,10 +458,19 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
             objectTypes: [PropertyTrack]
           },
           readonly: true,
+          isHidden(this: AnimationClip, index: number, obj: unknown) {
+            return !(obj instanceof PropertyTrack);
+          },
           get(this: AnimationClip, value) {
             value.object = [];
             for (const tracks of this.tracks) {
-              value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+              for (const track of tracks[1]) {
+                if (tracks[0] instanceof SceneNode && !(track instanceof PropertyTrack)) {
+                  track.target = tracks[0].persistentId;
+                }
+              }
+              //value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
+              value.object.push(...tracks[1].filter((track) => !!track.target));
             }
           },
           set(this: AnimationClip, value) {
@@ -213,6 +479,13 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
                 const targetObj = manager.findAnimationTarget(this._animationSet.model, track);
                 if (targetObj) {
                   this.addTrack(targetObj, track);
+                }
+              } else if (track instanceof AnimationTrack) {
+                const node = this._animationSet.model.scene.findNodeById(track.target);
+                if (node) {
+                  this.addTrack(node, track);
+                } else {
+                  console.error(`No node found with id = ${track.target}`);
                 }
               }
             }

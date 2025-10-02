@@ -9,7 +9,11 @@ import type { SceneNode } from '../scene';
  */
 export class NodeScaleTrack extends AnimationTrack<Vector3> {
   private readonly _state: Vector3;
-  private readonly _interpolator: Interpolator;
+  private _interpolator: Interpolator;
+  /**
+   * Create an instance of ScaleTrack
+   */
+  constructor();
   /**
    * Create an instance of ScaleTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -28,7 +32,10 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
     keyFramesOrEmbedded?: { time: number; value: Vector3 }[] | boolean,
     embedded?: boolean
   ) {
-    if (modeOrInterpolator instanceof Interpolator) {
+    if (modeOrInterpolator === undefined) {
+      super(false);
+      this._interpolator = null;
+    } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`ScaleTrack(): interpolator target must be 'vec3'`);
       }
@@ -47,6 +54,15 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
       this._interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
     }
     this._state = new Vector3();
+  }
+  get interpolator() {
+    return this._interpolator;
+  }
+  set interpolator(interp: Interpolator) {
+    if (interp && interp.target !== 'vec3') {
+      throw new Error(`ScaleTrack(): interpolator target must be 'vec3'`);
+    }
+    this._interpolator = interp ?? null;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
   calculateState(target: object, currentTime: number): Vector3 {

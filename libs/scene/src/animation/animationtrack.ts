@@ -22,6 +22,10 @@ export abstract class AnimationTrack<StateType = unknown> {
   protected _embedded: boolean;
   /** @internal */
   protected _animation: AnimationClip;
+  /** @internal */
+  protected _target: string;
+  /** @internal */
+  protected _jointIndex: number;
   /**
    * Construct a new animation track.
    *
@@ -30,6 +34,8 @@ export abstract class AnimationTrack<StateType = unknown> {
   constructor(embedded?: boolean) {
     this._name = 'noname';
     this._embedded = !!embedded;
+    this._target = '';
+    this._jointIndex = -1;
   }
   /**
    * Human-readable name of the track.
@@ -54,6 +60,27 @@ export abstract class AnimationTrack<StateType = unknown> {
   }
   set animation(ani: AnimationClip) {
     this._animation = ani;
+  }
+  /**
+   * Logical target identifier for this track (optional metadata).
+   *
+   * This does not affect application; it can be used by tooling or higher-level
+   * systems to label/group tracks.
+   */
+  get target() {
+    return this._target;
+  }
+  set target(val: string) {
+    this._target = val;
+  }
+  /**
+   * Joint index if this track controls a joint, otherwise -1
+   */
+  get jointIndex() {
+    return this._jointIndex;
+  }
+  set jointIndex(index: number) {
+    this._jointIndex = index;
   }
   /**
    * Reset the track to its initial state for the given target.

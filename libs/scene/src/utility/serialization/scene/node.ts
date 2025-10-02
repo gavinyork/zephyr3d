@@ -296,6 +296,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Children',
           type: 'object_array',
+          phase: 0,
           isHidden() {
             return true;
           },
@@ -326,6 +327,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Animations',
           type: 'object_array',
+          phase: 1,
           readonly: true,
           options: {
             objectTypes: [AnimationClip]

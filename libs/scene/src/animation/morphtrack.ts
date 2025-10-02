@@ -18,31 +18,79 @@ export type MorphState = {
  * @public
  */
 export class MorphTargetTrack extends AnimationTrack<MorphState> {
-  private readonly _state: MorphState;
-  private readonly _originBox: AABB;
-  private readonly _boundingBox: BoundingBox[];
-  private readonly _defaultWeights: number[];
-  private readonly _interpolator: Interpolator;
+  private _state: MorphState;
+  private _originBox: AABB;
+  private _boundingBox: BoundingBox[];
+  private _defaultWeights: number[];
+  private _interpolator: Interpolator;
+  /**
+   * Create an instance of MorphTargetTrack
+   */
+  constructor();
+  /**
+   * Create an instance of MorphTargetTrack from morph parameters
+   */
+  constructor(
+    interpolator?: Interpolator,
+    defaultMorphWeights?: number[],
+    targetBox?: BoundingBox[],
+    originBox?: AABB,
+    embedded?: boolean
+  );
   /**
    * Create an instance of MorphTargetTrack
    */
   constructor(
-    interpolator: Interpolator,
-    defaultMorphWeights: number[],
-    targetBox: BoundingBox[],
-    originBox: AABB,
+    interpolator?: Interpolator,
+    defaultMorphWeights?: number[],
+    targetBox?: BoundingBox[],
+    originBox?: AABB,
     embedded?: boolean
   ) {
     super(embedded);
-    this._interpolator = interpolator;
-    this._state = {
-      numTargets: interpolator.stride,
-      boundingBox: new BoundingBox(),
-      weights: new Float32Array(MAX_MORPH_TARGETS)
-    };
-    this._boundingBox = targetBox;
-    this._originBox = originBox;
-    this._defaultWeights = defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
+    if (interpolator === undefined) {
+      this._interpolator = null;
+      this._state = null;
+      this._boundingBox = null;
+      this._originBox = null;
+      this._defaultWeights = null;
+    } else {
+      this._interpolator = interpolator;
+      this._state = {
+        numTargets: interpolator.stride,
+        boundingBox: new BoundingBox(),
+        weights: new Float32Array(MAX_MORPH_TARGETS)
+      };
+      this._boundingBox = targetBox;
+      this._originBox = originBox;
+      this._defaultWeights =
+        defaultMorphWeights ?? Array.from({ length: this._state.numTargets }).map(() => 0);
+    }
+  }
+  get interpolator() {
+    return this._interpolator;
+  }
+  set interpolator(interp: Interpolator) {
+    this._interpolator = interp ?? null;
+    this._state = this._interpolator
+      ? {
+          numTargets: this._interpolator.stride,
+          boundingBox: new BoundingBox(),
+          weights: new Float32Array(MAX_MORPH_TARGETS)
+        }
+      : null;
+  }
+  get boundingBox() {
+    return this._boundingBox;
+  }
+  set boundingBox(box: BoundingBox[]) {
+    this._boundingBox = box;
+  }
+  get defaultWeights() {
+    return this._defaultWeights;
+  }
+  set defaultWeights(value: number[]) {
+    this._defaultWeights = value;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
 

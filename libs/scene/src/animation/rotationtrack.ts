@@ -9,7 +9,11 @@ import type { SceneNode } from '../scene';
  */
 export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   private readonly _state: Quaternion;
-  private readonly _interpolator: Interpolator;
+  private _interpolator: Interpolator;
+  /**
+   * Create an instance of RotationTrack
+   */
+  constructor();
   /**
    * Create an instance of RotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains keyframe values
@@ -24,11 +28,14 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
    */
   constructor(mode: InterpolationMode, keyFrames: { time: number; value: Quaternion }[], embedded?: boolean);
   constructor(
-    modeOrInterpolator: Interpolator | InterpolationMode,
+    modeOrInterpolator?: Interpolator | InterpolationMode,
     keyFramesOrEmbedded?: { time: number; value: Quaternion }[] | boolean,
     embedded?: boolean
   ) {
-    if (modeOrInterpolator instanceof Interpolator) {
+    if (modeOrInterpolator === undefined) {
+      super(false);
+      this._interpolator = null;
+    } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'quat') {
         throw new Error(`RotationTrack(): interpolator target must be 'quat'`);
       }
@@ -48,6 +55,15 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
       this._interpolator = new Interpolator(modeOrInterpolator, 'quat', inputs, outputs);
     }
     this._state = new Quaternion();
+  }
+  get interpolator() {
+    return this._interpolator;
+  }
+  set interpolator(interp: Interpolator) {
+    if (interp && interp.target !== 'quat') {
+      throw new Error(`RotationTrack(): interpolator target must be 'quat'`);
+    }
+    this._interpolator = interp ?? null;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
   calculateState(target: object, currentTime: number): Quaternion {

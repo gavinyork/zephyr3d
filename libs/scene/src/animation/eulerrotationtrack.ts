@@ -11,7 +11,11 @@ const tmpVec3 = new Vector3();
  */
 export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   private readonly _state: Quaternion;
-  private readonly _interpolator: Interpolator;
+  private _interpolator: Interpolator;
+  /**
+   * Create an instance of EulerRotationTrack
+   */
+  constructor();
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param interpolator - Interpolator object that contains the keyframe values
@@ -30,9 +34,12 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
     keyFramesOrEmbedded?: { time: number; value: Vector3 }[] | boolean,
     embedded?: boolean
   ) {
-    if (modeOrInterpolator instanceof Interpolator) {
+    if (modeOrInterpolator === undefined) {
+      super(false);
+      this._interpolator = null;
+    } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
-        throw new Error(`TranslationTrack(): interpolator target must be 'vec3'`);
+        throw new Error(`EulerRotationTrack(): interpolator target must be 'vec3'`);
       }
       super((keyFramesOrEmbedded as boolean) ?? false);
       this._interpolator = modeOrInterpolator;
@@ -49,6 +56,15 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
       this._interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
     }
     this._state = new Quaternion();
+  }
+  get interpolator() {
+    return this._interpolator;
+  }
+  set interpolator(interp: Interpolator) {
+    if (interp && interp.target !== 'vec3') {
+      throw new Error(`EulerRotationTrack(): interpolator target must be 'vec3'`);
+    }
+    this._interpolator = interp ?? null;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
   calculateState(target: object, currentTime: number): Quaternion {

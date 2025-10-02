@@ -34,7 +34,16 @@ import {
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
-import { getAnimationClass, getInterpolatorClass, getPropTrackClass } from './scene/animation';
+import {
+  getAnimationClass,
+  getInterpolatorClass,
+  getMorphTrackClass,
+  getNodeEulerRotationTrackClass,
+  getNodeRotationTrackClass,
+  getNodeScaleTrackClass,
+  getNodeTranslationTrackClass,
+  getPropTrackClass
+} from './scene/animation';
 import type { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
@@ -203,6 +212,11 @@ export class SerializationManager {
         getNodeHierarchyClass(),
         getAnimationClass(this),
         getPropTrackClass(this),
+        getNodeRotationTrackClass(),
+        getNodeScaleTrackClass(),
+        getNodeTranslationTrackClass(),
+        getNodeEulerRotationTrackClass(),
+        getMorphTrackClass(),
         getSceneNodeClass(this),
         getGraphNodeClass(),
         getMeshClass(),
@@ -961,7 +975,11 @@ export class SerializationManager {
           if (typeof v === 'string' && v) {
             tmpVal.str[0] = v;
           } else {
-            tmpVal.object[0] = v ? (await this.deserializeObject<any>(obj, v)) ?? null : null;
+            tmpVal.object[0] = v
+              ? Array.isArray(v)
+                ? v
+                : (await this.deserializeObject<any>(obj, v)) ?? null
+              : null;
           }
           break;
         case 'object_array':
@@ -1050,7 +1068,9 @@ export class SerializationManager {
             typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
               ? tmpVal.str[0]
               : tmpVal.object[0]
-              ? this.serializeObject(tmpVal.object[0], {}, asyncTasks)
+              ? Array.isArray(tmpVal.object[0])
+                ? tmpVal.object[0]
+                : this.serializeObject(tmpVal.object[0], {}, asyncTasks)
               : null;
           if (value) {
             json[k] = value;

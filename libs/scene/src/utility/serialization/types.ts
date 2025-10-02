@@ -199,9 +199,10 @@ export type PropertyAccessor<T = object> = {
    * Controls visibility of a specific element or the property in UI.
    *
    * @param index - Target element index.
+   * @param obj - Value at index
    * @returns `true` if hidden, otherwise `false`.
    */
-  isHidden?: (this: T, index: number) => boolean;
+  isHidden?: (this: T, index: number, obj?: unknown) => boolean;
   /**
    * Executes a command-style property.
    *
