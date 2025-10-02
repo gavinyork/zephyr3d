@@ -226,6 +226,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this.renderContentDropHighlight();
     }
 
+    ImGui.BeginChild('##VFSContentInnerContainer', new ImGui.ImVec2(-1, -1), false);
     if (this._selectedDir) {
       switch (this._viewMode) {
         case ViewMode.List:
@@ -247,6 +248,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       );
       ImGui.TextDisabled('Select a folder to view its contents');
     }
+    ImGui.EndChild();
     ImGui.EndChild();
   }
 
