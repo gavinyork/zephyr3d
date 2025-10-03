@@ -538,8 +538,6 @@ export class AssetScene extends NamedObject {
  */
 export class SharedModel extends Disposable {
   /** @internal */
-  private _path: string;
-  /** @internal */
   private _vfs: VFS;
   /** @internal */
   private _name: string;
@@ -563,7 +561,6 @@ export class SharedModel extends Disposable {
    */
   constructor(VFS: VFS, path: string) {
     super();
-    this._path = path;
     this._vfs = VFS;
     this._name = VFS.basename(path, VFS.extname(path));
     this._pathname = VFS.dirname(path);
