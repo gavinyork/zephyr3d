@@ -427,7 +427,7 @@ export function getSkeletonClass(): SerializableClass {
     },
     getInitParams(obj: Skeleton) {
       return {
-        joints: obj.joints,
+        joints: obj.joints.map((joint) => joint.persistentId),
         inverseBindMatrices: obj.inverseBindMatrices,
         bindPoseMatrices: obj.bindPoseMatrices,
         id: obj.persistentId

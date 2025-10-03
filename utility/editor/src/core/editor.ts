@@ -5,7 +5,7 @@ import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneController } from '../controllers/scenecontroller';
 import { FontGlyph } from './fontglyph';
-import { AssetManager, ScriptingSystem } from '@zephyr3d/scene';
+import { AssetManager, ScriptingSystem, SerializationManager } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
   analyzeGPUObjectGrowth,
@@ -163,7 +163,9 @@ export class Editor {
   }
   async loadAssets() {
     const assetManager = new AssetManager(
-      new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
+      new SerializationManager(
+        new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
+      )
     );
     const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
     for (const name in brushConfig) {

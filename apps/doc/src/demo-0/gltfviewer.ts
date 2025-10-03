@@ -1,11 +1,11 @@
 import * as zip from '@zip.js/zip.js';
 import type * as draco3d from 'draco3d';
-import { Vector4, Vector3, HttpFS, DRef } from '@zephyr3d/base';
+import { Vector4, Vector3, DRef } from '@zephyr3d/base';
 import type { SceneNode, Scene, AnimationSet, OIT } from '@zephyr3d/scene';
-import { Mesh, PlaneShape, LambertMaterial, getDevice, getInput } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, LambertMaterial, getDevice, getInput, getEngine } from '@zephyr3d/scene';
 import { BatchGroup, WeightedBlendedOIT, ABufferOIT, OrbitCameraController } from '@zephyr3d/scene';
 import type { AABB } from '@zephyr3d/base';
-import { BoundingBox, AssetManager, DirectionalLight, PerspectiveCamera } from '@zephyr3d/scene';
+import { BoundingBox, DirectionalLight, PerspectiveCamera } from '@zephyr3d/scene';
 import { EnvMaps } from './envmap';
 import { Panel } from './ui';
 
@@ -17,7 +17,6 @@ export class GLTFViewer {
   private _currentAnimation: string;
   private readonly _modelNode: DRef<SceneNode>;
   private readonly _animationSet: DRef<AnimationSet>;
-  private readonly _assetManager: AssetManager;
   private readonly _scene: Scene;
   private _oit: OIT;
   private readonly _camera: PerspectiveCamera;
@@ -44,9 +43,6 @@ export class GLTFViewer {
     this._scene.env.light.strength = 0.8;
     this._envMaps = new EnvMaps();
     this._batchGroup = new BatchGroup(scene);
-    this._assetManager = new AssetManager(
-      new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
-    );
     const floorMaterial = new LambertMaterial();
     floorMaterial.albedoColor = new Vector4(0.8, 0.8, 0.8, 1);
     this._floor = new Mesh(scene, new PlaneShape({ size: 1, anchor: 0 }), floorMaterial);
@@ -137,8 +133,8 @@ export class GLTFViewer {
     return fileMap;
   }
   async loadModel(url: string) {
-    this._assetManager
-      .fetchModel(this._scene, url, {
+    getEngine()
+      .serializationManager.fetchModel(url, this._scene, {
         enableInstancing: true,
         dracoDecoderModule: this._dracoModule
       })

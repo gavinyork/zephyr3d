@@ -1,17 +1,8 @@
 import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
-import { AssetManager, ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice } from '@zephyr3d/scene';
+import { ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice, getEngine } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import {
-  ASSERT,
-  degree2radian,
-  Disposable,
-  DRef,
-  HttpRequest,
-  Vector2,
-  Vector4,
-  type Vector3
-} from '@zephyr3d/base';
+import { degree2radian, Disposable, DRef, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -26,7 +17,6 @@ import { TerrainSmoothBrush } from './brushes/smooth';
 import { TerrainFlattenBrush } from './brushes/flatten';
 import { FilePicker } from '../../components/filepicker';
 import { Dialog } from '../dlg/dlg';
-import { ProjectService } from '../../core/services/project';
 import { eventBus } from '../../core/eventbus';
 import type { BaseTerrainBrush } from './brushes/base';
 import { EraseGrassBrush, GrassBrush } from './brushes/grass';
@@ -655,37 +645,32 @@ export class TerrainEditTool extends Disposable implements EditTool {
             });
           eventBus.dispatchEvent('scene_changed');
         } else {
-          // TODO: should use a http VFS here, current not working
-          ASSERT(false, 'To be implemented');
-          const assetManager = new AssetManager(ProjectService.serializationManager.vfs);
-          assetManager
-            .fetchTexture<Texture2D>(files[0].name, {
-              linearColorSpace: true,
-              samplerOptions: { mipFilter: 'none' }
-            })
-            .then((tex) => {
-              if (!tex || !tex.isTexture2D()) {
-                Dialog.messageBox('Error', 'Invalid texture');
-              }
-              const heightMap = this._terrain.get().heightMap;
-              new CopyBlitter().blit(
-                tex,
-                heightMap,
-                fetchSampler(
-                  heightMap.width === tex.width && heightMap.height === tex.height
-                    ? 'clamp_nearest_nomip'
-                    : 'clamp_linear_nomip'
-                )
-              );
-              this._terrain.get().updateBoundingBox();
-              eventBus.dispatchEvent('scene_changed');
-
-              URL.revokeObjectURL(url);
-            })
-            .catch((err) => {
-              Dialog.messageBox('Error', String(err));
-              URL.revokeObjectURL(url);
-            });
+          files[0].arrayBuffer().then((buffer) => {
+            getEngine()
+              .serializationManager.loadTextureFromBuffer(buffer, files[0].type, false, { mipFilter: 'none' })
+              .then((tex) => {
+                if (!tex || !tex.isTexture2D()) {
+                  Dialog.messageBox('Error', 'Invalid texture');
+                }
+                const heightMap = this._terrain.get().heightMap;
+                new CopyBlitter().blit(
+                  tex,
+                  heightMap,
+                  fetchSampler(
+                    heightMap.width === tex.width && heightMap.height === tex.height
+                      ? 'clamp_nearest_nomip'
+                      : 'clamp_linear_nomip'
+                  )
+                );
+                this._terrain.get().updateBoundingBox();
+                eventBus.dispatchEvent('scene_changed');
+                URL.revokeObjectURL(url);
+              })
+              .catch((err) => {
+                Dialog.messageBox('Error', String(err));
+                URL.revokeObjectURL(url);
+              });
+          });
         }
       }
     });

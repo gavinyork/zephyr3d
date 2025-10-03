@@ -1,8 +1,8 @@
-import type { DecoderModule } from 'draco3d';
-import type { InterpolationMode, TypedArray, VFS } from '@zephyr3d/base';
+import type * as draco3d from 'draco3d';
+import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
+import { AssetHierarchyNode } from '../model';
 import type {
-  AssetHierarchyNode,
   AssetMeshData,
   AssetAnimationData,
   AssetSubMeshData,
@@ -15,9 +15,9 @@ import type {
   AssetAnimationTrack,
   AssetPrimitiveInfo,
   AssetTextureInfo,
-  AssetImageInfo
+  SharedModel
 } from '../model';
-import { SharedModel, AssetSkeleton, AssetScene } from '../model';
+import { AssetSkeleton, AssetScene } from '../model';
 import {
   BoundingBox,
   DracoMeshDecoder,
@@ -31,7 +31,6 @@ import {
   MORPH_TARGET_TEX3,
   getDevice
 } from '@zephyr3d/scene';
-import type { AssetManager } from '@zephyr3d/scene';
 import { ComponentType, GLTFAccessor } from './helpers';
 import type { VertexAttribFormat } from '@zephyr3d/device';
 import {
@@ -44,51 +43,49 @@ import {
   getVertexAttribName,
   getVertexAttributeIndex
 } from '@zephyr3d/device';
-import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf';
+import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf_types';
+import type { ModelImporter } from '../importer';
+import { ProjectService } from '../../core/services/project';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
-  _manager: AssetManager;
-  _vfs: VFS;
   _loadedBuffers: ArrayBuffer[];
   _accessors: GLTFAccessor[];
-  _textureCache: Record<string, AssetImageInfo>;
-  _materialCache: Record<string, AssetMaterial>;
   _nodes: AssetHierarchyNode[];
   _meshes: AssetMeshData[];
   _device: AbstractDevice;
-  _dracoModule?: DecoderModule;
+  _dracoModule?: draco3d.DecoderModule;
+}
+
+declare global {
+  const DracoDecoderModule: draco3d.DracoDecoderModule;
 }
 
 /**
  * The GLTF/GLB model loader
  * @internal
  */
-export class GLTFLoader {
-  async load(
-    assetManager: AssetManager,
-    url: string,
-    mimeType: string,
-    data: Blob,
-    decoderModule?: DecoderModule
-  ) {
+export class GLTFImporter implements ModelImporter {
+  async initDraco3d(gltf: GLTFContent) {
+    return new Promise<void>((resolve) => {
+      DracoDecoderModule({
+        onModuleLoaded: (module) => {
+          gltf._dracoModule = module;
+          resolve();
+        }
+      });
+    });
+  }
+  async import(data: Blob, model: SharedModel): Promise<boolean> {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(assetManager, url, buffer, assetManager.vfs, decoderModule);
+      return this.loadBinary(buffer, model);
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
-    gltf._manager = assetManager;
-    gltf._vfs = assetManager.vfs;
     gltf._loadedBuffers = null;
-    return this.loadJson(url, gltf, decoderModule);
+    return this.loadJson(gltf, model);
   }
-  async loadBinary(
-    assetManager: AssetManager,
-    url: string,
-    buffer: ArrayBuffer,
-    vfs: VFS,
-    decoderModule?: DecoderModule
-  ): Promise<SharedModel> {
+  async loadBinary(buffer: ArrayBuffer, model: SharedModel): Promise<boolean> {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: GLTFContent = null;
@@ -104,27 +101,25 @@ export class GLTFLoader {
       }
     }
     if (gltf) {
-      gltf._manager = assetManager;
-      gltf._vfs = vfs;
       gltf._loadedBuffers = buffers;
-      return this.loadJson(url, gltf, decoderModule);
+      return this.loadJson(gltf, model);
     }
     return null;
   }
-  async loadJson(url: string, gltf: GLTFContent, dracoDecoderModule?: DecoderModule): Promise<SharedModel> {
+  async loadJson(gltf: GLTFContent, model: SharedModel): Promise<boolean> {
     // check extensions
     if (
-      !dracoDecoderModule &&
+      !gltf._dracoModule &&
       gltf.extensionsRequired &&
       gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0
     ) {
-      console.error('Draco3d is required for loading model');
-      return null;
+      await this.initDraco3d(gltf);
+      if (!gltf._dracoModule) {
+        console.error('Draco3d is required for loading model');
+        return null;
+      }
     }
-    gltf._dracoModule = dracoDecoderModule;
     gltf._accessors = [];
-    gltf._textureCache = {};
-    gltf._materialCache = {};
     gltf._nodes = [];
     gltf._meshes = [];
     // check asset property
@@ -136,14 +131,14 @@ export class GLTFLoader {
         return null;
       }
     }
-    gltf._baseURI = url.substring(0, url.lastIndexOf('/') + 1);
+    gltf._baseURI = model.pathName;
     if (!gltf._loadedBuffers) {
       gltf._loadedBuffers = [];
       const buffers = gltf.buffers;
       if (buffers) {
         for (const buffer of buffers) {
           const uri = this._normalizeURI(gltf._baseURI, buffer.uri);
-          const buf = await gltf._manager.fetchBinaryData(uri, null);
+          const buf = await ProjectService.serializationManager.fetchBinary(uri);
           if (buffer.byteLength !== buf.byteLength) {
             console.error(`Invalid GLTF: buffer byte length error.`);
             return null;
@@ -160,8 +155,8 @@ export class GLTFLoader {
     }
     const scenes = gltf.scenes;
     if (scenes) {
-      const sharedModel = new SharedModel();
-      await this._loadMeshes(gltf);
+      const sharedModel = model;
+      await this._loadMeshes(sharedModel, gltf);
       this._loadNodes(gltf, sharedModel);
       this._loadSkins(gltf, sharedModel);
       for (let i = 0; i < gltf.nodes?.length; i++) {
@@ -180,9 +175,9 @@ export class GLTFLoader {
       if (typeof gltf.scene === 'number') {
         sharedModel.activeScene = gltf.scene;
       }
-      return sharedModel;
+      return true;
     }
-    return null;
+    return false;
   }
   /** @internal */
   private _normalizeURI(baseURI: string, uri: string) {
@@ -404,7 +399,7 @@ export class GLTFLoader {
     }
     const nodeInfo = gltf.nodes?.[nodeIndex];
     if (nodeInfo) {
-      node = model.addNode(parent, nodeIndex, nodeInfo.name);
+      node = new AssetHierarchyNode(nodeInfo.name, parent); //model.addNode(parent, nodeInfo.name);
       if (typeof nodeInfo.mesh === 'number') {
         node.mesh = gltf._meshes[nodeInfo.mesh];
         if (node.weights) {
@@ -481,15 +476,15 @@ export class GLTFLoader {
     return node;
   }
   /** @internal */
-  private async _loadMeshes(gltf: GLTFContent) {
+  private async _loadMeshes(model: SharedModel, gltf: GLTFContent) {
     if (gltf.meshes) {
       for (let i = 0; i < gltf.meshes.length; i++) {
-        gltf._meshes[i] = await this._loadMesh(gltf, i);
+        gltf._meshes[i] = await this._loadMesh(model, gltf, i);
       }
     }
   }
   /** @internal */
-  private async _loadMesh(gltf: GLTFContent, meshIndex: number): Promise<AssetMeshData> {
+  private async _loadMesh(model: SharedModel, gltf: GLTFContent, meshIndex: number): Promise<AssetMeshData> {
     const meshInfo = gltf.meshes && gltf.meshes[meshIndex];
     let mesh: AssetMeshData = null;
     if (meshInfo) {
@@ -622,17 +617,18 @@ export class GLTFLoader {
           const materialHash = `${p.material}.${Number(hasVertexNormal)}.${Number(hasVertexColor)}.${Number(
             hasVertexTangent
           )}`;
-          let material = gltf._materialCache[materialHash];
+          let material = model.getMaterial(materialHash);
           if (!material) {
             const materialInfo = p.material !== undefined ? gltf.materials[p.material] : null;
             material = await this._loadMaterial(
+              model,
               gltf,
               materialInfo,
               hasVertexColor,
               hasVertexNormal,
               hasVertexTangent
             );
-            gltf._materialCache[materialHash] = material;
+            model.setMaterial(materialHash, material);
           }
           subMeshData.primitive = primitive;
           subMeshData.material = material;
@@ -644,6 +640,7 @@ export class GLTFLoader {
   }
   /** @internal */
   private async _loadMaterial(
+    model: SharedModel,
     gltf: GLTFContent,
     materialInfo: Material,
     vertexColor: boolean,
@@ -678,15 +675,15 @@ export class GLTFLoader {
     }
     if (materialInfo?.pbrMetallicRoughness || materialInfo?.extensions?.KHR_materials_pbrSpecularGlossiness) {
       pbrCommon.normalMap = materialInfo.normalTexture
-        ? await this._loadTexture(gltf, materialInfo.normalTexture, false)
+        ? await this._loadTexture(model, gltf, materialInfo.normalTexture, false)
         : null;
       pbrCommon.bumpScale = materialInfo.normalTexture?.scale ?? 1;
       pbrCommon.occlusionMap = materialInfo.occlusionTexture
-        ? await this._loadTexture(gltf, materialInfo.occlusionTexture, false)
+        ? await this._loadTexture(model, gltf, materialInfo.occlusionTexture, false)
         : null;
       pbrCommon.occlusionStrength = materialInfo.occlusionTexture?.strength ?? 1;
       pbrCommon.emissiveMap = materialInfo.emissiveTexture
-        ? await this._loadTexture(gltf, materialInfo.emissiveTexture, false)
+        ? await this._loadTexture(model, gltf, materialInfo.emissiveTexture, false)
         : null;
       pbrCommon.emissiveStrength =
         materialInfo?.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1;
@@ -706,10 +703,15 @@ export class GLTFLoader {
       pbrMetallicRoughness.metallic = materialInfo.pbrMetallicRoughness.metallicFactor ?? 1;
       pbrMetallicRoughness.roughness = materialInfo.pbrMetallicRoughness.roughnessFactor ?? 1;
       pbrMetallicRoughness.diffuseMap = materialInfo.pbrMetallicRoughness.baseColorTexture
-        ? await this._loadTexture(gltf, materialInfo.pbrMetallicRoughness.baseColorTexture, true)
+        ? await this._loadTexture(model, gltf, materialInfo.pbrMetallicRoughness.baseColorTexture, true)
         : null;
       pbrMetallicRoughness.metallicMap = materialInfo.pbrMetallicRoughness.metallicRoughnessTexture
-        ? await this._loadTexture(gltf, materialInfo.pbrMetallicRoughness.metallicRoughnessTexture, false)
+        ? await this._loadTexture(
+            model,
+            gltf,
+            materialInfo.pbrMetallicRoughness.metallicRoughnessTexture,
+            false
+          )
         : null;
       pbrMetallicRoughness.metallicIndex = 2;
       pbrMetallicRoughness.roughnessIndex = 1;
@@ -725,10 +727,10 @@ export class GLTFLoader {
       pbrSpecularGlossness.specular = new Vector3(sg.specularFactor ?? [1, 1, 1]);
       pbrSpecularGlossness.glossness = sg.glossnessFactor ?? 1;
       pbrSpecularGlossness.diffuseMap = sg.diffuseTexture
-        ? await this._loadTexture(gltf, sg.diffuseTexture, true)
+        ? await this._loadTexture(model, gltf, sg.diffuseTexture, true)
         : null;
       pbrSpecularGlossness.specularGlossnessMap = sg.specularGlossinessTexture
-        ? await this._loadTexture(gltf, sg.specularGlossinessTexture, true)
+        ? await this._loadTexture(model, gltf, sg.specularGlossinessTexture, true)
         : null;
     }
     assetMaterial = pbrSpecularGlossness || pbrMetallicRoughness;
@@ -768,11 +770,17 @@ export class GLTFLoader {
         materialInfo?.extensions?.KHR_materials_specular?.specularFactor ?? 1
       );
       pbrMetallicRoughness.specularMap = materialInfo?.extensions?.KHR_materials_specular?.specularTexture
-        ? await this._loadTexture(gltf, materialInfo.extensions.KHR_materials_specular.specularTexture, false)
+        ? await this._loadTexture(
+            model,
+            gltf,
+            materialInfo.extensions.KHR_materials_specular.specularTexture,
+            false
+          )
         : null;
       pbrMetallicRoughness.specularColorMap = materialInfo?.extensions?.KHR_materials_specular
         ?.specularColorTexture
         ? await this._loadTexture(
+            model,
             gltf,
             materialInfo.extensions.KHR_materials_specular.specularColorTexture,
             true
@@ -784,13 +792,13 @@ export class GLTFLoader {
         pbrMetallicRoughness.iridescence = {
           iridescenceFactor: iridescence.iridescenceFactor ?? 0,
           iridescenceMap: iridescence.iridescenceTexture
-            ? await this._loadTexture(gltf, iridescence.iridescenceTexture, false)
+            ? await this._loadTexture(model, gltf, iridescence.iridescenceTexture, false)
             : null,
           iridescenceIor: iridescence.iridescenceIor ?? 1.3,
           iridescenceThicknessMinimum: iridescence.iridescenceThicknessMinimum ?? 100,
           iridescenceThicknessMaximum: iridescence.iridescenceThicknessMaximum ?? 400,
           iridescenceThicknessMap: iridescence.iridescenceThicknessTexture
-            ? await this._loadTexture(gltf, iridescence.iridescenceThicknessTexture, false)
+            ? await this._loadTexture(model, gltf, iridescence.iridescenceThicknessTexture, false)
             : null
         };
       }
@@ -800,7 +808,7 @@ export class GLTFLoader {
         pbrMetallicRoughness.transmission = {
           transmissionFactor: transmission.transmissionFactor ?? 0,
           transmissionMap: transmission.transmissionTexture
-            ? await this._loadTexture(gltf, transmission.transmissionTexture, false)
+            ? await this._loadTexture(model, gltf, transmission.transmissionTexture, false)
             : null,
           thicknessFactor: 0,
           thicknessMap: null,
@@ -811,7 +819,7 @@ export class GLTFLoader {
         if (volume) {
           pbrMetallicRoughness.transmission.thicknessFactor = volume.thicknessFactor ?? 0;
           pbrMetallicRoughness.transmission.thicknessMap = volume.thicknessTexture
-            ? await this._loadTexture(gltf, volume.thicknessTexture, false)
+            ? await this._loadTexture(model, gltf, volume.thicknessTexture, false)
             : null;
           pbrMetallicRoughness.transmission.attenuationDistance = volume.attenuationDistance ?? 99999;
           const attenuationColor = (volume.attenuationColor ?? [1, 1, 1]) as [number, number, number];
@@ -824,11 +832,11 @@ export class GLTFLoader {
         pbrMetallicRoughness.sheen = {
           sheenColorFactor: new Vector3(sheen.sheenColorFactor ?? [0, 0, 0]),
           sheenColorMap: sheen.sheenColorTexture
-            ? await this._loadTexture(gltf, sheen.sheenColorTexture, true)
+            ? await this._loadTexture(model, gltf, sheen.sheenColorTexture, true)
             : null,
           sheenRoughnessFactor: sheen.sheenRoughnessFactor ?? 0,
           sheenRoughnessMap: sheen.sheenRoughnessTexture
-            ? await this._loadTexture(gltf, sheen.sheenRoughnessTexture, true)
+            ? await this._loadTexture(model, gltf, sheen.sheenRoughnessTexture, true)
             : null
         };
       }
@@ -838,14 +846,14 @@ export class GLTFLoader {
         pbrMetallicRoughness.clearcoat = {
           clearCoatFactor: cc.clearcoatFactor ?? 0,
           clearCoatIntensityMap: cc.clearcoatTexture
-            ? await this._loadTexture(gltf, cc.clearcoatTexture, false)
+            ? await this._loadTexture(model, gltf, cc.clearcoatTexture, false)
             : null,
           clearCoatRoughnessFactor: cc.clearcoatRoughnessFactor ?? 0,
           clearCoatRoughnessMap: cc.clearcoatRoughnessTexture
-            ? await this._loadTexture(gltf, cc.clearcoatRoughnessTexture, false)
+            ? await this._loadTexture(model, gltf, cc.clearcoatRoughnessTexture, false)
             : null,
           clearCoatNormalMap: cc.clearcoatNormalTexture
-            ? await this._loadTexture(gltf, cc.clearcoatNormalTexture, false)
+            ? await this._loadTexture(model, gltf, cc.clearcoatNormalTexture, false)
             : null
         };
       }
@@ -854,6 +862,7 @@ export class GLTFLoader {
   }
   /** @internal */
   private async _loadTexture(
+    model: SharedModel,
     gltf: GLTFContent,
     info: Partial<TextureInfo>,
     sRGB: boolean
@@ -951,16 +960,14 @@ export class GLTFLoader {
         }
       }
       const imageIndex: number = textureInfo.source;
-      const hash = `${imageIndex}:${!!sRGB}:${wrapS}:${wrapT}:${minFilter}:${magFilter}:${mipFilter}`;
-      mt.image = gltf._textureCache[hash];
+      mt.image = model.getImage(imageIndex);
       if (!mt.image) {
         const image = gltf.images[imageIndex];
         if (image) {
           if (image.uri) {
             const imageUrl = this._normalizeURI(gltf._baseURI, image.uri);
             mt.image = {
-              uri: imageUrl,
-              sRGB: !!sRGB
+              uri: imageUrl
             };
           } else if (typeof image.bufferView === 'number' && image.mimeType) {
             const bufferView = gltf.bufferViews && gltf.bufferViews[image.bufferView];
@@ -971,18 +978,18 @@ export class GLTFLoader {
                 const mimeType = image.mimeType;
                 mt.image = {
                   data: view,
-                  mimeType,
-                  sRGB: !!sRGB
+                  mimeType
                 };
               }
             }
           }
         }
         if (mt.image) {
-          gltf._textureCache[hash] = mt.image;
+          model.setImage(imageIndex, mt.image);
         }
       }
       if (mt.image) {
+        mt.sRGB = !!sRGB;
         mt.sampler = {
           wrapS,
           wrapT,

@@ -579,10 +579,19 @@ export abstract class VFS extends Observable<{
   /**
    * Extract base file name part for a path
    * @param path - path
-   * @returns Base file name part of the path
+   * @param ext - Optional extension to strip (exact suffix match).
+   * @returns The base name of the path.
    */
-  basename(path: string): string {
-    return PathUtils.basename(path);
+  basename(path: string, ext?: string): string {
+    return PathUtils.basename(path, ext);
+  }
+  /**
+   * Extract extension file name part for a path
+   * @param path - path
+   * @returns extension file name part of the path
+   */
+  extname(path: string): string {
+    return PathUtils.extname(path);
   }
   /**
    * Converts an absolute path to a path relative to the current working directory.

@@ -1,4 +1,4 @@
-import type { TypedArray, Interpolator } from '@zephyr3d/base';
+import type { TypedArray, Interpolator, VFS } from '@zephyr3d/base';
 import { DRef, Vector4 } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
@@ -17,9 +17,8 @@ import {
   PBPrimitiveTypeInfo,
   PBStructTypeInfo
 } from '@zephyr3d/device';
-import type { MeshMaterial, Scene } from '@zephyr3d/scene';
+import type { MeshMaterial, Scene, SerializationManager } from '@zephyr3d/scene';
 import {
-  getEngine,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   Primitive,
@@ -69,7 +68,6 @@ export interface AssetImageInfo {
   uri?: string;
   data?: Uint8Array<ArrayBuffer>;
   mimeType?: string;
-  sRGB?: boolean;
 }
 
 export interface AssetVertexBufferInfo {
@@ -92,6 +90,7 @@ export interface AssetPrimitiveInfo {
  */
 export interface AssetTextureInfo {
   image: AssetImageInfo;
+  sRGB?: boolean;
   sampler: AssetSamplerInfo;
   texCoord: number;
   transform: Matrix4x4;
@@ -539,29 +538,49 @@ export class AssetScene extends NamedObject {
  */
 export class SharedModel extends Disposable {
   /** @internal */
+  private _path: string;
+  /** @internal */
+  private _vfs: VFS;
+  /** @internal */
   private _name: string;
   /** @internal */
-  private _skeletons: AssetSkeleton[];
+  private _pathname: string;
   /** @internal */
-  private _nodes: AssetHierarchyNode[];
+  private _skeletons: AssetSkeleton[];
   /** @internal */
   private _animations: AssetAnimationData[];
   /** @internal */
   private _scenes: AssetScene[];
   /** @internal */
   private _activeScene: number;
+  /** @internal */
+  private _imageList: AssetImageInfo[];
+  /** @internal */
+  private _materialList: Record<string, AssetMaterial>;
   /**
    * Creates an instance of SharedModel
    * @param name - Name of the model
    */
-  constructor(name?: string) {
+  constructor(VFS: VFS, path: string) {
     super();
-    this._name = name || '';
+    this._path = path;
+    this._vfs = VFS;
+    this._name = VFS.basename(path, VFS.extname(path));
+    this._pathname = VFS.dirname(path);
     this._skeletons = [];
-    this._nodes = [];
     this._scenes = [];
     this._animations = [];
+    this._imageList = [];
+    this._materialList = {};
     this._activeScene = -1;
+  }
+  /** Path */
+  get pathName(): string {
+    return this._pathname;
+  }
+  /** VFS */
+  get VFS(): VFS {
+    return this._vfs;
   }
   /** Name of the model */
   get name(): string {
@@ -582,10 +601,6 @@ export class SharedModel extends Disposable {
   get skeletons(): AssetSkeleton[] {
     return this._skeletons;
   }
-  /** All nodes that the model contains */
-  get nodes(): AssetHierarchyNode[] {
-    return this._nodes;
-  }
   /** The active scene of the model */
   get activeScene(): number {
     return this._activeScene;
@@ -593,17 +608,17 @@ export class SharedModel extends Disposable {
   set activeScene(val: number) {
     this._activeScene = val;
   }
-  /**
-   * Adds a node to the scene
-   * @param parent - Under which node the node should be added
-   * @param index - Index of the node
-   * @param name - Name of the node
-   * @returns The added node
-   */
-  addNode(parent: AssetHierarchyNode, index: number, name: string): AssetHierarchyNode {
-    const childNode = new AssetHierarchyNode(name, parent);
-    this._nodes[index] = childNode;
-    return childNode;
+  getImage(index: number) {
+    return this._imageList[index];
+  }
+  setImage(index: number, img: AssetImageInfo) {
+    this._imageList[index] = img;
+  }
+  getMaterial(hash: string) {
+    return this._materialList[hash];
+  }
+  setMaterial(hash: string, material: AssetMaterial) {
+    this._materialList[hash] = material;
   }
   /**
    * Adds a skeleton to the scene
@@ -619,7 +634,48 @@ export class SharedModel extends Disposable {
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
   }
-  async createSceneNode(scene: Scene, instancing: boolean): Promise<SceneNode> {
+  /** preprocess */
+  async preprocess(): Promise<void> {
+    for (let i = 0; i < this._imageList.length; i++) {
+      const img = this._imageList[i];
+      let ext: string = '';
+      if (!img.uri && img.data && img.mimeType) {
+        if (img.mimeType === 'image/jpeg') {
+          ext = '.jpg';
+        } else if (img.mimeType === 'image/png') {
+          ext = '.png';
+        } else if (img.mimeType === 'image/webp') {
+          ext = '.webp';
+        } else if (img.mimeType === 'image/tga') {
+          ext = '.tga';
+        } else if (img.mimeType === 'image/vnd.radiance') {
+          ext = '.hdr';
+        } else if (img.mimeType === 'image/ktx') {
+          ext = '.ktx';
+        } else if (img.mimeType === 'image/ktx2') {
+          ext = '.ktx2';
+        } else {
+          continue;
+        }
+      }
+      if (ext) {
+        const path = this._vfs.join(this._pathname, `${this._name}_texture_${i}${ext}`);
+        await this._vfs.writeFile(
+          path,
+          img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
+          { encoding: 'binary', create: true }
+        );
+        img.uri = path;
+        img.data = null;
+        img.mimeType = '';
+      }
+    }
+  }
+  async createSceneNode(
+    manager: SerializationManager,
+    scene: Scene,
+    instancing: boolean
+  ): Promise<SceneNode> {
     const group = new SceneNode(scene);
     group.name = this.name;
     const animationSet = group.animationSet;
@@ -632,6 +688,7 @@ export class SharedModel extends Disposable {
       const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
       for (let k = 0; k < assetScene.rootNodes.length; k++) {
         await this.setAssetNodeToSceneNode(
+          manager,
           scene,
           group,
           assetScene.rootNodes[k],
@@ -715,12 +772,12 @@ export class SharedModel extends Disposable {
   }
   protected onDispose() {
     super.onDispose();
-    this._nodes = [];
     this._skeletons = [];
     this._scenes = [];
     this._animations = [];
   }
   private async setAssetNodeToSceneNode(
+    manager: SerializationManager,
     scene: Scene,
     parent: SceneNode,
     assetNode: AssetHierarchyNode,
@@ -749,7 +806,7 @@ export class SharedModel extends Disposable {
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = this.createPrimitive(subMesh.primitive);
-          const material = await this.createMaterial(subMesh.material);
+          const material = await this.createMaterial(manager, subMesh.material);
           meshNode.material =
             instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
               ? material.createInstance()
@@ -770,27 +827,30 @@ export class SharedModel extends Disposable {
     }
     node.parent = parent;
     for (const child of assetNode.children) {
-      await this.setAssetNodeToSceneNode(scene, node, child, skeletonMeshMap, nodeMap, instancing);
+      await this.setAssetNodeToSceneNode(manager, scene, node, child, skeletonMeshMap, nodeMap, instancing);
     }
   }
-  private async image2Texture(img: AssetImageInfo): Promise<Texture2D> {
-    if (img.uri) {
-      const texture = await getEngine().serializationManager.fetchTexture<Texture2D>(img.uri, {
-        linearColorSpace: !img.sRGB
+  private async image2Texture(manager: SerializationManager, info: AssetTextureInfo): Promise<Texture2D> {
+    if (info.image.uri) {
+      const texture = await manager.fetchTexture<Texture2D>(info.image.uri, {
+        linearColorSpace: !info.sRGB
       });
-      texture.name = img.uri;
+      texture.name = info.image.uri;
       return texture;
-    } else if (img.data && img.mimeType) {
-      const texture = await getEngine().serializationManager.loadTextureFromBuffer<Texture2D>(
-        img.data,
-        img.mimeType,
-        !!img.sRGB
+    } else if (info.image.data && info.image.mimeType) {
+      const texture = await manager.loadTextureFromBuffer<Texture2D>(
+        info.image.data,
+        info.image.mimeType,
+        !!info.sRGB
       );
       return texture;
     }
   }
-  private async createTexture(info: AssetTextureInfo): Promise<MaterialTextureInfo> {
-    const texture = await this.image2Texture(info.image);
+  private async createTexture(
+    manager: SerializationManager,
+    info: AssetTextureInfo
+  ): Promise<MaterialTextureInfo> {
+    const texture = await this.image2Texture(manager, info);
     const sampler = getDevice().createSampler({
       addressU: info.sampler.wrapS,
       addressV: info.sampler.wrapT,
@@ -822,13 +882,16 @@ export class SharedModel extends Disposable {
     primitive.setBoundingVolume(new BoundingBox(info.boxMin, info.boxMax));
     return primitive;
   }
-  private async createMaterial(assetMaterial: AssetMaterial): Promise<MeshMaterial> {
+  private async createMaterial(
+    manager: SerializationManager,
+    assetMaterial: AssetMaterial
+  ): Promise<MeshMaterial> {
     const infoMap: Map<AssetTextureInfo, MaterialTextureInfo> = new Map();
     const that = this;
     async function getTextureInfo(info: AssetTextureInfo): Promise<MaterialTextureInfo> {
       let t = infoMap.get(info);
       if (!t) {
-        t = await that.createTexture(info);
+        t = await that.createTexture(manager, info);
         infoMap.set(info, t);
       }
       return t;

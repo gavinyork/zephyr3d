@@ -108,16 +108,15 @@ export class DockPannel {
   get padding() {
     return this._padding;
   }
-  beginChild(id: string) {
+  beginChild(id: string, extraFlags = 0) {
     const windowPos = new ImGui.ImVec2(this._left, this._top);
     ImGui.SetCursorPos(windowPos);
     const windowSize = new ImGui.ImVec2(this._width, this._height);
-    const flags = ImGui.WindowFlags.None;
     this._renderContent = false;
-    if (ImGui.BeginChild(id, windowSize, true, flags)) {
+    if (ImGui.BeginChild(id, windowSize, true, extraFlags)) {
       this._initialCursorPos = ImGui.GetCursorPos();
       this._availableHeight = ImGui.GetContentRegionAvail().y;
-      this.beginContent();
+      this.beginContent(extraFlags);
       return true;
     }
     return false;
@@ -127,7 +126,7 @@ export class DockPannel {
     this.renderResizeBar(this._initialCursorPos);
     ImGui.EndChild();
   }
-  begin(id: string) {
+  begin(id: string, extraFlags = 0) {
     const windowPos = new ImGui.ImVec2(this._left, this._top);
     const windowSize = new ImGui.ImVec2(this._width, this._height);
     ImGui.SetNextWindowPos(windowPos, ImGui.Cond.Always);
@@ -142,7 +141,7 @@ export class DockPannel {
     if (ImGui.Begin(id, null, flags)) {
       this._initialCursorPos = ImGui.GetCursorPos();
       this._availableHeight = ImGui.GetContentRegionAvail().y;
-      this.beginContent();
+      this.beginContent(extraFlags);
       return true;
     }
     return false;
@@ -152,7 +151,7 @@ export class DockPannel {
     this.renderResizeBar(this._initialCursorPos);
     ImGui.End();
   }
-  private beginContent() {
+  private beginContent(extraFlags = 0) {
     const resizeBarSize = 4;
     const padding = 8;
 
@@ -179,8 +178,8 @@ export class DockPannel {
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + leftOffset);
     ImGui.SetCursorPosY(ImGui.GetCursorPosY() + topOffset);
 
-    const childFlags = ImGui.WindowFlags.None; // Allow scrollbars when needed
-    ImGui.BeginChild('ContentRegion', new ImGui.ImVec2(availableWidth, availableHeight), false, childFlags);
+    //const childFlags = extraFlags; // Allow scrollbars when needed
+    ImGui.BeginChild('ContentRegion', new ImGui.ImVec2(availableWidth, availableHeight), false, extraFlags);
     this._renderContent = true;
   }
   private endContent() {

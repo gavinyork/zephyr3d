@@ -1,6 +1,6 @@
-import type { Accessor, AccessorSparse } from './gltf';
+import type { Accessor, AccessorSparse } from './gltf_types';
 import type { TypedArray } from '@zephyr3d/base';
-import type { GLTFContent } from './gltf_loader';
+import type { GLTFContent } from './gltf_importer';
 
 /** @internal */
 export const enum ComponentType {

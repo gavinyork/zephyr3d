@@ -1,6 +1,6 @@
 import { ZipFS } from '@zephyr3d/base';
 import type { AnimationSet, Scene, SceneNode } from '@zephyr3d/scene';
-import { AssetManager } from '@zephyr3d/scene';
+import { AssetManager, SerializationManager } from '@zephyr3d/scene';
 import * as zip from '@zip.js/zip.js';
 
 export class Character {
@@ -36,7 +36,7 @@ export class Character {
       await fetch('https://cdn.zephyr3d.org/doc/assets/models/alice_shellfire.zip')
     ).arrayBuffer();
     await zipFS.initializeFromData(content);
-    const assetManager = new AssetManager(zipFS);
+    const assetManager = new AssetManager(new SerializationManager(zipFS));
     const modelFiles = await zipFS.glob('**/*.{gltf,glb}');
     if (modelFiles.length === 0) {
       throw new Error('No glTF model found in zip');

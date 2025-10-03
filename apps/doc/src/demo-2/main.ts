@@ -14,7 +14,8 @@ import {
   DirectionalLight,
   PerspectiveCamera,
   SphereShape,
-  getInput
+  getInput,
+  SerializationManager
 } from '@zephyr3d/scene';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -108,7 +109,7 @@ lightApp.ready().then(async () => {
   }).then(async (zipContent) => {
     const zipfs = new ZipFS(zip);
     await zipfs.initializeFromData(zipContent);
-    const assetManager = new AssetManager(zipfs);
+    const assetManager = new AssetManager(new SerializationManager(zipfs));
     assetManager.fetchModel(scene, '/sponza/Sponza.gltf').then((info) => {
       message = '';
       function traverseModel(group: SceneNode, func: (node: SceneNode) => void, context?: any) {

@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import type { HttpRequest, TypedArray, VFS } from '@zephyr3d/base';
+import type { HttpRequest, TypedArray } from '@zephyr3d/base';
 import { isPowerOf2, nextPowerOf2, DWeakRef } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
@@ -16,6 +16,8 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
+import { Material } from '../material';
+import type { SerializationManager } from '../utility';
 
 /**
  * Options for texture fetching.
@@ -144,18 +146,28 @@ export class AssetManager {
     [url: string]: Promise<string>;
   };
   /** @internal */
+  private _materialDatas: {
+    [url: string]: Promise<Material>;
+  };
+  /** @internal */
+  private _materialInstanceDatas: {
+    [url: string]: Promise<Material>;
+  };
+  /** @internal */
   private _jsonDatas: {
     [url: string]: Promise<any>;
   };
   /** @internal */
-  private readonly _vfs: VFS;
+  private readonly _serializationManager: SerializationManager;
   /**
    * Creates an instance of AssetManager
    */
-  constructor(vfs?: VFS) {
-    this._vfs = vfs ?? getEngine().VFS;
+  constructor(serializationManager?: SerializationManager) {
+    this._serializationManager = serializationManager ?? getEngine().serializationManager;
     this._textures = {};
     this._models = {};
+    this._materialDatas = {};
+    this._materialInstanceDatas = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
@@ -164,7 +176,7 @@ export class AssetManager {
    * VFS used to read resources (files, URLs, virtual mounts).
    */
   get vfs() {
-    return this._vfs;
+    return this._serializationManager.vfs;
   }
   /**
    * Clear cached references and promises.
@@ -189,6 +201,20 @@ export class AssetManager {
       }
     }
     this._models = {};
+    for (const k in Object.keys(this._materialDatas)) {
+      const v = this._materialDatas[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._materialDatas = {};
+    for (const k in Object.keys(this._materialInstanceDatas)) {
+      const v = this._materialInstanceDatas[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._materialInstanceDatas = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
@@ -286,6 +312,15 @@ export class AssetManager {
     if (!P) {
       P = this.loadBinaryData(url, postProcess);
       this._binaryDatas[hash] = P;
+    }
+    return P;
+  }
+  async fetchMaterial<T extends Material = Material>(url: string, httpRequest?: HttpRequest): Promise<T> {
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._materialDatas[hash] as Promise<T>;
+    if (!P) {
+      P = this.loadMaterial<T>(url);
+      this._materialDatas[hash] = P;
     }
     return P;
   }
@@ -388,7 +423,7 @@ export class AssetManager {
    * @internal
    */
   async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
-    let text = (await this._vfs.readFile(url, { encoding: 'utf8' })) as string;
+    let text = (await this.vfs.readFile(url, { encoding: 'utf8' })) as string;
     if (postProcess) {
       try {
         text = postProcess(text);
@@ -409,7 +444,7 @@ export class AssetManager {
    * @internal
    */
   async loadJsonData(url: string, postProcess?: (json: any) => any): Promise<string> {
-    let json = JSON.parse((await this._vfs.readFile(url, { encoding: 'utf8' })) as string);
+    let json = JSON.parse((await this.vfs.readFile(url, { encoding: 'utf8' })) as string);
 
     if (postProcess) {
       try {
@@ -431,7 +466,7 @@ export class AssetManager {
    * @internal
    */
   async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
-    let data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
+    let data = (await this.vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     if (postProcess) {
       try {
         data = postProcess(data);
@@ -440,6 +475,21 @@ export class AssetManager {
       }
     }
     return data;
+  }
+  async loadMaterial<T extends Material = Material>(url: string): Promise<T> {
+    try {
+      const data = (await this.vfs.readFile(url, { encoding: 'utf8' })) as string;
+      const obj = await this._serializationManager.deserializeObject<T>(null, JSON.parse(data));
+      if (!(obj instanceof Material)) {
+        if (typeof (obj as any).dispose === 'function') {
+          (obj as any).dispose();
+        }
+        return null;
+      }
+      return obj;
+    } catch (err) {
+      throw new Error(`Load material failed: ${err}`);
+    }
   }
   /**
    * Load a texture directly from an ArrayBuffer or typed array.
@@ -493,14 +543,14 @@ export class AssetManager {
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
   ): Promise<BaseTexture> {
-    const data = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
-    mimeType = mimeType ?? this._vfs.guessMIMEType(url);
+    const data = (await this.vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
+    mimeType = mimeType ?? this.vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
       if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
-      tex.name = this._vfs.basename(url);
+      tex.name = this.vfs.basename(url);
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
@@ -588,7 +638,7 @@ export class AssetManager {
    * @internal
    */
   async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
-    const arrayBuffer = (await this._vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
+    const arrayBuffer = (await this.vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
     const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
     const data = new Blob([arrayBuffer], { type: mimeType });
     const filename = this.vfs.basename(url);
