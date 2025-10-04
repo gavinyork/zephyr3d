@@ -134,7 +134,6 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import type { Material } from '../../material';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -503,13 +502,6 @@ export class SerializationManager {
       this._allocated.set(data, id);
     }
     return data;
-  }
-  async fetchMaterial<T extends Material>(id: string): Promise<T> {
-    const material = await this._assetManager.fetchMaterial<T>(id);
-    if (material) {
-      this._allocated.set(material, id);
-    }
-    return material;
   }
   /**
    * Serialize an object to a JSON structure using registered class metadata.

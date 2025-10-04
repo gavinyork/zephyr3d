@@ -63,7 +63,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           this._info,
           '/assets',
-          'Scene (*.scn)|*.scn',
+          'Scene (*.zscn)|*.zscn',
           500,
           400
         ).then((value) => {
@@ -85,7 +85,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           this._info,
           '/assets',
-          'Scene (*.scn)|*.scn',
+          'Scene (*.zscn)|*.zscn',
           500,
           400
         ).then((value) => {

@@ -4,6 +4,7 @@ import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
+import type { IRUniformTexture, IRUniformValue } from '../utility/blueprint/material/ir';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import type { DrawContext } from '../render/drawable';
 
@@ -23,12 +24,18 @@ export class PBRBluePrintMaterial
   private static readonly FEATURE_VERTEX_UV = this.defineFeature();
   /** @internal */
   private _ir: MaterialBlueprintIR;
+  /** @internal */
+  private _uniformValues: IRUniformValue[];
+  /** @internal */
+  private _uniformTextures: IRUniformTexture[];
   /**
    * Creates an instance of PBRMetallicRoughnessMaterial class
    */
   constructor(ir: MaterialBlueprintIR) {
     super();
     this._ir = ir ?? new MaterialBlueprintIR(null, '');
+    this._uniformValues = ir.uniformValues;
+    this._uniformTextures = ir.uniformTextures;
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._ir.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._ir.behaviors.useVertexColor);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._ir.behaviors.useVertexUV);
@@ -41,6 +48,22 @@ export class PBRBluePrintMaterial
       this._ir = ir;
       this.optionChanged(true);
     }
+  }
+  /** @internal */
+  get uniformValues() {
+    return this._uniformValues;
+  }
+  set uniformValues(val: IRUniformValue[]) {
+    this._uniformValues = val;
+    this.uniformChanged();
+  }
+  /** @internal */
+  get uniformTextures() {
+    return this._uniformTextures;
+  }
+  set uniformTextures(val: IRUniformTexture[]) {
+    this._uniformTextures = val;
+    this.uniformChanged();
   }
   clone(): PBRBluePrintMaterial {
     const other = new PBRBluePrintMaterial(this._ir);
@@ -127,10 +150,10 @@ export class PBRBluePrintMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
-      for (const u of this._ir.uniformValues) {
+      for (const u of this._uniformValues) {
         bindGroup.setValue(u.name, u.value);
       }
-      for (const u of this._ir.uniformTextures) {
+      for (const u of this._uniformTextures) {
         bindGroup.setTexture(u.name, u.texture.get(), u.sampler.get());
       }
     }

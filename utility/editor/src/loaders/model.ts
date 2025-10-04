@@ -632,7 +632,7 @@ export class SharedModel extends Disposable {
     this._animations.push(animation);
   }
   /** preprocess */
-  async preprocess(): Promise<void> {
+  async preprocess(manager: SerializationManager): Promise<void> {
     for (let i = 0; i < this._imageList.length; i++) {
       const img = this._imageList[i];
       let ext: string = '';
@@ -656,7 +656,7 @@ export class SharedModel extends Disposable {
         }
       }
       if (ext) {
-        const path = this._vfs.join(this._pathname, `${this._name}_texture_${i}${ext}`);
+        const path = this._vfs.join(this._pathname, `${this._name}_texture${i}${ext}`);
         await this._vfs.writeFile(
           path,
           img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
@@ -666,6 +666,14 @@ export class SharedModel extends Disposable {
         img.data = null;
         img.mimeType = '';
       }
+    }
+    for (const k of Object.keys(this._materialList)) {
+      const path = this._vfs.join(this._pathname, `${this._name}_material${k}.zmtl`);
+      const m = await this.createMaterial(manager, this._materialList[k]);
+      const data = await manager.serializeObject(m);
+      const content = JSON.stringify({ type: 'Default', data }, null, '  ');
+      await this._vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+      m.dispose();
     }
   }
   async createSceneNode(

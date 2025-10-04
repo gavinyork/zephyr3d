@@ -822,11 +822,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   private fileDoubleClicked(file: FileInfo) {
     if (this._options.allowDblClickOpen) {
-      if (file.meta.path.toLowerCase().endsWith('.scn')) {
+      if (file.meta.path.toLowerCase().endsWith('.zscn')) {
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
         return;
-      } else if (file.meta.path.toLowerCase().endsWith('.mat')) {
+      } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
         const name = this._vfs.basename(file.meta.path).slice(0, -4);
         eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
       } else {
@@ -898,8 +898,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             ImGui.Separator();
             if (ImGui.MenuItem('Scene...')) {
               this.createNewFile('Create Scene', 'Scene Name', (path) => {
-                if (!path.toLowerCase().endsWith('.scn')) {
-                  path = `${path}.scn`;
+                if (!path.toLowerCase().endsWith('.zscn')) {
+                  path = `${path}.zscn`;
                 }
                 eventBus.dispatchEvent('action', 'NEW_DOC', path);
               });
@@ -907,8 +907,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             ImGui.Separator();
             if (ImGui.MenuItem('Material...')) {
               this.createNewFile('Create Material', 'Material Name', (path) => {
-                if (!path.toLowerCase().endsWith('.mat')) {
-                  path = `${path}.mat`;
+                if (!path.toLowerCase().endsWith('.zmtl')) {
+                  path = `${path}.zmtl`;
                 }
                 const name = path.slice(0, -4);
                 eventBus.dispatchEvent('edit_material', name, name, path);

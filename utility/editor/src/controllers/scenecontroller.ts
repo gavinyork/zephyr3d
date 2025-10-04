@@ -133,7 +133,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           ProjectService.VFS,
           this._editor.currentProject,
           '/assets',
-          'Scene (*.scn)|*.scn|All files (*)|*',
+          'Scene (*.zscn)|*.zscn|All files (*)|*',
           500,
           400
         );
@@ -153,7 +153,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
                   ProjectService.VFS,
                   this._editor.currentProject,
                   '/assets',
-                  'Scene (*.scn)|*.scn|All files (*)|*',
+                  'Scene (*.zscn)|*.zscn|All files (*)|*',
                   500,
                   400
                 );

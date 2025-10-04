@@ -1,11 +1,4 @@
-import type {
-  ModelInfo,
-  NodeCloneMethod,
-  Scene,
-  SceneNode,
-  ShapeOptionType,
-  ShapeType
-} from '@zephyr3d/scene';
+import type { NodeCloneMethod, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
 import { NodeHierarchy } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import {
@@ -22,6 +15,7 @@ import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { ProjectService } from '../core/services/project';
+import { importModel } from '../loaders/importer';
 
 const idNodeMap: Record<string, SceneNode> = {};
 
@@ -40,21 +34,23 @@ export class AddAssetCommand extends Command<SceneNode> {
     this._position = new Vector3(position);
   }
   async execute() {
-    let asset: ModelInfo = null;
+    let asset: SceneNode = null;
     try {
-      asset = await ProjectService.serializationManager.fetchModel(this._asset, this._scene);
+      const model = await importModel(this._asset);
+      asset = await model.createSceneNode(ProjectService.serializationManager, this._scene, false);
+      //asset = await ProjectService.serializationManager.fetchModel(this._asset, this._scene);
     } catch (err) {
       console.error(`Load asset failed: ${this._asset}: ${err}`);
     }
     if (asset) {
-      asset.group.position.set(this._position);
+      asset.position.set(this._position);
       if (this._nodeId) {
-        asset.group.persistentId = this._nodeId;
+        asset.persistentId = this._nodeId;
       } else {
-        this._nodeId = asset.group.persistentId;
+        this._nodeId = asset.persistentId;
       }
-      idNodeMap[asset.group.persistentId] = asset.group;
-      return asset.group;
+      idNodeMap[asset.persistentId] = asset;
+      return asset;
     } else {
       this._nodeId = '';
       return null;

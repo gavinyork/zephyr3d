@@ -343,11 +343,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
-            },
-            {
-              label: 'Graph Editor',
-              id: 'SHOW_GRAPH_EDITOR',
-              action: () => Dialog.editMaterial('Edit material', 'Out', 'test.mat')
             }
           ]
         }
@@ -1373,21 +1368,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (ProjectService.VFS.guessMIMEType(asset) === 'model/gltf-binary') {
       importModel(asset).then((sharedModel) => {
-        Promise.resolve() /*sharedModel.preprocess()*/
-          .then(() => {
-            sharedModel
-              .createSceneNode(ProjectService.serializationManager, this.controller.model.scene, false)
-              .then((node) => {
-                node.parent = null;
-                node.iterate((node) => {
-                  node.gpuPickable = false;
-                });
-                this._nodeToBePlaced.set(node);
-                this._assetToBeAdded = asset;
-                this._typeToBePlaced = 'asset';
-                this._ctorToBePlaced = null;
+        sharedModel.preprocess(ProjectService.serializationManager).then(() => {
+          sharedModel
+            .createSceneNode(ProjectService.serializationManager, this.controller.model.scene, false)
+            .then((node) => {
+              node.parent = null;
+              node.iterate((node) => {
+                node.gpuPickable = false;
               });
-          });
+              this._nodeToBePlaced.set(node);
+              this._assetToBeAdded = asset;
+              this._typeToBePlaced = 'asset';
+              this._ctorToBePlaced = null;
+            });
+        });
       });
     }
     /*

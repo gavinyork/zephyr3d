@@ -273,7 +273,7 @@ export class NodeEditor extends Observable<{
   }
   public saveState(): NodeEditorState {
     const nodes = [...this.nodes.values()].map((node) => {
-      const impl = getEngine().serializationManager.serializeObject(node.impl);
+      const impl = getEngine().serializationManager.serializeObject(node.impl) as IGraphNode;
       return {
         id: node.id,
         position: [node.position.x, node.position.y],

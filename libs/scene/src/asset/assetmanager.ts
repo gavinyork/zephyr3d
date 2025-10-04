@@ -1,6 +1,6 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray } from '@zephyr3d/base';
-import { isPowerOf2, nextPowerOf2, DWeakRef } from '@zephyr3d/base';
+import { isPowerOf2, nextPowerOf2, DWeakRef, DRef } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -11,13 +11,23 @@ import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { AnimationSet } from '../animation/animationset';
-import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
+import type { BaseTexture, SamplerOptions, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material } from '../material';
-import type { SerializationManager } from '../utility';
+import { Material, PBRBluePrintMaterial } from '../material';
+import type {
+  BlueprintDAG,
+  GraphStructure,
+  IGraphNode,
+  IRUniformTexture,
+  IRUniformValue,
+  NodeConnection,
+  SerializationManager
+} from '../utility';
+import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import type { Skeleton } from '../animation';
 
 /**
  * Options for texture fetching.
@@ -146,12 +156,16 @@ export class AssetManager {
     [url: string]: Promise<string>;
   };
   /** @internal */
-  private _materialDatas: {
-    [url: string]: Promise<Material>;
+  private _bluePrints: {
+    [url: string]: Promise<MaterialBlueprintIR>;
   };
   /** @internal */
-  private _materialInstanceDatas: {
-    [url: string]: Promise<Material>;
+  private _materials: {
+    [url: string]: { [uuid: string]: Promise<Material> | DWeakRef<Material> };
+  };
+  /** @internal */
+  private _skeletons: {
+    [url: string]: Promise<Skeleton> | DWeakRef<Skeleton>;
   };
   /** @internal */
   private _jsonDatas: {
@@ -166,8 +180,8 @@ export class AssetManager {
     this._serializationManager = serializationManager ?? getEngine().serializationManager;
     this._textures = {};
     this._models = {};
-    this._materialDatas = {};
-    this._materialInstanceDatas = {};
+    this._materials = {};
+    this._bluePrints = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
@@ -201,20 +215,20 @@ export class AssetManager {
       }
     }
     this._models = {};
-    for (const k in Object.keys(this._materialDatas)) {
-      const v = this._materialDatas[k];
+    for (const k in Object.keys(this._materials)) {
+      const v = this._materials[k];
       if (v instanceof DWeakRef) {
         v.dispose();
       }
     }
-    this._materialDatas = {};
-    for (const k in Object.keys(this._materialInstanceDatas)) {
-      const v = this._materialInstanceDatas[k];
+    this._materials = {};
+    for (const k in Object.keys(this._skeletons)) {
+      const v = this._skeletons[k];
       if (v instanceof DWeakRef) {
         v.dispose();
       }
     }
-    this._materialInstanceDatas = {};
+    this._skeletons = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
@@ -315,14 +329,40 @@ export class AssetManager {
     }
     return P;
   }
-  async fetchMaterial<T extends Material = Material>(url: string, httpRequest?: HttpRequest): Promise<T> {
-    const hash = httpRequest?.urlResolver?.(url) ?? url;
-    let P = this._materialDatas[hash] as Promise<T>;
+  async fetchBluePrint(url: string): Promise<MaterialBlueprintIR> {
+    const hash = url;
+    let P = this._bluePrints[hash];
     if (!P) {
-      P = this.loadMaterial<T>(url);
-      this._materialDatas[hash] = P;
+      P = this.loadBluePrint(url);
+      this._bluePrints[hash] = P;
     }
     return P;
+  }
+  /**
+   * Fetch a material resource.
+   *
+   * @typeParam T - Expected concrete material type.
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded material.
+   */
+  async fetchMaterial<T extends Material = Material>(url: string, uuid: string): Promise<T> {
+    const hash = url;
+    if (!this._materials[hash]) {
+      this._materials[hash] = {};
+    }
+    const cache = this._materials[hash];
+    let P = cache[uuid] as Promise<T> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+      return P.get();
+    } else if (!P || P instanceof DWeakRef) {
+      P = this.loadMaterial<T>(url);
+      cache[uuid] = P;
+    }
+    const material = await P;
+    if (cache[uuid] instanceof Promise) {
+      cache[uuid] = new DWeakRef<Material>(material);
+    }
+    return material;
   }
   /**
    * Fetch a texture resource via registered loaders.
@@ -476,19 +516,230 @@ export class AssetManager {
     }
     return data;
   }
+  /**
+   * Load a material.
+   *
+   * - Does not use or modify the internal cache; use fetchMaterial for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded material.
+   * @internal
+   */
   async loadMaterial<T extends Material = Material>(url: string): Promise<T> {
     try {
       const data = (await this.vfs.readFile(url, { encoding: 'utf8' })) as string;
-      const obj = await this._serializationManager.deserializeObject<T>(null, JSON.parse(data));
-      if (!(obj instanceof Material)) {
-        if (typeof (obj as any).dispose === 'function') {
-          (obj as any).dispose();
+      const content = JSON.parse(data) as { type: string; data: any };
+      if (content.type === 'PBRBluePrintMaterial') {
+        const ir = await this.fetchBluePrint(content.data.IR as string);
+        const material = new PBRBluePrintMaterial(ir);
+        const uniformValues: IRUniformValue[] = (
+          content.data.uniformValues as { name: string; value: number[] }[]
+        ).map((v) => ({
+          node: null,
+          name: v.name,
+          value: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
+        }));
+        const uniformTextures: IRUniformTexture[] = [];
+        const textures = content.data.uniformTextures as {
+          name: string;
+          id: number;
+          texture: string;
+          wrapS: string;
+          wrapT: string;
+          minFilter: string;
+          magFilter: string;
+          mipFilter: string;
+        }[];
+        for (const v of textures) {
+          uniformTextures.push({
+            node: null,
+            name: v.name,
+            texture: new DRef(await this.fetchTexture(v.texture)),
+            sampler: new DRef(
+              getDevice().createSampler({
+                addressU: v.wrapS as TextureAddressMode,
+                addressV: v.wrapT as TextureAddressMode,
+                minFilter: v.minFilter as TextureFilterMode,
+                magFilter: v.magFilter as TextureFilterMode,
+                mipFilter: v.mipFilter as TextureFilterMode
+              })
+            )
+          });
         }
-        return null;
+        material.uniformValues = uniformValues;
+        material.uniformTextures = uniformTextures;
+        return material as unknown as T;
+      } else {
+        const obj = await this._serializationManager.deserializeObject<T>(null, JSON.parse(content.data));
+        if (!(obj instanceof Material)) {
+          if (typeof (obj as any).dispose === 'function') {
+            (obj as any).dispose();
+          }
+          return null;
+        }
+        return obj;
       }
-      return obj;
     } catch (err) {
       throw new Error(`Load material failed: ${err}`);
+    }
+  }
+  private rebuildGraphStructure(
+    nodes: Record<number, IGraphNode>,
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): GraphStructure {
+    const gs: GraphStructure = {
+      outgoing: {},
+      incoming: {}
+    };
+    // Initialize adjacency lists
+    for (const nodeId in nodes) {
+      gs.outgoing[nodeId] = [];
+      gs.incoming[nodeId] = [];
+    }
+    // Fill with links
+    for (const link of links) {
+      const outConnection: NodeConnection = {
+        targetNodeId: link.endNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      const inConnection: NodeConnection = {
+        targetNodeId: link.startNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      gs.outgoing[link.startNodeId]?.push(outConnection);
+      gs.incoming[link.endNodeId]?.push(inConnection);
+    }
+    return gs;
+  }
+  private collectReachableBackward(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): Set<number> {
+    const reachable = new Set<number>();
+    const q: number[] = [];
+
+    for (const r of roots) {
+      if (nodes[r]) {
+        reachable.add(r);
+        q.push(r);
+      }
+    }
+    while (q.length > 0) {
+      const u = q.shift()!;
+      const ins = gs.incoming[u] || [];
+      for (const conn of ins) {
+        const v = conn.targetNodeId; // 前驱
+        if (!reachable.has(v)) {
+          reachable.add(v);
+          q.push(v);
+        }
+      }
+    }
+    return reachable;
+  }
+  private getReverseTopologicalOrderFromRoots(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): {
+    order: number[];
+    levels: number[][];
+  } {
+    if (!roots || roots.length === 0) {
+      return { order: [], levels: [] };
+    }
+    const sub = this.collectReachableBackward(gs, nodes, roots);
+    if (sub.size === 0) {
+      return { order: [], levels: [] };
+    }
+    const outDegree = new Map<number, number>();
+    for (const id of sub) {
+      const outs = (gs.outgoing[id] || []).filter((c) => sub.has(c.targetNodeId));
+      outDegree.set(id, outs.length);
+    }
+    let currentLevel = Array.from(outDegree.entries())
+      .filter(([, deg]) => deg === 0)
+      .map(([id]) => id);
+    const result: number[] = [];
+    const levels: number[][] = [];
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+      const nextLevel: number[] = [];
+      for (const u of currentLevel) {
+        const ins = gs.incoming[u] || [];
+        for (const conn of ins) {
+          const v = conn.targetNodeId; // 前驱
+          if (!sub.has(v)) {
+            continue;
+          }
+          const deg = outDegree.get(v)! - 1;
+          outDegree.set(v, deg);
+          if (deg === 0) {
+            nextLevel.push(v);
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+    if (result.length !== sub.size) {
+      console.warn('Subgraph contains cycles (from given roots).');
+      return null;
+    }
+    return { order: result, levels };
+  }
+  createBluePrintDAG(
+    nodeMap: Record<number, IGraphNode>,
+    roots: number[],
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): BlueprintDAG {
+    const gs = this.rebuildGraphStructure(nodeMap, links);
+    for (const k in gs.incoming) {
+      const node = nodeMap[k];
+      for (const conn of gs.incoming[k]) {
+        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        input.inputNode = nodeMap[conn.targetNodeId];
+        input.inputId = conn.startSlotId;
+      }
+    }
+    return {
+      graph: gs,
+      nodeMap,
+      roots,
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+    };
+  }
+  async loadBluePrint(path: string) {
+    try {
+      const content = (await this.vfs.readFile(path, { encoding: 'utf8' })) as string;
+      const state = JSON.parse(content) as {
+        nodes: {
+          id: number;
+          locked: boolean;
+          node: object;
+        }[];
+        links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+      };
+      const nodeMap: Record<number, IGraphNode> = {};
+      const roots: number[] = [];
+      for (const node of state.nodes) {
+        const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
+        nodeMap[node.id] = impl;
+        if (node.locked) {
+          roots.push(node.id);
+        }
+      }
+      const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
+      return new MaterialBlueprintIR(dag, path);
+    } catch (err) {
+      const msg = `Load material failed: ${err}`;
+      console.error(msg);
+      return null;
     }
   }
   /**

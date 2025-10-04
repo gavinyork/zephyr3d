@@ -1,4 +1,10 @@
-import type { BlueprintDAG, IGraphNode } from '@zephyr3d/scene';
+import type {
+  BlueprintDAG,
+  ConstantTexture2DArrayNode,
+  ConstantTexture2DNode,
+  ConstantTextureCubeNode,
+  IGraphNode
+} from '@zephyr3d/scene';
 import {
   DirectionalLight,
   getDevice,
@@ -15,7 +21,7 @@ import { getConstantNodeCategories } from '../nodes/constants';
 import { getMathNodeCategories } from '../nodes/math';
 import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
-import { DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
@@ -73,24 +79,98 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async save(path: string) {
     if (path) {
+      const VFS = ProjectService.VFS;
+      const bpPath = VFS.normalizePath(
+        VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
+      );
+      // Save blueprint
       const state = this.nodeEditor.saveState();
       try {
-        await ProjectService.VFS.writeFile(path, JSON.stringify(state, null, '  '), {
+        await VFS.writeFile(bpPath, JSON.stringify({ type: 'PBRMaterial', state }, null, '  '), {
           encoding: 'utf8',
           create: true
         });
-        this._version = this.nodeEditor.version;
       } catch (err) {
         const msg = `Save material failed: ${err}`;
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
+      // Save material
+      const ir = this.createIR();
+      const content: {
+        type: string;
+        data: {
+          IR: string;
+          uniformValues: {
+            name: string;
+            id: number;
+            value: number[];
+          }[];
+          uniformTextures: {
+            name: string;
+            id: number;
+            texture: string;
+            wrapS: string;
+            wrapT: string;
+            minFilter: string;
+            magFilter: string;
+            mipFilter: string;
+          }[];
+        };
+      } = {
+        type: 'PBRBluePrintMaterial',
+        data: {
+          IR: bpPath,
+          uniformValues: [],
+          uniformTextures: []
+        }
+      };
+      for (const u of ir.uniformValues) {
+        const v = [...this.nodeEditor.nodes.values()].find((v) => v.impl === u.node);
+        ASSERT(!!v, 'Uniform node not found');
+        content.data.uniformValues.push({
+          name: u.name,
+          id: v.id,
+          value: typeof u.value === 'number' ? [u.value] : [...u.value]
+        });
+      }
+      for (const u of ir.uniformTextures) {
+        const texnode = u.node as
+          | ConstantTexture2DNode
+          | ConstantTexture2DArrayNode
+          | ConstantTextureCubeNode;
+        const v = [...this.nodeEditor.nodes.values()].find((v) => v.impl === u.node);
+        ASSERT(!!v, 'Uniform node not found');
+        content.data.uniformTextures.push({
+          name: u.name,
+          id: v.id,
+          texture: texnode.textureId,
+          wrapS: texnode.addressU,
+          wrapT: texnode.addressV,
+          minFilter: texnode.filterMin,
+          magFilter: texnode.filterMag,
+          mipFilter: texnode.filterMip
+        });
+      }
+      try {
+        await VFS.writeFile(path, JSON.stringify(content, null, '  '), {
+          encoding: 'utf8',
+          create: true
+        });
+      } catch (err) {
+        const msg = `Save material failed: ${err}`;
+        console.error(msg);
+        Dialog.messageBox('Error', msg);
+      }
+      this._version = this.nodeEditor.version;
     }
   }
   async load(path: string) {
     try {
       const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
-      const state = JSON.parse(content) as NodeEditorState;
+      const data = JSON.parse(content);
+      ASSERT(data.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
+      const state = data.state as NodeEditorState;
       await this.nodeEditor.loadState(state);
       this._version = this.nodeEditor.version;
       console.log(this.createDAG());
@@ -100,6 +180,24 @@ export class PBRMaterialEditor extends GraphEditor {
       console.error(msg);
       Dialog.messageBox('Error', msg);
     }
+  }
+  createIR() {
+    const dag = this.createDAG();
+    for (const [, v] of this.nodeEditor.nodes) {
+      v.impl.reset();
+    }
+    for (const i of dag.order) {
+      const node = this.nodeEditor.nodes.get(i);
+      node.impl.check();
+      if (node.impl.error) {
+        return null;
+      }
+    }
+    const ir = new MaterialBlueprintIR(dag, randomUUID());
+    if (!ir.ok) {
+      return null;
+    }
+    return ir;
   }
   createDAG(): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};
@@ -165,6 +263,8 @@ export class PBRMaterialEditor extends GraphEditor {
     );
   }
   private applyPreviewMaterial() {
+    const ir = this.createIR();
+    /*
     const dag = this.createDAG();
     for (const [, v] of this.nodeEditor.nodes) {
       v.impl.reset();
@@ -185,14 +285,14 @@ export class PBRMaterialEditor extends GraphEditor {
         error = true;
       }
     }
-    if (error) {
+    */
+    if (!ir) {
       this._previewMesh.get().material = this._defaultMaterial.get();
     } else {
-      const ir = new MaterialBlueprintIR(dag, randomUUID());
       const uniformNames: Set<string> = new Set();
       for (const u of [...ir.uniformValues, ...ir.uniformTextures]) {
         if (uniformNames.has(u.name)) {
-          for (const i of dag.order) {
+          for (const i of ir.DAG.order) {
             const node = this.nodeEditor.nodes.get(i);
             if (node.impl === u.node) {
               node.impl.error = `Duplicated uniform name: ${u.name}`;
