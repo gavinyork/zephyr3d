@@ -14,6 +14,7 @@ import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
 import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
+import { TreeViewData, TreeView } from './treeview';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -59,6 +60,111 @@ type VFSRendererOptions = {
   multiSelect?: boolean;
 };
 
+class VFSDirData extends TreeViewData<DirectoryInfo> {
+  private _root: DirectoryInfo;
+  private _projectName: string;
+  constructor(root: DirectoryInfo, projectName: string) {
+    super();
+    this._root = root;
+    this._projectName = projectName;
+  }
+  getRoot(): DirectoryInfo {
+    return this._root;
+  }
+  getChildren(parent: DirectoryInfo): DirectoryInfo[] {
+    return parent?.subDir ?? [];
+  }
+  getParent(node: DirectoryInfo): DirectoryInfo {
+    return node.parent;
+  }
+  getId(node: DirectoryInfo): string {
+    return node.path;
+  }
+  getNodeName(node: DirectoryInfo): string {
+    const name = node.path.slice(node.path.lastIndexOf('/') + 1);
+    const emoji = '📁';
+    const id = node.path;
+    return convertEmojiString(`${emoji}${node === this._root ? this._projectName : name}##${id}`);
+  }
+  getDragSourcePayloadType(): string {
+    return '';
+  }
+  getDragSourcePayload(): unknown {
+    return null;
+  }
+  getDragTargetPayloadType(): string {
+    return 'ASSET';
+  }
+}
+
+export class DirTreeView extends TreeView<{}, DirectoryInfo> {
+  private _root: DirectoryInfo;
+  private _renderer: VFSRenderer;
+  constructor(renderer: VFSRenderer, root: DirectoryInfo, projectName: string) {
+    super('###VFSNavigator', new VFSDirData(root, projectName));
+    this._root = root;
+    this._renderer = renderer;
+  }
+  protected onGetContextMenuId(node: DirectoryInfo): string {
+    return this._renderer.VFS.readOnly ? '' : `vfs_${node.path}`;
+  }
+  protected onNodeDeselected(): void {
+    this._renderer.refreshFileView();
+  }
+  protected onNodeSelected(): void {
+    this._renderer.refreshFileView();
+  }
+  protected onDrawContextMenu(dir: DirectoryInfo) {
+    if (ImGui.BeginMenu('Create New##VFSCreate')) {
+      if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
+        DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
+          if (name) {
+            if (/[\\/?*]/.test(name)) {
+              DlgMessage.messageBox('Error', 'Invalid folder name');
+            } else {
+              this._renderer.VFS.readDirectory(dir.path, { includeHidden: true, recursive: false })
+                .then((items) => {
+                  if (items.find((item) => item.type === 'directory' && item.name === name)) {
+                    DlgMessage.messageBox('Error', 'A folder with same name already exists');
+                  } else {
+                    this._renderer.VFS.makeDirectory(this._renderer.VFS.join(dir.path, name), false).catch(
+                      (err) => {
+                        DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
+                      }
+                    );
+                  }
+                })
+                .catch((err) => {
+                  DlgMessage.messageBox('Error', `Read parent path failed: ${err}`);
+                });
+            }
+          }
+        });
+      }
+      ImGui.EndMenu();
+    }
+    if (dir !== this._root && dir.path !== '/assets' && dir.path !== '/src') {
+      if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
+        this._renderer.VFS.deleteDirectory(dir.path, true)
+          .then(() => {
+            if (dir === this.selectedNode) {
+              this.selectNode(null);
+            }
+          })
+          .catch((err) => {
+            DlgMessage.messageBox('Error', `Delete directory failed: ${err}`);
+          });
+      }
+      if (ImGui.MenuItem('Rename##VFSRenameFolder')) {
+        this._renderer.renameItem(dir);
+      }
+    }
+  }
+  protected onDragDrop(node: DirectoryInfo, _type: string, payload: unknown) {
+    this._renderer.handleFileMoveOrCopy(node.path, payload as { isDir: boolean; path: string }[]);
+  }
+}
+
 export class VFSRenderer extends makeObservable(Disposable)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
   file_dbl_clicked: [file: FileInfo];
@@ -71,8 +177,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private readonly _vfs: VFS;
   private readonly _project: ProjectInfo;
   private readonly _treePanel: DockPannel;
+  private _nav: DirTreeView;
   private _filesystem: DirectoryInfo;
-  private _selectedDir: DirectoryInfo;
   private _fileFilter: string[];
   private _currentDirContent: (FileInfo | DirectoryInfo)[] = [];
   private _viewMode: ViewMode = ViewMode.List;
@@ -100,7 +206,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._project = project;
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
-    this._selectedDir = null;
     this._fileFilter = fileFilter?.slice() ?? [];
     this._options = { rootDir: '/', allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
     this.loadFileSystem();
@@ -125,7 +230,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     });
   }
   get selectedDir() {
-    return this._selectedDir ?? null;
+    return this._nav?.selectedNode ?? null;
   }
   get selectedFiles() {
     return [...this._selectedItems].filter((item) => 'meta' in item);
@@ -152,7 +257,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           this.renderNavigationDropHighlight();
         }
         if (this._filesystem) {
-          this.renderDir(this._filesystem);
+          this._nav.render(false);
+          //this.renderDir(this._filesystem);
         }
       }
       this._treePanel.endChild();
@@ -227,7 +333,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
 
     ImGui.BeginChild('##VFSContentInnerContainer', new ImGui.ImVec2(-1, -1), false);
-    if (this._selectedDir) {
+    if (this.selectedDir) {
       switch (this._viewMode) {
         case ViewMode.List:
           this.renderListView();
@@ -284,7 +390,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (this._isDragOverNavigation) {
       return this._filesystem;
     } else if (this._isDragOverContent) {
-      return this._selectedDir;
+      return this.selectedDir;
     }
     return null;
   }
@@ -322,11 +428,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     DlgMessage.messageBox('Properties', info);
   }
   private renderToolbar() {
-    const canGoUp = this._selectedDir && this._selectedDir.parent;
+    const canGoUp = this.selectedDir && this.selectedDir.parent;
     if (canGoUp) {
       if (ImGui.Button('⬆##DirUP')) {
-        this._selectedDir.parent.open = true;
-        this.selectDir(this._selectedDir.parent);
+        this.selectedDir.parent.open = true;
+        this._nav.selectNode(this.selectedDir.parent);
+        //this.selectDir(this._selectedDir.parent);
       }
     } else {
       ImGui.PushStyleVar(ImGui.StyleVar.Alpha, 0.5);
@@ -706,7 +813,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private handleItemDoubleClick(item: FileInfo | DirectoryInfo) {
     const isDir = 'subDir' in item;
     if (isDir) {
-      this.selectDir(item as DirectoryInfo);
+      this._nav.selectNode(item as DirectoryInfo);
       item.open = true;
     } else {
       this.fileDoubleClicked(item);
@@ -787,7 +894,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           if (ImGui.MenuItem('Folder...')) {
             this.createNewFolder();
           }
-          if (this._vfs.isParentOf('/assets', this._selectedDir.path)) {
+          if (this._vfs.isParentOf('/assets', this.selectedDir.path)) {
             ImGui.Separator();
             if (ImGui.MenuItem('Scene...')) {
               this.createNewFile('Create Scene', 'Scene Name', (path) => {
@@ -819,7 +926,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             ImGui.Separator();
             if (ImGui.BeginMenu('Texture')) {
               if (ImGui.MenuItem('Ramp Texture...')) {
-                this.createRampTexture(this._selectedDir.path);
+                this.createRampTexture(this.selectedDir.path);
               }
               ImGui.EndMenu();
             }
@@ -1043,7 +1150,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   private createNewFolder() {
-    if (!this._selectedDir) {
+    if (!this.selectedDir) {
       return;
     }
 
@@ -1052,7 +1159,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         if (/[\\/?*]/.test(name)) {
           DlgMessage.messageBox('Error', 'Invalid folder name');
         } else {
-          const newPath = this._vfs.join(this._selectedDir.path, name);
+          const newPath = this._vfs.join(this.selectedDir.path, name);
           this._vfs.makeDirectory(newPath, false).catch((err) => {
             DlgMessage.messageBox('Error', `Create folder failed: ${err}`);
           });
@@ -1080,7 +1187,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     defaultName: string,
     content: (path: string) => void | Promise<void>
   ) {
-    if (!this._selectedDir) {
+    if (!this.selectedDir) {
       return;
     }
     const name = await DlgPromptName.promptName(title, 'Name', defaultName);
@@ -1088,7 +1195,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (/[\\/?*]/.test(name)) {
         DlgMessage.messageBox('Error', 'Invalid file name');
       } else {
-        const newPath = this._vfs.join(this._selectedDir.path, name);
+        const newPath = this._vfs.join(this.selectedDir.path, name);
         const exists = await this._vfs.exists(newPath);
         if (exists) {
           const stat = await this._vfs.stat(newPath);
@@ -1141,7 +1248,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       });
   }
 
-  private renameItem(item: DirectoryInfo | FileInfo) {
+  renameItem(item: DirectoryInfo | FileInfo) {
     const isDir = 'subDir' in item;
     const currentName = isDir
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
@@ -1168,20 +1275,17 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this.renameItem(Array.from(this._selectedItems)[0]);
   }
 
-  selectDir(dir: DirectoryInfo) {
-    if (dir !== this._selectedDir) {
-      this._selectedDir = dir;
-      this.refreshFileView();
-    }
+  selectDir() {
+    this.refreshFileView();
   }
 
   refreshFileView() {
-    if (!this._selectedDir) {
+    if (!this.selectedDir) {
       this._currentDirContent = [];
       return;
     }
 
-    this._currentDirContent = [...this._selectedDir.subDir, ...this._selectedDir.files];
+    this._currentDirContent = [...this.selectedDir.subDir, ...this.selectedDir.files];
     this.sortContent();
     if (this._selectedItems.size > 0) {
       this._selectedItems.clear();
@@ -1197,20 +1301,20 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       `${emoji}${dir === this._filesystem ? this._project.name : name}##${id}`
     );
     let flags = VFSRenderer.baseFlags;
-    if (this._selectedDir === dir) {
+    if (this.selectedDir === dir) {
       flags |= ImGui.TreeNodeFlags.Selected;
     }
     if (dir.subDir.length === 0) {
       flags |= ImGui.TreeNodeFlags.Leaf;
     }
-    const forceExpanded = this._selectedDir ? this.isParentOf(dir, this._selectedDir) : false;
+    const forceExpanded = this.selectedDir ? this.isParentOf(dir, this.selectedDir) : false;
     if (forceExpanded) {
       ImGui.SetNextItemOpen(true);
     }
     dir.open = ImGui.TreeNodeEx(label, flags);
     this.acceptFileMoveOrCopy(dir.path);
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-      this.selectDir(dir);
+      this._nav.selectNode(dir);
     }
     if (!this._vfs.readOnly) {
       if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
@@ -1249,8 +1353,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             this._vfs
               .deleteDirectory(dir.path, true)
               .then(() => {
-                if (dir === this._selectedDir) {
-                  this.selectDir(null);
+                if (dir === this.selectedDir) {
+                  this._nav.selectNode(null);
                 }
               })
               .catch((err) => {
@@ -1278,12 +1382,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     const rootDir = await this.loadDirectoryInfo(this._options.rootDir);
     this._filesystem = rootDir;
+    this._nav = new DirTreeView(this, this._filesystem, this._project.name);
 
-    if (this._selectedDir) {
-      const newSelectedDir = this.findDirectoryByPath(this._filesystem, this._selectedDir.path);
-      this.selectDir(newSelectedDir ?? null);
+    if (this.selectedDir) {
+      const newSelectedDir = this.findDirectoryByPath(this._filesystem, this.selectedDir.path);
+      this._nav.selectNode(newSelectedDir ?? null);
     } else {
-      this.selectDir(this._filesystem);
+      this._nav.selectNode(this._filesystem);
     }
   }
 
@@ -1399,7 +1504,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   emitSelectedChanged() {
-    this.dispatchEvent('selection_changed', this._selectedDir ?? null, this.selectedFiles);
+    this.dispatchEvent('selection_changed', this.selectedDir ?? null, this.selectedFiles);
   }
 
   onVFSChanged(type: 'created' | 'deleted' | 'moved' | 'modified') {
@@ -1428,7 +1533,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       ImGui.EndDragDropTarget();
     }
   }
-  private async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
+  async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
     const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
     if (dlg) {

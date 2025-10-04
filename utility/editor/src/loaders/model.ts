@@ -760,11 +760,6 @@ export class SharedModel extends Disposable {
         }
       }
     }
-    group.iterate((child) => {
-      if (child !== group) {
-        child.sealed = true;
-      }
-    });
     return group;
   }
   protected onDispose() {
