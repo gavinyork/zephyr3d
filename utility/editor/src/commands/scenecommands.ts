@@ -173,13 +173,11 @@ export class AddShapeCommand extends Command<Mesh> {
 }
 
 export class NodeDeleteCommand extends Command {
-  private readonly _scene: any;
   private _archive: any;
   private readonly _nodeId: string;
   private readonly _parentId: string;
   constructor(node: SceneNode) {
     super('Delete node');
-    this._scene = node.scene;
     this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
     this._parentId = node.parent.persistentId;
