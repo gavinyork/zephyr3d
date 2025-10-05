@@ -69,7 +69,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "@types/node": "^22.12.0",
     "@zephyr3d/device": "workspace:*",
     "@zephyr3d/base": "workspace:*",

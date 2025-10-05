@@ -15,7 +15,7 @@ import { Command } from '../core/command';
 import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { ProjectService } from '../core/services/project';
-import { importModel } from '../loaders/importer';
+//import { importModel } from '../loaders/importer';
 
 const idNodeMap: Record<string, SceneNode> = {};
 
@@ -36,9 +36,9 @@ export class AddAssetCommand extends Command<SceneNode> {
   async execute() {
     let asset: SceneNode = null;
     try {
-      const model = await importModel(this._asset);
-      asset = await model.createSceneNode(ProjectService.serializationManager, this._scene, false);
-      //asset = await ProjectService.serializationManager.fetchModel(this._asset, this._scene);
+      //const model = await importModel(this._asset);
+      //asset = await model.createSceneNode(ProjectService.serializationManager, this._scene, false);
+      asset = (await ProjectService.serializationManager.fetchModel(this._asset, this._scene)).group;
     } catch (err) {
       console.error(`Load asset failed: ${this._asset}: ${err}`);
     }

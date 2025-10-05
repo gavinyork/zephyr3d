@@ -67,7 +67,7 @@
     "@types/upng-js": "^2.1.5",
     "@types/streamsaver": "^2.0.5",
     "@types/draco3d": "^1.4.9",
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "idb": "^8.0.1",
     "@zip.js/zip.js": "^2.7.54",
     "upng-js": "^2.1.0",

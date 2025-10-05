@@ -134,6 +134,8 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
+import type { Material } from '../../material';
+import type { Primitive } from '../../render';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -180,7 +182,7 @@ const defaultValues: Record<PropertyType, any> = {
  */
 export class SerializationManager {
   private readonly _classMap: Map<GenericConstructor, SerializableClass>;
-  private readonly _vfs: VFS;
+  private _vfs: VFS;
   private _propMap: Record<string, PropertyAccessor>;
   private readonly _propNameMap: Map<PropertyAccessor, string>;
   private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
@@ -330,8 +332,11 @@ export class SerializationManager {
    * @remarks
    * Used by asset fetchers and scene save/load operations.
    */
-  get vfs() {
+  get VFS() {
     return this._vfs;
+  }
+  set VFS(vfs: VFS) {
+    this._vfs = vfs;
   }
   /**
    * Wethether editor mode is enabled
@@ -497,7 +502,7 @@ export class SerializationManager {
    * @returns A Promise that resolves to the binary content, or `null` if not found.
    */
   async fetchBinary(id: string) {
-    const data = await this.doFetchBinary(id);
+    const data = await this._assetManager.fetchBinaryData(id);
     if (data) {
       this._allocated.set(data, id);
     }
@@ -586,18 +591,6 @@ export class SerializationManager {
     }
     return obj;
   }
-  protected async doFetchBinary(path: string) {
-    return await this._assetManager.fetchBinaryData(path, null);
-  }
-  protected async doFetchModel(path: string, scene: Scene, options?: ModelFetchOptions) {
-    return await this._assetManager.fetchModel(scene, path, options);
-  }
-  protected async doFetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(
-    path: string,
-    options?: TextureFetchOptions<T>
-  ) {
-    return await this._assetManager.fetchTexture<T>(path, options);
-  }
   /**
    * Load a model by ID and track the allocation for reverse lookup.
    *
@@ -608,7 +601,7 @@ export class SerializationManager {
    * @returns A Promise resolving to the loaded model object, or `null` if failed.
    */
   async fetchModel(id: string, scene: Scene, options?: ModelFetchOptions) {
-    const model = await this.doFetchModel(id, scene, options);
+    const model = await this._assetManager.fetchModel(scene, id, options);
     if (model) {
       this._allocated.set(model.group, id);
     }
@@ -649,11 +642,39 @@ export class SerializationManager {
     id: string,
     options?: TextureFetchOptions<T>
   ) {
-    const texture = await this.doFetchTexture(id, options);
+    const texture = await this._assetManager.fetchTexture(id, options);
     if (texture) {
       this._allocated.set(texture, id);
     }
     return texture;
+  }
+  /**
+   * Load a material by ID and track the allocation for reverse lookup.
+   *
+   * @param id - Material identifier or path.
+   *
+   * @returns A Promise resolving to the loaded material, or `null` if failed.
+   */
+  async fetchMaterial<T extends Material = Material>(id: string) {
+    const material = await this._assetManager.fetchMaterial<T>(id);
+    if (material) {
+      this._allocated.set(material, id);
+    }
+    return material;
+  }
+  /**
+   * Load a primitive by ID and track the allocation for reverse lookup.
+   *
+   * @param id - Primitive identifier or path.
+   *
+   * @returns A Promise resolving to the loaded primitive, or `null` if failed.
+   */
+  async fetchPrimitive<T extends Primitive = Primitive>(id: string) {
+    const primitive = await this._assetManager.fetchPrimitive<T>(id);
+    if (primitive) {
+      this._allocated.set(primitive, id);
+    }
+    return primitive;
   }
   /**
    * Load a scene from a JSON file via VFS.
@@ -1100,7 +1121,7 @@ export class SerializationManager {
               (async () => {
                 console.log(k);
                 const buffer = (await resource) as ArrayBuffer;
-                await this.vfs.writeFile(relativePath, buffer, {
+                await this.VFS.writeFile(relativePath, buffer, {
                   encoding: 'binary',
                   create: true
                 });

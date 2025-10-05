@@ -769,7 +769,7 @@ export function getPBRBluePrintMaterialClass(manager: SerializationManager): Ser
           },
           async set(this: PBRBluePrintMaterial, value) {
             try {
-              const path = manager.vfs.normalizePath(value.str[0]);
+              const path = manager.VFS.normalizePath(value.str[0]);
               const dag = await manager.loadBluePrint(path);
               const IR = new MaterialBlueprintIR(dag, path);
               this.IR = IR;

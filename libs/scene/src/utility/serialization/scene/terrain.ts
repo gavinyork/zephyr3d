@@ -329,7 +329,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const path = value.str[0];
-              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+              const data = (await manager.VFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load height map failed');
                 return;
@@ -366,7 +366,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const path = value.str[0];
-              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+              const data = (await manager.VFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load grass data failed');
                 return;
@@ -415,7 +415,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           async set(this: ClipmapTerrain, value) {
             if (value.str[0]) {
               const path = value.str[0];
-              const data = (await manager.vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+              const data = (await manager.VFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
               if (!data) {
                 console.error('Load height map failed');
                 return;

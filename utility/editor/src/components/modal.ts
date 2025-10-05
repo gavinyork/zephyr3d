@@ -170,6 +170,9 @@ export class DialogRenderer<T> extends Observable<{
     if (this._noMove) {
       flags |= ImGui.WindowFlags.NoMove;
     }
+    if (this._size.x === 0 || this._size.y === 0) {
+      flags |= ImGui.WindowFlags.AlwaysAutoResize;
+    }
     ImGui.OpenPopup(this._id);
     if (!this._mask) {
       ImGui.PushStyleColor(ImGui.Col.ModalWindowDimBg, new ImGui.ImVec4(0, 0, 0, 0));

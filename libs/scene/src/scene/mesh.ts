@@ -12,7 +12,8 @@ import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
-import type { Skeleton, SkinnedBoundingBox } from '../animation';
+import type { SkinnedBoundingBox } from '../animation';
+import { Skeleton } from '../animation';
 
 /**
  * Mesh node
@@ -29,6 +30,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _skinnedBoundingInfo: SkinnedBoundingBox;
   /** @internal */
   protected _animatedBoundingBox: BoundingBox;
+  /** @internal */
+  protected _skeletonName: string;
   /** @internal */
   protected _skeleton: DRef<Skeleton>;
   /** @internal */
@@ -137,12 +140,22 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   setPickTarget(node: SceneNode, label?: string) {
     this._pickTarget = { node, label };
   }
+  get skeletonName() {
+    return this._skeletonName;
+  }
+  set skeletonName(name: string) {
+    if (name !== this._skeletonName) {
+      this._skeleton.dispose();
+      this._skeletonName = name;
+    }
+  }
   get skeleton() {
     return this._skeleton.get();
   }
   set skeleton(sk: Skeleton) {
     if (sk !== this.skeleton) {
       this._skeleton.set(sk);
+      this._skeletonName = sk?.persistentId ?? null;
       this.updateSkeletonState();
       if (sk) {
         this.scene.queueUpdateNode(this);
@@ -276,15 +289,13 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
-    if (this.skeleton) {
-      if (this.skeleton.playing) {
-        this.setBoneMatrices(this.skeleton.jointTexture);
-        this.skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
-        this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
-      } else {
-        this.setBoneMatrices(null);
-        this.setAnimatedBoundingBox(null);
+    if (this._skeletonName) {
+      let skeleton = this._skeleton.get();
+      if (!skeleton) {
+        skeleton = Skeleton.findSkeletonById(this._skeletonName);
+        this._skeleton.set(skeleton);
       }
+      this.updateSkeletonState();
       this.scene.queueUpdateNode(this);
     }
   }
@@ -325,9 +336,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** @internal */
   private updateSkeletonState() {
-    if (this.skeleton?.playing) {
-      this.setBoneMatrices(this.skeleton.jointTexture);
-      this.skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
+    const skeleton = this.skeleton;
+    if (skeleton?.playing) {
+      this.setBoneMatrices(skeleton.jointTexture);
+      skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
       this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
     } else {
       this.setBoneMatrices(null);

@@ -633,6 +633,7 @@ export class GLTFImporter implements ModelImporter {
           subMeshData.primitive = primitive;
           subMeshData.material = material;
           mesh.subMeshes.push(subMeshData);
+          model.addPrimitive(primitive);
         }
       }
     }

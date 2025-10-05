@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@zephyr3d/base": "workspace:*",
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "@types/node": "^22.12.0",
     "@rollup/plugin-commonjs": "~28.0.2",
     "rollup-plugin-import-css": "~3.5.8"

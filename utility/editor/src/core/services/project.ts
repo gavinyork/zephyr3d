@@ -141,6 +141,7 @@ export class ProjectService {
     await this.writeManifest(manifest);
 
     this._vfs = new IndexedDBFS(info.uuid, '$');
+    this._serializationManager?.clearCache();
     this._serializationManager = new SerializationManager(this._vfs, true);
     this._currentProject = uuid;
     console.log(`Project opened: ${uuid}`);

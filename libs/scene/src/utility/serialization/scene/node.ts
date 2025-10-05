@@ -2,7 +2,7 @@ import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import type { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { degree2radian, radian2degree } from '@zephyr3d/base';
+import { degree2radian, DRef, radian2degree } from '@zephyr3d/base';
 import type { Mesh, ParticleSystem, Visitor } from '../../../scene';
 import { GraphNode } from '../../../scene';
 import type { Material } from '../../../material';
@@ -322,6 +322,24 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
                 console.error(`Invalid scene node: ${child}`);
               }
             }
+          }
+        },
+        {
+          name: 'Skeletons',
+          type: 'object_array',
+          phase: 1,
+          isHidden() {
+            return true;
+          },
+          get(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            value.object = animationSet.skeletons.map((v) => v.get());
+          },
+          set(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            animationSet.skeletons.forEach((v) => v.dispose());
+            animationSet.skeletons.splice(0, animationSet.skeletons.length);
+            animationSet.skeletons.push(...(value.object as any[]).map((v) => new DRef(v)));
           }
         },
         {

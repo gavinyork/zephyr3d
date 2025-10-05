@@ -1,5 +1,5 @@
 import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
-import { Matrix4x4 } from '@zephyr3d/base';
+import { base64ToUint8Array, Matrix4x4, uint8ArrayToBase64 } from '@zephyr3d/base';
 import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack, Skeleton } from '../../../animation';
 import {
@@ -23,16 +23,34 @@ export function getInterpolatorClass(): SerializableClass {
     name: 'Interpolator',
     createFunc(
       ctx,
-      init: { mode: InterpolationMode; target: InterpolationTarget; inputs: number[]; outputs: number[] }
+      init: { mode: InterpolationMode; target: InterpolationTarget; inputs: string; outputs: string }
     ) {
-      return { obj: new Interpolator(init.mode, init.target, init.inputs, init.outputs) };
+      const inputs = init.inputs
+        ? new Float32Array(base64ToUint8Array(init.inputs).buffer)
+        : new Float32Array();
+      const outputs = init.outputs
+        ? new Float32Array(base64ToUint8Array(init.outputs).buffer)
+        : new Float32Array();
+      return { obj: new Interpolator(init.mode, init.target, inputs, outputs) };
     },
     getInitParams(obj: Interpolator) {
+      const inputs: Float32Array<ArrayBuffer> =
+        obj.inputs instanceof Float32Array
+          ? obj.inputs
+          : obj.inputs
+          ? new Float32Array(obj.inputs)
+          : new Float32Array();
+      const outputs: Float32Array<ArrayBuffer> =
+        obj.outputs instanceof Float32Array
+          ? obj.outputs
+          : obj.outputs
+          ? new Float32Array(obj.outputs)
+          : new Float32Array();
       return {
         mode: obj.mode,
         target: obj.target,
-        inputs: obj.inputs instanceof Float32Array ? [...obj.inputs] : obj.inputs ?? [],
-        outputs: obj.outputs instanceof Float32Array ? [...obj.outputs] : obj.outputs ?? []
+        inputs: uint8ArrayToBase64(new Uint8Array(inputs.buffer, inputs.byteOffset, inputs.byteLength)),
+        outputs: uint8ArrayToBase64(new Uint8Array(outputs.buffer, outputs.byteOffset, outputs.byteLength))
       };
     },
     getProps() {
@@ -49,30 +67,6 @@ export function getInterpolatorClass(): SerializableClass {
           type: 'string',
           get(this: Interpolator, value) {
             value.str[0] = this.target;
-          }
-        },
-        {
-          name: 'Inputs',
-          type: 'string',
-          get(this: Interpolator, value) {
-            const data = this.inputs instanceof Float32Array ? [...this.inputs] : this.inputs ?? [];
-            value.str[0] = JSON.stringify(data);
-          },
-          set(this: Interpolator, value) {
-            const data = JSON.parse(value.str[0]) as number[];
-            this.inputs = new Float32Array(data);
-          }
-        },
-        {
-          name: 'Outputs',
-          type: 'string',
-          get(this: Interpolator, value) {
-            const data = this.outputs instanceof Float32Array ? [...this.outputs] : this.outputs ?? [];
-            value.str[0] = JSON.stringify(data);
-          },
-          set(this: Interpolator, value) {
-            const data = JSON.parse(value.str[0]) as number[];
-            this.outputs = new Float32Array(data);
           }
         }
       ];
@@ -405,17 +399,19 @@ export function getSkeletonClass(): SerializableClass {
     name: 'Skeleton',
     createFunc(
       ctx: SceneNode,
-      init: { joints: string[]; inverseBindMatrices: number[]; bindPoseMatrices: number[]; id: string }
+      init: { joints: string[]; inverseBindMatrices: string; bindPoseMatrices: string; id: string }
     ) {
       const joints = init.joints.map((id) => ctx.scene.findNodeById(id));
+      const inverseBindMatricesArray = new Float32Array(base64ToUint8Array(init.inverseBindMatrices).buffer);
+      const bindPoseMatricesArray = new Float32Array(base64ToUint8Array(init.bindPoseMatrices).buffer);
       const inverseBindMatrices: Matrix4x4[] = [];
       const bindPoseMatrices: Matrix4x4[] = [];
       for (let i = 0; i < joints.length; i++) {
         const ibMatrix = new Matrix4x4();
-        ibMatrix.set(init.inverseBindMatrices.slice(i * 16, i * 16 + 16));
+        ibMatrix.set(inverseBindMatricesArray.slice(i * 16, i * 16 + 16));
         inverseBindMatrices.push(ibMatrix);
         const bpMatrix = new Matrix4x4();
-        bpMatrix.set(init.bindPoseMatrices.slice(i * 16, i * 16 + 16));
+        bpMatrix.set(bindPoseMatricesArray.slice(i * 16, i * 16 + 16));
         bindPoseMatrices.push(bpMatrix);
       }
       const skeleton = new Skeleton(joints, inverseBindMatrices, bindPoseMatrices);
@@ -426,10 +422,16 @@ export function getSkeletonClass(): SerializableClass {
       };
     },
     getInitParams(obj: Skeleton) {
+      const inverseBindMatrices: number[] = obj.inverseBindMatrices
+        .map((v) => [...v])
+        .reduce((a, b) => [...a, ...b], []);
+      const bindPoseMatrices: number[] = obj.bindPoseMatrices
+        .map((v) => [...v])
+        .reduce((a, b) => [...a, ...b], []);
       return {
         joints: obj.joints.map((joint) => joint.persistentId),
-        inverseBindMatrices: obj.inverseBindMatrices,
-        bindPoseMatrices: obj.bindPoseMatrices,
+        inverseBindMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(inverseBindMatrices).buffer)),
+        bindPoseMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(bindPoseMatrices).buffer)),
         id: obj.persistentId
       };
     },

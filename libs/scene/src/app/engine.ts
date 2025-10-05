@@ -61,6 +61,10 @@ export class Engine {
   get VFS() {
     return this._scriptingSystem.registry.VFS;
   }
+  set VFS(vfs: VFS) {
+    this._serializationManager.VFS = vfs;
+    this._scriptingSystem.registry.VFS = vfs;
+  }
   /**
    * Exposes the instance of {@link SerializationManager}.
    */

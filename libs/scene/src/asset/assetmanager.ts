@@ -1,6 +1,14 @@
 import type { DecoderModule } from 'draco3d';
 import type { HttpRequest, TypedArray } from '@zephyr3d/base';
-import { isPowerOf2, nextPowerOf2, DWeakRef, DRef } from '@zephyr3d/base';
+import {
+  isPowerOf2,
+  nextPowerOf2,
+  DWeakRef,
+  DRef,
+  base64ToUint8Array,
+  Vector3,
+  ASSERT
+} from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
@@ -11,7 +19,15 @@ import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { AnimationSet } from '../animation/animationset';
-import type { BaseTexture, SamplerOptions, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
+import type {
+  BaseTexture,
+  PrimitiveType,
+  SamplerOptions,
+  TextureAddressMode,
+  TextureFilterMode,
+  VertexAttribFormat,
+  VertexSemantic
+} from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
@@ -26,8 +42,10 @@ import type {
   NodeConnection,
   SerializationManager
 } from '../utility';
+import { BoundingBox } from '../utility/bounding_volume';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import type { Skeleton } from '../animation';
+import { Primitive } from '../render';
 
 /**
  * Options for texture fetching.
@@ -161,7 +179,11 @@ export class AssetManager {
   };
   /** @internal */
   private _materials: {
-    [url: string]: { [uuid: string]: Promise<Material> | DWeakRef<Material> };
+    [url: string]: Promise<Material> | DWeakRef<Material>;
+  };
+  /** @internal */
+  private _primitives: {
+    [url: string]: Promise<Primitive> | DWeakRef<Primitive>;
   };
   /** @internal */
   private _skeletons: {
@@ -181,6 +203,7 @@ export class AssetManager {
     this._textures = {};
     this._models = {};
     this._materials = {};
+    this._primitives = {};
     this._bluePrints = {};
     this._binaryDatas = {};
     this._textDatas = {};
@@ -190,7 +213,7 @@ export class AssetManager {
    * VFS used to read resources (files, URLs, virtual mounts).
    */
   get vfs() {
-    return this._serializationManager.vfs;
+    return this._serializationManager.VFS;
   }
   /**
    * Clear cached references and promises.
@@ -222,6 +245,13 @@ export class AssetManager {
       }
     }
     this._materials = {};
+    for (const k in Object.keys(this._primitives)) {
+      const v = this._primitives[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._primitives = {};
     for (const k in Object.keys(this._skeletons)) {
       const v = this._skeletons[k];
       if (v instanceof DWeakRef) {
@@ -345,24 +375,42 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @returns A promise that resolves to the loaded material.
    */
-  async fetchMaterial<T extends Material = Material>(url: string, uuid: string): Promise<T> {
+  async fetchMaterial<T extends Material = Material>(url: string): Promise<T> {
     const hash = url;
-    if (!this._materials[hash]) {
-      this._materials[hash] = {};
-    }
-    const cache = this._materials[hash];
-    let P = cache[uuid] as Promise<T> | DWeakRef<T>;
+    let P = this._materials[hash] as Promise<T> | DWeakRef<T>;
     if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
       return P.get();
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadMaterial<T>(url);
-      cache[uuid] = P;
+      this._materials[hash] = P;
     }
     const material = await P;
-    if (cache[uuid] instanceof Promise) {
-      cache[uuid] = new DWeakRef<Material>(material);
+    if (this._materials[hash] instanceof Promise) {
+      this._materials[hash] = new DWeakRef<Material>(material);
     }
     return material;
+  }
+  /**
+   * Fetch a primitive resource.
+   *
+   * @typeParam T - Expected concrete primitive type.
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded primitive.
+   */
+  async fetchPrimitive<T extends Primitive = Primitive>(url: string): Promise<T> {
+    const hash = url;
+    let P = this._primitives[hash] as Promise<T> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+      return P.get();
+    } else if (!P || P instanceof DWeakRef) {
+      P = this.loadPrimitive<T>(url);
+      this._primitives[hash] = P;
+    }
+    const primitive = await P;
+    if (this._primitives[hash] instanceof Promise) {
+      this._primitives[hash] = new DWeakRef<Primitive>(primitive);
+    }
+    return primitive;
   }
   /**
    * Fetch a texture resource via registered loaders.
@@ -506,15 +554,78 @@ export class AssetManager {
    * @internal
    */
   async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
-    let data = (await this.vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
-    if (postProcess) {
-      try {
+    try {
+      let data = (await this.vfs.readFile(url, { encoding: 'binary' })) as ArrayBuffer;
+      if (postProcess) {
         data = postProcess(data);
-      } catch (err) {
-        throw new Error(`Load binary data post process failed: ${err}`);
       }
+      return data;
+    } catch (err) {
+      console.error(`Load binary data failed: ${err}`);
+      return null;
     }
-    return data;
+  }
+  async loadPrimitive<T extends Primitive = Primitive>(url: string): Promise<T> {
+    try {
+      const data = (await this.vfs.readFile(url, { encoding: 'utf8' })) as string;
+      const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(
+        content.type === 'Primitive' || content.type === 'Default',
+        `Unsupported primitive type: ${content.type}`
+      );
+      if (content.type === 'Primitive') {
+        const data = content.data as {
+          vertices: Record<VertexSemantic, { format: VertexAttribFormat; data: string }>;
+          indices: string;
+          indexType: 'u16' | 'u32';
+          indexCount: number;
+          type: PrimitiveType;
+          boxMin: number[];
+          boxMax: number[];
+        };
+        const primitive = new Primitive();
+        for (const k in data.vertices) {
+          const v = data.vertices[k as VertexSemantic];
+          const vertexData = base64ToUint8Array(v.data);
+          primitive.createAndSetVertexBuffer(v.format, vertexData);
+        }
+        if (data.indices) {
+          const indexData = base64ToUint8Array(data.indices);
+          const indices =
+            data.indexType === 'u16'
+              ? new Uint16Array(indexData.buffer)
+              : data.indexType === 'u32'
+              ? new Uint32Array(indexData.buffer)
+              : null;
+          if (!indices) {
+            console.error(`Invalid index type in primitive data: ${data.indexType}`);
+            return null;
+          }
+          primitive.createAndSetIndexBuffer(indices);
+        }
+        primitive.primitiveType = data.type;
+        primitive.indexCount = data.indexCount;
+        primitive.setBoundingVolume(
+          new BoundingBox(
+            new Vector3(data.boxMin[0], data.boxMin[1], data.boxMin[2]),
+            new Vector3(data.boxMax[0], data.boxMax[1], data.boxMax[2])
+          )
+        );
+        return primitive as T;
+      } else {
+        const obj = await this._serializationManager.deserializeObject<T>(null, content.data);
+        if (!(obj instanceof Primitive)) {
+          if (typeof (obj as any).dispose === 'function') {
+            (obj as any).dispose();
+          }
+          return null;
+        }
+        return obj;
+      }
+    } catch (err) {
+      console.error(`Load primitive failed: ${err}`);
+      return null;
+    }
   }
   /**
    * Load a material.
@@ -529,6 +640,10 @@ export class AssetManager {
     try {
       const data = (await this.vfs.readFile(url, { encoding: 'utf8' })) as string;
       const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(
+        content.type === 'PBRBluePrintMaterial' || content.type === 'Default',
+        `Unsupported material type: ${content.type}`
+      );
       if (content.type === 'PBRBluePrintMaterial') {
         const ir = await this.fetchBluePrint(content.data.IR as string);
         const material = new PBRBluePrintMaterial(ir);
@@ -570,7 +685,7 @@ export class AssetManager {
         material.uniformTextures = uniformTextures;
         return material as unknown as T;
       } else {
-        const obj = await this._serializationManager.deserializeObject<T>(null, JSON.parse(content.data));
+        const obj = await this._serializationManager.deserializeObject<T>(null, content.data);
         if (!(obj instanceof Material)) {
           if (typeof (obj as any).dispose === 'function') {
             (obj as any).dispose();
@@ -580,7 +695,8 @@ export class AssetManager {
         return obj;
       }
     } catch (err) {
-      throw new Error(`Load material failed: ${err}`);
+      console.error(`Load material failed: ${err}`);
+      return null;
     }
   }
   private rebuildGraphStructure(

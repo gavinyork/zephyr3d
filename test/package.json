@@ -55,7 +55,7 @@
     "tslib": "^2.8.1"
   },
   "dependencies": {
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "@zip.js/zip.js": "^2.7.54",
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",

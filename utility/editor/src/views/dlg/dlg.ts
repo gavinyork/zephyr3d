@@ -14,6 +14,7 @@ import { DlgOpenFile } from './openfiledlg';
 import { DlgProjectSettings } from './projectsettingsdlg';
 import type { ImGui } from '@zephyr3d/imgui';
 import { DlgPBMaterialEditor } from './materialeditor';
+import { DlgImport } from './importdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -39,6 +40,9 @@ export class Dialog {
       color,
       icon
     );
+  }
+  public static async promptImport(title: string, vfs: VFS, width?: number, height?: number) {
+    return DlgImport.promptImport(`${title}##Dialog`, vfs, width, height);
   }
   public static async editMaterial(
     title: string,

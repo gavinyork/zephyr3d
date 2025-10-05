@@ -15,6 +15,8 @@ import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
 import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
 import { TreeViewData, TreeView } from './treeview';
+import { DlgImport } from '../views/dlg/importdlg';
+import { importModel } from '../loaders/importer';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -1473,7 +1475,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     );
     if (info.targetDirectory && ev.type === 'drop' && !this._vfs.readOnly) {
       const data = ev.dataTransfer;
-      const testVFS = new DataTransferVFS(data);
+      const dtVFS = new DataTransferVFS(data);
       if (!this._vfs.isParentOf('/assets', info.targetDirectory.path)) {
         if (
           (await DlgMessageBoxEx.messageBoxEx(
@@ -1490,16 +1492,29 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           return;
         }
       }
-      const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
-      dlgProgressBar.showModal();
-      await testVFS.copyFileEx('/**/*', info.targetDirectory.path, {
-        overwrite: true,
-        targetVFS: this._vfs,
-        onProgress: (current, total) => {
-          dlgProgressBar.setProgress(current, total);
+      DlgImport.promptImport('Import options', dtVFS, 0, 0).then(async (result) => {
+        if (result?.op === 'copy') {
+          const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
+          dlgProgressBar.showModal();
+          await dtVFS.copyFileEx('/**/*', info.targetDirectory.path, {
+            overwrite: true,
+            targetVFS: this._vfs,
+            onProgress: (current, total) => {
+              dlgProgressBar.setProgress(current, total);
+            }
+          });
+          dlgProgressBar.close();
+        } else if (result?.op === 'import') {
+          const dlgProgressBar = new DlgProgress('Import File##ImportProgress', 300);
+          dlgProgressBar.showModal();
+          for (let i = 0; i < result.paths.length; i++) {
+            dlgProgressBar.setProgress(i + 1, result.paths.length);
+            const sharedModel = await importModel(dtVFS, result.paths[i]);
+            await sharedModel.savePrefab(ProjectService.serializationManager, info.targetDirectory.path);
+          }
+          dlgProgressBar.close();
         }
       });
-      dlgProgressBar.close();
     }
   }
 

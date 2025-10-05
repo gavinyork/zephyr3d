@@ -1,5 +1,5 @@
 import type { TypedArray, Interpolator, VFS } from '@zephyr3d/base';
-import { DRef, Vector4 } from '@zephyr3d/base';
+import { ASSERT, DRef, uint8ArrayToBase64, Vector4 } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
   PrimitiveType,
@@ -17,7 +17,8 @@ import {
   PBPrimitiveTypeInfo,
   PBStructTypeInfo
 } from '@zephyr3d/device';
-import type { MeshMaterial, Scene, SerializationManager } from '@zephyr3d/scene';
+import type { MeshMaterial, SerializationManager } from '@zephyr3d/scene';
+import { Scene } from '@zephyr3d/scene';
 import {
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
@@ -82,6 +83,7 @@ export interface AssetPrimitiveInfo {
   type: PrimitiveType;
   boxMin: Vector3;
   boxMax: Vector3;
+  path?: string;
 }
 
 /**
@@ -130,6 +132,7 @@ export interface AssetMaterialCommon {
 export interface AssetMaterial {
   type: string;
   common: AssetMaterialCommon;
+  path?: string;
 }
 
 /**
@@ -554,6 +557,8 @@ export class SharedModel extends Disposable {
   /** @internal */
   private _imageList: AssetImageInfo[];
   /** @internal */
+  private _primitiveList: AssetPrimitiveInfo[];
+  /** @internal */
   private _materialList: Record<string, AssetMaterial>;
   /**
    * Creates an instance of SharedModel
@@ -568,16 +573,13 @@ export class SharedModel extends Disposable {
     this._scenes = [];
     this._animations = [];
     this._imageList = [];
+    this._primitiveList = [];
     this._materialList = {};
     this._activeScene = -1;
   }
   /** Path */
   get pathName(): string {
     return this._pathname;
-  }
-  /** VFS */
-  get VFS(): VFS {
-    return this._vfs;
   }
   /** Name of the model */
   get name(): string {
@@ -617,6 +619,9 @@ export class SharedModel extends Disposable {
   setMaterial(hash: string, material: AssetMaterial) {
     this._materialList[hash] = material;
   }
+  addPrimitive(prim: AssetPrimitiveInfo) {
+    this._primitiveList.push(prim);
+  }
   /**
    * Adds a skeleton to the scene
    * @param skeleton - The skeleton to be added
@@ -631,49 +636,92 @@ export class SharedModel extends Disposable {
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
   }
+  /** save as prefab */
+  async savePrefab(manager: SerializationManager, path: string): Promise<void> {
+    await this.preprocess(manager, this._name, path);
+    const tmpScene = new Scene();
+    const node = await this.createSceneNode(manager, tmpScene, false);
+    const data = await manager.serializeObject(node);
+    tmpScene.dispose();
+    const content = JSON.stringify({ type: 'SceneNode', data }, null, '  ');
+    await manager.VFS.writeFile(manager.VFS.join(path, `${this._name}.zprefab`), content, {
+      encoding: 'utf8',
+      create: true
+    });
+  }
   /** preprocess */
-  async preprocess(manager: SerializationManager): Promise<void> {
+  async preprocess(manager: SerializationManager, destName: string, destPath: string): Promise<void> {
+    const srcVFS = this._vfs ?? manager.VFS;
     for (let i = 0; i < this._imageList.length; i++) {
       const img = this._imageList[i];
       let ext: string = '';
-      if (!img.uri && img.data && img.mimeType) {
-        if (img.mimeType === 'image/jpeg') {
-          ext = '.jpg';
-        } else if (img.mimeType === 'image/png') {
-          ext = '.png';
-        } else if (img.mimeType === 'image/webp') {
-          ext = '.webp';
-        } else if (img.mimeType === 'image/tga') {
-          ext = '.tga';
-        } else if (img.mimeType === 'image/vnd.radiance') {
-          ext = '.hdr';
-        } else if (img.mimeType === 'image/ktx') {
-          ext = '.ktx';
-        } else if (img.mimeType === 'image/ktx2') {
-          ext = '.ktx2';
-        } else {
-          continue;
-        }
+      const mimeType = img.uri ? srcVFS.guessMIMEType(img.uri) : img.data ? img.mimeType : '';
+      if (img.mimeType === 'image/jpeg') {
+        ext = '.jpg';
+      } else if (img.mimeType === 'image/png') {
+        ext = '.png';
+      } else if (img.mimeType === 'image/webp') {
+        ext = '.webp';
+      } else if (img.mimeType === 'image/tga') {
+        ext = '.tga';
+      } else if (img.mimeType === 'image/vnd.radiance') {
+        ext = '.hdr';
+      } else if (img.mimeType === 'image/ktx') {
+        ext = '.ktx';
+      } else if (img.mimeType === 'image/ktx2') {
+        ext = '.ktx2';
+      } else {
+        continue;
       }
-      if (ext) {
-        const path = this._vfs.join(this._pathname, `${this._name}_texture${i}${ext}`);
-        await this._vfs.writeFile(
-          path,
-          img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
-          { encoding: 'binary', create: true }
-        );
-        img.uri = path;
-        img.data = null;
-        img.mimeType = '';
+      ASSERT(!!ext, `Unknown image mime type: ${mimeType}`);
+      const path = manager.VFS.join(destPath, `${destName}_texture${i}${ext}`);
+      if (img.uri) {
+        img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
       }
+      await manager.VFS.writeFile(
+        path,
+        img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
+        { encoding: 'binary', create: true }
+      );
+      img.uri = path;
+      img.data = null;
+      img.mimeType = '';
     }
     for (const k of Object.keys(this._materialList)) {
-      const path = this._vfs.join(this._pathname, `${this._name}_material${k}.zmtl`);
+      const path = manager.VFS.join(destPath, `${destName}_material${k}.zmtl`);
       const m = await this.createMaterial(manager, this._materialList[k]);
       const data = await manager.serializeObject(m);
       const content = JSON.stringify({ type: 'Default', data }, null, '  ');
-      await this._vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+      await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+      this._materialList[k].path = path;
       m.dispose();
+    }
+    for (let i = 0; i < this._primitiveList.length; i++) {
+      const info = this._primitiveList[i];
+      const path = manager.VFS.join(destPath, `${destName}_mesh${i}.zmsh`);
+      const data = {
+        vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
+        indices: info.indices
+          ? uint8ArrayToBase64(
+              new Uint8Array(info.indices.buffer, info.indices.byteOffset, info.indices.byteLength)
+            )
+          : null,
+        indexType: info.indices ? (info.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
+        indexCount: info.indexCount,
+        type: info.type,
+        boxMin: [info.boxMin.x, info.boxMin.y, info.boxMin.z],
+        boxMax: [info.boxMax.x, info.boxMax.y, info.boxMax.z]
+      };
+      for (const k in info.vertices) {
+        const v = info.vertices[k as VertexSemantic];
+        data.vertices[k] = {
+          format: v.format,
+          data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
+        };
+      }
+      const content = JSON.stringify({ type: 'Primitive', data }, null, '  ');
+      await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+      info.path = path;
     }
   }
   async createSceneNode(
@@ -805,7 +853,7 @@ export class SharedModel extends Disposable {
           meshNode.showState = 'inherit';
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
-          meshNode.primitive = this.createPrimitive(subMesh.primitive);
+          meshNode.primitive = await this.createPrimitive(manager, subMesh.primitive);
           const material = await this.createMaterial(manager, subMesh.material);
           meshNode.material =
             instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
@@ -868,7 +916,10 @@ export class SharedModel extends Disposable {
     };
   }
 
-  private createPrimitive(info: AssetPrimitiveInfo): Primitive {
+  private async createPrimitive(manager: SerializationManager, info: AssetPrimitiveInfo): Promise<Primitive> {
+    if (info.path) {
+      return manager.fetchPrimitive(info.path);
+    }
     const primitive = new Primitive();
     for (const k in info.vertices) {
       const v = info.vertices[k as VertexSemantic];
@@ -886,6 +937,9 @@ export class SharedModel extends Disposable {
     manager: SerializationManager,
     assetMaterial: AssetMaterial
   ): Promise<MeshMaterial> {
+    if (assetMaterial.path) {
+      return manager.fetchMaterial<MeshMaterial>(assetMaterial.path);
+    }
     const infoMap: Map<AssetTextureInfo, MaterialTextureInfo> = new Map();
     const that = this;
     async function getTextureInfo(info: AssetTextureInfo): Promise<MaterialTextureInfo> {

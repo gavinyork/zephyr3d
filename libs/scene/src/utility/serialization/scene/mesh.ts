@@ -41,6 +41,19 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'Skeleton',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: Mesh, value) {
+            value.str[0] = this.skeletonName;
+          },
+          set(this: Mesh, value) {
+            this.skeletonName = value.str[0];
+          }
+        },
+        {
           name: 'PrimitiveId',
           type: 'string',
           get(this: Mesh, value) {

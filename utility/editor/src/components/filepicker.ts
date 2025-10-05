@@ -1,5 +1,5 @@
 export class FilePicker {
-  static async chooseFiles(multi: boolean, accept: string): Promise<File[]> {
+  static async chooseFiles(multi: boolean, accept?: string): Promise<File[]> {
     return new Promise((resolve) => {
       const fileInput = document.createElement('input');
       fileInput.type = 'file';

@@ -71,7 +71,7 @@
   "dependencies": {
     "@zephyr3d/base": "workspace:*",
     "@zephyr3d/device": "workspace:*",
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "@types/draco3d": "^1.4.9",
     "es-module-lexer": "^1.7.0"
   }

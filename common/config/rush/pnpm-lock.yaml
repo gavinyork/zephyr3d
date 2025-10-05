@@ -22,7 +22,7 @@ importers:
       '@types/diff': ^5.0.2
       '@types/draco3d': ^1.4.9
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -63,7 +63,7 @@ importers:
       '@popperjs/core': 2.11.8
       '@types/diff': 5.2.3
       '@types/draco3d': 1.4.10
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/backend-webgl': link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../../libs/backend-webgpu
       '@zephyr3d/base': link:../../libs/base
@@ -127,7 +127,7 @@ importers:
       '@swc/core': ^1.3.62
       '@types/diff': ^5.0.2
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -157,7 +157,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
       '@types/diff': 5.2.3
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -207,7 +207,7 @@ importers:
       '@rollup/pluginutils': ~5.1.4
       '@swc/core': ^1.3.62
       '@types/node': ^22.12.0
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -230,7 +230,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
       '@types/node': 22.18.0
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -272,7 +272,7 @@ importers:
       '@rollup/pluginutils': ~5.1.4
       '@swc/core': ^1.3.62
       '@types/node': ^22.12.0
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -295,7 +295,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
       '@types/node': 22.18.0
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -396,7 +396,7 @@ importers:
       '@rollup/pluginutils': ~5.1.4
       '@swc/core': ^1.3.62
       '@types/node': ^22.12.0
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/base': workspace:*
       cross-env: ^7.0.3
       eslint: ^8.56.0
@@ -418,7 +418,7 @@ importers:
     dependencies:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
       '@types/node': 22.18.0
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/base': link:../base
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
     devDependencies:
@@ -460,7 +460,7 @@ importers:
       '@swc/core': ^1.3.62
       '@types/emscripten': ^1.39.6
       '@types/node': ^22.12.0
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -483,7 +483,7 @@ importers:
     dependencies:
       '@types/emscripten': 1.41.0
       '@types/node': 22.18.0
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       rollup-plugin-import-css: 3.5.8_rollup@4.30.1
@@ -525,7 +525,7 @@ importers:
       '@rollup/pluginutils': ~5.1.4
       '@swc/core': ^1.3.62
       '@types/draco3d': ^1.4.9
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/base': workspace:*
       '@zephyr3d/device': workspace:*
       cross-env: ^7.0.3
@@ -547,7 +547,7 @@ importers:
       typescript-eslint: ^8.44.1
     dependencies:
       '@types/draco3d': 1.4.10
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/base': link:../base
       '@zephyr3d/device': link:../device
       es-module-lexer: 1.7.0
@@ -590,7 +590,7 @@ importers:
       '@rollup/pluginutils': ~5.1.4
       '@swc/core': ^1.3.62
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -619,7 +619,7 @@ importers:
       typescript-eslint: ^8.44.1
     dependencies:
       '@rollup/plugin-commonjs': 28.0.6_rollup@4.30.1
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/backend-webgl': link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../libs/backend-webgpu
       '@zephyr3d/base': link:../libs/base
@@ -678,7 +678,7 @@ importers:
       '@types/streamsaver': ^2.0.5
       '@types/upng-js': ^2.1.5
       '@web/dev-server': ^0.1.35
-      '@webgpu/types': ^0.1.62
+      '@webgpu/types': ^0.1.65
       '@zephyr3d/backend-webgl': workspace:*
       '@zephyr3d/backend-webgpu': workspace:*
       '@zephyr3d/base': workspace:*
@@ -724,7 +724,7 @@ importers:
       '@types/node': 22.18.0
       '@types/streamsaver': 2.0.5
       '@types/upng-js': 2.1.5
-      '@webgpu/types': 0.1.64
+      '@webgpu/types': 0.1.65
       '@zephyr3d/backend-webgl': link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu': link:../../libs/backend-webgpu
       '@zephyr3d/base': link:../../libs/base
@@ -3797,8 +3797,8 @@ packages:
       parse5: 6.0.1
     dev: true
 
-  /@webgpu/types/0.1.64:
-    resolution: {integrity: sha512-84kRIAGV46LJTlJZWxShiOrNL30A+9KokD7RB3dRCIqODFjodS5tCD5yyiZ8kIReGVZSDfA3XkkwyyOIF6K62A==}
+  /@webgpu/types/0.1.65:
+    resolution: {integrity: sha512-cYrHab4d6wuVvDW5tdsfI6/o6vcLMDe6w2Citd1oS51Xxu2ycLCnVo4fqwujfKWijrZMInTJIKcXxteoy21nVA==}
     dev: false
 
   /@zip.js/zip.js/2.7.73:

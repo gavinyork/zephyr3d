@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@types/diff": "^5.0.2",
-    "@webgpu/types": "^0.1.62",
+    "@webgpu/types": "^0.1.65",
     "@types/draco3d": "^1.4.9",
     "draco3d": "^1.5.7",
     "diff": "^5.0.0",

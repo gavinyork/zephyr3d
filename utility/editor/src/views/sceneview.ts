@@ -70,7 +70,6 @@ import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
-import { importModel } from '../loaders/importer';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -1366,25 +1365,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    if (ProjectService.VFS.guessMIMEType(asset) === 'model/gltf-binary') {
-      importModel(asset).then((sharedModel) => {
-        sharedModel.preprocess(ProjectService.serializationManager).then(() => {
-          sharedModel
-            .createSceneNode(ProjectService.serializationManager, this.controller.model.scene, false)
-            .then((node) => {
-              node.parent = null;
-              node.iterate((node) => {
-                node.gpuPickable = false;
-              });
-              this._nodeToBePlaced.set(node);
-              this._assetToBeAdded = asset;
-              this._typeToBePlaced = 'asset';
-              this._ctorToBePlaced = null;
-            });
-        });
-      });
-    }
-    /*
     ProjectService.serializationManager
       .fetchModel(asset, this.controller.model.scene)
       .then((node) => {
@@ -1400,7 +1380,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       .catch((err) => {
         Dialog.messageBox('Error', `${err}`);
       });
-    */
   }
   private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
