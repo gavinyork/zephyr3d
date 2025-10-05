@@ -1,7 +1,7 @@
 import type { GenericConstructor, TypedArray, VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
-import { getGraphNodeClass, getNodeHierarchyClass, getSceneNodeClass } from './scene/node';
+import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getPerspectiveCameraClass, getOrthoCameraClass } from './scene/camera';
 import {
@@ -23,13 +23,13 @@ import {
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
 import {
-  getPrimitiveClass,
   getBoxShapeClass,
   getBoxFrameShapeClass,
   getSphereShapeClass,
   getTorusShapeClass,
   getCylinderShapeClass,
-  getPlaneShapeClass
+  getPlaneShapeClass,
+  getTetrahedronShapeClass
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
@@ -212,7 +212,6 @@ export class SerializationManager {
         getJSONArrayClass(),
         getAABBClass(),
         getInterpolatorClass(),
-        getNodeHierarchyClass(),
         getSkeletonClass(),
         getAnimationClass(this),
         getPropTrackClass(this),
@@ -246,13 +245,13 @@ export class SerializationManager {
         getPBRSpecularGlossinessMaterialClass(this),
         getPBRBluePrintMaterialClass(this),
         getParticleMaterialClass(this),
-        getPrimitiveClass(),
         getBoxShapeClass(),
         getBoxFrameShapeClass(),
         getSphereShapeClass(),
         getTorusShapeClass(),
         getCylinderShapeClass(),
         getPlaneShapeClass(),
+        getTetrahedronShapeClass(),
         ConstantScalarNode.getSerializationCls(),
         ConstantVec2Node.getSerializationCls(),
         ConstantVec3Node.getSerializationCls(),

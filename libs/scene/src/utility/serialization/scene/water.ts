@@ -1,8 +1,8 @@
 import { Vector2 } from '@zephyr3d/base';
-import { GraphNode, SceneNode } from '../../../scene';
+import type { SceneNode } from '../../../scene';
+import { GraphNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import type { SerializableClass } from '../types';
-import type { NodeHierarchy } from './node';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
@@ -186,11 +186,9 @@ export function getWaterClass(manager: SerializationManager): SerializableClass 
     ctor: Water,
     name: 'Water',
     parent: GraphNode,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new Water(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {

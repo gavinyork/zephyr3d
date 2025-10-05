@@ -228,7 +228,11 @@ export function guessMimeType(path: string): string {
     '.gltf': 'model/gltf+json',
     '.glb': 'model/gltf-binary',
     '.ktx': 'image/ktx',
-    '.ktx2': 'image/ktx2'
+    '.ktx2': 'image/ktx2',
+    // zephyr3d specific
+    '.zmsh': 'application/vnd.zephyr3d.mesh+json',
+    '.zmtl': 'application/vnd.zephyr3d.material+json',
+    '.zscn': 'application/vnd.zephyr3d.scene+json'
   };
 
   return mimeTypes[ext] || 'application/octet-stream';

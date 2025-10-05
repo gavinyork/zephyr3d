@@ -1,186 +1,24 @@
 import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
-import type { Scene } from '../../../scene/scene';
+import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { degree2radian, DRef, radian2degree } from '@zephyr3d/base';
-import type { Mesh, ParticleSystem, Visitor } from '../../../scene';
 import { GraphNode } from '../../../scene';
-import type { Material } from '../../../material';
-import type { Primitive } from '../../../render';
 import type { SerializationManager } from '../manager';
 import { AnimationClip } from '../../../animation';
 import { JSONData } from '../json';
-
-/** @internal */
-export class GatherVisitor implements Visitor<SceneNode> {
-  /** @internal */
-  private readonly _primitiveSet: Set<Primitive>;
-  private readonly _materialSet: Set<Material>;
-  private readonly _nodeList: SceneNode[];
-  /**
-   * Creates an instance of CullVisitor
-   * @param renderPass - Render pass for the culling task
-   * @param camera - Camera that will be used for culling
-   * @param rendeQueue - RenderQueue
-   * @param viewPoint - Camera position of the primary render pass
-   */
-  constructor() {
-    this._primitiveSet = new Set();
-    this._materialSet = new Set();
-    this._nodeList = [];
-  }
-  get primitiveSet() {
-    return this._primitiveSet;
-  }
-  get materialSet() {
-    return this._materialSet;
-  }
-  get nodeList() {
-    return this._nodeList;
-  }
-  visit(target: SceneNode): unknown {
-    this._nodeList.push(target);
-    if (target.isMesh()) {
-      return this.visitMesh(target);
-    } else if (target.isParticleSystem()) {
-      return this.visitParticleSystem(target);
-    }
-  }
-  /** @internal */
-  visitParticleSystem(node: ParticleSystem) {
-    this.addMaterial(node.material);
-    return true;
-  }
-  /** @internal */
-  visitMesh(node: Mesh) {
-    if (!node.sealed) {
-      this.addMaterial(node.material);
-      this.addPrimitive(node.primitive);
-    }
-    return true;
-  }
-  /** @internal */
-  private addMaterial(material: Material) {
-    if (material) {
-      this._materialSet.add(material);
-      if (material.$isInstance) {
-        this._materialSet.add(material.coreMaterial);
-      }
-    }
-  }
-  private addPrimitive(primitive: Primitive) {
-    if (primitive) {
-      this._primitiveSet.add(primitive);
-    }
-  }
-}
-
-/** @internal */
-export class NodeHierarchy {
-  private readonly _scene: Scene;
-  private _rootNode: SceneNode;
-  private _materialList: Material[];
-  private _primitiveList: Primitive[];
-  constructor(scene: Scene, node?: SceneNode) {
-    this._scene = scene;
-    this._rootNode = node ?? null;
-    this._materialList = null;
-    this._primitiveList = null;
-  }
-  get scene() {
-    return this._scene;
-  }
-  get rootNode() {
-    return this._rootNode;
-  }
-  set rootNode(node: SceneNode) {
-    this._rootNode = node;
-  }
-  get materialList() {
-    if (!this._materialList) {
-      this.gather();
-    }
-    return this._materialList;
-  }
-  get primitiveList() {
-    if (!this._primitiveList) {
-      this.gather();
-    }
-    return this._primitiveList;
-  }
-  private gather() {
-    const v = new GatherVisitor();
-    this._rootNode.traverse(v);
-    this._materialList = [...v.materialSet];
-    this._primitiveList = [...v.primitiveSet];
-  }
-}
-
-/** @internal */
-export function getNodeHierarchyClass(): SerializableClass {
-  return {
-    ctor: NodeHierarchy,
-    name: 'NodeHierarchy',
-    createFunc(ctx) {
-      return { obj: new NodeHierarchy(ctx as Scene) };
-    },
-    getProps() {
-      return [
-        {
-          name: 'MaterialList',
-          type: 'object_array',
-          phase: 0,
-          isHidden() {
-            return true;
-          },
-          get(this: NodeHierarchy, value) {
-            value.object = [...this.materialList].sort(
-              (a, b) => Number(!!a.$isInstance) - Number(!!b.$isInstance)
-            );
-          },
-          set() {}
-        },
-        {
-          name: 'PrimitiveList',
-          type: 'object_array',
-          phase: 0,
-          isHidden() {
-            return true;
-          },
-          get(this: NodeHierarchy, value) {
-            value.object = [...this.primitiveList];
-          },
-          set() {}
-        },
-        {
-          name: 'NodeHierarchy',
-          type: 'object',
-          phase: 1,
-          isHidden() {
-            return true;
-          },
-          get(this: NodeHierarchy, value) {
-            value.object = [this.rootNode];
-          },
-          set(this: NodeHierarchy, value) {
-            this.rootNode = value.object[0] as SceneNode;
-          }
-        }
-      ];
-    }
-  };
-}
 
 /** @internal */
 export function getSceneNodeClass(manager: SerializationManager): SerializableClass {
   return {
     ctor: SceneNode,
     name: 'SceneNode',
-    async createFunc(ctx: NodeHierarchy | SceneNode, init?: { asset?: string }) {
+    async createFunc(ctx: Scene | SceneNode, init?: { asset?: string }) {
+      const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init?.asset) {
-        return { obj: (await manager.fetchModel(init.asset, ctx.scene)).group };
+        return { obj: (await manager.fetchModel(init.asset, scene)).group };
       }
-      const node = new SceneNode(ctx.scene);
+      const node = new SceneNode(scene);
       if (ctx instanceof SceneNode) {
         node.parent = ctx;
       }
@@ -325,24 +163,6 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           }
         },
         {
-          name: 'Skeletons',
-          type: 'object_array',
-          phase: 1,
-          isHidden() {
-            return true;
-          },
-          get(this: SceneNode, value) {
-            const animationSet = this.animationSet;
-            value.object = animationSet.skeletons.map((v) => v.get());
-          },
-          set(this: SceneNode, value) {
-            const animationSet = this.animationSet;
-            animationSet.skeletons.forEach((v) => v.dispose());
-            animationSet.skeletons.splice(0, animationSet.skeletons.length);
-            animationSet.skeletons.push(...(value.object as any[]).map((v) => new DRef(v)));
-          }
-        },
-        {
           name: 'Animations',
           type: 'object_array',
           phase: 2,
@@ -380,7 +200,6 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             }
           }
         },
-        /*
         {
           name: 'Skeletons',
           type: 'object_array',
@@ -396,10 +215,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             const animationSet = this.animationSet;
             animationSet.skeletons.forEach((v) => v.dispose());
             animationSet.skeletons.splice(0, animationSet.skeletons.length);
-            animationSet.skeletons.push(...(value.object as Skeleton[]).map((v) => new DRef(v)));
+            animationSet.skeletons.push(...(value.object as any[]).map((v) => new DRef(v)));
           }
         },
-        */
         {
           name: 'Script',
           type: 'object',
@@ -441,11 +259,9 @@ export function getGraphNodeClass(): SerializableClass {
     ctor: GraphNode,
     parent: SceneNode,
     name: 'GraphNode',
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new GraphNode(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {

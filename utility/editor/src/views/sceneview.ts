@@ -11,33 +11,26 @@ import type {
   PropertyTrack,
   PropertyValue,
   Scene,
-  ShapeOptionType,
-  ShapeType
+  MeshMaterial
 } from '@zephyr3d/scene';
 import {
-  BoxShape,
-  CylinderShape,
   Mesh,
   ParticleSystem,
-  PBRMetallicRoughnessMaterial,
-  PlaneShape,
   PointLight,
-  SphereShape,
   SpotLight,
-  TorusShape,
   Water,
   ClipmapTerrain,
   PerspectiveCamera,
   OrthoCamera,
-  TetrahedronShape,
-  getDevice
+  getDevice,
+  getEngine
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import type { GenericConstructor, AABB } from '@zephyr3d/base';
+import type { AABB } from '@zephyr3d/base';
 import { DRef, HttpFS } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
@@ -91,7 +84,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
   private _descToBePlaced: string;
   private _assetToBeAdded: string;
-  private _shapeToBeAdded: { cls: GenericConstructor<ShapeType>; options: any };
+  private _shapeToBeAdded: { cls: string };
   private _mousePosX: number;
   private _mousePosY: number;
   private _pickResult: PickResult;
@@ -251,35 +244,27 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               subMenus: [
                 {
                   label: 'Box',
-                  action: () =>
-                    this.handleAddShape(BoxShape, {
-                      anchor: 0.5,
-                      anchorY: 0
-                    })
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/box.zmsh')
                 },
                 {
                   label: 'Sphere',
-                  action: () => this.handleAddShape(SphereShape)
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/sphere.zmsh')
                 },
                 {
                   label: 'Plane',
-                  action: () => this.handleAddShape(PlaneShape)
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/plane.zmsh')
                 },
                 {
                   label: 'Cylinder',
-                  action: () =>
-                    this.handleAddShape(CylinderShape, {
-                      topCap: true,
-                      bottomCap: true
-                    })
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/cylinder.zmsh')
                 },
                 {
                   label: 'Torus',
-                  action: () => this.handleAddShape(TorusShape)
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/torus.zmsh')
                 },
                 {
                   label: 'Tetrahedron',
-                  action: () => this.handleAddShape(TetrahedronShape)
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/tetrahedron.zmsh')
                 }
               ]
             },
@@ -763,14 +748,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 break;
               case 'shape':
                 this._cmdManager
-                  .execute(
-                    new AddShapeCommand(
-                      this.controller.model.scene,
-                      this._shapeToBeAdded.cls,
-                      pos,
-                      this._shapeToBeAdded.options
-                    )
-                  )
+                  .execute(new AddShapeCommand(this.controller.model.scene, this._shapeToBeAdded.cls, pos))
                   .then((mesh) => {
                     this._sceneHierarchy.selectNode(mesh);
                     placeNode.parent = null;
@@ -1321,23 +1299,22 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleNodeDoubleClicked(node: SceneNode) {
     this.lookAt(this.controller.model.scene.mainCamera, node);
   }
-  private handleAddShape<T extends ShapeType>(shapeCls: GenericConstructor<T>, options?: ShapeOptionType<T>) {
+  private async handleAddShape(shapeCls: string) {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
       placeNode.remove();
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    const shape = new shapeCls(options);
-    const material = new PBRMetallicRoughnessMaterial();
-    material.vertexNormal = true;
-    material.vertexTangent = true;
+    const shape = await getEngine().serializationManager.fetchPrimitive(shapeCls);
+    const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
+      '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
+    );
     const mesh = new Mesh(this.controller.model.scene, shape, material);
     mesh.gpuPickable = false;
     this._nodeToBePlaced.set(mesh);
     this._shapeToBeAdded = {
-      cls: shapeCls,
-      options
+      cls: shapeCls
     };
     this._typeToBePlaced = 'shape';
     this._ctorToBePlaced = null;

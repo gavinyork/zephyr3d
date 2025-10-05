@@ -1,30 +1,14 @@
 import { Primitive } from '../../../render';
-import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
+import {
+  BoxFrameShape,
+  BoxShape,
+  CylinderShape,
+  PlaneShape,
+  SphereShape,
+  TetrahedronShape,
+  TorusShape
+} from '../../../shapes';
 import type { SerializableClass } from '../types';
-
-/** @internal */
-export function getPrimitiveClass(): SerializableClass {
-  return {
-    ctor: Primitive,
-    name: 'Primitive',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new Primitive();
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
-    getProps() {
-      return [];
-    }
-  };
-}
 
 /** @internal */
 export function getBoxShapeClass(): SerializableClass {
@@ -32,19 +16,6 @@ export function getBoxShapeClass(): SerializableClass {
     ctor: BoxShape,
     parent: Primitive,
     name: 'BoxShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new BoxShape({ size: 1 });
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -94,19 +65,6 @@ export function getBoxFrameShapeClass(): SerializableClass {
     ctor: BoxFrameShape,
     parent: Primitive,
     name: 'BoxFrameShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new BoxFrameShape({ size: 1 });
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -156,19 +114,6 @@ export function getTorusShapeClass(): SerializableClass {
     ctor: TorusShape,
     parent: Primitive,
     name: 'TorusShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new TorusShape();
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -242,19 +187,6 @@ export function getPlaneShapeClass(): SerializableClass {
     ctor: PlaneShape,
     parent: Primitive,
     name: 'PlaneShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new PlaneShape({ size: 1 });
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -328,19 +260,6 @@ export function getCylinderShapeClass(): SerializableClass {
     ctor: CylinderShape,
     parent: Primitive,
     name: 'CylinderShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new CylinderShape();
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -447,19 +366,6 @@ export function getSphereShapeClass(): SerializableClass {
     ctor: SphereShape,
     parent: Primitive,
     name: 'SphereShape',
-    createFunc(ctx, initParams) {
-      let primitive = Primitive.findPrimitiveById(initParams.persistentId);
-      if (primitive) {
-        return { obj: primitive, loadProps: false };
-      } else {
-        primitive = new SphereShape();
-        primitive.persistentId = initParams.persistentId;
-        return { obj: primitive, loadProps: true };
-      }
-    },
-    getInitParams(obj: BoxShape) {
-      return { persistentId: obj.persistentId };
-    },
     getProps() {
       return [
         {
@@ -495,6 +401,50 @@ export function getSphereShapeClass(): SerializableClass {
           },
           set(this: SphereShape, value) {
             this.options = { ...this.options, horizonalDetail: Math.max(2, Math.min(value.num[0], 100)) };
+          }
+        }
+      ];
+    }
+  };
+}
+
+/** @internal */
+export function getTetrahedronShapeClass(): SerializableClass {
+  return {
+    ctor: TetrahedronShape,
+    parent: Primitive,
+    name: 'TetrahedronShape',
+    getProps() {
+      return [
+        {
+          name: 'Height',
+          type: 'float',
+          default: 1,
+          get(this: TetrahedronShape, value) {
+            value.num[0] = this.options.height;
+          },
+          set(this: TetrahedronShape, value) {
+            this.options = { ...this.options, height: value.num[0] };
+          }
+        },
+        {
+          name: 'SizeX',
+          type: 'float',
+          get(this: TetrahedronShape, value) {
+            value.num[0] = this.options.sizeX;
+          },
+          set(this: TetrahedronShape, value) {
+            this.options = { ...this.options, sizeX: value.num[0] };
+          }
+        },
+        {
+          name: 'SizeZ',
+          type: 'float',
+          get(this: TetrahedronShape, value) {
+            value.num[0] = this.options.sizeZ;
+          },
+          set(this: TetrahedronShape, value) {
+            this.options = { ...this.options, sizeZ: value.num[0] };
           }
         }
       ];

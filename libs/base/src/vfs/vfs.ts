@@ -74,20 +74,6 @@ export interface ListOptions {
 }
 
 /**
- * Options for mounting a VFS.
- *
- * @public
- */
-export interface MountOptions {
-  /** Auto-create mount directory when it does not exist (default: true) */
-  autoCreate?: boolean;
-  /** If auto-created by this mount, remove the directory on unmount when still empty (default: true) */
-  cleanupOnUnmount?: boolean;
-  /** Require the mount path to be empty to avoid overlay semantics (default: true) */
-  requireEmpty?: boolean;
-}
-
-/**
  * Represents an error that occurred during a VFS operation.
  *
  * @public
@@ -326,7 +312,7 @@ export abstract class VFS extends Observable<{
   changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
 }> {
   /** Whether this file system is read-only */
-  readonly readOnly: boolean;
+  protected _readOnly: boolean;
 
   // CWD support
   private _cwd: string = '/';
@@ -335,8 +321,6 @@ export abstract class VFS extends Observable<{
   // Simple mounting support
   private readonly simpleMounts: Map<string, VFS>;
   private sortedMountPaths: string[];
-  private autoCreatedMounts: Set<string>;
-  private cleanupOnUnmountFlags: Map<string, boolean>;
   private mountChangeCallbacks: Map<
     string,
     (type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory') => void
@@ -349,16 +333,21 @@ export abstract class VFS extends Observable<{
    */
   constructor(readOnly: boolean = false) {
     super();
-    this.readOnly = readOnly;
+    this._readOnly = readOnly;
     this._dirStack = [];
     this.simpleMounts = new Map();
     this._cwd = '/';
     this.sortedMountPaths = [];
-    this.autoCreatedMounts = new Set();
-    this.cleanupOnUnmountFlags = new Map();
     this.mountChangeCallbacks = new Map();
   }
 
+  /** Toggle readonly */
+  get readOnly() {
+    return this._readOnly;
+  }
+  set readOnly(val: boolean) {
+    this.setReadonly(val);
+  }
   /**
    * Gets all simple mount points.
    *
@@ -680,7 +669,7 @@ export abstract class VFS extends Observable<{
     // Check for type compatibility
     await this._validateTypeCompatibility(normalizedSource, normalizedTarget, options);
 
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedSource);
     }
 
@@ -700,12 +689,15 @@ export abstract class VFS extends Observable<{
    */
   async makeDirectory(path: string, recursive?: boolean): Promise<void> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.makeDirectory(mounted.relativePath, recursive);
     }
 
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -715,6 +707,14 @@ export abstract class VFS extends Observable<{
 
   async readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      const v = this.simpleMounts.get(normalizedPath)!;
+      const childEntries = await v.readDirectory('/', options).catch(() => []);
+      return childEntries.map((e) => ({
+        ...e,
+        path: PathUtils.normalize(PathUtils.join(normalizedPath, e.path === '/' ? '' : e.path))
+      }));
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       const childEntries = await mounted.vfs.readDirectory(mounted.relativePath, options);
@@ -725,7 +725,10 @@ export abstract class VFS extends Observable<{
       }));
     }
 
-    return this._readDirectory(normalizedPath, options);
+    const entries = await this._readDirectory(normalizedPath, options);
+
+    // 注入直属挂载点
+    return this.injectDirectMountDirs(normalizedPath, entries, options);
   }
 
   async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
@@ -745,7 +748,7 @@ export abstract class VFS extends Observable<{
       return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
     }
 
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -782,7 +785,12 @@ export abstract class VFS extends Observable<{
         throw new VFSError(`Failed to fetch: ${err}`, 'EIO', path);
       }
     }
+
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+    }
+
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.readFile(mounted.relativePath, options);
@@ -799,12 +807,15 @@ export abstract class VFS extends Observable<{
    */
   async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.writeFile(mounted.relativePath, data, options);
     }
 
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -819,12 +830,15 @@ export abstract class VFS extends Observable<{
    */
   async deleteFile(path: string): Promise<void> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.deleteFile(mounted.relativePath);
     }
 
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
     }
 
@@ -839,6 +853,9 @@ export abstract class VFS extends Observable<{
    */
   async exists(path: string): Promise<boolean> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      return true;
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.exists(mounted.relativePath);
@@ -854,6 +871,15 @@ export abstract class VFS extends Observable<{
    */
   async stat(path: string): Promise<FileStat> {
     const normalizedPath = this.normalizePath(path);
+    if (this.simpleMounts.has(normalizedPath)) {
+      return {
+        size: 0,
+        isFile: false,
+        isDirectory: true,
+        created: new Date(0),
+        modified: new Date(0)
+      };
+    }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       return mounted.vfs.stat(mounted.relativePath);
@@ -875,7 +901,7 @@ export abstract class VFS extends Observable<{
   ): Promise<void> {
     const targetVFS = options?.targetVFS ?? this;
     const overwrite = !!options?.overwrite;
-    if (targetVFS.readOnly) {
+    if (targetVFS._readOnly) {
       throw new VFSError('Target VFS is read-only', 'EROFS');
     }
     const normalizedSrc = this.normalizePath(src);
@@ -941,7 +967,7 @@ export abstract class VFS extends Observable<{
     const targetVFS = options?.targetVFS ?? this;
     const overwrite = !!options?.overwrite;
 
-    if (targetVFS.readOnly) {
+    if (targetVFS._readOnly) {
       throw new VFSError('Target VFS is read-only', 'EROFS');
     }
 
@@ -1150,54 +1176,14 @@ export abstract class VFS extends Observable<{
    * Mounts another VFS at the specified path.
    *
    * Constraints/Behavior:
-   * - By default, mount path must be an existing empty directory.
-   * - If `autoCreate` is true, it will create the directory if it does not exist.
-   * - If the path exists but is not a directory -> ENOTDIR
-   * - If `requireEmpty` is true and the directory is not empty -> ENOTEMPTY
+   * - Mount path can be an existing directory or non existing directory.
    * - Changes from child VFS will bubble to host namespace (path is rewritten with mount prefix)
    *
    * @param path - The path where to mount the VFS
    * @param vfs - The VFS instance to mount
-   * @param options - Mount options controlling auto-creation and cleanup behavior
    */
-  async mount(path: string, vfs: VFS, options: MountOptions = {}): Promise<void> {
-    const { autoCreate = true, cleanupOnUnmount = true, requireEmpty = true } = options;
+  async mount(path: string, vfs: VFS): Promise<void> {
     const normalizedPath = PathUtils.normalize(path);
-
-    // Prepare mount directory
-    let exists = await this._exists(normalizedPath);
-    if (!exists) {
-      if (!autoCreate) {
-        throw new VFSError('Mount path does not exist', 'ENOENT', normalizedPath);
-      }
-      if (this.readOnly) {
-        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
-      }
-      await this._makeDirectory(normalizedPath, true);
-      exists = true;
-      this.autoCreatedMounts.add(normalizedPath);
-      this.cleanupOnUnmountFlags.set(normalizedPath, cleanupOnUnmount);
-    }
-
-    // Must be a directory
-    const st = await this._stat(normalizedPath).catch(() => null);
-    if (!st || !st.isDirectory) {
-      // Rollback auto-created marks if present
-      this.autoCreatedMounts.delete(normalizedPath);
-      this.cleanupOnUnmountFlags.delete(normalizedPath);
-      throw new VFSError('Mount path must be a directory', 'ENOTDIR', normalizedPath);
-    }
-
-    // Must be empty if requireEmpty
-    if (requireEmpty) {
-      const entries = await this._readDirectory(normalizedPath, { includeHidden: true }).catch(() => []);
-      if (Array.isArray(entries) && entries.length > 0) {
-        // Not empty: refuse to mount and rollback marks
-        this.autoCreatedMounts.delete(normalizedPath);
-        this.cleanupOnUnmountFlags.delete(normalizedPath);
-        throw new VFSError('Mount path must be empty', 'ENOTEMPTY', normalizedPath);
-      }
-    }
 
     // Register mount
     this.simpleMounts.set(normalizedPath, vfs);
@@ -1236,38 +1222,23 @@ export abstract class VFS extends Observable<{
     // Rebuild sorted mount paths
     this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
 
-    const wasAutoCreated = this.autoCreatedMounts.has(normalizedPath);
-    const shouldCleanup = this.cleanupOnUnmountFlags.get(normalizedPath) ?? false;
-
-    // Clear flags immediately
-    this.autoCreatedMounts.delete(normalizedPath);
-    this.cleanupOnUnmountFlags.delete(normalizedPath);
-
-    // Conditional cleanup: only for auto-created mounts, and when still empty
-    if (wasAutoCreated && shouldCleanup) {
-      try {
-        const st = await this._stat(normalizedPath).catch(() => null);
-        if (st?.isDirectory) {
-          const entries = await this._readDirectory(normalizedPath, { includeHidden: true }).catch(() => []);
-          if ((entries?.length ?? 0) === 0) {
-            if (this.readOnly) {
-              // do nothing in read-only
-            } else {
-              await this._deleteDirectory(normalizedPath, false);
-            }
-          }
-        }
-      } catch {
-        // Ignore cleanup errors; unmount succeeded
-      }
-    }
-
     return true;
   }
   /**
    * Closes file system and release resources
    */
-  async close() {}
+  async close() {
+    for (const path of this.simpleMounts.keys()) {
+      await this.unmount(path);
+    }
+    await this.onClose();
+  }
+  /** @internal */
+  protected setReadonly(readonly: boolean) {
+    this._readOnly = !!readonly;
+  }
+  /** @internal */
+  protected onClose(): Promise<void> | void {}
   /**
    * Gets the mounted VFS for a given path, if any.
    *
@@ -1508,6 +1479,57 @@ export abstract class VFS extends Observable<{
     }
   }
 
+  private injectDirectMountDirs(
+    dirPath: string,
+    entries: FileMetadata[],
+    options?: ListOptions
+  ): FileMetadata[] {
+    const existing = new Set(entries.map((e) => e.name));
+    const parentPrefix = dirPath === '/' ? '/' : dirPath + '/';
+
+    for (const mountPath of this.simpleMounts.keys()) {
+      // 必须在当前目录之下
+      if (!mountPath.startsWith(parentPrefix)) {
+        continue;
+      }
+      if (mountPath === dirPath) {
+        continue;
+      } // 自身
+
+      // 取相对名
+      const remainder = mountPath.slice(parentPrefix.length);
+      if (remainder.length === 0) {
+        continue;
+      }
+
+      // 仅直属子级（remainder 不含 '/'）
+      if (remainder.includes('/')) {
+        continue;
+      }
+
+      const name = remainder;
+
+      // 已存在则不注入（本地真实目录优先显示，避免重复）
+      if (existing.has(name)) {
+        continue;
+      }
+      if (options?.includeHidden === false && name.startsWith('.')) {
+        continue;
+      }
+
+      const meta: FileMetadata = {
+        name,
+        path: PathUtils.normalize(PathUtils.join(dirPath, name)),
+        size: 0,
+        type: 'directory',
+        created: new Date(0),
+        modified: new Date(0)
+      };
+      entries.push(meta);
+      existing.add(name);
+    }
+    return entries;
+  }
   private async _validateTypeCompatibility(
     sourcePath: string,
     targetPath: string,

@@ -1,6 +1,6 @@
-import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
+import type { HttpDirectoryReader } from '@zephyr3d/base';
 import { formatString, HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
-import { SerializationManager } from '@zephyr3d/scene';
+import { getEngine } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
 
 export type ProjectInfo = {
@@ -37,15 +37,13 @@ const metaVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
 
 export class ProjectService {
   private static _currentProject = '';
-  private static _serializationManager: SerializationManager = null;
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
-  private static _vfs: VFS = null;
 
   static get VFS() {
-    return this._vfs;
+    return getEngine().VFS;
   }
   static get serializationManager() {
-    return this._serializationManager;
+    return getEngine().serializationManager;
   }
   static get currentProject() {
     return this._currentProject;
@@ -98,22 +96,22 @@ export class ProjectService {
     return this._currentProject ? await this.getProjectInfo(this._currentProject) : null;
   }
   static async getCurrentProjectSettings(): Promise<ProjectSettings> {
-    if (this._vfs) {
-      const exists = await this._vfs.exists('/src/settings.json');
+    if (this.VFS) {
+      const exists = await this.VFS.exists('/src/settings.json');
       if (!exists) {
-        await this._vfs.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
+        await this.VFS.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
           encoding: 'utf8',
           create: true
         });
       }
-      const content = (await this._vfs.readFile('/src/settings.json', { encoding: 'utf8' })) as string;
+      const content = (await this.VFS.readFile('/src/settings.json', { encoding: 'utf8' })) as string;
       return JSON.parse(content);
     }
     return null;
   }
   static async saveCurrentProjectSettings(settings: ProjectSettings) {
-    if (this._vfs) {
-      await this._vfs.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
+    if (this.VFS) {
+      await this.VFS.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
         encoding: 'utf8',
         create: true
       });
@@ -122,10 +120,7 @@ export class ProjectService {
   static async closeCurrentProject() {
     if (this._currentProject) {
       this._currentProject = '';
-      await this._vfs.close();
-      this._vfs = null;
-      this._serializationManager.clearCache();
-      this._serializationManager = null;
+      getEngine().VFS = metaVFS;
     }
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
@@ -140,9 +135,7 @@ export class ProjectService {
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
 
-    this._vfs = new IndexedDBFS(info.uuid, '$');
-    this._serializationManager?.clearCache();
-    this._serializationManager = new SerializationManager(this._vfs, true);
+    getEngine().VFS = new IndexedDBFS(info.uuid, '$');
     this._currentProject = uuid;
     console.log(`Project opened: ${uuid}`);
     return info;
@@ -151,8 +144,7 @@ export class ProjectService {
     if (this._currentProject) {
       throw new Error('Current project must be closed before opening another project');
     }
-    this._vfs = new HttpFS(url, { directoryReader });
-    this._serializationManager = new SerializationManager(this._vfs, true);
+    getEngine().VFS = new HttpFS(url, { directoryReader });
     console.log(`Remote project opened: ${url}`);
     return {
       name: url,

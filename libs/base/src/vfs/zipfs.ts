@@ -259,7 +259,7 @@ export class ZipFS extends VFS {
   /**
    * Close zip archive and release resources
    */
-  async close(): Promise<void> {
+  protected async onClose(): Promise<void> {
     if (this.zipReader && this.zipReader.close) {
       await this.zipReader.close();
     }
@@ -395,7 +395,7 @@ export class ZipFS extends VFS {
       progress?: (current: number, total: number, path: string) => void;
     }
   ): Promise<void> {
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 
@@ -910,7 +910,7 @@ export class ZipFS extends VFS {
     return;
   }
   protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 
@@ -1030,7 +1030,7 @@ export class ZipFS extends VFS {
   }
 
   private async ensureWriter(): Promise<ZipJSWriter> {
-    if (this.readOnly) {
+    if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
 

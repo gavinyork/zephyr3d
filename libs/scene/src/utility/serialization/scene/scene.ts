@@ -4,12 +4,12 @@ import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
-import { NodeHierarchy } from './node';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { SerializationManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
 import { getDevice } from '../../../app/api';
+import type { SceneNode } from '../../../scene';
 
 /** @internal */
 export function getSceneClass(manager: SerializationManager): SerializableClass {
@@ -570,13 +570,15 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
             return true;
           },
           get(this: Scene, value) {
-            value.object = [new NodeHierarchy(this, this.rootNode)];
+            value.object[0] = this.rootNode;
           },
           set(this: Scene, value) {
-            const nodeHierarchy = value.object[0] as NodeHierarchy;
-            nodeHierarchy.rootNode.remove();
-            for (const child of nodeHierarchy.rootNode.children.slice()) {
-              child.get().parent = this.rootNode;
+            const sceneNode = value.object[0] as SceneNode;
+            if (sceneNode) {
+              sceneNode.remove();
+              for (const child of sceneNode.children.slice()) {
+                child.get().parent = this.rootNode;
+              }
             }
           }
         },

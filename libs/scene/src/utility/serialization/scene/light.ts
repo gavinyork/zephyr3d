@@ -2,7 +2,6 @@ import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
 import type { SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
-import type { NodeHierarchy } from './node';
 import { ClipmapTerrain, Mesh, SceneNode, Terrain } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 
@@ -415,11 +414,9 @@ export function getDirectionalLightClass(): SerializableClass {
     ctor: DirectionalLight,
     name: 'DirectionalLight',
     parent: PunctualLight,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new DirectionalLight(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
@@ -446,11 +443,9 @@ export function getPointLightClass(): SerializableClass {
     ctor: PointLight,
     name: 'PointLight',
     parent: PunctualLight,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new PointLight(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
@@ -482,11 +477,9 @@ export function getSpotLightClass(): SerializableClass {
     ctor: SpotLight,
     name: 'SpotLight',
     parent: PunctualLight,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new SpotLight(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {

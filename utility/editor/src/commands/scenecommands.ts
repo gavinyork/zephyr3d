@@ -1,18 +1,9 @@
-import type { NodeCloneMethod, Scene, SceneNode, ShapeOptionType, ShapeType } from '@zephyr3d/scene';
-import { NodeHierarchy } from '@zephyr3d/scene';
+import type { MeshMaterial, NodeCloneMethod, Scene, SceneNode } from '@zephyr3d/scene';
+import { getEngine } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
-import {
-  BoxFrameShape,
-  BoxShape,
-  CylinderShape,
-  Mesh,
-  PBRMetallicRoughnessMaterial,
-  PlaneShape,
-  SphereShape,
-  TorusShape
-} from '@zephyr3d/scene';
+import { Mesh } from '@zephyr3d/scene';
 import { Command } from '../core/command';
-import { Matrix4x4, Quaternion, Vector3, type GenericConstructor } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { ProjectService } from '../core/services/project';
 //import { importModel } from '../loaders/importer';
@@ -141,55 +132,24 @@ export class AddParticleSystemCommand extends Command<ParticleSystem> {
     }
   }
 }
-export class AddShapeCommand<T extends ShapeType> extends Command<Mesh> {
+export class AddShapeCommand extends Command<Mesh> {
   private readonly _scene: Scene;
   private _nodeId: string;
-  private readonly _shapeCls: GenericConstructor<T>;
-  private readonly _options: ShapeOptionType<T>;
+  private readonly _shapeCls: string;
   private readonly _position: Vector3;
-  constructor(scene: Scene, shapeCls: GenericConstructor<T>, pos: Vector3, options?: ShapeOptionType<T>) {
+  constructor(scene: Scene, shapeCls: string, pos: Vector3) {
     super();
     this._nodeId = '';
     this._scene = scene;
     this._position = pos.clone();
-    switch (shapeCls as any) {
-      case BoxShape: {
-        this._desc = 'Add box';
-        break;
-      }
-      case SphereShape: {
-        this._desc = 'Add sphere';
-        break;
-      }
-      case BoxFrameShape: {
-        this._desc = 'Add box frame';
-        break;
-      }
-      case PlaneShape: {
-        this._desc = 'Add plane';
-        break;
-      }
-      case CylinderShape: {
-        this._desc = 'Add cylinder';
-        break;
-      }
-      case TorusShape: {
-        this._desc = 'Add torus';
-        break;
-      }
-      default: {
-        this._desc = 'Add unknown shape';
-        break;
-      }
-    }
+    this._desc = 'Add shape';
     this._shapeCls = shapeCls;
-    this._options = options;
   }
   async execute() {
-    const shape = new this._shapeCls(this._options);
-    const material = new PBRMetallicRoughnessMaterial();
-    material.vertexNormal = shape.options.needNormal;
-    material.vertexTangent = shape.options.needTangent;
+    const shape = await getEngine().serializationManager.fetchPrimitive(this._shapeCls);
+    const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
+      '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
+    );
     const mesh = new Mesh(this._scene, shape, material);
     mesh.position.set(this._position);
     if (this._nodeId) {
@@ -229,8 +189,7 @@ export class NodeDeleteCommand extends Command {
   async execute(): Promise<void> {
     const node = idNodeMap[this._nodeId];
     if (node) {
-      const nodeHierarchy = new NodeHierarchy(node.scene, node);
-      this._archive = await ProjectService.serializationManager.serializeObject(nodeHierarchy, null, null);
+      this._archive = await ProjectService.serializationManager.serializeObject(node, null, null);
       node.remove();
       node.iterate((child) => {
         delete idNodeMap[child.persistentId];
@@ -242,11 +201,10 @@ export class NodeDeleteCommand extends Command {
     if (this._archive) {
       const parent = idNodeMap[this._parentId];
       if (parent) {
-        const nodeHierarchy = await ProjectService.serializationManager.deserializeObject<NodeHierarchy>(
-          this._scene,
+        const node = await ProjectService.serializationManager.deserializeObject<SceneNode>(
+          parent,
           this._archive
         );
-        const node = nodeHierarchy.rootNode;
         if (node) {
           node.iterate((child) => {
             idNodeMap[child.persistentId] = child;

@@ -399,7 +399,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  async close() {
+  protected async onClose() {
     if (this.db) {
       this.db.close();
       this.db = null;

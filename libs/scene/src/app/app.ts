@@ -207,6 +207,7 @@ export class Application extends Observable<appEventMap> {
         throw new Error('App.init(): create device failed');
       }
       this._device.canvas.focus();
+      await this._engine.init();
       this._inputManager.start();
       this._device.on('resize', (width, height) => {
         this.dispatchEvent('resize', width, height);

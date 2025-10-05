@@ -1,6 +1,5 @@
 import type { SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
-import type { NodeHierarchy } from './node';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -19,11 +18,9 @@ export function getCameraClass(): SerializableClass {
     ctor: Camera,
     name: 'Camera',
     parent: SceneNode,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new Camera(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
@@ -625,11 +622,9 @@ export function getPerspectiveCameraClass(): SerializableClass {
     ctor: PerspectiveCamera,
     parent: Camera,
     name: 'PerspectiveCamera',
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new PerspectiveCamera(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
@@ -693,11 +688,9 @@ export function getOrthoCameraClass(): SerializableClass {
     ctor: OrthoCamera,
     parent: Camera,
     name: 'OrthoCamera',
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new OrthoCamera(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {

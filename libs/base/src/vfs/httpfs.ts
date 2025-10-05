@@ -123,6 +123,11 @@ export class HttpFS extends VFS {
     return super.normalizePath(path);
   }
 
+  protected setReadonly(readonly: boolean): void {
+    if (!readonly) {
+      console.error('Http VFS is always read-only');
+    }
+  }
   /** {@inheritDoc VFS._makeDirectory} */
   protected async _makeDirectory(path: string): Promise<void> {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);

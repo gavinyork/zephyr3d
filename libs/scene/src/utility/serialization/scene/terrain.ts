@@ -1,7 +1,6 @@
 import type { GrassInstanceInfo } from '../../../scene';
-import { GraphNode, SceneNode } from '../../../scene';
+import { GraphNode, type SceneNode } from '../../../scene';
 import type { SerializableClass } from '../types';
-import type { NodeHierarchy } from './node';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
@@ -117,12 +116,10 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
     ctor: ClipmapTerrain,
     name: 'ClipmapTerrain',
     parent: GraphNode,
-    createFunc(ctx: NodeHierarchy | SceneNode, init: number) {
+    createFunc(ctx: SceneNode, init: number) {
       const node = new ClipmapTerrain(ctx.scene);
       node.numDetailMaps = init;
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getInitParams(obj: ClipmapTerrain) {

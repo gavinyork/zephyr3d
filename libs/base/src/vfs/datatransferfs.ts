@@ -60,6 +60,11 @@ export class DataTransferVFS extends VFS {
         : this.initializeFromFileList(data);
   }
 
+  protected setReadonly(readonly: boolean): void {
+    if (!readonly) {
+      console.error('DataTransfer VFS is always read-only');
+    }
+  }
   /**
    * {@inheritDoc VFS._readDirectory}
    */

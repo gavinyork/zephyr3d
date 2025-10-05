@@ -1,18 +1,7 @@
-import {
-  BlinnMaterial,
-  LambertMaterial,
-  Material,
-  MeshMaterial,
-  PBRBluePrintMaterial,
-  PBRMetallicRoughnessMaterial,
-  PBRSpecularGlossinessMaterial,
-  UnlitMaterial
-} from '../../../material';
-import { Primitive } from '../../../render';
-import { GraphNode, Mesh, SceneNode } from '../../../scene';
-import { BoxFrameShape, BoxShape, CylinderShape, PlaneShape, SphereShape, TorusShape } from '../../../shapes';
+import { getEngine } from '../../../app/api';
+import type { MeshMaterial } from '../../../material';
+import { GraphNode, Mesh, type SceneNode } from '../../../scene';
 import type { SerializableClass } from '../types';
-import type { NodeHierarchy } from './node';
 
 /** @internal */
 export function getMeshClass(): SerializableClass {
@@ -20,11 +9,9 @@ export function getMeshClass(): SerializableClass {
     ctor: Mesh,
     name: 'Mesh',
     parent: GraphNode,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new Mesh(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
@@ -54,71 +41,44 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
-          name: 'PrimitiveId',
-          type: 'string',
-          get(this: Mesh, value) {
-            value.str[0] = this.primitive?.persistentId ?? '';
-          },
-          set(this: Mesh, value) {
-            this.primitive = Primitive.findPrimitiveById(value.str[0]);
-          }
-        },
-        {
           name: 'Primitive',
           type: 'object',
-          persistent: false,
-          default: null,
           options: {
-            objectTypes: [BoxShape, BoxFrameShape, SphereShape, CylinderShape, PlaneShape, TorusShape]
+            mimeTypes: ['application/vnd.zephyr3d.mesh+json']
           },
           get(this: Mesh, value) {
-            value.object[0] = this.primitive;
+            value.str[0] = this.primitive ? getEngine().serializationManager.getAssetId(this.primitive) : '';
           },
-          set(this: Mesh, value) {
-            if (!value.object[0]) {
-              this.primitive = null;
-            } else if (value.object[0] instanceof Primitive) {
-              this.primitive = value.object[0];
-            } else {
-              console.error('Invalid primitive type');
+          async set(this: Mesh, value) {
+            if (value?.str[0]) {
+              const primitive = await getEngine().serializationManager.fetchPrimitive(value.str[0]);
+              if (primitive) {
+                this.primitive = primitive;
+              } else {
+                console.error(`Primitive not found: ${value.str[0]}`);
+              }
             }
-          }
-        },
-        {
-          name: 'MaterialId',
-          type: 'string',
-          get(this: Mesh, value) {
-            value.str[0] = this.material?.persistentId ?? '';
-          },
-          set(this: Mesh, value) {
-            this.material = Material.findMaterialById(value.str[0]) as MeshMaterial;
           }
         },
         {
           name: 'Material',
           type: 'object',
-          default: null,
-          persistent: false,
           options: {
-            objectTypes: [
-              UnlitMaterial,
-              LambertMaterial,
-              BlinnMaterial,
-              PBRMetallicRoughnessMaterial,
-              PBRSpecularGlossinessMaterial,
-              PBRBluePrintMaterial
-            ]
+            mimeTypes: ['application/vnd.zephyr3d.material+json']
           },
           get(this: Mesh, value) {
-            value.object[0] = this.material;
+            value.str[0] = this.material ? getEngine().serializationManager.getAssetId(this.material) : '';
           },
-          set(this: Mesh, value) {
-            if (!value.object[0]) {
-              this.material = null;
-            } else if (value.object[0] instanceof MeshMaterial) {
-              this.material = value.object[0];
-            } else {
-              console.error('Invalid material type');
+          async set(this: Mesh, value) {
+            if (value?.str[0]) {
+              const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
+                value.str[0]
+              );
+              if (material) {
+                this.material = material;
+              } else {
+                console.error(`Material not found: ${value.str[0]}`);
+              }
             }
           }
         }

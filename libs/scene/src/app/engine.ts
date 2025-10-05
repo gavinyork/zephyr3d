@@ -1,4 +1,5 @@
 import type { IDisposable, ReadOptions } from '@zephyr3d/base';
+import { MemoryFS } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
@@ -6,6 +7,14 @@ import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
 import { SerializationManager } from '../utility';
 import type { Scene } from '../scene';
+import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
+import {
+  BlinnMaterial,
+  LambertMaterial,
+  PBRMetallicRoughnessMaterial,
+  PBRSpecularGlossinessMaterial,
+  UnlitMaterial
+} from '../material';
 
 /**
  * Interface for objects that can be rendered.
@@ -34,6 +43,7 @@ export interface IRenderable extends IDisposable {
  * @public
  */
 export class Engine {
+  private _builtinsVFS: MemoryFS;
   private _scriptingSystem: ScriptingSystem;
   private _serializationManager: SerializationManager;
   private _enabled: boolean;
@@ -49,6 +59,7 @@ export class Engine {
    */
   constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean) {
     VFS = VFS ?? new HttpFS('./');
+    this._builtinsVFS = null;
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });
     this._serializationManager = new SerializationManager(VFS);
     this._enabled = enabled ?? true;
@@ -62,14 +73,22 @@ export class Engine {
     return this._scriptingSystem.registry.VFS;
   }
   set VFS(vfs: VFS) {
-    this._serializationManager.VFS = vfs;
-    this._scriptingSystem.registry.VFS = vfs;
+    if (vfs !== this._serializationManager.VFS) {
+      this._serializationManager.VFS?.close();
+      this._serializationManager.VFS = vfs;
+      this._scriptingSystem.registry.VFS = vfs;
+      this.ensureBuiltinVFS();
+    }
   }
   /**
    * Exposes the instance of {@link SerializationManager}.
    */
   get serializationManager() {
     return this._serializationManager;
+  }
+  /** @internal */
+  async init() {
+    await this.ensureBuiltinVFS();
   }
   /**
    * Detaches all scripts from all hosts, if enabled.
@@ -188,6 +207,45 @@ export class Engine {
   render() {
     for (const k of Object.keys(this._activeRenderables)) {
       this._activeRenderables[k].get().render();
+    }
+  }
+  private async ensureBuiltinVFS() {
+    if (!this._builtinsVFS) {
+      this._builtinsVFS = await this.createBuiltinVFS();
+    }
+    this.VFS.unmount('/assets/@builtins');
+    this.VFS.mount('/assets/@builtins', this._builtinsVFS);
+  }
+  private async createBuiltinVFS(): Promise<MemoryFS> {
+    const fs = new MemoryFS();
+    const shapeClsMap = {
+      '/primitives/box.zmsh': BoxShape,
+      '/primitives/sphere.zmsh': SphereShape,
+      '/primitives/cylinder.zmsh': CylinderShape,
+      '/primitives/plane.zmsh': PlaneShape,
+      '/primitives/torus.zmsh': TorusShape,
+      '/primitives/tetrahedron.zmsh': TetrahedronShape,
+      '/materials/unlit.zmtl': UnlitMaterial,
+      '/materials/lambert.zmtl': LambertMaterial,
+      '/materials/blinnphong.zmtl': BlinnMaterial,
+      '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
+      '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial
+    } as const;
+    for (const key of Object.keys(shapeClsMap)) {
+      const obj = new shapeClsMap[key]();
+      await this.writeSerializableObject(fs, 'Default', obj, key);
+      obj.dispose();
+    }
+    fs.readOnly = true;
+    return fs;
+  }
+  private async writeSerializableObject(VFS: VFS, type: string, obj: any, path: string) {
+    try {
+      const data = this.serializationManager.serializeObject(obj);
+      const content = JSON.stringify({ type, data }, null, 2);
+      await VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+    } catch (err) {
+      console.error(`Write file '${path}' failed: ${err}`);
     }
   }
   private async _loadScene(path: string): Promise<Scene> {

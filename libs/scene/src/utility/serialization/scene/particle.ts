@@ -1,8 +1,7 @@
 import { GraphNode, type EmitterBehavior, type EmitterShape } from '../../../scene';
-import { SceneNode } from '../../../scene/scene_node';
+import type { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
 import type { SerializableClass } from '../types';
-import type { NodeHierarchy } from './node';
 import { ParticleMaterial } from '../../../material';
 
 /** @internal */
@@ -11,11 +10,9 @@ export function getParticleNodeClass(): SerializableClass {
     ctor: ParticleSystem,
     name: 'ParticleSystem',
     parent: GraphNode,
-    createFunc(ctx: NodeHierarchy | SceneNode) {
+    createFunc(ctx: SceneNode) {
       const node = new ParticleSystem(ctx.scene);
-      if (ctx instanceof SceneNode) {
-        node.parent = ctx;
-      }
+      node.parent = ctx;
       return { obj: node };
     },
     getProps() {
