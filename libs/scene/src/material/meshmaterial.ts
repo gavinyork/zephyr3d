@@ -703,12 +703,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (ctx.oit) {
       ctx.oit.applyUniforms(ctx, bindGroup);
     }
-    if (
-      !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING) &&
-      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
-    ) {
-      bindGroup.setValue('zObjectColor', this._objectColor);
-    }
     if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
       bindGroup.setValue('zTAAStrength', (1 - this._taaStrength) * 50000);
     }
@@ -840,6 +834,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       if (this.isTransparentPass(this.pass)) {
         scope.$outputs.zOpacity = this.getInstancedUniform(scope, MeshMaterial.OPACITY_UNIFORM);
       }
+    } else {
+      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+        scope.$outputs.zObjectColor = scope[ShaderHelper.getObjectColorUniformName()];
+      }
     }
   }
   /**
@@ -863,11 +861,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ) {
         scope.zOpacity = pb.float().uniform(2);
       }
-    } else if (
-      this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR &&
-      !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
-    ) {
-      scope.zObjectColor = pb.vec4().uniform(2);
     }
   }
   /**
@@ -1020,10 +1013,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           });
         }
         ShaderHelper.discardIfClipped(this, this.worldPos);
-        this.$outputs.zFragmentOutput =
-          that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
-            ? scope.$inputs.zObjectColor
-            : scope.zObjectColor;
+        this.$outputs.zFragmentOutput = scope.$inputs.zObjectColor;
         if (that.drawContext.device.type === 'webgl') {
           this.$l.linearDepth = ShaderHelper.nonLinearDepthToLinearNormalized(
             this,

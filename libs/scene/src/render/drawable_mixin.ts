@@ -262,6 +262,9 @@ export function mixinDrawable<
         } else {
           this._mdDrawableBindGroup = bindGroup;
         }
+        if (!instancing) {
+          bindGroup.setValue(ShaderHelper.getObjectColorUniformName(), this.getObjectColor());
+        }
       }
       return bindGroup;
     }

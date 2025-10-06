@@ -60,7 +60,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.occlusionTexture;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'occlusionTexture', '2D', 0),
+    ...getTextureProps<PBRMaterial>(manager, 'occlusionTexture', '2D', false, 0),
     {
       name: 'EmissiveColor',
       type: 'rgb',
@@ -97,8 +97,8 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return this.$isInstance ? this.coreMaterial.emissiveStrength : 1;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'emissiveTexture', '2D', 0),
-    ...getTextureProps<PBRMaterial>(manager, 'specularTexture', '2D', 0),
+    ...getTextureProps<PBRMaterial>(manager, 'emissiveTexture', '2D', true, 0),
+    ...getTextureProps<PBRMaterial>(manager, 'specularTexture', '2D', false, 0),
     {
       name: 'Transmission',
       type: 'bool',
@@ -134,7 +134,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'transmissionTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'transmissionTexture', '2D', false, 1, function () {
       return this.transmission;
     }),
     {
@@ -157,7 +157,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.transmission;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'thicknessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'thicknessTexture', '2D', false, 1, function () {
       return this.transmission;
     }),
     {
@@ -235,7 +235,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'iridescenceTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'iridescenceTexture', '2D', false, 1, function () {
       return this.iridescence;
     }),
     {
@@ -296,7 +296,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.iridescence;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'iridescenceThicknessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'iridescenceThicknessTexture', '2D', false, 1, function () {
       return this.iridescence;
     }),
     {
@@ -334,7 +334,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'clearcoatIntensityTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'clearcoatIntensityTexture', '2D', false, 1, function () {
       return this.clearcoat;
     }),
     {
@@ -357,10 +357,10 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.clearcoat;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'clearcoatRoughnessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'clearcoatRoughnessTexture', '2D', false, 1, function () {
       return this.clearcoat;
     }),
-    ...getTextureProps<PBRMaterial>(manager, 'clearcoatNormalTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'clearcoatNormalTexture', '2D', false, 1, function () {
       return this.clearcoat;
     }),
     {
@@ -398,7 +398,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'sheenColorTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'sheenColorTexture', '2D', true, 1, function () {
       return this.sheen;
     }),
     {
@@ -421,7 +421,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
         return !this.$isInstance && !!this.sheen;
       }
     },
-    ...getTextureProps<PBRMaterial>(manager, 'sheenRoughnessTexture', '2D', 1, function () {
+    ...getTextureProps<PBRMaterial>(manager, 'sheenRoughnessTexture', '2D', false, 1, function () {
       return this.sheen;
     }),
     ...getLitMaterialProps(manager)
@@ -459,7 +459,7 @@ function getLitMaterialProps(manager: SerializationManager): PropertyAccessor<Li
         return !this.$isInstance && !!this.vertexNormal;
       }
     },
-    ...getTextureProps<LitPropTypes>(manager, 'normalTexture', '2D', 0)
+    ...getTextureProps<LitPropTypes>(manager, 'normalTexture', '2D', false, 0)
   ];
 }
 
@@ -499,7 +499,7 @@ function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<
         return this.$isInstance ? this.coreMaterial.albedoColor : [1, 1, 1, 1];
       }
     },
-    ...getTextureProps<UnlitPropTypes>(manager, 'albedoTexture', '2D', 0)
+    ...getTextureProps<UnlitPropTypes>(manager, 'albedoTexture', '2D', true, 0)
   ];
 }
 
@@ -1001,8 +1001,8 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
             return this.$isInstance ? this.coreMaterial.specularFactor : [1, 1, 1, 1];
           }
         },
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(manager, 'metallicRoughnessTexture', '2D', 0),
-        ...getTextureProps<PBRMetallicRoughnessMaterial>(manager, 'specularColorTexture', '2D', 0),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(manager, 'metallicRoughnessTexture', '2D', false, 0),
+        ...getTextureProps<PBRMetallicRoughnessMaterial>(manager, 'specularColorTexture', '2D', true, 0),
         ...getPBRCommonProps(manager)
       ];
     }

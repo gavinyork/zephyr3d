@@ -12,6 +12,50 @@ const idNodeMap: Record<string, SceneNode> = {};
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
+export class AddPrefabCommand extends Command<SceneNode> {
+  private readonly _scene: Scene;
+  private readonly _prefab: string;
+  private _nodeId: string;
+  private readonly _position: Vector3;
+  constructor(scene: Scene, prefab: string, position: Vector3) {
+    super('Add Prefab');
+    this._scene = scene;
+    this._nodeId = '';
+    this._prefab = prefab;
+    this._position = new Vector3(position);
+  }
+  async execute() {
+    let asset: SceneNode = null;
+    try {
+      asset = await getEngine().serializationManager.instantiatePrefab(this._scene.rootNode, this._prefab);
+    } catch (err) {
+      console.error(`Load prefab failed: ${this._prefab}: ${err}`);
+    }
+    if (asset) {
+      asset.position.set(this._position);
+      if (this._nodeId) {
+        asset.persistentId = this._nodeId;
+      } else {
+        this._nodeId = asset.persistentId;
+      }
+      idNodeMap[asset.persistentId] = asset;
+      return asset;
+    } else {
+      this._nodeId = '';
+      return null;
+    }
+  }
+  async undo() {
+    if (this._nodeId) {
+      const node = idNodeMap[this._nodeId];
+      if (node) {
+        idNodeMap[this._nodeId] = undefined;
+        node.parent = null;
+      }
+    }
+  }
+}
+
 export class AddAssetCommand extends Command<SceneNode> {
   private readonly _scene: Scene;
   private readonly _asset: string;

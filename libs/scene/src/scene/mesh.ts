@@ -33,8 +33,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _skeletonName: string;
   /** @internal */
-  protected _skeleton: DRef<Skeleton>;
-  /** @internal */
   protected _boneMatrices: DRef<Texture2D>;
   /** @internal */
   protected _morphData: DRef<Texture2D>;
@@ -67,7 +65,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive = new DRef();
     this._material = new DRef();
     this._castShadow = true;
-    this._skeleton = new DRef();
     this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
     this._boneMatrices = new DRef();
@@ -109,7 +106,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
           boundingBox: new BoundingBox(other._skinnedBoundingInfo.boundingBox)
         }
       : null;
-    this.skeleton = other.skeleton;
+    this.skeletonName = other.skeletonName;
     this.setMorphData(other.getMorphData());
     this.setMorphInfo(other.getMorphInfo());
   }
@@ -145,22 +142,13 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   set skeletonName(name: string) {
     if (name !== this._skeletonName) {
-      this._skeleton.dispose();
       this._skeletonName = name;
-    }
-  }
-  get skeleton() {
-    return this._skeleton.get();
-  }
-  set skeleton(sk: Skeleton) {
-    if (sk !== this.skeleton) {
-      this._skeleton.set(sk);
-      this._skeletonName = sk?.persistentId ?? null;
       this.updateSkeletonState();
-      if (sk) {
-        this.scene.queueUpdateNode(this);
-      }
     }
+  }
+  /** @internal */
+  get skinnedBoundingInfo() {
+    return this._skinnedBoundingInfo;
   }
   /** @internal */
   get skinAnimation() {
@@ -289,15 +277,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
-    if (this._skeletonName) {
-      let skeleton = this._skeleton.get();
-      if (!skeleton) {
-        skeleton = Skeleton.findSkeletonById(this._skeletonName);
-        this._skeleton.set(skeleton);
-      }
-      this.updateSkeletonState();
-      this.scene.queueUpdateNode(this);
-    }
+    this.updateSkeletonState();
   }
   /**
    * {@inheritDoc Drawable.isBatchable}
@@ -336,11 +316,17 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** @internal */
   private updateSkeletonState() {
-    const skeleton = this.skeleton;
-    if (skeleton?.playing) {
-      this.setBoneMatrices(skeleton.jointTexture);
-      skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
-      this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
+    if (this._skeletonName) {
+      const skeleton = Skeleton.findSkeletonById(this._skeletonName);
+      if (skeleton?.playing) {
+        this.setBoneMatrices(skeleton.jointTexture);
+        skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
+        this.setAnimatedBoundingBox(this._skinnedBoundingInfo.boundingBox);
+      } else {
+        this.setBoneMatrices(null);
+        this.setAnimatedBoundingBox(null);
+      }
+      this.scene.queueUpdateNode(this);
     } else {
       this.setBoneMatrices(null);
       this.setAnimatedBoundingBox(null);
@@ -415,10 +401,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** Disposes the mesh node */
   protected onDispose() {
     super.onDispose();
+    this.skeletonName = null;
     this._primitive.get()?.off('bv_changed', this._onBoundingboxChange, this);
     this._primitive.dispose();
     this._material.dispose();
-    this._skeleton.dispose();
     this._boneMatrices.dispose();
     this._morphData.dispose();
     this._morphInfo.dispose();

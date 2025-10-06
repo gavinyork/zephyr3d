@@ -1,4 +1,4 @@
-import type { GenericConstructor, TypedArray, VFS } from '@zephyr3d/base';
+import { ASSERT, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
@@ -674,6 +674,23 @@ export class SerializationManager {
       this._allocated.set(primitive, id);
     }
     return primitive;
+  }
+  /**
+   * Instantiate a prefab from a JSON file via VFS.
+   * @param parent - Parent node to attach the instantiated prefab to.
+   * @param path - Path to the prefab JSON file in VFS.
+   * @returns A Promise resolving to the instantiated `SceneNode`, or `null` on failure.
+   */
+  async instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode> {
+    try {
+      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
+      const json = JSON.parse(content) as { type: string; data: object };
+      ASSERT(json?.type === 'SceneNode', 'Invalid prefab format');
+      return await this.deserializeObject<SceneNode>(parent, json.data);
+    } catch (err) {
+      console.error(`Failed to instantiate prefab from ${path}:`, err);
+      return null;
+    }
   }
   /**
    * Load a scene from a JSON file via VFS.

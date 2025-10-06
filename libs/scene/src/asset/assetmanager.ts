@@ -833,14 +833,19 @@ export class AssetManager {
   async loadBluePrint(path: string) {
     try {
       const content = (await this.vfs.readFile(path, { encoding: 'utf8' })) as string;
-      const state = JSON.parse(content) as {
-        nodes: {
-          id: number;
-          locked: boolean;
-          node: object;
-        }[];
-        links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+      const bp = JSON.parse(content) as {
+        type: string;
+        state: {
+          nodes: {
+            id: number;
+            locked: boolean;
+            node: object;
+          }[];
+          links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+        };
       };
+      ASSERT(bp.type === 'PBRMaterial', `Unsupported blueprint type: ${bp.type}`);
+      const state = bp.state;
       const nodeMap: Record<number, IGraphNode> = {};
       const roots: number[] = [];
       for (const node of state.nodes) {

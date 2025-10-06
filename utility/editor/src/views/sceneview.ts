@@ -43,6 +43,7 @@ import { CommandManager } from '../core/command';
 import {
   AddAssetCommand,
   AddChildCommand,
+  AddPrefabCommand,
   AddShapeCommand,
   NodeCloneCommand,
   NodeDeleteCommand,
@@ -80,7 +81,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
   private readonly _nodeToBePlaced: DRef<SceneNode>;
-  private _typeToBePlaced: 'shape' | 'asset' | 'node' | 'none';
+  private _typeToBePlaced: 'shape' | 'asset' | 'prefab' | 'node' | 'none';
   private _ctorToBePlaced: { new (scene: Scene): SceneNode };
   private _descToBePlaced: string;
   private _assetToBeAdded: string;
@@ -746,6 +747,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
+              case 'prefab':
+                this._cmdManager
+                  .execute(new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded, pos))
+                  .then((node) => {
+                    this._sceneHierarchy.selectNode(node);
+                    placeNode.parent = null;
+                    eventBus.dispatchEvent('scene_changed');
+                  });
+                break;
               case 'shape':
                 this._cmdManager
                   .execute(new AddShapeCommand(this.controller.model.scene, this._shapeToBeAdded.cls, pos))
@@ -1217,8 +1227,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.dispatchEvent('scene_changed');
   }
   private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
-    if (payload.path.toLowerCase().endsWith('glb') || payload.path.toLowerCase().endsWith('gltf')) {
+    const mimeType = getEngine().VFS.guessMIMEType(payload.path);
+    if (mimeType === 'model/gltf-binary' || mimeType === 'model/gltf+json') {
       this.handleAddAsset(payload.path);
+    } else if (mimeType === 'application/vnd.zephyr3d.prefab+json') {
+      this.handleAddPrefab(payload.path);
     }
   }
   private handleWorkspaceDragLeave() {}
@@ -1257,12 +1270,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       const pos = placeNode.position.clone();
       placeNode.parent = null;
       this._nodeToBePlaced.dispose();
-      this._cmdManager
-        .execute(new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos))
-        .then((node) => {
-          this._sceneHierarchy.selectNode(node);
-          eventBus.dispatchEvent('scene_changed');
-        });
+      const command =
+        this._typeToBePlaced === 'asset'
+          ? new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded, pos)
+          : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded, pos);
+      this._cmdManager.execute(command).then((node) => {
+        this._sceneHierarchy.selectNode(node);
+        eventBus.dispatchEvent('scene_changed');
+      });
     }
   }
   private editMaterial(label: string, name: string, path: string) {
@@ -1335,6 +1350,26 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._ctorToBePlaced = ctor;
     this._descToBePlaced = desc;
   }
+  private handleAddPrefab(prefab: string) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
+    }
+    getEngine()
+      .serializationManager.instantiatePrefab(this.controller.model.scene.rootNode, prefab)
+      .then((node) => {
+        node.parent = null;
+        node.iterate((node) => {
+          node.gpuPickable = false;
+        });
+        this._nodeToBePlaced.set(node);
+        this._assetToBeAdded = prefab;
+        this._typeToBePlaced = 'prefab';
+        this._ctorToBePlaced = null;
+      });
+  }
   private handleAddAsset(asset: string) {
     const placeNode = this._nodeToBePlaced.get();
     if (placeNode) {
@@ -1342,8 +1377,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    ProjectService.serializationManager
-      .fetchModel(asset, this.controller.model.scene)
+    getEngine()
+      .serializationManager.fetchModel(asset, this.controller.model.scene)
       .then((node) => {
         node.group.parent = null;
         node.group.iterate((node) => {

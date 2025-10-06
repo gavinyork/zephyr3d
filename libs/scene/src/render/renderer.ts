@@ -547,6 +547,7 @@ export class SceneRenderer {
     const rq = this._objectColorPass.cullScene(ctx, this._pickCamera);
     ctx.camera = this._pickCamera;
     this._objectColorPass.render(ctx, null, rq);
+    rq.dispose();
     ctx.camera = camera;
     ctx.device.popDeviceStates();
     const colorTex = fb.getColorAttachments()[0];

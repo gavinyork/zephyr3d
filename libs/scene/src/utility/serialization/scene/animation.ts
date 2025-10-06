@@ -193,6 +193,19 @@ export function getNodeRotationTrackClass(): SerializableClass {
           set(this: NodeRotationTrack, value) {
             this.interpolator = value.object[0] as Interpolator;
           }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: NodeRotationTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: NodeRotationTrack, value) {
+            this.target = value.str[0];
+          }
         }
       ];
     }
@@ -233,6 +246,19 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
           },
           set(this: NodeEulerRotationTrack, value) {
             this.interpolator = value.object[0] as Interpolator;
+          }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: NodeEulerRotationTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: NodeEulerRotationTrack, value) {
+            this.target = value.str[0];
           }
         }
       ];
@@ -275,6 +301,19 @@ export function getNodeTranslationTrackClass(): SerializableClass {
           set(this: NodeTranslationTrack, value) {
             this.interpolator = value.object[0] as Interpolator;
           }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: NodeTranslationTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: NodeTranslationTrack, value) {
+            this.target = value.str[0];
+          }
         }
       ];
     }
@@ -315,6 +354,19 @@ export function getNodeScaleTrackClass(): SerializableClass {
           },
           set(this: NodeScaleTrack, value) {
             this.interpolator = value.object[0] as Interpolator;
+          }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: NodeScaleTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: NodeScaleTrack, value) {
+            this.target = value.str[0];
           }
         }
       ];

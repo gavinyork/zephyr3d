@@ -632,7 +632,7 @@ export class SharedModel extends Disposable {
                   weights: nodes.bounding[i].rawJointWeights
                 };
                 mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-                mesh.skeleton = nodes.skeleton;
+                mesh.skeletonName = nodes.skeleton.persistentId;
               }
               animationSet.skeletons.push(new DRef(nodes.skeleton));
             }

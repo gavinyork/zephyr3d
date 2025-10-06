@@ -15,6 +15,7 @@ export function getTextureProps<T extends Material>(
   manager: SerializationManager,
   name: keyof T & string & { [P in keyof T]: T[P] extends Texture2D | TextureCube ? P : never }[keyof T],
   type: T[typeof name] extends Texture2D ? '2D' : T[typeof name] extends TextureCube ? 'Cube' : never,
+  sRGB: boolean,
   phase: number,
   isValid?: (this: T) => boolean
 ): PropertyAccessor<T>[] {
@@ -44,7 +45,7 @@ export function getTextureProps<T extends Material>(
             const assetId = value.str[0];
             let tex: Texture2D | TextureCube;
             try {
-              tex = await manager.fetchTexture<Texture2D | TextureCube>(assetId);
+              tex = await manager.fetchTexture<Texture2D | TextureCube>(assetId, { linearColorSpace: !sRGB });
             } catch (err) {
               console.error(`Load asset failed: ${value.str[0]}: ${err}`);
               tex = null;

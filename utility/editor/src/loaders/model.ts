@@ -807,7 +807,7 @@ export class SharedModel extends Disposable {
                   weights: nodes.bounding[i].rawJointWeights
                 };
                 mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-                mesh.skeleton = nodes.skeleton;
+                mesh.skeletonName = nodes.skeleton.persistentId;
               }
               animationSet.skeletons.push(new DRef(nodes.skeleton));
             }
@@ -854,11 +854,7 @@ export class SharedModel extends Disposable {
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = await this.createPrimitive(manager, subMesh.primitive);
-          const material = await this.createMaterial(manager, subMesh.material);
-          meshNode.material =
-            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
-              ? material.createInstance()
-              : material.clone();
+          meshNode.material = await this.createMaterial(manager, subMesh.material);
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

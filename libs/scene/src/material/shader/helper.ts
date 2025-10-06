@@ -44,6 +44,7 @@ const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
 const UNIFORM_NAME_SCENE_COLOR_MAP_SIZE = 'Z_UniformSceneColorSize';
 const UNIFORM_NAME_HIZ_DEPTH_MAP = 'Z_UniformHiZDepth';
 const UNIFORM_NAME_HIZ_DEPTH_MAP_INFO = 'Z_UniformHiZDepthInfo';
+const UNIFORM_NAME_OBJECT_COLOR = 'Z_ObjectColor';
 const UNIFORM_NAME_WORLD_MATRIX = 'Z_UniformWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRIX = 'Z_UniformPrevWorldMatrix';
 const UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME = 'Z_UniformPrevWorldMatrixFrame';
@@ -94,6 +95,9 @@ export class ShaderHelper {
     atmosphereParams: getDefaultAtmosphereParams(),
     heightFogParams: getDefaultHeightFogParams()
   };
+  static getObjectColorUniformName(): string {
+    return UNIFORM_NAME_OBJECT_COLOR;
+  }
   static getWorldMatrixUniformName(): string {
     return UNIFORM_NAME_WORLD_MATRIX;
   }
@@ -742,6 +746,7 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_WORLD_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_PREV_WORLD_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME] = pb.int().uniform(1);
+      scope[UNIFORM_NAME_OBJECT_COLOR] = pb.vec4().uniform(1);
     }
     if (skinning) {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
