@@ -24,7 +24,6 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
   const grassRenderer = terrain.grassRenderer;
   const layerDatas: Uint8Array<ArrayBuffer>[] = [];
   let dataSize = 4 + 4 * grassRenderer.numLayers;
-  let numGrassBlades = 0;
   for (let i = 0; i < grassRenderer.numLayers; i++) {
     const promises: Promise<Uint8Array<ArrayBuffer>>[] = [];
     const layer = grassRenderer.getLayer(i);
@@ -46,7 +45,6 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
       const merged = mergeTypedArrays(Uint8Array, data) as Uint8Array<ArrayBuffer>;
       dataSize += merged.length;
       layerDatas.push(merged);
-      numGrassBlades += merged.length / (4 * 4);
     } else {
       layerDatas.push(new Uint8Array());
     }
@@ -62,9 +60,6 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
     view.set(layerDatas[i], offset);
     offset += layerDatas[i].length;
   }
-  console.log(
-    `Export grass: total ${grassRenderer.numGrassBlades} blades, ${numGrassBlades} blades exported`
-  );
   return data.buffer;
 }
 

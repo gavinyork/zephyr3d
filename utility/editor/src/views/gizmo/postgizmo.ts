@@ -755,7 +755,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._translatePlaneInfo.type === 'move_free') {
       const hitPos = pickResult?.intersectedPoint ?? null;
       if (hitPos) {
-        console.log('PickTarget:', pickResult.target.label ?? pickResult.target.node.constructor.name);
         const parentPos = this._node.parent.getWorldPosition();
         this._node.position.set(Vector3.sub(hitPos, parentPos, parentPos));
       } else {

@@ -123,12 +123,12 @@ function loadDDSHeader(dds: ArrayBuffer, offset: number): DDSHeader {
   const header = new Uint32Array(dds, offset, DDSHeaderSize + 1);
   const magic = header[0];
   if (magic !== DDS_MAGIC) {
-    console.log('Invalid DDS magic');
+    console.error('Invalid DDS magic');
     return null;
   }
   ddsHeader.dwSize = header[1];
   if (ddsHeader.dwSize !== 124) {
-    console.log('Invalid DDS header size');
+    console.error('Invalid DDS header size');
     return null;
   }
   ddsHeader.dataOffset = ddsHeader.dwSize + 4;

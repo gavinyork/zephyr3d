@@ -126,7 +126,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     if (!this._device.isContextLost()) {
       for (let layer = 0; layer < depth; layer++) {
         if (levels.mipDatas[layer].length !== levels.mipLevels) {
-          console.log(`Texture3D.loadLevels() failed: Invalid texture data`);
+          console.error(`Texture3D.loadLevels() failed: Invalid texture data`);
           return;
         }
         for (let i = 0; i < levels.mipLevels; i++) {

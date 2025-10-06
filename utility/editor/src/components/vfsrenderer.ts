@@ -466,7 +466,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               [val],
               (msg) => (dlgMessageBoxEx.text = msg)
             ).then(() => {
-              console.log('Dependencies installed');
+              console.info('Dependencies installed');
               dlgMessageBoxEx.buttons[0] = 'Ok';
             });
           }

@@ -174,7 +174,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
             } else if (message.type === 'warning') {
               console.warn(msg);
             } else {
-              console.log(msg);
+              console.info(msg);
             }
             this._error += msg;
           }

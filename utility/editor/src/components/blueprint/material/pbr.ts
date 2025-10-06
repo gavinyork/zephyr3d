@@ -173,8 +173,6 @@ export class PBRMaterialEditor extends GraphEditor {
       const state = data.state as NodeEditorState;
       await this.nodeEditor.loadState(state);
       this._version = this.nodeEditor.version;
-      console.log(this.createDAG());
-      console.log(await ProjectService.serializationManager.loadBluePrint(path));
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);

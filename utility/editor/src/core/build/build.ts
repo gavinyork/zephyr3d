@@ -132,7 +132,6 @@ export async function buildForEndUser(options: {
     chunkFileNames: 'assets/chunk-[hash].js',
     assetFileNames: 'assets/[name]-[hash][extname]'
   });
-  console.log(output);
 
   await bundle.close();
 

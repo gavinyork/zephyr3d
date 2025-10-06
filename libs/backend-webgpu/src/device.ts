@@ -239,9 +239,9 @@ export class WebGPUDevice extends BaseDevice {
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
       requiredLimits: { ...this._adapter.limits } as any
     });
-    console.log('WebGPU device features:');
+    console.info('WebGPU device features:');
     for (const feature of this._device.features) {
-      console.log(` - ${feature}`);
+      console.info(` - ${feature}`);
     }
     this.device.lost.then((info) => {
       console.error(`WebGPU device was lost: ${info.message}`);

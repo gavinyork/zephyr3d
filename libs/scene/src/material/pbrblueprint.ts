@@ -1,5 +1,5 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import type { BindGroup, GPUProgram, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
@@ -157,13 +157,6 @@ export class PBRBluePrintMaterial
         bindGroup.setTexture(u.name, u.texture.get(), u.sampler.get());
       }
     }
-  }
-  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
-    const program = super.createProgram(ctx, pass);
-    if (program) {
-      console.log(program.getShaderSource('fragment'));
-    }
-    return program;
   }
   protected _createHash(): string {
     return this._ir.hash;

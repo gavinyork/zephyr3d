@@ -57,10 +57,12 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
         if (!entry.buffer) {
-          console.log(`setBuffer() failed: resource '${name}' is not buffer`);
+          console.error(`setBuffer() failed: resource '${name}' is not buffer`);
         } else {
           if (buffer && !(buffer.usage & GPUResourceUsageFlags.BF_UNIFORM)) {
-            console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
+            console.error(
+              `setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`
+            );
           } else if (buffer !== this._resources[entry.name]) {
             this._resources[entry.name] = buffer as WebGLGPUBuffer;
           }
@@ -71,7 +73,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
         return;
       }
     }
-    console.log(`setBuffer() failed: no buffer resource named '${name}'`);
+    console.error(`setBuffer() failed: no buffer resource named '${name}'`);
   }
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number) {
     const mappedName = this._layout.nameMap?.[name];
@@ -82,7 +84,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       if (buffer) {
         buffer.bufferSubData(byteOffset, data, srcPos, srcLength);
       } else {
-        console.log(`set(): no uniform buffer named '${name}'`);
+        console.error(`set(): no uniform buffer named '${name}'`);
       }
     }
   }
@@ -104,7 +106,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
           }
         }
       } else {
-        console.log(`set(): no uniform buffer named '${name}'`);
+        console.error(`set(): no uniform buffer named '${name}'`);
       }
     }
   }
@@ -135,7 +137,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
           texture.getDefaultSampler(!!entry.texture?.autoBindSamplerComparison)) as WebGLTextureSampler
       ];
     } else {
-      console.log(`setTexture() failed: no texture uniform named '${name}'`);
+      console.error(`setTexture() failed: no texture uniform named '${name}'`);
     }
   }
   setSampler(_name: string, _value: TextureSampler) {

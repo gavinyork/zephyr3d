@@ -108,11 +108,13 @@ export class WebGPURenderPass {
     const vy = this._device.screenToDevice(this._currentViewport.y);
     const vw = this._device.screenToDevice(this._currentViewport.width);
     const vh = this._device.screenToDevice(this._currentViewport.height);
+    /*
     if (vx < 0 || vy < 0 || vw > this._device.drawingBufferWidth || vh > this._device.drawingBufferHeight) {
-      console.log(
+      console.error(
         `** VIEWPORT ERROR **: (${vx}, ${vy}, ${vw}, ${vh}) => (0, 0, ${this._device.drawingBufferWidth}, ${this._device.drawingBufferHeight})`
       );
     }
+    */
     if (this._renderPassEncoder) {
       this._renderPassEncoder.setViewport(vx, this._device.drawingBufferHeight - vy - vh, vw, vh, 0, 1);
     }

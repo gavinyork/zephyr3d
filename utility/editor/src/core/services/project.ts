@@ -137,7 +137,7 @@ export class ProjectService {
 
     getEngine().VFS = new IndexedDBFS(info.uuid, '$');
     this._currentProject = uuid;
-    console.log(`Project opened: ${uuid}`);
+    console.info(`Project opened: ${uuid}`);
     return info;
   }
   static async openRemoteProject(url: string, directoryReader: HttpDirectoryReader): Promise<ProjectInfo> {
@@ -145,7 +145,7 @@ export class ProjectService {
       throw new Error('Current project must be closed before opening another project');
     }
     getEngine().VFS = new HttpFS(url, { directoryReader });
-    console.log(`Remote project opened: ${url}`);
+    console.info(`Remote project opened: ${url}`);
     return {
       name: url,
       uuid: url

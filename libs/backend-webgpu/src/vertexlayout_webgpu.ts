@@ -93,7 +93,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
       const bufferInfo = vertexBuffers[attrib];
       const buffer = bufferInfo?.buffer;
       if (!buffer) {
-        console.log(`ERROR: No vertex buffer set for location ${idx}`);
+        console.error(`ERROR: No vertex buffer set for location ${idx}`);
         continue;
       }
       const gpuFormat = WebGPUStructuredBuffer.getGPUVertexFormat(bufferInfo.type);

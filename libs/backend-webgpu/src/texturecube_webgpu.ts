@@ -206,7 +206,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     if (!this._device.isContextLost()) {
       for (let face = 0; face < 6; face++) {
         if (levels.mipDatas[face].length !== levels.mipLevels) {
-          console.log(`TextureCube.loadLevels() failed: Invalid texture data`);
+          console.error(`TextureCube.loadLevels() failed: Invalid texture data`);
           return;
         }
         for (let i = 0; i < levels.mipLevels; i++) {

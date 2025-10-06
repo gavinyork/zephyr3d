@@ -184,7 +184,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     if (!this._device.isContextLost()) {
       for (let layer = 0; layer < levels.arraySize; layer++) {
         if (levels.mipDatas[layer].length !== levels.mipLevels) {
-          console.log(`Texture2DArray.loadLevels() failed: Invalid texture data`);
+          console.error(`Texture2DArray.loadLevels() failed: Invalid texture data`);
           return;
         }
         for (let i = 0; i < levels.mipLevels; i++) {

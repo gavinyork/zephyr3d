@@ -565,7 +565,7 @@ export class CodeEditor {
         }
       });
       this.updateTitle();
-      console.log('Code editor initialized');
+      console.info('Code editor initialized');
     } catch (error) {
       console.error('Code editor initialize failed:', error);
     }

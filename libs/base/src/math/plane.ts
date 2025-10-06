@@ -75,7 +75,7 @@ export class Plane extends VectorBase {
         break;
       }
       default: {
-        console.log('ERROR: Plane constructor must have 0/2/3/4 arguments');
+        console.error('ERROR: Plane constructor must have 0/2/3/4 arguments');
       }
     }
   }

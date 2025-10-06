@@ -103,7 +103,7 @@ export class Editor {
           stackDepth: 32,
           includeNewStacks: true
         });
-        console.log(formatGrowthAnalysis(analysis));
+        console.debug(formatGrowthAnalysis(analysis));
         this._leakTestA = null;
       }
       return true;
@@ -189,7 +189,7 @@ export class Editor {
       if (this._currentProject) {
         for (const k of Object.keys(deps.dependencies)) {
           const pkg = `${k}@${deps.dependencies[k].version}`;
-          console.log(`Loading DTS for package ${pkg}`);
+          console.info(`Loading DTS for package ${pkg}`);
           try {
             const libs = await loadTypes(this._currentProject.uuid, pkg, window.monaco);
             if (libs.project === this._currentProject?.uuid) {
@@ -431,7 +431,7 @@ export class Editor {
       ProjectService.VFS.writeFile(fileName, arg, { encoding: 'utf8', create: true });
     } else if (action === 'BUILD_PROJECT') {
       this.buildProject().then(() => {
-        console.log('Project build succeeded');
+        console.info('Project build succeeded');
       });
     }
   }

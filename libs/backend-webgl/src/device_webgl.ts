@@ -947,7 +947,7 @@ export class WebGLDevice extends BaseDevice {
       this._loseContextExtension?.restoreContext();
       const err = this.getError();
       if (err) {
-        console.log(err);
+        console.error(err);
       }
     }
   }
@@ -1202,7 +1202,7 @@ export class WebGLDevice extends BaseDevice {
   }
   /** @internal */
   private handleContextRestored() {
-    console.log('handle context restored');
+    console.info('handle context restored');
     this.initContextState();
     this._textureSamplerMap = new WeakMap();
     this._currentProgram = null;

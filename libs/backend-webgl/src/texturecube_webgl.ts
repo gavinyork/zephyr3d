@@ -245,12 +245,11 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     if (!this._device.isContextLost()) {
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
-      //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
       (this.device as WebGLDevice).clearErrors();
       for (let face = 0; face < 6; face++) {
         const faceTarget = cubeMapFaceMap[face];
         if (this._mipLevelCount > 1 && levels.mipDatas[face].length !== this._mipLevelCount) {
-          console.log(`invalid texture data`);
+          console.error(`invalid texture data`);
           return;
         }
         for (let i = 0; i < this._mipLevelCount; i++) {

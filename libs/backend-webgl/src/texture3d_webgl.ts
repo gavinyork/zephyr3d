@@ -158,7 +158,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       (this.device as WebGLDevice).clearErrors();
       for (let layer = 0; layer < depth; layer++) {
         if (levels.mipDatas[layer].length !== levels.mipLevels) {
-          console.log(`Texture2DArray.loadLevels() failed: Invalid texture data`);
+          console.error(`Texture2DArray.loadLevels() failed: Invalid texture data`);
           return;
         }
         for (let i = 0; i < levels.mipLevels; i++) {

@@ -1363,27 +1363,6 @@ export class NodeEditor extends Observable<{
       }
     }
 
-    /*
-    // For debug
-    ImGui.SameLine();
-    if (ImGui.Button('Check DAG')) {
-      const topo = this.getReverseTopologicalOrderFromRoots([1]);
-      if (topo) {
-        console.log('Graph is a valid DAG');
-        console.log('Topological order:', topo.order);
-        console.log('Levels:', topo.levels);
-      } else {
-        console.log('Graph contains cycles!');
-      }
-    }
-    ImGui.SameLine();
-    if (ImGui.Button('Check save')) {
-      const state = this.saveState();
-      console.log(JSON.stringify(state, null, ' '));
-      this.loadState(state);
-    }
-    */
-
     ImGui.Separator();
 
     const canvasPos = ImGui.GetCursorScreenPos();

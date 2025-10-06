@@ -1135,7 +1135,6 @@ export class SerializationManager {
             const resource = tmpVal.object[0];
             asyncTasks.push(
               (async () => {
-                console.log(k);
                 const buffer = (await resource) as ArrayBuffer;
                 await this.VFS.writeFile(relativePath, buffer, {
                   encoding: 'binary',

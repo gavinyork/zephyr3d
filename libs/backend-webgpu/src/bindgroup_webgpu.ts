@@ -110,7 +110,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
         if (!entry.buffer) {
-          console.log(`setBuffer() failed: resource '${name}' is not buffer`);
+          console.error(`setBuffer() failed: resource '${name}' is not buffer`);
         } else {
           bindOffset = bindOffset ?? 0;
           bindSize = bindSize ?? (buffer ? Math.max(0, buffer.byteLength - bindOffset) : 0);
@@ -120,7 +120,9 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
               ? GPUResourceUsageFlags.BF_UNIFORM
               : GPUResourceUsageFlags.BF_STORAGE;
           if (!buffer || !(buffer.usage & bufferUsage)) {
-            console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
+            console.error(
+              `setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`
+            );
           } else if (buffer !== info?.[0] || bindOffset !== info?.[1] || bindSize !== info?.[2]) {
             this._resources[entry.name] = [buffer as WebGPUBuffer, bindOffset, bindSize];
             this.invalidate();
@@ -132,7 +134,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         return;
       }
     }
-    console.log(`setBuffer() failed: no buffer resource named '${name}'`);
+    console.error(`setBuffer() failed: no buffer resource named '${name}'`);
   }
   setValue(name: string, value: StructuredValue) {
     const mappedName = this._layout.nameMap?.[name];
@@ -156,7 +158,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           }
         }
       } else {
-        console.log(`setValue() failed: no uniform buffer named '${name}'`);
+        console.error(`setValue() failed: no uniform buffer named '${name}'`);
       }
     }
   }
@@ -173,7 +175,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       if (buffer) {
         buffer.bufferSubData(byteOffset, data, srcPos, srcLength);
       } else {
-        console.log(`set(): no uniform buffer named '${name}'`);
+        console.error(`set(): no uniform buffer named '${name}'`);
       }
     }
   }
@@ -332,10 +334,10 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   setSampler(name: string, value: TextureSampler) {
     const sampler = (value as WebGPUTextureSampler)?.object;
     if (!sampler) {
-      console.log(`WebGPUBindGroup.setSampler() failed: invalid sampler uniform value: ${value}`);
+      console.error(`WebGPUBindGroup.setSampler() failed: invalid sampler uniform value: ${value}`);
     } else if (this._resources[name] !== sampler) {
       if (!this._findSamplerLayout(name)) {
-        console.log(`WebGPUBindGroup.setSampler() failed: no sampler uniform named '${name}'`);
+        console.error(`WebGPUBindGroup.setSampler() failed: no sampler uniform named '${name}'`);
       } else {
         this._resources[name] = sampler;
         this.invalidate();
@@ -497,7 +499,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
     bindGroup = this._device.gpuCreateBindGroup(descriptor);
     if (!bindGroup) {
-      console.log('Create bindgroup failed');
+      console.error('Create bindgroup failed');
     }
     this._layoutDesc = desc;
     this._entries = entries;

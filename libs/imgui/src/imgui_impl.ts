@@ -90,7 +90,7 @@ function document_on_paste(event: ClipboardEvent): void {
 function window_on_resize(): void {}
 
 function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
-  console.log(
+  console.info(
     'Gamepad connected at index %d: %s. %d buttons, %d axes.',
     event.gamepad.index,
     event.gamepad.id,
@@ -100,7 +100,7 @@ function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
 }
 
 function window_on_gamepaddisconnected(event: any /* GamepadEvent */): void {
-  console.log('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
+  console.info('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
 }
 
 function canvas_on_blur(_event: FocusEvent): void {
@@ -356,12 +356,12 @@ export function injectTouchEvent(ev: TouchEvent) {
 /*
 function canvas_on_contextlost(e:Event):void {
     e.preventDefault();
-    console.log("canvas_on_contextlost");
+    console.info("canvas_on_contextlost");
     is_contextlost=true;
 }
 
 function canvas_on_contextrestored(e:Event):void {
-    console.log("canvas_on_contextrestored");
+    console.info("canvas_on_contextrestored");
     is_contextlost=false;
 }
 */
@@ -467,9 +467,11 @@ export function NewFrame(time: number): void {
   prev_time = time;
   io.DeltaTime = Math.max(0.001, dt / 1000);
 
+  /*
   if (io.WantSetMousePos) {
     console.log('TODO: MousePos', io.MousePos.x, io.MousePos.y);
   }
+  */
 
   if (typeof document !== 'undefined') {
     if (io.MouseDrawCursor) {

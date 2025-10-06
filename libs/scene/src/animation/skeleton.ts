@@ -393,47 +393,6 @@ export class Skeleton extends Disposable {
         indices[5] = i;
       }
     }
-    /*
-    let minx_j = Number.MAX_VALUE;
-    let maxx_j = -Number.MAX_VALUE;
-    let miny_j = Number.MAX_VALUE;
-    let maxy_j = -Number.MAX_VALUE;
-    let minz_j = Number.MAX_VALUE;
-    let maxz_j = -Number.MAX_VALUE;
-    for (let i = 0; i < this._joints.length; i++) {
-      const m = this._jointMatrices[i + this._jointOffsets[0]];
-      const x = m.m03;
-      const y = m.m13;
-      const z = m.m23;
-      if (x < minx_j) {
-        minx_j = x;
-      }
-      if (x > maxx_j) {
-        maxx_j = x;
-      }
-      if (y < miny_j) {
-        miny_j = y;
-      }
-      if (y > maxy_j) {
-        maxy_j = y;
-      }
-      if (z < minz_j) {
-        minz_j = z;
-      }
-      if (z > maxz_j) {
-        maxz_j = z;
-      }
-    }
-    const dx = Math.max(Math.abs(minx - minx_j), Math.abs(maxx - maxx_j));
-    const dy = Math.max(Math.abs(miny - miny_j), Math.abs(maxy - maxy_j));
-    const dz = Math.max(Math.abs(minz - minz_j), Math.abs(maxz - maxz_j));
-    const diff = Math.max(dx, dy, dz);
-    const bbox = new AABB(
-      new Vector3(minx_j - diff, miny_j - diff, minz_j - diff),
-      new Vector3(maxx_j + diff, maxy_j + diff, maxz_j + diff)
-    );
-    console.log(`Skinned bounding diff: (${dx}, ${dy}, ${dz})`);
-    */
     const info: SkinnedBoundingBox = {
       boundingVertexBlendIndices: new Float32Array(
         Array.from({ length: 6 * 4 }).map(

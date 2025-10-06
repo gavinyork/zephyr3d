@@ -1942,7 +1942,7 @@ export class ProgramBuilder {
         return null;
       } else {
         this._lastError = Object.prototype.toString.call(err);
-        console.log(`Error: ${this._lastError}`);
+        console.error(`Error: ${this._lastError}`);
         return null;
       }
     }
@@ -2027,7 +2027,7 @@ export class ProgramBuilder {
         return null;
       } else {
         this._lastError = Object.prototype.toString.call(err);
-        console.log(`Error: ${this._lastError}`);
+        console.error(`Error: ${this._lastError}`);
         return null;
       }
     }

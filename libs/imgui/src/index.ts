@@ -21,7 +21,7 @@ let inFrame = false;
 export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number) {
   await ImGui.default();
   ImGui.CHECKVERSION();
-  console.log('ImGui.CreateContext() VERSION=', ImGui.VERSION);
+  console.info('ImGui.CreateContext() VERSION=', ImGui.VERSION);
 
   ImGui.CreateContext();
   ImGui.StyleColorsDark();
