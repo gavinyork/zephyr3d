@@ -127,8 +127,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   let FEATURE_TRANSMISSION = 0;
   let FEATURE_IRIDESCENCE = 0;
 
-  const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb');
-  const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float');
+  const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb', 'EmissiveColor');
+  const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float', 'EmissiveStrength');
 
   const cls = class extends S {
     static readonly pbrCommonMixed = true;

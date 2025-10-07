@@ -52,8 +52,8 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
     return BaseCls as T & { new (...args: any[]): IMixinPBRSpecularGlossiness };
   }
   const S = applyMaterialMixins(BaseCls, mixinPBRCommon, mixinLight, mixinTextureProps('specular'));
-  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'rgb');
-  const GLOSSINESS_FACTOR_UNIFORM = S.defineInstanceUniform('glossinessFactor', 'float');
+  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'rgb', 'SpecularFactor');
+  const GLOSSINESS_FACTOR_UNIFORM = S.defineInstanceUniform('glossinessFactor', 'float', 'GlossinessFactor');
   return class extends S {
     static readonly pbrSpecularGlossnessMixed = true;
     private readonly _specularFactor: Vector3;

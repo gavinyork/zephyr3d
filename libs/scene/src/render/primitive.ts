@@ -1,8 +1,6 @@
 import {
   Disposable,
-  DWeakRef,
   makeObservable,
-  randomUUID,
   releaseObject,
   retainObject,
   type Clonable,
@@ -41,9 +39,6 @@ import { getDevice } from '../app/api';
  * - When removing/overwriting buffers, the primitive releases the previous buffers.
  * - Disposing the primitive also disposes the internal `VertexLayout` and releases retained buffers.
  *
- * Serialization:
- * - Maintains a persistent UUID (`persistentId`) and a weak registry for lookup.
- *
  * @public
  */
 export class Primitive
@@ -52,8 +47,6 @@ export class Primitive
   }>()
   implements Clonable<Primitive>
 {
-  /** @internal Global weak registry keyed by persistentId for serialization/lookup. */
-  private static readonly _registry: Map<string, DWeakRef<Primitive>> = new Map();
   /** @internal Current vertex layout object (created lazily from options). */
   protected _vertexLayout: VertexLayout;
   /** @internal Mutable options used to build the vertex layout. */
@@ -72,8 +65,6 @@ export class Primitive
   private static _nextId = 0;
   /** @internal Unique runtime id for the instance. */
   protected _id: number;
-  /** @internal Persistent UUID for serialization. */
-  protected _persistentId: string;
   /** @internal Optional bounding volume for culling/raycast. */
   protected _bbox: BoundingVolume;
   /** @internal Change tag increments when draw-affecting state changes. */
@@ -97,25 +88,8 @@ export class Primitive
     this._defaultIndexCount = 0;
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
-    this._persistentId = randomUUID();
     this._changeTag = 0;
     this._bbox = null;
-    Primitive._registry.set(this._persistentId, new DWeakRef(this));
-  }
-  /**
-   * Lookup a primitive from the global registry by persistent id.
-   *
-   * @param id - The persistent UUID to search for.
-   * @returns The primitive if alive, otherwise `null`.
-   * @internal
-   */
-  static findPrimitiveById(id: string) {
-    const m = this._registry.get(id);
-    if (m && !m.get()) {
-      this._registry.delete(id);
-      return null;
-    }
-    return m ? m.get() : null;
   }
   /**
    * Unique runtime identifier of this primitive.
@@ -134,26 +108,6 @@ export class Primitive
    */
   get changeTag() {
     return this._changeTag;
-  }
-  /**
-   * Persistent UUID used for serialization and registry lookup.
-   *
-   * Reassigning this updates the registry entry. Throws if the old entry
-   * does not match this instance (integrity check).
-   */
-  get persistentId() {
-    return this._persistentId;
-  }
-  set persistentId(val) {
-    if (val !== this._persistentId) {
-      const m = Primitive._registry.get(this._persistentId);
-      if (!m || m.get() !== this) {
-        throw new Error('Registry primitive mismatch');
-      }
-      Primitive._registry.delete(this._persistentId);
-      this._persistentId = val;
-      Primitive._registry.set(this._persistentId, m);
-    }
   }
   /**
    * Create a shallow clone: copies topology, draw range, and buffers.
@@ -428,11 +382,6 @@ export class Primitive
    */
   protected onDispose() {
     super.onDispose();
-    const m = Primitive._registry.get(this.persistentId);
-    if (m?.get() === this) {
-      Primitive._registry.delete(this._persistentId);
-      m.dispose();
-    }
     this._vertexLayout?.dispose();
     this._vertexLayout = null;
     if (this._vertexLayoutOptions) {

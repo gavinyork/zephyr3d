@@ -51,7 +51,7 @@ class PropertyGroup {
     this.property = null;
     this.prop = null;
     this.currentType = -1;
-    this.objectTypes = [];
+    this.objectTypes = null;
     this.properties = [];
     this.subgroups = [];
   }
@@ -81,11 +81,11 @@ class PropertyGroup {
       bool: [false],
       object: []
     };
-    if (value.type === 'object' && value.options?.objectTypes?.length > 0) {
+    if (value.type === 'object' && value.options?.objectTypes) {
       value.get.call(obj, tmpProperty);
       const propGroup = group.addGroup(value.name);
       propGroup.setObject(tmpProperty.object[0], value, obj, null, 1);
-    } else if (value.type === 'object_array' && value.options?.objectTypes?.length > 0) {
+    } else if (value.type === 'object_array' && value.options?.objectTypes) {
       value.get.call(obj, tmpProperty);
       if (tmpProperty.object) {
         if (tmpProperty.object.length === 0) {
@@ -166,16 +166,18 @@ class PropertyGroup {
       this.objectTypes =
         prop?.options?.objectTypes?.length > 0
           ? prop.options.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
-          : [];
-      if (this.objectTypes.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
+          : null;
+      if (this.objectTypes?.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
         this.objectTypes.unshift(null);
       }
-      this.selected[0] = this.objectTypes.findIndex((val) => {
-        if (!val) {
-          return !obj;
-        }
-        return val.ctor === (obj?.constructor ?? null);
-      });
+      this.selected[0] = this.objectTypes
+        ? this.objectTypes.findIndex((val) => {
+            if (!val) {
+              return !obj;
+            }
+            return val.ctor === (obj?.constructor ?? null);
+          })
+        : -1;
 
       this.properties = [];
       this.subgroups = [];
@@ -304,7 +306,7 @@ export class PropertyEditor extends Observable<{
       group.object &&
       group.prop &&
       (group.prop.type === 'object' || group.prop.type === 'object_array') &&
-      group.objectTypes.length > 0
+      group.objectTypes
     ) {
       const editable =
         (group.value.object?.[0] instanceof AABB && group.prop.options?.edit === 'aabb') ||
@@ -326,53 +328,77 @@ export class PropertyEditor extends Observable<{
       if (settable || addable || deletable || editable) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
-        ImGui.Combo(
-          '',
-          group.selected,
-          group.objectTypes.map((val) => val?.name ?? 'NULL'),
-          group.objectTypes.length
-        );
-        if (settable) {
-          ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
-            const ctor = group.objectTypes[group.selected[0]]?.ctor;
-            const newObj = ctor
-              ? group.prop.create
-                ? group.prop.create.call(group.object, ctor, group.index)
-                : new ctor()
-              : null;
-            const value = { object: [newObj] };
-            group.prop.set.call(group.object, value, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop);
-            this.refresh();
+        if (group.objectTypes.length > 0) {
+          ImGui.Combo(
+            '',
+            group.selected,
+            group.objectTypes.map((val) => val?.name ?? 'NULL'),
+            group.objectTypes.length
+          );
+          if (settable) {
+            ImGui.SameLine(0, 0);
+            if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
+              const ctor = group.objectTypes[group.selected[0]]?.ctor;
+              const newObj = ctor
+                ? group.prop.create
+                  ? group.prop.create.call(group.object, ctor, group.index)
+                  : new ctor()
+                : null;
+              const value = { object: [newObj] };
+              group.prop.set.call(group.object, value, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+            }
           }
-        }
-        if (addable) {
-          ImGui.SameLine(0, 0);
-          if (
-            ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0)) &&
-            group.selected[0] >= 0
-          ) {
-            const ctor = group.objectTypes[group.selected[0]]?.ctor;
-            const newObj = ctor
-              ? group.prop.create
-                ? group.prop.create.call(group.object, ctor, group.index)
-                : new ctor()
-              : null;
-            group.prop.add.call(group.object, { object: [newObj] }, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop);
-            this.refresh();
+          if (addable) {
+            ImGui.SameLine(0, 0);
+            if (
+              ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0)) &&
+              group.selected[0] >= 0
+            ) {
+              const ctor = group.objectTypes[group.selected[0]]?.ctor;
+              const newObj = ctor
+                ? group.prop.create
+                  ? group.prop.create.call(group.object, ctor, group.index)
+                  : new ctor()
+                : null;
+              group.prop.add.call(group.object, { object: [newObj] }, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+            }
           }
-        }
-        if (deletable) {
-          ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
-            group.prop.delete.call(group.object, group.index);
-            this.dispatchEvent('object_property_changed', group.object, group.prop);
-            this.refresh();
-            if (editable) {
+          if (deletable) {
+            ImGui.SameLine(0, 0);
+            if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
+              group.prop.delete.call(group.object, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+              if (editable) {
+                if (group.prop.options?.edit === 'aabb') {
+                  this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+                } else if (group.prop.options?.edit === 'proptrack') {
+                  const animation: unknown = group.object;
+                  ASSERT(
+                    animation instanceof AnimationClip,
+                    'PropertyTrack can only be edited in AnimationClip'
+                  );
+                  ASSERT(group.value.object[0] instanceof PropertyTrack);
+                  const node = animation.animationSet.model;
+                  this.dispatchEvent(
+                    'end_edit_track',
+                    group.value.object[0],
+                    ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0]),
+                    false
+                  );
+                }
+              }
+            }
+          }
+          if (editable) {
+            ImGui.SameLine(0, 0);
+            if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
               if (group.prop.options?.edit === 'aabb') {
-                this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+                this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
               } else if (group.prop.options?.edit === 'proptrack') {
                 const animation: unknown = group.object;
                 ASSERT(
@@ -382,30 +408,11 @@ export class PropertyEditor extends Observable<{
                 ASSERT(group.value.object[0] instanceof PropertyTrack);
                 const node = animation.animationSet.model;
                 this.dispatchEvent(
-                  'end_edit_track',
+                  'request_edit_track',
                   group.value.object[0],
-                  ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0]),
-                  false
+                  ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0])
                 );
               }
-            }
-          }
-        }
-        if (editable) {
-          ImGui.SameLine(0, 0);
-          if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
-            if (group.prop.options?.edit === 'aabb') {
-              this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
-            } else if (group.prop.options?.edit === 'proptrack') {
-              const animation: unknown = group.object;
-              ASSERT(animation instanceof AnimationClip, 'PropertyTrack can only be edited in AnimationClip');
-              ASSERT(group.value.object[0] instanceof PropertyTrack);
-              const node = animation.animationSet.model;
-              this.dispatchEvent(
-                'request_edit_track',
-                group.value.object[0],
-                ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0])
-              );
             }
           }
         }

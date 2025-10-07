@@ -62,9 +62,9 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
     mixinTextureProps('specular'),
     mixinTextureProps('specularColor')
   );
-  const METALLIC_UNIFORM = S.defineInstanceUniform('metallic', 'float');
-  const ROUGHNESS_UNIFORM = S.defineInstanceUniform('roughness', 'float');
-  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'vec4');
+  const METALLIC_UNIFORM = S.defineInstanceUniform('metallic', 'float', 'Metallic');
+  const ROUGHNESS_UNIFORM = S.defineInstanceUniform('roughness', 'float', 'Roughness');
+  const SPECULAR_FACTOR_UNFORM = S.defineInstanceUniform('specularFactor', 'rgba', 'SpecularFactor');
 
   return class extends S {
     static readonly pbrMetallicRoughnessMixed = true;

@@ -4,7 +4,7 @@ import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { DWeakRef, Disposable, randomUUID } from '@zephyr3d/base';
+import { Disposable } from '@zephyr3d/base';
 import type { Clonable, IDisposable } from '@zephyr3d/base';
 
 type MaterialState = {
@@ -62,12 +62,6 @@ type MaterialState = {
  */
 export class Material extends Disposable implements Clonable<Material>, IDisposable {
   /**
-   * Global registry for persistent material IDs to weak refs, used for
-   * serialization/deserialization and deduplication.
-   * @internal
-   */
-  protected static _registry: Map<string, DWeakRef<Material>> = new Map();
-  /**
    * Monotonic instance ID counter.
    * @internal
    */
@@ -107,12 +101,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   private readonly _id: number;
   /**
-   * Persistent UUID for serialization.
-   * Registered in `_registry` on construction.
-   * @internal
-   */
-  private _persistentId: string;
-  /**
    * Latest computed global hash per pass, set during `apply()`, read in `bind()`.
    * @internal
    */
@@ -133,14 +121,12 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   constructor() {
     super();
     this._id = ++Material._nextId;
-    this._persistentId = randomUUID();
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
     this._changeTag = 0;
     this._currentHash = [];
-    Material._registry.set(this._persistentId, new DWeakRef(this));
   }
   /**
    * Create a shallow clone of this material.
@@ -177,39 +163,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   get changeTag() {
     return this._changeTag;
-  }
-  /**
-   * Look up a material from the global registry by persistent ID.
-   *
-   * Cleans up dead weak refs automatically.
-   * @internal
-   */
-  static findMaterialById(id: string) {
-    const m = this._registry.get(id);
-    if (m && !m.get()) {
-      this._registry.delete(id);
-      return null;
-    }
-    return m ? m.get() : null;
-  }
-  /**
-   * Persistent UUID used for serialization.
-   *
-   * Setting a new value re-registers the material in the global registry.
-   */
-  get persistentId() {
-    return this._persistentId;
-  }
-  set persistentId(val) {
-    if (val !== this._persistentId) {
-      const m = Material._registry.get(this._persistentId);
-      if (!m || m.get() !== this) {
-        throw new Error('Registry material mismatch');
-      }
-      Material._registry.delete(this._persistentId);
-      this._persistentId = val;
-      Material._registry.set(this._persistentId, m);
-    }
   }
   /**
    * Runtime-unique numeric identifier for the material instance.
@@ -507,11 +460,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   protected onDispose() {
     super.onDispose();
-    const m = Material._registry.get(this.persistentId);
-    if (m?.get() === this) {
-      Material._registry.delete(this.persistentId);
-      m.dispose();
-    }
     if (this._states) {
       for (const k in this._states) {
         this._states[k]?.bindGroup?.dispose();

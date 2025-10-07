@@ -23,7 +23,7 @@ import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable } from '@zephyr3d/base';
-import { Vector2, Vector3, Vector4, applyMixins, DRef, DWeakRef, randomUUID } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { getDevice } from '../app/api';
 
@@ -129,7 +129,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Each entry defines property name, type, and packed offset (float-aligned).
    * @internal
    */
-  static INSTANCE_UNIFORMS: { prop: string; type: InstanceUniformType; offset: number }[] = [];
+  static INSTANCE_UNIFORMS: { prop: string; type: InstanceUniformType; offset: number; name: string }[] = [];
   /**
    * Next free feature index for subclasses to define their own feature toggles.
    * @internal
@@ -144,7 +144,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Built-in per-instance uniform: opacity (float), used in transparent passes.
    * @internal
    */
-  static OPACITY_UNIFORM = this.defineInstanceUniform('opacity', 'float');
+  static OPACITY_UNIFORM = this.defineInstanceUniform('opacity', 'float', 'Opacity');
   /** @internal Feature state array (indexed by feature indices). */
   private _featureStates: unknown[];
   /** @internal Alpha test cutoff in [0, 1]. */
@@ -256,7 +256,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    *
    * @throws If the property is already defined or type is invalid.
    */
-  static defineInstanceUniform(prop: string, type: InstanceUniformType): number {
+  static defineInstanceUniform(prop: string, type: InstanceUniformType, name = ''): number {
     if (this.INSTANCE_UNIFORMS.findIndex((val) => val.prop === prop) >= 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
     }
@@ -285,7 +285,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     }
     this.INSTANCE_UNIFORMS = this.INSTANCE_UNIFORMS.slice();
-    this.INSTANCE_UNIFORMS.splice(index, 0, { prop, offset, type });
+    this.INSTANCE_UNIFORMS.splice(index, 0, { prop, offset, type, name });
     return (offset << 2) | (numComponents - 1);
   }
   /**
@@ -360,27 +360,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     };
     instance.$instanceUniforms = uniformsHolder;
     instance.$isInstance = true;
-    let persistentId = randomUUID();
-    Material._registry.set(persistentId, new DWeakRef(instance));
     Object.defineProperty(instance, 'coreMaterial', {
       get: function () {
         return coreMaterial.get();
-      }
-    });
-    Object.defineProperty(instance, 'persistentId', {
-      get: function () {
-        return persistentId;
-      },
-      set: function (val) {
-        if (val !== persistentId) {
-          const m = Material._registry.get(persistentId);
-          if (!m || m.get() !== instance) {
-            throw new Error('Registry material mismatch');
-          }
-          Material._registry.delete(persistentId);
-          persistentId = val;
-          Material._registry.set(persistentId, m);
-        }
       }
     });
 

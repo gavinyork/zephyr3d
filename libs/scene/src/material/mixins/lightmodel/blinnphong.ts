@@ -34,7 +34,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinBlinnPhong };
   }
   const S = applyMaterialMixins(BaseCls, mixinLight);
-  const SHININESS_UNIFORM = S.defineInstanceUniform('shininess', 'float');
+  const SHININESS_UNIFORM = S.defineInstanceUniform('shininess', 'float', 'Shininess');
   return class extends S {
     protected static blinnPhongMixed = true;
     private _shininess: number;
