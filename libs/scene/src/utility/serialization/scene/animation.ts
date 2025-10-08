@@ -453,7 +453,14 @@ export function getSkeletonClass(): SerializableClass {
       ctx: SceneNode,
       init: { joints: string[]; inverseBindMatrices: string; bindPoseMatrices: string; id: string }
     ) {
-      const joints = init.joints.map((id) => ctx.scene.findNodeById(id));
+      const joints = init.joints
+        .map((id) => ctx.findNodeById(id))
+        .map((node) => {
+          node.jointTypeT = 'static';
+          node.jointTypeS = 'static';
+          node.jointTypeR = 'static';
+          return node;
+        });
       const inverseBindMatricesArray = new Float32Array(base64ToUint8Array(init.inverseBindMatrices).buffer);
       const bindPoseMatricesArray = new Float32Array(base64ToUint8Array(init.bindPoseMatrices).buffer);
       const inverseBindMatrices: Matrix4x4[] = [];
@@ -595,7 +602,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
                   this.addTrack(targetObj, track);
                 }
               } else if (track instanceof AnimationTrack) {
-                const node = this._animationSet.model.scene.findNodeById(track.target);
+                const node = this._animationSet.model.findNodeById(track.target);
                 if (node) {
                   this.addTrack(node, track);
                 } else {

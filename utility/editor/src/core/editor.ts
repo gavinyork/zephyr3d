@@ -422,9 +422,9 @@ export class Editor {
         });
       } else if (arg === 'text/html') {
         this.editCode(fileName, 'html');
-      } else if (arg === 'application/json') {
+      } else if (arg === 'application/json' || arg.endsWith('+json')) {
         this.editCode(fileName, 'json');
-      } else if (arg === 'text/plain') {
+      } else {
         this.editCode(fileName, 'plaintext');
       }
     } else if (action === 'SAVE_CODE') {

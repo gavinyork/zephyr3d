@@ -530,16 +530,19 @@ export class SerializationManager {
       throw new Error('Serialize object failed: Cannot found serialization meta data');
     }
     let info = cls[index];
-    const initParams = await info?.getInitParams?.(obj);
+    const flags = { saveProps: true };
+    const initParams = await info?.getInitParams?.(obj, flags);
     json = json ?? {};
     json.ClassName = info.name;
     json.Object = {};
     if (initParams !== undefined && initParams !== null) {
       json.Init = initParams;
     }
-    while (info) {
-      await this.serializeObjectProps(obj, info, json.Object, asyncTasks);
-      info = this.getClassByConstructor(info.parent);
+    if (flags.saveProps) {
+      while (info) {
+        await this.serializeObjectProps(obj, info, json.Object, asyncTasks);
+        info = this.getClassByConstructor(info.parent);
+      }
     }
     return json;
   }
@@ -1019,7 +1022,7 @@ export class SerializationManager {
       if (prop.isValid && !prop.isValid.call(obj)) {
         continue;
       }
-      const persistent = prop.persistent ?? true;
+      const persistent = prop.isPersistent?.call(obj) ?? true;
       if (!persistent) {
         continue;
       }
@@ -1111,7 +1114,7 @@ export class SerializationManager {
       if (prop.type === 'command') {
         continue;
       }
-      const persistent = prop.persistent ?? true;
+      const persistent = prop.isPersistent?.call(obj) ?? true;
       if (!persistent) {
         continue;
       }
@@ -1139,9 +1142,11 @@ export class SerializationManager {
           break;
         }
         case 'object_array':
-          json[k] = [];
-          for (const p of tmpVal.object) {
-            json[k].push(await this.serializeObject(p, {}, asyncTasks));
+          if (tmpVal.object.length > 0) {
+            json[k] = [];
+            for (const p of tmpVal.object) {
+              json[k].push(await this.serializeObject(p, {}, asyncTasks));
+            }
           }
           break;
         case 'embedded': {

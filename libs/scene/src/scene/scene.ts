@@ -182,14 +182,7 @@ export class Scene
    * @returns The first matching node, or `null` if not found.
    */
   findNodeById<T extends SceneNode>(id: string) {
-    let node: T = null;
-    this._rootNode?.get().iterate((child) => {
-      if (child.persistentId === id) {
-        node = child as T;
-        return true;
-      }
-    });
-    return node;
+    return this._rootNode.get().findNodeById<T>(id);
   }
   /**
    * Finds a scene node by name.
@@ -205,14 +198,7 @@ export class Scene
    * Names are not guaranteed unique. Prefer IDs for stable references.
    */
   findNodeByName<T extends SceneNode>(name: string) {
-    let node: T = null;
-    this._rootNode?.get().iterate((child) => {
-      if (child.name === name) {
-        node = child as T;
-        return true;
-      }
-    });
-    return node;
+    return this._rootNode.get().findNodeByName<T>(name);
   }
   /**
    * Casts a ray into the scene and returns the closest intersection, if any.

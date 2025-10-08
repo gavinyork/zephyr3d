@@ -1,4 +1,5 @@
-import { Camera, Scene, SerializableClass } from '@zephyr3d/scene';
+import type { Scene } from '@zephyr3d/scene';
+import { Camera } from '@zephyr3d/scene';
 import {
   BaseLight,
   BatchGroup,
@@ -9,8 +10,6 @@ import {
   Water
 } from '@zephyr3d/scene';
 import { TreeViewData, TreeView } from './treeview';
-import type { GenericConstructor } from '@zephyr3d/base';
-import { ProjectService } from '../core/services/project';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 

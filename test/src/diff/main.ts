@@ -1,8 +1,4 @@
-import { diff, applyPatch } from '@zephyr3d/base';
-
-type JSONValue = null | boolean | number | string | JSONObject | JSONArray;
-type JSONObject = { [k: string]: JSONValue };
-type JSONArray = JSONValue[];
+import { diff, applyPatch, type DiffValue } from '@zephyr3d/base';
 
 interface CanonOptions {
   floatEpsilon?: number;
@@ -10,7 +6,7 @@ interface CanonOptions {
   normalizeNewline?: boolean;
 }
 
-function canonicalize(v: JSONValue, opt: CanonOptions = {}): JSONValue {
+function canonicalize(v: DiffValue, opt: CanonOptions = {}): DiffValue {
   const eps = opt.floatEpsilon ?? 0;
   const digits = opt.floatDigits;
   const normNL = opt.normalizeNewline ?? false;
@@ -39,7 +35,7 @@ function canonicalize(v: JSONValue, opt: CanonOptions = {}): JSONValue {
     return s.replace(/\r\n?/g, '\n');
   }
 
-  function canon(x: JSONValue): JSONValue {
+  function canon(x: DiffValue): DiffValue {
     if (x === null) {
       return null;
     }
@@ -70,7 +66,7 @@ function canonicalize(v: JSONValue, opt: CanonOptions = {}): JSONValue {
   return canon(v);
 }
 
-function stringifyCanonical(v: JSONValue, opt?: CanonOptions): string {
+function stringifyCanonical(v: DiffValue, opt?: CanonOptions): string {
   const c = canonicalize(v, opt);
   return JSON.stringify(c, null, 2);
 }

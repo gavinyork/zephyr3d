@@ -128,7 +128,7 @@ export type PropertyAccessor<T = object> = {
    * If true, the property is persisted during save/serialize.
    * Non-persistent properties may be computed or session-only.
    */
-  persistent?: boolean;
+  //persistent?: boolean;
   /** Editor and validation options for this property. */
   options?: PropertyAccessorOptions;
   /**
@@ -186,6 +186,12 @@ export type PropertyAccessor<T = object> = {
    * @returns `true` if valid, otherwise `false`.
    */
   isValid?: (this: T) => boolean;
+  /**
+   * Indicates whether this property is serializable. Default is serializable if not present.
+   *
+   * @returns `true` if persistent, otherwise `false`.
+   */
+  isPersistent?: (this: T) => boolean;
   /**
    * Indicates whether a specific element or slot may be `null` or `undefined`.
    *
@@ -261,7 +267,7 @@ export type SerializableClass = {
    * @param obj - The instance to introspect.
    * @returns An initialization payload (serializable).
    */
-  getInitParams?: (obj: any) => any;
+  getInitParams?: (obj: any, flags: { saveProps: boolean }) => any;
   /**
    * Enumerates property accessors for this class.
    *

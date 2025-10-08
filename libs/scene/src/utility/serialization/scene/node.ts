@@ -2,10 +2,11 @@ import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { degree2radian, DRef, radian2degree } from '@zephyr3d/base';
+import type { DiffPatch, DiffValue } from '@zephyr3d/base';
+import { applyPatch, ASSERT, degree2radian, diff, DRef, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
 import type { SerializationManager } from '../manager';
-import { AnimationClip } from '../../../animation';
+import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 
 /** @internal */
@@ -13,10 +14,17 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
   return {
     ctor: SceneNode,
     name: 'SceneNode',
-    async createFunc(ctx: Scene | SceneNode, init?: { asset?: string }) {
+    async createFunc(ctx: Scene | SceneNode, init?: { prefabId: string; patch: DiffPatch }) {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
-      if (init?.asset) {
-        return { obj: (await manager.fetchModel(init.asset, scene)).group };
+      if (init) {
+        const prefabData = (await manager.loadPrefabContent(init.prefabId)).data as DiffValue;
+        const nodeData = applyPatch(prefabData, init.patch);
+        const tmpNode = new DRef(new SceneNode(scene));
+        tmpNode.get().remove();
+        const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData as object);
+        sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        tmpNode.dispose();
+        return { obj: sceneNode, loadProps: false };
       }
       const node = new SceneNode(scene);
       if (ctx instanceof SceneNode) {
@@ -24,10 +32,27 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
       }
       return { obj: node };
     },
-    getInitParams(obj: SceneNode) {
-      //const prefabId = obj.prefabId;
-      const asset = manager.getAssetId(obj);
-      return asset ? { asset } : undefined;
+    async getInitParams(obj: SceneNode, flags) {
+      const prefabId = obj.prefabId;
+      let patch: DiffPatch;
+      if (prefabId) {
+        try {
+          obj.prefabId = '';
+          const prefabData = (await manager.loadPrefabContent(prefabId)).data as DiffValue;
+          const nodeData = await manager.serializeObject(obj);
+          patch = diff(prefabData, nodeData);
+          ASSERT(diff(applyPatch(prefabData, patch), nodeData).length === 0, 'Patch test failed');
+        } finally {
+          obj.prefabId = prefabId;
+        }
+        flags.saveProps = false;
+      }
+      return prefabId
+        ? {
+            prefabId,
+            patch
+          }
+        : null;
     },
     getProps() {
       return [
@@ -47,6 +72,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'PrefabId',
           type: 'string',
+          default: '',
           get(this: SceneNode, value) {
             value.str[0] = this.prefabId;
           }
@@ -68,6 +94,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           options: {
             animatable: true
           },
+          isPersistent(this: SceneNode) {
+            return this.jointTypeT !== 'animated';
+          },
           get(this: SceneNode, value) {
             value.num[0] = this.position.x;
             value.num[1] = this.position.y;
@@ -82,6 +111,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           type: 'vec3',
           options: {
             animatable: true
+          },
+          isPersistent(this: SceneNode) {
+            return this.jointTypeS !== 'animated';
           },
           get(this: SceneNode, value) {
             value.num[0] = this.scale.x;
@@ -99,6 +131,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
             animatable: true,
             edit: 'quaternion'
           },
+          isPersistent() {
+            return false;
+          },
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
             value.num[0] = Math.round(radian2degree(zyx.x));
@@ -114,8 +149,28 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           }
         },
         {
+          name: 'QuatRotation',
+          type: 'vec4',
+          isHidden() {
+            return true;
+          },
+          isPersistent(this: SceneNode) {
+            return this.jointTypeR !== 'animated';
+          },
+          get(this: SceneNode, value) {
+            value.num[0] = this.rotation.x;
+            value.num[1] = this.rotation.y;
+            value.num[2] = this.rotation.z;
+            value.num[3] = this.rotation.w;
+          },
+          set(this: SceneNode, value) {
+            this.rotation.setXYZW(value.num[0], value.num[1], value.num[2], value.num[3]);
+          }
+        },
+        {
           name: 'Pickable',
           type: 'bool',
+          default: false,
           get(this: SceneNode, value) {
             value.bool[0] = this.pickable;
           },
@@ -126,6 +181,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Visible',
           type: 'string',
+          default: 'inherit',
           options: {
             enum: {
               labels: ['Visible', 'Hidden', 'Inherit'],
@@ -191,6 +247,15 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
                 for (const track of tracks[1]) {
                   if (!track.embedded) {
                     animation.addTrack(tracks[0], track);
+                    if (tracks[0] instanceof SceneNode) {
+                      if (track instanceof NodeTranslationTrack) {
+                        tracks[0].jointTypeT = 'animated';
+                      } else if (track instanceof NodeScaleTrack) {
+                        tracks[0].jointTypeS = 'animated';
+                      } else if (track instanceof NodeRotationTrack) {
+                        tracks[0].jointTypeR = 'animated';
+                      }
+                    }
                   }
                 }
               }

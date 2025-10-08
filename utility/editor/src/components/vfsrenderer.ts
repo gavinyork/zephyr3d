@@ -827,22 +827,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (file.meta.path.toLowerCase().endsWith('.zscn')) {
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
-        return;
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
         const name = this._vfs.basename(file.meta.path).slice(0, -4);
         eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(file.meta.path);
-        if (
-          mimeType === 'text/javascript' ||
-          mimeType === 'text/x-typescript' ||
-          mimeType === 'text/html' ||
-          mimeType === 'application/json' ||
-          mimeType === 'text/plain'
-        ) {
-          eventBus.dispatchEvent('action', 'EDIT_CODE', file.meta.path, mimeType);
-          return;
-        }
+        eventBus.dispatchEvent('action', 'EDIT_CODE', file.meta.path, mimeType);
       }
     }
     this.dispatchEvent('file_dbl_clicked', file);
@@ -880,6 +870,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             this.renameSelectedItem();
           }
 
+          if (!('subDir' in item)) {
+            ImGui.Separator();
+            if (ImGui.MenuItem('Edit as text')) {
+              const mimeType = this.VFS.guessMIMEType(item.meta.path);
+              eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
+            }
+          }
           ImGui.Separator();
           if (ImGui.MenuItem('Properties')) {
             this.showItemProperties(item);

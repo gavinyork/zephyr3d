@@ -123,6 +123,12 @@ export class SceneNode
   protected _animationSet: DRef<AnimationSet>;
   /** @internal Optional shared model reference for instancing. */
   protected _sharedModel: DRef<SharedModel>;
+  /** @internal */
+  protected _jointTypeT: 'none' | 'animated' | 'static';
+  /** @internal */
+  protected _jointTypeS: 'none' | 'animated' | 'static';
+  /** @internal */
+  protected _jointTypeR: 'none' | 'animated' | 'static';
   /** @internal Clip test flag used by renderer. */
   protected _clipMode: boolean;
   /** @internal Bounding-box visualization mode. */
@@ -204,6 +210,9 @@ export class SceneNode
     this._name = '';
     this._animationSet = new DRef();
     this._sharedModel = new DRef();
+    this._jointTypeT = 'none';
+    this._jointTypeS = 'none';
+    this._jointTypeR = 'none';
     this._bv = null;
     this._bvWorld = null;
     this._bvDirty = true;
@@ -277,6 +286,42 @@ export class SceneNode
   }
   set prefabId(id: string) {
     this._prefabId = id;
+  }
+  /**
+   * Translation type if this is a joint node of any skeleton
+   *
+   * @remarks
+   * Internal used for serialization
+   */
+  get jointTypeT() {
+    return this._jointTypeT;
+  }
+  set jointTypeT(val: 'none' | 'animated' | 'static') {
+    this._jointTypeT = val;
+  }
+  /**
+   * Scale type if this is a joint node of any skeleton
+   *
+   * @remarks
+   * Internal used for serialization
+   */
+  get jointTypeS() {
+    return this._jointTypeS;
+  }
+  set jointTypeS(val: 'none' | 'animated' | 'static') {
+    this._jointTypeS = val;
+  }
+  /**
+   * Rotation type if this is a joint node of any skeleton
+   *
+   * @remarks
+   * Internal used for serialization
+   */
+  get jointTypeR() {
+    return this._jointTypeR;
+  }
+  set jointTypeR(val: 'none' | 'animated' | 'static') {
+    this._jointTypeR = val;
   }
   /**
    * Arbitrary metadata associated with this node.
@@ -656,6 +701,47 @@ export class SceneNode
   set gpuPickable(val: boolean) {
     this._gpuPickable = !!val;
   }
+  /**
+   * Finds a scene node by its persistent ID.
+   *
+   * @typeParam T - Expected node type.
+   * @param id - Persistent identifier to match against `SceneNode.persistentId`.
+   * @returns The first matching node, or `null` if not found.
+   */
+  findNodeById<T extends SceneNode>(id: string) {
+    let node: T = null;
+    this.iterate((child) => {
+      if (child.persistentId === id) {
+        node = child as T;
+        return true;
+      }
+    });
+    return node;
+  }
+  /**
+   * Finds a scene node by name.
+   *
+   * If multiple nodes share the same name, returns the first match encountered
+   * during traversal.
+   *
+   * @typeParam T - Expected node type.
+   * @param name - Node name to match.
+   * @returns The first matching node, or `null` if not found.
+   *
+   * @remarks
+   * Names are not guaranteed unique. Prefer IDs for stable references.
+   */
+  findNodeByName<T extends SceneNode>(name: string) {
+    let node: T = null;
+    this.iterate((child) => {
+      if (child.name === name) {
+        node = child as T;
+        return true;
+      }
+    });
+    return node;
+  }
+
   /** Computed value for bounding box draw mode */
   get computedBoundingBoxDrawMode(): number {
     if (this._boxDrawMode === SceneNode.BBOXDRAW_INHERITED) {

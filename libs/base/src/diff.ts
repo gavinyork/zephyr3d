@@ -1,24 +1,24 @@
-type JSONValue = null | boolean | number | string | JSONObject | JSONArray;
-type JSONObject = { [k: string]: JSONValue };
-type JSONArray = JSONValue[];
+export type DiffValue = null | boolean | number | string | DiffObject | DiffArray;
+export type DiffObject = { [k: string]: DiffValue };
+export type DiffArray = DiffValue[];
 
-type Path = (string | number)[];
+export type DiffPath = (string | number)[];
 
-type OpSet = { kind: 'set'; path: Path; value: JSONValue };
-type OpDel = { kind: 'del'; path: Path };
-type ArrIns = { op: 'ins'; index: number; value: JSONValue };
-type ArrDel = { op: 'del'; index: number };
-type ArrSet = { op: 'set'; index: number; value: JSONValue };
-type OpArr = { kind: 'arr'; path: Path; ops: (ArrIns | ArrDel | ArrSet)[] };
+export type DiffOpSet = { kind: 'set'; path: DiffPath; value: DiffValue };
+export type DiffOpDel = { kind: 'del'; path: DiffPath };
+export type DiffArrIns = { op: 'ins'; index: number; value: DiffValue };
+export type DiffArrDel = { op: 'del'; index: number };
+export type DiffArrSet = { op: 'set'; index: number; value: DiffValue };
+export type DiffOpArr = { kind: 'arr'; path: DiffPath; ops: (DiffArrIns | DiffArrDel | DiffArrSet)[] };
 
-type Patch = (OpSet | OpDel | OpArr)[];
+export type DiffPatch = (DiffOpSet | DiffOpDel | DiffOpArr)[];
 
 // ---------- Utils ----------
 
-function isObject(x: any): x is JSONObject {
+function isObject(x: any): x is DiffObject {
   return x !== null && typeof x === 'object' && !Array.isArray(x);
 }
-function isArray(x: any): x is JSONArray {
+function isArray(x: any): x is DiffArray {
   return Array.isArray(x);
 }
 function isPrimitive(x: any): x is null | boolean | number | string {
@@ -27,7 +27,7 @@ function isPrimitive(x: any): x is null | boolean | number | string {
 function shallowEqual(a: any, b: any): boolean {
   return a === b; // 基本类型直接 ===；对象/数组时我们在递归中处理
 }
-function cloneDeep<T extends JSONValue>(v: T): T {
+function cloneDeep<T extends DiffValue>(v: T): T {
   if (isArray(v)) {
     return v.map(cloneDeep) as T;
   }
@@ -43,13 +43,13 @@ function cloneDeep<T extends JSONValue>(v: T): T {
 
 // ---------- Diff ----------
 
-export function diff(base: JSONValue, target: JSONValue): Patch {
-  const patch: Patch = [];
+export function diff(base: DiffValue, target: DiffValue): DiffPatch {
+  const patch: DiffPatch = [];
   diffInto(base, target, [], patch);
   return patch;
 }
 
-function diffInto(base: JSONValue, target: JSONValue, path: Path, out: Patch) {
+function diffInto(base: DiffValue, target: DiffValue, path: DiffPath, out: DiffPatch) {
   if (isPrimitive(base) && isPrimitive(target)) {
     if (!shallowEqual(base, target)) {
       out.push({ kind: 'set', path, value: cloneDeep(target) });
@@ -71,7 +71,7 @@ function diffInto(base: JSONValue, target: JSONValue, path: Path, out: Patch) {
   out.push({ kind: 'set', path, value: cloneDeep(target) });
 }
 
-function diffObject(baseObj: JSONObject, targetObj: JSONObject, path: Path, out: Patch) {
+function diffObject(baseObj: DiffObject, targetObj: DiffObject, path: DiffPath, out: DiffPatch) {
   const keys = new Set([...Object.keys(baseObj), ...Object.keys(targetObj)]);
   for (const k of keys) {
     const p = [...path, k];
@@ -94,8 +94,8 @@ function diffObject(baseObj: JSONObject, targetObj: JSONObject, path: Path, out:
 //   - 否则若不同或基本类型不同：arr.set(i, value)
 // - 对于 target 比 base 长的部分：顺序 arr.ins(i, v)
 // - 对于 base 比 target 长的尾部：从尾到头 arr.del(i)
-function diffArray(baseArr: JSONArray, targetArr: JSONArray, path: Path, out: Patch) {
-  const ops: (ArrIns | ArrDel | ArrSet)[] = [];
+function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out: DiffPatch) {
+  const ops: (DiffArrIns | DiffArrDel | DiffArrSet)[] = [];
   const minLen = Math.min(baseArr.length, targetArr.length);
 
   // 前缀对齐
@@ -115,7 +115,7 @@ function diffArray(baseArr: JSONArray, targetArr: JSONArray, path: Path, out: Pa
       // 递归差异将以独立的 patch 表达，但对于数组内的对象，我们更希望生成针对该索引下的 set/del 等。
       // 这里的策略：对 b 与 t 调用子 diff，收集到一个临时 patch；
       // 如果临时 patch 为空，跳过；否则将这些 patch 的 path 前缀替换为 [...path, i]
-      const sub: Patch = [];
+      const sub: DiffPatch = [];
       diffInto(b, t, [], sub);
       if (sub.length > 0) {
         // 将相对路径补上数组索引
@@ -161,7 +161,7 @@ function diffArray(baseArr: JSONArray, targetArr: JSONArray, path: Path, out: Pa
 
 // ---------- Apply ----------
 
-function getAt(root: any, path: Path): any {
+function getAt(root: any, path: DiffPath): any {
   let cur = root;
   for (const k of path) {
     cur = cur?.[k as any];
@@ -169,7 +169,7 @@ function getAt(root: any, path: Path): any {
   return cur;
 }
 
-function ensurePath(root: any, path: Path): any {
+function ensurePath(root: any, path: DiffPath): any {
   let cur = root;
   for (let i = 0; i < path.length; i++) {
     const k = path[i];
@@ -183,7 +183,7 @@ function ensurePath(root: any, path: Path): any {
   return cur;
 }
 
-function setAt(root: any, path: Path, value: any): any {
+function setAt(root: any, path: DiffPath, value: any): any {
   // 返回可能更新后的 root（包括根替换）
   if (path.length === 0) {
     // 直接替换根
@@ -196,7 +196,7 @@ function setAt(root: any, path: Path, value: any): any {
   return root;
 }
 
-function delAt(root: any, path: Path): any {
+function delAt(root: any, path: DiffPath): any {
   // 返回可能更新后的 root（包括根删除的约定行为）
   if (path.length === 0) {
     // 删除根：语义不明确，这里返回 undefined
@@ -218,7 +218,7 @@ function delAt(root: any, path: Path): any {
   return root;
 }
 
-function applyArrayOps(arr: any[], ops: (ArrIns | ArrDel | ArrSet)[]) {
+function applyArrayOps(arr: any[], ops: (DiffArrIns | DiffArrDel | DiffArrSet)[]) {
   // 与原实现一致
   for (const op of ops) {
     if (op.op === 'set') {
@@ -232,7 +232,7 @@ function applyArrayOps(arr: any[], ops: (ArrIns | ArrDel | ArrSet)[]) {
   }
   const dels = ops
     .filter((o) => o.op === 'del')
-    .sort((a, b) => (b as ArrDel).index - (a as ArrDel).index) as ArrDel[];
+    .sort((a, b) => (b as DiffArrDel).index - (a as DiffArrDel).index) as DiffArrDel[];
   for (const op of dels) {
     if (op.index >= 0 && op.index < arr.length) {
       arr.splice(op.index, 1);
@@ -240,7 +240,7 @@ function applyArrayOps(arr: any[], ops: (ArrIns | ArrDel | ArrSet)[]) {
   }
 }
 
-export function applyPatch(base: JSONValue, patch: Patch): JSONValue {
+export function applyPatch(base: DiffValue, patch: DiffPatch): DiffValue {
   // 根值可能在过程中被替换，因此必须把 root 作为变量引用持有
   let root: any = cloneDeep(base);
 
@@ -261,10 +261,10 @@ export function applyPatch(base: JSONValue, patch: Patch): JSONValue {
     }
   }
 
-  return root as JSONValue;
+  return root as DiffValue;
 }
 
-function replayArrayOps(start: any[], ops: (ArrIns | ArrDel | ArrSet)[]) {
+function replayArrayOps(start: any[], ops: (DiffArrIns | DiffArrDel | DiffArrSet)[]) {
   const arr = start.slice();
   applyArrayOps(arr, ops);
   return arr;

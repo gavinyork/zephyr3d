@@ -94,7 +94,7 @@ export class Skeleton extends Disposable {
     this._jointOffsets = null;
     this._jointTexture = new DRef();
     this._playing = false;
-    this.updateJointMatrices();
+    this.updateJointMatrices(this._bindPoseMatrices);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -232,6 +232,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   reset() {
+    this.updateJointMatrices(this._bindPoseMatrices);
     this._playing = false;
   }
   /**

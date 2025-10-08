@@ -21,7 +21,7 @@ export class DlgImport extends DialogRenderer<{ op: string; paths?: string[] }> 
   doRender(): void {
     ImGui.RadioButton('Copy to project', this._op, 0);
     ImGui.SameLine();
-    ImGui.RadioButton('Import to project', this._op, 1);
+    ImGui.RadioButton('Import as Prefab', this._op, 1);
     if (this._op[0] === 1) {
       if (this._paths === null) {
         this._msg = 'Searching for importable files...';

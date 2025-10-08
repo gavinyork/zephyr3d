@@ -76,6 +76,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
     this._skinAnimation = false;
+    this._skeletonName = '';
     this._morphAnimation = false;
     this._renderBundle = {};
     this._useRenderBundle = true;

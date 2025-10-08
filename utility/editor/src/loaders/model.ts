@@ -762,13 +762,47 @@ export class SharedModel extends Disposable {
           }
         }
         const animation = animationSet.createAnimation(name, true);
+        for (const sk of animationData.skeletons) {
+          const nodes = skeletonMeshMap.get(sk);
+          if (nodes) {
+            if (!nodes.skeleton) {
+              nodes.skeleton = new Skeleton(
+                sk.joints.map((val) => {
+                  const node = nodeMap.get(val);
+                  node.jointTypeT = 'static';
+                  node.jointTypeS = 'static';
+                  node.jointTypeR = 'static';
+                  return node;
+                }),
+                sk.inverseBindMatrices,
+                sk.bindPoseMatrices
+              );
+              for (let i = 0; i < nodes.mesh.length; i++) {
+                const mesh = nodes.mesh[i];
+                const v = {
+                  positions: nodes.bounding[i].rawPositions,
+                  blendIndices: nodes.bounding[i].rawBlendIndices,
+                  weights: nodes.bounding[i].rawJointWeights
+                };
+                mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
+                mesh.skeletonName = nodes.skeleton.persistentId;
+              }
+              animationSet.skeletons.push(new DRef(nodes.skeleton));
+            }
+            animation.addSkeleton(nodes.skeleton.persistentId);
+          }
+        }
         for (const track of animationData.tracks) {
+          const target = nodeMap.get(track.node);
           if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));
+            animation.addTrack(target, new NodeTranslationTrack(track.interpolator, true));
+            target.jointTypeT = 'animated';
           } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator, true));
+            animation.addTrack(target, new NodeScaleTrack(track.interpolator, true));
+            target.jointTypeS = 'animated';
           } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator, true));
+            animation.addTrack(target, new NodeRotationTrack(track.interpolator, true));
+            target.jointTypeR = 'animated';
           } else if (track.type === 'weights') {
             for (const m of track.node.mesh.subMeshes) {
               if (track.interpolator.stride > MAX_MORPH_TARGETS) {
@@ -788,30 +822,6 @@ export class SharedModel extends Disposable {
             }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);
-          }
-        }
-        for (const sk of animationData.skeletons) {
-          const nodes = skeletonMeshMap.get(sk);
-          if (nodes) {
-            if (!nodes.skeleton) {
-              nodes.skeleton = new Skeleton(
-                sk.joints.map((val) => nodeMap.get(val)),
-                sk.inverseBindMatrices,
-                sk.bindPoseMatrices
-              );
-              for (let i = 0; i < nodes.mesh.length; i++) {
-                const mesh = nodes.mesh[i];
-                const v = {
-                  positions: nodes.bounding[i].rawPositions,
-                  blendIndices: nodes.bounding[i].rawBlendIndices,
-                  weights: nodes.bounding[i].rawJointWeights
-                };
-                mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-                mesh.skeletonName = nodes.skeleton.persistentId;
-              }
-              animationSet.skeletons.push(new DRef(nodes.skeleton));
-            }
-            animation.addSkeleton(nodes.skeleton.persistentId);
           }
         }
       }
@@ -854,7 +864,7 @@ export class SharedModel extends Disposable {
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = await this.createPrimitive(manager, subMesh.primitive);
-          meshNode.material = (await this.createMaterial(manager, subMesh.material)).createInstance();
+          meshNode.material = await this.createMaterial(manager, subMesh.material);
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

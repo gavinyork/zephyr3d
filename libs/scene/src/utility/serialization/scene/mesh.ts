@@ -101,19 +101,6 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
-          name: 'Skeleton',
-          type: 'string',
-          isHidden() {
-            return true;
-          },
-          get(this: Mesh, value) {
-            value.str[0] = this.skeletonName;
-          },
-          set(this: Mesh, value) {
-            this.skeletonName = value.str[0];
-          }
-        },
-        {
           name: 'SkinnedBoundingInfo',
           type: 'string',
           isHidden() {
@@ -150,6 +137,19 @@ export function getMeshClass(): SerializableClass {
             } else {
               this.setSkinnedBoundingInfo(null);
             }
+          }
+        },
+        {
+          name: 'Skeleton',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: Mesh, value) {
+            value.str[0] = this.skeletonName;
+          },
+          set(this: Mesh, value) {
+            this.skeletonName = value.str[0];
           }
         },
         {
