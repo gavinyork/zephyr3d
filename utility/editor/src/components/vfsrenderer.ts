@@ -1102,7 +1102,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         return '🌍';
       case 'gltf':
       case 'glb':
-        return '🌐';
+        return '🧊';
       default:
         return '📄';
     }

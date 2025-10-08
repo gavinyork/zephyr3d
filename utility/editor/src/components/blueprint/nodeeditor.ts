@@ -271,9 +271,9 @@ export class NodeEditor extends Observable<{
   public nextNodeId() {
     return this.nodeId++;
   }
-  public saveState(): NodeEditorState {
-    const nodes = [...this.nodes.values()].map((node) => {
-      const impl = getEngine().serializationManager.serializeObject(node.impl) as IGraphNode;
+  public async saveState(): Promise<NodeEditorState> {
+    const nodes = [...this.nodes.values()].map(async (node) => {
+      const impl = (await getEngine().serializationManager.serializeObject(node.impl)) as IGraphNode;
       return {
         id: node.id,
         position: [node.position.x, node.position.y],
@@ -291,7 +291,7 @@ export class NodeEditor extends Observable<{
       endSlotId: link.endSlotId
     }));
     return {
-      nodes,
+      nodes: await Promise.all(nodes),
       links,
       canvasOffset: [this.canvasOffset.x, this.canvasOffset.y],
       canvasScale: this.canvasScale

@@ -4,7 +4,7 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '📁': 0xe000, // Folder close
   '📂': 0xe001, // Folder open
   '📦': 0xe002, // archive
-  '🌐': 0xe003, // 3D model (.obj, .fbx, .dae, .gltf)
+  '🧊': 0xe003, // 3D model (.obj, .fbx, .dae, .gltf)
   '📄': 0xe004, // file
   '🖼️': 0xe005, // image
   '🔊': 0xe006, // audio
@@ -16,7 +16,13 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '📝': 0xe00c, // text
   '🌍': 0xe00d, // earth
   '⚠️': 0xe00e, // warning
-  '♻️': 0xe00f // reinstall packages
+  '♻️': 0xe00f, // reinstall packages
+  '🌊': 0xe010, // Water
+  '⛰️': 0xe011, // Terrain
+  '✨': 0xe012, // Particle
+  '🟪': 0xe013, // Group,
+  '💡': 0xe014, // light,
+  '🦴': 0xe015 // Bone
 };
 
 export function initEmojiMapping() {

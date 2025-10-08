@@ -241,7 +241,7 @@ export class Engine {
   }
   private async writeSerializableObject(VFS: VFS, type: string, obj: any, path: string) {
     try {
-      const data = this.serializationManager.serializeObject(obj);
+      const data = await this.serializationManager.serializeObject(obj);
       const content = JSON.stringify({ type, data }, null, 2);
       await VFS.writeFile(path, content, { encoding: 'utf8', create: true });
     } catch (err) {

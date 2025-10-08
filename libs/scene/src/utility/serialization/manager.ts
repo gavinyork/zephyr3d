@@ -520,7 +520,7 @@ export class SerializationManager {
    *
    * @returns The serialized JSON structure.
    */
-  serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
+  async serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -530,7 +530,7 @@ export class SerializationManager {
       throw new Error('Serialize object failed: Cannot found serialization meta data');
     }
     let info = cls[index];
-    const initParams = info?.getInitParams?.(obj);
+    const initParams = await info?.getInitParams?.(obj);
     json = json ?? {};
     json.ClassName = info.name;
     json.Object = {};
@@ -538,7 +538,7 @@ export class SerializationManager {
       json.Init = initParams;
     }
     while (info) {
-      this.serializeObjectProps(obj, info, json.Object, asyncTasks);
+      await this.serializeObjectProps(obj, info, json.Object, asyncTasks);
       info = this.getClassByConstructor(info.parent);
     }
     return json;
@@ -676,6 +676,21 @@ export class SerializationManager {
     return primitive;
   }
   /**
+   * Load a prefab content.
+   * @param path - Path to the prefab JSON file in VFS.
+   * @returns A Promise resolving to the prefab json object, or `null` on failure.
+   */
+  async loadPrefabContent(path: string): Promise<{ type: string; data: object }> {
+    try {
+      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
+      const json = JSON.parse(content) as { type: string; data: object };
+      return json;
+    } catch (err) {
+      console.error(`Failed to load prefab from ${path}:`, err);
+      return null;
+    }
+  }
+  /**
    * Instantiate a prefab from a JSON file via VFS.
    * @param parent - Parent node to attach the instantiated prefab to.
    * @param path - Path to the prefab JSON file in VFS.
@@ -683,10 +698,11 @@ export class SerializationManager {
    */
   async instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode> {
     try {
-      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
-      const json = JSON.parse(content) as { type: string; data: object };
+      const json = await this.loadPrefabContent(path);
       ASSERT(json?.type === 'SceneNode', 'Invalid prefab format');
-      return await this.deserializeObject<SceneNode>(parent, json.data);
+      const node = await this.deserializeObject<SceneNode>(parent, json.data);
+      node.prefabId = this._vfs.normalizePath(path);
+      return node;
     } catch (err) {
       console.error(`Failed to instantiate prefab from ${path}:`, err);
       return null;
@@ -1081,7 +1097,7 @@ export class SerializationManager {
       await Promise.all(promises);
     }
   }
-  private serializeObjectProps<T extends object>(
+  private async serializeObjectProps<T extends object>(
     obj: T,
     cls: SerializableClass,
     json: object,
@@ -1115,7 +1131,7 @@ export class SerializationManager {
               : tmpVal.object[0]
               ? Array.isArray(tmpVal.object[0])
                 ? tmpVal.object[0]
-                : this.serializeObject(tmpVal.object[0], {}, asyncTasks)
+                : await this.serializeObject(tmpVal.object[0], {}, asyncTasks)
               : null;
           if (value) {
             json[k] = value;
@@ -1125,7 +1141,7 @@ export class SerializationManager {
         case 'object_array':
           json[k] = [];
           for (const p of tmpVal.object) {
-            json[k].push(this.serializeObject(p, {}, asyncTasks));
+            json[k].push(await this.serializeObject(p, {}, asyncTasks));
           }
           break;
         case 'embedded': {

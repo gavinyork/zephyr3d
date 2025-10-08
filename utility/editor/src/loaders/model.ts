@@ -854,7 +854,7 @@ export class SharedModel extends Disposable {
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = await this.createPrimitive(manager, subMesh.primitive);
-          meshNode.material = await this.createMaterial(manager, subMesh.material);
+          meshNode.material = (await this.createMaterial(manager, subMesh.material)).createInstance();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
           processMorphData(subMesh, meshData.morphWeights);

@@ -117,6 +117,8 @@ export class SceneNode
 
   /** @internal Unique persistent id. */
   protected _id: string;
+  /** @internal Prefab id */
+  protected _prefabId: string;
   /** @internal Animation set reference. */
   protected _animationSet: DRef<AnimationSet>;
   /** @internal Optional shared model reference for instancing. */
@@ -197,6 +199,7 @@ export class SceneNode
   constructor(scene: Scene) {
     super();
     this._id = randomUUID();
+    this._prefabId = '';
     this._scene = scene;
     this._name = '';
     this._animationSet = new DRef();
@@ -262,6 +265,18 @@ export class SceneNode
   }
   set persistentId(id: string) {
     this._id = id;
+  }
+  /**
+   * If not empty, this node was loaded from a prefab
+   *
+   * @remarks
+   * Internal used for serialization
+   */
+  get prefabId() {
+    return this._prefabId;
+  }
+  set prefabId(id: string) {
+    this._prefabId = id;
   }
   /**
    * Arbitrary metadata associated with this node.

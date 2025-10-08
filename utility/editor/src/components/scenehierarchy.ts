@@ -1,9 +1,18 @@
-import type { Camera, Scene, SerializableClass } from '@zephyr3d/scene';
-import { BatchGroup, SceneNode } from '@zephyr3d/scene';
+import { Camera, Scene, SerializableClass } from '@zephyr3d/scene';
+import {
+  BaseLight,
+  BatchGroup,
+  ClipmapTerrain,
+  Mesh,
+  ParticleSystem,
+  SceneNode,
+  Water
+} from '@zephyr3d/scene';
 import { TreeViewData, TreeView } from './treeview';
 import type { GenericConstructor } from '@zephyr3d/base';
 import { ProjectService } from '../core/services/project';
 import { ImGui } from '@zephyr3d/imgui';
+import { convertEmojiString } from '../helpers/emoji';
 
 class SceneData extends TreeViewData<SceneNode> {
   private _scene: Scene;
@@ -28,17 +37,25 @@ class SceneData extends TreeViewData<SceneNode> {
       if (node === node.scene.rootNode) {
         return `${node.scene.name || 'Scene'}${forceUpdate ? ' (Unsaved)' : ''}`;
       }
-      if (node.name) {
-        return node.name;
+      let emoj: string;
+      if (node instanceof Mesh) {
+        emoj = '🧊';
+      } else if (node instanceof Water) {
+        emoj = '🌊';
+      } else if (node instanceof ClipmapTerrain) {
+        emoj = '⛰️';
+      } else if (node instanceof ParticleSystem) {
+        emoj = '✨';
+      } else if (node instanceof BaseLight) {
+        emoj = '💡';
+      } else if (node instanceof Camera) {
+        emoj = '🎥';
+      } else {
+        emoj = '🟪';
       }
+      return convertEmojiString(`${emoj}${node.name || '(noname)'}`);
     }
-    let cls: SerializableClass = null;
-    let ctor = (node as any).constructor as GenericConstructor;
-    while (!cls) {
-      cls = ProjectService.serializationManager.getClassByConstructor(ctor);
-      ctor = Object.getPrototypeOf(ctor);
-    }
-    return cls.name;
+    return '(unknown)';
   }
   getDragSourcePayloadType(): string {
     return 'NODE';

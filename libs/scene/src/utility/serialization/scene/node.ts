@@ -25,6 +25,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
       return { obj: node };
     },
     getInitParams(obj: SceneNode) {
+      //const prefabId = obj.prefabId;
       const asset = manager.getAssetId(obj);
       return asset ? { asset } : undefined;
     },
@@ -41,6 +42,13 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           },
           set(this: SceneNode, value) {
             this.persistentId = value.str[0];
+          }
+        },
+        {
+          name: 'PrefabId',
+          type: 'string',
+          get(this: SceneNode, value) {
+            value.str[0] = this.prefabId;
           }
         },
         {
