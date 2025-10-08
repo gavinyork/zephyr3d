@@ -1,16 +1,88 @@
+/**
+ * A JSON-like value that can be diffed/patched.
+ *
+ * Includes primitives (`null`, `boolean`, `number`, `string`), objects, and arrays.
+ *
+ * @public
+ */
 export type DiffValue = null | boolean | number | string | DiffObject | DiffArray;
+
+/**
+ * A JSON-like object with string keys and {@link DiffValue} values.
+ *
+ * @public
+ */
 export type DiffObject = { [k: string]: DiffValue };
+
+/**
+ * A JSON-like array with {@link DiffValue} elements.
+ *
+ * @public
+ */
 export type DiffArray = DiffValue[];
 
+/**
+ * A path describing a location within a JSON-like structure.
+ *
+ * Each segment is either a string (object key) or a number (array index).
+ *
+ * Example: `["users", 0, "name"]`
+ *
+ * @public
+ */
 export type DiffPath = (string | number)[];
 
+/**
+ * A patch operation that sets the value at `path` to `value`.
+ *
+ * - Represents add/replace semantics.
+ *
+ * @public
+ */
 export type DiffOpSet = { kind: 'set'; path: DiffPath; value: DiffValue };
+
+/**
+ * A patch operation that deletes the value at `path`.
+ *
+ * @public
+ */
 export type DiffOpDel = { kind: 'del'; path: DiffPath };
+
+/**
+ * An array patch operation that inserts `value` at `index`.
+ *
+ * @public
+ */
 export type DiffArrIns = { op: 'ins'; index: number; value: DiffValue };
+
+/**
+ * An array patch operation that deletes the element at `index`.
+ *
+ * @public
+ */
 export type DiffArrDel = { op: 'del'; index: number };
+
+/**
+ * An array patch operation that sets the element at `index` to `value`.
+ *
+ * @public
+ */
 export type DiffArrSet = { op: 'set'; index: number; value: DiffValue };
+
+/**
+ * A patch operation that applies a list of array mutations (`ops`) at `path`.
+ *
+ * - The `ops` list can include insert (`ins`), delete (`del`), and set (`set`) operations.
+ *
+ * @public
+ */
 export type DiffOpArr = { kind: 'arr'; path: DiffPath; ops: (DiffArrIns | DiffArrDel | DiffArrSet)[] };
 
+/**
+ * A patch is a list of operations that can transform one {@link DiffValue} into another.
+ *
+ * @public
+ */
 export type DiffPatch = (DiffOpSet | DiffOpDel | DiffOpArr)[];
 
 // ---------- Utils ----------
@@ -25,7 +97,7 @@ function isPrimitive(x: any): x is null | boolean | number | string {
   return x === null || typeof x === 'boolean' || typeof x === 'number' || typeof x === 'string';
 }
 function shallowEqual(a: any, b: any): boolean {
-  return a === b; // 基本类型直接 ===；对象/数组时我们在递归中处理
+  return a === b;
 }
 function cloneDeep<T extends DiffValue>(v: T): T {
   if (isArray(v)) {
@@ -43,6 +115,31 @@ function cloneDeep<T extends DiffValue>(v: T): T {
 
 // ---------- Diff ----------
 
+/**
+ * Compute a patch that transforms `base` into `target`.
+ *
+ * This function emits a sequence of operations needed to convert the input value
+ * `base` into `target`. The resulting {@link DiffPatch} can be applied with
+ * {@link applyPatch}.
+ *
+ * Semantics:
+ * - Primitives: emits a single `set` if values differ.
+ * - Objects: recurses into keys; emits `set` for additions/updates and `del` for removals.
+ * - Arrays: emits an `arr` operation containing element-wise `set`, `ins`, and `del`.
+ *
+ * Notes:
+ * - Comparison for primitives uses strict equality (`===`) via `shallowEqual`.
+ * - Complex nested changes within arrays are represented either as:
+ *   - element-wise `set` when types differ or primitives differ, or
+ *   - nested operations pushed to the top-level with extended paths when elements are arrays/objects.
+ * - This is not a minimum-edit-distance diff; it's a straightforward positional diff.
+ *
+ * @param base - The source value.
+ * @param target - The desired target value.
+ * @returns A {@link DiffPatch} that converts `base` into `target`.
+ *
+ * @public
+ */
 export function diff(base: DiffValue, target: DiffValue): DiffPatch {
   const patch: DiffPatch = [];
   diffInto(base, target, [], patch);
@@ -67,7 +164,6 @@ function diffInto(base: DiffValue, target: DiffValue, path: DiffPath, out: DiffP
     return;
   }
 
-  // 类型不一致，整段替换
   out.push({ kind: 'set', path, value: cloneDeep(target) });
 }
 
@@ -88,17 +184,11 @@ function diffObject(baseObj: DiffObject, targetObj: DiffObject, path: DiffPath, 
   }
 }
 
-// 保守数组 diff：
-// - 对齐前缀：对每个 i 在 [0, minLen) 上递归：
-//   - 若元素类型相同且为对象/数组：递归 diff
-//   - 否则若不同或基本类型不同：arr.set(i, value)
-// - 对于 target 比 base 长的部分：顺序 arr.ins(i, v)
-// - 对于 base 比 target 长的尾部：从尾到头 arr.del(i)
 function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out: DiffPatch) {
   const ops: (DiffArrIns | DiffArrDel | DiffArrSet)[] = [];
   const minLen = Math.min(baseArr.length, targetArr.length);
 
-  // 前缀对齐
+  // sort prefix
   for (let i = 0; i < minLen; i++) {
     const b = baseArr[i];
     const t = targetArr[i];
@@ -110,22 +200,12 @@ function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out
       continue;
     }
 
-    // 如果二者都是数组或对象，尽量递归细化（避免整段替换）
     if ((isArray(b) && isArray(t)) || (isObject(b) && isObject(t))) {
-      // 递归差异将以独立的 patch 表达，但对于数组内的对象，我们更希望生成针对该索引下的 set/del 等。
-      // 这里的策略：对 b 与 t 调用子 diff，收集到一个临时 patch；
-      // 如果临时 patch 为空，跳过；否则将这些 patch 的 path 前缀替换为 [...path, i]
       const sub: DiffPatch = [];
       diffInto(b, t, [], sub);
       if (sub.length > 0) {
-        // 将相对路径补上数组索引
         for (const sop of sub) {
           if (sop.kind === 'arr' || sop.kind === 'set' || sop.kind === 'del') {
-            // 子 patch 的 path 是相对的（起点是该元素本身）
-            // 对于 set/del：直接合并为顶层 out 的 set/del（路径 = [...path, i, ...sop.path]）
-            // 对于 arr：将其 path 前缀为 [...path, i, ...]
-            // 注意：为了保持“数组操作与对象操作分离”的简洁，我们将子数组 op（kind: "arr"）推到 out，
-            // 而不是嵌入父级的 ops。
             const newPath = [...path, i, ...sop.path];
             if (sop.kind === 'arr') {
               out.push({ kind: 'arr', path: newPath, ops: sop.ops });
@@ -140,16 +220,13 @@ function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out
       continue;
     }
 
-    // 类型不同或一个是对象一个是基本类型 → 直接 set
     ops.push({ op: 'set', index: i, value: cloneDeep(t) });
   }
 
-  // 末尾新增
   for (let i = minLen; i < targetArr.length; i++) {
     ops.push({ op: 'ins', index: i, value: cloneDeep(targetArr[i]) });
   }
 
-  // 末尾删除（从后往前）
   for (let i = baseArr.length - 1; i >= targetArr.length; i--) {
     ops.push({ op: 'del', index: i });
   }
@@ -175,7 +252,6 @@ function ensurePath(root: any, path: DiffPath): any {
     const k = path[i];
     const next = path[i + 1];
     if (!(k in cur) || cur[k as any] === undefined || cur[k as any] === null) {
-      // 下一个是数字 → 需要数组；否则对象
       cur[k as any] = typeof next === 'number' ? [] : {};
     }
     cur = cur[k as any];
@@ -184,12 +260,9 @@ function ensurePath(root: any, path: DiffPath): any {
 }
 
 function setAt(root: any, path: DiffPath, value: any): any {
-  // 返回可能更新后的 root（包括根替换）
   if (path.length === 0) {
-    // 直接替换根
     return cloneDeep(value);
   }
-  // 常规：修改子路径
   const parent = ensurePath(root, path.slice(0, -1));
   const key = path[path.length - 1];
   parent[key as any] = cloneDeep(value);
@@ -197,10 +270,7 @@ function setAt(root: any, path: DiffPath, value: any): any {
 }
 
 function delAt(root: any, path: DiffPath): any {
-  // 返回可能更新后的 root（包括根删除的约定行为）
   if (path.length === 0) {
-    // 删除根：语义不明确，这里返回 undefined
-    // 如果你希望“清空为 {} 或 []”，可在此自定义策略
     return undefined;
   }
   const parent = getAt(root, path.slice(0, -1));
@@ -219,7 +289,6 @@ function delAt(root: any, path: DiffPath): any {
 }
 
 function applyArrayOps(arr: any[], ops: (DiffArrIns | DiffArrDel | DiffArrSet)[]) {
-  // 与原实现一致
   for (const op of ops) {
     if (op.op === 'set') {
       arr[op.index] = cloneDeep(op.value);
@@ -240,8 +309,32 @@ function applyArrayOps(arr: any[], ops: (DiffArrIns | DiffArrDel | DiffArrSet)[]
   }
 }
 
+/**
+ * Apply a {@link DiffPatch} to a given `base` value to produce a new value.
+ *
+ * Behavior:
+ * - `set`: sets/replaces the value at path (deep-cloned).
+ * - `del`: deletes the value at path; deleting the root yields `undefined`.
+ * - `arr`: applies array element `set`s first, then `ins`, then `del` (descending indices),
+ *   minimizing index-shift side-effects during mutation.
+ *
+ * Structural handling:
+ * - Intermediate containers are created as needed: arrays for numeric next keys,
+ *   objects otherwise.
+ * - If an `arr` operation targets a non-array location, the array result is
+ *   reconstructed by replaying the sub-ops against an empty array and then
+ *   placed at the path.
+ *
+ * Immutability:
+ * - The function starts by deep-cloning `base` to avoid mutating the input.
+ *
+ * @param base - The source value onto which the patch is applied.
+ * @param patch - The patch to apply (produced by {@link diff}).
+ * @returns The result of applying `patch` to `base`.
+ *
+ * @public
+ */
 export function applyPatch(base: DiffValue, patch: DiffPatch): DiffValue {
-  // 根值可能在过程中被替换，因此必须把 root 作为变量引用持有
   let root: any = cloneDeep(base);
 
   for (const op of patch) {
@@ -252,7 +345,6 @@ export function applyPatch(base: DiffValue, patch: DiffPatch): DiffValue {
     } else if (op.kind === 'arr') {
       const arr = getAt(root, op.path);
       if (!isArray(arr)) {
-        // 路径不是数组：退化为 set 整段替换（先在空数组上回放，再整体 set）
         const replaced = replayArrayOps([], op.ops);
         root = setAt(root, op.path, replaced);
       } else {
