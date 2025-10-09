@@ -1,10 +1,15 @@
 import type { EventMap } from '@zephyr3d/base';
 import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
+import { convertEmojiString } from '../helpers/emoji';
 
 export abstract class ListViewData<T = unknown> {
   abstract getItems(): T[];
-  abstract getId(item: T, index: number): string;
+  abstract getItemIcon(item: T, index: number): string;
+  abstract getItemName(item: T, index: number): string;
+  abstract getDetailColumnsInfo(): string[];
+  abstract getDetailColumn(item: T, col: number): string;
+  abstract sortDetailItems(a: T, b: T, sortBy: number, sortAscending: boolean): number;
   abstract getDragSourcePayloadType(node: T): string;
   abstract getDragSourcePayload(node: T): unknown;
   abstract getDragTargetPayloadType(node: T): string;
@@ -13,6 +18,7 @@ export abstract class ListViewData<T = unknown> {
 export type ListViewType = 'list' | 'grid' | 'detail';
 export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   protected _type: ListViewType;
+  protected _multiSelect: boolean;
   protected _gridItemSize: number;
   protected _selectedItems: Set<T>;
   protected _hoveredItem: T;
@@ -23,24 +29,33 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   protected _data: ListViewData<T>;
   protected _id: string;
   protected _pendingFocusId: string;
+  protected _detailColumnsInfo: string[];
+  private _sortBy: number;
+  private _sortAscending: boolean;
+  private _items: T[];
 
   constructor(id: string, data: ListViewData<T>) {
     super();
     this._selectedItems = new Set();
+    this._multiSelect = true;
     this._visibleRows = [];
     this._visibleDirty = true;
     this._draggingItem = false;
     this._data = data;
     this._id = id;
     this._pendingFocusId = null;
+    this._detailColumnsInfo = this._data.getDetailColumnsInfo();
     this._clipper = new ImGui.ListClipper();
+    this._sortBy = 0;
+    this._sortAscending = true;
+    this._items = [];
   }
   invalidate() {
     this._visibleDirty = true;
   }
-  renderListView(items: T[]) {
+  renderListView() {
     const rowH = ImGui.GetTextLineHeightWithSpacing();
-    const total = items.length;
+    const total = this._items.length;
     this._clipper.Begin(total, rowH);
     while (this._clipper.Step()) {
       for (let i = this._clipper.DisplayStart; i < this._clipper.DisplayEnd; i++) {
@@ -52,25 +67,172 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.handleAutoScrollWhileDragging();
     this.ensureSelectionVisible();
   }
-  renderListItem(_item: T, _index: number) {}
-  renderGridView(_items: T[]) {}
-  renderDetailView(_items: T[]) {}
+  renderListItem(item: T, index: number) {
+    const name = this._data.getItemName(item, index);
+    const icon = this._data.getItemIcon(item, index);
+    const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##item_${index}`);
+    const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
+    if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
+    }
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+    this.handleListItemRendered(item);
+  }
+  renderGridView() {
+    const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
+    const itemsPerRow = Math.max(1, Math.floor(windowWidth / (this._gridItemSize + 10)));
+
+    for (let i = 0; i < this._items.length; i++) {
+      const item = this._items[i];
+
+      if (i % itemsPerRow !== 0) {
+        ImGui.SameLine();
+      }
+
+      this.renderGridItem(item, i);
+    }
+  }
+  renderGridItem(item: T, index: number) {
+    const name = this._data.getItemName(item, index);
+    const icon = this._data.getItemIcon(item, index);
+    const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
+
+    ImGui.BeginGroup();
+
+    const iconSize = this._gridItemSize;
+    if (
+      ImGui.Selectable(
+        `##icon_${index}`,
+        isSelected,
+        ImGui.SelectableFlags.AllowDoubleClick,
+        new ImGui.ImVec2(iconSize, iconSize)
+      )
+    ) {
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
+    }
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+    this.handleListItemRendered(item);
+    const drawList = ImGui.GetWindowDrawList();
+    const pos = ImGui.GetItemRectMin();
+    const emojiStr = convertEmojiString(icon);
+    const emojiSize = ImGui.CalcTextSize(emojiStr);
+    const emojiPos = new ImGui.ImVec2(
+      pos.x + (iconSize - emojiSize.x) * 0.5,
+      pos.y + (iconSize - emojiSize.y) * 0.5
+    );
+    drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), emojiStr);
+
+    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
+    ImGui.TextWrapped(name);
+    ImGui.PopTextWrapPos();
+
+    ImGui.EndGroup();
+  }
+  renderDetailView() {
+    if (
+      ImGui.BeginTable(
+        '##TableView',
+        1 + this._detailColumnsInfo.length,
+        ImGui.TableFlags.Resizable |
+          ImGui.TableFlags.Sortable |
+          ImGui.TableFlags.BordersInnerV |
+          ImGui.TableFlags.RowBg
+      )
+    ) {
+      ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.DefaultSort);
+      for (const col of this._detailColumnsInfo) {
+        ImGui.TableSetupColumn(col);
+      }
+      ImGui.TableHeadersRow();
+
+      const sortSpecs = ImGui.TableGetSortSpecs();
+      if (sortSpecs && sortSpecs.SpecsDirty) {
+        this.handleTableSort(sortSpecs);
+        sortSpecs.SpecsDirty = false;
+      }
+
+      for (let i = 0; i < this._items.length; i++) {
+        const item = this._items[i];
+        this.renderTableRow(item, i);
+      }
+
+      ImGui.EndTable();
+    }
+  }
+  private renderTableRow(item: T, index: number) {
+    const name = this._data.getItemName(item, index);
+
+    ImGui.TableNextRow();
+    ImGui.TableSetColumnIndex(0);
+    const icon = this._data.getItemIcon(item, index);
+    const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##row_${index}`);
+    const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
+    if (
+      ImGui.Selectable(
+        label,
+        isSelected,
+        ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
+      )
+    ) {
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
+    }
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+    this.handleListItemRendered(item);
+
+    for (let i = 0; i < this._detailColumnsInfo.length; i++) {
+      const text = this._data.getDetailColumn(item, i);
+      ImGui.Text(text);
+    }
+  }
   render() {
-    const items = this._data.getItems();
+    this._items = this._data.getItems();
     const flags = this._draggingItem ? ImGui.WindowFlags.NoScrollbar : 0;
     ImGui.BeginChild(this._id, ImGui.GetContentRegionAvail(), false, flags);
     if (!ImGui.GetIO().MouseDown[0]) {
       this._draggingItem = false;
     }
     const rowH = ImGui.GetTextLineHeightWithSpacing();
-    const total = items.length;
+    const total = this._items.length;
     this._clipper.Begin(total, rowH);
     if (this._type === 'list') {
-      this.renderListView(items);
+      this.renderListView();
     } else if (this._type === 'detail') {
-      this.renderDetailView(items);
+      this.renderDetailView();
     } else if (this._type === 'grid') {
-      this.renderGridView(items);
+      this.renderGridView();
     }
     this._clipper.End();
     this.handleAutoScrollWhileDragging();
@@ -78,6 +240,25 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     ImGui.EndChild();
   }
 
+  protected handleItemClick(item: T) {
+    const io = ImGui.GetIO();
+
+    if (this._multiSelect && io.KeyCtrl) {
+      if (this._selectedItems.has(item)) {
+        this._selectedItems.delete(item);
+      } else {
+        this._selectedItems.add(item);
+      }
+    } else if (this._multiSelect && io.KeyShift && this._selectedItems.size > 0) {
+      this._selectedItems.clear();
+      this._selectedItems.add(item);
+    } else {
+      this._selectedItems.clear();
+      this._selectedItems.add(item);
+    }
+  }
+  protected handleItemDoubleClick(_item: T) {}
+  protected handleListItemRendered(_item: T) {}
   private handleAutoScrollWhileDragging() {
     if (!this._draggingItem) {
       return;
@@ -147,7 +328,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     let rowIndex = -1;
     for (let i = 0; i < this._visibleRows.length; i++) {
       const n = this._visibleRows[i];
-      if (this._data.getId(n, i) === targetId) {
+      if (this._data.getItemName(n, i) === targetId) {
         rowIndex = i;
         break;
       }
@@ -179,5 +360,13 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     }
 
     this._pendingFocusId = null;
+  }
+  private handleTableSort(sortSpecs: any) {
+    if (sortSpecs.Specs.length > 0) {
+      const spec = sortSpecs.Specs[0];
+      this._sortBy = spec.ColumnIndex;
+      this._sortAscending = spec.SortDirection === ImGui.SortDirection.Ascending;
+      this._items.sort((a, b) => this._data.sortDetailItems(a, b, this._sortBy, this._sortAscending));
+    }
   }
 }
