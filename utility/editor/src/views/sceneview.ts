@@ -650,7 +650,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.renderDeviceInfo();
     }
     if (this._showListView) {
-      ListView.testListViewRenderer('detail');
+      ListView.testListViewRenderer();
     }
   }
   play() {

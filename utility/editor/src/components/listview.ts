@@ -31,10 +31,15 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   protected _detailColumnsInfo: string[];
   private _sortBy: number;
   private _sortAscending: boolean;
+  private _cellXGap: number;
+  private _cellYGap: number;
+  private _gridItemWidth: number; // width is fixed
+  private _itemHeightCache: Map<string, number>;
   private _items: T[];
 
   constructor(id: string, data: ListViewData<T>) {
     super();
+    this._type = 'list';
     this._selectedItems = new Set();
     this._multiSelect = true;
     this._draggingItem = false;
@@ -45,6 +50,10 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this._pendingFocusId = null;
     this._detailColumnsInfo = this._data.getDetailColumnsInfo();
     this._clipper = new ImGui.ListClipper();
+    this._cellXGap = 10;
+    this._cellYGap = 10;
+    this._gridItemWidth = this._gridItemSize;
+    this._itemHeightCache = new Map();
     this._sortBy = 0;
     this._sortAscending = true;
     this._items = [];
@@ -56,7 +65,51 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     return this._type;
   }
   set type(val: ListViewType) {
-    this._type = val;
+    if (this._type !== val) {
+      this._type = val;
+      const selected = [...this.selectedItems];
+      this.deselectAll();
+      this.selectItems(selected);
+    }
+  }
+  deselectItems(items: T[]) {
+    let deselected = false;
+    for (const item of items) {
+      if (this._selectedItems.has(item)) {
+        this._selectedItems.delete(item);
+        deselected = true;
+        if (item === this._pendingFocusId) {
+          this._pendingFocusId = null;
+        }
+      }
+    }
+    if (deselected) {
+      this.onSelectionChanged();
+    }
+  }
+  deselectAll() {
+    if (this._selectedItems.size > 0) {
+      this._selectedItems.clear();
+      this._pendingFocusId = null;
+      this.onSelectionChanged();
+    }
+  }
+  selectItems(items: T[]) {
+    let selected = false;
+    for (const item of items) {
+      if (this._selectedItems.has(item)) {
+        continue;
+      }
+      this._selectedItems.add(item);
+      selected = true;
+    }
+    if (!this._pendingFocusId && this._selectedItems.size > 0) {
+      const item = this._selectedItems.values().next().value;
+      this._pendingFocusId = this._data.getItemName(item, this._items.indexOf(item));
+    }
+    if (selected) {
+      this.onSelectionChanged();
+    }
   }
   renderListView() {
     const rowH = ImGui.GetTextLineHeightWithSpacing();
@@ -95,18 +148,120 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.postRenderItem(item);
   }
   renderGridView() {
-    const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
-    const itemsPerRow = Math.max(1, Math.floor(windowWidth / (this._gridItemSize + 10)));
+    // Compute columns
+    const contentMinX = ImGui.GetWindowContentRegionMin().x;
+    const contentMaxX = ImGui.GetWindowContentRegionMax().x;
+    const windowWidth = contentMaxX - contentMinX;
+    const cellW = this._gridItemWidth;
+    const gapX = this._cellXGap;
+    const itemsPerRow = Math.max(1, Math.floor((windowWidth + gapX) / (cellW + gapX)));
+
+    const draw = ImGui.GetWindowDrawList();
+    const clipMin = draw.GetClipRectMin();
+    const clipMax = draw.GetClipRectMax();
+
+    let col = 0;
 
     for (let i = 0; i < this._items.length; i++) {
       const item = this._items[i];
+      const key = this.getItemKey(item, i);
 
-      if (i % itemsPerRow !== 0) {
-        ImGui.SameLine();
+      if (col > 0) {
+        ImGui.SameLine(0, gapX);
       }
 
-      this.renderGridItem(item, i);
+      // Estimate height before drawing
+      const estimatedH = this._itemHeightCache.get(key) ?? this._gridItemSize + 20;
+      const cellMin = ImGui.GetCursorScreenPos();
+      const cellMax = new ImGui.ImVec2(cellMin.x + cellW, cellMin.y + estimatedH);
+
+      // Visibility test at the cursor
+      const visible = this.rectsOverlap(cellMin, cellMax, clipMin, clipMax);
+      if (!visible) {
+        // Off-screen: Dummy to advance layout and keep scrollbars right
+        ImGui.Dummy(new ImGui.ImVec2(cellW, estimatedH));
+      } else {
+        // Visible: render fully and measure actual height
+        const actualH = this.renderGridItemMeasured(item, i, cellW);
+        // Update cache if changed
+        if (actualH !== estimatedH) {
+          this._itemHeightCache.set(key, actualH);
+        }
+      }
+
+      // Wrap to next row
+      col++;
+      if (col >= itemsPerRow) {
+        col = 0;
+        ImGui.Dummy(new ImGui.ImVec2(0, this._cellYGap)); // row gap
+      }
     }
+  }
+
+  private rectsOverlap(aMin: ImGui.ImVec2, aMax: ImGui.ImVec2, bMin: ImGui.ImVec2, bMax: ImGui.ImVec2) {
+    return !(aMax.x < bMin.x || aMin.x > bMax.x || aMax.y < bMin.y || aMin.y > bMax.y);
+  }
+  private renderGridItemMeasured(item: T, index: number, width: number): number {
+    const isSelected = this._selectedItems.has(item);
+    const keyCtrl = ImGui.GetIO().KeyCtrl;
+    const icon = this._data.getItemIcon(item, index);
+    const name = this._data.getItemName(item, index);
+    const iconSize = this._gridItemSize;
+
+    ImGui.BeginGroup();
+
+    // Selectable icon area: enforce width for consistent wrapping downstream
+    if (
+      ImGui.Selectable(
+        `##icon_${index}`,
+        isSelected,
+        ImGui.SelectableFlags.AllowDoubleClick,
+        new ImGui.ImVec2(width, iconSize)
+      )
+    ) {
+      if (isSelected && !keyCtrl) {
+        this.handleItemClick(item);
+      }
+    }
+    if (ImGui.IsItemHovered()) {
+      this._hoveredItem = item;
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+      this.handleItemClick(item);
+    }
+    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+      this.handleItemDoubleClick(item);
+    }
+    this.postRenderItem(item);
+
+    // Draw emoji centered in the icon rect
+    const drawList = ImGui.GetWindowDrawList();
+    const iconMin = ImGui.GetItemRectMin();
+    const emojiStr = convertEmojiString(icon);
+    const emojiSize = ImGui.CalcTextSize(emojiStr);
+    const emojiPos = new ImGui.ImVec2(
+      iconMin.x + (width - emojiSize.x) * 0.5,
+      iconMin.y + (iconSize - emojiSize.y) * 0.5
+    );
+    drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), emojiStr);
+
+    // Name text, wrapped to the cell width
+    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width);
+    ImGui.TextWrapped(name);
+    ImGui.PopTextWrapPos();
+
+    ImGui.EndGroup();
+
+    if (this._pendingFocusId && name === this._pendingFocusId) {
+      ImGui.SetScrollHereY(0.25);
+      this._pendingFocusId = null; // 命中后清空
+    }
+
+    // Measure the group bounding box (screen coords)
+    const minRect = ImGui.GetItemRectMin();
+    const maxRect = ImGui.GetItemRectMax();
+    const actualHeight = Math.max(1, maxRect.y - minRect.y);
+    return actualHeight;
   }
   renderGridItem(item: T, index: number) {
     const name = this._data.getItemName(item, index);
@@ -157,71 +312,87 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     ImGui.EndGroup();
   }
   renderDetailView() {
-    if (
-      ImGui.BeginTable(
-        '##TableView',
-        1 + this._detailColumnsInfo.length,
-        ImGui.TableFlags.Resizable |
-          ImGui.TableFlags.Sortable |
-          ImGui.TableFlags.BordersInnerV |
-          ImGui.TableFlags.RowBg
-      )
-    ) {
+    const flags =
+      ImGui.TableFlags.Resizable |
+      ImGui.TableFlags.Sortable |
+      ImGui.TableFlags.BordersInnerV |
+      ImGui.TableFlags.RowBg; // enable internal clipping + scroll
+
+    const avail = ImGui.GetContentRegionAvail();
+    const height = avail.y;
+    // Optionally bound the table to a child with size if needed
+    if (ImGui.BeginTable('##TableView', 1 + this._detailColumnsInfo.length, flags, avail)) {
+      // Header
       ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.DefaultSort);
       for (const col of this._detailColumnsInfo) {
         ImGui.TableSetupColumn(col);
       }
       ImGui.TableHeadersRow();
 
+      // Sorting
       const sortSpecs = ImGui.TableGetSortSpecs();
       if (sortSpecs && sortSpecs.SpecsDirty) {
         this.handleTableSort(sortSpecs);
         sortSpecs.SpecsDirty = false;
       }
 
+      // Row height hint
+      const rowH = ImGui.GetTextLineHeightWithSpacing();
+
+      // Table clipping is built-in with ScrollY flag.
+      // You still need to call TableNextRow per row, but only visible rows get drawn.
       for (let i = 0; i < this._items.length; i++) {
+        const posY = ImGui.GetCursorPosY() - ImGui.GetScrollY();
+        const IsVisible = posY >= -rowH && posY <= height;
+        ImGui.TableNextRow(ImGui.TableRowFlags.None, rowH);
+        if (!IsVisible) {
+          continue;
+        }
         const item = this._items[i];
-        this.renderTableRow(item, i);
+        const name = this._data.getItemName(item, i);
+
+        // Column 0: selectable with SpanAllColumns behavior
+        ImGui.TableSetColumnIndex(0);
+        const icon = this._data.getItemIcon(item, i);
+        const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##row_${i}`);
+        const isSelected = this._selectedItems.has(item);
+        const keyCtrl = ImGui.GetIO().KeyCtrl;
+
+        if (
+          ImGui.Selectable(
+            label,
+            isSelected,
+            ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
+          )
+        ) {
+          if (isSelected && !keyCtrl) {
+            this.handleItemClick(item);
+          }
+        }
+        if (ImGui.IsItemHovered()) {
+          this._hoveredItem = item;
+        }
+        if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+          this.handleItemClick(item);
+        }
+        if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
+          this.handleItemDoubleClick(item);
+        }
+        this.postRenderItem(item);
+
+        // Other columns
+        for (let c = 0; c < this._detailColumnsInfo.length; c++) {
+          ImGui.TableSetColumnIndex(1 + c);
+          ImGui.Text(this._data.getDetailColumn(item, c));
+        }
+
+        if (this._pendingFocusId && name === this._pendingFocusId) {
+          ImGui.SetScrollHereY(0.25);
+          this._pendingFocusId = null;
+        }
       }
 
       ImGui.EndTable();
-    }
-  }
-  private renderTableRow(item: T, index: number) {
-    const name = this._data.getItemName(item, index);
-
-    ImGui.TableNextRow();
-    ImGui.TableSetColumnIndex(0);
-    const icon = this._data.getItemIcon(item, index);
-    const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##row_${index}`);
-    const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
-    if (
-      ImGui.Selectable(
-        label,
-        isSelected,
-        ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
-      )
-    ) {
-      if (isSelected && !keyCtrl) {
-        this.handleItemClick(item);
-      }
-    }
-    if (ImGui.IsItemHovered()) {
-      this._hoveredItem = item;
-    }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
-      this.handleItemClick(item);
-    }
-    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
-      this.handleItemDoubleClick(item);
-    }
-    this.postRenderItem(item);
-
-    for (let i = 0; i < this._detailColumnsInfo.length; i++) {
-      ImGui.TableSetColumnIndex(i + 1);
-      const text = this._data.getDetailColumn(item, i);
-      ImGui.Text(text);
     }
   }
   render() {
@@ -231,9 +402,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     if (!ImGui.GetIO().MouseDown[0]) {
       this._draggingItem = false;
     }
-    const rowH = ImGui.GetTextLineHeightWithSpacing();
-    const total = this._items.length;
-    this._clipper.Begin(total, rowH);
     if (this._type === 'list') {
       this.renderListView();
     } else if (this._type === 'detail') {
@@ -241,7 +409,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     } else if (this._type === 'grid') {
       this.renderGridView();
     }
-    this._clipper.End();
     this.handleContextMenu();
     this.handleAutoScrollWhileDragging();
     this.ensureSelectionVisible();
@@ -359,42 +526,44 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     if (!this._pendingFocusId) {
       return;
     }
-    const targetId = this._pendingFocusId;
-    let rowIndex = -1;
-    for (let i = 0; i < this._items.length; i++) {
-      const n = this._items[i];
-      if (this._data.getItemName(n, i) === targetId) {
-        rowIndex = i;
-        break;
+    if (this._type === 'list') {
+      const targetId = this._pendingFocusId;
+      let rowIndex = -1;
+      for (let i = 0; i < this._items.length; i++) {
+        const n = this._items[i];
+        if (this._data.getItemName(n, i) === targetId) {
+          rowIndex = i;
+          break;
+        }
       }
+      if (rowIndex < 0) {
+        return;
+      }
+      const rowH = ImGui.GetTextLineHeightWithSpacing();
+      const itemTop = rowIndex * rowH;
+      const itemBottom = itemTop + rowH;
+
+      const curScroll = ImGui.GetScrollY();
+      const viewHeight = ImGui.GetWindowSize().y;
+      const viewTop = curScroll;
+      const viewBottom = curScroll + viewHeight;
+
+      let newScroll = curScroll;
+
+      if (itemTop < viewTop) {
+        newScroll = itemTop;
+      } else if (itemBottom > viewBottom) {
+        newScroll = itemBottom - viewHeight;
+      }
+
+      newScroll = Math.max(0, Math.min(ImGui.GetScrollMaxY(), newScroll));
+
+      if (newScroll !== curScroll) {
+        ImGui.SetScrollY(newScroll);
+      }
+
+      this._pendingFocusId = null;
     }
-    if (rowIndex < 0) {
-      return;
-    }
-    const rowH = ImGui.GetTextLineHeightWithSpacing();
-    const itemTop = rowIndex * rowH;
-    const itemBottom = itemTop + rowH;
-
-    const curScroll = ImGui.GetScrollY();
-    const viewHeight = ImGui.GetWindowSize().y;
-    const viewTop = curScroll;
-    const viewBottom = curScroll + viewHeight;
-
-    let newScroll = curScroll;
-
-    if (itemTop < viewTop) {
-      newScroll = itemTop;
-    } else if (itemBottom > viewBottom) {
-      newScroll = itemBottom - viewHeight;
-    }
-
-    newScroll = Math.max(0, Math.min(ImGui.GetScrollMaxY(), newScroll));
-
-    if (newScroll !== curScroll) {
-      ImGui.SetScrollY(newScroll);
-    }
-
-    this._pendingFocusId = null;
   }
   private handleTableSort(sortSpecs: any) {
     if (sortSpecs.Specs.length > 0) {
@@ -432,8 +601,13 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   private getItemUnderMouse(): T {
     return this._hoveredItem;
   }
+  private getItemKey(item: T, index: number): string {
+    // Use stable key if available from data; fallback to index
+    // Prefer something like a unique path/name from your data
+    return this._data.getItemName(item, index);
+  }
   static testDataCls = class extends ListViewData<number> {
-    private randNumbers = Array.from({ length: 100 }).map(() => Math.random());
+    private randNumbers = Array.from({ length: 5000 }).map(() => Math.random());
     getItems(): number[] {
       return this.randNumbers;
     }
@@ -463,10 +637,20 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     }
   };
   static testListView = new ListView('Test##TestListView', new this.testDataCls());
-  static testListViewRenderer(type: ListViewType) {
-    this.testListView.type = type;
+  static testListViewRenderer() {
     if (ImGui.Begin('TestListView')) {
-      ImGui.BeginChild('TestListViewContainer', ImGui.GetContentRegionAvail(), false);
+      if (ImGui.RadioButton('List', this.testListView.type === 'list')) {
+        this.testListView.type = 'list';
+      }
+      ImGui.SameLine();
+      if (ImGui.RadioButton('Grid', this.testListView.type === 'grid')) {
+        this.testListView.type = 'grid';
+      }
+      ImGui.SameLine();
+      if (ImGui.RadioButton('Detail', this.testListView.type === 'detail')) {
+        this.testListView.type = 'detail';
+      }
+      ImGui.BeginChild('TestListViewContainer', ImGui.GetContentRegionAvail(), true);
       this.testListView.render();
       ImGui.EndChild();
     }
