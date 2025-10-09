@@ -64,6 +64,7 @@ import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
+import { ListView } from '../components/listview';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -92,6 +93,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
+  private _showListView: boolean;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
@@ -125,6 +127,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._showListView = false;
     this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
@@ -328,6 +331,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
+            },
+            {
+              label: 'Test ListView',
+              id: 'SHOW_LIST_VIEW',
+              action: () => (this._showListView = !this._showListView),
+              checked: () => this._showListView
             }
           ]
         }
@@ -542,6 +551,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._showListView = false;
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
@@ -638,6 +648,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
+    }
+    if (this._showListView) {
+      ListView.testListViewRenderer('detail');
     }
   }
   play() {

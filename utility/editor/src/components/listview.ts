@@ -41,14 +41,25 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this._visibleRows = [];
     this._visibleDirty = true;
     this._draggingItem = false;
+    this._hoveredItem = null;
     this._data = data;
     this._id = id;
+    this._gridItemSize = 80;
     this._pendingFocusId = null;
     this._detailColumnsInfo = this._data.getDetailColumnsInfo();
     this._clipper = new ImGui.ListClipper();
     this._sortBy = 0;
     this._sortAscending = true;
     this._items = [];
+  }
+  get selectedItems() {
+    return this._selectedItems;
+  }
+  get type() {
+    return this._type;
+  }
+  set type(val: ListViewType) {
+    this._type = val;
   }
   invalidate() {
     this._visibleDirty = true;
@@ -213,6 +224,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.handleListItemRendered(item);
 
     for (let i = 0; i < this._detailColumnsInfo.length; i++) {
+      ImGui.TableSetColumnIndex(i + 1);
       const text = this._data.getDetailColumn(item, i);
       ImGui.Text(text);
     }
@@ -235,6 +247,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
       this.renderGridView();
     }
     this._clipper.End();
+    this.handleContextMenu();
     this.handleAutoScrollWhileDragging();
     this.ensureSelectionVisible();
     ImGui.EndChild();
@@ -256,9 +269,11 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
       this._selectedItems.clear();
       this._selectedItems.add(item);
     }
+    this.onSelectionChanged();
   }
   protected handleItemDoubleClick(_item: T) {}
   protected handleListItemRendered(_item: T) {}
+  protected onSelectionChanged() {}
   private handleAutoScrollWhileDragging() {
     if (!this._draggingItem) {
       return;
@@ -318,7 +333,8 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   protected onGetContextMenuId(_node: T): string {
     return '';
   }
-  protected onDrawContextMenu(_node: T, _menuId: string) {}
+  protected onItemContextMenu() {}
+  protected onContentContextMenu() {}
   protected onDragDrop(_node: T, _type: string, _payload: unknown) {}
   private ensureSelectionVisible() {
     if (!this._pendingFocusId) {
@@ -368,5 +384,71 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
       this._sortAscending = spec.SortDirection === ImGui.SortDirection.Ascending;
       this._items.sort((a, b) => this._data.sortDetailItems(a, b, this._sortBy, this._sortAscending));
     }
+  }
+  private handleContextMenu() {
+    if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGui.MouseButton.Right)) {
+      const clickedItem = this.getItemUnderMouse();
+      if (clickedItem) {
+        if (!this._selectedItems.has(clickedItem)) {
+          this._selectedItems.clear();
+          this._selectedItems.add(clickedItem);
+          this.onSelectionChanged();
+        }
+        ImGui.OpenPopup('##ItemContextMenu');
+      } else {
+        ImGui.OpenPopup('##ContentContextMenu');
+      }
+    }
+
+    if (ImGui.BeginPopup('##ItemContextMenu')) {
+      this.onItemContextMenu();
+      ImGui.EndPopup();
+    }
+
+    if (ImGui.BeginPopup('##ContentContextMenu')) {
+      this.onContentContextMenu();
+      ImGui.EndPopup();
+    }
+  }
+  private getItemUnderMouse(): T {
+    return this._hoveredItem;
+  }
+  static testDataCls = class extends ListViewData<number> {
+    private randNumbers = Array.from({ length: 100 }).map(() => Math.random());
+    getItems(): number[] {
+      return this.randNumbers;
+    }
+    getItemIcon(): string {
+      return '🖼️';
+    }
+    getItemName(item: number, index: number): string {
+      return `${index} - ${item}`;
+    }
+    getDetailColumnsInfo(): string[] {
+      return ['Sign', 'Value'];
+    }
+    getDetailColumn(item: number, col: number): string {
+      return col === 0 ? String(item >= 0) : String(item);
+    }
+    sortDetailItems(a: number, b: number, _sortBy: number, sortAscending: boolean): number {
+      return sortAscending ? a - b : b - a;
+    }
+    getDragSourcePayloadType(): string {
+      return 'Number';
+    }
+    getDragSourcePayload(node: number): unknown {
+      return node;
+    }
+    getDragTargetPayloadType(): string {
+      return 'Number';
+    }
+  };
+  static testListView = new ListView('Test##TestListView', new this.testDataCls());
+  static testListViewRenderer(type: ListViewType) {
+    this.testListView.type = type;
+    if (ImGui.Begin('TestListView')) {
+      this.testListView.render();
+    }
+    ImGui.End();
   }
 }
