@@ -3,7 +3,7 @@ import type { DRef, IDisposable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
-import { Skeleton } from './skeleton';
+import type { Skeleton } from './skeleton';
 
 /**
  * Options for playing an animation.

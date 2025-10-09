@@ -45,7 +45,8 @@ import {
   getPropTrackClass,
   getSkeletonClass
 } from './scene/animation';
-import { Scene, SceneNode } from '../../scene';
+import type { Scene } from '../../scene';
+import { SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';

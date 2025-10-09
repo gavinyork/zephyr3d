@@ -73,7 +73,7 @@ class VFSDirData extends TreeViewData<DirectoryInfo> {
     const name = node.path.slice(node.path.lastIndexOf('/') + 1);
     const emoji = '📁';
     const id = node.path;
-    return convertEmojiString(`${emoji}${node === this._root ? this._projectName : name}##${id}`);
+    return convertEmojiString(`${emoji}${node === this._renderer.root ? this._projectName : name}##${id}`);
   }
   getDragSourcePayloadType(): string {
     return '';
