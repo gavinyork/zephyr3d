@@ -843,7 +843,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             }
           }
           node = this._proxy.getProto(node);
-          this._sceneHierarchy.selectNode(node);
+          if (!ImGui.GetIO().KeyAlt) {
+            this._sceneHierarchy.selectNode(node?.getPrefabNode() ?? node);
+          } else {
+            this._sceneHierarchy.selectNode(node);
+          }
         }
       }
     }
