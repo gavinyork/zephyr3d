@@ -13,6 +13,7 @@ export abstract class ListViewData<T = unknown> {
   abstract sortDetailItems(a: T, b: T, sortBy: number, sortAscending: boolean): number;
   abstract getDragSourcePayloadType(lv: ListView<any>, node: T): string;
   abstract getDragSourcePayload(lv: ListView<any>, node: T): unknown;
+  abstract getDragSourceHint(lv: ListView<any>, node: T): string;
   abstract getDragTargetPayloadType(lv: ListView<any>, node: T): string;
 }
 
@@ -33,7 +34,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   private _sortAscending: boolean;
   private _cellXGap: number;
   private _cellYGap: number;
-  private _gridItemWidth: number; // width is fixed
   private _itemHeightCache: Map<string, number>;
   private _items: T[];
 
@@ -52,7 +52,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this._clipper = new ImGui.ListClipper();
     this._cellXGap = 10;
     this._cellYGap = 10;
-    this._gridItemWidth = this._gridItemSize;
     this._itemHeightCache = new Map();
     this._sortBy = 0;
     this._sortAscending = true;
@@ -64,6 +63,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   get type() {
     return this._type;
   }
+  get data() {
+    return this._data;
+  }
   set type(val: ListViewType) {
     if (this._type !== val) {
       this._type = val;
@@ -71,6 +73,12 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
       this.deselectAll();
       this.selectItems(selected);
     }
+  }
+  get gridItemSize() {
+    return this._gridItemSize;
+  }
+  set gridItemSize(val: number) {
+    this._gridItemSize = val;
   }
   deselectItems(items: T[]) {
     let deselected = false;
@@ -152,7 +160,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     const contentMinX = ImGui.GetWindowContentRegionMin().x;
     const contentMaxX = ImGui.GetWindowContentRegionMax().x;
     const windowWidth = contentMaxX - contentMinX;
-    const cellW = this._gridItemWidth;
+    const cellW = this._gridItemSize;
     const gapX = this._cellXGap;
     const itemsPerRow = Math.max(1, Math.floor((windowWidth + gapX) / (cellW + gapX)));
 
@@ -396,6 +404,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     }
   }
   render() {
+    this._hoveredItem = null;
     this._items = this._data.getItems();
     const flags = this._draggingItem ? ImGui.WindowFlags.NoScrollbar : 0;
     ImGui.BeginChild(this._id, ImGui.GetContentRegionAvail(), false, flags);
@@ -430,7 +439,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
           item,
           sourcePayloadType,
           () => this._data.getDragSourcePayload(this, item),
-          () => ImGui.Text('Hint')
+          () => ImGui.Text(this._data.getDragSourceHint(this, item))
         )
       ) {
         this._draggingItem = true;
@@ -634,6 +643,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     }
     getDragTargetPayloadType(): string {
       return 'Number';
+    }
+    getDragSourceHint(): string {
+      return 'Hint';
     }
   };
   static testListView = new ListView('Test##TestListView', new this.testDataCls());

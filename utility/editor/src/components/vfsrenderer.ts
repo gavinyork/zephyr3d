@@ -5,7 +5,6 @@ import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 import { ProjectService, type ProjectInfo } from '../core/services/project';
-import { enableWorkspaceDragging } from './dragdrop';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
@@ -17,6 +16,7 @@ import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
 import { TreeViewData, TreeView } from './treeview';
 import { DlgImport } from '../views/dlg/importdlg';
 import { importModel } from '../loaders/importer';
+import { ListView, ListViewData } from './listview';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -30,19 +30,6 @@ export type DirectoryInfo = {
   parent: DirectoryInfo;
   open: boolean;
 };
-
-enum ViewMode {
-  List = 0,
-  Grid = 1,
-  Details = 2
-}
-
-enum SortBy {
-  Name = 0,
-  Size = 1,
-  Type = 2,
-  Modified = 3
-}
 
 interface AreaBounds {
   min: ImGui.ImVec2;
@@ -96,6 +83,229 @@ class VFSDirData extends TreeViewData<DirectoryInfo> {
   }
   getDragTargetPayloadType(): string {
     return 'ASSET';
+  }
+}
+
+class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
+  renderer: VFSRenderer;
+  private _columnNames: string[];
+  constructor(renderer: VFSRenderer) {
+    super();
+    this.renderer = renderer;
+    this._columnNames = ['Size', 'Type', 'Modified'];
+  }
+  getItems() {
+    return this.renderer.currentDirContent;
+  }
+  getItemIcon(item: FileInfo | DirectoryInfo): string {
+    const isDir = 'subDir' in item;
+    return isDir ? '📁' : this.renderer.getFileEmoji(item.meta);
+  }
+  getItemName(item: FileInfo | DirectoryInfo): string {
+    const isDir = 'subDir' in item;
+    return isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : item.meta.name;
+  }
+  getDetailColumn(item: FileInfo | DirectoryInfo, col: number): string {
+    const isDir = 'subDir' in item;
+    if (col === 0) {
+      return isDir ? '--' : this.renderer.formatFileSize(item.meta.size);
+    }
+    if (col === 1) {
+      return isDir ? '' : item.meta.mimeType ?? 'File';
+    }
+    if (col === 2) {
+      return !isDir && !!item.meta.modified ? this.renderer.formatDate(item.meta.modified) : '--';
+    }
+    return '';
+  }
+  getDetailColumnsInfo(): string[] {
+    return this._columnNames;
+  }
+  sortDetailItems(
+    a: FileInfo | DirectoryInfo,
+    b: FileInfo | DirectoryInfo,
+    sortBy: number,
+    sortAscending: boolean
+  ): number {
+    const isADir = 'subDir' in a;
+    const isBDir = 'subDir' in b;
+    if (isADir && !isBDir) {
+      return -1;
+    }
+    if (!isADir && isBDir) {
+      return 1;
+    }
+    let comparison = 0;
+    switch (sortBy) {
+      case 0: {
+        const nameA = isADir ? a.path.slice(a.path.lastIndexOf('/') + 1) : (a as FileInfo).meta.name;
+        const nameB = isBDir ? b.path.slice(b.path.lastIndexOf('/') + 1) : (b as FileInfo).meta.name;
+        comparison = nameA.localeCompare(nameB);
+        break;
+      }
+      case 1:
+        if (!isADir && !isBDir) {
+          comparison = (a as FileInfo).meta.size - (b as FileInfo).meta.size;
+        }
+        break;
+
+      case 2:
+        if (!isADir && !isBDir) {
+          const typeA = (a as FileInfo).meta.mimeType || '';
+          const typeB = (b as FileInfo).meta.mimeType || '';
+          comparison = typeA.localeCompare(typeB);
+        }
+        break;
+
+      case 3:
+        if (!isADir && !isBDir) {
+          const timeA = (a as FileInfo).meta.modified?.getTime() || 0;
+          const timeB = (b as FileInfo).meta.modified?.getTime() || 0;
+          comparison = timeA - timeB;
+        }
+        break;
+    }
+    return sortAscending ? comparison : -comparison;
+  }
+  getDragSourcePayloadType(): string {
+    return this.renderer.selectedItems.size > 0 ? 'ASSET' : null;
+  }
+  getDragSourceHint(_lv, item: DirectoryInfo | FileInfo): string {
+    if (this.renderer.selectedItems.size > 0) {
+      const ctrlDown = ImGui.GetIO().KeyCtrl;
+      let icon = 'subDir' in item ? '📁' : this.renderer.getFileEmoji(item.meta);
+      if (ctrlDown) {
+        icon += '+';
+      }
+      return convertEmojiString(icon);
+    }
+    return '';
+  }
+  getDragSourcePayload(): unknown {
+    if (this.renderer.selectedItems.size > 0) {
+      return [...this.renderer.selectedItems].map((item) => ({
+        isDir: 'subDir' in item,
+        path: 'subDir' in item ? item.path : item.meta.path
+      }));
+    }
+    return null;
+  }
+  getDragTargetPayloadType(): string {
+    return null;
+  }
+}
+
+export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
+  constructor(data: VFSContentData) {
+    super('##VFSContentListView', data);
+  }
+  get renderer() {
+    return (this._data as VFSContentData).renderer;
+  }
+  protected postRenderItem(item: FileInfo | DirectoryInfo): void {
+    super.postRenderItem(item);
+    if ('subDir' in item && !this.renderer.VFS.readOnly) {
+      this.renderer.acceptFileMoveOrCopy(item.path);
+    }
+  }
+  protected onContentContextMenu(): void {
+    if (!this.renderer.VFS.readOnly) {
+      if (ImGui.BeginMenu('Create New')) {
+        if (ImGui.MenuItem('Folder...')) {
+          this.renderer.createNewFolder();
+        }
+        if (this.renderer.VFS.isParentOf('/assets', this.renderer.selectedDir.path)) {
+          ImGui.Separator();
+          if (ImGui.MenuItem('Scene...')) {
+            this.renderer.createNewFile('Create Scene', 'Scene Name', (path) => {
+              if (!path.toLowerCase().endsWith('.zscn')) {
+                path = `${path}.zscn`;
+              }
+              eventBus.dispatchEvent('action', 'NEW_DOC', path);
+            });
+          }
+          ImGui.Separator();
+          if (ImGui.MenuItem('Material...')) {
+            this.renderer.createNewFile('Create Material', 'Material Name', (path) => {
+              if (!path.toLowerCase().endsWith('.zmtl')) {
+                path = `${path}.zmtl`;
+              }
+              const name = path.slice(0, -4);
+              eventBus.dispatchEvent('edit_material', name, name, path);
+            });
+          }
+          ImGui.Separator();
+          if (ImGui.MenuItem('Typescript...')) {
+            this.renderer.createNewFile('Create Typescript', 'Script Name', async (path) => {
+              if (!path.toLowerCase().endsWith('.ts') && !path.toLowerCase().endsWith('.js')) {
+                path = `${path}.ts`;
+              }
+              await this.renderer.VFS.writeFile(path, templateScript ?? '', {
+                encoding: 'utf8',
+                create: true
+              });
+            });
+          }
+          ImGui.Separator();
+          if (ImGui.BeginMenu('Texture')) {
+            if (ImGui.MenuItem('Ramp Texture...')) {
+              this.renderer.createRampTexture(this.renderer.selectedDir.path);
+            }
+            ImGui.EndMenu();
+          }
+        }
+        ImGui.EndMenu();
+      }
+
+      ImGui.Separator();
+    }
+
+    if (ImGui.MenuItem('Refresh')) {
+      this.renderer.refreshFileView();
+    }
+  }
+  protected onItemContextMenu(): void {
+    const selectedCount = this.renderer.selectedItems.size;
+    const selectedItems = Array.from(this._selectedItems);
+
+    if (selectedCount > 0) {
+      if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
+        this.renderer.deleteSelectedItems();
+      }
+
+      if (selectedCount === 1) {
+        const item = selectedItems[0];
+
+        ImGui.Separator();
+        if (ImGui.MenuItem('Rename')) {
+          this.renderer.renameSelectedItem();
+        }
+
+        if (!('subDir' in item)) {
+          ImGui.Separator();
+          if (ImGui.MenuItem('Edit as text')) {
+            const mimeType = this.renderer.VFS.guessMIMEType(item.meta.path);
+            eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
+          }
+        }
+        ImGui.Separator();
+        if (ImGui.MenuItem('Properties')) {
+          this.renderer.showItemProperties(item);
+        }
+      }
+    }
+  }
+  protected onSelectionChanged(): void {
+    this.renderer.emitSelectedChanged();
+  }
+  protected handleItemDoubleClick(item: FileInfo | DirectoryInfo): void {
+    const isDir = 'subDir' in item;
+    if (isDir) {
+      this.renderer.nav.selectNode(item);
+      item.open = true;
+    } else {
+      this.renderer.fileDoubleClicked(item);
+    }
   }
 }
 
@@ -180,15 +390,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private readonly _project: ProjectInfo;
   private readonly _treePanel: DockPannel;
   private _nav: DirTreeView;
+  private _contentView: ContentListView;
   private _filesystem: DirectoryInfo;
   private _fileFilter: string[];
   private _currentDirContent: (FileInfo | DirectoryInfo)[] = [];
-  private _viewMode: ViewMode = ViewMode.List;
-  private _sortBy: SortBy = SortBy.Name;
-  private _sortAscending: boolean = true;
-  private readonly _selectedItems: Set<FileInfo | DirectoryInfo> = new Set();
-  private _gridItemSize: number = 80;
-  private _hoveredItem: FileInfo | DirectoryInfo | null = null;
   private _navigationBounds: AreaBounds | null = null;
   private _contentBounds: AreaBounds | null = null;
   private _isDragOverNavigation = false;
@@ -222,6 +427,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   get VFS() {
     return this._vfs;
   }
+  get nav() {
+    return this._nav;
+  }
   get fileFilter(): string[] {
     return this._fileFilter;
   }
@@ -235,10 +443,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     return this._nav?.selectedNode ?? null;
   }
   get selectedFiles() {
-    return [...this._selectedItems].filter((item) => 'meta' in item);
+    return [...this._contentView.selectedItems].filter((item) => 'meta' in item);
   }
   get selectedItems() {
-    return this._selectedItems;
+    return this._contentView.selectedItems;
+  }
+  get currentDirContent() {
+    return this._currentDirContent;
   }
   render() {
     if (ImGui.BeginChild('##VFSViewContainer', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
@@ -311,7 +522,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   private renderContentArea() {
-    this._hoveredItem = null;
     ImGui.BeginChild(
       '##VFSContentToolBar',
       new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y),
@@ -336,18 +546,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
     ImGui.BeginChild('##VFSContentInnerContainer', new ImGui.ImVec2(-1, -1), false);
     if (this.selectedDir) {
-      switch (this._viewMode) {
-        case ViewMode.List:
-          this.renderListView();
-          break;
-        case ViewMode.Grid:
-          this.renderGridView();
-          break;
-        case ViewMode.Details:
-          this.renderDetailsView();
-          break;
-      }
-      this.handleContextMenu();
+      this._contentView.render();
     } else {
       const windowSize = ImGui.GetWindowSize();
       const textSize = imGuiCalcTextSize('Select a folder to view its contents');
@@ -410,7 +609,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     };
   }
 
-  private showItemProperties(item: FileInfo | DirectoryInfo) {
+  showItemProperties(item: FileInfo | DirectoryInfo) {
     const isDir = 'subDir' in item;
     const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
     let info = `Name: ${name}\n`;
@@ -435,7 +634,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (ImGui.Button('⬆##DirUP')) {
         this.selectedDir.parent.open = true;
         this._nav.selectNode(this.selectedDir.parent);
-        //this.selectDir(this._selectedDir.parent);
       }
     } else {
       ImGui.PushStyleVar(ImGui.StyleVar.Alpha, 0.5);
@@ -487,342 +685,37 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     ImGui.Dummy(new ImGui.ImVec2(20, 0));
     ImGui.SameLine();
 
-    if (ImGui.RadioButton('List', this._viewMode === ViewMode.List)) {
-      this._viewMode = ViewMode.List;
+    if (ImGui.RadioButton('List', this._contentView?.type === 'list')) {
+      this._contentView.type = 'list';
     }
     ImGui.SameLine();
 
-    if (ImGui.RadioButton('Grid', this._viewMode === ViewMode.Grid)) {
-      this._viewMode = ViewMode.Grid;
+    if (ImGui.RadioButton('Grid', this._contentView?.type === 'grid')) {
+      this._contentView.type = 'grid';
     }
     ImGui.SameLine();
 
-    if (ImGui.RadioButton('Details', this._viewMode === ViewMode.Details)) {
-      this._viewMode = ViewMode.Details;
-    }
-
-    ImGui.SameLine();
-    ImGui.Dummy(new ImGui.ImVec2(20, 0));
-    ImGui.SameLine();
-
-    ImGui.Text('Sort by:');
-    ImGui.SameLine();
-    ImGui.SetNextItemWidth(100);
-
-    const sortItems = ['Name', 'Size', 'Type', 'Modified'];
-    const currentSort = this._sortBy;
-    if (ImGui.Combo('##SortBy', [currentSort], sortItems)) {
-      this._sortBy = currentSort;
-      this.sortContent();
-    }
-
-    ImGui.SameLine();
-    if (ImGui.Button(this._sortAscending ? '↑' : '↓')) {
-      this._sortAscending = !this._sortAscending;
-      this.sortContent();
+    if (ImGui.RadioButton('Details', this._contentView?.type === 'detail')) {
+      this._contentView.type = 'detail';
     }
 
     ImGui.SameLine();
     ImGui.Dummy(new ImGui.ImVec2(20, 0));
     ImGui.SameLine();
 
-    if (this._viewMode === ViewMode.Grid) {
+    if (this._contentView?.type === 'grid') {
       ImGui.SameLine();
       ImGui.Text('Size:');
       ImGui.SameLine();
       ImGui.SetNextItemWidth(100);
-      const size = [this._gridItemSize] as [number];
+      const size = [this._contentView.gridItemSize] as [number];
       if (ImGui.SliderInt('##GridSize', size, 40, 120)) {
-        this._gridItemSize = size[0];
+        this._contentView.gridItemSize = size[0];
       }
     }
   }
 
-  private renderListView() {
-    for (let i = 0; i < this._currentDirContent.length; i++) {
-      const item = this._currentDirContent[i];
-      this.renderListItem(item, i);
-    }
-  }
-
-  private renderGridView() {
-    const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
-    const itemsPerRow = Math.max(1, Math.floor(windowWidth / (this._gridItemSize + 10)));
-
-    for (let i = 0; i < this._currentDirContent.length; i++) {
-      const item = this._currentDirContent[i];
-
-      if (i % itemsPerRow !== 0) {
-        ImGui.SameLine();
-      }
-
-      this.renderGridItem(item, i);
-    }
-  }
-
-  private renderDetailsView() {
-    if (
-      ImGui.BeginTable(
-        '##FileTable',
-        4,
-        ImGui.TableFlags.Resizable |
-          ImGui.TableFlags.Sortable |
-          ImGui.TableFlags.BordersInnerV |
-          ImGui.TableFlags.RowBg
-      )
-    ) {
-      ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.DefaultSort);
-      ImGui.TableSetupColumn('Size');
-      ImGui.TableSetupColumn('Type');
-      ImGui.TableSetupColumn('Modified');
-      ImGui.TableHeadersRow();
-
-      const sortSpecs = ImGui.TableGetSortSpecs();
-      if (sortSpecs && sortSpecs.SpecsDirty) {
-        this.handleTableSort(sortSpecs);
-        sortSpecs.SpecsDirty = false;
-      }
-
-      for (let i = 0; i < this._currentDirContent.length; i++) {
-        const item = this._currentDirContent[i];
-        this.renderTableRow(item, i);
-      }
-
-      ImGui.EndTable();
-    }
-  }
-
-  private renderListItem(item: FileInfo | DirectoryInfo, index: number) {
-    const isDir = 'subDir' in item;
-    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
-
-    const emoji = isDir ? '📁' : this.getFileEmoji((item as FileInfo).meta);
-    const label = convertEmojiString(`${emoji} ${name}##item_${index}`);
-
-    const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
-
-    if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
-      if (isSelected && !keyCtrl) {
-        this.handleItemClick(item);
-      }
-    }
-    if (ImGui.IsItemHovered()) {
-      this._hoveredItem = item;
-    }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
-      this.handleItemClick(item);
-    }
-    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
-      this.handleItemDoubleClick(item);
-    }
-    if (isDir && !this._vfs.readOnly) {
-      this.acceptFileMoveOrCopy(item.path);
-    }
-    if (this._selectedItems.size > 0) {
-      enableWorkspaceDragging(
-        item,
-        'ASSET',
-        () =>
-          [...this.selectedItems].map((item) => {
-            return {
-              isDir: 'subDir' in item,
-              path: 'subDir' in item ? item.path : item.meta.path
-            };
-          }),
-        () => {
-          const ctrlDown = ImGui.GetIO().KeyCtrl;
-          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
-          if (ctrlDown) {
-            icon += '+';
-          }
-          ImGui.Text(convertEmojiString(icon));
-        }
-      );
-    }
-  }
-
-  private renderGridItem(item: FileInfo | DirectoryInfo, index: number) {
-    const isDir = 'subDir' in item;
-    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
-
-    const emoji = isDir ? '📁' : this.getFileEmoji((item as FileInfo).meta);
-    const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
-
-    ImGui.BeginGroup();
-
-    const iconSize = this._gridItemSize;
-    if (
-      ImGui.Selectable(
-        `##icon_${index}`,
-        isSelected,
-        ImGui.SelectableFlags.AllowDoubleClick,
-        new ImGui.ImVec2(iconSize, iconSize)
-      )
-    ) {
-      if (isSelected && !keyCtrl) {
-        this.handleItemClick(item);
-      }
-    }
-    if (ImGui.IsItemHovered()) {
-      this._hoveredItem = item;
-    }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
-      this.handleItemClick(item);
-    }
-    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
-      this.handleItemDoubleClick(item);
-    }
-    if (isDir) {
-      this.acceptFileMoveOrCopy(item.path);
-    }
-    if (this._selectedItems.size > 0) {
-      enableWorkspaceDragging(
-        item,
-        'ASSET',
-        () =>
-          [...this.selectedItems].map((item) => {
-            return {
-              isDir: 'subDir' in item,
-              path: 'subDir' in item ? item.path : item.meta.path
-            };
-          }),
-        () => {
-          const ctrlDown = ImGui.GetIO().KeyCtrl;
-          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
-          if (ctrlDown) {
-            icon += '+';
-          }
-          ImGui.Text(convertEmojiString(icon));
-        }
-      );
-    }
-
-    const drawList = ImGui.GetWindowDrawList();
-    const pos = ImGui.GetItemRectMin();
-    const emojiSize = ImGui.CalcTextSize(convertEmojiString(emoji));
-    const emojiPos = new ImGui.ImVec2(
-      pos.x + (iconSize - emojiSize.x) * 0.5,
-      pos.y + (iconSize - emojiSize.y) * 0.5
-    );
-    drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), convertEmojiString(emoji));
-
-    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
-    ImGui.TextWrapped(name);
-    ImGui.PopTextWrapPos();
-
-    ImGui.EndGroup();
-  }
-
-  private renderTableRow(item: FileInfo | DirectoryInfo, index: number) {
-    const isDir = 'subDir' in item;
-    const meta = isDir ? null : (item as FileInfo).meta;
-    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : meta.name;
-
-    ImGui.TableNextRow();
-    ImGui.TableSetColumnIndex(0);
-    const emoji = isDir ? '📁' : this.getFileEmoji(meta);
-    const label = convertEmojiString(`${emoji} ${name}##row_${index}`);
-    const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
-    if (
-      ImGui.Selectable(
-        label,
-        isSelected,
-        ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
-      )
-    ) {
-      if (isSelected && !keyCtrl) {
-        this.handleItemClick(item);
-      }
-    }
-    if (ImGui.IsItemHovered()) {
-      this._hoveredItem = item;
-    }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
-      this.handleItemClick(item);
-    }
-    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
-      this.handleItemDoubleClick(item);
-    }
-    if (this._selectedItems.size > 0) {
-      enableWorkspaceDragging(
-        item,
-        'ASSET',
-        () =>
-          [...this.selectedItems].map((item) => {
-            return {
-              isDir: 'subDir' in item,
-              path: 'subDir' in item ? item.path : item.meta.path
-            };
-          }),
-        () => {
-          const ctrlDown = ImGui.GetIO().KeyCtrl;
-          let icon = isDir ? '📁' : this.getFileEmoji(item.meta);
-          if (ctrlDown) {
-            icon += '+';
-          }
-          ImGui.Text(convertEmojiString(icon));
-        }
-      );
-    }
-
-    ImGui.TableSetColumnIndex(1);
-    if (!isDir && meta) {
-      ImGui.Text(this.formatFileSize(meta.size));
-    } else {
-      ImGui.Text('--');
-    }
-
-    ImGui.TableSetColumnIndex(2);
-    if (!isDir) {
-      if (meta?.mimeType) {
-        ImGui.Text(meta.mimeType);
-      } else {
-        ImGui.Text('File');
-      }
-    }
-
-    ImGui.TableSetColumnIndex(3);
-    const modifiedDate = isDir ? null : meta?.modified;
-    if (modifiedDate) {
-      ImGui.Text(this.formatDate(modifiedDate));
-    } else {
-      ImGui.Text('--');
-    }
-  }
-
-  private handleItemClick(item: FileInfo | DirectoryInfo) {
-    const io = ImGui.GetIO();
-
-    if (this._options.multiSelect && io.KeyCtrl) {
-      if (this._selectedItems.has(item)) {
-        this._selectedItems.delete(item);
-      } else {
-        this._selectedItems.add(item);
-      }
-    } else if (this._options.multiSelect && io.KeyShift && this._selectedItems.size > 0) {
-      this._selectedItems.clear();
-      this._selectedItems.add(item);
-    } else {
-      this._selectedItems.clear();
-      this._selectedItems.add(item);
-    }
-    this.emitSelectedChanged();
-  }
-
-  private handleItemDoubleClick(item: FileInfo | DirectoryInfo) {
-    const isDir = 'subDir' in item;
-    if (isDir) {
-      this._nav.selectNode(item as DirectoryInfo);
-      item.open = true;
-    } else {
-      this.fileDoubleClicked(item);
-    }
-  }
-
-  private fileDoubleClicked(file: FileInfo) {
+  fileDoubleClicked(file: FileInfo) {
     if (this._options.allowDblClickOpen) {
       if (file.meta.path.toLowerCase().endsWith('.zscn')) {
         // open scene
@@ -838,176 +731,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this.dispatchEvent('file_dbl_clicked', file);
   }
 
-  private handleContextMenu() {
-    if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGui.MouseButton.Right)) {
-      const clickedItem = this.getItemUnderMouse();
-      if (clickedItem) {
-        if (!this._selectedItems.has(clickedItem)) {
-          this._selectedItems.clear();
-          this._selectedItems.add(clickedItem);
-          this.emitSelectedChanged();
-        }
-        ImGui.OpenPopup('##ItemContextMenu');
-      } else {
-        ImGui.OpenPopup('##ContentContextMenu');
-      }
-    }
-
-    if (ImGui.BeginPopup('##ItemContextMenu')) {
-      const selectedCount = this._selectedItems.size;
-      const selectedItems = Array.from(this._selectedItems);
-
-      if (selectedCount > 0) {
-        if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
-          this.deleteSelectedItems();
-        }
-
-        if (selectedCount === 1) {
-          const item = selectedItems[0];
-
-          ImGui.Separator();
-          if (ImGui.MenuItem('Rename')) {
-            this.renameSelectedItem();
-          }
-
-          if (!('subDir' in item)) {
-            ImGui.Separator();
-            if (ImGui.MenuItem('Edit as text')) {
-              const mimeType = this.VFS.guessMIMEType(item.meta.path);
-              eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
-            }
-          }
-          ImGui.Separator();
-          if (ImGui.MenuItem('Properties')) {
-            this.showItemProperties(item);
-          }
-        }
-      }
-
-      ImGui.EndPopup();
-    }
-
-    if (ImGui.BeginPopup('##ContentContextMenu')) {
-      if (!this._vfs.readOnly) {
-        if (ImGui.BeginMenu('Create New')) {
-          if (ImGui.MenuItem('Folder...')) {
-            this.createNewFolder();
-          }
-          if (this._vfs.isParentOf('/assets', this.selectedDir.path)) {
-            ImGui.Separator();
-            if (ImGui.MenuItem('Scene...')) {
-              this.createNewFile('Create Scene', 'Scene Name', (path) => {
-                if (!path.toLowerCase().endsWith('.zscn')) {
-                  path = `${path}.zscn`;
-                }
-                eventBus.dispatchEvent('action', 'NEW_DOC', path);
-              });
-            }
-            ImGui.Separator();
-            if (ImGui.MenuItem('Material...')) {
-              this.createNewFile('Create Material', 'Material Name', (path) => {
-                if (!path.toLowerCase().endsWith('.zmtl')) {
-                  path = `${path}.zmtl`;
-                }
-                const name = path.slice(0, -4);
-                eventBus.dispatchEvent('edit_material', name, name, path);
-              });
-            }
-            ImGui.Separator();
-            if (ImGui.MenuItem('Typescript...')) {
-              this.createNewFile('Create Typescript', 'Script Name', async (path) => {
-                if (!path.toLowerCase().endsWith('.ts') && !path.toLowerCase().endsWith('.js')) {
-                  path = `${path}.ts`;
-                }
-                await this._vfs.writeFile(path, templateScript ?? '', { encoding: 'utf8', create: true });
-              });
-            }
-            ImGui.Separator();
-            if (ImGui.BeginMenu('Texture')) {
-              if (ImGui.MenuItem('Ramp Texture...')) {
-                this.createRampTexture(this.selectedDir.path);
-              }
-              ImGui.EndMenu();
-            }
-          }
-          ImGui.EndMenu();
-        }
-
-        ImGui.Separator();
-      }
-
-      if (ImGui.BeginMenu('View')) {
-        if (ImGui.RadioButton('List View', this._viewMode === ViewMode.List)) {
-          this._viewMode = ViewMode.List;
-        }
-        if (ImGui.RadioButton('Grid View', this._viewMode === ViewMode.Grid)) {
-          this._viewMode = ViewMode.Grid;
-        }
-        if (ImGui.RadioButton('Details View', this._viewMode === ViewMode.Details)) {
-          this._viewMode = ViewMode.Details;
-        }
-        ImGui.EndMenu();
-      }
-
-      if (ImGui.BeginMenu('Sort by')) {
-        if (ImGui.RadioButton('Name', this._sortBy === SortBy.Name)) {
-          this._sortBy = SortBy.Name;
-          this.sortContent();
-        }
-        if (ImGui.RadioButton('Size', this._sortBy === SortBy.Size)) {
-          this._sortBy = SortBy.Size;
-          this.sortContent();
-        }
-        if (ImGui.RadioButton('Type', this._sortBy === SortBy.Type)) {
-          this._sortBy = SortBy.Type;
-          this.sortContent();
-        }
-        if (ImGui.RadioButton('Modified', this._sortBy === SortBy.Modified)) {
-          this._sortBy = SortBy.Modified;
-          this.sortContent();
-        }
-        ImGui.Separator();
-        if (ImGui.MenuItem(this._sortAscending ? 'Descending' : 'Ascending')) {
-          this._sortAscending = !this._sortAscending;
-          this.sortContent();
-        }
-        ImGui.EndMenu();
-      }
-
-      if (ImGui.MenuItem('Refresh')) {
-        this.refreshFileView();
-      }
-
-      ImGui.EndPopup();
-    }
-  }
-
-  private getItemUnderMouse(): FileInfo | DirectoryInfo | null {
-    return this._hoveredItem;
-  }
-
-  private handleTableSort(sortSpecs: any) {
-    if (sortSpecs.Specs.length > 0) {
-      const spec = sortSpecs.Specs[0];
-      switch (spec.ColumnIndex) {
-        case 0:
-          this._sortBy = SortBy.Name;
-          break;
-        case 1:
-          this._sortBy = SortBy.Size;
-          break;
-        case 2:
-          this._sortBy = SortBy.Type;
-          break;
-        case 3:
-          this._sortBy = SortBy.Modified;
-          break;
-      }
-      this._sortAscending = spec.SortDirection === ImGui.SortDirection.Ascending;
-      this.sortContent();
-    }
-  }
-
   private sortContent() {
     this._currentDirContent.sort((a, b) => {
       const isADir = 'subDir' in a;
@@ -1019,44 +742,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (!isADir && isBDir) {
         return 1;
       }
-
-      let comparison = 0;
-
-      switch (this._sortBy) {
-        case SortBy.Name: {
-          const nameA = isADir ? a.path.slice(a.path.lastIndexOf('/') + 1) : (a as FileInfo).meta.name;
-          const nameB = isBDir ? b.path.slice(b.path.lastIndexOf('/') + 1) : (b as FileInfo).meta.name;
-          comparison = nameA.localeCompare(nameB);
-          break;
-        }
-        case SortBy.Size:
-          if (!isADir && !isBDir) {
-            comparison = (a as FileInfo).meta.size - (b as FileInfo).meta.size;
-          }
-          break;
-
-        case SortBy.Type:
-          if (!isADir && !isBDir) {
-            const typeA = (a as FileInfo).meta.mimeType || '';
-            const typeB = (b as FileInfo).meta.mimeType || '';
-            comparison = typeA.localeCompare(typeB);
-          }
-          break;
-
-        case SortBy.Modified:
-          if (!isADir && !isBDir) {
-            const timeA = (a as FileInfo).meta.modified?.getTime() || 0;
-            const timeB = (b as FileInfo).meta.modified?.getTime() || 0;
-            comparison = timeA - timeB;
-          }
-          break;
-      }
-
-      return this._sortAscending ? comparison : -comparison;
+      const nameA = isADir ? a.path.slice(a.path.lastIndexOf('/') + 1) : (a as FileInfo).meta.name;
+      const nameB = isBDir ? b.path.slice(b.path.lastIndexOf('/') + 1) : (b as FileInfo).meta.name;
+      return nameA.localeCompare(nameB);
     });
   }
 
-  private getFileEmoji(meta: FileMetadata): string {
+  getFileEmoji(meta: FileMetadata): string {
     if (!meta?.mimeType) {
       return '📄';
     }
@@ -1105,7 +797,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
   }
 
-  private formatFileSize(bytes: number): string {
+  formatFileSize(bytes: number): string {
     if (bytes === 0) {
       return '0 B';
     }
@@ -1117,7 +809,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  private formatDate(date: Date): string {
+  formatDate(date: Date): string {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -1148,7 +840,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
   }
 
-  private createNewFolder() {
+  createNewFolder() {
     if (!this.selectedDir) {
       return;
     }
@@ -1166,7 +858,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       }
     });
   }
-  private async createRampTexture(path: string) {
+  async createRampTexture(path: string) {
     const data = await DlgRampTextureCreator.createRampTexture(
       'Create Ramp Texture',
       true,
@@ -1181,11 +873,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       await this._vfs.writeFile(filePath, pngData, { create: true, encoding: 'binary' });
     }
   }
-  private async createNewFile(
-    title: string,
-    defaultName: string,
-    content: (path: string) => void | Promise<void>
-  ) {
+  async createNewFile(title: string, defaultName: string, content: (path: string) => void | Promise<void>) {
     if (!this.selectedDir) {
       return;
     }
@@ -1222,12 +910,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
   }
 
-  private deleteSelectedItems() {
-    if (this._selectedItems.size === 0) {
+  deleteSelectedItems() {
+    if (this.selectedItems.size === 0) {
       return;
     }
 
-    const items = Array.from(this._selectedItems);
+    const items = Array.from(this.selectedItems);
     const deletePromises = items.map((item) => {
       const isDir = 'subDir' in item;
       if (isDir) {
@@ -1239,7 +927,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
     Promise.all(deletePromises)
       .then(() => {
-        this._selectedItems.clear();
+        this._contentView.deselectAll();
         this.emitSelectedChanged();
       })
       .catch((err) => {
@@ -1267,11 +955,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     });
   }
 
-  private renameSelectedItem() {
-    if (this._selectedItems.size !== 1) {
+  renameSelectedItem() {
+    if (this.selectedItems.size !== 1) {
       return;
     }
-    this.renameItem(Array.from(this._selectedItems)[0]);
+    this.renameItem(Array.from(this.selectedItems)[0]);
   }
 
   selectDir() {
@@ -1286,10 +974,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
     this._currentDirContent = [...this.selectedDir.subDir, ...this.selectedDir.files];
     this.sortContent();
-    if (this._selectedItems.size > 0) {
-      this._selectedItems.clear();
-      this.emitSelectedChanged();
-    }
+    this._contentView.deselectAll();
   }
 
   renderDir(dir: DirectoryInfo) {
@@ -1382,6 +1067,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     const rootDir = await this.loadDirectoryInfo(this._options.rootDir);
     this._filesystem = rootDir;
     this._nav = new DirTreeView(this, this._filesystem, this._project.name);
+    this._contentView = new ContentListView(new VFSContentData(this));
 
     if (this.selectedDir) {
       const newSelectedDir = this.findDirectoryByPath(this._filesystem, this.selectedDir.path);
@@ -1536,7 +1222,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       eventBus.off('external_drop', this.handleDragEvent, this);
     }
   }
-  private acceptFileMoveOrCopy(path: string) {
+  acceptFileMoveOrCopy(path: string) {
     if (ImGui.BeginDragDropTarget()) {
       const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as { isDir: boolean; path: string }[];
       if (payload) {
