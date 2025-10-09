@@ -50,15 +50,15 @@ type VFSRendererOptions = {
 };
 
 class VFSDirData extends TreeViewData<DirectoryInfo> {
-  private _root: DirectoryInfo;
+  private _renderer: VFSRenderer;
   private _projectName: string;
-  constructor(root: DirectoryInfo, projectName: string) {
+  constructor(renderer: VFSRenderer, projectName: string) {
     super();
-    this._root = root;
+    this._renderer = renderer;
     this._projectName = projectName;
   }
   getRoot(): DirectoryInfo {
-    return this._root;
+    return this._renderer.root;
   }
   getChildren(parent: DirectoryInfo): DirectoryInfo[] {
     return parent?.subDir ?? [];
@@ -310,11 +310,9 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
 }
 
 export class DirTreeView extends TreeView<{}, DirectoryInfo> {
-  private _root: DirectoryInfo;
   private _renderer: VFSRenderer;
-  constructor(renderer: VFSRenderer, root: DirectoryInfo, projectName: string) {
-    super('###VFSNavigator', new VFSDirData(root, projectName));
-    this._root = root;
+  constructor(renderer: VFSRenderer, projectName: string) {
+    super('###VFSNavigator', new VFSDirData(renderer, projectName));
     this._renderer = renderer;
   }
   protected onGetContextMenuId(node: DirectoryInfo): string {
@@ -355,7 +353,7 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
       }
       ImGui.EndMenu();
     }
-    if (dir !== this._root && dir.path !== '/assets' && dir.path !== '/src') {
+    if (dir !== this._renderer.root && dir.path !== '/assets' && dir.path !== '/src') {
       if (ImGui.MenuItem('Delete##VFSDeleteFolder')) {
         this._renderer.VFS.deleteDirectory(dir.path, true)
           .then(() => {
@@ -415,6 +413,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._filesystem = null;
     this._fileFilter = fileFilter?.slice() ?? [];
     this._options = { rootDir: '/', allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
+    this._nav = new DirTreeView(this, this._project.name);
+    this._contentView = new ContentListView(new VFSContentData(this));
     this.loadFileSystem();
     if (this._options.allowDrop) {
       eventBus.on('external_dragenter', this.handleDragEvent, this);
@@ -429,6 +429,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
   get nav() {
     return this._nav;
+  }
+  get root() {
+    return this._filesystem;
   }
   get fileFilter(): string[] {
     return this._fileFilter;
@@ -1066,8 +1069,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     const rootDir = await this.loadDirectoryInfo(this._options.rootDir);
     this._filesystem = rootDir;
-    this._nav = new DirTreeView(this, this._filesystem, this._project.name);
-    this._contentView = new ContentListView(new VFSContentData(this));
 
     if (this.selectedDir) {
       const newSelectedDir = this.findDirectoryByPath(this._filesystem, this.selectedDir.path);
