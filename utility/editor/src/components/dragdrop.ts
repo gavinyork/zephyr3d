@@ -8,7 +8,7 @@ export function enableWorkspaceDragging(
   type: string,
   payload?: () => unknown,
   renderFunc?: () => void
-) {
+): boolean {
   if (ImGui.BeginDragDropSource()) {
     ImGui.SetDragDropPayload(type, payload ? payload() : null);
     if (renderFunc) {
@@ -19,8 +19,10 @@ export function enableWorkspaceDragging(
       isDragging = object;
       eventBus.dispatchEvent('workspace_drag_start', type, payload);
     }
+    return true;
   } else if (isDragging === object) {
     isDragging = null;
     eventBus.dispatchEvent('workspace_drag_end', type, payload);
   }
+  return false;
 }

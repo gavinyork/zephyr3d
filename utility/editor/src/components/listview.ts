@@ -2,6 +2,7 @@ import type { EventMap } from '@zephyr3d/base';
 import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
+import { enableWorkspaceDragging } from './dragdrop';
 
 export abstract class ListViewData<T = unknown> {
   abstract getItems(): T[];
@@ -10,9 +11,9 @@ export abstract class ListViewData<T = unknown> {
   abstract getDetailColumnsInfo(): string[];
   abstract getDetailColumn(item: T, col: number): string;
   abstract sortDetailItems(a: T, b: T, sortBy: number, sortAscending: boolean): number;
-  abstract getDragSourcePayloadType(node: T): string;
-  abstract getDragSourcePayload(node: T): unknown;
-  abstract getDragTargetPayloadType(node: T): string;
+  abstract getDragSourcePayloadType(lv: ListView<any>, node: T): string;
+  abstract getDragSourcePayload(lv: ListView<any>, node: T): unknown;
+  abstract getDragTargetPayloadType(lv: ListView<any>, node: T): string;
 }
 
 export type ListViewType = 'list' | 'grid' | 'detail';
@@ -22,8 +23,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   protected _gridItemSize: number;
   protected _selectedItems: Set<T>;
   protected _hoveredItem: T;
-  protected _visibleRows: T[];
-  protected _visibleDirty: boolean;
   protected _draggingItem: boolean;
   protected _clipper: ImGui.ListClipper;
   protected _data: ListViewData<T>;
@@ -38,8 +37,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     super();
     this._selectedItems = new Set();
     this._multiSelect = true;
-    this._visibleRows = [];
-    this._visibleDirty = true;
     this._draggingItem = false;
     this._hoveredItem = null;
     this._data = data;
@@ -61,16 +58,13 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   set type(val: ListViewType) {
     this._type = val;
   }
-  invalidate() {
-    this._visibleDirty = true;
-  }
   renderListView() {
     const rowH = ImGui.GetTextLineHeightWithSpacing();
     const total = this._items.length;
     this._clipper.Begin(total, rowH);
     while (this._clipper.Step()) {
       for (let i = this._clipper.DisplayStart; i < this._clipper.DisplayEnd; i++) {
-        const item = this._visibleRows[i];
+        const item = this._items[i];
         this.renderListItem(item, i);
       }
     }
@@ -98,7 +92,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-    this.handleListItemRendered(item);
+    this.postRenderItem(item);
   }
   renderGridView() {
     const windowWidth = ImGui.GetWindowContentRegionMax().x - ImGui.GetWindowContentRegionMin().x;
@@ -144,7 +138,8 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-    this.handleListItemRendered(item);
+    this.postRenderItem(item);
+
     const drawList = ImGui.GetWindowDrawList();
     const pos = ImGui.GetItemRectMin();
     const emojiStr = convertEmojiString(icon);
@@ -221,7 +216,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.handleItemDoubleClick(item);
     }
-    this.handleListItemRendered(item);
+    this.postRenderItem(item);
 
     for (let i = 0; i < this._detailColumnsInfo.length; i++) {
       ImGui.TableSetColumnIndex(i + 1);
@@ -252,7 +247,29 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.ensureSelectionVisible();
     ImGui.EndChild();
   }
-
+  protected postRenderItem(item: T) {
+    const targetPayloadType = this._data.getDragTargetPayloadType(this, item);
+    if (targetPayloadType && ImGui.BeginDragDropTarget()) {
+      const payload = ImGui.AcceptDragDropPayload(targetPayloadType);
+      if (payload) {
+        this.onDragDrop(item, targetPayloadType, payload.Data);
+      }
+      ImGui.EndDragDropTarget();
+    }
+    const sourcePayloadType = this._data.getDragSourcePayloadType(this, item);
+    if (sourcePayloadType) {
+      if (
+        enableWorkspaceDragging(
+          item,
+          sourcePayloadType,
+          () => this._data.getDragSourcePayload(this, item),
+          () => ImGui.Text('Hint')
+        )
+      ) {
+        this._draggingItem = true;
+      }
+    }
+  }
   protected handleItemClick(item: T) {
     const io = ImGui.GetIO();
 
@@ -272,7 +289,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.onSelectionChanged();
   }
   protected handleItemDoubleClick(_item: T) {}
-  protected handleListItemRendered(_item: T) {}
+  protected handleListItemRendered(_item: T): boolean {
+    return false;
+  }
   protected onSelectionChanged() {}
   private handleAutoScrollWhileDragging() {
     if (!this._draggingItem) {
@@ -342,8 +361,8 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     }
     const targetId = this._pendingFocusId;
     let rowIndex = -1;
-    for (let i = 0; i < this._visibleRows.length; i++) {
-      const n = this._visibleRows[i];
+    for (let i = 0; i < this._items.length; i++) {
+      const n = this._items[i];
       if (this._data.getItemName(n, i) === targetId) {
         rowIndex = i;
         break;
@@ -433,11 +452,11 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     sortDetailItems(a: number, b: number, _sortBy: number, sortAscending: boolean): number {
       return sortAscending ? a - b : b - a;
     }
-    getDragSourcePayloadType(): string {
-      return 'Number';
+    getDragSourcePayloadType(lv: ListView<{}, number>): string {
+      return lv.selectedItems.size > 0 ? 'Number' : null;
     }
-    getDragSourcePayload(node: number): unknown {
-      return node;
+    getDragSourcePayload(lv: ListView<{}, number>): unknown {
+      return [...lv.selectedItems];
     }
     getDragTargetPayloadType(): string {
       return 'Number';
@@ -447,7 +466,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   static testListViewRenderer(type: ListViewType) {
     this.testListView.type = type;
     if (ImGui.Begin('TestListView')) {
+      ImGui.BeginChild('TestListViewContainer', ImGui.GetContentRegionAvail(), false);
       this.testListView.render();
+      ImGui.EndChild();
     }
     ImGui.End();
   }
