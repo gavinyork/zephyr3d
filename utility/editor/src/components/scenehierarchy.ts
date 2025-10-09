@@ -29,7 +29,7 @@ class SceneData extends TreeViewData<SceneNode> {
     return node.parent;
   }
   getId(node: SceneNode): string {
-    return node.persistentId;
+    return String(node.runtimeId);
   }
   getNodeName(node: SceneNode, forceUpdate: boolean): string {
     if (node instanceof SceneNode) {
@@ -104,7 +104,7 @@ export class SceneHierarchy extends TreeView<
     this.dispatchEvent('node_double_clicked', node);
   }
   protected onGetContextMenuId(node: SceneNode): string {
-    return `context_${node.persistentId}`;
+    return `context_${node.runtimeId}`;
   }
   protected onDrawContextMenu(node: SceneNode, _menuId: string) {
     if (node !== this._scene.rootNode) {
@@ -125,7 +125,7 @@ export class SceneHierarchy extends TreeView<
     if (animationSet && animationSet.getAnimationNames().length > 0) {
       ImGui.Separator();
       if (ImGui.BeginMenu('Animation')) {
-        ImGui.PushID(node.persistentId);
+        ImGui.PushID(node.runtimeId);
         for (let i = 0; i < animationSet.getAnimationNames().length; i++) {
           if (i > 0) {
             ImGui.Separator();

@@ -346,7 +346,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         }
       });
       ani.skeletons?.forEach((v, k) => {
-        const skeleton = Skeleton.findSkeletonById(k);
+        const skeleton = this.model.findSkeletonById(k);
         if (skeleton) {
           const refcount = this._activeSkeletons.get(skeleton);
           if (refcount) {
@@ -391,7 +391,7 @@ export class AnimationSet extends Disposable implements IDisposable {
           });
         });
         ani.skeletons?.forEach((v, k) => {
-          const skeleton = Skeleton.findSkeletonById(k);
+          const skeleton = this.model.findSkeletonById(k);
           if (skeleton) {
             const refcount = this._activeSkeletons.get(skeleton);
             if (refcount === 1) {

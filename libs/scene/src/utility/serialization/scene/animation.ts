@@ -453,8 +453,9 @@ export function getSkeletonClass(): SerializableClass {
       ctx: SceneNode,
       init: { joints: string[]; inverseBindMatrices: string; bindPoseMatrices: string; id: string }
     ) {
+      const prefabNode = ctx.getPrefabNode();
       const joints = init.joints
-        .map((id) => ctx.findNodeById(id))
+        .map((id) => prefabNode.findNodeById(id))
         .map((node) => {
           node.jointTypeT = 'static';
           node.jointTypeS = 'static';
@@ -602,7 +603,8 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
                   this.addTrack(targetObj, track);
                 }
               } else if (track instanceof AnimationTrack) {
-                const node = this._animationSet.model.findNodeById(track.target);
+                const prefabNode = this._animationSet.model.getPrefabNode();
+                const node = prefabNode.findNodeById(track.target);
                 if (node) {
                   this.addTrack(node, track);
                 } else {

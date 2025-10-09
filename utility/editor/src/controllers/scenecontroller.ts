@@ -40,7 +40,12 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
     this._scenePath = '';
     this._sceneChanged = !scenePath;
     if (scenePath) {
-      await this.openScene(scenePath, false);
+      try {
+        await this.openScene(scenePath, false);
+      } catch (err) {
+        console.error(`Open scene '${scenePath}' failed: ${err}`);
+        await this.createScene(false);
+      }
     } else {
       await this.createScene(false);
     }

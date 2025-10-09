@@ -21,7 +21,9 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         const nodeData = applyPatch(prefabData, init.patch);
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get().remove();
+        tmpNode.get().prefabId = init.prefabId;
         const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData as object);
+        sceneNode.prefabId = init.prefabId;
         sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
         tmpNode.dispose();
         return { obj: sceneNode, loadProps: false };
@@ -60,7 +62,7 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           name: 'Id',
           type: 'string',
           isHidden() {
-            return true;
+            return false;
           },
           get(this: SceneNode, value) {
             value.str[0] = this.persistentId;

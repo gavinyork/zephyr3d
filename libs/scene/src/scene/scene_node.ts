@@ -101,6 +101,7 @@ export class SceneNode
   }>()
   implements NodeClonable<SceneNode>, IDisposable
 {
+  private static _runTimeId = 1;
   /*
   static readonly PICK_INHERITED = -1;
   static readonly PICK_DISABLED = 0;
@@ -115,6 +116,8 @@ export class SceneNode
   /** Draw world-space bounding box. */
   static readonly BBOXDRAW_WORLD = 2;
 
+  /** @internal Runtime unique id. */
+  protected readonly _runtimeId: number;
   /** @internal Unique persistent id. */
   protected _id: string;
   /** @internal Prefab id */
@@ -204,6 +207,7 @@ export class SceneNode
    */
   constructor(scene: Scene) {
     super();
+    this._runtimeId = SceneNode._runTimeId++;
     this._id = randomUUID();
     this._prefabId = '';
     this._scene = scene;
@@ -264,6 +268,12 @@ export class SceneNode
     }
   }
   /**
+   * Node's runtime unique identifier
+   */
+  get runtimeId() {
+    return this._runtimeId;
+  }
+  /**
    * Node's persistent identifier.
    *
    * @remarks
@@ -286,6 +296,13 @@ export class SceneNode
   }
   set prefabId(id: string) {
     this._prefabId = id;
+  }
+  /**
+   * Get prefab node this node belongs to, or null if this node does not belongs to any prefab
+   * @returns prefab node this node belongs to
+   */
+  getPrefabNode(): SceneNode {
+    return this._prefabId ? this : this.parent?.getPrefabNode() ?? null;
   }
   /**
    * Translation type if this is a joint node of any skeleton
@@ -719,6 +736,19 @@ export class SceneNode
     return node;
   }
   /**
+   * Finds a skeleton object by its persistent ID.
+   * @param id - Persistent identifier to match against `Skeleton.persistentId`.
+   * @returns The first matchign node, or `null` if not found.
+   */
+  findSkeletonById(id: string) {
+    const prefabNode = this.getPrefabNode();
+    if (prefabNode) {
+      const sk = prefabNode.animationSet.skeletons.find((sk) => sk.get().persistentId === id);
+      return sk?.get() ?? null;
+    }
+    return null;
+  }
+  /**
    * Finds a scene node by name.
    *
    * If multiple nodes share the same name, returns the first match encountered
@@ -1080,7 +1110,7 @@ export class SceneNode
    * @param deltaInSeconds - Elapsed time since previous frame in seconds
    */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
-    const animationSet = this.animationSet;
+    const animationSet = this._animationSet.get();
     if (animationSet) {
       animationSet.update(deltaInSeconds);
       this.scene.queueUpdateNode(this);

@@ -1,4 +1,4 @@
-import { ASSERT, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
+import { ASSERT, DRef, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
@@ -45,7 +45,7 @@ import {
   getPropTrackClass,
   getSkeletonClass
 } from './scene/animation';
-import type { Scene, SceneNode } from '../../scene';
+import { Scene, SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
 import type { ModelFetchOptions, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
@@ -703,8 +703,13 @@ export class SerializationManager {
     try {
       const json = await this.loadPrefabContent(path);
       ASSERT(json?.type === 'SceneNode', 'Invalid prefab format');
-      const node = await this.deserializeObject<SceneNode>(parent, json.data);
-      node.prefabId = this._vfs.normalizePath(path);
+      const tmpNode = new DRef(new SceneNode(parent.scene));
+      tmpNode.get().remove();
+      tmpNode.get().prefabId = this._vfs.normalizePath(path);
+      const node = await this.deserializeObject<SceneNode>(tmpNode.get(), json.data);
+      node.prefabId = tmpNode.get().prefabId;
+      node.parent = parent;
+      tmpNode.dispose();
       return node;
     } catch (err) {
       console.error(`Failed to instantiate prefab from ${path}:`, err);

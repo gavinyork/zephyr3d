@@ -1,7 +1,6 @@
 import { Disposable } from '@zephyr3d/base';
 import type { AnimationSet } from './animationset';
 import type { AnimationTrack } from './animationtrack';
-import { Skeleton } from './skeleton';
 
 /**
  * Animation clip
@@ -202,7 +201,7 @@ export class AnimationClip extends Disposable {
         }
       }
       for (const sk of this.skeletons) {
-        const skeleton = Skeleton.findSkeletonById(sk);
+        const skeleton = this._animationSet.model.findSkeletonById(sk);
         if (skeleton) {
           skeleton.computeJoints();
         }

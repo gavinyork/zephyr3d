@@ -13,7 +13,6 @@ import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinnedBoundingBox } from '../animation';
-import { Skeleton } from '../animation';
 
 /**
  * Mesh node
@@ -318,7 +317,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   private updateSkeletonState() {
     if (this._skeletonName) {
-      const skeleton = Skeleton.findSkeletonById(this._skeletonName);
+      const skeleton = this.findSkeletonById(this._skeletonName);
       if (skeleton?.playing) {
         this.setBoneMatrices(skeleton.jointTexture);
         skeleton.computeBoundingBox(this._skinnedBoundingInfo, this.invWorldMatrix);
