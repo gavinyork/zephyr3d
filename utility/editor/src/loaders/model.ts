@@ -685,7 +685,7 @@ export class SharedModel extends Disposable {
           continue;
         }
         ASSERT(!!ext, `Unknown image mime type: ${mimeType}`);
-        const path = manager.VFS.join(destPath, `${destName}_texture${i}${ext}`);
+        const path = manager.VFS.join(destPath, `${destName}_texture_${i}${ext}`);
         if (img.uri) {
           img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
         }
@@ -703,7 +703,7 @@ export class SharedModel extends Disposable {
     if (materialKeys.length > 0) {
       console.info(`Importing ${materialKeys.length} materials`);
       for (const k of materialKeys) {
-        const path = manager.VFS.join(destPath, `${destName}_material${k}.zmtl`);
+        const path = manager.VFS.join(destPath, `${destName}_material_${k}.zmtl`);
         const m = await this.createMaterial(manager, this._materialList[k]);
         const data = await manager.serializeObject(m);
         const content = JSON.stringify({ type: 'Default', data }, null, '  ');
@@ -716,7 +716,7 @@ export class SharedModel extends Disposable {
       console.info(`Importing ${this._primitiveList.length} meshes`);
       for (let i = 0; i < this._primitiveList.length; i++) {
         const info = this._primitiveList[i];
-        const path = manager.VFS.join(destPath, `${destName}_mesh${i}.zmsh`);
+        const path = manager.VFS.join(destPath, `${destName}_mesh_${i}.zmsh`);
         const data = {
           vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
           indices: info.indices

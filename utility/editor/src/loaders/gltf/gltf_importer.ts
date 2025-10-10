@@ -600,12 +600,14 @@ export class GLTFImporter implements ModelImporter {
           const hasVertexNormal = !!primitive.vertices['normal'];
           const hasVertexColor = !!primitive.vertices['diffuse'];
           const hasVertexTangent = !!primitive.vertices['tangent'];
-          const materialHash = [
-            p.material ?? '',
+          const flagsHash = [
             hasVertexNormal ? 'N' : '',
             hasVertexColor ? 'C' : '',
             hasVertexTangent ? 'T' : ''
-          ].join('.');
+          ]
+            .filter((v) => !!v)
+            .join('');
+          const materialHash = [p.material ?? 'default', flagsHash].join('.');
           let material = model.getMaterial(materialHash);
           if (!material) {
             const materialInfo = p.material !== undefined ? gltf.materials[p.material] : null;
