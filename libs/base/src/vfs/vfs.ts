@@ -820,6 +820,12 @@ export abstract class VFS extends Observable<{
     }
 
     const existed = await this._exists(normalizedPath);
+    if (existed) {
+      const stat = await this._stat(normalizedPath);
+      if (stat.isDirectory) {
+        throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+      }
+    }
     await this._writeFile(normalizedPath, data, options);
     this.onChange(existed ? 'modified' : 'created', normalizedPath, 'file');
   }

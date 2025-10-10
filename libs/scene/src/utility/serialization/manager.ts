@@ -747,7 +747,7 @@ export class SerializationManager {
     const asyncTasks: Promise<unknown>[] = [];
     const content = await this.serializeObject(scene, null, asyncTasks);
     await Promise.all(asyncTasks);
-    await this._vfs.writeFile(filename, JSON.stringify(content), {
+    await this._vfs.writeFile(filename, JSON.stringify(content, null, 2), {
       encoding: 'utf8',
       create: true
     });

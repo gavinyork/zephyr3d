@@ -230,6 +230,7 @@ export function guessMimeType(path: string): string {
     '.ktx': 'image/ktx',
     '.ktx2': 'image/ktx2',
     // zephyr3d specific
+    '.zbpt': 'application/vnd.zephyr3d.blueprint+json',
     '.zmsh': 'application/vnd.zephyr3d.mesh+json',
     '.zmtl': 'application/vnd.zephyr3d.material+json',
     '.zscn': 'application/vnd.zephyr3d.scene+json',

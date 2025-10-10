@@ -143,7 +143,7 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           400
         );
         if (name) {
-          this._scenePath = name;
+          this._scenePath = name.endsWith('.zscn') ? name : `${name}.zscn`;
           await this.sceneAction('SAVE_DOC');
         }
         break;

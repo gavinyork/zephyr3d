@@ -1,4 +1,4 @@
-import type { HttpDirectoryReader } from '@zephyr3d/base';
+import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
 import { formatString, HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
 import { templateIndex, templateIndexHTML } from '../build/templates';
@@ -34,13 +34,23 @@ type EditorManifest = {
 
 const META_DATABASE_NAME = 'zephyr3d-editor';
 const metaVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
+let projectVFS: VFS = metaVFS;
 
 export class ProjectService {
   private static _currentProject = '';
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
 
   static get VFS() {
-    return getEngine().VFS;
+    return projectVFS;
+  }
+  static set VFS(vfs: VFS) {
+    if (projectVFS && projectVFS !== metaVFS) {
+      projectVFS.close();
+    }
+    projectVFS = vfs;
+    if (getEngine()) {
+      getEngine().VFS = vfs;
+    }
   }
   static get serializationManager() {
     return getEngine().serializationManager;
@@ -120,7 +130,7 @@ export class ProjectService {
   static async closeCurrentProject() {
     if (this._currentProject) {
       this._currentProject = '';
-      getEngine().VFS = metaVFS;
+      this.VFS = metaVFS;
     }
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
@@ -135,7 +145,8 @@ export class ProjectService {
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
 
-    getEngine().VFS = new IndexedDBFS(info.uuid, '$');
+    this.VFS = new IndexedDBFS(info.uuid, '$');
+
     this._currentProject = uuid;
     console.info(`Project opened: ${uuid}`);
     return info;
@@ -144,7 +155,7 @@ export class ProjectService {
     if (this._currentProject) {
       throw new Error('Current project must be closed before opening another project');
     }
-    getEngine().VFS = new HttpFS(url, { directoryReader });
+    this.VFS = new HttpFS(url, { directoryReader });
     console.info(`Remote project opened: ${url}`);
     return {
       name: url,

@@ -85,6 +85,7 @@ const editorApp = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
   runtimeOptions: {
+    VFS: ProjectService.VFS,
     scriptsRoot: '/assets',
     editorMode: true,
     enabled: !!project

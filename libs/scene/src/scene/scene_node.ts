@@ -11,7 +11,7 @@ import type { IDisposable, Quaternion } from '@zephyr3d/base';
 import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
-import { AnimationSet } from '../animation';
+import { AnimationSet, Skeleton } from '../animation';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
@@ -743,7 +743,11 @@ export class SceneNode
   findSkeletonById(id: string) {
     const prefabNode = this.getPrefabNode();
     if (prefabNode) {
-      const sk = prefabNode.animationSet.skeletons.find((sk) => sk.get().persistentId === id);
+      let sk: DRef<Skeleton> = null;
+      prefabNode.iterate((node) => {
+        sk = node.animationSet.skeletons.find((s) => s.get().persistentId === id);
+        return !!sk;
+      });
       return sk?.get() ?? null;
     }
     return null;
@@ -1112,8 +1116,12 @@ export class SceneNode
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     const animationSet = this._animationSet.get();
     if (animationSet) {
-      animationSet.update(deltaInSeconds);
-      this.scene.queueUpdateNode(this);
+      if (animationSet.numAnimations > 0 || animationSet.skeletons.length > 0) {
+        animationSet.update(deltaInSeconds);
+        this.scene.queueUpdateNode(this);
+      } else {
+        this._animationSet.dispose();
+      }
     }
   }
   /**
