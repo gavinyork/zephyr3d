@@ -1,6 +1,6 @@
 import type * as draco3d from 'draco3d';
 import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
-import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator } from '@zephyr3d/base';
+import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, ASSERT } from '@zephyr3d/base';
 import { AssetHierarchyNode } from '../model';
 import type {
   AssetMeshData,
@@ -45,7 +45,6 @@ import {
 } from '@zephyr3d/device';
 import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf_types';
 import type { ModelImporter } from '../importer';
-import { ProjectService } from '../../core/services/project';
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -76,16 +75,17 @@ export class GLTFImporter implements ModelImporter {
       });
     });
   }
-  async import(data: Blob, model: SharedModel): Promise<boolean> {
+  async import(data: Blob, model: SharedModel) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(buffer, model);
+      await this.loadBinary(buffer, model);
+      return;
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._loadedBuffers = null;
-    return this.loadJson(gltf, model);
+    await this.loadJson(gltf, model);
   }
-  async loadBinary(buffer: ArrayBuffer, model: SharedModel): Promise<boolean> {
+  async loadBinary(buffer: ArrayBuffer, model: SharedModel) {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: GLTFContent = null;
@@ -100,13 +100,11 @@ export class GLTFImporter implements ModelImporter {
         buffers.push(buffer.slice(info.start, info.start + info.length));
       }
     }
-    if (gltf) {
-      gltf._loadedBuffers = buffers;
-      return this.loadJson(gltf, model);
-    }
-    return null;
+    ASSERT(!!gltf, 'Invalid GLTF format');
+    gltf._loadedBuffers = buffers;
+    await this.loadJson(gltf, model);
   }
-  async loadJson(gltf: GLTFContent, model: SharedModel): Promise<boolean> {
+  async loadJson(gltf: GLTFContent, model: SharedModel) {
     // check extensions
     if (
       !gltf._dracoModule &&
@@ -114,10 +112,7 @@ export class GLTFImporter implements ModelImporter {
       gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0
     ) {
       await this.initDraco3d(gltf);
-      if (!gltf._dracoModule) {
-        console.error('Draco3d is required for loading model');
-        return null;
-      }
+      ASSERT(!!gltf._dracoModule, 'Draco3d is required for loading model');
     }
     gltf._accessors = [];
     gltf._nodes = [];
@@ -126,10 +121,7 @@ export class GLTFImporter implements ModelImporter {
     const asset = gltf.asset;
     if (asset) {
       const gltfVersion = asset.version;
-      if (gltfVersion !== '2.0') {
-        console.error(`Invalid GLTF version: ${gltfVersion}`);
-        return null;
-      }
+      ASSERT(gltfVersion === '2.0', `Invalid GLTF version: ${gltfVersion}`);
     }
     gltf._baseURI = model.pathName;
     if (!gltf._loadedBuffers) {
@@ -138,11 +130,8 @@ export class GLTFImporter implements ModelImporter {
       if (buffers) {
         for (const buffer of buffers) {
           const uri = this._normalizeURI(gltf._baseURI, buffer.uri);
-          const buf = await ProjectService.serializationManager.fetchBinary(uri);
-          if (buffer.byteLength !== buf.byteLength) {
-            console.error(`Invalid GLTF: buffer byte length error.`);
-            return null;
-          }
+          const buf = (await model.VFS.readFile(uri, { encoding: 'binary' })) as ArrayBuffer; // ProjectService.serializationManager.fetchBinary(uri);
+          ASSERT(buffer.byteLength === buf.byteLength, 'Invalid GLTF: buffer byte length error.');
           gltf._loadedBuffers.push(buf);
         }
       }
@@ -154,30 +143,27 @@ export class GLTFImporter implements ModelImporter {
       }
     }
     const scenes = gltf.scenes;
-    if (scenes) {
-      const sharedModel = model;
-      await this._loadMeshes(sharedModel, gltf);
-      this._loadNodes(gltf, sharedModel);
-      this._loadSkins(gltf, sharedModel);
-      for (let i = 0; i < gltf.nodes?.length; i++) {
-        if (typeof gltf.nodes[i].skin === 'number' && gltf.nodes[i].skin >= 0) {
-          gltf._nodes[i].skeleton = sharedModel.skeletons[gltf.nodes[i].skin];
-        }
+    ASSERT(!!scenes, 'No scenes found in model');
+    const sharedModel = model;
+    await this._loadMeshes(sharedModel, gltf);
+    this._loadNodes(gltf, sharedModel);
+    this._loadSkins(gltf, sharedModel);
+    for (let i = 0; i < gltf.nodes?.length; i++) {
+      if (typeof gltf.nodes[i].skin === 'number' && gltf.nodes[i].skin >= 0) {
+        gltf._nodes[i].skeleton = sharedModel.skeletons[gltf.nodes[i].skin];
       }
-      this._loadAnimations(gltf, sharedModel);
-      for (const scene of scenes) {
-        const assetScene = new AssetScene(scene.name);
-        for (const node of scene.nodes) {
-          assetScene.rootNodes.push(gltf._nodes[node]);
-        }
-        sharedModel.scenes.push(assetScene);
-      }
-      if (typeof gltf.scene === 'number') {
-        sharedModel.activeScene = gltf.scene;
-      }
-      return true;
     }
-    return false;
+    this._loadAnimations(gltf, sharedModel);
+    for (const scene of scenes) {
+      const assetScene = new AssetScene(scene.name);
+      for (const node of scene.nodes) {
+        assetScene.rootNodes.push(gltf._nodes[node]);
+      }
+      sharedModel.scenes.push(assetScene);
+    }
+    if (typeof gltf.scene === 'number') {
+      sharedModel.activeScene = gltf.scene;
+    }
   }
   /** @internal */
   private _normalizeURI(baseURI: string, uri: string) {

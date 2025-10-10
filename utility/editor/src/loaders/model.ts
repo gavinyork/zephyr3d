@@ -577,6 +577,10 @@ export class SharedModel extends Disposable {
     this._materialList = {};
     this._activeScene = -1;
   }
+  /** VFS */
+  get VFS() {
+    return this._vfs;
+  }
   /** Path */
   get pathName(): string {
     return this._pathname;
@@ -642,86 +646,101 @@ export class SharedModel extends Disposable {
     const tmpScene = new Scene();
     const node = await this.createSceneNode(manager, tmpScene, false);
     const data = await manager.serializeObject(node);
+    const numSkeletons = node.animationSet?.skeletons?.length ?? 0;
+    const numAnimations = node.animationSet?.getAnimationNames().length ?? 0;
     tmpScene.dispose();
     const content = JSON.stringify({ type: 'SceneNode', data }, null, '  ');
     await manager.VFS.writeFile(manager.VFS.join(path, `${this._name}.zprefab`), content, {
       encoding: 'utf8',
       create: true
     });
+    console.info(
+      `Successfully created prefab with ${numSkeletons} skeletons and ${numAnimations} animations: ${path}`
+    );
   }
   /** preprocess */
   async preprocess(manager: SerializationManager, destName: string, destPath: string): Promise<void> {
     const srcVFS = this._vfs ?? manager.VFS;
-    for (let i = 0; i < this._imageList.length; i++) {
-      const img = this._imageList[i];
-      let ext: string = '';
-      const mimeType = img.uri ? srcVFS.guessMIMEType(img.uri) : img.data ? img.mimeType : '';
-      if (img.mimeType === 'image/jpeg') {
-        ext = '.jpg';
-      } else if (img.mimeType === 'image/png') {
-        ext = '.png';
-      } else if (img.mimeType === 'image/webp') {
-        ext = '.webp';
-      } else if (img.mimeType === 'image/tga') {
-        ext = '.tga';
-      } else if (img.mimeType === 'image/vnd.radiance') {
-        ext = '.hdr';
-      } else if (img.mimeType === 'image/ktx') {
-        ext = '.ktx';
-      } else if (img.mimeType === 'image/ktx2') {
-        ext = '.ktx2';
-      } else {
-        continue;
+    if (this._imageList.length > 0) {
+      console.info(`Importing ${this._imageList.length} textures`);
+      for (let i = 0; i < this._imageList.length; i++) {
+        const img = this._imageList[i];
+        let ext: string = '';
+        const mimeType = img.uri ? srcVFS.guessMIMEType(img.uri) : img.data ? img.mimeType : '';
+        if (mimeType === 'image/jpeg') {
+          ext = '.jpg';
+        } else if (mimeType === 'image/png') {
+          ext = '.png';
+        } else if (mimeType === 'image/webp') {
+          ext = '.webp';
+        } else if (mimeType === 'image/tga') {
+          ext = '.tga';
+        } else if (mimeType === 'image/vnd.radiance') {
+          ext = '.hdr';
+        } else if (mimeType === 'image/ktx') {
+          ext = '.ktx';
+        } else if (mimeType === 'image/ktx2') {
+          ext = '.ktx2';
+        } else {
+          continue;
+        }
+        ASSERT(!!ext, `Unknown image mime type: ${mimeType}`);
+        const path = manager.VFS.join(destPath, `${destName}_texture${i}${ext}`);
+        if (img.uri) {
+          img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
+        }
+        await manager.VFS.writeFile(
+          path,
+          img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
+          { encoding: 'binary', create: true }
+        );
+        img.uri = path;
+        img.data = null;
+        img.mimeType = '';
       }
-      ASSERT(!!ext, `Unknown image mime type: ${mimeType}`);
-      const path = manager.VFS.join(destPath, `${destName}_texture${i}${ext}`);
-      if (img.uri) {
-        img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
+    }
+    const materialKeys = Object.keys(this._materialList);
+    if (materialKeys.length > 0) {
+      console.info(`Importing ${materialKeys.length} materials`);
+      for (const k of materialKeys) {
+        const path = manager.VFS.join(destPath, `${destName}_material${k}.zmtl`);
+        const m = await this.createMaterial(manager, this._materialList[k]);
+        const data = await manager.serializeObject(m);
+        const content = JSON.stringify({ type: 'Default', data }, null, '  ');
+        await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+        this._materialList[k].path = path;
+        m.dispose();
       }
-      await manager.VFS.writeFile(
-        path,
-        img.data.buffer.slice(img.data.byteOffset, img.data.byteOffset + img.data.byteLength),
-        { encoding: 'binary', create: true }
-      );
-      img.uri = path;
-      img.data = null;
-      img.mimeType = '';
     }
-    for (const k of Object.keys(this._materialList)) {
-      const path = manager.VFS.join(destPath, `${destName}_material${k}.zmtl`);
-      const m = await this.createMaterial(manager, this._materialList[k]);
-      const data = await manager.serializeObject(m);
-      const content = JSON.stringify({ type: 'Default', data }, null, '  ');
-      await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
-      this._materialList[k].path = path;
-      m.dispose();
-    }
-    for (let i = 0; i < this._primitiveList.length; i++) {
-      const info = this._primitiveList[i];
-      const path = manager.VFS.join(destPath, `${destName}_mesh${i}.zmsh`);
-      const data = {
-        vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
-        indices: info.indices
-          ? uint8ArrayToBase64(
-              new Uint8Array(info.indices.buffer, info.indices.byteOffset, info.indices.byteLength)
-            )
-          : null,
-        indexType: info.indices ? (info.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
-        indexCount: info.indexCount,
-        type: info.type,
-        boxMin: [info.boxMin.x, info.boxMin.y, info.boxMin.z],
-        boxMax: [info.boxMax.x, info.boxMax.y, info.boxMax.z]
-      };
-      for (const k in info.vertices) {
-        const v = info.vertices[k as VertexSemantic];
-        data.vertices[k] = {
-          format: v.format,
-          data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
+    if (this._primitiveList.length > 0) {
+      console.info(`Importing ${this._primitiveList.length} meshes`);
+      for (let i = 0; i < this._primitiveList.length; i++) {
+        const info = this._primitiveList[i];
+        const path = manager.VFS.join(destPath, `${destName}_mesh${i}.zmsh`);
+        const data = {
+          vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
+          indices: info.indices
+            ? uint8ArrayToBase64(
+                new Uint8Array(info.indices.buffer, info.indices.byteOffset, info.indices.byteLength)
+              )
+            : null,
+          indexType: info.indices ? (info.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
+          indexCount: info.indexCount,
+          type: info.type,
+          boxMin: [info.boxMin.x, info.boxMin.y, info.boxMin.z],
+          boxMax: [info.boxMax.x, info.boxMax.y, info.boxMax.z]
         };
+        for (const k in info.vertices) {
+          const v = info.vertices[k as VertexSemantic];
+          data.vertices[k] = {
+            format: v.format,
+            data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
+          };
+        }
+        const content = JSON.stringify({ type: 'Primitive', data }, null, '  ');
+        await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+        info.path = path;
       }
-      const content = JSON.stringify({ type: 'Primitive', data }, null, '  ');
-      await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
-      info.path = path;
     }
   }
   async createSceneNode(

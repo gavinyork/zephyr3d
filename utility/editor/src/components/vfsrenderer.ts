@@ -1193,8 +1193,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           dlgProgressBar.showModal();
           for (let i = 0; i < result.paths.length; i++) {
             dlgProgressBar.setProgress(i + 1, result.paths.length);
-            const sharedModel = await importModel(dtVFS, result.paths[i]);
-            await sharedModel.savePrefab(ProjectService.serializationManager, info.targetDirectory.path);
+            try {
+              const sharedModel = await importModel(dtVFS, result.paths[i]);
+              await sharedModel.savePrefab(ProjectService.serializationManager, info.targetDirectory.path);
+            } catch (err) {
+              console.error(`Load model ${result.paths[i]} failed: ${err}`);
+            }
           }
           dlgProgressBar.close();
         }

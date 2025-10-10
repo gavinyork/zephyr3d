@@ -1,5 +1,5 @@
 import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Quaternion, TypedArray } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -69,6 +69,8 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _jointMatrices: Matrix4x4[];
   /** @internal */
+  protected _jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[];
+  /** @internal */
   protected _jointOffsets: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _jointMatrixArray: Float32Array<ArrayBuffer>;
@@ -83,7 +85,12 @@ export class Skeleton extends Disposable {
    * @param inverseBindMatrices - Inverse bind matrices for each joint.
    * @param bindPoseMatrices - Bind pose matrices for each joint (model-space).
    */
-  constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[]) {
+  constructor(
+    joints: SceneNode[],
+    inverseBindMatrices: Matrix4x4[],
+    bindPoseMatrices: Matrix4x4[],
+    jointTransforms?: { scale: Vector3; rotation: Quaternion; position: Vector3 }[]
+  ) {
     super();
     this._id = randomUUID();
     this._joints = joints;
@@ -94,6 +101,20 @@ export class Skeleton extends Disposable {
     this._jointOffsets = null;
     this._jointTexture = new DRef();
     this._playing = false;
+    if (jointTransforms) {
+      this._jointTransforms = jointTransforms;
+      for (let i = 0; i < jointTransforms.length; i++) {
+        this._joints[i].scale = jointTransforms[i].scale;
+        this._joints[i].rotation = jointTransforms[i].rotation;
+        this._joints[i].position = jointTransforms[i].position;
+      }
+    } else {
+      this._jointTransforms = this._joints.map((joint) => ({
+        scale: joint.scale.clone(),
+        rotation: joint.rotation.clone(),
+        position: joint.position.clone()
+      }));
+    }
     this.updateJointMatrices(this._bindPoseMatrices);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
@@ -115,6 +136,10 @@ export class Skeleton extends Disposable {
   /** @internal */
   get joints() {
     return this._joints;
+  }
+  /** @internal */
+  get jointTransforms() {
+    return this._jointTransforms;
   }
   /** @internal */
   get inverseBindMatrices() {

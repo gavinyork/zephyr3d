@@ -1,4 +1,5 @@
 import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
+import { Quaternion } from '@zephyr3d/base';
 import { base64ToUint8Array, Matrix4x4, uint8ArrayToBase64 } from '@zephyr3d/base';
 import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack, Skeleton } from '../../../animation';
@@ -451,7 +452,13 @@ export function getSkeletonClass(): SerializableClass {
     name: 'Skeleton',
     createFunc(
       ctx: SceneNode,
-      init: { joints: string[]; inverseBindMatrices: string; bindPoseMatrices: string; id: string }
+      init: {
+        joints: string[];
+        inverseBindMatrices: string;
+        bindPoseMatrices: string;
+        jointTransforms: string;
+        id: string;
+      }
     ) {
       const prefabNode = ctx.getPrefabNode();
       const joints = init.joints
@@ -464,17 +471,20 @@ export function getSkeletonClass(): SerializableClass {
         });
       const inverseBindMatricesArray = new Float32Array(base64ToUint8Array(init.inverseBindMatrices).buffer);
       const bindPoseMatricesArray = new Float32Array(base64ToUint8Array(init.bindPoseMatrices).buffer);
+      const jointTransformsArray = new Float32Array(base64ToUint8Array(init.jointTransforms).buffer);
       const inverseBindMatrices: Matrix4x4[] = [];
       const bindPoseMatrices: Matrix4x4[] = [];
+      const jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[] = [];
       for (let i = 0; i < joints.length; i++) {
-        const ibMatrix = new Matrix4x4();
-        ibMatrix.set(inverseBindMatricesArray.slice(i * 16, i * 16 + 16));
-        inverseBindMatrices.push(ibMatrix);
-        const bpMatrix = new Matrix4x4();
-        bpMatrix.set(bindPoseMatricesArray.slice(i * 16, i * 16 + 16));
-        bindPoseMatrices.push(bpMatrix);
+        inverseBindMatrices.push(new Matrix4x4(inverseBindMatricesArray.slice(i * 16, i * 16 + 16)));
+        bindPoseMatrices.push(new Matrix4x4(bindPoseMatricesArray.slice(i * 16, i * 16 + 16)));
+        jointTransforms.push({
+          position: new Vector3(jointTransformsArray.slice(i * 10 + 0, i * 10 + 3)),
+          rotation: new Quaternion(jointTransformsArray.slice(i * 10 + 3, i * 10 + 7)),
+          scale: new Vector3(jointTransformsArray.slice(i * 10 + 7, i * 10 + 10))
+        });
       }
-      const skeleton = new Skeleton(joints, inverseBindMatrices, bindPoseMatrices);
+      const skeleton = new Skeleton(joints, inverseBindMatrices, bindPoseMatrices, jointTransforms);
       skeleton.persistentId = init.id;
       return {
         obj: skeleton,
@@ -488,10 +498,14 @@ export function getSkeletonClass(): SerializableClass {
       const bindPoseMatrices: number[] = obj.bindPoseMatrices
         .map((v) => [...v])
         .reduce((a, b) => [...a, ...b], []);
+      const jointTransforms: number[] = obj.jointTransforms
+        .map((v) => [...v.position, ...v.rotation, ...v.scale])
+        .reduce((a, b) => [...a, ...b], []);
       return {
         joints: obj.joints.map((joint) => joint.persistentId),
         inverseBindMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(inverseBindMatrices).buffer)),
         bindPoseMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(bindPoseMatrices).buffer)),
+        jointTransforms: uint8ArrayToBase64(new Uint8Array(new Float32Array(jointTransforms).buffer)),
         id: obj.persistentId
       };
     },
