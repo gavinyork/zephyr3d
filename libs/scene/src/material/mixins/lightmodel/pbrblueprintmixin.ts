@@ -241,7 +241,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           outputs.Opacity ?? 1
         );
         this.zCommonData.metallic = outputs.Metallic ?? 0;
-        this.zCommonData.roughness = outputs.Roughness ?? 0;
+        this.zCommonData.roughness = outputs.Roughness
+          ? pb.mul(outputs.Roughness, ShaderHelper.getCameraRoughnessFactor(scope))
+          : ShaderHelper.getCameraRoughnessFactor(scope);
         this.zCommonData.specular = outputs.Specular ?? pb.vec3(1);
         this.zCommonData.emissive = outputs.Emissive ?? pb.vec3(0);
         this.zCommonData.f90 = pb.vec3(1);

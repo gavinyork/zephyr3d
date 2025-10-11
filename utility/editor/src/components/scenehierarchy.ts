@@ -76,6 +76,7 @@ export class SceneHierarchy extends TreeView<
     node_drag_drop: [from: SceneNode, target: SceneNode];
     set_main_camera: [camea: Camera];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
+    request_save_prefab: [node: SceneNode];
   },
   SceneNode
 > {
@@ -113,14 +114,17 @@ export class SceneHierarchy extends TreeView<
       }
       ImGui.Separator();
     }
-    if (ImGui.MenuItem('Create static batch')) {
+    if (ImGui.MenuItem('Create Batch Group')) {
       this.dispatchEvent('request_add_child', node, BatchGroup);
     }
     ImGui.Separator();
-    if (ImGui.MenuItem('Create group')) {
+    if (ImGui.MenuItem('Create Empty Node')) {
       this.dispatchEvent('request_add_child', node, SceneNode);
     }
-
+    ImGui.Separator();
+    if (ImGui.MenuItem('Create Prefab...')) {
+      this.dispatchEvent('request_save_prefab', node);
+    }
     const animationSet = node.animationSet;
     if (animationSet && animationSet.getAnimationNames().length > 0) {
       ImGui.Separator();

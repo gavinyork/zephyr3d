@@ -169,7 +169,6 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         break;
       }
       default:
-        console.error(`Unknown action: ${action}`);
         break;
     }
   }

@@ -65,6 +65,8 @@ import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { ListView } from '../components/listview';
+import { DlgSaveFile } from './dlg/savefiledlg';
+import { ResourceService } from '../core/services/resource';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -955,6 +957,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
+      this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy.createProxy(node);
@@ -983,6 +986,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
+      this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
@@ -1414,6 +1418,26 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
       this._sceneHierarchy.selectNode(node);
       eventBus.dispatchEvent('scene_changed');
+    });
+  }
+  private handleSavePrefab(node: SceneNode) {
+    DlgSaveFile.saveFile(
+      'Save Prefab',
+      getEngine().VFS,
+      this.controller.editor.currentProject,
+      '/assets',
+      'Prefab (*.zprefab)|*.zprefab',
+      500,
+      400
+    ).then((name) => {
+      if (name) {
+        ResourceService.savePrefab(
+          node,
+          getEngine().serializationManager,
+          getEngine().VFS.dirname(name),
+          getEngine().VFS.basename(name)
+        );
+      }
     });
   }
   private handleNodeRemoved(node: SceneNode) {

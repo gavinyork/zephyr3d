@@ -41,6 +41,7 @@ import {
   MAX_MORPH_TARGETS,
   MorphTargetTrack
 } from '@zephyr3d/scene';
+import { ResourceService } from '../core/services/resource';
 
 /**
  * Named object interface for model loading
@@ -642,25 +643,21 @@ export class SharedModel extends Disposable {
   }
   /** save as prefab */
   async savePrefab(manager: SerializationManager, path: string): Promise<void> {
-    await this.preprocess(manager, this._name, path);
+    await this.preprocess(manager, path);
     const tmpScene = new Scene();
     const node = await this.createSceneNode(manager, tmpScene, false);
-    const data = await manager.serializeObject(node);
     const numSkeletons = node.animationSet?.skeletons?.length ?? 0;
     const numAnimations = node.animationSet?.getAnimationNames().length ?? 0;
+    await ResourceService.savePrefab(node, manager, path, this._name);
     tmpScene.dispose();
-    const content = JSON.stringify({ type: 'SceneNode', data }, null, '  ');
-    await manager.VFS.writeFile(manager.VFS.join(path, `${this._name}.zprefab`), content, {
-      encoding: 'utf8',
-      create: true
-    });
     console.info(
       `Successfully created prefab with ${numSkeletons} skeletons and ${numAnimations} animations: ${path}`
     );
   }
   /** preprocess */
-  async preprocess(manager: SerializationManager, destName: string, destPath: string): Promise<void> {
+  async preprocess(manager: SerializationManager, destPath: string): Promise<void> {
     const srcVFS = this._vfs ?? manager.VFS;
+    const destName = this._name;
     if (this._imageList.length > 0) {
       console.info(`Importing ${this._imageList.length} textures`);
       for (let i = 0; i < this._imageList.length; i++) {

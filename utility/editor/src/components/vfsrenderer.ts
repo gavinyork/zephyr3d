@@ -15,8 +15,8 @@ import { installDeps, reinstallPackages } from '../core/build/dep';
 import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
 import { TreeViewData, TreeView } from './treeview';
 import { DlgImport } from '../views/dlg/importdlg';
-import { importModel } from '../loaders/importer';
 import { ListView, ListViewData } from './listview';
+import { ResourceService } from '../core/services/resource';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -1194,7 +1194,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           for (let i = 0; i < result.paths.length; i++) {
             dlgProgressBar.setProgress(i + 1, result.paths.length);
             try {
-              const sharedModel = await importModel(dtVFS, result.paths[i]);
+              const sharedModel = await ResourceService.importModel(dtVFS, result.paths[i]);
               await sharedModel.savePrefab(ProjectService.serializationManager, info.targetDirectory.path);
             } catch (err) {
               console.error(`Load model ${result.paths[i]} failed: ${err}`);

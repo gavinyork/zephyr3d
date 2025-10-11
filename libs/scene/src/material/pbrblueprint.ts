@@ -134,7 +134,7 @@ export class PBRBluePrintMaterial
             scope.$inputs.worldPos,
             scope.litColor,
             scope.outRoughness,
-            pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+            pb.vec4(pb.add(pb.mul(scope.commonData.normal, 0.5), pb.vec3(0.5)), 1)
           );
         } else {
           scope.$l.litColor = this.PBRLight(scope, scope.$inputs.worldPos, scope.viewVec, scope.commonData);
