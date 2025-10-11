@@ -92,6 +92,12 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   set defaultWeights(value: number[]) {
     this._defaultWeights = value;
   }
+  get originBoundingBox() {
+    return this._originBox;
+  }
+  set originBoundingBox(box: AABB) {
+    this._originBox = box;
+  }
   /** {@inheritDoc AnimationTrack.calculateState} */
 
   calculateState(target: object, currentTime: number): MorphState {
@@ -106,7 +112,10 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   }
   /** {@inheritDoc AnimationTrack.applyState} */
   applyState(node: SceneNode, state: MorphState) {
-    (node as Mesh).getMorphInfo().bufferSubData(4 * 4, state.weights);
+    (node as Mesh)
+      .getMorphInfo()
+      .buffer.get()
+      .bufferSubData(4 * 4, state.weights);
     state.boundingBox.minPoint.addBy(this._originBox.minPoint);
     state.boundingBox.maxPoint.addBy(this._originBox.maxPoint);
     (node as Mesh).setAnimatedBoundingBox(state.boundingBox);

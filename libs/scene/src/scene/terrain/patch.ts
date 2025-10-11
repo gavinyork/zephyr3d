@@ -1,8 +1,15 @@
 import { Disposable, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
+import type { Texture2D } from '@zephyr3d/device';
+import type {
+  BatchDrawable,
+  Drawable,
+  DrawContext,
+  MorphData,
+  MorphInfo,
+  PickTarget
+} from '../../render/drawable';
 import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
@@ -128,10 +135,10 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getBoneMatrices(): Texture2D<unknown> {
     return null;
   }
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
-  getMorphInfo(): GPUDataBuffer {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   getSortDistance(camera: Camera): number {

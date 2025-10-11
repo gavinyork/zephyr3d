@@ -1,5 +1,5 @@
 import type { InterpolationMode, InterpolationTarget } from '@zephyr3d/base';
-import { Quaternion } from '@zephyr3d/base';
+import { AABB, Quaternion } from '@zephyr3d/base';
 import { base64ToUint8Array, Matrix4x4, uint8ArrayToBase64 } from '@zephyr3d/base';
 import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack, Skeleton } from '../../../animation';
@@ -122,6 +122,29 @@ export function getMorphTrackClass(): SerializableClass {
           }
         },
         {
+          name: 'OriginBoundingBox',
+          type: 'object',
+          get(this: MorphTargetTrack, value) {
+            if (!this.originBoundingBox) {
+              value.object[0] = null;
+            } else {
+              const arr = [...this.originBoundingBox.minPoint, ...this.originBoundingBox.maxPoint];
+              value.object[0] = arr;
+            }
+          },
+          set(this: MorphTargetTrack, value) {
+            if (!value.object[0]) {
+              this.originBoundingBox = null;
+            } else {
+              const bbox = new AABB();
+              const values = value.object[0] as number[];
+              bbox.minPoint.setXYZ(values[0], values[1], values[2]);
+              bbox.maxPoint.setXYZ(values[3], values[4], values[5]);
+              this.originBoundingBox = bbox;
+            }
+          }
+        },
+        {
           name: 'BoundingBox',
           type: 'object',
           get(this: MorphTargetTrack, value) {
@@ -152,6 +175,19 @@ export function getMorphTrackClass(): SerializableClass {
               }
               this.boundingBox = arr;
             }
+          }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: NodeRotationTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: NodeRotationTrack, value) {
+            this.target = value.str[0];
           }
         }
       ];

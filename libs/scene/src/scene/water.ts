@@ -5,19 +5,19 @@ import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, WaveGenerator } from '../render';
+import type {
+  Drawable,
+  DrawContext,
+  MorphData,
+  MorphInfo,
+  PickTarget,
+  PrimitiveInstanceInfo,
+  WaveGenerator
+} from '../render';
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
-import type {
-  AbstractDevice,
-  BindGroup,
-  FrameBuffer,
-  GPUDataBuffer,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D
-} from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import type { MeshMaterial } from '../material';
 import type { BoundingVolume } from '../utility/bounding_volume';
@@ -173,13 +173,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): GPUDataBuffer<unknown> {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   /**

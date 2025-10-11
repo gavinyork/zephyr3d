@@ -232,8 +232,8 @@ export function mixinDrawable<
       if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
         const morphData = (this as unknown as Mesh).getMorphData();
         const morphInfo = (this as unknown as Mesh).getMorphInfo();
-        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData);
-        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo);
+        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData.texture.get());
+        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo.buffer.get());
       }
     }
     /** @internal */

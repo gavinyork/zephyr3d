@@ -1,15 +1,16 @@
 import { DRef, Disposable, Vector2, applyMixins, nextPowerOf2 } from '@zephyr3d/base';
 import { Primitive } from '../../render/primitive';
-import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
+import type {
+  BatchDrawable,
+  Drawable,
+  DrawContext,
+  MorphData,
+  MorphInfo,
+  PickTarget
+} from '../../render/drawable';
 import type { QuadtreeNode } from './quadtree';
 import type { Camera } from '../../camera/camera';
-import type {
-  AbstractDevice,
-  GPUDataBuffer,
-  IndexBuffer,
-  StructuredBuffer,
-  Texture2D
-} from '@zephyr3d/device';
+import type { AbstractDevice, IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Terrain } from './terrain';
 import { GrassMaterial } from '../../material/grassmaterial';
 import { mixinDrawable } from '../../render/drawable_mixin';
@@ -62,10 +63,10 @@ export class GrassCluster extends applyMixins(GrassClusterBase, mixinDrawable) i
   getBoneMatrices(): Texture2D<unknown> {
     return null;
   }
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
-  getMorphInfo(): GPUDataBuffer {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   getSortDistance(camera: Camera): number {

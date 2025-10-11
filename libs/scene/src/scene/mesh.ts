@@ -1,13 +1,28 @@
 import { applyMixins, DRef } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
-import { LambertMaterial } from '../material';
-import type { RenderPass, Primitive, BatchDrawable, DrawContext, PickTarget } from '../render';
-import type { GPUDataBuffer, RenderBundle, Texture2D } from '@zephyr3d/device';
+import { LambertMaterial, ShaderHelper } from '../material';
+import type {
+  RenderPass,
+  Primitive,
+  BatchDrawable,
+  DrawContext,
+  PickTarget,
+  MorphData,
+  MorphInfo
+} from '../render';
+import {
+  PBArrayTypeInfo,
+  PBPrimitiveType,
+  PBPrimitiveTypeInfo,
+  PBStructTypeInfo,
+  type RenderBundle,
+  type Texture2D
+} from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
-import { QUEUE_OPAQUE } from '../values';
+import { MORPH_ATTRIBUTE_VECTOR_COUNT, MORPH_WEIGHTS_VECTOR_COUNT, QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
@@ -34,9 +49,9 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _boneMatrices: DRef<Texture2D>;
   /** @internal */
-  protected _morphData: DRef<Texture2D>;
+  protected _morphData: MorphData;
   /** @internal */
-  protected _morphInfo: DRef<GPUDataBuffer>;
+  protected _morphInfo: MorphInfo;
   /** @internal */
   protected _instanceHash: string;
   /** @internal */
@@ -67,8 +82,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
     this._boneMatrices = new DRef();
-    this._morphData = new DRef();
-    this._morphInfo = new DRef();
+    this._morphData = null;
+    this._morphInfo = null;
     this._instanceHash = null;
     this._pickTarget = { node: this };
     this._batchable = getDevice().type !== 'webgl';
@@ -227,6 +242,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this.invalidateBoundingVolume();
   }
   /**
+   * Gets the bounding box for animation
+   */
+  getAnimatedBoundingBox() {
+    return this._animatedBoundingBox ?? null;
+  }
+  /**
    * Sets the texture that contains the bone matrices for skeletal animation
    * @param matrices - The texture that contains the bone matrices
    */
@@ -241,9 +262,36 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    * Sets the texture that contains the morph target data
    * @param data - The texture that contains the morph target data
    */
-  setMorphData(data: Texture2D) {
-    if (this._morphData.get() !== data) {
-      this._morphData.set(data);
+  setMorphData(data: MorphData) {
+    if (!data) {
+      if (this._morphData) {
+        this._morphData?.texture.dispose();
+        this._morphData = null;
+        this._renderBundle = {};
+        RenderBundleWrapper.drawableChanged(this);
+      }
+    } else {
+      if (!this._morphData) {
+        this._morphData = {
+          width: 0,
+          height: 0,
+          data: null,
+          texture: new DRef()
+        };
+      }
+      this._morphData.width = data.width;
+      this._morphData.height = data.height;
+      this._morphData.data = data.data.slice();
+      const tex = getDevice().createTexture2D('rgba32f', data.width, data.height, {
+        mipmapping: false,
+        samplerOptions: {
+          minFilter: 'nearest',
+          magFilter: 'nearest',
+          mipFilter: 'none'
+        }
+      });
+      tex.update(data.data, 0, 0, data.width, data.height);
+      this._morphData.texture.set(tex);
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -255,24 +303,55 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Texture2D {
-    return this._morphData.get();
+  getMorphData() {
+    return this._morphData;
   }
   /**
    * Sets the buffer that contains the morph target information
    * @param info - The buffer that contains the morph target information
    */
-  setMorphInfo(info: GPUDataBuffer) {
-    if (this._morphInfo.get() !== info) {
-      this._morphInfo.set(info);
+  setMorphInfo(info: MorphInfo) {
+    if (!info) {
+      if (this._morphInfo) {
+        this._morphInfo.buffer.dispose();
+        this._morphInfo = null;
+        this._renderBundle = {};
+        RenderBundleWrapper.drawableChanged(this);
+      }
+    } else {
+      if (!this._morphInfo) {
+        this._morphInfo = {
+          data: null,
+          buffer: new DRef()
+        };
+      }
+      this._morphInfo.data = info.data.slice();
+      const bufferType = new PBStructTypeInfo('dummy', 'std140', [
+        {
+          name: ShaderHelper.getMorphInfoUniformName(),
+          type: new PBArrayTypeInfo(
+            new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
+            1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
+          )
+        }
+      ]);
+      const morphUniformBuffer = getDevice().createStructuredBuffer(
+        bufferType,
+        {
+          usage: 'uniform'
+        },
+        info.data
+      );
+      this._morphInfo.buffer.set(morphUniformBuffer);
+      this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): GPUDataBuffer<unknown> {
-    return this._morphInfo.get();
+  getMorphInfo(): MorphInfo {
+    return this._morphInfo;
   }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
@@ -284,10 +363,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   isBatchable(): this is BatchDrawable {
     return (
-      this._batchable &&
-      !this._boneMatrices.get() &&
-      !this._morphData.get() &&
-      this._material.get()?.isBatchable()
+      this._batchable && !this._boneMatrices.get() && !this._morphData && this._material.get()?.isBatchable()
     );
   }
   /**
@@ -406,8 +482,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._primitive.dispose();
     this._material.dispose();
     this._boneMatrices.dispose();
-    this._morphData.dispose();
-    this._morphInfo.dispose();
+    this.setMorphData(null);
+    this.setMorphInfo(null);
     this._renderBundle = null;
     RenderBundleWrapper.drawableChanged(this);
   }

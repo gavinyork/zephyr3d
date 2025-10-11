@@ -6,9 +6,8 @@ import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility';
 import { BoundingBox } from '../utility/bounding_volume';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget } from '../render';
+import type { Drawable, DrawContext, MorphData, MorphInfo, PickTarget } from '../render';
 import { Primitive } from '../render';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
 import type { NodeClonable, NodeCloneMethod } from '.';
@@ -728,13 +727,13 @@ export class ParticleSystem
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): GPUDataBuffer<unknown> {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   /**

@@ -1,17 +1,19 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
-import type {
-  GPUDataBuffer,
-  PBInsideFunctionScope,
-  PBShaderExp,
-  Texture2D,
-  Texture2DArray
-} from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from '@zephyr3d/device';
 import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, Primitive, PrimitiveInstanceInfo } from '../../render';
+import type {
+  Drawable,
+  DrawContext,
+  MorphData,
+  MorphInfo,
+  PickTarget,
+  Primitive,
+  PrimitiveInstanceInfo
+} from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import type { MeshMaterial } from '../../material';
@@ -294,13 +296,13 @@ export class ClipmapTerrain
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): GPUDataBuffer<unknown> {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   /**

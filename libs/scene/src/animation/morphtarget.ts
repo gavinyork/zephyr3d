@@ -1,12 +1,5 @@
-import { PBArrayTypeInfo, PBPrimitiveType, PBPrimitiveTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
 import type { AssetSubMeshData } from '../asset';
-import {
-  MAX_MORPH_ATTRIBUTES,
-  MAX_MORPH_TARGETS,
-  MORPH_ATTRIBUTE_VECTOR_COUNT,
-  MORPH_WEIGHTS_VECTOR_COUNT
-} from '../values';
-import { ShaderHelper } from '../material/shader/helper';
+import { MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
 
@@ -55,30 +48,6 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
       }
     }
   }
-  const morphTexture = device.createTexture2D('rgba32f', textureSize, textureSize, {
-    mipmapping: false,
-    samplerOptions: {
-      minFilter: 'nearest',
-      magFilter: 'nearest'
-    }
-  });
-  morphTexture.update(textureData, 0, 0, textureSize, textureSize);
-  const bufferType = new PBStructTypeInfo('dummy', 'std140', [
-    {
-      name: ShaderHelper.getMorphInfoUniformName(),
-      type: new PBArrayTypeInfo(
-        new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
-        1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
-      )
-    }
-  ]);
-  const morphUniformBuffer = device.createStructuredBuffer(
-    bufferType,
-    {
-      usage: 'uniform'
-    },
-    weightsAndOffsets
-  );
   const morphBoundingBox = new BoundingBox();
   calculateMorphBoundingBox(
     morphBoundingBox,
@@ -90,8 +59,8 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
   morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
   morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
-  subMesh.mesh.setMorphData(morphTexture);
-  subMesh.mesh.setMorphInfo(morphUniformBuffer);
+  subMesh.mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
+  subMesh.mesh.setMorphInfo({ data: weightsAndOffsets });
   subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
 }
 

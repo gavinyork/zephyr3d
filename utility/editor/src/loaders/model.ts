@@ -10,13 +10,7 @@ import type {
   VertexAttribFormat,
   VertexSemantic
 } from '@zephyr3d/device';
-import {
-  getVertexFormatComponentCount,
-  PBArrayTypeInfo,
-  PBPrimitiveType,
-  PBPrimitiveTypeInfo,
-  PBStructTypeInfo
-} from '@zephyr3d/device';
+import { getVertexFormatComponentCount } from '@zephyr3d/device';
 import type { MeshMaterial, SerializationManager } from '@zephyr3d/scene';
 import { Scene } from '@zephyr3d/scene';
 import {
@@ -34,9 +28,6 @@ import {
   NodeTranslationTrack,
   getDevice,
   MAX_MORPH_ATTRIBUTES,
-  ShaderHelper,
-  MORPH_WEIGHTS_VECTOR_COUNT,
-  MORPH_ATTRIBUTE_VECTOR_COUNT,
   BoundingBox,
   MAX_MORPH_TARGETS,
   MorphTargetTrack
@@ -1271,30 +1262,6 @@ function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
       }
     }
   }
-  const morphTexture = device.createTexture2D('rgba32f', textureSize, textureSize, {
-    mipmapping: false,
-    samplerOptions: {
-      minFilter: 'nearest',
-      magFilter: 'nearest'
-    }
-  });
-  morphTexture.update(textureData, 0, 0, textureSize, textureSize);
-  const bufferType = new PBStructTypeInfo('dummy', 'std140', [
-    {
-      name: ShaderHelper.getMorphInfoUniformName(),
-      type: new PBArrayTypeInfo(
-        new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
-        1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
-      )
-    }
-  ]);
-  const morphUniformBuffer = device.createStructuredBuffer(
-    bufferType,
-    {
-      usage: 'uniform'
-    },
-    weightsAndOffsets
-  );
   const morphBoundingBox = new BoundingBox();
   calculateMorphBoundingBox(
     morphBoundingBox,
@@ -1306,8 +1273,8 @@ function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
   morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
   morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
-  subMesh.mesh.setMorphData(morphTexture);
-  subMesh.mesh.setMorphInfo(morphUniformBuffer);
+  subMesh.mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
+  subMesh.mesh.setMorphInfo({ data: weightsAndOffsets });
   subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
 }
 

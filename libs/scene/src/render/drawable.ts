@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { DRef, TypedArray, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -134,6 +134,23 @@ export interface DrawContext {
 }
 
 /**
+ * Morph Data
+ * @public
+ */
+export type MorphData = {
+  width: number;
+  height: number;
+  data: Float32Array<ArrayBuffer>;
+  texture?: DRef<Texture2D>;
+};
+
+/**
+ * Morph information
+ * @public
+ */
+export type MorphInfo = { data: TypedArray; buffer?: DRef<GPUDataBuffer> };
+
+/**
  * Base interface for a drawable (renderable) object.
  *
  * A drawable encapsulates geometry, material, and GPU-resident data required to be rendered.
@@ -159,9 +176,9 @@ export interface Drawable {
   /** Returns the unique color used for GPU picking (object ID in color). */
   getObjectColor(): Vector4;
   /** Returns the morph target data texture (if morphing is used). */
-  getMorphData(): Texture2D;
+  getMorphData(): MorphData;
   /** Returns the morph information buffer (weights, ranges, etc.). */
-  getMorphInfo(): GPUDataBuffer;
+  getMorphInfo(): MorphInfo;
   /**
    * Computes the distance used for sorting (e.g., transparent draw order).
    *

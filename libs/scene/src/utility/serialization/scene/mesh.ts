@@ -153,6 +153,94 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'MorphData',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          async get(this: Mesh, value) {
+            const morphData = this.getMorphData();
+            if (morphData) {
+              const buffer = new ArrayBuffer(4 + 4 + 4 * 4 * morphData.width * morphData.height);
+              const dataView = new DataView(buffer);
+              dataView.setUint32(0, morphData.width, true);
+              dataView.setUint32(4, morphData.height, true);
+              new Float32Array(buffer, 8, 4 * morphData.width * morphData.height).set(morphData.data);
+              value.str[0] = uint8ArrayToBase64(new Uint8Array(buffer));
+            } else {
+              value.str[0] = '';
+            }
+          },
+          set(this: Mesh, value) {
+            if (value.str[0]) {
+              const data = base64ToUint8Array(value.str[0]);
+              const dataView = new DataView(data.buffer);
+              const width = dataView.getUint32(0, true);
+              const height = dataView.getUint32(4, true);
+              const pixels = new Float32Array(data.buffer, 8, 4 * width * height);
+              this.setMorphData({ width, height, data: pixels });
+            } else {
+              this.setMorphData(null);
+            }
+          }
+        },
+        {
+          name: 'MorphInfo',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          async get(this: Mesh, value) {
+            const morphInfo = this.getMorphInfo();
+            if (morphInfo) {
+              const data = new Uint8Array(
+                morphInfo.data.buffer,
+                morphInfo.data.byteOffset,
+                morphInfo.data.byteLength
+              );
+              value.str[0] = uint8ArrayToBase64(data);
+            } else {
+              value.str[0] = '';
+            }
+          },
+          set(this: Mesh, value) {
+            if (value.str[0]) {
+              const data = base64ToUint8Array(value.str[0]);
+              this.setMorphInfo({ data });
+            } else {
+              this.setMorphInfo(null);
+            }
+          }
+        },
+        {
+          name: 'MorphBoundingBox',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: Mesh, value) {
+            value.str[0] = '';
+            if (this.getMorphData()) {
+              const box = this.getAnimatedBoundingBox();
+              if (box) {
+                const data = new Float32Array([...box.minPoint, ...box.maxPoint]);
+                value.str[0] = uint8ArrayToBase64(new Uint8Array(data.buffer));
+              }
+            }
+          },
+          set(this: Mesh, value) {
+            if (value.str[0]) {
+              const data = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
+              const bbox = new BoundingBox();
+              bbox.minPoint.setXYZ(data[0], data[1], data[2]);
+              bbox.maxPoint.setXYZ(data[3], data[4], data[5]);
+              this.setAnimatedBoundingBox(bbox);
+            } else {
+              this.setAnimatedBoundingBox(null);
+            }
+          }
+        },
+        {
           name: 'Primitive',
           type: 'object',
           options: {
