@@ -61,9 +61,6 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
         {
           name: 'Id',
           type: 'string',
-          isHidden() {
-            return false;
-          },
           get(this: SceneNode, value) {
             value.str[0] = this.persistentId;
           },
@@ -72,9 +69,29 @@ export function getSceneNodeClass(manager: SerializationManager): SerializableCl
           }
         },
         {
+          name: 'RuntimeId',
+          type: 'string',
+          isPersistent() {
+            return false;
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = `${this.runtimeId}`;
+          }
+        },
+        {
+          name: 'PrefabNode',
+          type: 'string',
+          isPersistent() {
+            return false;
+          },
+          get(this: SceneNode, value) {
+            const node = this.getPrefabNode();
+            value.str[0] = node ? `${node.runtimeId}` : '';
+          }
+        },
+        {
           name: 'PrefabId',
           type: 'string',
-          default: '',
           get(this: SceneNode, value) {
             value.str[0] = this.prefabId;
           }

@@ -143,7 +143,7 @@ export function getMeshClass(): SerializableClass {
           name: 'Skeleton',
           type: 'string',
           isHidden() {
-            return true;
+            return false;
           },
           get(this: Mesh, value) {
             value.str[0] = this.skeletonName;

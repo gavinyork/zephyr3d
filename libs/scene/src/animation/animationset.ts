@@ -153,6 +153,7 @@ export class AnimationSet extends Disposable implements IDisposable {
     } else {
       const animation = new AnimationClip(name, this, embedded);
       this._animations[name] = animation;
+      this._model.get().scene.queueUpdateNode(this._model.get());
       return animation;
     }
   }
