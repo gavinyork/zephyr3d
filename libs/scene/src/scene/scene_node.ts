@@ -460,6 +460,8 @@ export class SceneNode
       console.error('SceneNode.copyFrom(): Cannot copy from/to node which belongs to another scene');
       return;
     }
+    this.name = other.name;
+    this.prefabId = other.prefabId;
     this.clipTestEnabled = other.clipTestEnabled;
     this.boundingBoxDrawMode = other.boundingBoxDrawMode;
     this.showState = other.showState;

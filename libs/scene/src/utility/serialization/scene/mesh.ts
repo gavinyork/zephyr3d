@@ -284,6 +284,16 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'Geometry Instance',
+          type: 'bool',
+          get(this: Mesh, value) {
+            value.bool[0] = !!this.material?.$isInstance;
+          },
+          set(this: Mesh, value) {
+            this.material = value.bool[0] ? this.material?.createInstance() : this.material?.coreMaterial;
+          }
+        },
+        {
           name: 'MaterialInstanceUniforms',
           type: 'object',
           phase: 1,

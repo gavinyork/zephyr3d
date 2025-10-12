@@ -339,7 +339,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       return this.coreMaterial.createInstance();
     }
     const isWebGL1 = getDevice().type === 'webgl';
-    if (isWebGL1 || !this.supportInstancing) {
+    if (isWebGL1 || !this.supportInstancing()) {
       return this.clone() as this;
     }
     const instanceUniforms = this.getInstancedUniforms();

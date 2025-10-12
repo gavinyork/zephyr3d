@@ -491,6 +491,22 @@ export class SerializationManager {
     return this._allocated.get(asset) ?? null;
   }
   /**
+   * Associate an asset ID to a loaded/allocated asset.
+   *
+   * @param asset - Asset instance (e.g., texture, model group) to set Id.
+   * @param id - Asset ID to associated to this asset.
+   *
+   */
+  setAssetId(asset: unknown, id: string) {
+    if (asset) {
+      if (id) {
+        this._allocated.set(asset, id);
+      } else {
+        this._allocated.delete(asset);
+      }
+    }
+  }
+  /**
    * Fetch a binary asset by ID via the asset manager.
    *
    * @remarks

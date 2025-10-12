@@ -6,6 +6,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { Disposable } from '@zephyr3d/base';
 import type { Clonable, IDisposable } from '@zephyr3d/base';
+import { getEngine } from '../app/api';
 
 type MaterialState = {
   program: GPUProgram;
@@ -156,6 +157,10 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       this._states = {};
     }
     this._numPasses = other._numPasses;
+    getEngine().serializationManager.setAssetId(
+      this,
+      getEngine().serializationManager.getAssetId(other.coreMaterial)
+    );
   }
   /**
    * Incremented when the material’s GPU-relevant state changes and render bundles

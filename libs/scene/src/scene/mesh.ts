@@ -108,11 +108,11 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
     super.copyFrom(other, method, recursive);
     this.castShadow = other.castShadow;
-    this.primitive = method === 'deep' ? other.primitive.clone() : other.primitive;
-    this.material =
-      !this._skinAnimation && !this._morphAnimation && method === 'instance'
-        ? other.material?.createInstance()
-        : other.material?.clone();
+    this.primitive = other.primitive;
+    this.material = other.material?.$isInstance ? other.material.createInstance() : other.material;
+    if (other.material.$isInstance) {
+      this.material.$instanceUniforms.set(other.material.$instanceUniforms);
+    }
     this._skinnedBoundingInfo = other._skinnedBoundingInfo
       ? {
           boundingVertices: other._skinnedBoundingInfo.boundingVertices,

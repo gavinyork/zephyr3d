@@ -22,7 +22,8 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '✨': 0xe012, // Particle
   '🟪': 0xe013, // Group,
   '💡': 0xe014, // light,
-  '🦴': 0xe015 // Bone
+  '🦴': 0xe015, // Bone,
+  '🧩': 0xe016 // Prefab
 };
 
 export function initEmojiMapping() {

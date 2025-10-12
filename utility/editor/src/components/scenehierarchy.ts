@@ -50,7 +50,7 @@ class SceneData extends TreeViewData<SceneNode> {
       } else if (node instanceof Camera) {
         emoj = '🎥';
       } else {
-        emoj = '🟪';
+        emoj = node.prefabId ? '🧩' : '🟪';
       }
       return convertEmojiString(`${emoj}${node.name || '(noname)'}`);
     }
