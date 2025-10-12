@@ -367,11 +367,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
       ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup);
+      if (this._mode === 'select') {
+        ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
+      }
       PostGizmoRenderer._primitives[this._mode].draw();
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
         PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
         ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
+        ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
         PostGizmoRenderer._primitives.select.draw();
       }
     }
@@ -1208,6 +1212,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         if (selectMode) {
           this.$inputs.uv = pb.vec2().attrib('texCoord0');
           this.$inputs.axis = pb.float().attrib('texCoord1');
+          this.$inputs.barycentric = pb.vec3().attrib('texCoord2');
         } else {
           this.$inputs.axis = pb.float().attrib('texCoord0');
           this.$inputs.color = pb.vec4().attrib('diffuse');
@@ -1226,6 +1231,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.$outputs.color = pb.mul(this.$inputs.color, this.colorScale);
           } else {
             this.$outputs.uv = this.$inputs.uv;
+            this.$outputs.barycentric = this.$inputs.barycentric;
           }
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
         });
@@ -1236,33 +1242,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.time = pb.float().uniform(0);
-        if (selectMode) {
-          pb.func('edge', [pb.vec2('uv'), pb.float('lineWidth')], function () {
-            this.$l.fw = pb.add(pb.abs(pb.dpdx(this.uv)), pb.abs(pb.dpdy(this.uv)));
-            this.$l.domain = pb.abs(pb.sub(pb.fract(pb.add(this.uv, pb.vec2(0.5))), pb.vec2(0.5)));
-            this.domain = pb.div(this.domain, this.fw);
-            this.$l.lineDist = pb.min(this.domain.x, this.domain.y);
-            this.$return(pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.lineDist, this.lineWidth))));
-          });
-        }
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = this.$builtins.fragCoord.z;
-          /*
-          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
-            this,
-            this.$builtins.fragCoord.z,
-            this.cameraNearFar
-          );
-          */
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
-          /*
-          this.$l.sceneDepth =
-            pb.getDevice().type === 'webgl'
-              ? decodeNormalizedFloatFromRGBA(this, this.sceneDepthSample)
-              : this.sceneDepthSample.r;
-          */
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
             selectMode ? pb.float(0.3) : pb.float(0.5),
@@ -1270,11 +1254,20 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           );
           if (selectMode) {
             this.$l.lineWidth = pb.float(1);
-            this.$l.edgeFactor = this.edge(this.$inputs.uv, this.lineWidth);
-            this.alpha = pb.mul(this.alpha, this.edgeFactor);
-            this.$if(pb.lessThan(this.alpha, 0.01), function () {
-              pb.discard();
-            });
+            this.$l.dBdx = pb.dpdx(this.$inputs.barycentric);
+            this.$l.dBdy = pb.dpdy(this.$inputs.barycentric);
+            this.$l.gradLen = pb.max(
+              pb.sqrt(pb.add(pb.mul(this.dBdx, this.dBdx), pb.mul(this.dBdy, this.dBdy))),
+              pb.vec3(1e-5)
+            );
+            this.$l.threshold = pb.mul(this.lineWidth, this.gradLen);
+            this.$l.edgeMask = pb.smoothStep(
+              pb.sub(this.threshold, this.gradLen),
+              pb.add(this.threshold, this.gradLen),
+              this.$inputs.barycentric
+            );
+            this.alpha = pb.sub(1, pb.min(pb.min(this.edgeMask.x, this.edgeMask.y), this.edgeMask.z));
+            this.alpha = pb.clamp(this.alpha, 0, 1);
           }
           const diffuse = selectMode ? pb.vec3(0, 255, 204) : this.$inputs.color.rgb;
           this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);

@@ -23,15 +23,21 @@ export const AXIS_Z = 1 << 2;
 export const axisList = [AXIS_X, AXIS_Y, AXIS_Z];
 export function createSelectGizmo(): Primitive {
   const vertices: number[] = [];
+  const barycentric: number[] = [];
+  const bcCoords = [1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0];
   const uv: number[] = [];
   const indices: number[] = [];
   const bbox = new BoundingBox();
   bbox.beginExtend();
-  BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, uv, indices, bbox);
+  BoxShape.generateData({ anchor: 0, size: 1 }, vertices, null, null, uv, indices, bbox, null, (index) => {
+    const t = index % 4;
+    barycentric.push(bcCoords[t], bcCoords[t + 1], bcCoords[t + 2]);
+  });
   const primitive = new Primitive();
   primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
   primitive.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uv));
   primitive.createAndSetVertexBuffer('tex1_f32', new Float32Array(vertices.length / 3).fill(0));
+  primitive.createAndSetVertexBuffer('tex2_f32x3', new Float32Array(barycentric));
   primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;
