@@ -282,16 +282,20 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       this._morphData.width = data.width;
       this._morphData.height = data.height;
       this._morphData.data = data.data.slice();
-      const tex = getDevice().createTexture2D('rgba32f', data.width, data.height, {
-        mipmapping: false,
-        samplerOptions: {
-          minFilter: 'nearest',
-          magFilter: 'nearest',
-          mipFilter: 'none'
-        }
-      });
-      tex.update(data.data, 0, 0, data.width, data.height);
-      this._morphData.texture.set(tex);
+      if (data.texture?.get()) {
+        this._morphData.texture.set(data.texture.get());
+      } else {
+        const tex = getDevice().createTexture2D('rgba32f', data.width, data.height, {
+          mipmapping: false,
+          samplerOptions: {
+            minFilter: 'nearest',
+            magFilter: 'nearest',
+            mipFilter: 'none'
+          }
+        });
+        tex.update(data.data, 0, 0, data.width, data.height);
+        this._morphData.texture.set(tex);
+      }
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -326,23 +330,27 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         };
       }
       this._morphInfo.data = info.data.slice();
-      const bufferType = new PBStructTypeInfo('dummy', 'std140', [
-        {
-          name: ShaderHelper.getMorphInfoUniformName(),
-          type: new PBArrayTypeInfo(
-            new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
-            1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
-          )
-        }
-      ]);
-      const morphUniformBuffer = getDevice().createStructuredBuffer(
-        bufferType,
-        {
-          usage: 'uniform'
-        },
-        info.data
-      );
-      this._morphInfo.buffer.set(morphUniformBuffer);
+      if (info.buffer?.get()) {
+        this._morphInfo.buffer.set(info.buffer.get());
+      } else {
+        const bufferType = new PBStructTypeInfo('dummy', 'std140', [
+          {
+            name: ShaderHelper.getMorphInfoUniformName(),
+            type: new PBArrayTypeInfo(
+              new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
+              1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
+            )
+          }
+        ]);
+        const morphUniformBuffer = getDevice().createStructuredBuffer(
+          bufferType,
+          {
+            usage: 'uniform'
+          },
+          info.data
+        );
+        this._morphInfo.buffer.set(morphUniformBuffer);
+      }
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
