@@ -1,4 +1,4 @@
-import { ASSERT, DRef, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
+import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
@@ -726,6 +726,7 @@ export class SerializationManager {
       const node = await this.deserializeObject<SceneNode>(tmpNode.get(), json.data);
       node.prefabId = tmpNode.get().prefabId;
       node.parent = parent;
+      node.persistentId = randomUUID();
       tmpNode.dispose();
       return node;
     } catch (err) {

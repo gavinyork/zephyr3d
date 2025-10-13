@@ -512,9 +512,9 @@ export abstract class VFS extends Observable<{
       return PathUtils.normalize(path);
     }
 
-    if (this.isObjectURL(path) || this.parseDataURI(path)) {
-      // Do not normalize if it is ObjectURL or dataURL
-      return path;
+    if (this.isAbsoluteURL(path) || this.isObjectURL(path) || this.parseDataURI(path)) {
+      // Normalize URL
+      return encodeURI(path);
     }
 
     // Relative path: merged with CWD and then do normalization

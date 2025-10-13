@@ -1,5 +1,5 @@
 import type * as draco3d from 'draco3d';
-import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
+import type { InterpolationMode, TypedArray, VFS } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, ASSERT } from '@zephyr3d/base';
 import { AssetHierarchyNode } from '../model';
 import type {
@@ -129,7 +129,7 @@ export class GLTFImporter implements ModelImporter {
       const buffers = gltf.buffers;
       if (buffers) {
         for (const buffer of buffers) {
-          const uri = this._normalizeURI(gltf._baseURI, buffer.uri);
+          const uri = model.VFS.normalizePath(model.VFS.join(gltf._baseURI, buffer.uri));
           const buf = (await model.VFS.readFile(uri, { encoding: 'binary' })) as ArrayBuffer; // ProjectService.serializationManager.fetchBinary(uri);
           ASSERT(buffer.byteLength === buf.byteLength, 'Invalid GLTF: buffer byte length error.');
           gltf._loadedBuffers.push(buf);
@@ -166,7 +166,7 @@ export class GLTFImporter implements ModelImporter {
     }
   }
   /** @internal */
-  private _normalizeURI(baseURI: string, uri: string) {
+  private _normalizeURI(vfs: VFS, baseURI: string, uri: string) {
     const s = uri.toLowerCase();
     if (
       s.startsWith('http://') ||
@@ -957,7 +957,7 @@ export class GLTFImporter implements ModelImporter {
         const image = gltf.images[imageIndex];
         if (image) {
           if (image.uri) {
-            const imageUrl = this._normalizeURI(gltf._baseURI, image.uri);
+            const imageUrl = model.VFS.normalizePath(model.VFS.join(gltf._baseURI, image.uri));
             mt.image = {
               uri: imageUrl
             };

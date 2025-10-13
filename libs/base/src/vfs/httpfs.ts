@@ -93,7 +93,7 @@ export class HttpFS extends VFS {
   /**
    * Optional URL resolver hook that transforms VFS paths into concrete URLs.
    *
-   * If present, it is applied by {@link VFS.normalizePath} before other checks.
+   * If present, it is applied by {@link VFS#normalizePath} before other checks.
    */
   get urlResolver(): (url: string) => string {
     return this.options.urlResolver ?? null;
@@ -309,9 +309,48 @@ export class HttpFS extends VFS {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }
   private toAbsoluteURL(url: string): string {
-    return this.isObjectURL(url) || this.parseDataURI(url) || this.isAbsoluteURL(url)
-      ? url
-      : new URL(this.join(this.basePath, url), this.baseOrigin).href;
+    // Specical URL case, just return
+    if (this.isObjectURL(url) || this.parseDataURI(url) || this.isAbsoluteURL(url)) {
+      return url;
+    }
+
+    // Split path, search parameters and hash
+    const [pathPart, ...rest] = url.split('?');
+    const queryAndHash = rest.join('?'); // Merge multiple '?'s
+
+    const [query, hash] = queryAndHash ? queryAndHash.split('#') : ['', ''];
+
+    // Encode path
+    const joinedPath = this.join(this.basePath, pathPart);
+    const encodedPath = joinedPath
+      .split('/')
+      .map((segment) => {
+        if (!segment || segment === '.' || segment === '..') {
+          return segment;
+        }
+        // Avoid duplicated encoding
+        try {
+          return decodeURIComponent(segment) === segment ? encodeURIComponent(segment) : segment;
+        } catch {
+          return encodeURIComponent(segment);
+        }
+      })
+      .join('/');
+
+    // Construct base URL
+    const baseUrl = new URL(encodedPath, this.baseOrigin);
+
+    // Add search parameters
+    if (query) {
+      baseUrl.search = query.includes('%') ? query : new URLSearchParams(query).toString();
+    }
+
+    // Add hash
+    if (hash) {
+      baseUrl.hash = hash;
+    }
+
+    return baseUrl.href;
   }
 
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
