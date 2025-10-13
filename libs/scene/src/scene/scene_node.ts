@@ -17,6 +17,7 @@ import type { SharedModel } from '../asset';
 import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
+import { getEngine } from '../app/api';
 
 /**
  * Iteration callback used by traversal helpers.
@@ -37,31 +38,6 @@ export type NodeIterateFunc = ((node: SceneNode) => boolean) | ((node: SceneNode
  * @public
  */
 export type SceneNodeVisible = 'visible' | 'inherit' | 'hidden';
-
-/**
- * Clone method for scene nodes.
- *
- * - 'deep': recursively clone children
- * - 'instance': create an instanced/linked representation when supported
- *
- * @public
- */
-export type NodeCloneMethod = 'deep' | 'instance';
-
-/**
- * Interface for clonable scene nodes.
- *
- * @public
- */
-export interface NodeClonable<T extends SceneNode> {
-  /**
-   * Create a clone of this node.
-   *
-   * @param method - Clone method ('deep' or 'instance').
-   * @param recursive - If true, clone children recursively.
-   */
-  clone(method: NodeCloneMethod, recursive: boolean): T;
-}
 
 /**
  * The base class of all scene graph objects.
@@ -100,7 +76,7 @@ export class SceneNode
     /** Emitted when the node is disposed. */
     dispose: [];
   }>()
-  implements NodeClonable<SceneNode>, IDisposable
+  implements IDisposable
 {
   private static _runTimeId = 1;
   /*
@@ -431,52 +407,14 @@ export class SceneNode
    * @param recursive - Whether children are cloned recursively.
    * @returns New node instance
    */
-  clone(method: NodeCloneMethod, recursive: boolean): SceneNode {
-    const other = this._sharedModel.get()
-      ? this._sharedModel.get().createSceneNode(this.scene, method === 'instance')
-      : new SceneNode(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
+  async clone(): Promise<this> {
+    const parent = this.parent;
+    const tmpParent = new SceneNode(this.scene);
+    const data = await getEngine().serializationManager.serializeObject(this);
+    const other = await getEngine().serializationManager.deserializeObject<this>(tmpParent, data);
+    other.parent = parent;
+    tmpParent.dispose();
     return other;
-  }
-  /**
-   * Copy core properties from another node.
-   *
-   * @remarks
-   * Requires both nodes to belong to the same scene and be undisposed.
-   * When `recursive` is true, non-sealed children are cloned and attached.
-   *
-   * @param other - Source node.
-   * @param method - Clone method for children when recursive.
-   * @param recursive - If true, clone and attach children.
-   *
-   */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
-    if (other.disposed || this.disposed) {
-      console.error('SceneNode.copyFrom(): Cannot copy from/to disposed node');
-      return;
-    }
-    if (other.scene !== this.scene) {
-      console.error('SceneNode.copyFrom(): Cannot copy from/to node which belongs to another scene');
-      return;
-    }
-    this.name = other.name;
-    this.prefabId = other.prefabId;
-    this.clipTestEnabled = other.clipTestEnabled;
-    this.boundingBoxDrawMode = other.boundingBoxDrawMode;
-    this.showState = other.showState;
-    this.pickable = other.pickable;
-    this.placeToOctree = other.placeToOctree;
-    this.position.set(other.position);
-    this.scale.set(other.scale);
-    this.rotation.set(other.rotation);
-    if (recursive) {
-      for (const child of other.children) {
-        if (!child.get().sealed) {
-          child.get().clone(method, true).parent = this;
-        }
-      }
-    }
   }
   /**
    * Whether the given node is a direct child of this node.

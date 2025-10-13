@@ -6,7 +6,6 @@ import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import type { Scene } from './scene';
-import type { NodeClonable, NodeCloneMethod } from '.';
 
 /**
  * Base class for any kind of light node
@@ -35,15 +34,6 @@ export abstract class BaseLight extends GraphNode {
     this._positionRange = null;
     this._directionCutoff = null;
     this._diffuseIntensity = null;
-  }
-  /**
-   * Copy from another BaseLight
-   * @param other - Other BaseLight to copy from
-   * @param method - Copy method
-   */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean) {
-    super.copyFrom(other, method, recursive);
-    this.intensity = other.intensity;
   }
   /** Gets the light type */
   get lightType(): number {
@@ -180,12 +170,6 @@ export class PunctualLight extends BaseLight {
     this._castShadow = false;
     this._shadowMapper = new ShadowMapper(this);
   }
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.color = other.color;
-    this.castShadow = other.castShadow;
-    this.shadow.copyFrom(other.shadow);
-  }
   /** Color of the light */
   get color(): Vector4 {
     return this._color.clone();
@@ -244,7 +228,7 @@ export class PunctualLight extends BaseLight {
  * Directional light
  * @public
  */
-export class DirectionalLight extends PunctualLight implements NodeClonable<DirectionalLight> {
+export class DirectionalLight extends PunctualLight {
   private static readonly _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
   /**
    * Creates an instance of directional light
@@ -270,12 +254,6 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
     } else {
       ref.set(light);
     }
-  }
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new DirectionalLight(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
   }
   /**
    * true if the light was defined as sun light
@@ -500,7 +478,7 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
  * Point light
  * @public
  */
-export class PointLight extends PunctualLight implements NodeClonable<PointLight> {
+export class PointLight extends PunctualLight {
   /** @internal */
   protected _range: number;
   /**
@@ -511,16 +489,6 @@ export class PointLight extends PunctualLight implements NodeClonable<PointLight
     super(scene, LIGHT_TYPE_POINT);
     this._range = 10;
     this.invalidateBoundingVolume();
-  }
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new PointLight(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.range = other.range;
   }
   /** The range of the light */
   get range() {
@@ -571,7 +539,7 @@ export class PointLight extends PunctualLight implements NodeClonable<PointLight
  * Spot light
  * @public
  */
-export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> {
+export class SpotLight extends PunctualLight {
   /** @internal */
   protected _range: number;
   /** @internal */
@@ -585,17 +553,6 @@ export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> 
     this._range = 10;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
-  }
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new SpotLight(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  copyFrom(other: this, method: NodeCloneMethod, recursive): void {
-    super.copyFrom(other, method, recursive);
-    this.range = other.range;
-    this.cutoff = other.cutoff;
   }
   /** The range of the light */
   get range() {

@@ -1,7 +1,6 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from '@zephyr3d/device';
-import type { NodeClonable, NodeCloneMethod } from '../scene_node';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
@@ -75,10 +74,7 @@ class HeightBoundingGenerator extends RenderMipmap {
  *
  * @public
  */
-export class ClipmapTerrain
-  extends applyMixins(GraphNode, mixinDrawable)
-  implements Drawable, NodeClonable<ClipmapTerrain>
-{
+export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static readonly _heightBoundingGenerator = new HeightBoundingGenerator();
   private static readonly _copyBlitter = new HeightMinMaxBlitter();
   private static readonly _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
@@ -208,18 +204,9 @@ export class ClipmapTerrain
     this.material.numDetailMaps = val;
   }
   /** {@inheritDoc SceneNode.clone} */
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new ClipmapTerrain(this.scene, this._sizeX, this._sizeZ);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  /** {@inheritDoc SceneNode.copyFrom} */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.setSize(other.sizeX, other.sizeZ);
-    this.wireframe = other.wireframe;
-    this.castShadow = other.castShadow;
+  async clone(): Promise<this> {
+    console.error('Cloning clipmap terrain not implemented');
+    return null;
   }
   /**
    * Sets the terrain size.

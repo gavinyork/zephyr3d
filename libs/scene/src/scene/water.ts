@@ -1,7 +1,6 @@
 import { Vector4 } from '@zephyr3d/base';
 import type { Matrix4x4 } from '@zephyr3d/base';
 import { applyMixins, Vector3, DRef } from '@zephyr3d/base';
-import type { NodeClonable, NodeCloneMethod } from './scene_node';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
@@ -29,7 +28,7 @@ import { getDevice } from '../app/api';
  * Water scene node
  * @public
  */
-export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable, NodeClonable<Water> {
+export class Water extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private readonly _pickTarget: PickTarget;
   private _clipmap: Clipmap;
   private _renderData: PrimitiveInstanceInfo[];
@@ -81,20 +80,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this._feedbackRenderTarget.dispose();
     }
     this._material.dispose();
-  }
-  /** {@inheritDoc SceneNode.clone} */
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new Water(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  /** {@inheritDoc SceneNode.copyFrom} */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.waveGenerator = other.waveGenerator?.clone() ?? null;
-    this.gridScale = other.gridScale;
-    this.wireframe = other.wireframe;
   }
   /** Whether water should be drawn with lines */
   get wireframe() {

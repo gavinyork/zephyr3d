@@ -1,6 +1,5 @@
-import type { CubeFace } from '@zephyr3d/base';
-import { DRef, Plane, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
-import type { NodeClonable, NodeCloneMethod } from '../scene/scene_node';
+import type { CubeFace, Plane } from '@zephyr3d/base';
+import { DRef, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import type { Drawable, PickTarget } from '../render/drawable';
 import type { BaseTexture } from '@zephyr3d/device';
@@ -64,7 +63,7 @@ export type CameraHistoryData = {
  *
  * @public
  */
-export class Camera extends SceneNode implements NodeClonable<Camera> {
+export class Camera extends SceneNode {
   /** @internal Halton 2-3 sequence used for TAA jittering. */
   private static readonly _halton23 = halton23(16);
   /** @internal Per-camera history resources. */
@@ -303,47 +302,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     if (scene && !scene.mainCamera) {
       scene.mainCamera = this;
     }
-  }
-  /** {@inheritDoc SceneNode.clone} */
-  clone(method: NodeCloneMethod, recursive: boolean): Camera {
-    const other = new Camera(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  /** {@inheritDoc SceneNode.copyFrom} */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.clipPlane = other.clipPlane ? new Plane(other.clipPlane) : null;
-    this.clearColor = other.clearColor;
-    this.clearDepth = other.clearDepth;
-    this.clearStencil = other.clearStencil;
-    this._HDR = other.HDR;
-    this.HiZ = other.HiZ;
-    this.toneMap = other.toneMap;
-    this.toneMapExposure = other.toneMapExposure;
-    this.bloom = other.bloom;
-    this.FXAA = other.FXAA;
-    this.TAA = other.TAA;
-    this.TAADebug = other.TAADebug;
-    this.SSR = other.SSR;
-    this.ssrMaxRoughness = other.ssrMaxRoughness;
-    this.ssrRoughnessFactor = other.ssrRoughnessFactor;
-    this.ssrStride = other.ssrStride;
-    this.ssrMaxDistance = other.ssrMaxDistance;
-    this.ssrIterations = other.ssrIterations;
-    this.ssrThickness = other.ssrThickness;
-    this.ssrCalcThickness = other.ssrCalcThickness;
-    this.ssrBlurScale = other.ssrBlurScale;
-    this.ssrBlurDepthCutoff = other.ssrBlurDepthCutoff;
-    this.ssrBlurKernelSize = other.ssrBlurKernelSize;
-    this.depthPrePass = other.depthPrePass;
-    this.commandBufferReuse = other.commandBufferReuse;
-    this.oit = other.oit;
-    this.clipMask = other.clipMask;
-    this.viewport = other.viewport?.slice() ?? null;
-    this.scissor = other.scissor?.slice() ?? null;
-    this.setProjectionMatrix(other.getProjectionMatrix());
   }
   /**
    * The compositor that owns and runs the camera's post-processing chain.

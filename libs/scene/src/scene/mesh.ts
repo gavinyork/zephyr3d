@@ -21,11 +21,11 @@ import {
 } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingVolume } from '../utility/bounding_volume';
-import { BoundingBox } from '../utility/bounding_volume';
+import type { BoundingBox } from '../utility/bounding_volume';
 import { MORPH_ATTRIBUTE_VECTOR_COUNT, MORPH_WEIGHTS_VECTOR_COUNT, QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import type { NodeClonable, NodeCloneMethod, SceneNode } from './scene_node';
+import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinnedBoundingBox } from '../animation';
 
@@ -33,7 +33,7 @@ import type { SkinnedBoundingBox } from '../animation';
  * Mesh node
  * @public
  */
-export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable, NodeClonable<Mesh> {
+export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements BatchDrawable {
   /** @internal */
   private readonly _primitive: DRef<Primitive>;
   /** @internal */
@@ -96,34 +96,6 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._useRenderBundle = true;
     this._materialChangeTag = null;
     this._primitiveChangeTag = null;
-  }
-  /** {@inheritDoc SceneNode.clone} */
-  clone(method: NodeCloneMethod, recursive: boolean): Mesh {
-    const other = new Mesh(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  /** {@inheritDoc SceneNode.copyFrom} */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.castShadow = other.castShadow;
-    this.primitive = other.primitive;
-    this.material = other.material?.$isInstance ? other.material.createInstance() : other.material;
-    if (other.material.$isInstance) {
-      this.material.$instanceUniforms.set(other.material.$instanceUniforms);
-    }
-    this._skinnedBoundingInfo = other._skinnedBoundingInfo
-      ? {
-          boundingVertices: other._skinnedBoundingInfo.boundingVertices,
-          boundingVertexBlendIndices: other._skinnedBoundingInfo.boundingVertexBlendIndices,
-          boundingVertexJointWeights: other._skinnedBoundingInfo.boundingVertexJointWeights,
-          boundingBox: new BoundingBox(other._skinnedBoundingInfo.boundingBox)
-        }
-      : null;
-    this.skeletonName = other.skeletonName;
-    this.setMorphData(other.getMorphData());
-    this.setMorphInfo(other.getMorphInfo());
   }
   /**
    * {@inheritDoc Drawable.getName}

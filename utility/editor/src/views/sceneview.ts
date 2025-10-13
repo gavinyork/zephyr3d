@@ -5,7 +5,6 @@ import { PropertyEditor } from '../components/grid';
 import type {
   Camera,
   Compositor,
-  NodeCloneMethod,
   PickResult,
   PropertyAccessor,
   PropertyTrack,
@@ -413,7 +412,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             return !!this._sceneHierarchy.selectedNode;
           },
           action: () => {
-            this.handleCloneNode(this._sceneHierarchy.selectedNode, 'instance');
+            this.handleCloneNode(this._sceneHierarchy.selectedNode);
           }
         },
         {
@@ -1200,14 +1199,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handlePasteNode() {
     if (this._clipBoardData.get()) {
-      this.handleCloneNode(this._clipBoardData.get(), 'deep');
+      this.handleCloneNode(this._clipBoardData.get());
     }
   }
-  private handleCloneNode(node: SceneNode, method: NodeCloneMethod) {
+  private handleCloneNode(node: SceneNode) {
     if (!node) {
       return;
     }
-    this._cmdManager.execute(new NodeCloneCommand(node, method)).then((sceneNode) => {
+    this._cmdManager.execute(new NodeCloneCommand(node)).then((sceneNode) => {
       sceneNode.position.x += 1;
       this._sceneHierarchy.selectNode(sceneNode);
     });

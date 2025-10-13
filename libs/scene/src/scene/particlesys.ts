@@ -10,7 +10,6 @@ import type { Drawable, DrawContext, MorphData, MorphInfo, PickTarget } from '..
 import { Primitive } from '../render';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
-import type { NodeClonable, NodeCloneMethod } from '.';
 import { getDevice } from '../app/api';
 
 const tmpVec3 = new Vector3();
@@ -51,10 +50,7 @@ export type EmitterBehavior = 'surface' | 'volume';
  * Particle system class
  * @public
  */
-export class ParticleSystem
-  extends applyMixins(GraphNode, mixinDrawable)
-  implements Drawable, NodeClonable<ParticleSystem>
-{
+export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static readonly updateFuncMap: WeakMap<ParticleSystem, () => void> = new WeakMap();
   private readonly _activeParticleList: ParticleNode[];
   private _maxParticleCount: number;
@@ -138,48 +134,6 @@ export class ParticleSystem
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._material = new DRef(new ParticleMaterial());
-  }
-  /** {@inheritDoc SceneNode.clone} */
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const other = new ParticleSystem(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  /** {@inheritDoc SceneNode.copyFrom} */
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.maxParticleCount = other.maxParticleCount;
-    this.emitInterval = other.emitInterval;
-    this.emitCount = other.emitCount;
-    this.gravity = other.gravity.clone();
-    this.wind = other.wind.clone();
-    this.scalar = other.scalar;
-    this.aspect = other.aspect;
-    this.airResistence = other.airResistence;
-    this.particleRotationMin = other.particleRotationMin;
-    this.particleRotationMax = other.particleRotationMax;
-    this.jitterSpeed = other.jitterSpeed;
-    this.jitterPower = other.jitterPower;
-    this.emitterShape = other.emitterShape;
-    this.emitterBehavior = other.emitterBehavior;
-    this.emitterConeRadiusMin = other.emitterConeRadiusMin;
-    this.emitterConeRadiusMax = other.emitterConeRadiusMax;
-    this.particleVelocityMin = other.particleVelocityMin;
-    this.particleVelocityMax = other.particleVelocityMax;
-    this.particleLifeMin = other.particleLifeMin;
-    this.particleLifeMax = other.particleLifeMax;
-    this.particleSize1Min = other.particleSize1Min;
-    this.particleSize1Max = other.particleSize1Max;
-    this.particleSize2Min = other.particleSize2Min;
-    this.particleSize2Max = other.particleSize2Max;
-    this.particleAccelMin = other.particleAccelMin;
-    this.particleAccelMax = other.particleAccelMax;
-    this.emitterShapeSizeMin = other.emitterShapeSizeMin.clone();
-    this.emitterShapeSizeMax = other.emitterShapeSizeMax.clone();
-    this.directional = other.directional;
-    this.worldSpace = other.worldSpace;
-    this.flags = other.flags;
   }
   /** Material of the particle system node */
   get material(): ParticleMaterial {

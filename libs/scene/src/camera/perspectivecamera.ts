@@ -1,14 +1,13 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
 import { Matrix4x4 } from '@zephyr3d/base';
-import type { NodeClonable, NodeCloneMethod } from '../scene';
 import { getDevice } from '../app/api';
 
 /**
  * Perspective camera class
  * @public
  */
-export class PerspectiveCamera extends Camera implements NodeClonable<PerspectiveCamera> {
+export class PerspectiveCamera extends Camera {
   /** @internal */
   private _near: number;
   private _far: number;
@@ -33,20 +32,6 @@ export class PerspectiveCamera extends Camera implements NodeClonable<Perspectiv
     this._autoAspect = true;
     this._window = null;
     this._invalidate(true);
-  }
-  clone(method: NodeCloneMethod, recursive: boolean): PerspectiveCamera {
-    const other = new PerspectiveCamera(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.window = other.window?.slice() ?? null;
-    this.near = other.near;
-    this.far = other.far;
-    this.fovY = other.fovY;
-    this.aspect = other.aspect;
   }
   /** Sub-window of the frustum */
   get window(): number[] {

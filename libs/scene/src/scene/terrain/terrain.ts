@@ -10,14 +10,13 @@ import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
-import type { NodeClonable, NodeCloneMethod } from '..';
 import { getDevice } from '../../app/api';
 
 /**
  * Terrain node
  * @public
  */
-export class Terrain extends GraphNode implements NodeClonable<Terrain> {
+export class Terrain extends GraphNode {
   /** @internal */
   private readonly _quadtree: DRef<Quadtree>;
   /** @internal */
@@ -64,25 +63,9 @@ export class Terrain extends GraphNode implements NodeClonable<Terrain> {
     this._viewPoint = null;
     this._castShadow = true;
   }
-  clone(method: NodeCloneMethod, recursive: boolean) {
-    const terrain = new Terrain(this.scene);
-    terrain.copyFrom(this, method, recursive);
-    terrain.parent = this;
-    return terrain;
-  }
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this._quadtree.set(other._quadtree.get());
-    this._grassManager.set(other._grassManager.get());
-    this.maxPixelError = other.maxPixelError;
-    this.castShadow = other.castShadow;
-    this._lodCamera = null;
-    this._heightFieldScale.set(other._heightFieldScale);
-    this._patchSize = other._patchSize;
-    this._lastTanHalfFOVY = 0;
-    this._width = other._width;
-    this._height = other._height;
-    this._material = other._material?.clone() ?? null;
+  async clone(): Promise<this> {
+    console.error('Cloning terrain not implemented');
+    return null;
   }
   /** @internal */
   get quadtree(): Quadtree {

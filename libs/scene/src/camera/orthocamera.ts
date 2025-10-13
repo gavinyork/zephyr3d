@@ -1,13 +1,12 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
 import { Matrix4x4 } from '@zephyr3d/base';
-import type { NodeClonable, NodeCloneMethod } from '../scene';
 
 /**
  * Orthogonal camera class
  * @public
  */
-export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
+export class OrthoCamera extends Camera {
   /** @internal */
   private _left: number;
   private _right: number;
@@ -35,12 +34,6 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
     this._window = null;
     this._invalidate(true);
   }
-  clone(method: NodeCloneMethod, recursive: boolean): OrthoCamera {
-    const other = new OrthoCamera(this.scene);
-    other.copyFrom(this, method, recursive);
-    other.parent = this.parent;
-    return other;
-  }
   /** Sub-window of the frustum */
   get window(): number[] {
     return this._window;
@@ -48,16 +41,6 @@ export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
   set window(val: number[]) {
     this._window = val?.slice() ?? null;
     this._invalidate(true);
-  }
-  copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void {
-    super.copyFrom(other, method, recursive);
-    this.window = other.window?.slice() ?? null;
-    this.near = other.near;
-    this.far = other.far;
-    this.left = other.left;
-    this.right = other.right;
-    this.top = other.top;
-    this.bottom = other.bottom;
   }
   /** The near clip plane */
   get near(): number {

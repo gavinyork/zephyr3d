@@ -1,4 +1,4 @@
-import type { MeshMaterial, NodeCloneMethod, Scene, SceneNode } from '@zephyr3d/scene';
+import type { MeshMaterial, Scene, SceneNode } from '@zephyr3d/scene';
 import { getEngine } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import { Mesh } from '@zephyr3d/scene';
@@ -295,51 +295,23 @@ export class NodeReparentCommand extends Command {
 
 export class NodeCloneCommand extends Command<SceneNode> {
   private readonly _nodeId: string;
-  private _newNodeId: string;
-  private readonly _method: NodeCloneMethod;
-  constructor(node: SceneNode, method: NodeCloneMethod) {
+  private _newNodeId: number;
+  constructor(node: SceneNode) {
     super('Clone node');
     this._nodeId = node.persistentId;
     idNodeMap[this._nodeId] = node;
-    this._method = method;
-    this._newNodeId = '';
+    this._newNodeId = 0;
   }
   async execute(): Promise<SceneNode> {
     const node = idNodeMap[this._nodeId];
     if (!node) {
       return null;
     }
-    const that = this;
-    async function cloneNode(node: SceneNode) {
-      let newNode: SceneNode;
-      if (!node || node.sealed) {
-        return null;
-      }
-      const assetId = ProjectService.serializationManager.getAssetId(node);
-      if (assetId) {
-        newNode = (
-          await ProjectService.serializationManager.fetchModel(assetId, node.scene, {
-            enableInstancing: that._method === 'instance'
-          })
-        ).group;
-        newNode.position = node.position;
-        newNode.rotation = node.rotation;
-        newNode.scale = node.scale;
-      } else {
-        newNode = node.clone(that._method, false);
-      }
-      const promises = node.children.map((val) => cloneNode(val.get()));
-      const newChildren = await Promise.all(promises);
-      for (const newChild of newChildren) {
-        if (newChild) {
-          newChild.parent = newNode;
-        }
-      }
-      return newNode;
+    const newNode = await node.clone();
+    if (newNode) {
+      this._newNodeId = newNode.runtimeId;
+      idNodeMap[newNode.persistentId] = newNode;
     }
-    const newNode = await cloneNode(node);
-    this._newNodeId = newNode.persistentId;
-    idNodeMap[newNode.persistentId] = newNode;
 
     return newNode;
   }
@@ -349,7 +321,7 @@ export class NodeCloneCommand extends Command<SceneNode> {
       if (newNode) {
         newNode.parent = null;
       }
-      this._newNodeId = '';
+      this._newNodeId = 0;
     }
   }
 }
