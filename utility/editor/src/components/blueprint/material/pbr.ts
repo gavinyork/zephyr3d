@@ -169,8 +169,12 @@ export class PBRMaterialEditor extends GraphEditor {
     try {
       const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
       const data = JSON.parse(content);
-      ASSERT(data.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
-      const state = data.state as NodeEditorState;
+      ASSERT(data.type === 'PBRBluePrintMaterial', 'Invalid PBR Material BluePrint');
+      const blueprint = data.data?.IR as string;
+      const blueprintContent = (await ProjectService.VFS.readFile(blueprint, { encoding: 'utf8' })) as string;
+      const blueprintData = JSON.parse(blueprintContent);
+      ASSERT(blueprintData.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
+      const state = blueprintData.state as NodeEditorState;
       await this.nodeEditor.loadState(state);
       this._version = this.nodeEditor.version;
     } catch (err) {
