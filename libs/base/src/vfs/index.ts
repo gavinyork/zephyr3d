@@ -4,6 +4,7 @@ export * from './httpfs';
 export * from './idbfs';
 export * from './memfs';
 export * from './zipfs';
+export * from './nullfs';
 export * from './datatransferfs';
 export * from './readers/reader';
 export * from './readers/generic_html_index_reader';

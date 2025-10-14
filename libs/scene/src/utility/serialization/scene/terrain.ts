@@ -150,6 +150,9 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
           name: 'Wireframe',
           type: 'bool',
           default: false,
+          isPersistent() {
+            return false;
+          },
           get(this: ClipmapTerrain, value) {
             value.bool[0] = this.wireframe;
           },
@@ -167,6 +170,9 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
             }
           },
           default: 'none',
+          isPersistent() {
+            return false;
+          },
           get(this: ClipmapTerrain, value) {
             value.str[0] = this.material.debugMode;
           },

@@ -415,6 +415,16 @@ export class SceneNode
     other.persistentId = randomUUID();
     other.parent = parent;
     tmpParent.dispose();
+    const postClonePromises: Promise<void>[] = [];
+    other.iterate((node) => {
+      const P = node.onPostClone();
+      if (P instanceof Promise) {
+        postClonePromises.push(P);
+      }
+    });
+    if (postClonePromises.length > 0) {
+      await Promise.all(postClonePromises);
+    }
     return other;
   }
   /**
@@ -736,6 +746,8 @@ export class SceneNode
   set boundingBoxDrawMode(mode: number) {
     this._boxDrawMode = mode;
   }
+  /** Get called when the node was just created by cloning from other node */
+  protected onPostClone(): void | Promise<void> {}
   /** Disposes the node */
   protected onDispose() {
     super.onDispose();

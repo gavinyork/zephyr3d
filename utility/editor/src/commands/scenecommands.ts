@@ -11,7 +11,7 @@ import { ProjectService } from '../core/services/project';
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
 function findNodesByPath(parentNode: SceneNode, path: string): SceneNode[] {
-  const parts = path.split('/');
+  const parts = path.split('/').filter((p) => !!p);
   const result: SceneNode[] = [parentNode];
   while (parts.length > 0) {
     const part = parts.shift();
