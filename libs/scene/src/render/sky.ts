@@ -39,7 +39,12 @@ import { fetchSampler } from '../utility/misc';
 import { CubemapSHProjector } from '../utility/shprojector';
 import { Fog, uniformSphereSamples } from '../values';
 import type { HeightFogParams } from '../shaders/fog';
-import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../shaders/fog';
+import {
+  calculateFog,
+  getDefaultHeightFogParams,
+  getHeightFogParamsStruct,
+  MAX_FOG_HEIGHT
+} from '../shaders/fog';
 import { getDevice } from '../app/api';
 import { drawFullscreenQuad } from './fullscreenquad';
 
@@ -318,6 +323,13 @@ export class SkyRenderer extends Disposable {
   }
   set heightFogStartDistance(val: number) {
     this._heightFogParams.parameter2.z = val;
+  }
+  /** Height fog end distance */
+  get heightFogEndDistance() {
+    return this._heightFogParams.parameter2.w;
+  }
+  set heightFogEndDistance(val: number) {
+    this._heightFogParams.parameter2.w = val;
   }
   /** Height fog maximum opacity */
   get heightFogMaxOpacity() {
@@ -600,7 +612,7 @@ export class SkyRenderer extends Disposable {
     // Update height fog parameters
     if (this._fogType === 'height_fog') {
       const cameraY = Math.min(
-        this._heightFogParams.parameter2.y + this._heightFogParams.parameter2.w,
+        this._heightFogParams.parameter2.y + MAX_FOG_HEIGHT,
         ctx.camera.getWorldPosition().y
       );
       const p = Math.max(

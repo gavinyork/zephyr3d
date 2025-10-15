@@ -115,7 +115,7 @@ export class Skeleton extends Disposable {
         position: joint.position.clone()
       }));
     }
-    this.updateJointMatrices(this._bindPoseMatrices);
+    this.updateJointMatrices();
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**

@@ -408,6 +408,11 @@ export class SceneNode
    * @returns New node instance
    */
   async clone(): Promise<this> {
+    this.iterate((node) => {
+      if (node.isTerrain() || node.isClipmapTerrain()) {
+        throw new Error('Cloning terrain node is not allowed');
+      }
+    });
     const parent = this.parent;
     const tmpParent = new SceneNode(this.scene);
     const data = await getEngine().serializationManager.serializeObject(this);

@@ -359,6 +359,24 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           }
         },
         {
+          name: 'HeightFogEndDistance',
+          type: 'float',
+          default: 10000,
+          options: {
+            group: 'HeightFog',
+            label: 'EndDistance'
+          },
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogEndDistance;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogEndDistance = value.num[0];
+          }
+        },
+        {
           name: 'HeightFogMaxOpacity',
           type: 'float',
           options: { group: 'HeightFog', label: 'MaxOpacity', minValue: 0, maxValue: 1 },

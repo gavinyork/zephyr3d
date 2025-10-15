@@ -66,6 +66,7 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { ListView } from '../components/listview';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
+import { DlgMessage } from './dlg/messagedlg';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -1206,6 +1207,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (!node) {
       return;
     }
+    let hasTerrain = false;
+    node.iterate((node) => {
+      if (node.isTerrain() || node.isClipmapTerrain()) {
+        hasTerrain = true;
+        return true;
+      }
+      return false;
+    });
+    if (hasTerrain) {
+      DlgMessage.messageBox('Error', 'Cloning terrain node is not allowed');
+      return;
+    }
     this._cmdManager.execute(new NodeCloneCommand(node)).then((sceneNode) => {
       sceneNode.position.x += 1;
       this._sceneHierarchy.selectNode(sceneNode);
@@ -1420,6 +1433,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     });
   }
   private handleSavePrefab(node: SceneNode) {
+    let hasTerrain = false;
+    node.iterate((node) => {
+      if (node.isTerrain() || node.isClipmapTerrain()) {
+        hasTerrain = true;
+        return true;
+      }
+      return false;
+    });
+    if (hasTerrain) {
+      DlgMessage.messageBox('Error', 'Terrain node cannot be saved as prefab');
+      return;
+    }
     DlgSaveFile.saveFile(
       'Save Prefab',
       getEngine().VFS,

@@ -3,6 +3,10 @@ import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr
 import { aerialPerspective, getAtmosphereParamsStruct } from './atmosphere';
 import { Fog } from '../values';
 
+/** @internal */
+export const MAX_FOG_HEIGHT = 100;
+
+/** @internal */
 export type HeightFogParams = {
   parameter1: Vector4; // [rgb=fogColor a=heightFalloff]
   parameter2: Vector4; // [r=density g=startHeight b=startDistance a=maxHeight]
@@ -12,10 +16,11 @@ export type HeightFogParams = {
   lightColor: Vector3;
 };
 
+/** @internal */
 export function getDefaultHeightFogParams(): HeightFogParams {
   return {
     parameter1: new Vector4(0, 0, 0, 0.5),
-    parameter2: new Vector4(0.02, -100, 0, 100),
+    parameter2: new Vector4(0.02, -100, 0, 10000),
     parameter3: new Vector4(0.8, 1, 0, 4),
     parameter4: new Vector4(0, 0, 0, 0),
     lightDir: new Vector3(0, 1, 0),
@@ -23,6 +28,7 @@ export function getDefaultHeightFogParams(): HeightFogParams {
   };
 }
 
+/** @internal */
 export function getHeightFogParamsStruct(pb: ProgramBuilder) {
   return pb.defineStruct([
     pb.vec4('parameter1'),
@@ -149,7 +155,7 @@ export function calculateHeightFog(
         this.cameraPosition,
         pb.vec3(
           this.cameraPosition.x,
-          pb.min(this.cameraPosition.y, pb.add(this.params.parameter2.y, this.params.parameter2.w)),
+          pb.min(this.cameraPosition.y, pb.add(this.params.parameter2.y, MAX_FOG_HEIGHT)),
           this.cameraPosition.z
         )
       );
@@ -174,13 +180,11 @@ export function calculateHeightFog(
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
         pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
       );
+      this.$l.worldDistance = pb.dot(pb.sub(this.worldPos, this.origin), this.rayNorm);
       this.$l.lineIntegral = pb.mul(
         this.term,
         this.factor,
-        pb.max(
-          0,
-          pb.dot(pb.sub(this.worldPos, this.origin), this.rayNorm)
-        ) /*pb.distance(this.origin, this.worldPos)*/
+        pb.max(0, this.worldDistance) /*pb.distance(this.origin, this.worldPos)*/
       );
 
       this.$l.directionalInscattering = pb.mul(
@@ -188,6 +192,8 @@ export function calculateHeightFog(
         pb.pow(pb.clamp(pb.dot(this.rayNorm, this.params.lightDir), 0, 1), this.params.parameter3.w)
       );
       this.$l.fogFactor = pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.lineIntegral)), 0, 1));
+      this.$l.distanceFactor = pb.clamp(pb.div(this.worldDistance, this.params.parameter2.w), 0, 1);
+      this.fogFactor = pb.mul(this.fogFactor, pb.sub(1, this.distanceFactor));
       this.$l.directionalInscattering = pb.mul(
         this.$l.directionalInscattering,
         pb.max(this.fogFactor, this.fading)
