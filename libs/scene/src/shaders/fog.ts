@@ -174,7 +174,14 @@ export function calculateHeightFog(
         pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
         pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
       );
-      this.$l.lineIntegral = pb.mul(this.term, this.factor, pb.distance(this.origin, this.worldPos));
+      this.$l.lineIntegral = pb.mul(
+        this.term,
+        this.factor,
+        pb.max(
+          0,
+          pb.dot(pb.sub(this.worldPos, this.origin), this.rayNorm)
+        ) /*pb.distance(this.origin, this.worldPos)*/
+      );
 
       this.$l.directionalInscattering = pb.mul(
         pb.add(this.params.parameter4.rgb, pb.mul(this.params.lightColor, this.params.parameter3.y)),
