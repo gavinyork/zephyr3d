@@ -126,7 +126,7 @@ export interface ProgramBuilder {
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope;
   /** Gets the current scope */
-  getCurrentScope(): PBScope;
+  getCurrentScope<T extends PBScope = PBScope>(): T;
   /**
    * Query the global variable by the name
    * @param name - Name of the variable
@@ -1156,8 +1156,8 @@ export class ProgramBuilder {
     return this._scopeStack.shift();
   }
   /** Gets the current scope */
-  getCurrentScope(): PBScope {
-    return this._scopeStack[0];
+  getCurrentScope<T extends PBScope = PBScope>(): T {
+    return this._scopeStack[0] as T;
   }
   /** Gets the current function scope */
   getCurrentFunctionScope(): PBFunctionScope {

@@ -5,7 +5,10 @@ import {
   VertexBinormalNode,
   CameraPositionNode,
   VertexPositionNode,
-  VertexUVNode
+  VertexUVNode,
+  ElapsedTimeNode,
+  CameraNearFarNode,
+  SkyEnvTextureNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -41,6 +44,18 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'CameraPositionWS',
           create: () => new CameraPositionNode()
+        },
+        {
+          name: 'CameraNearFar',
+          create: () => new CameraNearFarNode()
+        },
+        {
+          name: 'SkyEnvTexture',
+          create: () => new SkyEnvTextureNode()
+        },
+        {
+          name: 'ElapsedTime',
+          create: () => new ElapsedTimeNode()
         }
       ]
     }

@@ -1,5 +1,6 @@
 import type {
   BaseTexture,
+  PBInsideFunctionScope,
   PBScope,
   ProgramBuilder,
   TextureAddressMode,
@@ -20,7 +21,10 @@ import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
 import { GenericMathNode, MakeVectorNode } from '../common/math';
 import {
+  CameraNearFarNode,
   CameraPositionNode,
+  ElapsedTimeNode,
+  SkyEnvTextureNode,
   VertexBinormalNode,
   VertexColorNode,
   VertexNormalNode,
@@ -28,6 +32,7 @@ import {
   VertexTangentNode,
   VertexUVNode
 } from './inputs';
+import { ShaderHelper } from '../../../material/shader/helper';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number; node: IGraphNode };
 export type IRUniformTexture = {
@@ -120,13 +125,13 @@ class IRConstantfv extends IRExpression {
 }
 
 class IRInput extends IRExpression {
-  readonly name: string;
-  constructor(name: string) {
+  readonly func: string | ((scope: PBInsideFunctionScope) => PBShaderExp);
+  constructor(func: string | ((scope: PBInsideFunctionScope) => PBShaderExp)) {
     super();
-    this.name = name;
+    this.func = func;
   }
   create(pb: ProgramBuilder): PBShaderExp {
-    return pb.getCurrentScope()[this.name];
+    return typeof this.func === 'string' ? pb.getCurrentScope()[this.func] : this.func(pb.getCurrentScope());
   }
 }
 
@@ -392,6 +397,12 @@ export class MaterialBlueprintIR {
       expr = this.vertexBinormal(node, output);
     } else if (node instanceof CameraPositionNode) {
       expr = this.cameraPosition(node, output);
+    } else if (node instanceof CameraNearFarNode) {
+      expr = this.cameraNearFar(node, output);
+    } else if (node instanceof SkyEnvTextureNode) {
+      expr = this.skyEnvTexture(node, output);
+    } else if (node instanceof ElapsedTimeNode) {
+      expr = this.elapsedTime(node, output);
     }
     if (expr && originType) {
       const outputType = node.getOutputType(output);
@@ -498,7 +509,27 @@ export class MaterialBlueprintIR {
   }
   private cameraPosition(node: CameraPositionNode, output: number): IRExpression {
     this._behaviors.useCameraPosition = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zCameraPos');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getCameraPosition(scope)
+    );
+  }
+  private cameraNearFar(node: CameraNearFarNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRInput,
+      (scope: PBInsideFunctionScope) => ShaderHelper.getCameraParams(scope).xy
+    );
+  }
+  private skyEnvTexture(node: SkyEnvTextureNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getBakedSkyTexture(scope)
+    );
+  }
+  private elapsedTime(node: ElapsedTimeNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getElapsedTime(scope)
+    );
   }
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);

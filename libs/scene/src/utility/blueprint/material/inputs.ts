@@ -181,6 +181,31 @@ export class VertexBinormalNode extends BaseGraphNode {
   }
 }
 
+export class ElapsedTimeNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'Elapsed time';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ElapsedTimeNode,
+      name: 'ElapsedTimeNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'float';
+  }
+}
+
 export class CameraPositionNode extends BaseGraphNode {
   constructor() {
     super();
@@ -208,5 +233,58 @@ export class CameraPositionNode extends BaseGraphNode {
   }
   protected getType(id: number): string {
     return id > 1 ? 'float' : 'vec3';
+  }
+}
+
+export class SkyEnvTextureNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString(): string {
+    return 'SkyEnvTexture';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SkyEnvTextureNode,
+      name: 'SkyEnvTextureNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'texCube';
+  }
+}
+export class CameraNearFarNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'near', swizzle: 'x' },
+      { id: 3, name: 'far', swizzle: 'y' }
+    ];
+  }
+  toString() {
+    return 'camera near far';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: CameraNearFarNode,
+      name: 'CameraNearFarNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(id: number): string {
+    return id > 1 ? 'float' : 'vec2';
   }
 }

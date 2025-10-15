@@ -125,7 +125,10 @@ import {
   TanNode
 } from '../blueprint/common/math';
 import {
+  CameraNearFarNode,
   CameraPositionNode,
+  ElapsedTimeNode,
+  SkyEnvTextureNode,
   VertexBinormalNode,
   VertexColorNode,
   VertexNormalNode,
@@ -318,6 +321,9 @@ export class SerializationManager {
         VertexTangentNode.getSerializationCls(),
         VertexBinormalNode.getSerializationCls(),
         CameraPositionNode.getSerializationCls(),
+        CameraNearFarNode.getSerializationCls(),
+        SkyEnvTextureNode.getSerializationCls(),
+        ElapsedTimeNode.getSerializationCls(),
         PBRBlockNode.getSerializationCls(),
         TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
