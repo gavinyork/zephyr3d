@@ -52,7 +52,7 @@ import { getDevice } from '../../../app/api';
 /** @internal */
 export interface GLTFContent extends GlTf {
   _manager: AssetManager;
-  _vfs: VFS;
+  _VFSs: VFS[];
   _loadedBuffers: ArrayBuffer[];
   _accessors: GLTFAccessor[];
   _bufferCache: Record<string, GPUDataBuffer>;
@@ -77,15 +77,16 @@ export class GLTFLoader extends AbstractModelLoader {
     url: string,
     mimeType: string,
     data: Blob,
-    decoderModule?: DecoderModule
+    decoderModule?: DecoderModule,
+    VFSs?: VFS[]
   ) {
     const buffer = await data.arrayBuffer();
     if (this.isGLB(buffer)) {
-      return this.loadBinary(assetManager, url, buffer, assetManager.vfs, decoderModule);
+      return this.loadBinary(assetManager, url, buffer, VFSs, decoderModule);
     }
     const gltf = (await new Response(data).json()) as GLTFContent;
     gltf._manager = assetManager;
-    gltf._vfs = assetManager.vfs;
+    gltf._VFSs = VFSs;
     gltf._loadedBuffers = null;
     return this.loadJson(url, gltf, decoderModule);
   }
@@ -93,7 +94,7 @@ export class GLTFLoader extends AbstractModelLoader {
     assetManager: AssetManager,
     url: string,
     buffer: ArrayBuffer,
-    vfs: VFS,
+    VFSs: VFS[],
     decoderModule?: DecoderModule
   ): Promise<SharedModel> {
     const jsonChunkType = 0x4e4f534a;
@@ -112,7 +113,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     if (gltf) {
       gltf._manager = assetManager;
-      gltf._vfs = vfs;
+      gltf._VFSs = VFSs;
       gltf._loadedBuffers = buffers;
       return this.loadJson(url, gltf, decoderModule);
     }
@@ -151,7 +152,7 @@ export class GLTFLoader extends AbstractModelLoader {
       if (buffers) {
         for (const buffer of buffers) {
           const uri = this._normalizeURI(gltf._baseURI, buffer.uri);
-          const buf = await gltf._manager.fetchBinaryData(uri, null);
+          const buf = await gltf._manager.fetchBinaryData(uri, null, null, gltf._VFSs);
           if (buffer.byteLength !== buf.byteLength) {
             console.error(`Invalid GLTF: buffer byte length error.`);
             return null;
@@ -1183,7 +1184,7 @@ export class GLTFLoader extends AbstractModelLoader {
         if (image) {
           if (image.uri) {
             const imageUrl = this._normalizeURI(gltf._baseURI, image.uri);
-            mt.texture = await gltf._manager.fetchTexture(imageUrl, { linearColorSpace: !sRGB });
+            mt.texture = await gltf._manager.fetchTexture(imageUrl, { linearColorSpace: !sRGB }, gltf._VFSs);
             mt.texture.name = imageUrl;
           } else if (typeof image.bufferView === 'number' && image.mimeType) {
             const bufferView = gltf.bufferViews && gltf.bufferViews[image.bufferView];

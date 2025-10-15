@@ -2,7 +2,7 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../assetmanager';
 import type { SharedModel } from '../model';
 import type { DecoderModule } from 'draco3d';
-import type { TypedArray } from '@zephyr3d/base';
+import type { TypedArray, VFS } from '@zephyr3d/base';
 
 /**
  * Base interface for any kind loaders
@@ -102,6 +102,7 @@ export abstract class AbstractModelLoader extends LoaderBase {
     url: string,
     mimeType: string,
     data: Blob,
-    dracoDecoderModule?: DecoderModule
+    dracoDecoderModule?: DecoderModule,
+    VFSs?: VFS[]
   ): Promise<SharedModel>;
 }
