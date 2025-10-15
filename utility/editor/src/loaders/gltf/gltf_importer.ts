@@ -1,5 +1,5 @@
 import type * as draco3d from 'draco3d';
-import type { InterpolationMode, TypedArray, VFS } from '@zephyr3d/base';
+import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
 import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, ASSERT } from '@zephyr3d/base';
 import { AssetHierarchyNode } from '../model';
 import type {
@@ -164,29 +164,6 @@ export class GLTFImporter implements ModelImporter {
     if (typeof gltf.scene === 'number') {
       sharedModel.activeScene = gltf.scene;
     }
-  }
-  /** @internal */
-  private _normalizeURI(vfs: VFS, baseURI: string, uri: string) {
-    const s = uri.toLowerCase();
-    if (
-      s.startsWith('http://') ||
-      s.startsWith('https://') ||
-      s.startsWith('blob:') ||
-      s.startsWith('data:')
-    ) {
-      // absolute path
-      return encodeURI(uri);
-    }
-    uri = uri.replace(/\.\//g, '');
-    uri = decodeURIComponent(uri);
-    if (uri[0] === '/') {
-      uri = uri.slice(1);
-    }
-    uri = uri
-      .split('/')
-      .map((val) => encodeURIComponent(val))
-      .join('/');
-    return baseURI + uri;
   }
   /** @internal */
   private _loadNodes(gltf: GLTFContent, model: SharedModel) {
