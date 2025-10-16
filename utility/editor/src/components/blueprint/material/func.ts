@@ -9,6 +9,7 @@ import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
 import type { NodeEditorState } from '../nodeeditor';
+import { getFunctionNodeCategories } from '../nodes/func';
 
 export class MaterialFunctionEditor extends GraphEditor {
   private _version: number;
@@ -26,7 +27,8 @@ export class MaterialFunctionEditor extends GraphEditor {
       ...getConstantNodeCategories(),
       ...getInputNodeCategories(),
       ...getTextureNodeCategories(),
-      ...getMathNodeCategories()
+      ...getMathNodeCategories(),
+      ...getFunctionNodeCategories()
     ];
   }
   get saved() {
@@ -35,13 +37,10 @@ export class MaterialFunctionEditor extends GraphEditor {
   async save(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
-      const bpPath = VFS.normalizePath(
-        VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
-      );
       // Save blueprint
       const state = await this.nodeEditor.saveState();
       try {
-        await VFS.writeFile(bpPath, JSON.stringify({ type: 'MaterialFunction', state }, null, '  '), {
+        await VFS.writeFile(path, JSON.stringify({ type: 'MaterialFunction', state }, null, '  '), {
           encoding: 'utf8',
           create: true
         });
@@ -50,38 +49,12 @@ export class MaterialFunctionEditor extends GraphEditor {
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
-      // Save material
-      const content: {
-        type: string;
-        data: {
-          IR: string;
-        };
-      } = {
-        type: 'BluePrintMaterialFunction',
-        data: {
-          IR: bpPath
-        }
-      };
-      try {
-        await VFS.writeFile(path, JSON.stringify(content, null, '  '), {
-          encoding: 'utf8',
-          create: true
-        });
-      } catch (err) {
-        const msg = `Save material function failed: ${err}`;
-        console.error(msg);
-        Dialog.messageBox('Error', msg);
-      }
       this._version = this.nodeEditor.version;
     }
   }
   async load(path: string) {
     try {
-      const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
-      const data = JSON.parse(content);
-      ASSERT(data.type === 'BluePrintMaterialFunction', 'Invalid PBR Material Function BluePrint');
-      const blueprint = data.data?.IR as string;
-      const blueprintContent = (await ProjectService.VFS.readFile(blueprint, { encoding: 'utf8' })) as string;
+      const blueprintContent = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
       const blueprintData = JSON.parse(blueprintContent);
       ASSERT(blueprintData.type === 'MaterialFunction', 'Invalid PBR Material BluePrint');
       const state = blueprintData.state as NodeEditorState;

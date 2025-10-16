@@ -13,8 +13,9 @@ import { DlgSaveFile } from './savefiledlg';
 import { DlgOpenFile } from './openfiledlg';
 import { DlgProjectSettings } from './projectsettingsdlg';
 import type { ImGui } from '@zephyr3d/imgui';
-import { DlgPBMaterialEditor } from './materialeditor';
+import { DlgPBMaterialEditor as DlgPBRMaterialEditor } from './materialeditor';
 import { DlgImport } from './importdlg';
+import { DlgMaterialFunctionEditor } from './materialfunceditor';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -51,7 +52,10 @@ export class Dialog {
     width?: number,
     height?: number
   ) {
-    return DlgPBMaterialEditor.editPBRMaterial(title, outputName, path, width, height);
+    return DlgPBRMaterialEditor.editPBRMaterial(title, outputName, path, width, height);
+  }
+  public static async editMaterialFunction(title: string, path: string, width?: number, height?: number) {
+    return DlgMaterialFunctionEditor.editMaterialFunction(title, path, width, height);
   }
   public static async editProjectSettings(
     title: string,

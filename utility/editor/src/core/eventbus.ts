@@ -21,6 +21,7 @@ type EventBusEventMap = {
   external_drop: [ev: DragEvent];
   action: [action: string, ...args: any];
   edit_material: [label: string, outputName: string, path: string];
+  edit_material_function: [path: string];
 };
 
 export class EventBus extends Observable<EventBusEventMap> {}

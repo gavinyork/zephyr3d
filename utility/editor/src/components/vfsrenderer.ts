@@ -235,6 +235,15 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
             });
           }
           ImGui.Separator();
+          if (ImGui.MenuItem('Material function...')) {
+            this.renderer.createNewFile('Create Material Function', 'Function Name', (path) => {
+              if (!path.toLowerCase().endsWith('.zbpf')) {
+                path = `${path}.zbpf`;
+              }
+              eventBus.dispatchEvent('edit_material_function', path);
+            });
+          }
+          ImGui.Separator();
           if (ImGui.MenuItem('Typescript...')) {
             this.renderer.createNewFile('Create Typescript', 'Script Name', async (path) => {
               if (!path.toLowerCase().endsWith('.ts') && !path.toLowerCase().endsWith('.js')) {

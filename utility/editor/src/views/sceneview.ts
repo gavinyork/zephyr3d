@@ -911,6 +911,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.on('workspace_dragging', this.handleWorkspaceDragging, this);
     eventBus.on('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
     eventBus.on('edit_material', this.editMaterial, this);
+    eventBus.on('edit_material_function', this.editMaterialFunction, this);
     this.reset();
     this._sceneHierarchy.selectNode(this.controller.model.scene.rootNode);
   }
@@ -932,6 +933,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     eventBus.off('workspace_drag_end', this.handleWorkspaceDragEnd, this);
     eventBus.off('workspace_dragging', this.handleWorkspaceDragging, this);
     eventBus.off('workspace_drag_drop', this.handleWorkspaceDragDrop, this);
+    eventBus.off('edit_material', this.editMaterial, this);
+    eventBus.off('edit_material_function', this.editMaterialFunction, this);
     this.sceneFinialize();
   }
   private sceneSetup() {
@@ -1315,6 +1318,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private editMaterial(label: string, name: string, path: string) {
     Dialog.editMaterial(label, name, path, 800, 600);
+  }
+  private editMaterialFunction(path: string) {
+    Dialog.editMaterialFunction(path, path, 800, 600);
   }
   private handleWorkspaceDragEnd() {
     if (!this._workspaceDragging) {
