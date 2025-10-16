@@ -38,7 +38,6 @@ export class PBRMaterialEditor extends GraphEditor {
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
   private _version: number;
-  private _previewFocus: boolean;
   constructor(label: string, outputName: string) {
     super(label);
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
@@ -54,7 +53,6 @@ export class PBRMaterialEditor extends GraphEditor {
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
     camera.controller = new OrbitCameraController();
     this._version = 0;
-    this._previewFocus = false;
     this._previewScene = new DRef(scene);
     this._framebuffer = new DRef();
     const light = new DirectionalLight(scene);

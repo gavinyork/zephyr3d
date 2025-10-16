@@ -181,6 +181,131 @@ export class VertexBinormalNode extends BaseGraphNode {
   }
 }
 
+export class ProjectionMatrixNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'ViewToClipMatrix';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ProjectionMatrixNode,
+      name: 'ProjectionMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'mat4';
+  }
+}
+
+export class ViewMatrixNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'WorldToViewMatrix';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ViewMatrixNode,
+      name: 'ViewMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'mat4';
+  }
+}
+
+export class ViewProjMatrixNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'WorldToClipMatrix';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ViewProjMatrixNode,
+      name: 'ViewProjMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'mat4';
+  }
+}
+
+export class InvProjMatrixNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'ClipToViewMatrix';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: InvProjMatrixNode,
+      name: 'InvProjMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'mat4';
+  }
+}
+
+export class InvViewProjMatrixNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  toString() {
+    return 'ClipToWorldMatrix';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: InvViewProjMatrixNode,
+      name: 'InvViewProjMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    return '';
+  }
+  protected getType(): string {
+    return 'mat4';
+  }
+}
+
 export class ElapsedTimeNode extends BaseGraphNode {
   constructor() {
     super();

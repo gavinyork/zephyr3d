@@ -122,19 +122,25 @@ import {
   SqrtNode,
   StepNode,
   TanHNode,
-  TanNode
+  TanNode,
+  TransformNode
 } from '../blueprint/common/math';
 import {
   CameraNearFarNode,
   CameraPositionNode,
   ElapsedTimeNode,
+  InvProjMatrixNode,
+  InvViewProjMatrixNode,
+  ProjectionMatrixNode,
   SkyEnvTextureNode,
   VertexBinormalNode,
   VertexColorNode,
   VertexNormalNode,
   VertexPositionNode,
   VertexTangentNode,
-  VertexUVNode
+  VertexUVNode,
+  ViewMatrixNode,
+  ViewProjMatrixNode
 } from '../blueprint/material/inputs';
 import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
@@ -307,6 +313,7 @@ export class SerializationManager {
         SaturateNode.getSerializationCls(),
         MixNode.getSerializationCls(),
         NormalizeNode.getSerializationCls(),
+        TransformNode.getSerializationCls(),
         FaceForwardNode.getSerializationCls(),
         ReflectNode.getSerializationCls(),
         RefractNode.getSerializationCls(),
@@ -320,6 +327,11 @@ export class SerializationManager {
         VertexNormalNode.getSerializationCls(),
         VertexTangentNode.getSerializationCls(),
         VertexBinormalNode.getSerializationCls(),
+        ViewMatrixNode.getSerializationCls(),
+        ProjectionMatrixNode.getSerializationCls(),
+        ViewProjMatrixNode.getSerializationCls(),
+        InvProjMatrixNode.getSerializationCls(),
+        InvViewProjMatrixNode.getSerializationCls(),
         CameraPositionNode.getSerializationCls(),
         CameraNearFarNode.getSerializationCls(),
         SkyEnvTextureNode.getSerializationCls(),

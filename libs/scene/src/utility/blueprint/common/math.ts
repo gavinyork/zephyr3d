@@ -106,6 +106,122 @@ export class MakeVectorNode extends BaseGraphNode {
   }
 }
 
+export class TransformNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'a',
+        type: ['vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'b',
+        type: ['vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4']
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  toString(): string {
+    return 'Transform';
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: TransformNode,
+      name: 'TransformNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const types: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const name = this._inputs[i].name;
+      if (!this._inputs[i].inputNode) {
+        return `Missing argument \`${name}\``;
+      }
+      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!type) {
+        return `Cannot determine type of argument \`${name}\``;
+      }
+      if (!this._inputs[i].type.includes(type)) {
+        return `Invalid input type ${type}`;
+      }
+      types.push(type);
+    }
+    if (types[0] === 'vec2' && types[1] === 'mat2') {
+      return '';
+    }
+    if (types[0] === 'vec3' && types[1] === 'mat3') {
+      return '';
+    }
+    if (types[0] === 'vec4' && types[1] === 'mat4') {
+      return '';
+    }
+    if (types[0] === 'mat2' && (types[1] === 'mat2' || types[1] === 'vec2')) {
+      return '';
+    }
+    if (types[0] === 'mat3' && (types[1] === 'mat3' || types[1] === 'vec3')) {
+      return '';
+    }
+    if (types[0] === 'mat4' && (types[1] === 'mat4' || types[1] === 'vec4')) {
+      return '';
+    }
+    return 'Invalid argument types of transformation';
+  }
+  protected getType() {
+    const err = super.validate();
+    if (err) {
+      return '';
+    }
+    const types: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      if (!this._inputs[i].inputNode) {
+        return '';
+      }
+      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      if (!type) {
+        return '';
+      }
+      if (!this._inputs[i].type.includes(type)) {
+        return '';
+      }
+      types.push(type);
+    }
+    if (types[0] === 'vec2' && types[1] === 'mat2') {
+      return 'vec2';
+    }
+    if (types[0] === 'vec3' && types[1] === 'mat3') {
+      return 'vec3';
+    }
+    if (types[0] === 'vec4' && types[1] === 'mat4') {
+      return 'vec4';
+    }
+    if (types[0] === 'mat2' && (types[1] === 'mat2' || types[1] === 'vec2')) {
+      return types[1] === 'mat2' ? 'mat2' : 'vec2';
+    }
+    if (types[0] === 'mat3' && (types[1] === 'mat3' || types[1] === 'vec3')) {
+      return types[1] === 'mat3' ? 'mat3' : 'vec3';
+    }
+    if (types[0] === 'mat4' && (types[1] === 'mat4' || types[1] === 'vec4')) {
+      return types[1] === 'mat4' ? 'mat4' : 'vec4';
+    }
+    return '';
+  }
+}
+
 export abstract class GenericMathNode extends BaseGraphNode {
   readonly func: string;
   readonly outType: string;

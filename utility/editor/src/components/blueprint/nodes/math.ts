@@ -48,7 +48,8 @@ import {
   PowNode,
   FmaNode,
   ClampNode,
-  SaturateNode
+  SaturateNode,
+  TransformNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -60,6 +61,10 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'MakeVector',
           create: () => new MakeVectorNode()
+        },
+        {
+          name: 'Transform',
+          create: () => new TransformNode()
         },
         {
           name: 'CompAdd',

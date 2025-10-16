@@ -19,7 +19,14 @@ import type { GenericConstructor } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
-import { GenericMathNode, MakeVectorNode } from '../common/math';
+import { GenericMathNode, MakeVectorNode, TransformNode } from '../common/math';
+import {
+  InvProjMatrixNode,
+  InvViewProjMatrixNode,
+  ProjectionMatrixNode,
+  ViewMatrixNode,
+  ViewProjMatrixNode
+} from './inputs';
 import {
   CameraNearFarNode,
   CameraPositionNode,
@@ -383,6 +390,8 @@ export class MaterialBlueprintIR {
       expr = this.makeVector(node, output);
     } else if (node instanceof GenericMathNode) {
       expr = this.func(node, output);
+    } else if (node instanceof TransformNode) {
+      expr = this.transform(node, output);
     } else if (node instanceof VertexColorNode) {
       expr = this.vertexColor(node, output);
     } else if (node instanceof VertexUVNode) {
@@ -395,6 +404,16 @@ export class MaterialBlueprintIR {
       expr = this.vertexTangent(node, output);
     } else if (node instanceof VertexBinormalNode) {
       expr = this.vertexBinormal(node, output);
+    } else if (node instanceof ViewMatrixNode) {
+      expr = this.viewMatrix(node, output);
+    } else if (node instanceof ProjectionMatrixNode) {
+      expr = this.projectionMatrix(node, output);
+    } else if (node instanceof ViewProjMatrixNode) {
+      expr = this.viewProjectionMatrix(node, output);
+    } else if (node instanceof InvProjMatrixNode) {
+      expr = this.invProjectionMatrix(node, output);
+    } else if (node instanceof InvViewProjMatrixNode) {
+      expr = this.invViewProjectionMatrix(node, output);
     } else if (node instanceof CameraPositionNode) {
       expr = this.cameraPosition(node, output);
     } else if (node instanceof CameraNearFarNode) {
@@ -475,6 +494,15 @@ export class MaterialBlueprintIR {
     const funcName = node.getOutputType(output);
     return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
   }
+  private transform(node: TransformNode, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    for (const input of node.inputs) {
+      if (input.inputNode) {
+        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+      }
+    }
+    return this.getOrCreateIRExpression(node, output, IRFunc, params, 'mul');
+  }
   private func(node: GenericMathNode, output: number): IRExpression {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
@@ -506,6 +534,31 @@ export class MaterialBlueprintIR {
   }
   private vertexPosition(node: VertexPositionNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRInput, 'zWorldPos');
+  }
+  private viewMatrix(node: ViewMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getViewMatrix(scope)
+    );
+  }
+  private projectionMatrix(node: ProjectionMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getProjectionMatrix(scope)
+    );
+  }
+  private viewProjectionMatrix(node: ViewProjMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getViewProjectionMatrix(scope)
+    );
+  }
+  private invProjectionMatrix(node: InvProjMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getInvProjectionMatrix(scope)
+    );
+  }
+  private invViewProjectionMatrix(node: InvViewProjMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
+      ShaderHelper.getInvViewProjectionMatrix(scope)
+    );
   }
   private cameraPosition(node: CameraPositionNode, output: number): IRExpression {
     this._behaviors.useCameraPosition = true;

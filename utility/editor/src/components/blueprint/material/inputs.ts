@@ -8,7 +8,12 @@ import {
   VertexUVNode,
   ElapsedTimeNode,
   CameraNearFarNode,
-  SkyEnvTextureNode
+  SkyEnvTextureNode,
+  ViewMatrixNode,
+  ProjectionMatrixNode,
+  ViewProjMatrixNode,
+  InvProjMatrixNode,
+  InvViewProjMatrixNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -40,6 +45,26 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'WorldPosition',
           create: () => new VertexPositionNode()
+        },
+        {
+          name: 'WorldToViewMatrix',
+          create: () => new ViewMatrixNode()
+        },
+        {
+          name: 'ViewToClipMatrix',
+          create: () => new ProjectionMatrixNode()
+        },
+        {
+          name: 'WorldToClipMatrix',
+          create: () => new ViewProjMatrixNode()
+        },
+        {
+          name: 'ClipToViewMatrix',
+          create: () => new InvProjMatrixNode()
+        },
+        {
+          name: 'ClipToWorldMatrix',
+          create: () => new InvViewProjMatrixNode()
         },
         {
           name: 'CameraPositionWS',
