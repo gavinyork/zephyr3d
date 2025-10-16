@@ -173,6 +173,19 @@ export class InputManager {
     return this;
   }
   /**
+   * Register a middleware (interceptor) for input events at the first order.
+   *
+   * @param handler - Middleware function to add.
+   * @param ctx - `this` object for handler
+   * @returns The InputManager instance for chaining.
+   */
+  useFirst(handler: InputEventHandler, ctx?: unknown): this {
+    if (handler) {
+      this._middlewares.unshift({ handler, ctx });
+    }
+    return this;
+  }
+  /**
    * Unregister a previously registered middleware (interceptor) for input events.
    *
    * Removes the first middleware that matches both the given `handler` and `ctx`.

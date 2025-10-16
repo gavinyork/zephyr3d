@@ -739,6 +739,13 @@ export class Camera extends SceneNode {
   handleEvent(ev: Event, type?: string): boolean {
     let handled = false;
     if (this._controller) {
+      if (this.viewport && ev instanceof PointerEvent) {
+        const x = ev.offsetX;
+        const y = ev.offsetY;
+        if (!this.posInViewport(x, y, this.viewport)) {
+          return false;
+        }
+      }
       type = type ?? ev.type;
       if (type === 'pointerdown') {
         handled = this._controller.onMouseDown(ev as PointerEvent);
@@ -1235,5 +1242,17 @@ export class Camera extends SceneNode {
     this._postEffectTAA.dispose();
     this._postEffectTonemap.dispose();
     this._oit.dispose();
+  }
+  /** @internal */
+  private posInViewport(x: number, y: number, viewport: ArrayLike<number>): boolean {
+    const cvs = getDevice().canvas;
+    const vp = viewport;
+    const vp_x = vp ? vp[0] : 0;
+    const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
+    const vp_w = vp ? vp[2] : cvs.clientWidth;
+    const vp_h = vp ? vp[3] : cvs.clientHeight;
+    x -= vp_x;
+    y -= vp_y;
+    return x >= 0 && x < vp_w && y >= 0 && y < vp_h;
   }
 }

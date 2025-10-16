@@ -8,8 +8,10 @@ import type {
 } from '@zephyr3d/scene';
 import {
   DirectionalLight,
+  getApp,
   getDevice,
   Mesh,
+  OrbitCameraController,
   PerspectiveCamera,
   Scene,
   SphereShape,
@@ -36,6 +38,7 @@ export class PBRMaterialEditor extends GraphEditor {
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
   private _version: number;
+  private _previewFocus: boolean;
   constructor(label: string, outputName: string) {
     super(label);
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
@@ -49,7 +52,9 @@ export class PBRMaterialEditor extends GraphEditor {
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
+    camera.controller = new OrbitCameraController();
     this._version = 0;
+    this._previewFocus = false;
     this._previewScene = new DRef(scene);
     this._framebuffer = new DRef();
     const light = new DirectionalLight(scene);
@@ -66,6 +71,21 @@ export class PBRMaterialEditor extends GraphEditor {
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
     this.nodeEditor.on('changed', this.graphChanged, this);
     this.nodeEditor.on('save', this.save, this);
+  }
+  open() {
+    getApp().inputManager.useFirst(
+      this._previewScene.get().mainCamera.handleEvent,
+      this._previewScene.get().mainCamera
+    );
+  }
+  close() {
+    getApp().inputManager.unuse(
+      this._previewScene.get().mainCamera.handleEvent,
+      this._previewScene.get().mainCamera
+    );
+    this._previewScene.dispose();
+    this._previewMesh.dispose();
+    this._defaultMaterial.dispose();
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -258,12 +278,15 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewScene.get().render();
     device.popDeviceStates();
 
+    const cursorPos = ImGui.GetCursorPos();
     ImGui.Image(
       this._framebuffer.get().getColorAttachment(0),
       size,
       new ImGui.ImVec2(0, 1),
       new ImGui.ImVec2(1, 0)
     );
+    ImGui.SetCursorPos(cursorPos);
+    this._previewScene.get().mainCamera.updateController();
   }
   private applyPreviewMaterial() {
     const ir = this.createIR();

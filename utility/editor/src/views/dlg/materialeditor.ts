@@ -36,6 +36,11 @@ export class DlgPBMaterialEditor extends DialogRenderer<void> {
       }
     }
     super.show();
+    this.editor.open();
+  }
+  close(): void {
+    this.editor.close();
+    super.close();
   }
   public doRender(): void {
     if (
