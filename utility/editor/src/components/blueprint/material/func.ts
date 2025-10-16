@@ -1,0 +1,106 @@
+import type { NodeCategory } from '../api';
+import { GraphEditor } from '../grapheditor';
+import { getConstantNodeCategories } from '../nodes/constants';
+import { getMathNodeCategories } from '../nodes/math';
+import { getTextureNodeCategories } from './texture';
+import { ASSERT } from '@zephyr3d/base';
+import { ImGui } from '@zephyr3d/imgui';
+import { getInputNodeCategories } from './inputs';
+import { ProjectService } from '../../../core/services/project';
+import { Dialog } from '../../../views/dlg/dlg';
+import type { NodeEditorState } from '../nodeeditor';
+
+export class MaterialFunctionEditor extends GraphEditor {
+  private _version: number;
+  constructor(label: string) {
+    super(label);
+    this._version = 0;
+    this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
+    this.nodeEditor.on('changed', this.graphChanged, this);
+    this.nodeEditor.on('save', this.save, this);
+  }
+  open() {}
+  close() {}
+  getNodeCategory(): NodeCategory[] {
+    return [
+      ...getConstantNodeCategories(),
+      ...getInputNodeCategories(),
+      ...getTextureNodeCategories(),
+      ...getMathNodeCategories()
+    ];
+  }
+  get saved() {
+    return this._version === this.nodeEditor.version;
+  }
+  async save(path: string) {
+    if (path) {
+      const VFS = ProjectService.VFS;
+      const bpPath = VFS.normalizePath(
+        VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
+      );
+      // Save blueprint
+      const state = await this.nodeEditor.saveState();
+      try {
+        await VFS.writeFile(bpPath, JSON.stringify({ type: 'MaterialFunction', state }, null, '  '), {
+          encoding: 'utf8',
+          create: true
+        });
+      } catch (err) {
+        const msg = `Save material failed: ${err}`;
+        console.error(msg);
+        Dialog.messageBox('Error', msg);
+      }
+      // Save material
+      const content: {
+        type: string;
+        data: {
+          IR: string;
+        };
+      } = {
+        type: 'BluePrintMaterialFunction',
+        data: {
+          IR: bpPath
+        }
+      };
+      try {
+        await VFS.writeFile(path, JSON.stringify(content, null, '  '), {
+          encoding: 'utf8',
+          create: true
+        });
+      } catch (err) {
+        const msg = `Save material function failed: ${err}`;
+        console.error(msg);
+        Dialog.messageBox('Error', msg);
+      }
+      this._version = this.nodeEditor.version;
+    }
+  }
+  async load(path: string) {
+    try {
+      const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+      const data = JSON.parse(content);
+      ASSERT(data.type === 'BluePrintMaterialFunction', 'Invalid PBR Material Function BluePrint');
+      const blueprint = data.data?.IR as string;
+      const blueprintContent = (await ProjectService.VFS.readFile(blueprint, { encoding: 'utf8' })) as string;
+      const blueprintData = JSON.parse(blueprintContent);
+      ASSERT(blueprintData.type === 'MaterialFunction', 'Invalid PBR Material BluePrint');
+      const state = blueprintData.state as NodeEditorState;
+      await this.nodeEditor.loadState(state);
+      this._version = this.nodeEditor.version;
+    } catch (err) {
+      const msg = `Load material failed: ${err}`;
+      console.error(msg);
+      Dialog.messageBox('Error', msg);
+    }
+  }
+  protected renderRightPanel() {
+    const v = new ImGui.ImVec2();
+    ImGui.GetContentRegionAvail(v);
+    if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
+      super.renderRightPanel();
+    }
+    ImGui.EndChild();
+  }
+  protected onPropChanged(): void {}
+  private graphChanged() {}
+}

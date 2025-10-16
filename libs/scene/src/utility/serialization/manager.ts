@@ -146,6 +146,7 @@ import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 import type { Material } from '../../material';
 import type { Primitive } from '../../render';
+import { FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -337,6 +338,8 @@ export class SerializationManager {
         SkyEnvTextureNode.getSerializationCls(),
         ElapsedTimeNode.getSerializationCls(),
         PBRBlockNode.getSerializationCls(),
+        FunctionInputNode.getSerializationCls(),
+        FunctionOutputNode.getSerializationCls(),
         TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );

@@ -225,7 +225,7 @@ export class PBRMaterialEditor extends GraphEditor {
     const roots: number[] = [];
     for (const [k, v] of this.nodeEditor.nodes) {
       nodeMap[k] = v.impl;
-      if (v.locked) {
+      if (v.outputs.length === 0) {
         roots.push(v.id);
       }
     }

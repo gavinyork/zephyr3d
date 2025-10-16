@@ -510,3 +510,85 @@ export class TextureSampleNode extends BaseGraphNode {
     return 'vec4';
   }
 }
+
+export class TextureSampleGrad extends BaseGraphNode {
+  samplerType: 'Color' | 'Normal';
+  constructor() {
+    super();
+    this.samplerType = 'Color';
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D', 'tex2DArray', 'texCube'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2', 'vec3'],
+        required: true
+      }
+    ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: TextureSampleNode,
+      name: 'TextureSampleNode',
+      getProps(): PropertyAccessor<TextureSampleNode>[] {
+        return [
+          {
+            name: 'SamplerType',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['Color', 'Normal'],
+                values: ['Color', 'Normal']
+              }
+            },
+            get(this: TextureSampleNode, value) {
+              value.str[0] = this.samplerType;
+            },
+            set(this: TextureSampleNode, value) {
+              this.samplerType = value.str[0] as any;
+            }
+          }
+        ];
+      }
+    };
+  }
+  toString(): string {
+    return 'textureSample';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    if (!type0) {
+      return `Cannot determine type of argument \`${this._inputs[0].name}\``;
+    }
+    if (!this._inputs[0].type.includes(type0)) {
+      return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
+    }
+    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    if (!type1) {
+      return `Cannot determine type of argument \`${this._inputs[1].name}\``;
+    }
+    const expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
+    if (type1 !== expectedType1) {
+      return `Texture coordinate type should be ${expectedType1}`;
+    }
+    return '';
+  }
+  protected getType(): string {
+    return 'vec4';
+  }
+}
