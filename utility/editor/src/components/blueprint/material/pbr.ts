@@ -278,15 +278,21 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewScene.get().render();
     device.popDeviceStates();
 
-    const cursorPos = ImGui.GetCursorPos();
+    const camera = this._previewScene.get().mainCamera;
+    const cursorScreenPos = ImGui.GetCursorScreenPos();
+    camera.interactionRect = [
+      cursorScreenPos.x,
+      cursorScreenPos.y,
+      size.x < 0 ? 0 : size.x,
+      size.y < 0 ? 0 : size.y
+    ];
     ImGui.Image(
       this._framebuffer.get().getColorAttachment(0),
       size,
       new ImGui.ImVec2(0, 1),
       new ImGui.ImVec2(1, 0)
     );
-    ImGui.SetCursorPos(cursorPos);
-    this._previewScene.get().mainCamera.updateController();
+    camera.updateController();
   }
   private applyPreviewMaterial() {
     const ir = this.createIR();

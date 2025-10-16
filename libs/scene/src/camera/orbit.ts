@@ -189,7 +189,7 @@ export class OrbitCameraController extends BaseCameraController {
       this.panVelocityX = 0;
       this.panVelocityY = 0;
     }
-    return false;
+    return true;
   }
   /**
    * {@inheritDoc BaseCameraController._onMouseUp}
@@ -208,7 +208,7 @@ export class OrbitCameraController extends BaseCameraController {
       this.currentOp = OperationType.NONE;
       return true;
     }
-    return false;
+    return true;
   }
   /**
    * {@inheritDoc BaseCameraController._onMouseWheel}

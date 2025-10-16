@@ -214,9 +214,12 @@ export class Camera extends SceneNode {
   protected _prevPosition: Vector3;
   /** @internal Previous frame’s jittered VP matrix. */
   protected _prevJitteredVPMatrix: Matrix4x4;
-
   /** @internal Post-processing compositor attached to this camera. */
   protected _compositor: Compositor;
+  /** @internal Pointer interaction rectangle in css pixels (relative to canvas) */
+  protected _interactionRect: [left: number, top: number, width: number, height: number];
+  /** @internal captured by which mouse button (-1 if not captured) */
+  protected _capturedButton: number;
   /**
    * Creates a new camera node.
    *
@@ -298,6 +301,8 @@ export class Camera extends SceneNode {
     this._pickPosX = 0;
     this._pickPosY = 0;
     this._compositor = new Compositor();
+    this._capturedButton = -1;
+    this._interactionRect = null;
     this.updatePostProcessing();
     if (scene && !scene.mainCamera) {
       scene.mainCamera = this;
@@ -308,6 +313,15 @@ export class Camera extends SceneNode {
    */
   get compositor() {
     return this._compositor;
+  }
+  /**
+   * Pointer interaction rectangle in css pixels (relative to canvas)
+   */
+  get interactionRect() {
+    return this._interactionRect;
+  }
+  set interactionRect(rect) {
+    this._interactionRect = rect;
   }
   /**
    * Clip plane in camera space.
@@ -739,18 +753,24 @@ export class Camera extends SceneNode {
   handleEvent(ev: Event, type?: string): boolean {
     let handled = false;
     if (this._controller) {
-      if (this.viewport && ev instanceof PointerEvent) {
-        const x = ev.offsetX;
-        const y = ev.offsetY;
-        if (!this.posInViewport(x, y, this.viewport)) {
-          return false;
-        }
+      if (
+        this._capturedButton < 0 &&
+        (ev instanceof PointerEvent || ev instanceof WheelEvent) &&
+        !this.posInViewport(ev.offsetX, ev.offsetY)
+      ) {
+        return false;
       }
       type = type ?? ev.type;
       if (type === 'pointerdown') {
+        if (this._capturedButton < 0) {
+          this._capturedButton = (ev as PointerEvent).button;
+        }
         handled = this._controller.onMouseDown(ev as PointerEvent);
       } else if (type === 'pointerup') {
         handled = this._controller.onMouseUp(ev as PointerEvent);
+        if (this._capturedButton === (ev as PointerEvent).button) {
+          this._capturedButton = -1;
+        }
       } else if (type === 'pointermove') {
         handled = this._controller.onMouseMove(ev as PointerEvent);
       } else if (type === 'wheel') {
@@ -1244,15 +1264,22 @@ export class Camera extends SceneNode {
     this._oit.dispose();
   }
   /** @internal */
-  private posInViewport(x: number, y: number, viewport: ArrayLike<number>): boolean {
-    const cvs = getDevice().canvas;
-    const vp = viewport;
-    const vp_x = vp ? vp[0] : 0;
-    const vp_y = vp ? cvs.clientHeight - vp[1] - vp[3] : 0;
-    const vp_w = vp ? vp[2] : cvs.clientWidth;
-    const vp_h = vp ? vp[3] : cvs.clientHeight;
-    x -= vp_x;
-    y -= vp_y;
-    return x >= 0 && x < vp_w && y >= 0 && y < vp_h;
+  private posInViewport(x: number, y: number): boolean {
+    let rect = this._interactionRect;
+    if (!rect && this.viewport) {
+      const cvs = getDevice().canvas;
+      const vp = this.viewport;
+      const vp_x = vp[0];
+      const vp_y = cvs.clientHeight - vp[1] - vp[3];
+      const vp_w = vp[2];
+      const vp_h = vp[3];
+      rect = [vp_x, vp_y, vp_w, vp_h];
+    }
+    if (!rect) {
+      return true;
+    }
+    x -= rect[0];
+    y -= rect[1];
+    return x >= 0 && x < rect[2] && y >= 0 && y < rect[3];
   }
 }
