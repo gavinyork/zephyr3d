@@ -3,7 +3,8 @@ import type {
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
-  IGraphNode
+  IGraphNode,
+  PropertyAccessor
 } from '@zephyr3d/scene';
 import {
   DirectionalLight,
@@ -307,6 +308,9 @@ export class PBRMaterialEditor extends GraphEditor {
       }
       this._previewMesh.get().material = new PBRBluePrintMaterial(ir);
     }
+  }
+  protected onPropChanged(_obj: object, _prop: PropertyAccessor): void {
+    this.applyPreviewMaterial();
   }
   private graphChanged() {
     this.applyPreviewMaterial();

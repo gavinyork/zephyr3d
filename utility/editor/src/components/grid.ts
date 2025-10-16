@@ -558,6 +558,7 @@ export class PropertyEditor extends Observable<{
               undefined,
               readonly ? ImGui.InputTextFlags.ReadOnly : undefined
             );
+            this.setDragDropProperty(object, value, tmpProperty);
           }
           break;
         }
@@ -667,13 +668,14 @@ export class PropertyEditor extends Observable<{
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+          this.setDragDropProperty(object, value, tmpProperty);
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
               Promise.resolve(value.set.call(object, null)).then(() => {
                 this.refresh();
+                this.dispatchEvent('object_property_changed', object, value);
               });
-              this.dispatchEvent('object_property_changed', object, value);
               if (property.value.options?.objectTypes?.length > 0) {
                 ImGui.OpenPopup('X##list');
                 if (ImGui.BeginPopup('X##list')) {
@@ -690,6 +692,7 @@ export class PropertyEditor extends Observable<{
           }
         }
       }
+      /*
       if (value.set && (value.type === 'string' || value.type === 'object')) {
         if (value.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
           const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
@@ -703,8 +706,8 @@ export class PropertyEditor extends Observable<{
                   tmpProperty.str[0] = data[0].path;
                   Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
                     this.refresh();
+                    this.dispatchEvent('object_property_changed', object, value);
                   });
-                  this.dispatchEvent('object_property_changed', object, value);
                 }
               }
             }
@@ -712,6 +715,7 @@ export class PropertyEditor extends Observable<{
           ImGui.EndDragDropTarget();
         }
       }
+      */
       if (changed && value.set) {
         value.set.call(object, tmpProperty);
         this.refresh();
@@ -719,5 +723,29 @@ export class PropertyEditor extends Observable<{
       }
     }
     ImGui.PopID();
+  }
+  private setDragDropProperty(obj: any, prop: PropertyAccessor, value: PropertyValue) {
+    if (prop.set) {
+      if (prop.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
+        const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
+        if (peekPayload) {
+          const data = peekPayload.Data as { isDir: boolean; path: string }[];
+          if (data.length === 1 && !data[0].isDir) {
+            const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
+            if (prop.options.mimeTypes.includes(mimeType)) {
+              const payload = ImGui.AcceptDragDropPayload('ASSET');
+              if (payload) {
+                value.str[0] = data[0].path;
+                Promise.resolve(prop.set.call(obj, value)).then(() => {
+                  this.refresh();
+                  this.dispatchEvent('object_property_changed', obj, prop);
+                });
+              }
+            }
+          }
+        }
+        ImGui.EndDragDropTarget();
+      }
+    }
   }
 }

@@ -3,17 +3,24 @@ import { DockPannel, ResizeDirection } from '../dockpanel';
 import { PropertyEditor } from '../grid';
 import type { GraphEditorApi, NodeCategory } from './api';
 import { NodeEditor } from './nodeeditor';
+import { Observable } from '@zephyr3d/base';
+import type { PropertyAccessor } from '@zephyr3d/scene';
 
-export class GraphEditor implements GraphEditorApi {
+export class GraphEditor
+  extends Observable<{ object_property_changed: [object: object, prop: PropertyAccessor] }>
+  implements GraphEditorApi
+{
   private _rightPanel: DockPannel;
   private _nodePropGrid: PropertyEditor;
   private _nodeEditor: NodeEditor;
   protected _label: string;
   constructor(label: string) {
+    super();
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
     this._nodePropGrid = new PropertyEditor(0.4);
     this._nodeEditor = new NodeEditor(this);
     this._label = label ?? 'Graph Editor';
+    this._nodePropGrid.on('object_property_changed', this.onPropChanged, this);
   }
   get nodeEditor() {
     return this._nodeEditor;
@@ -67,6 +74,7 @@ export class GraphEditor implements GraphEditorApi {
   isCompatiblePin(_inType: string, _outType: string): boolean {
     return false;
   }
+  protected onPropChanged(_obj: object, _prop: PropertyAccessor) {}
   protected renderRightPanel() {
     this._nodePropGrid.render();
   }
