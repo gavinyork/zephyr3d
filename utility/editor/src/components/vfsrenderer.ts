@@ -237,8 +237,8 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           ImGui.Separator();
           if (ImGui.MenuItem('Material function...')) {
             this.renderer.createNewFile('Create Material Function', 'Function Name', (path) => {
-              if (!path.toLowerCase().endsWith('.zbpf')) {
-                path = `${path}.zbpf`;
+              if (!path.toLowerCase().endsWith('.zmf')) {
+                path = `${path}.zmf`;
               }
               eventBus.dispatchEvent('edit_material_function', path);
             });

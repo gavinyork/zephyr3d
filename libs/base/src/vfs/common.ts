@@ -233,6 +233,7 @@ export function guessMimeType(path: string): string {
     '.zbpt': 'application/vnd.zephyr3d.blueprint+json',
     '.zmsh': 'application/vnd.zephyr3d.mesh+json',
     '.zmtl': 'application/vnd.zephyr3d.material+json',
+    '.zmf': 'application/vnd.zephyr3d.blueprint.mf+json',
     '.zscn': 'application/vnd.zephyr3d.scene+json',
     '.zprefab': 'application/vnd.zephyr3d.prefab+json'
   };

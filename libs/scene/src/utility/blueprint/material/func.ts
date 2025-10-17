@@ -3,10 +3,18 @@ import { BaseGraphNode } from '../node';
 
 export class FunctionInputNode extends BaseGraphNode {
   private _type: string;
+  private _name: string;
   constructor() {
     super();
     this._type = 'vec4';
+    this._name = '';
     this._outputs = [{ id: 1, name: '' }];
+  }
+  get type() {
+    return this._type;
+  }
+  get name() {
+    return this._name;
   }
   static getSerializationCls(): SerializableClass {
     return {
@@ -29,6 +37,16 @@ export class FunctionInputNode extends BaseGraphNode {
             set(this: FunctionInputNode, value) {
               this._type = value.str[0];
             }
+          },
+          {
+            name: 'name',
+            type: 'string',
+            get(this: FunctionInputNode, value) {
+              value.str[0] = this._name;
+            },
+            set(this: FunctionInputNode, value) {
+              this._name = value.str[0];
+            }
           }
         ];
       }
@@ -46,16 +64,32 @@ export class FunctionInputNode extends BaseGraphNode {
 }
 
 export class FunctionOutputNode extends BaseGraphNode {
+  private _name: string;
   constructor() {
     super();
+    this._name = '';
     this._inputs = [{ id: 1, name: '', type: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'] }];
+  }
+  get name() {
+    return this._name;
   }
   static getSerializationCls(): SerializableClass {
     return {
       ctor: FunctionOutputNode,
       name: 'FunctionOutputNode',
       getProps() {
-        return [];
+        return [
+          {
+            name: 'name',
+            type: 'string',
+            get(this: FunctionOutputNode, value) {
+              value.str[0] = this._name;
+            },
+            set(this: FunctionOutputNode, value) {
+              this._name = value.str[0];
+            }
+          }
+        ];
       }
     };
   }
