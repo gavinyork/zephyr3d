@@ -1,4 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
+import type { PropertyType } from '@zephyr3d/scene';
 import {
   AnimationClip,
   PropertyTrack,
@@ -37,6 +38,21 @@ class PropertyGroup {
   objectTypes: SerializableClass[];
   prop: PropertyAccessor<any>;
   properties: (PropertyGroup | { name: string; property: Property<any> })[];
+  rawProperties: {
+    name: string;
+    type: PropertyType;
+    get: (value: PropertyValue) => void;
+    set?: (value: PropertyValue) => void;
+    options?: {
+      enum?: {
+        labels: string[];
+        values: any[];
+      };
+      speed?: number;
+      minValue?: number;
+      maxValue?: number;
+    };
+  }[];
   object: any;
   subgroups: PropertyGroup[];
   constructor(name: string, grid: PropertyEditor) {
@@ -53,6 +69,7 @@ class PropertyGroup {
     this.currentType = -1;
     this.objectTypes = null;
     this.properties = [];
+    this.rawProperties = [];
     this.subgroups = [];
   }
   addSeparator(label: string) {
@@ -65,6 +82,29 @@ class PropertyGroup {
         object: null,
         value: null
       }
+    });
+  }
+  addRawProperty(
+    name: string,
+    type: PropertyType,
+    get: (value: PropertyValue) => void,
+    set?: (value: PropertyValue) => void,
+    options?: {
+      enum?: {
+        labels: string[];
+        values: any[];
+      };
+      speed?: number;
+      minValue?: number;
+      maxValue?: number;
+    }
+  ) {
+    this.rawProperties.push({
+      name,
+      type,
+      get,
+      set,
+      options
     });
   }
   addProperty(obj: any, value: PropertyAccessor<any>) {
@@ -230,6 +270,9 @@ export class PropertyEditor extends Observable<{
   set object(value: any) {
     this._rootGroup.setObject(value);
   }
+  get root() {
+    return this._rootGroup;
+  }
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
   }
@@ -240,8 +283,10 @@ export class PropertyEditor extends Observable<{
     if (this._dirty) {
       this._dirty = false;
       const object = this.object;
+      const rawProps = this._rootGroup.rawProperties;
       this.clear();
       this.object = object;
+      this._rootGroup.rawProperties = rawProps;
     }
     const animateLabelWidth = ImGui.GetFrameHeight();
     const availableWidth = ImGui.GetContentRegionAvail().x;
@@ -426,10 +471,181 @@ export class PropertyEditor extends Observable<{
       for (const property of group.properties) {
         this.renderProperty(property instanceof PropertyGroup ? property : property.property, level + 2);
       }
+      for (const rawProperties of group.rawProperties) {
+        this.renderRawProperty(rawProperties, level + 2);
+      }
       this.renderSubGroups(group, level + 1);
     }
     if (level > 0) {
       ImGui.SetCursorPosX(baseX);
+    }
+  }
+  private renderRawProperty(
+    value: {
+      name: string;
+      type: PropertyType;
+      get: (value: PropertyValue) => void;
+      set?: (value: PropertyValue) => void;
+      options?: {
+        enum?: {
+          labels: string[];
+          values: any[];
+        };
+        speed?: number;
+        minValue?: number;
+        maxValue?: number;
+      };
+    },
+    level: number
+  ) {
+    ImGui.PushID(value.name);
+    ImGui.TableNextRow();
+    ImGui.TableNextColumn();
+    ImGui.TableNextColumn();
+    const baseX = ImGui.GetCursorPosX();
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX + level * 10);
+    }
+    ImGui.Text(value.name);
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX);
+    }
+    ImGui.TableNextColumn();
+    ImGui.SetNextItemWidth(-1);
+    const readonly = !value.set;
+    let changed = false;
+    const tmpProperty: PropertyValue = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
+    value.get(tmpProperty);
+    switch (value.type) {
+      case 'bool': {
+        const val = tmpProperty.bool as [boolean];
+        changed = ImGui.Checkbox(`##value`, val) && !readonly;
+        break;
+      }
+      case 'int': {
+        if (value.options?.enum) {
+          const val = [value.options.enum.values.indexOf(tmpProperty.num[0])] as [number];
+          changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
+          if (changed) {
+            tmpProperty.num[0] = value.options.enum.values[val[0]] as number;
+          }
+        } else {
+          const val = tmpProperty.num as [number];
+          changed = ImGui.DragInt(
+            '##value',
+            val,
+            readonly ? 0 : value.options?.speed ?? 0.1,
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
+        }
+        break;
+      }
+      case 'float': {
+        if (value.options?.enum) {
+          const val = [value.options.enum.values.indexOf(tmpProperty.num[0])] as [number];
+          changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
+          if (changed) {
+            tmpProperty.num[0] = value.options.enum.values[val[0]] as number;
+          }
+        } else {
+          const val = [tmpProperty.num[0]] as [number];
+          changed = ImGui.DragFloat(
+            '##value',
+            val,
+            readonly ? 0 : value.options?.speed ?? 0.01,
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
+          );
+          tmpProperty.num[0] = val[0];
+        }
+        break;
+      }
+      case 'string': {
+        if (value.options?.enum) {
+          const val = [value.options.enum.values.indexOf(tmpProperty.str[0])] as [number];
+          changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
+          if (changed) {
+            tmpProperty.str[0] = value.options.enum.values[val[0]] as string;
+          }
+        } else {
+          const val = tmpProperty.str as [string];
+          changed = ImGui.InputText(
+            '##value',
+            val,
+            undefined,
+            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          );
+        }
+        break;
+      }
+      case 'int2': {
+        const val = tmpProperty.num as [number, number];
+        changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
+      case 'int3': {
+        const val = tmpProperty.num as [number, number, number];
+        changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
+      case 'int4': {
+        const val = tmpProperty.num as [number, number, number, number];
+        changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        break;
+      }
+      case 'vec2': {
+        const val = tmpProperty.num as [number, number];
+        changed = ImGui.InputFloat2(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
+        break;
+      }
+      case 'vec3': {
+        const val = tmpProperty.num as [number, number, number];
+        changed = ImGui.InputFloat3(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
+        break;
+      }
+      case 'vec4': {
+        const val = tmpProperty.num as [number, number, number, number];
+        changed = ImGui.InputFloat4(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
+        break;
+      }
+      case 'rgb': {
+        const val = tmpProperty.num as [number, number, number];
+        changed = ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        break;
+      }
+      case 'rgba': {
+        const val = tmpProperty.num as [number, number, number, number];
+        changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        break;
+      }
+    }
+    ImGui.PopID();
+    if (changed && value.set) {
+      value.set(tmpProperty);
+      this.refresh();
+      this.dispatchEvent('object_property_changed', null, value);
     }
   }
   private renderProperty(property: PropertyGroup | Property<any>, level: number) {

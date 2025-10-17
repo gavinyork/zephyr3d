@@ -4,7 +4,7 @@ import { PropertyEditor } from '../grid';
 import type { GraphEditorApi, NodeCategory } from './api';
 import { NodeEditor } from './nodeeditor';
 import { Observable } from '@zephyr3d/base';
-import type { PropertyAccessor } from '@zephyr3d/scene';
+import type { IGraphNode, PropertyAccessor } from '@zephyr3d/scene';
 
 export class GraphEditor
   extends Observable<{ object_property_changed: [object: object, prop: PropertyAccessor] }>
@@ -34,10 +34,13 @@ export class GraphEditor
     if (this._nodeEditor.selectedNodes.length === 1) {
       const selectedNode = this._nodeEditor.nodes.get(this._nodeEditor.selectedNodes[0]);
       if (selectedNode && selectedNode.impl !== this._nodePropGrid.object) {
+        this._nodePropGrid.clear();
         this._nodePropGrid.object = selectedNode.impl;
+        this.onSelectionChanged(selectedNode.impl);
       }
     } else if (this._nodePropGrid.object) {
-      this._nodePropGrid.object = null;
+      this._nodePropGrid.clear();
+      this.onSelectionChanged(null);
     }
 
     const regionAvail = ImGui.GetContentRegionAvail();
@@ -75,7 +78,9 @@ export class GraphEditor
     return false;
   }
   protected onPropChanged(_obj: object, _prop: PropertyAccessor) {}
+  protected onSelectionChanged(_obj: IGraphNode) {}
   protected renderRightPanel() {
     this._nodePropGrid.render();
   }
+  protected updateToplevelPropertyEditor(_propEditor: PropertyEditor) {}
 }

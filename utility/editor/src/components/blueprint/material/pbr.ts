@@ -1,4 +1,5 @@
 import type {
+  BlendMode,
   BlueprintDAG,
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
@@ -38,6 +39,8 @@ export class PBRMaterialEditor extends GraphEditor {
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
   private _version: number;
+  private _blendMode: BlendMode;
+  private _doubleSided: boolean;
   constructor(label: string, outputName: string) {
     super(label);
     const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
@@ -59,12 +62,14 @@ export class PBRMaterialEditor extends GraphEditor {
     light.intensity = 10;
     light.sunLight = true;
     light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-    const sphere = new SphereShape({ radius: 4 });
+    const sphere = new SphereShape({ radius: 4, horizonalDetail: 50, verticalDetail: 50 });
     const defaultMat = new UnlitMaterial();
     defaultMat.albedoColor = new Vector4(1, 0, 1, 1);
     this._defaultMaterial = new DRef(defaultMat);
     const previewMesh = new Mesh(scene, sphere, this._defaultMaterial.get());
     this._previewMesh = new DRef(previewMesh);
+    this._blendMode = 'none';
+    this._doubleSided = false;
     this.applyPreviewMaterial();
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
     this.nodeEditor.on('changed', this.graphChanged, this);
@@ -333,11 +338,44 @@ export class PBRMaterialEditor extends GraphEditor {
           uniformNames.add(u.name);
         }
       }
-      this._previewMesh.get().material = new PBRBluePrintMaterial(ir);
+      const newMaterial = new PBRBluePrintMaterial(ir);
+      newMaterial.blendMode = this._blendMode;
+      newMaterial.cullMode = this._doubleSided ? 'none' : 'back';
+      newMaterial.doubleSidedLighting = !!this._doubleSided;
+      this._previewMesh.get().material = newMaterial;
     }
   }
   protected onPropChanged(_obj: object, _prop: PropertyAccessor): void {
     this.applyPreviewMaterial();
+  }
+  protected onSelectionChanged(object: IGraphNode): void {
+    if (!object) {
+      this.nodePropEditor.root.addRawProperty(
+        'BlendMode',
+        'string',
+        (value) => {
+          value.str[0] = this._blendMode;
+        },
+        (value) => {
+          this._blendMode = value.str[0] as BlendMode;
+          this.onPropChanged(null, null);
+        },
+        {
+          enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] }
+        }
+      );
+      this.nodePropEditor.root.addRawProperty(
+        'DoubleSided',
+        'bool',
+        (value) => {
+          value.bool[0] = this._doubleSided;
+        },
+        (value) => {
+          this._doubleSided = value.bool[0];
+          this.onPropChanged(null, null);
+        }
+      );
+    }
   }
   private graphChanged() {
     this.applyPreviewMaterial();
