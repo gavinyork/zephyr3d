@@ -9,6 +9,7 @@ import type {
 } from '@zephyr3d/scene';
 import {
   DirectionalLight,
+  FunctionCallNode,
   getApp,
   getDevice,
   Mesh,
@@ -25,7 +26,7 @@ import { getConstantNodeCategories } from '../nodes/constants';
 import { getMathNodeCategories } from '../nodes/math';
 import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
-import { ASSERT, DRef, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
@@ -74,6 +75,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
     this.nodeEditor.on('changed', this.graphChanged, this);
     this.nodeEditor.on('save', this.save, this);
+    this.nodeEditor.on('dragdrop', this.dragdrop, this);
   }
   open() {
     getApp().inputManager.useFirst(
@@ -89,6 +91,10 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewScene.dispose();
     this._previewMesh.dispose();
     this._defaultMaterial.dispose();
+    this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
+    this.nodeEditor.off('changed', this.graphChanged, this);
+    this.nodeEditor.off('save', this.save, this);
+    this.nodeEditor.off('dragdrop', this.dragdrop, this);
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -379,5 +385,28 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   private graphChanged() {
     this.applyPreviewMaterial();
+  }
+  private dragdrop(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
+    if (
+      _payload.length === 1 &&
+      guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
+    ) {
+      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((DAG) => {
+        if (DAG) {
+          const world = this.nodeEditor.canvasToWorld(new ImGui.ImVec2(x, y));
+          const snapped = this.nodeEditor.snapWorldToScreenGrid(world, this.nodeEditor.canvasScale);
+          const node = new GNode(
+            this.nodeEditor,
+            snapped,
+            new FunctionCallNode(
+              _payload[0].path,
+              ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
+              DAG
+            )
+          );
+          this.nodeEditor.addNode(node);
+        }
+      });
+    }
   }
 }

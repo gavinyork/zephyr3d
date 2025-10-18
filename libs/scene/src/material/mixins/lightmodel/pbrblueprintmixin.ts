@@ -237,15 +237,15 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         const outputs = ir.create(pb);
         this.zCommonData.albedo = pb.vec4(
-          (outputs.BaseColor as PBShaderExp)?.rgb ?? pb.vec3(1),
-          outputs.Opacity ?? 1
+          (that.getOutput(outputs, 'BaseColor') as PBShaderExp)?.rgb ?? pb.vec3(1),
+          that.getOutput(outputs, 'Opacity') ?? 1
         );
-        this.zCommonData.metallic = outputs.Metallic ?? 0;
-        this.zCommonData.roughness = outputs.Roughness
-          ? pb.mul(outputs.Roughness, ShaderHelper.getCameraRoughnessFactor(scope))
+        this.zCommonData.metallic = that.getOutput(outputs, 'Metallic') ?? 0;
+        this.zCommonData.roughness = that.getOutput(outputs, 'Roughness')
+          ? pb.mul(that.getOutput(outputs, 'Roughness'), ShaderHelper.getCameraRoughnessFactor(scope))
           : ShaderHelper.getCameraRoughnessFactor(scope);
-        this.zCommonData.specular = outputs.Specular ?? pb.vec3(1);
-        this.zCommonData.emissive = outputs.Emissive ?? pb.vec3(0);
+        this.zCommonData.specular = that.getOutput(outputs, 'Specular') ?? pb.vec3(1);
+        this.zCommonData.emissive = that.getOutput(outputs, 'Emissive') ?? pb.vec3(0);
         this.zCommonData.f90 = pb.vec3(1);
         this.zCommonData.f0 = pb.vec4(
           pb.mix(
@@ -255,17 +255,19 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           ),
           1.5
         );
-        if (outputs.Tangent instanceof PBShaderExp) {
+        if (that.getOutput(outputs, 'Tangent') instanceof PBShaderExp) {
           this.$l.ng = pb.normalize(this.zVertexNormal);
-          this.$l.t_ = outputs.Tangent;
+          this.$l.t_ = that.getOutput(outputs, 'Tangent');
           this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
           this.$l.b = pb.cross(this.ng, this.t);
           this.zCommonData.TBN = pb.mat3(this.t, this.b, this.ng);
         } else {
           this.zCommonData.TBN = that.calculateTBN(this, this.zWorldPos, this.zVertexNormal);
         }
-        if (outputs.Normal) {
-          this.zCommonData.normal = pb.normalize(pb.mul(this.zCommonData.TBN, outputs.Normal));
+        if (that.getOutput(outputs, 'Normal')) {
+          this.zCommonData.normal = pb.normalize(
+            pb.mul(this.zCommonData.TBN, that.getOutput(outputs, 'Normal'))
+          );
         } else {
           this.zCommonData.normal = this.zVertexNormal;
         }
@@ -275,6 +277,15 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         );
       });
       scope[funcName](...paramValues);
+    }
+    private getOutput(
+      outputs: {
+        name: string;
+        exp: number | PBShaderExp;
+      }[],
+      name: string
+    ) {
+      return outputs.find((output) => output.name === name)?.exp;
     }
     directLighting(
       scope: PBInsideFunctionScope,

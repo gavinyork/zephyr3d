@@ -858,14 +858,17 @@ export class AssetManager {
           links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
         };
       };
-      ASSERT(bp.type === 'PBRMaterial', `Unsupported blueprint type: ${bp.type}`);
+      ASSERT(
+        bp.type === 'PBRMaterial' || bp.type === 'MaterialFunction',
+        `Unsupported blueprint type: ${bp.type}`
+      );
       const state = bp.state;
       const nodeMap: Record<number, IGraphNode> = {};
       const roots: number[] = [];
       for (const node of state.nodes) {
         const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
         nodeMap[node.id] = impl;
-        if (node.locked) {
+        if (impl.outputs.length === 0) {
           roots.push(node.id);
         }
       }

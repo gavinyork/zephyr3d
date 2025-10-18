@@ -146,7 +146,7 @@ import { PBRBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 import type { Material } from '../../material';
 import type { Primitive } from '../../render';
-import { FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
+import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -340,6 +340,7 @@ export class SerializationManager {
         PBRBlockNode.getSerializationCls(),
         FunctionInputNode.getSerializationCls(),
         FunctionOutputNode.getSerializationCls(),
+        FunctionCallNode.getSerializationCls(this),
         TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );
@@ -922,31 +923,7 @@ export class SerializationManager {
     };
   }
   async loadBluePrint(path: string) {
-    try {
-      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
-      const state = JSON.parse(content) as {
-        nodes: {
-          id: number;
-          locked: boolean;
-          node: object;
-        }[];
-        links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-      };
-      const nodeMap: Record<number, IGraphNode> = {};
-      const roots: number[] = [];
-      for (const node of state.nodes) {
-        const impl = await this.deserializeObject<IGraphNode>(null, node.node);
-        nodeMap[node.id] = impl;
-        if (node.locked) {
-          roots.push(node.id);
-        }
-      }
-      return await this.createBluePrintDAG(nodeMap, roots, state.links);
-    } catch (err) {
-      const msg = `Load material failed: ${err}`;
-      console.error(msg);
-      return null;
-    }
+    return this._assetManager.loadBluePrint(path);
   }
   /**
    * Clear cached allocations and asset-manager caches.

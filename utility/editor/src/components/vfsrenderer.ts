@@ -1,6 +1,6 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
-import { DataTransferVFS, Disposable, makeObservable } from '@zephyr3d/base';
+import { DataTransferVFS, Disposable, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -230,7 +230,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
               if (!path.toLowerCase().endsWith('.zmtl')) {
                 path = `${path}.zmtl`;
               }
-              const name = path.slice(0, -4);
+              const name = path.slice(0, -5);
               eventBus.dispatchEvent('edit_material', name, name, path);
             });
           }
@@ -265,19 +265,15 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
         }
         ImGui.EndMenu();
       }
-
-      ImGui.Separator();
-    }
-
-    if (ImGui.MenuItem('Refresh')) {
-      this.renderer.refreshFileView();
     }
   }
   protected onItemContextMenu(): void {
+    this.onContentContextMenu();
     const selectedCount = this.renderer.selectedItems.size;
     const selectedItems = Array.from(this._selectedItems);
 
     if (selectedCount > 0) {
+      ImGui.Separator();
       if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
         this.renderer.deleteSelectedItems();
       }
@@ -337,8 +333,9 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
     if (ImGui.BeginMenu('Create New##VFSCreate')) {
       if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
         DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
+          name = name.trim();
           if (name) {
-            if (/[\\/?*]/.test(name)) {
+            if (PathUtils.sanitizeFilename(name) !== name) {
               DlgMessage.messageBox('Error', 'Invalid folder name');
             } else {
               this._renderer.VFS.readDirectory(dir.path, { includeHidden: true, recursive: false })
@@ -733,8 +730,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
-        const name = this._vfs.basename(file.meta.path).slice(0, -4);
+        const name = this._vfs.basename(file.meta.path).slice(0, -5);
         eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
+      } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
+        eventBus.dispatchEvent('edit_material_function', file.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(file.meta.path);
         eventBus.dispatchEvent('action', 'EDIT_CODE', file.meta.path, mimeType);
@@ -858,8 +857,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
 
     DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
+      name = name.trim();
       if (name) {
-        if (/[\\/?*]/.test(name)) {
+        const sanitized = PathUtils.sanitizeFilename(name);
+        if (sanitized !== name) {
           DlgMessage.messageBox('Error', 'Invalid folder name');
         } else {
           const newPath = this._vfs.join(this.selectedDir.path, name);
@@ -880,7 +881,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       400
     );
     if (data) {
-      const filePath = this._vfs.join(path, `${data.name}.png`);
+      const sanitized = PathUtils.sanitizeFilename(data.name);
+      const filePath = this._vfs.join(path, `${sanitized}.png`);
       const pngData = UPNG.encode([data.data.buffer], data.data.length >> 2, 1, 0);
       await this._vfs.writeFile(filePath, pngData, { create: true, encoding: 'binary' });
     }
@@ -889,9 +891,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (!this.selectedDir) {
       return;
     }
-    const name = await DlgPromptName.promptName(title, 'Name', defaultName);
+    const name = (await DlgPromptName.promptName(title, 'Name', defaultName)).trim();
     if (name) {
-      if (/[\\/?*]/.test(name)) {
+      if (PathUtils.sanitizeFilename(name) !== name) {
         DlgMessage.messageBox('Error', 'Invalid file name');
       } else {
         const newPath = this._vfs.join(this.selectedDir.path, name);
@@ -953,8 +955,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
     DlgPromptName.promptName('Rename', 'Name', currentName).then((newName) => {
+      newName = newName.trim();
       if (newName && newName !== currentName) {
-        if (/[\\/?*]/.test(newName)) {
+        if (PathUtils.sanitizeFilename(newName) !== newName) {
           DlgMessage.messageBox('Error', 'Invalid name');
         } else {
           const parentPath = isDir
@@ -1020,8 +1023,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         if (ImGui.BeginMenu('Create New##VFSCreate')) {
           if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
             DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
+              name = name.trim();
               if (name) {
-                if (/[\\/?*]/.test(name)) {
+                if (PathUtils.sanitizeFilename(name) !== name) {
                   DlgMessage.messageBox('Error', 'Invalid folder name');
                 } else {
                   this._vfs

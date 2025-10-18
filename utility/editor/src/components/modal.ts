@@ -147,7 +147,7 @@ export class DialogRenderer<T> extends Observable<{
   }
   renderModeless() {
     this.setWindowPlacement();
-    let flags = ImGui.WindowFlags.None;
+    let flags = ImGui.WindowFlags.NoSavedSettings;
     if (this._noResize) {
       flags |= ImGui.WindowFlags.NoResize;
     }

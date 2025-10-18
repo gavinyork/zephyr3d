@@ -132,6 +132,82 @@ export class PathUtils {
   }
 
   /**
+   * Sanitizes a file or directory name by replacing or removing invalid characters.
+   *
+   * Behavior:
+   * - Removes or replaces characters that are invalid in common filesystems.
+   * - Trims leading/trailing spaces and dots.
+   * - Collapses multiple spaces into single spaces.
+   * - Replaces reserved names with safe alternatives.
+   * - Optionally limits the length of the result.
+   *
+   * Invalid characters replaced with underscore:
+   * - Control characters (0x00-0x1F, 0x7F)
+   * - Reserved characters: < > : " / \ | ? *
+   *
+   * Reserved names (Windows): CON, PRN, AUX, NUL, COM1-9, LPT1-9
+   *
+   * Examples:
+   * - sanitizeFilename('my file.txt') -> 'my file.txt'
+   * - sanitizeFilename('file:name*.txt') -> 'file_name_.txt'
+   * - sanitizeFilename('  .hidden  ') -> 'hidden'
+   * - sanitizeFilename('CON') -> '_CON'
+   * - sanitizeFilename('a'.repeat(300)) -> (truncated to maxLength)
+   *
+   * @param filename - Input filename to sanitize.
+   * @param options - Optional configuration.
+   * @param options.replacement - Character to use for invalid chars (default: '_').
+   * @param options.maxLength - Maximum length of result (default: 255).
+   * @returns Sanitized filename safe for use across platforms.
+   */
+  static sanitizeFilename(
+    filename: string,
+    options?: { replacement?: string; maxLength?: number; asciiOnly?: boolean }
+  ) {
+    const { replacement = '_', maxLength = 255, asciiOnly = false } = options ?? {};
+    const reserved = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+
+    // Replace reserved special characters
+    let sanitized = filename.replace(/[<>:"/\\|?*]/g, replacement);
+    // Replace control characters and optionally non-ASCII
+    sanitized = Array.from(sanitized)
+      .map((char) => {
+        const code = char.charCodeAt(0);
+        if (code <= 0x1f || code === 0x7f) {
+          return replacement;
+        }
+        if (asciiOnly && (code < 0x20 || code > 0x7e)) {
+          return replacement;
+        }
+        return char;
+      })
+      .join('');
+    // Normalize whitespace and trim invalid edges
+    sanitized = sanitized.replace(/\s+/g, ' ').replace(/^[\s.]+|[\s.]+$/g, '');
+    // Empty fallback
+    if (!sanitized) {
+      sanitized = 'unnamed';
+    }
+    // Handle reserved names (Windows)
+    const baseName = sanitized.split('.')[0];
+    if (reserved.test(baseName)) {
+      sanitized = replacement + sanitized;
+    }
+    // Truncate (preserve extension if possible)
+    if (sanitized.length > maxLength) {
+      const dotIndex = sanitized.lastIndexOf('.');
+      if (dotIndex > 0 && sanitized.length - dotIndex <= 10) {
+        const ext = sanitized.slice(dotIndex);
+        const base = sanitized.slice(0, maxLength - ext.length);
+        sanitized = base + ext;
+      } else {
+        sanitized = sanitized.slice(0, maxLength);
+      }
+    }
+
+    return sanitized;
+  }
+  /**
    * Determines whether the path is absolute.
    *
    * Definition here: absolute paths start with "/".

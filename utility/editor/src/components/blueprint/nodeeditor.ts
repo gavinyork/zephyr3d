@@ -48,6 +48,7 @@ interface TraversalResult {
 
 export class NodeEditor extends Observable<{
   changed: [];
+  dragdrop: [x: number, y: number, { isDir: boolean; path: string }[]];
   save: [path: string];
   close: [changed: boolean];
 }> {
@@ -1457,6 +1458,15 @@ export class NodeEditor extends Observable<{
 
     ImGui.SetCursorScreenPos(canvasPos);
     ImGui.InvisibleButton('Canvas', this.canvasSize);
+    if (ImGui.BeginDragDropTarget()) {
+      const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as { isDir: boolean; path: string }[];
+      if (payload) {
+        const x = ImGui.GetMousePos().x - canvasPos.x;
+        const y = ImGui.GetMousePos().y - canvasPos.y;
+        this.dispatchEvent('dragdrop', x, y, payload);
+      }
+      ImGui.EndDragDropTarget();
+    }
     if (this.justOpened) {
       this.justOpened = false;
       ImGui.SetItemDefaultFocus();

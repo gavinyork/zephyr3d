@@ -40,6 +40,7 @@ import {
   VertexUVNode
 } from './inputs';
 import { ShaderHelper } from '../../../material/shader/helper';
+import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from './func';
 
 export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number; node: IGraphNode };
 export type IRUniformTexture = {
@@ -169,6 +170,73 @@ class IRFunc extends IRExpression {
   }
 }
 
+class IRFunctionOutput extends IRExpression {
+  private tmpName: string;
+  private input: IRExpression | number;
+  constructor(input: IRExpression | number) {
+    super();
+    this.input = input;
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp | number {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const exp = this.input instanceof IRExpression ? this.input.create(pb) : this.input;
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRCallFunc extends IRExpression {
+  node: FunctionCallNode;
+  args: IRExpression[];
+  tmpName: string;
+  constructor(node: FunctionCallNode, args: IRExpression[]) {
+    super();
+    this.node = node;
+    this.args = args;
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const that = this;
+    const ir = this.node.IR;
+    const params = this.node.args.map((v) => pb[v.type](v.name));
+    pb.func(this.node.name, params, function () {
+      const outputs = ir.create(pb);
+      const rettype = pb.defineStruct(
+        that.node.outputs.map((output, index) => {
+          return pb[that.node.outs[index].type](output.swizzle);
+        })
+      );
+      this.$return(
+        rettype(
+          ...outputs.map((output) => {
+            return output.exp;
+          })
+        )
+      );
+    });
+    const args = this.args.map((arg) => arg.create(pb));
+    const exp = pb.getGlobalScope()[this.node.name](...args);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
 class IRSwizzle extends IRExpression {
   readonly src: IRExpression;
   readonly hash: string;
@@ -202,13 +270,18 @@ class IRSampleTexture extends IRExpression {
   tex: IRConstantTexture;
   coord: IRExpression;
   samplerType: 'Color' | 'Normal';
+  tmpName: string;
   constructor(tex: IRConstantTexture, coord: IRExpression, samplerType: 'Color' | 'Normal') {
     super();
     this.tex = tex.addRef();
     this.coord = coord.addRef();
     this.samplerType = samplerType;
+    this.tmpName = '';
   }
   create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
     const tex = this.tex.create(pb);
     const coord = this.coord.create(pb);
     let coordExp: PBShaderExp;
@@ -219,11 +292,16 @@ class IRSampleTexture extends IRExpression {
     } else {
       throw new Error('Invalid texture coordinate');
     }
-    const result = pb.textureSample(tex, coordExp);
+    let exp = pb.textureSample(tex, coordExp);
     if (this.samplerType === 'Normal') {
-      return pb.sub(pb.mul(result, pb.vec4(2, 2, 2, 1)), pb.vec4(1, 1, 1, 0));
+      exp = pb.sub(pb.mul(exp, pb.vec4(2, 2, 2, 1)), pb.vec4(1, 1, 1, 0));
+    }
+    if (this._ref === 1) {
+      return exp;
     } else {
-      return result;
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
     }
   }
 }
@@ -293,7 +371,7 @@ export class MaterialBlueprintIR {
   private _uniformValues: IRUniformValue[];
   private _uniformTextures: IRUniformTexture[];
   private _behaviors: MaterialBlueprintIRBehaviors;
-  private _outputs: Record<string, IRExpression>;
+  private _outputs: { name: string; expr: IRExpression }[];
   constructor(dag: BlueprintDAG, hash: string) {
     this._dag = dag ?? {
       nodeMap: {},
@@ -308,7 +386,7 @@ export class MaterialBlueprintIR {
     this.compile();
   }
   get ok() {
-    return !!this._outputs;
+    return this._outputs?.length > 0;
   }
   get hash() {
     return this._hash;
@@ -330,17 +408,26 @@ export class MaterialBlueprintIR {
   }
   compile(): boolean {
     this.reset();
-    this._outputs = {};
+    this._outputs = [];
     for (const root of this._dag.roots) {
       const rootNode = this._dag.nodeMap[root];
       for (const input of rootNode.inputs) {
         const name = input.name;
         if (input.inputNode) {
-          this._outputs[name] = this.ir(input.inputNode, input.inputId, input.originType).addRef();
+          this._outputs.push({
+            name,
+            expr: this.ir(input.inputNode, input.inputId, input.originType).addRef()
+          });
         } else if (typeof input.defaultValue === 'number') {
-          this._outputs[name] = new IRConstantf(input.defaultValue, '').addRef();
+          this._outputs.push({
+            name,
+            expr: new IRConstantf(input.defaultValue, '').addRef()
+          });
         } else if (Array.isArray(input.defaultValue)) {
-          this._outputs[name] = new IRConstantfv(input.defaultValue, '').addRef();
+          this._outputs.push({
+            name,
+            expr: new IRConstantfv(input.defaultValue, '').addRef()
+          });
         } else if (input.required) {
           this._outputs = null;
           return false;
@@ -349,13 +436,13 @@ export class MaterialBlueprintIR {
     }
     return true;
   }
-  create(pb: ProgramBuilder): Record<string, PBShaderExp | number> {
+  create(pb: ProgramBuilder): { name: string; exp: PBShaderExp | number }[] {
     if (!this._outputs) {
       return null;
     }
-    const outputs: Record<string, PBShaderExp | number> = {};
-    for (const k in this._outputs) {
-      outputs[k] = this._outputs[k].create(pb);
+    const outputs: { name: string; exp: PBShaderExp | number }[] = [];
+    for (const output of this._outputs) {
+      outputs.push({ name: output.name, exp: output.expr.create(pb) });
     }
     return outputs;
   }
@@ -422,6 +509,12 @@ export class MaterialBlueprintIR {
       expr = this.skyEnvTexture(node, output);
     } else if (node instanceof ElapsedTimeNode) {
       expr = this.elapsedTime(node, output);
+    } else if (node instanceof FunctionCallNode) {
+      expr = this.functionCall(node, output);
+    } else if (node instanceof FunctionInputNode) {
+      expr = this.functionInput(node, output);
+    } else if (node instanceof FunctionOutputNode) {
+      expr = this.functionOutput(node, output);
     }
     if (expr && originType) {
       const outputType = node.getOutputType(output);
@@ -513,6 +606,10 @@ export class MaterialBlueprintIR {
     const funcName = node.func;
     return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
   }
+  private functionOutput(node: FunctionOutputNode, output: number): IRExpression {
+    const input = this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType);
+    return this.getOrCreateIRExpression(node, output, IRFunctionOutput, input);
+  }
   private vertexColor(node: VertexColorNode, output: number): IRExpression {
     this._behaviors.useVertexColor = true;
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexColor');
@@ -583,6 +680,20 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
       ShaderHelper.getElapsedTime(scope)
     );
+  }
+  private functionInput(node: FunctionInputNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRInput,
+      (scope: PBInsideFunctionScope) => scope[node.name]
+    );
+  }
+  private functionCall(node: FunctionCallNode, output: number): IRExpression {
+    const args = node.inputs.map((input) => {
+      return this.ir(input.inputNode, input.inputId, input.originType);
+    });
+    return this.getOrCreateIRExpression(node, output, IRCallFunc, node, args);
   }
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);

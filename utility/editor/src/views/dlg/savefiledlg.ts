@@ -2,7 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import type { DirectoryInfo, FileInfo } from '../../components/vfsrenderer';
 import { VFSRenderer } from '../../components/vfsrenderer';
-import type { VFS } from '@zephyr3d/base';
+import { PathUtils, type VFS } from '@zephyr3d/base';
 import type { ProjectInfo } from '../../core/services/project';
 
 export class DlgSaveFile extends DialogRenderer<string> {
@@ -94,11 +94,15 @@ export class DlgSaveFile extends DialogRenderer<string> {
     }
   }
   saveFileAndClose() {
-    if (this._renderer.selectedDir && this._name[0] && !/[\\/?*]/.test(this._name[0])) {
-      const name = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
-      this._renderer.off('selection_changed', this.updateSelection, this);
-      this._renderer.dispose();
-      this.close(name);
+    const name = this._name[0].trim();
+    if (this._renderer.selectedDir && name) {
+      const sanitizedName = PathUtils.sanitizeFilename(name);
+      if (sanitizedName === name) {
+        const path = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
+        this._renderer.off('selection_changed', this.updateSelection, this);
+        this._renderer.dispose();
+        this.close(path);
+      }
     }
   }
 }
