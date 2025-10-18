@@ -190,22 +190,15 @@ export class LightPass extends RenderPass {
         }
       }
       if (!renderQueue.needSceneColor() || ctx.sceneColorTexture) {
-        if (i === 0) {
-          if (tmpFramebuffer) {
-            ctx.device.pushDeviceStates();
-            ctx.device.setFramebuffer(tmpFramebuffer);
-          }
-          ctx.env.sky.renderFog(ctx);
-          if (tmpFramebuffer) {
-            ctx.device.popDeviceStates();
-          }
-        }
         if (i === 0 || i === transparentPass) {
           ctx.compositor?.drawPostEffects(
             ctx,
             i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
             ctx.linearDepthTexture
           );
+        }
+        if (i === 0) {
+          ctx.env.sky.renderFog(ctx);
         }
       }
     }
