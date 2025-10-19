@@ -1,5 +1,5 @@
 <img
-    src="media/logo.svg"
+    src="https://cdn.zephyr3d.org/doc/assets/images/logo.svg"
     style="display: block; width: 400px; margin: auto; margin-bottom: 0"
 />
 

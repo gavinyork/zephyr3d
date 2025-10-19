@@ -115,9 +115,8 @@ assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnorma
 
 ```javascript
 
-  const assetManager = new AssetManager();
   // 加载模型到场景
-  assetManager.fetchModel(scene, 'assets/models/Duck.glb').then(info => {
+  getEngine().serializationManager.fetchModel('assets/models/Duck.glb', scene).then(info => {
     info.group.position.setXYZ(0, 0, -10);
   });
 

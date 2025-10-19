@@ -21,4 +21,4 @@
 3. 如需查看示例项目，可选择"打开远程项目"（只读模式）
 
 
-<img src="media/editor-main.jpg" width="1024"/>
+<img src="https://cdn.zephyr3d.org/doc/assets/images/editor-main.jpg" width="1024"/>

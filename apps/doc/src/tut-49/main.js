@@ -4,11 +4,11 @@ import {
   Scene,
   Application,
   PerspectiveCamera,
-  AssetManager,
   BatchGroup,
   FPSCameraController,
   DirectionalLight,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -29,9 +29,11 @@ myApp.ready().then(async () => {
   light.lookAt(new Vector3(1, 4, -1), new Vector3(0, 0, 0), new Vector3(0, 1, 1));
 
   // Load mesh
-  const assetManager = new AssetManager();
   const batchGroup = new BatchGroup(scene);
-  const room = await assetManager.fetchModel(scene, 'assets/models/sitting_room_with_baked_textures.glb');
+  const room = await getEngine().serializationManager.fetchModel(
+    'https://cdn.zephyr3d.org/doc/assets/models/sitting_room_with_baked_textures.glb',
+    scene
+  );
   room.group.parent = batchGroup;
 
   const camera = new PerspectiveCamera(

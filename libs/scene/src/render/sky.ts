@@ -161,7 +161,7 @@ export class SkyRenderer extends Disposable {
     this._atmosphereParams = getDefaultAtmosphereParams();
     this._atmosphereExposure = 1;
     this._debugAerialPerspective = 0;
-    this._fogType = 'none';
+    this._fogType = 'height_fog';
     this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;

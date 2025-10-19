@@ -135,7 +135,7 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
   });
   // load texture
   const img = document.createElement('img');
-  img.src = 'dog_01.png';
+  img.src = 'https://cdn.zephyr3d.org/doc/assets/images/dog_01.png';
   await img.decode();
   const bitmap = await createImageBitmap(img, { premultiplyAlpha: 'none' });
   const texture = device.createTexture2DFromImage(bitmap, true);

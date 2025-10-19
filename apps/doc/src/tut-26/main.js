@@ -6,7 +6,8 @@ import {
   PerspectiveCamera,
   AssetManager,
   AnimationTrack,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -54,8 +55,10 @@ const myApp = new Application({
 
 myApp.ready().then(async () => {
   const scene = new Scene();
-  const assetManager = new AssetManager();
-  const model = await assetManager.fetchModel(scene, 'assets/models/BoxTextured.glb');
+  const model = await getEngine().serializationManager.fetchModel(
+    'https://cdn.zephyr3d.org/doc/assets/models/BoxTextured.glb',
+    scene
+  );
   const animation = model.group.animationSet.createAnimation('UserTrackTest');
   const interpolator = new Interpolator(
     'linear',

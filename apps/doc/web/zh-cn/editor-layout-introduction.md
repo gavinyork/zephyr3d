@@ -5,7 +5,7 @@
 
 Zephyr3d Editor 采用经典的多面板布局：
 
-<img src="media/editor-workspace.jpg" width="1024">
+<img src="https://cdn.zephyr3d.org/doc/assets/images/editor-workspace.jpg" width="1024">
 
 **界面组成**（从上到下）：
 - **主菜单**：顶部菜单栏，包含所有功能入口

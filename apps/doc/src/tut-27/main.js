@@ -24,9 +24,11 @@ myApp.ready().then(function () {
 
   const assetManager = new AssetManager();
   // Load a model
-  assetManager.fetchModel(scene, 'assets/models/DamagedHelmet.glb').then((info) => {
-    info.group.position.setXYZ(0, -0.5, 0);
-  });
+  assetManager
+    .fetchModel(scene, 'https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb')
+    .then((info) => {
+      info.group.position.setXYZ(0, -0.5, 0);
+    });
 
   // Create camera
   const camera = new PerspectiveCamera(

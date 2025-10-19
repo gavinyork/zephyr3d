@@ -66,13 +66,13 @@ for (let i = 0; i < 10; i++) {
   const modelUrl = 'http://foo/bar.glb';
   for (let i = 0; i < 100; i++) {
     // 加载相同的模型并设置enableInstancing属性为true，这些模型自动使用实例化渲染
-    instancedModels.push(await assetManager.fetchModel(scene, url, {
+    instancedModels.push(await getEngine().serializationManager.fetchModel(url, scene, {
       enableInstancing: true
     }));
   }
   for (let i = 0; i < 100; i++) {
     // 加载相同的模型但未设置enableInstancing属性为true，这些模型不会使用实例化渲染
-    nonInstancedModels.push(await assetManager.fetchModel(scene, url));
+    nonInstancedModels.push(await getEngine().serializationManager.fetchModel(url, scene));
   }
 
 ```

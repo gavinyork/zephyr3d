@@ -112,9 +112,8 @@ The most common method for creating meshes is to load existing models. Currently
 
 ```javascript
 
-  const assetManager = new AssetManager();
   // Load model into scene
-  assetManager.fetchModel(scene, 'assets/models/Duck.glb').then(info => {
+  getEngine().serializationManager.fetchModel('assets/models/Duck.glb', scene).then(info => {
     info.group.position.setXYZ(0, 0, -10);
   });
 

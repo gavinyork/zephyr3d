@@ -20,6 +20,6 @@
 - 配置项目设置
 - 预览和发布项目
 
-<img src="media/project-menu.png">
+<img src="https://cdn.zephyr3d.org/doc/assets/images/project-menu.png">
 
 

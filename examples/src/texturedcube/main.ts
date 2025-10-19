@@ -85,14 +85,9 @@ import { DrawText } from '@zephyr3d/device';
     indexBuffer: ib
   });
 
-  // load texture
-  const img = document.createElement('img');
-  img.src = 'layer.jpg';
-  await img.decode();
-
   // load video texture
   const el = document.createElement('video');
-  el.src = 'sample-video.mp4';
+  el.src = 'https://cdn.zephyr3d.org/doc/assets/images/sample-video.mp4';
   el.loop = true;
   el.muted = true;
   await el.play();

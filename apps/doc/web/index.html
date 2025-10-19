@@ -1,110 +1,115 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Zephyr3d documentation</title>
-  <link rel="icon" href="media/favicon.ico" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-  <meta name="description" content="Zephyr3d documentation page">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <link rel="stylesheet" href="css/var.css">
-  <link rel="stylesheet" href="vendor/themes/style.min.css">
-  <link rel="stylesheet" href="css/doc.css">
-  <style>
-    .showcase {
-      width: 600px;
-      height: 400px;
-    }
-    .token.punctuation {
-      color: #00f0f0;
-    }
-  </style>
-</head>
-<body>
-  <div id="app"></div>
-  <script>
-    var url = new URL(location.href);
-    if (url.hash === '#/' || url.hash === '') {
-      if (navigator.language.indexOf('zh') === 0) {
-        url.hash = '#/zh-cn/';
-      } else {
-        url.hash = '#/en/';
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zephyr3d documentation</title>
+    <link rel="icon" href="https://cdn.zephyr3d.org/doc/assets/images/favicon.ico" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="description" content="Zephyr3d documentation page" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+    <link rel="stylesheet" href="css/var.css" />
+    <link rel="stylesheet" href="vendor/themes/style.min.css" />
+    <link rel="stylesheet" href="css/doc.css" />
+    <style>
+      .showcase {
+        width: 600px;
+        height: 400px;
       }
-      location.href = url.href;
-    }
-    window.$docsify = {
-      auto2top: true,
-      coverpage: true,
-      loadSidebar: true,
-      hideSidebar: false,
-      loadNavbar: true,
-      executeScript: true,
-      maxLevel: 2,
-      subMaxLevel: 2,
-      coverpage: ['/en/', '/zh-cn/'],
-      name: 'Zephyr3d',
-      repo: 'https://github.com/gavinyork/zephyr3d',
-      search: {
-        noData: {
-          '/zh-cn/': '没有结果!',
-          '/en/': 'No results!',
-        },
-        paths: 'auto',
-        placeholder: {
-          '/zh-cn/': '搜索',
-          '/': 'Search',
-        },
-        pathNamespaces: ['/zh-cn'],
+      .token.punctuation {
+        color: #00f0f0;
       }
-    }
-  </script>
-  <!-- Docsify v4 -->
-  <script src="vendor/docsify.js"></script>
-  <script src="vendor/search.min.js"></script>
-  <script>
-    window.onload = function(){
-      const createCase = function(el) {
-        const iframe = document.createElement('iframe');
-        const nocode = el.getAttribute('nocode')!==null;
-        iframe.src = `${nocode ? 'showdemo' : 'showcase'}.html?showcase=${el.getAttribute('case')}${el.getAttribute('nocode')!==null ? '&nocode' : ''}`;
-        iframe.style.border = "0";
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.height = 500;
-        el.append(iframe);
-        /*
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      var url = new URL(location.href);
+      if (url.hash === '#/' || url.hash === '') {
+        if (navigator.language.indexOf('zh') === 0) {
+          url.hash = '#/zh-cn/';
+        } else {
+          url.hash = '#/en/';
+        }
+        location.href = url.href;
+      }
+      window.$docsify = {
+        auto2top: true,
+        coverpage: true,
+        loadSidebar: true,
+        hideSidebar: false,
+        loadNavbar: true,
+        executeScript: true,
+        maxLevel: 2,
+        subMaxLevel: 2,
+        coverpage: ['/en/', '/zh-cn/'],
+        name: 'Zephyr3d',
+        repo: 'https://github.com/gavinyork/zephyr3d',
+        search: {
+          noData: {
+            '/zh-cn/': '没有结果!',
+            '/en/': 'No results!'
+          },
+          paths: 'auto',
+          placeholder: {
+            '/zh-cn/': '搜索',
+            '/': 'Search'
+          },
+          pathNamespaces: ['/zh-cn']
+        }
+      };
+    </script>
+    <!-- Docsify v4 -->
+    <script src="vendor/docsify.js"></script>
+    <script src="vendor/search.min.js"></script>
+    <script>
+      window.onload = function () {
+        const createCase = function (el) {
+          const iframe = document.createElement('iframe');
+          const nocode = el.getAttribute('nocode') !== null;
+          iframe.src = `${nocode ? 'showdemo' : 'showcase'}.html?showcase=${el.getAttribute('case')}${el.getAttribute('nocode') !== null ? '&nocode' : ''}`;
+          iframe.style.border = '0';
+          iframe.style.width = '100%';
+          iframe.style.height = '100%';
+          iframe.height = 500;
+          el.append(iframe);
+          /*
         iframe.contentWindow.document.open('text/html', 'replace');
         iframe.contentWindow.document.write(buildHtmlSource());
         iframe.contentWindow.document.close();
         */
-      }
-      const cases = document.querySelectorAll('.showcase').values();
-      const observer = new MutationObserver(function(mutations_list) {
-        let caseNodes = new Set();
-        mutations_list.forEach(function(mutation) {
-          mutation.addedNodes.forEach(function(added_node) {
-            if(added_node instanceof HTMLElement && added_node.classList.contains('showcase') && !caseNodes.has(added_node)) {
-              createCase(added_node);
-              caseNodes.add()
-            }
-            const caseList = (added_node instanceof HTMLElement) ? added_node.querySelectorAll('.showcase') : [];
-            caseList.forEach(el => {
-              if (!caseNodes.has(el)) {
-                caseNodes.add(el);
-                createCase(el);
+        };
+        const cases = document.querySelectorAll('.showcase').values();
+        const observer = new MutationObserver(function (mutations_list) {
+          let caseNodes = new Set();
+          mutations_list.forEach(function (mutation) {
+            mutation.addedNodes.forEach(function (added_node) {
+              if (
+                added_node instanceof HTMLElement &&
+                added_node.classList.contains('showcase') &&
+                !caseNodes.has(added_node)
+              ) {
+                createCase(added_node);
+                caseNodes.add();
               }
+              const caseList =
+                added_node instanceof HTMLElement ? added_node.querySelectorAll('.showcase') : [];
+              caseList.forEach((el) => {
+                if (!caseNodes.has(el)) {
+                  caseNodes.add(el);
+                  createCase(el);
+                }
+              });
             });
           });
         });
-      });
-      observer.observe(document.body, {
-        subtree: true,
-        childList: true
-      });
-      for (const k of cases) {
-        createCase(k);
-      }
-    }
-  </script>
-</body>
+        observer.observe(document.body, {
+          subtree: true,
+          childList: true
+        });
+        for (const k of cases) {
+          createCase(k);
+        }
+      };
+    </script>
+  </body>
 </html>

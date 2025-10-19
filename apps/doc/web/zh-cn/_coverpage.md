@@ -1,4 +1,4 @@
-<img src="media/logo_i.svg" style="width: 400px; margin-bottom: 50px;">
+<img src="https://cdn.zephyr3d.org/doc/assets/images/logo_i.svg" style="width: 400px; margin-bottom: 50px;">
 
 > Web平台的3D渲染API，全面支持WebGL/WebGL2/WebGPU
 

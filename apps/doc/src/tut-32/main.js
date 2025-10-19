@@ -40,6 +40,8 @@ myApp.ready().then(async () => {
   scene.env.sky.skyType = 'skybox';
   // Set skybox texture
   scene.env.sky.skyboxTexture = skyboxTexture;
+  // Disable height fog
+  scene.env.sky.fogType = 'none';
 
   // Reset aspect ratio when size was changed
   myApp.on('resize', (width, height) => {

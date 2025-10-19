@@ -698,16 +698,13 @@ export class SceneNode
    * @returns The first matchign node, or `null` if not found.
    */
   findSkeletonById(id: string) {
-    const prefabNode = this.getPrefabNode();
-    if (prefabNode) {
-      let sk: DRef<Skeleton> = null;
-      prefabNode.iterate((node) => {
-        sk = node.animationSet.skeletons.find((s) => s.get().persistentId === id);
-        return !!sk;
-      });
-      return sk?.get() ?? null;
-    }
-    return null;
+    const prefabNode = this.getPrefabNode() ?? this;
+    let sk: DRef<Skeleton> = null;
+    prefabNode.iterate((node) => {
+      sk = node.animationSet.skeletons.find((s) => s.get().persistentId === id);
+      return !!sk;
+    });
+    return sk?.get() ?? null;
   }
   /**
    * Finds a scene node by name.

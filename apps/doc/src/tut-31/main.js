@@ -24,7 +24,9 @@ myApp.ready().then(async () => {
     const mapWidth = 257;
     const mapHeight = 257;
     // Load heights
-    const heightMap = await assetManager.fetchBinaryData('assets/maps/map1/heightmap.raw');
+    const heightMap = await assetManager.fetchBinaryData(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/heightmap.raw'
+    );
     const heightsInt16 = new Uint16Array(heightMap);
     const heightsF32 = new Float32Array(mapWidth * mapHeight);
     // Converts 16-bit integer height values to floating-point numbers in the range of 0 to 1
@@ -33,36 +35,57 @@ myApp.ready().then(async () => {
     }
     // Splat map
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const splatMap = await assetManager.fetchTexture('assets/maps/map1/splatmap.tga', {
-      linearColorSpace: true
-    });
+    const splatMap = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/splatmap.tga',
+      {
+        linearColorSpace: true
+      }
+    );
     // Detail Texture 1, the weights correspond to the R channel of the splat map
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailAlbedo0 = await assetManager.fetchTexture('assets/maps/map1/detail1.jpg', {
-      linearColorSpace: false
-    });
+    const detailAlbedo0 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1.jpg',
+      {
+        linearColorSpace: false
+      }
+    );
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailNormal0 = await assetManager.fetchTexture('assets/maps/map1/detail1_norm.jpg', {
-      linearColorSpace: true
-    });
+    const detailNormal0 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1_norm.jpg',
+      {
+        linearColorSpace: true
+      }
+    );
     // Detail Texture 2, the weights correspond to the G channel of the splat map
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailAlbedo1 = await assetManager.fetchTexture('assets/maps/map1/detail2.jpg', {
-      linearColorSpace: false
-    });
+    const detailAlbedo1 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2.jpg',
+      {
+        linearColorSpace: false
+      }
+    );
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailNormal1 = await assetManager.fetchTexture('assets/maps/map1/detail2_norm.jpg', {
-      linearColorSpace: true
-    });
+    const detailNormal1 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2_norm.jpg',
+      {
+        linearColorSpace: true
+      }
+    );
     // Detail Texture 3, the weights correspond to the B channel of the splat map
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailAlbedo2 = await assetManager.fetchTexture('assets/maps/map1/detail3.jpg', {
-      linearColorSpace: false
-    });
+    const detailAlbedo2 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3.jpg',
+      {
+        linearColorSpace: false
+      }
+    );
     /** @type {import('@zephyr3d/device').Texture2D} */
-    const detailNormal2 = await assetManager.fetchTexture('assets/maps/map1/detail3_norm.jpg', {
-      linearColorSpace: true
-    });
+    const detailNormal2 = await assetManager.fetchTexture(
+      'https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3_norm.jpg',
+      {
+        linearColorSpace: true
+      }
+    );
     // Grass blade textures
     /** @type {import('@zephyr3d/device').Texture2D} */
     const grass1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/grass1.dds');

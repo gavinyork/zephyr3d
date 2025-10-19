@@ -2,10 +2,10 @@ import { Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   OrbitCameraController,
-  AssetManager,
   Application,
   PerspectiveCamera,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -17,8 +17,10 @@ const myApp = new Application({
 myApp.ready().then(async () => {
   const scene = new Scene();
 
-  const assetManager = new AssetManager();
-  const actor = await assetManager.fetchModel(scene, 'assets/models/CesiumMan.glb');
+  const actor = await getEngine().serializationManager.fetchModel(
+    'https://cdn.zephyr3d.org/doc/assets/models/CesiumMan.glb',
+    scene
+  );
   actor.group.scale.setXYZ(10, 10, 10);
   actor.animationSet.playAnimation(actor.animationSet.getAnimationNames()[0]);
 

@@ -35,6 +35,7 @@ myApp.ready().then(function () {
     // Set the sky mode to a skybox and set the skybox texture
     scene.env.sky.skyType = 'skybox';
     scene.env.sky.skyboxTexture = skyMap;
+    scene.env.sky.fogType = 'none';
     // Set the environment lighting mode to IBL and set the radiance map and irradiance map
     scene.env.light.type = 'ibl';
     scene.env.light.radianceMap = radianceMap;
@@ -47,9 +48,11 @@ myApp.ready().then(function () {
   light.color = new Vector4(1, 1, 1, 1);
 
   // Load a model
-  assetManager.fetchModel(scene, 'assets/models/DamagedHelmet.glb').then((info) => {
-    info.group.scale.setXYZ(10, 10, 10);
-  });
+  assetManager
+    .fetchModel(scene, 'https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb')
+    .then((info) => {
+      info.group.scale.setXYZ(10, 10, 10);
+    });
 
   // Create camera
   const camera = new PerspectiveCamera(

@@ -6,7 +6,8 @@ import {
   PerspectiveCamera,
   DirectionalLight,
   AssetManager,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -21,11 +22,12 @@ myApp.ready().then(function () {
   const light = new DirectionalLight(scene);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const assetManager = new AssetManager();
   // Load a model
-  assetManager.fetchModel(scene, 'assets/models/Duck.glb').then((info) => {
-    info.group.position.setXYZ(0, -0.5, 0);
-  });
+  getEngine()
+    .serializationManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/Duck.glb', scene)
+    .then((info) => {
+      info.group.position.setXYZ(0, -0.5, 0);
+    });
 
   // Create camera
   const camera = new PerspectiveCamera(
