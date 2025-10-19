@@ -3,6 +3,7 @@ import { DialogRenderer } from '../../components/modal';
 
 export class DlgPromptName extends DialogRenderer<string> {
   private _hint: string;
+  private _name: [string];
   private readonly _label: string;
   public static async promptName(
     title: string,
@@ -15,25 +16,21 @@ export class DlgPromptName extends DialogRenderer<string> {
   constructor(id: string, hint: string, label: string, width = 300) {
     super(id, width, 0, true, true);
     this._hint = hint ?? '';
+    this._name = [''];
     this._label = label ?? '';
   }
   doRender(): void {
-    const name = [''] as [string];
     ImGui.SetKeyboardFocusHere();
-    if (
-      ImGui.InputTextWithHint(
-        this._label,
-        this._hint ?? '',
-        name,
-        undefined,
-        ImGui.InputTextFlags.AutoSelectAll
-      )
-    ) {
-      this._hint = name[0];
-    }
+    const textEntered = ImGui.InputTextWithHint(
+      this._label,
+      this._hint,
+      this._name,
+      undefined,
+      ImGui.InputTextFlags.AutoSelectAll | ImGui.InputTextFlags.EnterReturnsTrue
+    );
     ImGui.Button('Ok');
-    if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
-      this.close(this._hint);
+    if (this._name[0] && (textEntered || (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)))) {
+      this.close(this._name[0]);
     }
     ImGui.SameLine();
     ImGui.Button('Cancel');

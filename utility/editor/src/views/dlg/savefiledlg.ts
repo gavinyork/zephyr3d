@@ -11,6 +11,7 @@ export class DlgSaveFile extends DialogRenderer<string> {
   private _filterLabels: string[];
   private _filterPatterns: string[];
   private _selected: [number];
+  private _error: string;
   public static async saveFile(
     title: string,
     vfs: VFS,
@@ -48,6 +49,7 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._filterLabels.push('All files (*)');
       this._filterPatterns.push('*');
     }
+    this._error = '';
     this._selected = [0];
     this._renderer = new VFSRenderer(
       vfs,
@@ -65,11 +67,13 @@ export class DlgSaveFile extends DialogRenderer<string> {
     this._renderer.on('selection_changed', this.updateSelection, this);
     this._renderer.on('file_dbl_clicked', (file: FileInfo) => {
       this._name[0] = file.meta.name;
+      this._error = '';
       this.saveFileAndClose();
     });
   }
   updateSelection(selectedDir: DirectoryInfo, files: FileInfo[]) {
     if (files.length === 1) {
+      this._error = '';
       this._name[0] = files[0].meta.name;
     }
   }
@@ -78,12 +82,21 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._renderer.render();
     }
     ImGui.EndChild();
-    ImGui.InputText('File Name', this._name, undefined, ImGui.InputTextFlags.AutoSelectAll);
+    if (!ImGui.IsItemActive() && !ImGui.IsAnyItemActive()) {
+      ImGui.SetKeyboardFocusHere();
+    }
+    const textEntered = ImGui.InputTextWithHint(
+      '',
+      'Enter file name',
+      this._name,
+      undefined,
+      ImGui.InputTextFlags.AutoSelectAll | ImGui.InputTextFlags.EnterReturnsTrue
+    );
     ImGui.SameLine();
     if (ImGui.Combo('##FileTypeCombo', this._selected, this._filterLabels)) {
       this._renderer.fileFilter = [this._filterPatterns[this._selected[0]]];
     }
-    if (ImGui.Button('Save')) {
+    if (ImGui.Button('Save') || textEntered) {
       this.saveFileAndClose();
     }
     ImGui.SameLine();
@@ -92,17 +105,30 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._renderer.dispose();
       this.close('');
     }
+    if (this._error) {
+      ImGui.SameLine();
+      ImGui.TextColored(new ImGui.ImVec4(0.85, 0.0, 0.0, 1.0), this._error);
+    }
   }
   saveFileAndClose() {
     const name = this._name[0].trim();
-    if (this._renderer.selectedDir && name) {
+    if (!name) {
+      this._error = 'Please input the file name';
+      return;
+    }
+    this._error = '';
+    if (this._renderer.selectedDir) {
       const sanitizedName = PathUtils.sanitizeFilename(name);
       if (sanitizedName === name) {
         const path = this._renderer.VFS.join(this._renderer.selectedDir.path, this._name[0]);
         this._renderer.off('selection_changed', this.updateSelection, this);
         this._renderer.dispose();
         this.close(path);
+      } else {
+        this._error = 'File name is invalid';
       }
+    } else {
+      this._error = 'No directory selected';
     }
   }
 }
