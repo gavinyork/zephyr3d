@@ -56,7 +56,6 @@ export class BoundingBox extends AABB implements BoundingVolume {
    */
   constructor(minPoint: Vector3, maxPoint: Vector3);
   constructor(arg0?: Vector3 | AABB, arg1?: Vector3) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     super(arg0 as any, arg1);
   }
   /** {@inheritDoc BoundingVolume.behindPlane} */

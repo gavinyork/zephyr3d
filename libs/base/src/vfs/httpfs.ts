@@ -86,8 +86,8 @@ export class HttpFS extends VFS {
     this.dirReaders = Array.isArray(options.directoryReader)
       ? options.directoryReader
       : options.directoryReader
-      ? [options.directoryReader]
-      : [];
+        ? [options.directoryReader]
+        : [];
   }
 
   /**

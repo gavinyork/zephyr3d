@@ -609,8 +609,8 @@ export class AssetManager {
             data.indexType === 'u16'
               ? new Uint16Array(indexData.buffer)
               : data.indexType === 'u32'
-              ? new Uint32Array(indexData.buffer)
-              : null;
+                ? new Uint32Array(indexData.buffer)
+                : null;
           if (!indices) {
             console.error(`Invalid index type in primitive data: ${data.indexType}`);
             return null;

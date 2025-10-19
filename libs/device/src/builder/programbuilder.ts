@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import type { AbstractDevice, ShaderKind } from '../base_types';
 import { ShaderType } from '../base_types';
 import type { GPUProgram, BindGroupLayout, BindGroupLayoutEntry, VertexSemantic } from '../gpuobject';
@@ -1082,10 +1080,10 @@ export class ProgramBuilder {
     return this._shaderType === ShaderType.Vertex
       ? 'vertex'
       : this._shaderType === ShaderType.Fragment
-      ? 'fragment'
-      : this._shaderType === ShaderType.Compute
-      ? 'compute'
-      : null;
+        ? 'fragment'
+        : this._shaderType === ShaderType.Compute
+          ? 'compute'
+          : null;
   }
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope {
@@ -1596,8 +1594,8 @@ export class ProgramBuilder {
       shaderType === ShaderType.Vertex
         ? 'vertex'
         : shaderType === ShaderType.Fragment
-        ? 'fragment'
-        : 'compute';
+          ? 'fragment'
+          : 'compute';
     const builtinVars = AST.builtinVariables['webgpu'];
     const args: { name: string; type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo }[] = [];
     const prefix: string[] = [];
@@ -2484,8 +2482,8 @@ export class ProgramBuilder {
             this._device.type === 'webgpu'
               ? uniformInfo.texture.exp.$sampleType
               : uniformInfo.texture.autoBindSampler && entry.type.isDepthTexture()
-              ? 'float'
-              : uniformInfo.texture.exp.$sampleType;
+                ? 'float'
+                : uniformInfo.texture.exp.$sampleType;
           let viewDimension: typeof entry.texture.viewDimension;
           if (entry.type.isArrayTexture()) {
             viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';

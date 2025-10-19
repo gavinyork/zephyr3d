@@ -202,8 +202,8 @@ export class Pool {
     const colors = Array.isArray(colorTexOrFormat)
       ? colorTexOrFormat
       : colorTexOrFormat
-      ? [colorTexOrFormat]
-      : [];
+        ? [colorTexOrFormat]
+        : [];
     const colorAttachments = colors.map((val) => {
       return typeof val === 'string'
         ? this.fetchTemporalTexture2D(false, val, width, height, mipmapping)

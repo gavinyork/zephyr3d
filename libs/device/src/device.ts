@@ -819,8 +819,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
         usageFlag = 0;
         break;
     }
-    const storageFlag = options?.storage ?? false ? GPUResourceUsageFlags.BF_STORAGE : 0;
-    const dynamicFlag = options?.dynamic ?? false ? GPUResourceUsageFlags.DYNAMIC : 0;
+    const storageFlag = (options?.storage ?? false) ? GPUResourceUsageFlags.BF_STORAGE : 0;
+    const dynamicFlag = (options?.dynamic ?? false) ? GPUResourceUsageFlags.DYNAMIC : 0;
     const managedFlag = dynamicFlag === 0 && (options?.managed ?? true) ? GPUResourceUsageFlags.MANAGED : 0;
     return usageFlag | storageFlag | dynamicFlag | managedFlag;
   }

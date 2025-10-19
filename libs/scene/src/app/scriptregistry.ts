@@ -180,10 +180,10 @@ export class ScriptRegistry {
     return this._editorMode
       ? await this.build(String(id))
       : id.endsWith('.js')
-      ? id
-      : id.endsWith('.ts')
-      ? `${id.slice(0, -3)}.js`
-      : `${id}.js`;
+        ? id
+        : id.endsWith('.ts')
+          ? `${id.slice(0, -3)}.js`
+          : `${id}.js`;
   }
 
   /**

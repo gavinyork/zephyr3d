@@ -205,7 +205,7 @@ class PropertyGroup {
       }
       this.objectTypes =
         prop?.options?.objectTypes?.length > 0
-          ? prop.options.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? []
+          ? (prop.options.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? [])
           : null;
       if (this.objectTypes?.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
         this.objectTypes.unshift(null);
@@ -539,7 +539,7 @@ export class PropertyEditor extends Observable<{
           changed = ImGui.DragInt(
             '##value',
             val,
-            readonly ? 0 : value.options?.speed ?? 0.1,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
             value.options?.minValue ?? undefined,
             value.options?.maxValue ?? undefined
           );
@@ -558,7 +558,7 @@ export class PropertyEditor extends Observable<{
           changed = ImGui.DragFloat(
             '##value',
             val,
-            readonly ? 0 : value.options?.speed ?? 0.01,
+            readonly ? 0 : (value.options?.speed ?? 0.01),
             value.options?.minValue ?? undefined,
             value.options?.maxValue ?? undefined,
             '%.3f'
@@ -731,7 +731,7 @@ export class PropertyEditor extends Observable<{
             changed = ImGui.DragInt(
               '##value',
               val,
-              readonly ? 0 : value.options?.speed ?? 0.1,
+              readonly ? 0 : (value.options?.speed ?? 0.1),
               value.options?.minValue ?? undefined,
               value.options?.maxValue ?? undefined
             );
@@ -750,7 +750,7 @@ export class PropertyEditor extends Observable<{
             changed = ImGui.DragFloat(
               '##value',
               val,
-              readonly ? 0 : value.options?.speed ?? 0.01,
+              readonly ? 0 : (value.options?.speed ?? 0.01),
               value.options?.minValue ?? undefined,
               value.options?.maxValue ?? undefined,
               '%.3f'

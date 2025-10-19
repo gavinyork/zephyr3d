@@ -560,15 +560,15 @@ export class ShadowMapper {
             )
           ]
         : lightType === LIGHT_TYPE_POINT
-        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
-        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
       : null;
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
         : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
-        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
-        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
     const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
     if (colorAttachments) {

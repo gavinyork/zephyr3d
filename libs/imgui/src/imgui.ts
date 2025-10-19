@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars, no-empty-function, @typescript-eslint/no-explicit-any */
 import type { Texture2D } from '@zephyr3d/device';
 export interface XY {
   x: number;
@@ -313,7 +312,10 @@ export function IM_ARRAYSIZE(_ARR: ArrayLike<any> | ImStringBuffer): number {
 
 export { ImStringBuffer as StringBuffer };
 export class ImStringBuffer {
-  constructor(public size: number, public buffer: string = '') {}
+  constructor(
+    public size: number,
+    public buffer: string = ''
+  ) {}
 }
 
 export type ImAccess<T> = Bind.ImAccess<T>;
@@ -1009,7 +1011,10 @@ export class ImVec2 implements Bind.interface_ImVec2 {
   public static readonly UNIT_X: Readonly<ImVec2> = new ImVec2(1.0, 0.0);
   public static readonly UNIT_Y: Readonly<ImVec2> = new ImVec2(0.0, 1.0);
 
-  constructor(public x: number = 0.0, public y: number = 0.0) {}
+  constructor(
+    public x: number = 0.0,
+    public y: number = 0.0
+  ) {}
 
   public Set(x: number, y: number): this {
     this.x = x;
@@ -1630,7 +1635,10 @@ export type ImGuiSizeCallback<T> = (data: ImGuiSizeCallbackData<T>) => void;
 // NB: For basic min/max size constraint on each axis you don't need to use the callback! The SetNextWindowSizeConstraints() parameters are enough.
 export { ImGuiSizeCallbackData as SizeCallbackData };
 export class ImGuiSizeCallbackData<T> {
-  constructor(public readonly native: Bind.reference_ImGuiSizeCallbackData, public readonly UserData: T) {}
+  constructor(
+    public readonly native: Bind.reference_ImGuiSizeCallbackData,
+    public readonly UserData: T
+  ) {}
 
   get Pos(): Readonly<Bind.interface_ImVec2> {
     return this.native.Pos;

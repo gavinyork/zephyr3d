@@ -573,8 +573,8 @@ export class ASTGlobalScope extends ASTScope {
       ctx.type === ShaderType.Vertex
         ? [BuiltinInputStructNameVS, BuiltinOutputStructNameVS]
         : ctx.type === ShaderType.Fragment
-        ? [BuiltinInputStructNameFS, BuiltinOutputStructNameFS]
-        : [BuiltinInputStructNameCS];
+          ? [BuiltinInputStructNameFS, BuiltinOutputStructNameFS]
+          : [BuiltinInputStructNameCS];
     const usedBuiltins: string[] = [];
     for (const k of ctx.builtins) {
       usedBuiltins.push(builtinVariables.webgpu[k].name);

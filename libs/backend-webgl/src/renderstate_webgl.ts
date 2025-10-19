@@ -30,7 +30,6 @@ export abstract class WebGLRenderState {
   protected static _defaultState: WebGLRenderState;
   protected static _currentState: WebGLRenderState;
   apply(gl: WebGLContext, force?: boolean) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c: any = this.constructor;
     if (force || c._currentState !== this) {
       this._apply(gl);

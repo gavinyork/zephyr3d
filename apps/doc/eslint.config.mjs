@@ -1,10 +1,11 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import importPlugin from 'eslint-plugin-import'; // 新增
-import prettierPlugin from 'eslint-plugin-prettier'; // 建议显式导入
-import eslintConfigPrettier from 'eslint-config-prettier'; // 可选：扁平化接入
+import tseslint from '@typescript-eslint/eslint-plugin'; // ✅ 直接导入插件
+import tsparser from '@typescript-eslint/parser'; // ✅ 直接导入解析器
+import importPlugin from 'eslint-plugin-import';
+import prettierPlugin from 'eslint-plugin-prettier';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,29 +13,38 @@ const __dirname = path.dirname(__filename);
 
 export default [
   {
-    ignores: ['**/*.d.ts', '**/dist/**', '.rush/**', 'common/temp/**', '**/vendor/**', 'web/**']
+    ignores: [
+      '**/*.d.ts',
+      '**/dist/**',
+      '.rush/**',
+      'common/temp/**',
+      '**/vendor/**',
+      'web/**',
+      '**/node_modules/**'
+    ]
   },
   {
+    files: ['src/**/*.{js,jsx}'],
     ...js.configs.recommended,
-    files: ['src/**/*.{js,jsx}']
-  },
-
-  // TS 推荐规则：加上 files 限定
-  ...tseslint.configs.recommended.map((cfg) => ({
-    ...cfg,
-    files: ['src/**/*.{ts,tsx}']
-  })),
-  //js.configs.recommended,
-  //...tseslint.configs.recommended,
-  {
-    files: ['src/**/*.{js,ts}'],
     languageOptions: {
-      parser: tseslint.parser,
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.es2021,
+        ...globals.node
+      }
+    }
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsparser,
       parserOptions: {
         ecmaVersion: 2021,
         sourceType: 'module',
-        tsconfigRootDir: __dirname,
-        project: ['./tsconfig.json']
+        projectService: true,
+        tsconfigRootDir: __dirname
       },
       globals: {
         ...globals.browser,
@@ -42,7 +52,7 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': tseslint.plugin,
+      '@typescript-eslint': tseslint,
       import: importPlugin,
       prettier: prettierPlugin
     },

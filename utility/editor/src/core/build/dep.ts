@@ -185,8 +185,8 @@ export async function resolveOnEsmSh(pkgSpec: string): Promise<ResolvedPkg> {
   const versions: string[] = Object.keys(pkg.versions ?? {}).length
     ? Object.keys(pkg.versions)
     : Array.isArray(pkg.version)
-    ? pkg.version
-    : [];
+      ? pkg.version
+      : [];
   const latest: string | undefined =
     (pkg['dist-tags'] && (pkg['dist-tags'].latest as string)) || pkg.version || undefined;
 

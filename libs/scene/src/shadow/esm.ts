@@ -169,15 +169,15 @@ export class ESM extends ShadowImpl {
             )
           ]
         : lightType === LIGHT_TYPE_POINT
-        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
-        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
       : null;
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
         : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
-        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
-        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
     const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
     if (colorAttachments) {
@@ -261,10 +261,10 @@ export class ESM extends ShadowImpl {
         ? 'rgba16f'
         : 'r16f'
       : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-      ? device.type === 'webgl'
-        ? 'rgba32f'
-        : 'r32f'
-      : 'rgba8unorm';
+        ? device.type === 'webgl'
+          ? 'rgba32f'
+          : 'r32f'
+        : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';

@@ -191,10 +191,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
           this,
           this.worldPos,
@@ -262,10 +262,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
           this,
           this.worldPos,
@@ -326,10 +326,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       pb.func(funcName, params, function () {
         const posW = this.worldPos;
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = pb.mat3();
         if (!worldNormal) {
           this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));

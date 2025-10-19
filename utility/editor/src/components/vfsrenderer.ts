@@ -111,7 +111,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
       return isDir ? '--' : this.renderer.formatFileSize(item.meta.size);
     }
     if (col === 1) {
-      return isDir ? '' : item.meta.mimeType ?? 'File';
+      return isDir ? '' : (item.meta.mimeType ?? 'File');
     }
     if (col === 2) {
       return !isDir && !!item.meta.modified ? this.renderer.formatDate(item.meta.modified) : '--';
@@ -613,8 +613,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       dropZone: this._isDragOverNavigation
         ? DropZone.Navigation
         : this._isDragOverContent
-        ? DropZone.Content
-        : DropZone.None
+          ? DropZone.Content
+          : DropZone.None
     };
   }
 

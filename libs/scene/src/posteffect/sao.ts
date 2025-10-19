@@ -232,8 +232,8 @@ export class SAO extends AbstractPostEffect {
       (!texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer)
       ? 'rgba8unorm'
       : texCaps.supportHalfFloatColorBuffer
-      ? 'r16f'
-      : 'r32f';
+        ? 'r16f'
+        : 'r32f';
   }
   /** @internal */
   private _prepare(device: AbstractDevice, _srcTexture: Texture2D) {

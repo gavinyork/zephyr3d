@@ -34,9 +34,8 @@ export type TextureMixinTypes<T> = ReturnType<
  *
  * @public
  */
-export type TextureMixinInstanceTypes<T> = TextureMixinTypes<T> extends { new (...args: any[]): infer U }
-  ? U
-  : never;
+export type TextureMixinInstanceTypes<T> =
+  TextureMixinTypes<T> extends { new (...args: any[]): infer U } ? U : never;
 
 /**
  * TextureProp
@@ -47,12 +46,12 @@ export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
     ? Texture2D
     : P extends 'TextureSampler'
-    ? TextureSampler
-    : P extends 'TexCoordIndex'
-    ? number
-    : P extends 'TexCoordMatrix'
-    ? Matrix4x4
-    : never;
+      ? TextureSampler
+      : P extends 'TexCoordIndex'
+        ? number
+        : P extends 'TexCoordMatrix'
+          ? Matrix4x4
+          : never;
 };
 
 /**
@@ -179,8 +178,9 @@ export function mixinTextureProps<U extends string>(name: U) {
         return scope.$builder.shaderKind === 'fragment'
           ? scope.$inputs[`z${capName}TexCoord`]
           : this.featureUsed(featureTexMatrix)
-          ? pb.mul(scope[`z${capName}TextureMatrix`], pb.vec4(scope.$inputs[`texCoord${texCoord}`], 0, 1)).xy
-          : scope.$inputs[`texCoord${texCoord}`];
+            ? pb.mul(scope[`z${capName}TextureMatrix`], pb.vec4(scope.$inputs[`texCoord${texCoord}`], 0, 1))
+                .xy
+            : scope.$inputs[`texCoord${texCoord}`];
       }
       copyFrom(other: any): void {
         super.copyFrom(other);

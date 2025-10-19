@@ -39,14 +39,14 @@ export function getInterpolatorClass(): SerializableClass {
         obj.inputs instanceof Float32Array
           ? obj.inputs
           : obj.inputs
-          ? new Float32Array(obj.inputs)
-          : new Float32Array();
+            ? new Float32Array(obj.inputs)
+            : new Float32Array();
       const outputs: Float32Array<ArrayBuffer> =
         obj.outputs instanceof Float32Array
           ? obj.outputs
           : obj.outputs
-          ? new Float32Array(obj.outputs)
-          : new Float32Array();
+            ? new Float32Array(obj.outputs)
+            : new Float32Array();
       return {
         mode: obj.mode,
         target: obj.target,

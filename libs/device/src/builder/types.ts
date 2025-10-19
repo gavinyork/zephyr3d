@@ -1293,8 +1293,8 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     return layout === 'packed' || this.elementType.isAnyType()
       ? 1
       : layout === 'std430'
-      ? this.elementType.getLayoutAlignment(layout)
-      : align(this.elementType.getLayoutAlignment(layout), 16);
+        ? this.elementType.getLayoutAlignment(layout)
+        : align(this.elementType.getLayoutAlignment(layout), 16);
   }
   /** @internal */
   getLayoutSize(layout: PBStructLayout): number {

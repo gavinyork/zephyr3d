@@ -73,10 +73,10 @@ export class PCFPD extends ShadowImpl {
           ? 'rgba16f'
           : 'r16f'
         : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-        ? device.type === 'webgl'
-          ? 'rgba32f'
-          : 'r32f'
-        : 'rgba8unorm';
+          ? device.type === 'webgl'
+            ? 'rgba32f'
+            : 'r32f'
+          : 'rgba8unorm';
     }
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {

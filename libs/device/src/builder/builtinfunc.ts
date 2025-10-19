@@ -39,8 +39,8 @@ function matchFunctionOverloadings(
     pb.getDevice().type === 'webgl'
       ? MASK_WEBGL1
       : pb.getDevice().type === 'webgl2'
-      ? MASK_WEBGL2
-      : MASK_WEBGPU;
+        ? MASK_WEBGL2
+        : MASK_WEBGPU;
   const overloadings = builtinFunctionsAll?.[name].overloads
     .filter((val) => !!(val[1] & bit))
     .map((val) => val[0]);

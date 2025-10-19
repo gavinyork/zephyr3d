@@ -5,7 +5,6 @@
 import { WebGLEnum } from './webgl_enum';
 
 export function isWebGL2(gl: WebGLRenderingContext | WebGL2RenderingContext): gl is WebGL2RenderingContext {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return !!(gl && (gl as any).texStorage2D);
 }
 

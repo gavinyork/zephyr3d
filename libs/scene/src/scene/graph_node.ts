@@ -5,7 +5,6 @@ import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 import type { OctreeNode } from '.';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 /**
  * Graph scene node
  *

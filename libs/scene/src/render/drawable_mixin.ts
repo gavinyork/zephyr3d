@@ -243,12 +243,12 @@ export function mixinDrawable<
       let bindGroup = instancing
         ? this._mdDrawableBindGroupInstanced.get(renderQueue)
         : skinning && morphing
-        ? this._mdDrawableBindGroupSkinMorph
-        : skinning
-        ? this._mdDrawableBindGroupSkin
-        : morphing
-        ? this._mdDrawableBindGroupMorph
-        : this._mdDrawableBindGroup;
+          ? this._mdDrawableBindGroupSkinMorph
+          : skinning
+            ? this._mdDrawableBindGroupSkin
+            : morphing
+              ? this._mdDrawableBindGroupMorph
+              : this._mdDrawableBindGroup;
       if (!bindGroup) {
         bindGroup = fetchBindGroup(skinning, morphing, instancing);
         if (instancing) {

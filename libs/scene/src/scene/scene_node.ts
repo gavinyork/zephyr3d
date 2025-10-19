@@ -279,7 +279,7 @@ export class SceneNode
    * @returns prefab node this node belongs to
    */
   getPrefabNode(): SceneNode {
-    return this._prefabId ? this : this.parent?.getPrefabNode() ?? null;
+    return this._prefabId ? this : (this.parent?.getPrefabNode() ?? null);
   }
   /**
    * Translation type if this is a joint node of any skeleton

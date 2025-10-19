@@ -190,8 +190,8 @@ export class SceneRenderer {
             ? 'rgba16f'
             : 'rgba8unorm'
           : ctx.SSRCalcThickness
-          ? 'rg32f'
-          : 'r32f';
+            ? 'rg32f'
+            : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
       if (!ctx.finalFramebuffer) {
         depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
@@ -229,8 +229,8 @@ export class SceneRenderer {
     this._depthPass.clearColor = transmission
       ? null
       : this._depthPass.encodeDepth
-      ? new Vector4(0, 0, 0, 1)
-      : new Vector4(1, 1, 1, 1);
+        ? new Vector4(0, 0, 0, 1)
+        : new Vector4(1, 1, 1, 1);
     this._depthPass.clearDepth = transmission ? null : 1;
     this._depthPass.clearStencil = null;
     this._depthPass.transmission = transmission;

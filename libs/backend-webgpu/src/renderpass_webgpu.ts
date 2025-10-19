@@ -266,8 +266,8 @@ export class WebGPURenderPass {
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
             ? attachment.layer
             : depthAttachmentTexture.isTextureCube()
-            ? attachment.face
-            : 0;
+              ? attachment.face
+              : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
       this._fbBindFlag = frameBuffer.bindFlag;
@@ -283,8 +283,8 @@ export class WebGPURenderPass {
                 tex.isTexture2DArray() || tex.isTexture3D()
                   ? attachment.layer
                   : tex.isTextureCube()
-                  ? attachment.face
-                  : 0;
+                    ? attachment.face
+                    : 0;
               if (frameBuffer.getOptions().sampleCount === 1) {
                 return {
                   view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),

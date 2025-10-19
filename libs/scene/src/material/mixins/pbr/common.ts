@@ -829,20 +829,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       );
       return pb
         .getGlobalScope()
-        [funcName](
-          brdf,
-          normal,
-          viewVec,
-          roughness,
-          baseColor,
-          f0,
-          f90,
-          position,
-          ior,
-          thickness,
-          attenuationColor,
-          attenuationDistance
-        );
+        [
+          funcName
+        ](brdf, normal, viewVec, roughness, baseColor, f0, f90, position, ior, thickness, attenuationColor, attenuationDistance);
     }
     directLighting(
       scope: PBInsideFunctionScope,

@@ -188,10 +188,10 @@ export class HDRLoader extends AbstractTextureLoader {
       dstFormat === 'rgba32f'
         ? this._rgbeToFloat32(img)
         : dstFormat === 'rgba16f'
-        ? this._rgbeToFloat16(img)
-        : dstFormat === 'rg11b10uf'
-        ? this._rgbeToR11G11B10(img)
-        : this._rgbeToRGBM(img);
+          ? this._rgbeToFloat16(img)
+          : dstFormat === 'rg11b10uf'
+            ? this._rgbeToR11G11B10(img)
+            : this._rgbeToRGBM(img);
 
     return {
       dataFloat: imageFloatBuffer,

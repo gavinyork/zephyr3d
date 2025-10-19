@@ -387,8 +387,8 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
       point.y > bbox.maxPoint.y
         ? point.y - bbox.maxPoint.y
         : point.y < bbox.minPoint.y
-        ? bbox.minPoint.y - point.y
-        : 0;
+          ? bbox.minPoint.y - point.y
+          : 0;
     return s * s + t * t;
   }
   sqrDistancePointToTriangle(P: Vector3, t0: Vector3, t1: Vector3, t2: Vector3): number {

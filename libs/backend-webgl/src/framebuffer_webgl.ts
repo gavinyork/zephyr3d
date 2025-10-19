@@ -92,7 +92,7 @@ export class WebGLFrameBuffer
             generateMipmaps: false
           }
         : null,
-      sampleCount: device.type === 'webgl' ? 1 : opt?.sampleCount ?? 1,
+      sampleCount: device.type === 'webgl' ? 1 : (opt?.sampleCount ?? 1),
       ignoreDepthStencil: opt?.ignoreDepthStencil ?? false
     };
     if (!this._options.colorAttachments && !this._options.depthAttachment) {

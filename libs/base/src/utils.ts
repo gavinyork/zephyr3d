@@ -511,8 +511,8 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 export type ExtractMixinType<M> = M extends [infer First]
   ? ExtractMixinReturnType<First>
   : M extends [infer First, ...infer Rest]
-  ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
-  : never;
+    ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
+    : never;
 
 /**
  * Applies mixins to a constructor function.
@@ -706,10 +706,10 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
               ? 1
               : 0
             : v == null
-            ? NaN
-            : typeof v === 'string' && v.trim() === ''
-            ? 0
-            : Number(v);
+              ? NaN
+              : typeof v === 'string' && v.trim() === ''
+                ? 0
+                : Number(v);
         return n;
       };
 

@@ -286,8 +286,8 @@ export class GLTFImporter implements ModelImporter {
         sampler.interpolation === 'STEP'
           ? 'step'
           : sampler.interpolation === 'CUBICSPLINE'
-          ? 'cubicspline'
-          : 'linear';
+            ? 'cubicspline'
+            : 'linear';
       if (channel.target.path === 'rotation') {
         interpolators.push(new Interpolator(mode, 'quat', input, output));
         interpolatorTypes.push('rotation');

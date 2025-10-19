@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';

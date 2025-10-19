@@ -219,10 +219,10 @@ export abstract class WebGPUBaseTexture<
         dimension: this.isTextureCube()
           ? 'cube'
           : this.isTexture3D()
-          ? '3d'
-          : this.isTexture2DArray()
-          ? '2d-array'
-          : '2d',
+            ? '3d'
+            : this.isTexture2DArray()
+              ? '2d-array'
+              : '2d',
         arrayLayerCount: this.isTextureCube() ? 6 : this.isTexture2DArray() ? this._depth : 1,
         aspect: hasDepthChannel(this.format) ? 'depth-only' : 'all'
       });

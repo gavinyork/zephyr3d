@@ -706,8 +706,8 @@ export class MaterialBlueprintIR {
       node instanceof ConstantVec2Node
         ? [node.x, node.y]
         : node instanceof ConstantVec3Node
-        ? [node.x, node.y, node.z]
-        : [node.x, node.y, node.z, node.w];
+          ? [node.x, node.y, node.z]
+          : [node.x, node.y, node.z, node.w];
     return this.getOrCreateIRExpression(node, output, IRConstantfv, value, node.paramName);
   }
   private constantTexture(node: BaseTextureNode, output: number): IRConstantTexture {

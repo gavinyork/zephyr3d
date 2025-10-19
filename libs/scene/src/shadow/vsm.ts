@@ -68,8 +68,8 @@ class VSMBlitter extends Blitter {
             ? pb.vec3(1, 0, 0)
             : pb.vec3(0, 1, 0)
           : this._phase === 'horizonal'
-          ? pb.vec2(1, 0)
-          : pb.vec2(0, 1);
+            ? pb.vec2(1, 0)
+            : pb.vec2(0, 1);
       scope.numBlurPixelsPerSide = pb.float((this._kernelSize + 1) / 2);
       scope.weight = pb.float(1 / (this._kernelSize * this._kernelSize));
     }
@@ -267,15 +267,15 @@ export class VSM extends ShadowImpl {
             )
           ]
         : lightType === LIGHT_TYPE_POINT
-        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
-        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
       : null;
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
         : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
-        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
-        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
     const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
     if (colorAttachments) {
@@ -348,11 +348,11 @@ export class VSM extends ShadowImpl {
         ? 'rgba32f'
         : 'rg32f'
       : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer &&
-        device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
-      ? device.type === 'webgl'
-        ? 'rgba16f'
-        : 'rg16f'
-      : 'rgba8unorm';
+          device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
+        ? device.type === 'webgl'
+          ? 'rgba16f'
+          : 'rg16f'
+        : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';

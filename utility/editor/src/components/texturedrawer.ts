@@ -140,32 +140,32 @@ export class TextureDrawer {
     const programinfo = tex.isTextureVideo()
       ? this._programVideo[encode].normal
       : tex.isTexture2D()
-      ? tex.isDepth()
-        ? this._program2D[encode].depth
-        : tex.isFilterable()
-        ? this._program2D[encode].normal
-        : tex.isIntegerFormat()
-        ? tex.isSignedFormat()
-          ? this._program2D[encode].int
-          : this._program2D[encode].uint
-        : this._program2D[encode].nonfilterable
-      : tex.isTextureCube()
-      ? tex.isDepth()
-        ? this._programCube[encode].depth
-        : tex.isFilterable()
-        ? this._programCube[encode].normal
-        : this._programCube[encode].nonfilterable
-      : tex.isTexture2DArray()
-      ? tex.isDepth()
-        ? this._program2DArray[encode].depth
-        : tex.isFilterable()
-        ? this._program2DArray[encode].normal
-        : tex.isIntegerFormat()
-        ? tex.isSignedFormat()
-          ? this._program2DArray[encode].int
-          : this._program2DArray[encode].uint
-        : this._program2DArray[encode].nonfilterable
-      : null;
+        ? tex.isDepth()
+          ? this._program2D[encode].depth
+          : tex.isFilterable()
+            ? this._program2D[encode].normal
+            : tex.isIntegerFormat()
+              ? tex.isSignedFormat()
+                ? this._program2D[encode].int
+                : this._program2D[encode].uint
+              : this._program2D[encode].nonfilterable
+        : tex.isTextureCube()
+          ? tex.isDepth()
+            ? this._programCube[encode].depth
+            : tex.isFilterable()
+              ? this._programCube[encode].normal
+              : this._programCube[encode].nonfilterable
+          : tex.isTexture2DArray()
+            ? tex.isDepth()
+              ? this._program2DArray[encode].depth
+              : tex.isFilterable()
+                ? this._program2DArray[encode].normal
+                : tex.isIntegerFormat()
+                  ? tex.isSignedFormat()
+                    ? this._program2DArray[encode].int
+                    : this._program2DArray[encode].uint
+                  : this._program2DArray[encode].nonfilterable
+            : null;
     if (!programinfo || tex.disposed) {
       return;
     }
@@ -400,16 +400,16 @@ export class TextureDrawer {
             sampleType === 'depth'
               ? pb.textureSample(this.tex, this.$inputs.uv)
               : sampleType === 'float' || sampleType === 'unfilterable-float'
-              ? /*this.linearFilter(this.$inputs.uv) */ pb.textureSampleLevel(
-                  this.tex,
-                  this.$inputs.uv,
-                  this.miplevel
-                )
-              : pb.textureLoad(
-                  this.tex,
-                  pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)),
-                  pb.int(this.miplevel)
-                );
+                ? /*this.linearFilter(this.$inputs.uv) */ pb.textureSampleLevel(
+                    this.tex,
+                    this.$inputs.uv,
+                    this.miplevel
+                  )
+                : pb.textureLoad(
+                    this.tex,
+                    pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)),
+                    pb.int(this.miplevel)
+                  );
           if (
             (sampleType === 'float' || sampleType === 'unfilterable-float') &&
             encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
@@ -635,13 +635,13 @@ export class TextureDrawer {
             sampleType === 'depth'
               ? pb.textureArraySample(this.tex, this.$inputs.uv, this.layer)
               : sampleType === 'float' || sampleType === 'unfilterable-float'
-              ? pb.textureArraySampleLevel(this.tex, this.$inputs.uv, this.layer, this.miplevel)
-              : pb.textureArrayLoad(
-                  this.tex,
-                  pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)),
-                  this.layer,
-                  pb.int(this.miplevel)
-                );
+                ? pb.textureArraySampleLevel(this.tex, this.$inputs.uv, this.layer, this.miplevel)
+                : pb.textureArrayLoad(
+                    this.tex,
+                    pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)),
+                    this.layer,
+                    pb.int(this.miplevel)
+                  );
           if (
             (sampleType === 'float' || sampleType === 'unfilterable-float') &&
             encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT

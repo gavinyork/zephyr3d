@@ -197,7 +197,7 @@ export function getTerrainClass(manager: SerializationManager): SerializableClas
             const numLayers = this.grassRenderer.numLayers;
             for (let i = 0; i < numLayers; i++) {
               const grassTexture = this.grassRenderer.getGrassTexture(i);
-              const assetId = grassTexture ? manager.getAssetId(grassTexture) ?? '' : '';
+              const assetId = grassTexture ? (manager.getAssetId(grassTexture) ?? '') : '';
               data.push({
                 texture: assetId,
                 bladeWidth: this.grassRenderer.getBladeWidth(i),

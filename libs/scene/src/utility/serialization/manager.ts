@@ -1063,7 +1063,7 @@ export class SerializationManager {
             tmpVal.object[0] = v
               ? Array.isArray(v)
                 ? v
-                : (await this.deserializeObject<any>(obj, v)) ?? null
+                : ((await this.deserializeObject<any>(obj, v)) ?? null)
               : null;
           }
           break;
@@ -1074,7 +1074,7 @@ export class SerializationManager {
               if (typeof p === 'string' && p) {
                 tmpVal.str[0] = p;
               } else {
-                tmpVal.object.push(p ? (await this.deserializeObject<any>(obj, p)) ?? null : null);
+                tmpVal.object.push(p ? ((await this.deserializeObject<any>(obj, p)) ?? null) : null);
               }
             }
           }
@@ -1153,10 +1153,10 @@ export class SerializationManager {
             typeof tmpVal.str[0] === 'string' && tmpVal.str[0]
               ? tmpVal.str[0]
               : tmpVal.object[0]
-              ? Array.isArray(tmpVal.object[0])
-                ? tmpVal.object[0]
-                : await this.serializeObject(tmpVal.object[0], {}, asyncTasks)
-              : null;
+                ? Array.isArray(tmpVal.object[0])
+                  ? tmpVal.object[0]
+                  : await this.serializeObject(tmpVal.object[0], {}, asyncTasks)
+                : null;
           if (value) {
             json[k] = value;
           }

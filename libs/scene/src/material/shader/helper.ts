@@ -270,12 +270,12 @@ export class ShaderHelper {
             ? scope.$builder.texCubeShadow()
             : scope.$builder.texCube()
           : shadowMapParams.shadowMap.isTexture2D()
-          ? shadowMapParams.shadowMap.isDepth()
-            ? scope.$builder.tex2DShadow()
-            : scope.$builder.tex2D()
-          : shadowMapParams.shadowMap.isDepth()
-          ? scope.$builder.tex2DArrayShadow()
-          : scope.$builder.tex2DArray();
+            ? shadowMapParams.shadowMap.isDepth()
+              ? scope.$builder.tex2DShadow()
+              : scope.$builder.tex2D()
+            : shadowMapParams.shadowMap.isDepth()
+              ? scope.$builder.tex2DArrayShadow()
+              : scope.$builder.tex2DArray();
         if (
           !shadowMapParams.shadowMap.isDepth() &&
           !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
@@ -523,8 +523,8 @@ export class ShaderHelper {
       scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
         ? [pb.mat4('skinMatrix'), pb.mat4('prevSkinMatrix')]
         : scope[that.SKIN_MATRIX_NAME]
-        ? [pb.mat4('skinMatrix')]
-        : [];
+          ? [pb.mat4('skinMatrix')]
+          : [];
     pb.func('Z_resolveVertexPosition', params, function () {
       this.$l.opos = this.$getVertexAttrib('position').xyz;
       if (that.hasMorphing(scope)) {
@@ -555,8 +555,8 @@ export class ShaderHelper {
     return scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
       ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
       : scope[that.SKIN_MATRIX_NAME]
-      ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
-      : scope.Z_resolveVertexPosition();
+        ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
+        : scope.Z_resolveVertexPosition();
   }
   /**
    * Resolve motion vector

@@ -52,8 +52,8 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 export type ExtractMixinType<M> = M extends [infer First]
   ? ExtractMixinReturnType<First>
   : M extends [infer First, ...infer Rest]
-  ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
-  : never;
+    ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
+    : never;
 
 /**
  * Apply material mixins to a target material class.

@@ -200,10 +200,10 @@ export class OrbitCameraController extends BaseCameraController {
       this.currentOp === OperationType.ROTATE
         ? this.options.controls.rotate
         : this.currentOp === OperationType.PAN
-        ? this.options.controls.pan
-        : this.currentOp === OperationType.ZOOM
-        ? this.options.controls.zoom
-        : null;
+          ? this.options.controls.pan
+          : this.currentOp === OperationType.ZOOM
+            ? this.options.controls.zoom
+            : null;
     if (control && evt.button === control.button) {
       this.currentOp = OperationType.NONE;
       return true;

@@ -987,11 +987,9 @@ export function filterShadowPCF(
   );
   return pb
     .getGlobalScope()
-    [funcNameFilterShadowPCF](
-      texCoord,
-      ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []),
-      ...(cascade ? [cascade] : [])
-    );
+    [
+      funcNameFilterShadowPCF
+    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : []));
 }
 
 /** @internal */
@@ -1048,9 +1046,7 @@ export function filterShadowPoissonDisc(
   );
   return pb
     .getGlobalScope()
-    [funcNameFilterShadowPoissonDisc](
-      texCoord,
-      ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []),
-      ...(cascade ? [cascade] : [])
-    );
+    [
+      funcNameFilterShadowPoissonDisc
+    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : []));
 }

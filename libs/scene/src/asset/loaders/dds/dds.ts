@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { TextureFormat, TextureMipmapLevelData, TextureMipmapData } from '@zephyr3d/device';
 import type { TypedArray } from '@zephyr3d/base';
 

@@ -78,8 +78,8 @@ export class WebGPUClearQuad {
                 colorAttachments[i] === 'f'
                   ? pb.vec4()
                   : colorAttachments[i] === 'i'
-                  ? pb.ivec4()
-                  : pb.uvec4();
+                    ? pb.ivec4()
+                    : pb.uvec4();
             }
             pb.main(function () {
               for (let i = 0; i < colorAttachments.length; i++) {
@@ -87,8 +87,8 @@ export class WebGPUClearQuad {
                   colorAttachments[i] === 'f'
                     ? this.clearColor
                     : colorAttachments[i] === 'i'
-                    ? pb.ivec4(this.clearColor)
-                    : pb.uvec4(this.clearColor);
+                      ? pb.ivec4(this.clearColor)
+                      : pb.uvec4(this.clearColor);
               }
             });
           }

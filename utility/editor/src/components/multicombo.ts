@@ -13,10 +13,10 @@ export function renderMultiSelectedCombo(
   const text = hint
     ? hint(selected)
     : numSelected === 0
-    ? 'Select items...'
-    : numSelected === 1
-    ? selected[0]
-    : `${numSelected} items selected`;
+      ? 'Select items...'
+      : numSelected === 1
+        ? selected[0]
+        : `${numSelected} items selected`;
   if (ImGui.BeginCombo(id, text)) {
     if (ImGui.Selectable('Select All') && numSelected < items.length) {
       items.forEach((val) => (val.selected = true));

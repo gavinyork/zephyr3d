@@ -79,7 +79,11 @@ export interface ListOptions {
  * @public
  */
 export class VFSError extends Error {
-  constructor(message: string, public code?: string, public path?: string) {
+  constructor(
+    message: string,
+    public code?: string,
+    public path?: string
+  ) {
     super(message);
     this.name = 'VFSError';
   }

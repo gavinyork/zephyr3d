@@ -52,8 +52,8 @@ export class SSM extends ShadowImpl {
         return device.getDeviceCaps().textureCaps.supportFloatColorBuffer
           ? 'rgba32f'
           : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-          ? 'rgba16f'
-          : 'rgba8unorm';
+            ? 'rgba16f'
+            : 'rgba8unorm';
       } else {
         return 'r32f';
       }

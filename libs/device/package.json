@@ -43,15 +43,13 @@
     "node": ">=16.18.0"
   },
   "devDependencies": {
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^8.6.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "@eslint/js": "^9.36.0",
-    "prettier": "^2.8.4",
-    "eslint-plugin-tsdoc": "^0.2.17",
-    "typescript-eslint": "^8.44.1",
+    
+    
+    
+    
+    
+    
+    
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
     "@rollup/plugin-node-resolve": "~16.0.0",
@@ -66,7 +64,19 @@
     "rollup-plugin-swc3": "~0.12.1",
     "shx": "^0.3.4",
     "cross-env": "^7.0.3",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "eslint": "~9.38.0",
+    "@eslint/js": "~9.38.0",
+    "@typescript-eslint/parser": "~8.46.1",
+    "@typescript-eslint/eslint-plugin": "~8.46.1",
+    "prettier": "~3.6.2",
+    "eslint-plugin-prettier": "~5.5.4",
+    "eslint-config-prettier": "~10.1.8",
+    "eslint-plugin-import": "~2.32.0",
+    "eslint-import-resolver-typescript": "~4.4.4",
+    "eslint-plugin-tsdoc": "~0.4.0",
+    "globals": "^16.4.0",
+    "eslint-formatter-compact": "~8.40.0"
   },
   "dependencies": {
     "@zephyr3d/base": "workspace:*",

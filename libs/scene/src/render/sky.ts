@@ -655,8 +655,8 @@ export class SkyRenderer extends Disposable {
         texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
           ? 'rgba16f'
           : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
-          ? 'rgba32f'
-          : 'rgba8unorm';
+            ? 'rgba32f'
+            : 'rgba8unorm';
       const tex =
         this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get() !== this.skyboxTexture
           ? this._bakedSkyboxTexture.get()

@@ -330,15 +330,15 @@ export class RenderQueue extends Disposable {
               ? this._itemList.transmission_trans.unlit[0].instanceList
               : this._itemList.transmission_trans.lit[0].instanceList
             : unlit
-            ? this._itemList.transparent.unlit[0].instanceList
-            : this._itemList.transparent.lit[0].instanceList
+              ? this._itemList.transparent.unlit[0].instanceList
+              : this._itemList.transparent.lit[0].instanceList
           : transmission
-          ? unlit
-            ? this._itemList.transmission.unlit[0].instanceList
-            : this._itemList.transmission.lit[0].instanceList
-          : unlit
-          ? this._itemList.opaque.unlit[0].instanceList
-          : this._itemList.opaque.lit[0].instanceList;
+            ? unlit
+              ? this._itemList.transmission.unlit[0].instanceList
+              : this._itemList.transmission.lit[0].instanceList
+            : unlit
+              ? this._itemList.opaque.unlit[0].instanceList
+              : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -353,15 +353,15 @@ export class RenderQueue extends Disposable {
               ? this._itemList.transmission_trans.unlit[0]
               : this._itemList.transmission_trans.lit[0]
             : unlit
-            ? this._itemList.transparent.unlit[0]
-            : this._itemList.transparent.lit[0]
+              ? this._itemList.transparent.unlit[0]
+              : this._itemList.transparent.lit[0]
           : transmission
-          ? unlit
-            ? this._itemList.transmission.unlit[0]
-            : this._itemList.transmission.lit[0]
-          : unlit
-          ? this._itemList.opaque.unlit[0]
-          : this._itemList.opaque.lit[0];
+            ? unlit
+              ? this._itemList.transmission.unlit[0]
+              : this._itemList.transmission.lit[0]
+            : unlit
+              ? this._itemList.opaque.unlit[0]
+              : this._itemList.opaque.lit[0];
         const skinAnimation = !!drawable.getBoneMatrices();
         const morphAnimation = !!drawable.getMorphData();
         let queue: RenderQueueItem[];
