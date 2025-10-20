@@ -418,7 +418,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
     this._fileFilter = fileFilter?.slice() ?? [];
-    this._options = { rootDir: '/', allowDrop: true, allowDblClickOpen: true, multiSelect: true, ...options };
+    this._options = {
+      rootDir: '/assets',
+      allowDrop: true,
+      allowDblClickOpen: true,
+      multiSelect: true,
+      ...options
+    };
     this._nav = new DirTreeView(this, this._project.name);
     this._contentView = new ContentListView(new VFSContentData(this));
     this.loadFileSystem();

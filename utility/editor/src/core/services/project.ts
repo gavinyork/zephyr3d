@@ -84,10 +84,6 @@ export class ProjectService {
     try {
       await vfs.makeDirectory('/src');
       await vfs.makeDirectory('/assets');
-      await vfs.writeFile('/index.html', formatString(templateIndexHTML, name, ''), {
-        encoding: 'utf8',
-        create: true
-      });
       await vfs.writeFile('/src/index.ts', templateIndex, {
         encoding: 'utf8',
         create: true

@@ -4,7 +4,6 @@ import {
   OrbitCameraController,
   Application,
   PerspectiveCamera,
-  AssetManager,
   AnimationTrack,
   getInput,
   getEngine

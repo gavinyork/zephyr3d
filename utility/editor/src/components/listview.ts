@@ -138,16 +138,16 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     const icon = this._data.getItemIcon(item, index);
     const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##item_${index}`);
     const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
+    const keyCtrlOrShift = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeyShift;
     if (ImGui.Selectable(label, isSelected, ImGui.SelectableFlags.AllowDoubleClick)) {
-      if (isSelected && !keyCtrl) {
+      if (isSelected && !keyCtrlOrShift) {
         this.handleItemClick(item);
       }
     }
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrlOrShift || !this._selectedItems.has(item))) {
       this.handleItemClick(item);
     }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
@@ -190,7 +190,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
         ImGui.Dummy(new ImGui.ImVec2(cellW, estimatedH));
       } else {
         // Visible: render fully and measure actual height
-        const actualH = this.renderGridItemMeasured(item, i, cellW);
+        const actualH = this.renderGridItem(item, i, cellW);
         // Update cache if changed
         if (actualH !== estimatedH) {
           this._itemHeightCache.set(key, actualH);
@@ -209,9 +209,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   private rectsOverlap(aMin: ImGui.ImVec2, aMax: ImGui.ImVec2, bMin: ImGui.ImVec2, bMax: ImGui.ImVec2) {
     return !(aMax.x < bMin.x || aMin.x > bMax.x || aMax.y < bMin.y || aMin.y > bMax.y);
   }
-  private renderGridItemMeasured(item: T, index: number, width: number): number {
+  private renderGridItem(item: T, index: number, width: number): number {
     const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
+    const keyCtrlOrShift = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeyShift;
     const icon = this._data.getItemIcon(item, index);
     const name = this._data.getItemName(item, index);
     const iconSize = this._gridItemSize;
@@ -227,14 +227,14 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
         new ImGui.ImVec2(width, iconSize)
       )
     ) {
-      if (isSelected && !keyCtrl) {
+      if (isSelected && !keyCtrlOrShift) {
         this.handleItemClick(item);
       }
     }
     if (ImGui.IsItemHovered()) {
       this._hoveredItem = item;
     }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrlOrShift || !this._selectedItems.has(item))) {
       this.handleItemClick(item);
     }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
@@ -270,54 +270,6 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     const maxRect = ImGui.GetItemRectMax();
     const actualHeight = Math.max(1, maxRect.y - minRect.y);
     return actualHeight;
-  }
-  renderGridItem(item: T, index: number) {
-    const name = this._data.getItemName(item, index);
-    const icon = this._data.getItemIcon(item, index);
-    const isSelected = this._selectedItems.has(item);
-    const keyCtrl = ImGui.GetIO().KeyCtrl;
-
-    ImGui.BeginGroup();
-
-    const iconSize = this._gridItemSize;
-    if (
-      ImGui.Selectable(
-        `##icon_${index}`,
-        isSelected,
-        ImGui.SelectableFlags.AllowDoubleClick,
-        new ImGui.ImVec2(iconSize, iconSize)
-      )
-    ) {
-      if (isSelected && !keyCtrl) {
-        this.handleItemClick(item);
-      }
-    }
-    if (ImGui.IsItemHovered()) {
-      this._hoveredItem = item;
-    }
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
-      this.handleItemClick(item);
-    }
-    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
-      this.handleItemDoubleClick(item);
-    }
-    this.postRenderItem(item);
-
-    const drawList = ImGui.GetWindowDrawList();
-    const pos = ImGui.GetItemRectMin();
-    const emojiStr = convertEmojiString(icon);
-    const emojiSize = ImGui.CalcTextSize(emojiStr);
-    const emojiPos = new ImGui.ImVec2(
-      pos.x + (iconSize - emojiSize.x) * 0.5,
-      pos.y + (iconSize - emojiSize.y) * 0.5
-    );
-    drawList.AddText(emojiPos, ImGui.GetColorU32(ImGui.Col.Text), emojiStr);
-
-    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
-    ImGui.TextWrapped(name);
-    ImGui.PopTextWrapPos();
-
-    ImGui.EndGroup();
   }
   renderDetailView() {
     const flags =
@@ -364,7 +316,7 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
         const icon = this._data.getItemIcon(item, i);
         const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##row_${i}`);
         const isSelected = this._selectedItems.has(item);
-        const keyCtrl = ImGui.GetIO().KeyCtrl;
+        const keyCtrlOrShift = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeyShift;
 
         if (
           ImGui.Selectable(
@@ -373,14 +325,17 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
             ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
           )
         ) {
-          if (isSelected && !keyCtrl) {
+          if (isSelected && !keyCtrlOrShift) {
             this.handleItemClick(item);
           }
         }
         if (ImGui.IsItemHovered()) {
           this._hoveredItem = item;
         }
-        if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && (keyCtrl || !this._selectedItems.has(item))) {
+        if (
+          ImGui.IsItemClicked(ImGui.MouseButton.Left) &&
+          (keyCtrlOrShift || !this._selectedItems.has(item))
+        ) {
           this.handleItemClick(item);
         }
         if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
@@ -456,8 +411,29 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
         this._selectedItems.add(item);
       }
     } else if (this._multiSelect && io.KeyShift && this._selectedItems.size > 0) {
+      let anchor = -1;
+      let anchorRenew = true;
+      let current = -1;
+      for (let i = 0; i < this._items.length; i++) {
+        if (this._items[i] === item) {
+          current = i;
+          if (anchor < 0) {
+            anchor = current;
+          }
+          break;
+        } else if (this._selectedItems.has(this._items[i])) {
+          if (anchorRenew) {
+            anchor = i;
+            anchorRenew = false;
+          }
+        } else {
+          anchorRenew = true;
+        }
+      }
       this._selectedItems.clear();
-      this._selectedItems.add(item);
+      for (let i = anchor; i <= current; i++) {
+        this._selectedItems.add(this._items[i]);
+      }
     } else {
       this._selectedItems.clear();
       this._selectedItems.add(item);

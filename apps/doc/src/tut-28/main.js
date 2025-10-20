@@ -5,7 +5,6 @@ import {
   OrbitCameraController,
   PerspectiveCamera,
   DirectionalLight,
-  AssetManager,
   getInput,
   getEngine
 } from '@zephyr3d/scene';

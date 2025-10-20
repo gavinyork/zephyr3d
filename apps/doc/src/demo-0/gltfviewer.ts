@@ -124,7 +124,7 @@ export class GLTFViewer {
     const fileMap = new Map();
     for (const entry of entries) {
       if (!entry.directory) {
-        const blob = await entry.getData(new zip.BlobWriter());
+        const blob = await (entry as zip.FileEntry).getData(new zip.BlobWriter());
         const fileURL = URL.createObjectURL(blob);
         fileMap.set(`/${entry.filename}`, fileURL);
       }

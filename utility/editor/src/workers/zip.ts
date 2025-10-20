@@ -1,4 +1,5 @@
 // worker.ts
+import type { FileEntry } from '@zip.js/zip.js';
 import { ZipWriter, BlobWriter, BlobReader, ZipReader } from '@zip.js/zip.js';
 
 interface WorkerMessage {
@@ -46,7 +47,7 @@ async function decompressBlob(zipBlob: Blob): Promise<Map<string, Blob>> {
         current: i + 1,
         total
       } as ProgressMessage);
-      const blob = await entry.getData(new BlobWriter());
+      const blob = await (entry as FileEntry).getData(new BlobWriter());
       fileMap.set(`/${entry.filename}`, blob);
     }
   }
