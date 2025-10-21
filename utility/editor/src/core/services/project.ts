@@ -1,7 +1,7 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
-import { formatString, HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
+import { HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
-import { templateIndex, templateIndexHTML } from '../build/templates';
+import { templateIndex } from '../build/templates';
 
 export type ProjectInfo = {
   name: string;
@@ -51,6 +51,9 @@ export class ProjectService {
     if (getEngine()) {
       getEngine().VFS = vfs;
     }
+  }
+  static get assetDir() {
+    return '/assets';
   }
   static get serializationManager() {
     return getEngine().serializationManager;

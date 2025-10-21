@@ -39,7 +39,6 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         DlgOpenFile.openFile(
           'Select Image File',
           this._vfs,
-          this._info,
           '/assets',
           'Image (*.ico;*.jpg;*.png;*.webp)|*.ico;*.jpg;*.png;*.webp',
           500,
@@ -61,7 +60,6 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         DlgOpenFile.openFile(
           'Select Scene File',
           this._vfs,
-          this._info,
           '/assets',
           'Scene (*.zscn)|*.zscn',
           500,
@@ -83,7 +81,6 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         DlgOpenFile.openFile(
           'Select Scene File',
           this._vfs,
-          this._info,
           '/assets',
           'Scene (*.zscn)|*.zscn',
           500,
@@ -105,7 +102,6 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         DlgOpenFile.openFile(
           'Select Script File',
           this._vfs,
-          this._info,
           '/assets',
           'Script file (*.ts;*.js)|*.ts;*.js',
           500,

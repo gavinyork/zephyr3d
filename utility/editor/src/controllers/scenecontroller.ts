@@ -136,7 +136,6 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         const name = await Dialog.saveFile(
           'Save Scene',
           ProjectService.VFS,
-          this._editor.currentProject,
           '/assets',
           'Scene (*.zscn)|*.zscn|All files (*)|*',
           500,
@@ -156,7 +155,6 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
               : await Dialog.openFile(
                   'Open Scene',
                   ProjectService.VFS,
-                  this._editor.currentProject,
                   '/assets',
                   'Scene (*.zscn)|*.zscn|All files (*)|*',
                   500,

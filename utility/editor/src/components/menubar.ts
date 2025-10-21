@@ -1,5 +1,5 @@
 import { Observable } from '@zephyr3d/base';
-import { ImGui } from '@zephyr3d/imgui';
+import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { getFrameHeight } from '../views/misc';
 import type { BaseView } from '../views/baseview';
 
@@ -135,10 +135,20 @@ export class MenubarView extends Observable<{
       }
     }
   }
-  render() {
+  render(title?: string) {
     if (ImGui.BeginMainMenuBar()) {
       for (const item of this._options.items) {
         this.renderItem(item);
+      }
+      if (title) {
+        const remainWidth = ImGui.GetContentRegionAvail().x;
+        const textWidth = imGuiCalcTextSize(title).x;
+        const pos = ImGui.GetCursorPosX();
+        const margin = (remainWidth - textWidth) >> 1;
+        if (margin > 0) {
+          ImGui.SetCursorPosX(pos + margin);
+          ImGui.TextDisabled(title);
+        }
       }
       ImGui.EndMainMenuBar();
     }

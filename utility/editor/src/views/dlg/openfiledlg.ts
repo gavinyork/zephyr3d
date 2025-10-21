@@ -3,7 +3,6 @@ import { DialogRenderer } from '../../components/modal';
 import type { DirectoryInfo, FileInfo } from '../../components/vfsrenderer';
 import { VFSRenderer } from '../../components/vfsrenderer';
 import type { VFS } from '@zephyr3d/base';
-import type { ProjectInfo } from '../../core/services/project';
 
 export class DlgOpenFile extends DialogRenderer<string> {
   private readonly _renderer: VFSRenderer;
@@ -15,23 +14,14 @@ export class DlgOpenFile extends DialogRenderer<string> {
   public static async openFile(
     title: string,
     vfs: VFS,
-    project: ProjectInfo,
     rootDir: string,
     filter: string,
     width: number,
     height: number
   ) {
-    return new DlgOpenFile(title, vfs, project, rootDir, filter, width, height).showModal();
+    return new DlgOpenFile(title, vfs, rootDir, filter, width, height).showModal();
   }
-  constructor(
-    id: string,
-    vfs: VFS,
-    project: ProjectInfo,
-    rootDir: string,
-    filter: string,
-    width: number,
-    height: number
-  ) {
+  constructor(id: string, vfs: VFS, rootDir: string, filter: string, width: number, height: number) {
     super(id, width, height);
     this._name = [''];
     this._filterLabels = [];
@@ -48,7 +38,6 @@ export class DlgOpenFile extends DialogRenderer<string> {
     this._selected = [0];
     this._renderer = new VFSRenderer(
       vfs,
-      project,
       this._filterLabels.length > 0 ? this._filterPatterns[this._selected[0]] : [],
       Math.max(0, Math.min(width / 2, 200)),
       {

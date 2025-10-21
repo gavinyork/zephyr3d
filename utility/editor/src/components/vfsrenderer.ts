@@ -4,7 +4,7 @@ import { DataTransferVFS, Disposable, makeObservable, PathUtils } from '@zephyr3
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
-import { ProjectService, type ProjectInfo } from '../core/services/project';
+import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
@@ -391,7 +391,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     ImGui.TreeNodeFlags.OpenOnArrow |
     ImGui.TreeNodeFlags.OpenOnDoubleClick;
   private readonly _vfs: VFS;
-  private readonly _project: ProjectInfo;
   private readonly _treePanel: DockPannel;
   private _nav: DirTreeView;
   private _contentView: ContentListView;
@@ -404,17 +403,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private _isDragOverContent = false;
   private readonly _options: VFSRendererOptions = null;
 
-  constructor(
-    vfs: VFS,
-    project: ProjectInfo,
-    fileFilter: string[] = [],
-    treePanelWidth = 200,
-    options?: VFSRendererOptions
-  ) {
+  constructor(vfs: VFS, fileFilter: string[] = [], treePanelWidth = 200, options?: VFSRendererOptions) {
     super();
     this._vfs = vfs;
     this._vfs.on('changed', this.onVFSChanged, this);
-    this._project = project;
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
     this._filesystem = null;
     this._fileFilter = fileFilter?.slice() ?? [];
@@ -425,7 +417,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       multiSelect: true,
       ...options
     };
-    this._nav = new DirTreeView(this, this._project.name);
+    this._nav = new DirTreeView(this, this._options.rootDir);
     this._contentView = new ContentListView(new VFSContentData(this));
     this.loadFileSystem();
     if (this._options.allowDrop) {
@@ -1003,7 +995,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     const emoji = '📁';
     const id = dir.path;
     const label = convertEmojiString(
-      `${emoji}${dir === this._filesystem ? this._project.name : name}##${id}`
+      `${emoji}${dir === this._filesystem ? this._options.rootDir : name}##${id}`
     );
     let flags = VFSRenderer.baseFlags;
     if (this.selectedDir === dir) {
@@ -1083,9 +1075,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   async loadFileSystem() {
-    if (!this._project) {
-      return;
-    }
     const rootDir = await this.loadDirectoryInfo(this._options.rootDir);
     this._filesystem = rootDir;
 

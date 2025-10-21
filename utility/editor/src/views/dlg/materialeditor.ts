@@ -6,7 +6,7 @@ import { ProjectService } from '../../core/services/project';
 
 export class DlgPBMaterialEditor extends DialogRenderer<void> {
   private readonly editor: PBRMaterialEditor;
-  private readonly path: string;
+  private path: string;
   constructor(id: string, width: number, height: number, outputName: string, path: string) {
     super(id, width, height, false, false, false, false);
     this.path = path;

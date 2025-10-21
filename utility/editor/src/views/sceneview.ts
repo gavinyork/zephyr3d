@@ -63,7 +63,6 @@ import { EditorCameraController } from '../helpers/editocontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
-import { ListView } from '../components/listview';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
@@ -95,7 +94,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
-  private _showListView: boolean;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _aabbForEdit: AABB;
   private _proxy: NodeProxy;
@@ -129,7 +127,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._showListView = false;
     this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
@@ -333,12 +330,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               id: 'SHOW_DEVICE_INFO',
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
-            },
-            {
-              label: 'Test ListView',
-              id: 'SHOW_LIST_VIEW',
-              action: () => (this._showListView = !this._showListView),
-              checked: () => this._showListView
             }
           ]
         }
@@ -553,7 +544,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._showListView = false;
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
@@ -573,7 +563,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._statusbar.height -
       this._assetView.panel.height;
 
-    this._menubar.render();
+    this._menubar.render(this.controller.editor.currentProject.name);
 
     if (
       this._leftDockPanel.begin(
@@ -650,9 +640,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
-    }
-    if (this._showListView) {
-      ListView.testListViewRenderer();
     }
   }
   play() {
@@ -890,7 +877,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     super.onActivate();
     this._assetView = new BottomView(
       ProjectService.VFS,
-      this.controller.editor.currentProject,
       0,
       ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
       ImGui.GetIO().DisplaySize.x,
@@ -1454,7 +1440,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     DlgSaveFile.saveFile(
       'Save Prefab',
       getEngine().VFS,
-      this.controller.editor.currentProject,
       '/assets',
       'Prefab (*.zprefab)|*.zprefab',
       500,
@@ -1564,7 +1549,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       camera === this.controller.model.scene.mainCamera &&
       (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)
     ) {
-      //compositor.removePostEffect(this._postDecalRenderer);
       compositor.removePostEffect(this._postGizmoRenderer);
     }
   }
