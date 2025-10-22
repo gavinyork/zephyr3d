@@ -271,32 +271,45 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
     this.onContentContextMenu();
     const selectedCount = this.renderer.selectedItems.size;
     const selectedItems = Array.from(this._selectedItems);
-
     if (selectedCount > 0) {
-      ImGui.Separator();
-      if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
-        this.renderer.deleteSelectedItems();
-      }
-
       if (selectedCount === 1) {
         const item = selectedItems[0];
-
-        ImGui.Separator();
-        if (ImGui.MenuItem('Rename')) {
-          this.renderer.renameSelectedItem();
-        }
-
         if (!('subDir' in item)) {
+          const mimeType = this.renderer.VFS.guessMIMEType(item.meta.path);
+          if (mimeType === 'application/vnd.zephyr3d.material+json') {
+            ImGui.Separator();
+            if (ImGui.MenuItem('Create Material Instance...')) {
+              DlgPromptName.promptName('Create Material Instance', '', 'Material Instance Name').then(
+                (name) => {
+                  name = name.trim();
+                  if (name) {
+                    if (PathUtils.sanitizeFilename(name) !== name) {
+                      DlgMessage.messageBox('Error', 'Invalid file name');
+                    } else {
+                      if (!name.endsWith('.zmtl')) {
+                        name = `${name}.zmtl`;
+                      }
+                      const path = this.renderer.VFS.join(this.renderer.VFS.dirname(item.meta.path), name);
+                      this.renderer.copyFile(item.meta.path, path, 'prompt');
+                    }
+                  }
+                }
+              );
+            }
+          }
           ImGui.Separator();
           if (ImGui.MenuItem('Edit as text')) {
-            const mimeType = this.renderer.VFS.guessMIMEType(item.meta.path);
             eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
           }
         }
         ImGui.Separator();
-        if (ImGui.MenuItem('Properties')) {
-          this.renderer.showItemProperties(item);
+        if (ImGui.MenuItem('Rename')) {
+          this.renderer.renameSelectedItem();
         }
+      }
+      ImGui.Separator();
+      if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
+        this.renderer.deleteSelectedItems();
       }
     }
   }
@@ -616,25 +629,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     };
   }
 
-  showItemProperties(item: FileInfo | DirectoryInfo) {
-    const isDir = 'subDir' in item;
-    const name = isDir ? item.path.slice(item.path.lastIndexOf('/') + 1) : (item as FileInfo).meta.name;
-    let info = `Name: ${name}\n`;
-    info += `Type: ${isDir ? 'Folder' : 'File'}\n`;
-    if (!isDir) {
-      const meta = (item as FileInfo).meta;
-      info += `Size: ${this.formatFileSize(meta.size)}\n`;
-      if (meta.mimeType) {
-        info += `MIME Type: ${meta.mimeType}\n`;
-      }
-      if (meta.modified) {
-        info += `Modified: ${this.formatDate(meta.modified)}\n`;
-      }
-    }
-
-    info += `Path: ${isDir ? item.path : (item as FileInfo).meta.path}`;
-    DlgMessage.messageBox('Properties', info);
-  }
   private renderToolbar() {
     const canGoUp = this.selectedDir && this.selectedDir.parent;
     if (canGoUp) {
@@ -1244,6 +1238,42 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       ImGui.EndDragDropTarget();
     }
   }
+  async copyFile(src: string, dst: string, overwriteMode: 'overwrite' | 'prompt' | 'cancel') {
+    src = this.VFS.normalizePath(src);
+    dst = this.VFS.normalizePath(dst);
+    if (src === dst) {
+      console.error(`Invalid destination file name: ${dst}`);
+      return;
+    }
+    if (!(await this.VFS.exists(src))) {
+      console.error(`Source file not exists: ${src}`);
+      return;
+    }
+    if (!(await this.VFS.stat(src)).isFile) {
+      console.error(`Source is not a file: ${src}`);
+      return;
+    }
+    if (await this.VFS.exists(dst)) {
+      if ((await this.VFS.stat(dst)).isDirectory) {
+        console.error(`Destination is a directory: ${dst}`);
+        return;
+      }
+      if (overwriteMode === 'cancel') {
+        return;
+      } else if (overwriteMode === 'prompt') {
+        if (
+          (await DlgMessageBoxEx.messageBoxEx(
+            'Copy file',
+            `${dst} already exists, do you want to overwrite it?`,
+            ['Yes', 'No']
+          )) === 'No'
+        ) {
+          return;
+        }
+      }
+    }
+    await this.VFS.copyFile(src, dst, { overwrite: true });
+  }
   async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
     const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
@@ -1253,7 +1283,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     for (let i = 0; i < payload.length; i++) {
       const asset = payload[i];
-      const vfs = ProjectService.VFS;
+      const vfs = this.VFS;
       const sourceDir = asset.path;
       const parentDir = vfs.dirname(sourceDir);
       if (vfs.isParentOf(parentDir, targetDir) && vfs.isParentOf(targetDir, parentDir)) {
