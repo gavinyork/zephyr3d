@@ -620,7 +620,8 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         addressU: 'repeat',
         addressV: 'repeat'
       },
-      writable: !!this._useComputeShader
+      writable: !!this._useComputeShader,
+      mipmapping: false
     };
     if (this._useComputeShader) {
       const tex = device.createTexture2DArray(format, size, size, num, options);

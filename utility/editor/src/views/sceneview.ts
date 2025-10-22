@@ -644,11 +644,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   play() {
     ensureDependencies().then(() => {
-      const projectId = this.controller.editor.currentProject.uuid;
-      const url = new URL(window.location.href);
-      url.searchParams.append('project', projectId);
-      url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
-      window.open(url.href, '_blank');
+      this.controller.editor.getProjectSettings().then((settings) => {
+        if (!settings.startupScene) {
+          DlgMessage.messageBox('Error', 'Please select startup scene in <Project Settings>');
+        } else {
+          const projectId = this.controller.editor.currentProject.uuid;
+          const url = new URL(window.location.href);
+          url.searchParams.append('project', projectId);
+          url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
+          window.open(url.href, '_blank');
+        }
+      });
     });
   }
   renderDropZone(x: number, y: number, w: number, h: number) {

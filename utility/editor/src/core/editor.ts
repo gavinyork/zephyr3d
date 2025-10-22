@@ -344,9 +344,17 @@ export class Editor {
       includeFiles: true,
       recursive: true
     });
-    const files = fileList.filter((path) => path.type === 'file' && !path.path.startsWith('/dist/'));
+    const files = fileList.filter(
+      (path) =>
+        path.type === 'file' && !path.path.startsWith('/dist/') && !path.path.startsWith('/assets/@builtins/')
+    );
     let directories = fileList.filter(
-      (path) => path.type === 'directory' && path.path !== '/dist' && !path.path.startsWith('/dist/')
+      (path) =>
+        path.type === 'directory' &&
+        path.path !== '/dist' &&
+        path.path !== '/assets/@builtins' &&
+        !path.path.startsWith('/dist/') &&
+        !path.path.startsWith('/assets/@builtins/')
     );
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
