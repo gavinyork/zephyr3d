@@ -1,6 +1,6 @@
-import { ImGui } from '@zephyr3d/imgui';
+import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
-import type { ProjectSettings, ProjectInfo } from '../../core/services/project';
+import { type ProjectSettings, type ProjectInfo } from '../../core/services/project';
 import { DlgOpenFile } from './openfiledlg';
 import type { VFS } from '@zephyr3d/base';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
@@ -9,6 +9,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
   private _vfs: VFS;
   private _info: ProjectInfo;
   private _settings: ProjectSettings;
+  private _selectedDep: [number];
   public static async editProjectSettings(
     title: string,
     vfs: VFS,
@@ -23,6 +24,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     this._vfs = vfs;
     this._info = { ...projectInfo };
     this._settings = { ...projectSettings };
+    this._selectedDep = [-1];
   }
   doRender(): void {
     const title = [this._settings.title ?? this._info.name] as [string];
@@ -138,6 +140,44 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     ) {
       this._settings.preferredRHI = items.filter((val) => val.selected).map((val) => val.text);
     }
+    if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {
+      ImGui.TextDisabled('Additional packages');
+      if (this._selectedDep[0] >= 0) {
+        ImGui.SameLine();
+        const buttonTextRemove = 'Remove';
+        const spacing = ImGui.GetStyle().ItemSpacing.x;
+        const padding = ImGui.GetStyle().FramePadding.x;
+        const totalWidth = imGuiCalcTextSize(buttonTextRemove).x + 2 * padding + spacing;
+        const offset = ImGui.GetContentRegionAvail().x - totalWidth;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
+        if (ImGui.Button('Remove')) {
+          console.log('Remove package');
+        }
+      }
+      if (ImGui.ListBoxHeader('ListBoxHeader', new ImGui.ImVec2(-1, -1))) {
+        if (this._settings.dependencies?.length > 0) {
+          for (let i = 0; i < this._settings.dependencies.length; i++) {
+            if (ImGui.Selectable(this._settings.dependencies[i], this._selectedDep[0] === i)) {
+              this._selectedDep[0] = i;
+            }
+            /*
+            if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
+              ImGui.OpenPopup(`##${this._settings.dependencies[i]}`);
+            }
+            if (ImGui.BeginPopup(`##${this._settings.dependencies[i]}`)) {
+              if (ImGui.MenuItem('Remove')) {
+                console.log(`Remove dependence: ${this._settings.dependencies[i]}`);
+              }
+              ImGui.EndPopup();
+            }
+            */
+          }
+        }
+        ImGui.ListBoxFooter();
+      }
+    }
+    ImGui.EndChild();
+
     ImGui.Button('Save');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
       this.close(this._settings);

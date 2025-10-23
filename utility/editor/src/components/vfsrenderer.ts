@@ -649,24 +649,32 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
         DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
           if (val) {
-            const dlgMessageBoxEx = new DlgMessageBoxEx(
-              'Install package',
-              '',
-              ['Installing...'],
-              400,
-              0,
-              false
-            );
-            dlgMessageBoxEx.showModal();
-            installDeps(
-              ProjectService.currentProject,
-              this.VFS,
-              '/',
-              [val],
-              (msg) => (dlgMessageBoxEx.text = msg)
-            ).then(() => {
-              console.info('Dependencies installed');
-              dlgMessageBoxEx.buttons[0] = 'Ok';
+            ProjectService.getCurrentProjectSettings().then((settings) => {
+              if (settings.dependencies?.includes(val)) {
+                DlgMessage.messageBox('Error', `Package ${val} already installed`);
+              } else {
+                const dlgMessageBoxEx = new DlgMessageBoxEx(
+                  'Install package',
+                  '',
+                  ['Installing...'],
+                  400,
+                  0,
+                  false
+                );
+                dlgMessageBoxEx.showModal();
+                installDeps(
+                  ProjectService.currentProject,
+                  this.VFS,
+                  '/',
+                  [val],
+                  (msg) => (dlgMessageBoxEx.text = msg)
+                ).then(() => {
+                  console.info('Dependencies installed');
+                  dlgMessageBoxEx.buttons[0] = 'Ok';
+                  settings.dependencies = [...(settings.dependencies ?? []), val];
+                  ProjectService.saveCurrentProjectSettings(settings);
+                });
+              }
             });
           }
         });

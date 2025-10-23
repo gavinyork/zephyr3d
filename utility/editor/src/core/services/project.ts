@@ -16,6 +16,7 @@ export type ProjectSettings = {
   splashScreen?: string;
   startupScript?: string;
   preferredRHI?: string[];
+  dependencies?: string[];
 };
 
 const defaultProjectSettings: Readonly<ProjectSettings> = {
