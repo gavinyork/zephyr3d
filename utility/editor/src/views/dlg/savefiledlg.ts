@@ -71,7 +71,11 @@ export class DlgSaveFile extends DialogRenderer<string> {
       this._renderer.render();
     }
     ImGui.EndChild();
-    if (!ImGui.IsItemActive() && !ImGui.IsAnyItemActive()) {
+    if (
+      !ImGui.IsItemActive() &&
+      !ImGui.IsAnyItemActive() &&
+      !ImGui.IsPopupOpen('', ImGui.PopupFlags.AnyPopupId)
+    ) {
       ImGui.SetKeyboardFocusHere();
     }
     const textEntered = ImGui.InputTextWithHint(

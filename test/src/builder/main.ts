@@ -160,7 +160,7 @@ pb.main(function(){
           console.error(error);
           alert(error);
         } else {
-          bg.value = JSON.stringify(program.bindGroupLayouts, null, '  ');
+          bg.value = JSON.stringify(program.bindGroupLayouts, null, 2);
           program.use();
         }
       } else {

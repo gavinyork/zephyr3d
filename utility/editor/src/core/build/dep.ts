@@ -4,18 +4,10 @@ import { loadTypes } from './loadtypes';
 import { ProjectService } from '../services/project';
 import { DlgMessageBoxEx } from '../../views/dlg/messageexdlg';
 
-async function sha256Base64(text: string): Promise<string> {
-  const buf = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', buf);
-  const b = String.fromCharCode(...new Uint8Array(digest));
-  return 'sha256-' + btoa(b);
-}
-
 export type LockEntry = {
   version: string;
   entry: string; // /deps/name@version/mod.js
   url: string; // CDN entry URL
-  integrity?: string; // optional
 };
 
 export type LockFile = {
@@ -342,7 +334,7 @@ export async function reinstallPackages() {
       false
     );
     dlgMessageBoxEx.showModal();
-    await installDeps(ProjectService.currentProject, ProjectService.VFS, '/', [packageName], null, true);
+    await installDeps(ProjectService.currentProject, ProjectService.VFS, '/', packageName, null, true);
     dlgMessageBoxEx.close('');
   }
 }
@@ -351,46 +343,35 @@ export async function installDeps(
   project: string,
   vfs: VFS,
   projectRoot: string,
-  specs: string[],
+  spec: string,
   onProgress?: (msg: string) => void,
   noFetchDTS?: boolean
-) {
+): Promise<{ name: string; version: string }> {
   let numPackagesInstalled = 0;
   onProgress?.('Reading lock file...');
   const registry: LockFile['registry'] = 'esm.sh';
   const lock = (await readLock(vfs, projectRoot)) ?? { registry, dependencies: {} };
 
-  for (const spec of specs) {
-    try {
-      onProgress?.(`Installing package ${spec}...`);
-      const { name, version, entryUrl } = await resolveOnEsmSh(spec);
-      const existing = lock.dependencies[name];
+  try {
+    onProgress?.(`Installing package ${spec}...`);
+    const { name, version, entryUrl } = await resolveOnEsmSh(spec);
 
-      // Skip if same version already present and entry exists
-      if (existing?.version === version && (await vfs.exists(existing.entry))) {
-        continue;
-      }
+    await crawlAndCache(vfs, entryUrl, name, version);
+    const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
 
-      await crawlAndCache(vfs, entryUrl, name, version);
-      const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
-      const code = (await vfs.readFile(entry, { encoding: 'utf8' })) as string;
-      const integrity = await sha256Base64(code);
+    lock.dependencies[name] = { version, entry, url: entryUrl };
+    numPackagesInstalled++;
 
-      lock.dependencies[name] = { version, entry, url: entryUrl, integrity };
-      numPackagesInstalled++;
-
-      if (!noFetchDTS) {
-        // Loading types
-        onProgress?.(`Loading DTS from package ${spec}...`);
-        await loadTypes(project, spec, window.monaco);
-      }
-    } catch (err) {
-      onProgress?.(`Failed to fetch ${spec}: ${err}`);
+    if (!noFetchDTS) {
+      // Loading types
+      onProgress?.(`Loading DTS from package ${spec}...`);
+      await loadTypes(project, spec, window.monaco);
     }
+    onProgress?.('Writing lock file...');
+    await writeLock(vfs, projectRoot, lock);
+    onProgress?.(`${numPackagesInstalled} packages installed`);
+    return { name, version };
+  } catch (err) {
+    onProgress?.(`Failed to fetch ${spec}: ${err}`);
   }
-
-  onProgress?.('Writing lock file...');
-  await writeLock(vfs, projectRoot, lock);
-  onProgress?.(`${numPackagesInstalled} packages installed`);
-  return lock;
 }

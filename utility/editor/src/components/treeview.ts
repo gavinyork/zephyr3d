@@ -79,6 +79,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     }
     const flags = this._draggingItem ? ImGui.WindowFlags.NoScrollbar : 0;
     ImGui.BeginChild(this._id, ImGui.GetContentRegionAvail(), false, flags);
+    ImGui.PushID(this._id);
     if (!ImGui.GetIO().MouseDown[0]) {
       this._draggingItem = false;
     }
@@ -94,6 +95,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     this._clipper.End();
     this.handleAutoScrollWhileDragging();
     this.ensureSelectionVisible();
+    ImGui.PopID();
     ImGui.EndChild();
   }
 

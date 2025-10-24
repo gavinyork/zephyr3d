@@ -40,7 +40,7 @@ export class ResourceService {
     node.position.set(position);
     node.rotation.set(rotation);
     node.scale.set(scale);
-    const content = JSON.stringify({ type: 'SceneNode', data }, null, '  ');
+    const content = JSON.stringify({ type: 'SceneNode', data }, null, 2);
     const fn = name.endsWith('.zprefab') ? name : `${name}.zprefab`;
     await manager.VFS.writeFile(manager.VFS.join(path, fn), content, {
       encoding: 'utf8',

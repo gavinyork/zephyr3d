@@ -79,7 +79,7 @@ try {
 } catch (err) {
   console.log('Build cache file not exists');
 }
-fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, ' '));
+fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2));
 
 let cacheChanged = false;
 let invalidAll = false;
@@ -91,7 +91,7 @@ if (!deepEqual(cachedZephr3d, dict)) {
   invalidAll = true;
 }
 const pattern = process.env.SITE_TUT ? process.env.SITE_TUT.split(';') : null;
-console.log(`Build pattern: ${JSON.stringify(pattern)}`);
+console.log(`Build pattern: ${JSON.stringify(pattern, null, 2)}`);
 if (process.env.SITE_NO_COMPRESS) {
   codeCompress = false;
 }
@@ -126,7 +126,7 @@ fs.readdirSync(srcdir).filter((dir) => {
 });
 
 if (cacheChanged) {
-  fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, ' '), 'utf8');
+  fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2), 'utf8');
 }
 
 function getCacheTarget() {

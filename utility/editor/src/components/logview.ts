@@ -103,15 +103,19 @@ function safeStringify(arg: any): string {
     }
     if (t === '[object Object]' || t === '[object Array]') {
       const cache = new WeakSet();
-      return JSON.stringify(arg, function (key, value) {
-        if (typeof value === 'object' && value !== null) {
-          if (cache.has(value)) {
-            return '[Circular]';
+      return JSON.stringify(
+        arg,
+        function (key, value) {
+          if (typeof value === 'object' && value !== null) {
+            if (cache.has(value)) {
+              return '[Circular]';
+            }
+            cache.add(value);
           }
-          cache.add(value);
-        }
-        return value;
-      });
+          return value;
+        },
+        2
+      );
     }
     if (typeof arg === 'function') {
       return arg.toString();

@@ -37,11 +37,11 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
   private _itemHeightCache: Map<string, number>;
   private _items: T[];
 
-  constructor(id: string, data: ListViewData<T>) {
+  constructor(id: string, data: ListViewData<T>, multiSelect = true) {
     super();
     this._type = 'list';
     this._selectedItems = new Set();
-    this._multiSelect = true;
+    this._multiSelect = multiSelect;
     this._draggingItem = false;
     this._hoveredItem = null;
     this._data = data;

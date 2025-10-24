@@ -168,14 +168,14 @@ export async function buildForEndUser(options: {
   htmlContent = htmlContent.replace('</body>', `  <script type="module" src="./index.js"></script>\n</body>`);
   htmlContent = htmlContent.replace(
     '</head>',
-    `<script type="importmap">\n${JSON.stringify(importMap, null, '  ')}\n</script>\n</head>`
+    `<script type="importmap">\n${JSON.stringify(importMap, null, 2)}\n</script>\n</head>`
   );
   await vfs.writeFile(vfs.join(distDir, 'index.html'), htmlContent, {
     encoding: 'utf8',
     create: true
   });
 
-  await vfs.writeFile(vfs.join(distDir, 'settings.json'), JSON.stringify(settings, null, '  '), {
+  await vfs.writeFile(vfs.join(distDir, 'settings.json'), JSON.stringify(settings, null, 2), {
     encoding: 'utf8',
     create: true
   });

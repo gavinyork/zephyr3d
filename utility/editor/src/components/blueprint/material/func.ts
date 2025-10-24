@@ -40,7 +40,7 @@ export class MaterialFunctionEditor extends GraphEditor {
       // Save blueprint
       const state = await this.nodeEditor.saveState();
       try {
-        await VFS.writeFile(path, JSON.stringify({ type: 'MaterialFunction', state }, null, '  '), {
+        await VFS.writeFile(path, JSON.stringify({ type: 'MaterialFunction', state }, null, 2), {
           encoding: 'utf8',
           create: true
         });

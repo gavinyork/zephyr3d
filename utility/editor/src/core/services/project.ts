@@ -16,7 +16,7 @@ export type ProjectSettings = {
   splashScreen?: string;
   startupScript?: string;
   preferredRHI?: string[];
-  dependencies?: string[];
+  dependencies?: { [name: string]: string };
 };
 
 const defaultProjectSettings: Readonly<ProjectSettings> = {
@@ -93,7 +93,7 @@ export class ProjectService {
         create: true
       });
       const settings = { ...defaultProjectSettings, title: name };
-      await vfs.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
+      await vfs.writeFile('/settings.json', JSON.stringify(settings, null, 2), {
         encoding: 'utf8',
         create: true
       });
@@ -107,21 +107,21 @@ export class ProjectService {
   }
   static async getCurrentProjectSettings(): Promise<ProjectSettings> {
     if (this.VFS) {
-      const exists = await this.VFS.exists('/src/settings.json');
+      const exists = await this.VFS.exists('/settings.json');
       if (!exists) {
-        await this.VFS.writeFile('/src/settings.json', JSON.stringify(defaultProjectSettings, null, '  '), {
+        await this.VFS.writeFile('/settings.json', JSON.stringify(defaultProjectSettings, null, 2), {
           encoding: 'utf8',
           create: true
         });
       }
-      const content = (await this.VFS.readFile('/src/settings.json', { encoding: 'utf8' })) as string;
+      const content = (await this.VFS.readFile('/settings.json', { encoding: 'utf8' })) as string;
       return JSON.parse(content);
     }
     return null;
   }
   static async saveCurrentProjectSettings(settings: ProjectSettings) {
     if (this.VFS) {
-      await this.VFS.writeFile('/src/settings.json', JSON.stringify(settings, null, '  '), {
+      await this.VFS.writeFile('/settings.json', JSON.stringify(settings, null, 2), {
         encoding: 'utf8',
         create: true
       });
@@ -195,7 +195,7 @@ export class ProjectService {
     return JSON.parse(content) as EditorManifest;
   }
   private static async writeManifest(manifest: EditorManifest) {
-    await metaVFS.writeFile(ProjectService.PROJECT_MANIFEST, JSON.stringify(manifest, null, '  '), {
+    await metaVFS.writeFile(ProjectService.PROJECT_MANIFEST, JSON.stringify(manifest, null, 2), {
       create: true,
       encoding: 'utf8'
     });

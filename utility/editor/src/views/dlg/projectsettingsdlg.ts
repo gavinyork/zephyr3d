@@ -1,15 +1,91 @@
-import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
+import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
-import { type ProjectSettings, type ProjectInfo } from '../../core/services/project';
+import { type ProjectSettings, type ProjectInfo, ProjectService } from '../../core/services/project';
 import { DlgOpenFile } from './openfiledlg';
 import type { VFS } from '@zephyr3d/base';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
+import { ListView, ListViewData } from '../../components/listview';
+
+class DepsContentData extends ListViewData<{ name: string; version: string }> {
+  elements: { name: string; version: string }[];
+  constructor(deps: { [name: string]: string }) {
+    super();
+    this.elements = Object.keys(deps).map((k) => ({ name: k, version: deps[k] }));
+  }
+  getItems() {
+    return this.elements;
+  }
+  getItemIcon(): string {
+    return '📦';
+  }
+  getItemName(item: { name: string; version: string }): string {
+    return item.name;
+  }
+  getDetailColumn(item: { name: string; version: string }, col: number): string {
+    return item.version;
+  }
+  getDetailColumnsInfo(): string[] {
+    return ['Version'];
+  }
+  sortDetailItems(
+    a: { name: string; version: string },
+    b: { name: string; version: string },
+    sortBy: number,
+    sortAscending: boolean
+  ): number {
+    let comparison = 0;
+    switch (sortBy) {
+      case 0: {
+        const nameA = a.name;
+        const nameB = b.name;
+        comparison = nameA.localeCompare(nameB);
+        break;
+      }
+      case 1: {
+        const nameA = a.version;
+        const nameB = b.version;
+        comparison = nameA.localeCompare(nameB);
+        break;
+      }
+    }
+    return sortAscending ? comparison : -comparison;
+  }
+  getDragSourcePayloadType(): string {
+    return '';
+  }
+  getDragSourceHint(): string {
+    return '';
+  }
+  getDragSourcePayload(): unknown {
+    return null;
+  }
+  getDragTargetPayloadType(): string {
+    return null;
+  }
+}
+
+export class DepsListView extends ListView<{}, { name: string; version: string }> {
+  constructor(data: DepsContentData) {
+    super('##ProjectDepsList', data, false);
+  }
+  protected onSelectionChanged(): void {}
+  protected onItemContextMenu(): void {
+    if (ImGui.MenuItem('Remove')) {
+      const item = [...this.selectedItems][0];
+      const data = this.data as DepsContentData;
+      const index = data.elements.indexOf(item);
+      if (index >= 0) {
+        data.elements.splice(index, 1);
+      }
+    }
+  }
+}
 
 export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
   private _vfs: VFS;
   private _info: ProjectInfo;
   private _settings: ProjectSettings;
-  private _selectedDep: [number];
+  private _depList: DepsListView;
   public static async editProjectSettings(
     title: string,
     vfs: VFS,
@@ -24,7 +100,8 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     this._vfs = vfs;
     this._info = { ...projectInfo };
     this._settings = { ...projectSettings };
-    this._selectedDep = [-1];
+    this._depList = new DepsListView(new DepsContentData(this._settings.dependencies ?? {}));
+    this._depList.type = 'detail';
   }
   doRender(): void {
     const title = [this._settings.title ?? this._info.name] as [string];
@@ -142,50 +219,62 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     }
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {
       ImGui.TextDisabled('Additional packages');
-      if (this._selectedDep[0] >= 0) {
-        ImGui.SameLine();
-        const buttonTextRemove = 'Remove';
-        const spacing = ImGui.GetStyle().ItemSpacing.x;
-        const padding = ImGui.GetStyle().FramePadding.x;
-        const totalWidth = imGuiCalcTextSize(buttonTextRemove).x + 2 * padding + spacing;
-        const offset = ImGui.GetContentRegionAvail().x - totalWidth;
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
-        if (ImGui.Button('Remove')) {
-          console.log('Remove package');
-        }
-      }
-      if (ImGui.ListBoxHeader('ListBoxHeader', new ImGui.ImVec2(-1, -1))) {
-        if (this._settings.dependencies?.length > 0) {
-          for (let i = 0; i < this._settings.dependencies.length; i++) {
-            if (ImGui.Selectable(this._settings.dependencies[i], this._selectedDep[0] === i)) {
-              this._selectedDep[0] = i;
-            }
-            /*
-            if (ImGui.IsItemClicked(ImGui.MouseButton.Right)) {
-              ImGui.OpenPopup(`##${this._settings.dependencies[i]}`);
-            }
-            if (ImGui.BeginPopup(`##${this._settings.dependencies[i]}`)) {
-              if (ImGui.MenuItem('Remove')) {
-                console.log(`Remove dependence: ${this._settings.dependencies[i]}`);
-              }
-              ImGui.EndPopup();
-            }
-            */
-          }
-        }
-        ImGui.ListBoxFooter();
-      }
+      this._depList.render();
     }
     ImGui.EndChild();
 
     ImGui.Button('Save');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
-      this.close(this._settings);
+      this.removePackages().then(() => {
+        this.close(this._settings);
+      });
     }
     ImGui.SameLine();
     ImGui.Button('Cancel');
     if (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)) {
       this.close(null);
+    }
+  }
+  async removePackages() {
+    if (this._settings.dependencies) {
+      const lockFile = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+      const lock = JSON.parse(lockFile) as {
+        dependencies: {
+          [name: string]: {
+            version: string;
+            entry: string;
+            url: string;
+          };
+        };
+      };
+      console.log('Dependencies lock file loaded');
+      const newPackages = this._depList.data.getItems();
+      let removed = false;
+      for (const k of Object.keys(this._settings.dependencies)) {
+        if (newPackages.findIndex((p) => p.name === k) < 0) {
+          console.log(`Remove package: ${k}`);
+          const dir = `/deps/${k}@${this._settings.dependencies[k]}`;
+          await ProjectService.VFS.deleteDirectory(dir, true);
+          console.log(`Directory removed: '${dir}'`);
+          delete this._settings.dependencies[k];
+          delete lock.dependencies[k];
+          removed = true;
+        }
+      }
+      if (removed) {
+        if (Object.keys(this._settings.dependencies).length === 0) {
+          await ProjectService.VFS.deleteDirectory('/deps', true);
+          console.log(`Directory removed: '/deps'`);
+          await ProjectService.VFS.deleteFile('/deps.lock.json');
+          console.log('Dependencies lock file deleted');
+        } else {
+          await ProjectService.VFS.writeFile('/deps.lock.json', JSON.stringify(lock, null, 2), {
+            encoding: 'utf8',
+            create: true
+          });
+          console.log('Dependencies lock file updated');
+        }
+      }
     }
   }
 }

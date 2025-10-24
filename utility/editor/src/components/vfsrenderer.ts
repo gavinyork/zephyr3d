@@ -197,7 +197,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
 
 export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
   constructor(data: VFSContentData) {
-    super('##VFSContentListView', data);
+    super(`##VFSContentListView${data.renderer.id}`, data);
   }
   get renderer() {
     return (this._data as VFSContentData).renderer;
@@ -330,7 +330,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
 export class DirTreeView extends TreeView<{}, DirectoryInfo> {
   private _renderer: VFSRenderer;
   constructor(renderer: VFSRenderer, projectName: string) {
-    super('###VFSNavigator', new VFSDirData(renderer, projectName));
+    super(`###VFSNavigator${renderer.id}`, new VFSDirData(renderer, projectName));
     this._renderer = renderer;
   }
   protected onGetContextMenuId(node: DirectoryInfo): string {
@@ -398,11 +398,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
   file_dbl_clicked: [file: FileInfo];
 }>() {
+  private static VFSId = 1;
   private static readonly baseFlags =
     ImGui.TreeNodeFlags.SpanAvailWidth |
     ImGui.TreeNodeFlags.SpanFullWidth |
     ImGui.TreeNodeFlags.OpenOnArrow |
     ImGui.TreeNodeFlags.OpenOnDoubleClick;
+  public readonly id: number;
   private readonly _vfs: VFS;
   private readonly _treePanel: DockPannel;
   private _nav: DirTreeView;
@@ -418,6 +420,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   constructor(vfs: VFS, fileFilter: string[] = [], treePanelWidth = 200, options?: VFSRendererOptions) {
     super();
+    this.id = VFSRenderer.VFSId++;
     this._vfs = vfs;
     this._vfs.on('changed', this.onVFSChanged, this);
     this._treePanel = new DockPannel(0, 0, treePanelWidth, -1, 8, 200, 500, ResizeDirection.Right, 0, 99999);
@@ -472,9 +475,16 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     return this._currentDirContent;
   }
   render() {
-    if (ImGui.BeginChild('##VFSViewContainer', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
+    if (
+      ImGui.BeginChild(
+        `##VFSViewContainer${this.id}`,
+        new ImGui.ImVec2(-1, -1),
+        false,
+        ImGui.WindowFlags.None
+      )
+    ) {
       const pos = ImGui.GetCursorPos();
-      if (this._treePanel.beginChild('##VFSViewTree')) {
+      if (this._treePanel.beginChild(`##VFSViewTree${this.id}`)) {
         const contentMin = ImGui.GetWindowPos();
         const contentMax = new ImGui.ImVec2(
           contentMin.x + ImGui.GetWindowSize().x,
@@ -497,7 +507,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this._treePanel.endChild();
 
       ImGui.SetCursorPos(new ImGui.ImVec2(this._treePanel.width + 8, pos.y));
-      if (ImGui.BeginChild('##VFSViewContent', new ImGui.ImVec2(-1, -1), false, ImGui.WindowFlags.None)) {
+      if (
+        ImGui.BeginChild(
+          `##VFSViewContent${this.id}`,
+          new ImGui.ImVec2(-1, -1),
+          false,
+          ImGui.WindowFlags.None
+        )
+      ) {
         this.renderContentArea();
       }
       ImGui.EndChild();
@@ -543,14 +560,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   private renderContentArea() {
     ImGui.BeginChild(
-      '##VFSContentToolBar',
+      `##VFSContentToolBar${this.id}`,
       new ImGui.ImVec2(-1, ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.y),
       false
     );
     this.renderToolbar();
     ImGui.EndChild();
 
-    ImGui.BeginChild('##VFSContentContainer', new ImGui.ImVec2(-1, -1), true);
+    ImGui.BeginChild(`##VFSContentContainer${this.id}`, new ImGui.ImVec2(-1, -1), true);
     const contentMin = ImGui.GetCursorScreenPos();
     const availableSize = ImGui.GetContentRegionAvail();
     const contentMax = new ImGui.ImVec2(contentMin.x + availableSize.x, contentMin.y + availableSize.y);
@@ -564,7 +581,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this.renderContentDropHighlight();
     }
 
-    ImGui.BeginChild('##VFSContentInnerContainer', new ImGui.ImVec2(-1, -1), false);
+    ImGui.BeginChild(`##VFSContentInnerContainer${this.id}`, new ImGui.ImVec2(-1, -1), false);
     if (this.selectedDir) {
       this._contentView.render();
     } else {
@@ -650,7 +667,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
           if (val) {
             ProjectService.getCurrentProjectSettings().then((settings) => {
-              if (settings.dependencies?.includes(val)) {
+              if (settings.dependencies && val in settings.dependencies) {
                 DlgMessage.messageBox('Error', `Package ${val} already installed`);
               } else {
                 const dlgMessageBoxEx = new DlgMessageBoxEx(
@@ -666,12 +683,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                   ProjectService.currentProject,
                   this.VFS,
                   '/',
-                  [val],
+                  val,
                   (msg) => (dlgMessageBoxEx.text = msg)
-                ).then(() => {
+                ).then((result) => {
                   console.info('Dependencies installed');
                   dlgMessageBoxEx.buttons[0] = 'Ok';
-                  settings.dependencies = [...(settings.dependencies ?? []), val];
+                  settings.dependencies = Object.assign(settings.dependencies ?? {}, {
+                    [result.name]: result.version
+                  });
                   ProjectService.saveCurrentProjectSettings(settings);
                 });
               }

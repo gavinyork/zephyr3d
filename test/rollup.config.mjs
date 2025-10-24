@@ -67,8 +67,7 @@ function getTargetES6(input, output) {
   };
 }
 
-export default (args) => {
+export default () => {
   const targets = srcfiles.map((f) => getTargetES6(f[0], f[1]));
-  console.log(JSON.stringify(targets));
   return targets;
 };

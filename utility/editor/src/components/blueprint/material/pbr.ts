@@ -116,7 +116,7 @@ export class PBRMaterialEditor extends GraphEditor {
       // Save blueprint
       const state = await this.nodeEditor.saveState();
       try {
-        await VFS.writeFile(bpPath, JSON.stringify({ type: 'PBRMaterial', state }, null, '  '), {
+        await VFS.writeFile(bpPath, JSON.stringify({ type: 'PBRMaterial', state }, null, 2), {
           encoding: 'utf8',
           create: true
         });
@@ -183,7 +183,7 @@ export class PBRMaterialEditor extends GraphEditor {
         });
       }
       try {
-        await VFS.writeFile(path, JSON.stringify(content, null, '  '), {
+        await VFS.writeFile(path, JSON.stringify(content, null, 2), {
           encoding: 'utf8',
           create: true
         });

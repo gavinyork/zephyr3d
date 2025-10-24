@@ -694,7 +694,7 @@ export class SharedModel extends Disposable {
         const path = manager.VFS.join(destPath, `${destName}_material_${k}.zmtl`);
         const m = await this.createMaterial(manager, this._materialList[k]);
         const data = await manager.serializeObject(m);
-        const content = JSON.stringify({ type: 'Default', data }, null, '  ');
+        const content = JSON.stringify({ type: 'Default', data }, null, 2);
         await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
         this._materialList[k].path = path;
         m.dispose();
@@ -725,7 +725,7 @@ export class SharedModel extends Disposable {
             data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
           };
         }
-        const content = JSON.stringify({ type: 'Primitive', data }, null, '  ');
+        const content = JSON.stringify({ type: 'Primitive', data }, null, 2);
         await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
         info.path = path;
       }
