@@ -21,7 +21,7 @@ class DepsContentData extends ListViewData<{ name: string; version: string }> {
   getItemName(item: { name: string; version: string }): string {
     return item.name;
   }
-  getDetailColumn(item: { name: string; version: string }, col: number): string {
+  getDetailColumn(item: { name: string; version: string }): string {
     return item.version;
   }
   getDetailColumnsInfo(): string[] {
