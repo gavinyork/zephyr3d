@@ -232,8 +232,7 @@ export class MemoryFS extends VFS {
       size,
       type: 'file',
       created: this.metadata.get(path)?.created || new Date(),
-      modified: new Date(),
-      mimeType: this.guessMIMEType(path)
+      modified: new Date()
     });
   }
 

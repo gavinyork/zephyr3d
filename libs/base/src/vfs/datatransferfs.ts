@@ -93,8 +93,7 @@ export class DataTransferVFS extends VFS {
           size: entry.size,
           type: 'file',
           created: entry.lastModified,
-          modified: entry.lastModified,
-          mimeType: entry.file.type || this.guessMIMEType(childPath)
+          modified: entry.lastModified
         };
       } else {
         metadata = {
@@ -103,8 +102,7 @@ export class DataTransferVFS extends VFS {
           size: 0,
           type: 'directory',
           created: new Date(),
-          modified: new Date(),
-          mimeType: undefined
+          modified: new Date()
         };
       }
 

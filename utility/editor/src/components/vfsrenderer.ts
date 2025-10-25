@@ -1,6 +1,6 @@
 import type { FileMetadata, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
-import { DataTransferVFS, Disposable, makeObservable, PathUtils } from '@zephyr3d/base';
+import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -111,7 +111,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
       return isDir ? '--' : this.renderer.formatFileSize(item.meta.size);
     }
     if (col === 1) {
-      return isDir ? '' : (item.meta.mimeType ?? 'File');
+      return isDir ? '' : guessMimeType(item.meta.name);
     }
     if (col === 2) {
       return !isDir && !!item.meta.modified ? this.renderer.formatDate(item.meta.modified) : '--';
@@ -151,8 +151,8 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
 
       case 2:
         if (!isADir && !isBDir) {
-          const typeA = (a as FileInfo).meta.mimeType || '';
-          const typeB = (b as FileInfo).meta.mimeType || '';
+          const typeA = guessMimeType((a as FileInfo).meta.name);
+          const typeB = guessMimeType((b as FileInfo).meta.name);
           comparison = typeA.localeCompare(typeB);
         }
         break;
@@ -779,11 +779,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   getFileEmoji(meta: FileMetadata): string {
-    if (!meta?.mimeType) {
-      return '📄';
-    }
-
-    const mimeType = meta.mimeType.toLowerCase();
+    const mimeType = guessMimeType(meta.name);
     if (mimeType.startsWith('image/')) {
       return '🖼️';
     }

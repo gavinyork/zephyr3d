@@ -5,7 +5,7 @@ import { tsTranspilePlugin } from './plugins/tstranspile';
 import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
-import { templateIndexHTML } from './templates';
+import { projectFileName, templateIndexHTML } from './templates';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -175,7 +175,7 @@ export async function buildForEndUser(options: {
     create: true
   });
 
-  await vfs.writeFile(vfs.join(distDir, 'settings.json'), JSON.stringify(settings, null, 2), {
+  await vfs.writeFile(vfs.join(distDir, projectFileName), JSON.stringify(settings, null, 2), {
     encoding: 'utf8',
     create: true
   });

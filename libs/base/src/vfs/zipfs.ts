@@ -575,8 +575,7 @@ export class ZipFS extends VFS {
             size: isDir ? 0 : entry.uncompressedSize || 0,
             type: isDir ? 'directory' : 'file',
             created: entry.lastModDate || new Date(),
-            modified: entry.lastModDate || new Date(),
-            mimeType: isDir ? undefined : this.guessMIMEType('/' + firstPart)
+            modified: entry.lastModDate || new Date()
           };
 
           if (this.matchesFilter(metadata, options)) {
@@ -600,8 +599,7 @@ export class ZipFS extends VFS {
               size: entry.directory ? 0 : entry.uncompressedSize || 0,
               type: entry.directory ? 'directory' : 'file',
               created: entry.lastModDate || new Date(),
-              modified: entry.lastModDate || new Date(),
-              mimeType: entry.directory ? undefined : this.guessMIMEType(fullPath)
+              modified: entry.lastModDate || new Date()
             };
 
             if (this.matchesFilter(metadata, options)) {
@@ -623,8 +621,7 @@ export class ZipFS extends VFS {
                 size: isDir ? 0 : entry.uncompressedSize || 0,
                 type: isDir ? 'directory' : 'file',
                 created: entry.lastModDate || new Date(),
-                modified: entry.lastModDate || new Date(),
-                mimeType: isDir ? undefined : this.guessMIMEType(childPath)
+                modified: entry.lastModDate || new Date()
               };
 
               if (this.matchesFilter(metadata, options)) {
@@ -653,8 +650,7 @@ export class ZipFS extends VFS {
             size,
             type: 'file',
             created: virtualFile.modified,
-            modified: virtualFile.modified,
-            mimeType: this.guessMIMEType(virtualPath)
+            modified: virtualFile.modified
           };
 
           if (this.matchesFilter(metadata, options)) {

@@ -1,3 +1,6 @@
+export const projectFileName = 'project.json';
+export const fileListFileName = 'filelist.json';
+
 export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
 import { RuntimeScript } from '@zephyr3d/scene';
 
@@ -56,7 +59,7 @@ export const templateIndex = `import { Application, getEngine } from '@zephyr3d/
 import { HttpFS } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
-const settingsJson = await VFS.readFile('/settings.json', { encoding: 'utf8' }) as string;
+const settingsJson = await VFS.readFile('/${projectFileName}', { encoding: 'utf8' }) as string;
 const settings = JSON.parse(settingsJson);
 const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
 let backend: DeviceBackend = null;
@@ -86,6 +89,7 @@ const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
   runtimeOptions: {
+    VFS,
     scriptsRoot: '/assets'
   }
 });

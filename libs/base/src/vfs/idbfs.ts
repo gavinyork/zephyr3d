@@ -123,8 +123,7 @@ export class IndexedDBFS extends VFS {
                     size: record.size,
                     type: record.type,
                     created: new Date(record.created),
-                    modified: new Date(record.modified),
-                    mimeType: record.mimeType
+                    modified: new Date(record.modified)
                   };
 
                   if (this.matchesFilter(metadata, options)) {
@@ -149,8 +148,7 @@ export class IndexedDBFS extends VFS {
                   size: record.size,
                   type: record.type,
                   created: new Date(record.created),
-                  modified: new Date(record.modified),
-                  mimeType: record.mimeType
+                  modified: new Date(record.modified)
                 };
 
                 if (this.matchesFilter(metadata, options)) {
@@ -326,8 +324,7 @@ export class IndexedDBFS extends VFS {
             created: created,
             modified: now,
             parent: parent,
-            data: fileData,
-            mimeType: this.guessMIMEType(path)
+            data: fileData
           };
 
           const saveRequest = existingRecord ? store.put(record) : store.add(record);

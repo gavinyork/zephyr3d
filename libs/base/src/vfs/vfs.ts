@@ -13,8 +13,6 @@ export interface FileMetadata {
   type: 'file' | 'directory';
   created: Date;
   modified: Date;
-  mimeType?: string;
-  permissions?: number;
 }
 
 /**

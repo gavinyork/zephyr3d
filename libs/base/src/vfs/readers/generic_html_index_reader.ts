@@ -109,8 +109,7 @@ export class GenericHtmlDirectoryReader implements HttpDirectoryReader {
         size: isDir ? 0 : size,
         type: isDir ? 'directory' : 'file',
         created: modified,
-        modified,
-        mimeType: isDir ? undefined : ctx.guessMimeType(cleanName)
+        modified
       });
     }
 

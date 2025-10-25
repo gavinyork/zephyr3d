@@ -1,7 +1,8 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
-import { HttpFS, IndexedDBFS, randomUUID } from '@zephyr3d/base';
+import { HttpFS, IndexedDBFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
-import { templateIndex } from '../build/templates';
+import { projectFileName, templateIndex } from '../build/templates';
+import { DlgMessage } from '../../views/dlg/messagedlg';
 
 export type ProjectInfo = {
   name: string;
@@ -40,7 +41,6 @@ let projectVFS: VFS = metaVFS;
 export class ProjectService {
   private static _currentProject = '';
   private static readonly PROJECT_MANIFEST = '/project.manifest.json';
-
   static get VFS() {
     return projectVFS;
   }
@@ -73,6 +73,48 @@ export class ProjectService {
       .map((v) => manifest.projectList[v])
       .filter((v) => !!v);
   }
+  static async importProject(files: File[]) {
+    let baseDir = '';
+    for (const f of files) {
+      if (f.name === projectFileName) {
+        baseDir = PathUtils.dirname(f.webkitRelativePath);
+        break;
+      }
+    }
+    if (!baseDir) {
+      await DlgMessage.messageBox('Error', 'No project found in specified directory');
+      return '';
+    }
+    const name = PathUtils.basename(baseDir);
+    const uuid = randomUUID();
+    const manifest = await this.readManifest();
+    manifest.projectList[uuid] = {
+      name,
+      uuid
+    };
+    await this.writeManifest(manifest);
+    const vfs = new IndexedDBFS(uuid, '$');
+    try {
+      for (const f of files) {
+        const path = `/${PathUtils.relative(baseDir, f.webkitRelativePath)}`;
+        const content = await f.arrayBuffer();
+        await vfs.writeFile(path, content, { encoding: 'binary', create: true });
+      }
+      if (!(await vfs.exists('/assets'))) {
+        await vfs.makeDirectory('/assets');
+      }
+      if (!(await vfs.exists('/src/index.ts'))) {
+        await vfs.makeDirectory('/src', true);
+        await vfs.writeFile('/src/index.ts', templateIndex, {
+          encoding: 'utf8',
+          create: true
+        });
+      }
+    } finally {
+      await vfs.close();
+    }
+    return uuid;
+  }
   static async createProject(name: string) {
     if (!name) {
       throw new Error('Create project failed: Project name must not be empty');
@@ -93,7 +135,7 @@ export class ProjectService {
         create: true
       });
       const settings = { ...defaultProjectSettings, title: name };
-      await vfs.writeFile('/settings.json', JSON.stringify(settings, null, 2), {
+      await vfs.writeFile(`/${projectFileName}`, JSON.stringify(settings, null, 2), {
         encoding: 'utf8',
         create: true
       });
@@ -107,21 +149,21 @@ export class ProjectService {
   }
   static async getCurrentProjectSettings(): Promise<ProjectSettings> {
     if (this.VFS) {
-      const exists = await this.VFS.exists('/settings.json');
+      const exists = await this.VFS.exists(`/${projectFileName}`);
       if (!exists) {
-        await this.VFS.writeFile('/settings.json', JSON.stringify(defaultProjectSettings, null, 2), {
+        await this.VFS.writeFile(`/${projectFileName}`, JSON.stringify(defaultProjectSettings, null, 2), {
           encoding: 'utf8',
           create: true
         });
       }
-      const content = (await this.VFS.readFile('/settings.json', { encoding: 'utf8' })) as string;
+      const content = (await this.VFS.readFile(`/${projectFileName}`, { encoding: 'utf8' })) as string;
       return JSON.parse(content);
     }
     return null;
   }
   static async saveCurrentProjectSettings(settings: ProjectSettings) {
     if (this.VFS) {
-      await this.VFS.writeFile('/settings.json', JSON.stringify(settings, null, 2), {
+      await this.VFS.writeFile(`/${projectFileName}`, JSON.stringify(settings, null, 2), {
         encoding: 'utf8',
         create: true
       });

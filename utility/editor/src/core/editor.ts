@@ -12,7 +12,7 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import { DRef, GenericHtmlDirectoryReader, HttpFS } from '@zephyr3d/base';
+import { DRef, GenericHtmlDirectoryReader, HttpFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -22,6 +22,8 @@ import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies } from './build/dep';
+import { FilePicker } from '../components/filepicker';
+import { fileListFileName } from './build/templates';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -266,7 +268,7 @@ export class Editor {
       ImGui.PushStyleColor(ImGui.Col.HeaderHovered, new ImGui.Vec4(0, 0, 0, 0));
       ImGui.PushStyleColor(ImGui.Col.HeaderActive, new ImGui.Vec4(0, 0, 0, 0));
       ImGui.PushStyleColor(ImGui.Col.Header, new ImGui.Vec4(0, 0, 0, 0));
-      const links = ['Create Project...', 'Open Project...', 'Open Remote Project...'];
+      const links = ['Create Project...', 'Open Project...', 'Open Remote Project...', 'Import Project...'];
       ImGui.PushID('WelcomeLink');
       for (let i = 0; i < links.length; i++) {
         ImGui.PushID(i);
@@ -289,7 +291,12 @@ export class Editor {
                     this._currentProject = project;
                     this._scriptingSystem.registry.VFS = ProjectService.VFS;
                     this.loadDepTypes();
-                    this._moduleManager.activate('Scene', this._currentProject.lastEditScene ?? '');
+                    ProjectService.getCurrentProjectSettings().then((settings) => {
+                      this._moduleManager.activate(
+                        'Scene',
+                        settings.startupScene || this._currentProject.lastEditScene || ''
+                      );
+                    });
                   });
                 }
               });
@@ -306,6 +313,9 @@ export class Editor {
                 });
               }
             });
+          }
+          if (i === 3) {
+            this.importProject();
           }
         }
         if (ImGui.IsItemHovered()) {
@@ -337,6 +347,34 @@ export class Editor {
     if (!this._currentProject) {
       return;
     }
+    type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
+    const treeData: TreeData = {
+      files: [],
+      subDirs: {}
+    };
+    function addDirectory(path: string): TreeData {
+      const entries = path.split('/').filter((val) => !!val);
+      let data = treeData;
+      while (entries.length > 0) {
+        const name = entries.shift();
+        let subdir = data.subDirs[name];
+        if (!subdir) {
+          subdir = { files: [], subDirs: {} };
+          data.subDirs[name] = subdir;
+        }
+        data = subdir;
+      }
+      return data;
+    }
+    function addFile(path: string, size: number) {
+      const dir = PathUtils.dirname(path);
+      const name = PathUtils.basename(path);
+      const data = addDirectory(dir);
+      data.files.push({
+        name,
+        size
+      });
+    }
     const zipDownloader = new ZipDownloader(`${this._currentProject.name}.zip`);
     const fileList = await ProjectService.VFS.glob('/**/*', {
       includeHidden: true,
@@ -361,11 +399,29 @@ export class Editor {
       const path = ProjectService.VFS.relative(file.path, '/');
       await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
       directories = directories.filter((dir) => !file.path.startsWith(`${dir.path}/`));
+      addFile(file.path, file.size);
     }
     for (const dir of directories) {
       await zipDownloader.zipWriter.add(`${ProjectService.VFS.relative(dir.path, '/')}/`);
+      addDirectory(dir.path);
     }
+    await zipDownloader.zipWriter.add(
+      fileListFileName,
+      new Blob([JSON.stringify(treeData, null, 2)]).stream()
+    );
     await zipDownloader.finish();
+  }
+  async importProject() {
+    const files = await FilePicker.chooseDirectory();
+    if (files?.length > 0) {
+      const uuid = await ProjectService.importProject(files);
+      if (uuid) {
+        const project = await ProjectService.openProject(uuid);
+        this._currentProject = project;
+        this._scriptingSystem.registry.VFS = ProjectService.VFS;
+        this._moduleManager.activate('Scene', '');
+      }
+    }
   }
   async newProject() {
     const name = await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400);
