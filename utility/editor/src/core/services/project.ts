@@ -1,7 +1,7 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
 import { HttpFS, IndexedDBFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
-import { projectFileName, templateIndex } from '../build/templates';
+import { projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 
 export type ProjectInfo = {
@@ -103,13 +103,6 @@ export class ProjectService {
       if (!(await vfs.exists('/assets'))) {
         await vfs.makeDirectory('/assets');
       }
-      if (!(await vfs.exists('/src/index.ts'))) {
-        await vfs.makeDirectory('/src', true);
-        await vfs.writeFile('/src/index.ts', templateIndex, {
-          encoding: 'utf8',
-          create: true
-        });
-      }
     } finally {
       await vfs.close();
     }
@@ -128,12 +121,7 @@ export class ProjectService {
     await this.writeManifest(manifest);
     const vfs = new IndexedDBFS(uuid, '$');
     try {
-      await vfs.makeDirectory('/src');
       await vfs.makeDirectory('/assets');
-      await vfs.writeFile('/src/index.ts', templateIndex, {
-        encoding: 'utf8',
-        create: true
-      });
       const settings = { ...defaultProjectSettings, title: name };
       await vfs.writeFile(`/${projectFileName}`, JSON.stringify(settings, null, 2), {
         encoding: 'utf8',

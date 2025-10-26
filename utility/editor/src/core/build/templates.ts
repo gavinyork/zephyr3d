@@ -1,3 +1,5 @@
+import { ProjectSettings } from '../services/project';
+
 export const projectFileName = 'project.json';
 export const fileListFileName = 'filelist.json';
 
@@ -54,6 +56,57 @@ export default class extends RuntimeScript<HostType> {
   }
 }
 `;
+
+export function generateIndexTS(settings: ProjectSettings) {
+  const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
+  return `import { Application, getEngine } from '@zephyr3d/scene';
+import { HttpFS } from '@zephyr3d/base';
+import type { DeviceBackend } from '@zephyr3d/device';
+let backend: DeviceBackend = null;
+${
+  rhiList.includes('webgpu')
+    ? `backend = backend || (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
+if (!backend.supported()) {
+  backend = null;
+}
+`
+    : ''
+}
+${
+  rhiList.includes('webgl2')
+    ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL2;
+if (!backend.supported()) {
+  backend = null;
+}
+`
+    : ''
+}
+${
+  rhiList.includes('webgl')
+    ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL1;
+if (!backend.supported()) {
+  backend = null;
+}
+`
+    : ''
+}
+if (!backend) {
+  throw new Error('No supported rendering device found');
+}
+
+const application = new Application({
+  backend,
+  canvas: document.querySelector('#canvas'),
+  runtimeOptions: {
+    scriptsRoot: '/assets'
+  }
+});
+application.ready().then(async () => {
+  getEngine().startup('${settings.startupScene}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
+  application.run();
+});
+`;
+}
 
 export const templateIndex = `import { Application, getEngine } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';

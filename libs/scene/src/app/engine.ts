@@ -187,7 +187,7 @@ export class Engine {
     const splashScreenLayer = 9999;
     if (splashScreen) {
       const splashScreenScene = await this.loadSceneFromFile(splashScreen);
-      if (splashScreen) {
+      if (splashScreenScene) {
         this.setRenderable(splashScreenScene, splashScreenLayer);
       }
     }

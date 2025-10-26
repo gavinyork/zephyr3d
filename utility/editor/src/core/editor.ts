@@ -12,7 +12,7 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import { DRef, GenericHtmlDirectoryReader, HttpFS, PathUtils } from '@zephyr3d/base';
+import { DRef, GenericHtmlDirectoryReader, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -23,7 +23,7 @@ import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies } from './build/dep';
 import { FilePicker } from '../components/filepicker';
-import { fileListFileName } from './build/templates';
+import { fileListFileName, generateIndexTS } from './build/templates';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -449,11 +449,19 @@ export class Editor {
     await ProjectService.deleteProject(uuid);
   }
   async buildProject() {
+    const settings = await ProjectService.getCurrentProjectSettings();
+    const srcIndexTS = generateIndexTS(settings);
+    const srcVFS = new MemoryFS();
+    srcVFS.writeFile('/index.ts', srcIndexTS, { encoding: 'utf8', create: true });
+    ProjectService.VFS.mount('/src', srcVFS);
     await ensureDependencies();
     await buildForEndUser({
       input: '/src/index.ts',
       distDir: '/dist'
     });
+    ProjectService.VFS.unmount('/src');
+    srcVFS.close();
+
     const zipDownloader = new ZipDownloader(`${this._currentProject.name}_dist.zip`);
     const distFileList = await ProjectService.VFS.glob('/dist/**/*', {
       includeHidden: true,
