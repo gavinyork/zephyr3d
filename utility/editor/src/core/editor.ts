@@ -21,9 +21,10 @@ import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
-import { ensureDependencies } from './build/dep';
+import { ensureDependencies, installDeps } from './build/dep';
 import { FilePicker } from '../components/filepicker';
 import { fileListFileName, generateIndexTS } from './build/templates';
+import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -384,15 +385,22 @@ export class Editor {
     });
     const files = fileList.filter(
       (path) =>
-        path.type === 'file' && !path.path.startsWith('/dist/') && !path.path.startsWith('/assets/@builtins/')
+        path.type === 'file' &&
+        !path.path.startsWith('/dist/') &&
+        !path.path.startsWith('/assets/@builtins/') &&
+        !path.path.startsWith('/deps') &&
+        path.path !== '/deps.lock.json' &&
+        path.path !== `/${fileListFileName}`
     );
     let directories = fileList.filter(
       (path) =>
         path.type === 'directory' &&
         path.path !== '/dist' &&
         path.path !== '/assets/@builtins' &&
+        path.path !== '/deps' &&
         !path.path.startsWith('/dist/') &&
-        !path.path.startsWith('/assets/@builtins/')
+        !path.path.startsWith('/assets/@builtins/') &&
+        !path.path.startsWith('/deps/')
     );
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
@@ -417,9 +425,26 @@ export class Editor {
       const uuid = await ProjectService.importProject(files);
       if (uuid) {
         const project = await ProjectService.openProject(uuid);
+        const settings = await ProjectService.getCurrentProjectSettings();
         this._currentProject = project;
         this._scriptingSystem.registry.VFS = ProjectService.VFS;
-        this._moduleManager.activate('Scene', '');
+        this._moduleManager.activate('Scene', settings.startupScene ?? project.lastEditScene ?? '');
+        for (const dep of Object.keys(settings.dependencies ?? {})) {
+          const depName = dep;
+          const depVersion = settings.dependencies[dep];
+          const packageName = `${depName}@${depVersion}`;
+          const dlgMessageBoxEx = new DlgMessageBoxEx(
+            'Install package',
+            `Installing ${packageName}`,
+            [],
+            400,
+            0,
+            false
+          );
+          dlgMessageBoxEx.showModal();
+          await installDeps(uuid, ProjectService.VFS, '/', packageName, null, false);
+          dlgMessageBoxEx.close('');
+        }
       }
     }
   }
@@ -440,9 +465,29 @@ export class Editor {
     const id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
     if (id) {
       const project = await ProjectService.openProject(id);
+      const settings = await ProjectService.getCurrentProjectSettings();
       this._currentProject = project;
       this.loadDepTypes();
-      this._moduleManager.activate('Scene', project.lastEditScene ?? '');
+      this._moduleManager.activate('Scene', settings.startupScene ?? project.lastEditScene ?? '');
+      for (const dep of Object.keys(settings.dependencies ?? {})) {
+        const depName = dep;
+        const depVersion = settings.dependencies[dep];
+        const packageName = `${depName}@${depVersion}`;
+        const installed = await ProjectService.VFS.exists(`/deps/${packageName}`);
+        if (!installed) {
+          const dlgMessageBoxEx = new DlgMessageBoxEx(
+            'Install package',
+            `Installing ${packageName}`,
+            [],
+            400,
+            0,
+            false
+          );
+          dlgMessageBoxEx.showModal();
+          await installDeps(id, ProjectService.VFS, '/', packageName, null, false);
+          dlgMessageBoxEx.close('');
+        }
+      }
     }
   }
   async deleteProject(uuid: string) {

@@ -1,4 +1,4 @@
-import { ProjectSettings } from '../services/project';
+import type { ProjectSettings } from '../services/project';
 
 export const projectFileName = 'project.json';
 export const fileListFileName = 'filelist.json';

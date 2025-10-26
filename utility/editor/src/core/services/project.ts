@@ -1,7 +1,7 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
 import { HttpFS, IndexedDBFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
-import { projectFileName } from '../build/templates';
+import { fileListFileName, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 
 export type ProjectInfo = {
@@ -97,6 +97,9 @@ export class ProjectService {
     try {
       for (const f of files) {
         const path = `/${PathUtils.relative(baseDir, f.webkitRelativePath)}`;
+        if (path === `/${fileListFileName}`) {
+          continue;
+        }
         const content = await f.arrayBuffer();
         await vfs.writeFile(path, content, { encoding: 'binary', create: true });
       }

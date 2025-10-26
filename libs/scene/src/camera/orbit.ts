@@ -171,6 +171,7 @@ export class OrbitCameraController extends BaseCameraController {
       this.panVelocityX = 0;
       this.panVelocityY = 0;
       this.currentOp = OperationType.ROTATE;
+      return true;
     } else if (this.matchesControl(evt, this.options.controls.pan)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
@@ -188,8 +189,9 @@ export class OrbitCameraController extends BaseCameraController {
       this.rotateY = 0;
       this.panVelocityX = 0;
       this.panVelocityY = 0;
+      return true;
     }
-    return true;
+    return false;
   }
   /**
    * {@inheritDoc BaseCameraController._onMouseUp}
@@ -208,7 +210,7 @@ export class OrbitCameraController extends BaseCameraController {
       this.currentOp = OperationType.NONE;
       return true;
     }
-    return true;
+    return false;
   }
   /**
    * {@inheritDoc BaseCameraController._onMouseWheel}
