@@ -5,6 +5,7 @@ import { DlgOpenFile } from './openfiledlg';
 import type { VFS } from '@zephyr3d/base';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
 import { ListView, ListViewData } from '../../components/listview';
+import { libDir } from '../../core/build/templates';
 
 class DepsContentData extends ListViewData<{ name: string; version: string }> {
   elements: { name: string; version: string }[];
@@ -237,7 +238,9 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
   }
   async removePackages() {
     if (this._settings.dependencies) {
-      const lockFile = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+      const lockFile = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
+        encoding: 'utf8'
+      })) as string;
       const lock = JSON.parse(lockFile) as {
         dependencies: {
           [name: string]: {
@@ -253,7 +256,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       for (const k of Object.keys(this._settings.dependencies)) {
         if (newPackages.findIndex((p) => p.name === k) < 0) {
           console.log(`Remove package: ${k}`);
-          const dir = `/deps/${k}@${this._settings.dependencies[k]}`;
+          const dir = `/${libDir}/deps/${k}@${this._settings.dependencies[k]}`;
           await ProjectService.VFS.deleteDirectory(dir, true);
           console.log(`Directory removed: '${dir}'`);
           delete this._settings.dependencies[k];
@@ -263,12 +266,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       }
       if (removed) {
         if (Object.keys(this._settings.dependencies).length === 0) {
-          await ProjectService.VFS.deleteDirectory('/deps', true);
+          await ProjectService.VFS.deleteDirectory(`/${libDir}/deps`, true);
           console.log(`Directory removed: '/deps'`);
-          await ProjectService.VFS.deleteFile('/deps.lock.json');
+          await ProjectService.VFS.deleteFile(`/${libDir}/deps.lock.json`);
           console.log('Dependencies lock file deleted');
         } else {
-          await ProjectService.VFS.writeFile('/deps.lock.json', JSON.stringify(lock, null, 2), {
+          await ProjectService.VFS.writeFile(`/${libDir}/deps.lock.json`, JSON.stringify(lock, null, 2), {
             encoding: 'utf8',
             create: true
           });

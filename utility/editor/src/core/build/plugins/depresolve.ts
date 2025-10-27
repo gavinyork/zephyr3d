@@ -1,6 +1,7 @@
 import type { VFS } from '@zephyr3d/base';
 import type { LockFile } from '../dep';
 import { readLock } from '../dep';
+import { libDir } from '../templates';
 
 export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
   let lock: LockFile | null = null;
@@ -15,7 +16,7 @@ export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
     },
     async resolveId(source, _importer) {
       // If already a VFS deps path, accept
-      if (source.startsWith('/deps/')) {
+      if (source.startsWith(`/${libDir}/deps/`)) {
         return source;
       }
 
@@ -28,7 +29,7 @@ export function depsResolvePlugin(vfs: VFS, projectRoot: string) {
       return null;
     },
     async load(id) {
-      if (id.startsWith('/deps/')) {
+      if (id.startsWith(`/${libDir}/deps/`)) {
         const code = (await vfs.readFile(id, { encoding: 'utf8' })) as string | null;
         if (code == null) {
           throw new Error(`VFS miss for dependency: ${id}`);

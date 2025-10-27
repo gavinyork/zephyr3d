@@ -404,9 +404,9 @@ export class ScriptRegistry {
       path = spec.replace(/^\/+/, '/');
     } else if (this._editorMode) {
       // naked module, checking if it is a installed module in editor mode
-      const depsExists = await this._vfs.exists('/deps.lock.json');
+      const depsExists = await this._vfs.exists('/libs/deps.lock.json');
       if (depsExists) {
-        const content = (await this._vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+        const content = (await this._vfs.readFile('/libs/deps.lock.json', { encoding: 'utf8' })) as string;
         const depsInfo = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
         if (depsInfo?.dependencies[spec]) {
           path = this._vfs.normalizePath(depsInfo.dependencies[spec].entry);

@@ -2,6 +2,7 @@ import type { ProjectSettings } from '../services/project';
 
 export const projectFileName = 'project.json';
 export const fileListFileName = 'filelist.json';
+export const libDir = 'libs';
 
 export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
 import { RuntimeScript } from '@zephyr3d/scene';

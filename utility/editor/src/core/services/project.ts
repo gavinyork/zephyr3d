@@ -1,8 +1,9 @@
 import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
-import { HttpFS, IndexedDBFS, PathUtils, randomUUID } from '@zephyr3d/base';
+import { HttpFS, IndexedDBFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
-import { fileListFileName, projectFileName } from '../build/templates';
+import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
+import { installDeps } from '../build/dep';
 
 export type ProjectInfo = {
   name: string;
@@ -189,6 +190,21 @@ export class ProjectService {
       throw new Error('Current project must be closed before opening another project');
     }
     this.VFS = new HttpFS(url, { directoryReader });
+    const settings = await this.getCurrentProjectSettings();
+    const deps = Object.keys(settings.dependencies ?? {});
+    if (deps.length > 0) {
+      const libsVFS = new MemoryFS();
+      await this.VFS.mount(`/${libDir}`, libsVFS);
+      for (const dep of deps) {
+        const depName = dep;
+        const depVersion = settings.dependencies[dep];
+        const packageName = `${depName}@${depVersion}`;
+        const installed = await ProjectService.VFS.exists(`/${libDir}/deps/${packageName}`);
+        if (!installed) {
+          await installDeps(url, this.VFS, '/', packageName, null, false);
+        }
+      }
+    }
     console.info(`Remote project opened: ${url}`);
     return {
       name: url,

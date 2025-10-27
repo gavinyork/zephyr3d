@@ -3,6 +3,7 @@ import type { VFS } from '@zephyr3d/base';
 import { loadTypes } from './loadtypes';
 import { ProjectService } from '../services/project';
 import { DlgMessageBoxEx } from '../../views/dlg/messageexdlg';
+import { libDir } from './templates';
 
 export type LockEntry = {
   version: string;
@@ -16,7 +17,7 @@ export type LockFile = {
 };
 
 export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile | null> {
-  const p = vfs.join(projectRoot, 'deps.lock.json');
+  const p = vfs.join(projectRoot, `/${libDir}/deps.lock.json`);
   if (!(await vfs.exists(p))) {
     return null;
   }
@@ -30,7 +31,7 @@ export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile 
 }
 
 export async function writeLock(vfs: VFS, projectRoot: string, lock: LockFile): Promise<void> {
-  const p = vfs.join(projectRoot, 'deps.lock.json');
+  const p = vfs.join(projectRoot, `/${libDir}/deps.lock.json`);
   const pretty = JSON.stringify(lock, null, 2);
   await vfs.writeFile(p, pretty, { encoding: 'utf8', create: true });
 }
@@ -217,7 +218,7 @@ export function depsPathOf(cdnUrl: string, name: string, version: string): strin
   if (isDirLike) {
     sub = (sub.endsWith('/') ? sub : sub + '/') + 'mod.js';
   }
-  return `/deps/${name}@${version}${sub}`;
+  return `/${libDir}/deps/${name}@${version}${sub}`;
 }
 
 export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, version: string) {
@@ -296,8 +297,10 @@ export async function ensureDependencies() {
 }
 
 export async function checkDependencies(): Promise<boolean> {
-  if (await ProjectService.VFS.exists('/deps.lock.json')) {
-    const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+  if (await ProjectService.VFS.exists(`/${libDir}/deps.lock.json`)) {
+    const content = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
+      encoding: 'utf8'
+    })) as string;
     const deps = JSON.parse(content) as {
       dependencies: Record<string, { version: string; entry: string }>;
     };
@@ -312,13 +315,15 @@ export async function checkDependencies(): Promise<boolean> {
 }
 
 export async function reinstallPackages() {
-  if (!(await ProjectService.VFS.exists('/deps.lock.json'))) {
+  if (!(await ProjectService.VFS.exists(`/${libDir}/deps.lock.json`))) {
     return;
   }
-  if (await ProjectService.VFS.exists('/deps')) {
-    await ProjectService.VFS.deleteDirectory('/deps', true);
+  if (await ProjectService.VFS.exists(`/${libDir}/deps`)) {
+    await ProjectService.VFS.deleteDirectory(`/${libDir}/deps`, true);
   }
-  const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+  const content = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
+    encoding: 'utf8'
+  })) as string;
   const entries = JSON.parse(content) as {
     dependencies: Record<string, { version: string }>;
   };

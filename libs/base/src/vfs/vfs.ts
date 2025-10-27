@@ -735,6 +735,14 @@ export abstract class VFS extends Observable<{
 
   async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
     const normalizedPath = this.normalizePath(path);
+    const exists = await this.exists(normalizedPath);
+    if (!exists) {
+      return;
+    }
+    const stat = await this.stat(normalizedPath);
+    if (!stat.isDirectory) {
+      throw new VFSError('Target path is not a directory', 'ENOTDIR', normalizedPath);
+    }
     for (const mountPath of this.sortedMountPaths) {
       if (mountPath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/')) {
         // Attempt to delete a mounted path or it's parent
@@ -907,13 +915,20 @@ export abstract class VFS extends Observable<{
     dest: string,
     options?: { overwrite?: boolean; targetVFS?: VFS }
   ): Promise<void> {
-    const targetVFS = options?.targetVFS ?? this;
+    // Detect if we are copying to a mounted VFS
+    const destMount = this.getMountedVFS(dest);
+    const targetVFS = options?.targetVFS ?? (destMount ? destMount.vfs : this);
     const overwrite = !!options?.overwrite;
+
+    // Check if target VFS is writable
     if (targetVFS._readOnly) {
-      throw new VFSError('Target VFS is read-only', 'EROFS');
+      throw new VFSError('Target VFS is read-only', 'EROFS', dest);
     }
+
     const normalizedSrc = this.normalizePath(src);
-    const normalizedDest = targetVFS.normalizePath(dest);
+    const normalizedDest = targetVFS.normalizePath(destMount ? destMount.relativePath : dest);
+
+    // Check source file
     if (!(await this.exists(normalizedSrc))) {
       throw new VFSError('Source file does not exist', 'ENOENT', normalizedSrc);
     }
@@ -921,22 +936,31 @@ export abstract class VFS extends Observable<{
     if (!sourceStat.isFile) {
       throw new VFSError('Source path is not a file', 'EISDIR', normalizedSrc);
     }
+
+    // Check target file
     const targetExists = await targetVFS.exists(normalizedDest);
     if (targetExists && !overwrite) {
-      if (!overwrite) {
-        throw new VFSError('Target file already exists', 'EEXIST', normalizedDest);
-      }
-      const targetStat = await targetVFS.stat(normalizedDest);
-      if (!targetStat.isFile) {
-        throw new VFSError('Target path is not a file', 'EISDIR', normalizedDest);
+      throw new VFSError('Target file already exists', 'EEXIST', normalizedDest);
+    }
+    if (targetExists) {
+      const tStat = await targetVFS.stat(normalizedDest);
+      if (tStat.isDirectory) {
+        throw new VFSError('Target path is a directory', 'EISDIR', normalizedDest);
       }
     }
-    const parentPath = targetVFS.dirname(normalizedDest);
-    if (parentPath !== '/' && !(await targetVFS.exists(parentPath))) {
-      await targetVFS.makeDirectory(parentPath, true);
+
+    // Make sure target directory exists
+    const parentDir = targetVFS.dirname(normalizedDest);
+    if (!(await targetVFS.exists(parentDir))) {
+      await targetVFS.makeDirectory(parentDir, true);
     }
+
+    // Copy file
     const data = await this.readFile(normalizedSrc, { encoding: 'binary' });
-    await targetVFS.writeFile(normalizedDest, data, { create: true, encoding: 'binary' });
+    await targetVFS.writeFile(normalizedDest, data, {
+      create: true,
+      encoding: 'binary'
+    });
   }
 
   /**
@@ -972,80 +996,86 @@ export abstract class VFS extends Observable<{
       onProgress?: (current: number, total: number) => void;
     }
   ): Promise<void> {
-    const targetVFS = options?.targetVFS ?? this;
+    // Detect if we are copying to mounted VFS
+    const targetMount = this.getMountedVFS(targetDirectory);
+    const targetVFS = options?.targetVFS ?? (targetMount ? targetMount.vfs : this);
     const overwrite = !!options?.overwrite;
 
     if (targetVFS._readOnly) {
-      throw new VFSError('Target VFS is read-only', 'EROFS');
+      throw new VFSError('Target VFS is read-only', 'EROFS', targetDirectory);
     }
 
     try {
-      const normalizedTargetDir = targetVFS.normalizePath(targetDirectory);
+      const normalizedTargetDir = targetVFS.normalizePath(
+        targetMount ? targetMount.relativePath : targetDirectory
+      );
 
-      // Always create target directory
+      // Make sure that target directory exists
       if (!(await targetVFS.exists(normalizedTargetDir))) {
         await targetVFS.makeDirectory(normalizedTargetDir, true);
       } else {
-        // Check if target is a directory
         const targetStat = await targetVFS.stat(normalizedTargetDir);
         if (!targetStat.isDirectory) {
           throw new VFSError('Target path is not a directory', 'ENOTDIR', normalizedTargetDir);
         }
       }
 
-      // Get list of files to copy
+      // Calculate source file list
       let filesToCopy: string[] = [];
-
       if (Array.isArray(sourcePattern)) {
-        // Array of specific file paths
         filesToCopy = sourcePattern;
       } else {
-        // Glob pattern or single path
         filesToCopy = await this.expandGlobPattern(sourcePattern, options?.cwd);
       }
 
-      let numCopied = 0;
-      options?.onProgress?.(numCopied, filesToCopy.length);
-      // Copy each file
+      // Copy files
+      let copied = 0;
+      options?.onProgress?.(copied, filesToCopy.length);
+
       for (const sourcePath of filesToCopy) {
         try {
-          // Check if source exists and is a file
           if (!(await this.exists(sourcePath))) {
-            console.error(`Source file does not exist: ${sourcePath}`);
+            console.warn(`Source file missing: ${sourcePath}`);
             continue;
           }
-
-          // Determine target file path - preserve relative directory structure
-          const targetFilePath = this.calculateTargetPath(sourcePattern, sourcePath, normalizedTargetDir);
 
           const sourceStat = await this.stat(sourcePath);
-          if (!sourceStat.isFile) {
-            await targetVFS.makeDirectory(targetFilePath, true);
+          const targetFilePath = this.calculateTargetPath(sourcePattern, sourcePath, normalizedTargetDir);
+
+          // Get relative mounted paths of target files
+          const targetRel =
+            targetMount?.vfs === targetVFS
+              ? targetVFS.normalizePath(PathUtils.relative(targetMount.mountPath, targetFilePath))
+              : targetFilePath;
+
+          if (sourceStat.isDirectory) {
+            await targetVFS.makeDirectory(targetRel, true);
             continue;
           }
 
-          // Check if target already exists
-          const targetExists = await targetVFS.exists(targetFilePath);
-          if (targetExists && !overwrite) {
+          const exists = await targetVFS.exists(targetRel);
+          if (exists && !overwrite) {
             continue;
           }
 
-          // Always create parent directory for target file
-          const targetParent = targetVFS.dirname(targetFilePath);
-          if (!(await targetVFS.exists(targetParent))) {
-            await targetVFS.makeDirectory(targetParent, true);
+          const parent = targetVFS.dirname(targetRel);
+          if (!(await targetVFS.exists(parent))) {
+            await targetVFS.makeDirectory(parent, true);
           }
 
-          // Copy the file
           const data = await this.readFile(sourcePath, { encoding: 'binary' });
-          await targetVFS.writeFile(targetFilePath, data, { create: true, encoding: 'binary' });
-          options?.onProgress?.(++numCopied, filesToCopy.length);
-        } catch (error) {
-          console.error(String(error));
+          await targetVFS.writeFile(targetRel, data, {
+            create: true,
+            encoding: 'binary'
+          });
+
+          options?.onProgress?.(++copied, filesToCopy.length);
+        } catch (err) {
+          console.error(String(err));
         }
       }
-    } catch (error) {
-      console.error(String(error));
+    } catch (err) {
+      console.error(String(err));
     }
   }
 

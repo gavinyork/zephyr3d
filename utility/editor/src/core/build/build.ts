@@ -5,7 +5,7 @@ import { tsTranspilePlugin } from './plugins/tstranspile';
 import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
-import { projectFileName, templateIndexHTML } from './templates';
+import { libDir, projectFileName, templateIndexHTML } from './templates';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -75,7 +75,7 @@ function transpileTS(fileName: string, code: string) {
 
 export async function getImportMap(vfs: VFS, distDir: string, writeDependencies = true) {
   const importMap: Record<string, string> = {};
-  const depsDir = vfs.join(distDir, 'deps');
+  const depsDir = vfs.join(distDir, `${libDir}/deps`);
   if (writeDependencies) {
     await vfs.makeDirectory(depsDir, true);
   }
@@ -87,16 +87,19 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
     }
     importMap[`@zephyr3d/${name}`] = `./${vfs.relative(path, distDir)}`;
   }
-  if ((await vfs.exists('/deps.lock.json')) && (await vfs.exists('/deps'))) {
-    if ((await vfs.stat('/deps.lock.json')).isFile && (await vfs.stat('/deps')).isDirectory) {
-      const content = (await vfs.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+  if ((await vfs.exists(`/${libDir}/deps.lock.json`)) && (await vfs.exists(`/${libDir}/deps`))) {
+    if (
+      (await vfs.stat(`/${libDir}/deps.lock.json`)).isFile &&
+      (await vfs.stat(`/${libDir}/deps`)).isDirectory
+    ) {
+      const content = (await vfs.readFile(`/${libDir}/deps.lock.json`, { encoding: 'utf8' })) as string;
       const packages = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
       for (const k of Object.keys(packages.dependencies)) {
         importMap[k] = packages.dependencies[k].entry;
       }
       if (writeDependencies) {
-        await vfs.copyFile('/deps.lock.json', '/dist/deps.lock.json');
-        await vfs.copyFileEx('/deps/**/*', depsDir, { cwd: '/deps' });
+        await vfs.copyFile(`/${libDir}/deps.lock.json`, `/dist/${libDir}/deps.lock.json`);
+        await vfs.copyFileEx(`/${libDir}/deps/**/*`, depsDir, { cwd: `/${libDir}/deps` });
       }
     }
   }

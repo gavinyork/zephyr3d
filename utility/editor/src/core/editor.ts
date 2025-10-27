@@ -24,7 +24,7 @@ import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies, installDeps } from './build/dep';
 import { FilePicker } from '../components/filepicker';
-import { fileListFileName, generateIndexTS } from './build/templates';
+import { fileListFileName, generateIndexTS, libDir } from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 
@@ -241,8 +241,10 @@ export class Editor {
     }
   }
   async loadDepTypes() {
-    if (await ProjectService.VFS.exists('/deps.lock.json')) {
-      const content = (await ProjectService.VFS.readFile('/deps.lock.json', { encoding: 'utf8' })) as string;
+    if (await ProjectService.VFS.exists(`/${libDir}/deps.lock.json`)) {
+      const content = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
+        encoding: 'utf8'
+      })) as string;
       const deps = JSON.parse(content) as {
         dependencies: Record<string, { version: string; entry: string }>;
       };
@@ -340,54 +342,10 @@ export class Editor {
             this.newProject();
           }
           if (i === 1) {
-            ProjectService.listProjects().then((projects) => {
-              const names = projects.map((project) => project.name);
-              const ids = projects.map((project) => project.uuid);
-              Dialog.openFromList('Open Project', names, ids, 400, 400).then((id) => {
-                if (id) {
-                  ProjectService.openProject(id).then((project) => {
-                    this._currentProject = project;
-                    this._scriptingSystem.registry.VFS = ProjectService.VFS;
-                    this.loadDepTypes();
-                    ProjectService.getCurrentProjectSettings().then((settings) => {
-                      this._moduleManager.activate(
-                        'Scene',
-                        settings.startupScene || this._currentProject.lastEditScene || ''
-                      );
-                    });
-                  });
-                }
-              });
-            });
+            this.openProject();
           }
           if (i === 2) {
-            Dialog.promptName('Open Remote Project', 'Project URL', '', 400).then((url) => {
-              if (url) {
-                this.loadFileList(url)
-                  .then((fileList) => {
-                    if (fileList) {
-                      ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList)).then(
-                        (project) => {
-                          this._currentProject = project;
-                          this._scriptingSystem.registry.VFS = ProjectService.VFS;
-                          this.loadDepTypes();
-                          ProjectService.getCurrentProjectSettings().then((settings) => {
-                            this._moduleManager.activate(
-                              'Scene',
-                              settings.startupScene || this._currentProject.lastEditScene || ''
-                            );
-                          });
-                        }
-                      );
-                    } else {
-                      DlgMessage.messageBox('Error', `Cannot read remote project at <${url}>`);
-                    }
-                  })
-                  .catch((err) => {
-                    DlgMessage.messageBox('Error', `Cannot read remote project: ${err}`);
-                  });
-              }
-            });
+            this.openRemoteProject();
           }
           if (i === 3) {
             this.importProject();
@@ -405,16 +363,20 @@ export class Editor {
     ImGui.End();
   }
   async loadFileList(url: string): Promise<TreeData> {
-    let fileList: TreeData = null;
-    const { origin, pathname } = new URL(url);
-    const fileListUrl = pathname.endsWith('/')
-      ? `${origin}${pathname}${fileListFileName}`
-      : `${origin}${pathname}/${fileListFileName}`;
-    const res = await fetch(fileListUrl);
-    if (res.ok) {
-      fileList = await res.json();
+    try {
+      let fileList: TreeData = null;
+      const { origin, pathname } = new URL(url);
+      const fileListUrl = pathname.endsWith('/')
+        ? `${origin}${pathname}${fileListFileName}`
+        : `${origin}${pathname}/${fileListFileName}`;
+      const res = await fetch(fileListUrl);
+      if (res.ok) {
+        fileList = await res.json();
+      }
+      return fileList;
+    } catch {
+      return null;
     }
-    return fileList;
   }
   async closeProject(lastScenePath: string) {
     if (this._currentProject) {
@@ -473,8 +435,7 @@ export class Editor {
         path.type === 'file' &&
         !path.path.startsWith('/dist/') &&
         !path.path.startsWith('/assets/@builtins/') &&
-        !path.path.startsWith('/deps') &&
-        path.path !== '/deps.lock.json' &&
+        !path.path.startsWith(`/${libDir}/`) &&
         path.path !== `/${fileListFileName}`
     );
     let directories = fileList.filter(
@@ -482,10 +443,10 @@ export class Editor {
         path.type === 'directory' &&
         path.path !== '/dist' &&
         path.path !== '/assets/@builtins' &&
-        path.path !== '/deps' &&
+        path.path !== `/${libDir}` &&
         !path.path.startsWith('/dist/') &&
         !path.path.startsWith('/assets/@builtins/') &&
-        !path.path.startsWith('/deps/')
+        !path.path.startsWith(`/${libDir}/`)
     );
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
@@ -518,7 +479,7 @@ export class Editor {
           const depName = dep;
           const depVersion = settings.dependencies[dep];
           const packageName = `${depName}@${depVersion}`;
-          const installed = await ProjectService.VFS.exists(`/deps/${packageName}`);
+          const installed = await ProjectService.VFS.exists(`/${libDir}/deps/${packageName}`);
           if (!installed) {
             const dlgMessageBoxEx = new DlgMessageBoxEx(
               'Install package',
@@ -546,6 +507,23 @@ export class Editor {
       this._moduleManager.activate('Scene', '');
     }
   }
+  async openRemoteProject() {
+    const url = await Dialog.promptName('Open Remote Project', 'Project URL', '', 400);
+    if (!url) {
+      return;
+    }
+    const fileList = await this.loadFileList(url);
+    if (!fileList) {
+      await DlgMessage.messageBox('Error', `Cannot read remote project at <${url}>`);
+      return;
+    }
+    const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
+    this._currentProject = project;
+    this._scriptingSystem.registry.VFS = ProjectService.VFS;
+    this.loadDepTypes();
+    const settings = await ProjectService.getCurrentProjectSettings();
+    this._moduleManager.activate('Scene', settings.startupScene || this._currentProject.lastEditScene || '');
+  }
   async openProject() {
     const projects = await ProjectService.listProjects();
     const names = projects.map((project) => project.name);
@@ -561,7 +539,7 @@ export class Editor {
         const depName = dep;
         const depVersion = settings.dependencies[dep];
         const packageName = `${depName}@${depVersion}`;
-        const installed = await ProjectService.VFS.exists(`/deps/${packageName}`);
+        const installed = await ProjectService.VFS.exists(`/${libDir}/deps/${packageName}`);
         if (!installed) {
           const dlgMessageBoxEx = new DlgMessageBoxEx(
             'Install package',
