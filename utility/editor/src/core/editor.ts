@@ -12,7 +12,8 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import { DRef, GenericHtmlDirectoryReader, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
+import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext } from '@zephyr3d/base';
+import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -25,6 +26,62 @@ import { ensureDependencies, installDeps } from './build/dep';
 import { FilePicker } from '../components/filepicker';
 import { fileListFileName, generateIndexTS } from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
+import { DlgMessage } from '../views/dlg/messagedlg';
+
+type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
+
+class RemoteProjectDirectoryReader implements HttpDirectoryReader {
+  readonly name = 'file-list-reader';
+  private _treeData: TreeData;
+  private _dt: Date;
+  constructor(fileList: TreeData) {
+    this._treeData = fileList;
+    this._dt = new Date();
+  }
+  async readOnce(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<FileMetadata[]> {
+    const entries = dirPath.split('/').filter((val) => !!val);
+    let data = this._treeData;
+    while (entries.length > 0) {
+      const name = entries.shift();
+      let subdir = data.subDirs[name];
+      if (!subdir) {
+        data = null;
+        break;
+      }
+      data = subdir;
+    }
+    const result: FileMetadata[] = [];
+    if (data) {
+      if (data.subDirs) {
+        for (const k of Object.keys(data.subDirs)) {
+          const fullPath = ctx.normalizePath(ctx.joinPath(dirPath, k + '/'));
+          result.push({
+            name: k,
+            path: fullPath,
+            size: 0,
+            type: 'directory',
+            created: this._dt,
+            modified: this._dt
+          });
+        }
+      }
+      if (data.files) {
+        for (const f of data.files) {
+          const fullPath = ctx.normalizePath(ctx.joinPath(dirPath, f.name));
+          result.push({
+            name: f.name,
+            path: fullPath,
+            size: f.size,
+            type: 'file',
+            created: this._dt,
+            modified: this._dt
+          });
+        }
+      }
+    }
+    return result;
+  }
+}
 
 export class Editor {
   private readonly _moduleManager: ModuleManager;
@@ -306,12 +363,29 @@ export class Editor {
           if (i === 2) {
             Dialog.promptName('Open Remote Project', 'Project URL', '', 400).then((url) => {
               if (url) {
-                ProjectService.openRemoteProject(url, new GenericHtmlDirectoryReader()).then((project) => {
-                  this._currentProject = project;
-                  this._scriptingSystem.registry.VFS = ProjectService.VFS;
-                  this.loadDepTypes();
-                  this._moduleManager.activate('Scene', '');
-                });
+                this.loadFileList(url)
+                  .then((fileList) => {
+                    if (fileList) {
+                      ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList)).then(
+                        (project) => {
+                          this._currentProject = project;
+                          this._scriptingSystem.registry.VFS = ProjectService.VFS;
+                          this.loadDepTypes();
+                          ProjectService.getCurrentProjectSettings().then((settings) => {
+                            this._moduleManager.activate(
+                              'Scene',
+                              settings.startupScene || this._currentProject.lastEditScene || ''
+                            );
+                          });
+                        }
+                      );
+                    } else {
+                      DlgMessage.messageBox('Error', `Cannot read remote project at <${url}>`);
+                    }
+                  })
+                  .catch((err) => {
+                    DlgMessage.messageBox('Error', `Cannot read remote project: ${err}`);
+                  });
               }
             });
           }
@@ -329,6 +403,18 @@ export class Editor {
       ImGui.PopStyleColor(4);
     }
     ImGui.End();
+  }
+  async loadFileList(url: string): Promise<TreeData> {
+    let fileList: TreeData = null;
+    const { origin, pathname } = new URL(url);
+    const fileListUrl = pathname.endsWith('/')
+      ? `${origin}${pathname}${fileListFileName}`
+      : `${origin}${pathname}/${fileListFileName}`;
+    const res = await fetch(fileListUrl);
+    if (res.ok) {
+      fileList = await res.json();
+    }
+    return fileList;
   }
   async closeProject(lastScenePath: string) {
     if (this._currentProject) {
@@ -348,7 +434,6 @@ export class Editor {
     if (!this._currentProject) {
       return;
     }
-    type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
     const treeData: TreeData = {
       files: [],
       subDirs: {}
@@ -433,17 +518,20 @@ export class Editor {
           const depName = dep;
           const depVersion = settings.dependencies[dep];
           const packageName = `${depName}@${depVersion}`;
-          const dlgMessageBoxEx = new DlgMessageBoxEx(
-            'Install package',
-            `Installing ${packageName}`,
-            [],
-            400,
-            0,
-            false
-          );
-          dlgMessageBoxEx.showModal();
-          await installDeps(uuid, ProjectService.VFS, '/', packageName, null, false);
-          dlgMessageBoxEx.close('');
+          const installed = await ProjectService.VFS.exists(`/deps/${packageName}`);
+          if (!installed) {
+            const dlgMessageBoxEx = new DlgMessageBoxEx(
+              'Install package',
+              `Installing ${packageName}`,
+              [],
+              400,
+              0,
+              false
+            );
+            dlgMessageBoxEx.showModal();
+            await installDeps(uuid, ProjectService.VFS, '/', packageName, null, false);
+            dlgMessageBoxEx.close('');
+          }
         }
       }
     }
@@ -497,8 +585,15 @@ export class Editor {
     const settings = await ProjectService.getCurrentProjectSettings();
     const srcIndexTS = generateIndexTS(settings);
     const srcVFS = new MemoryFS();
+    const distVFS = new MemoryFS();
     srcVFS.writeFile('/index.ts', srcIndexTS, { encoding: 'utf8', create: true });
     ProjectService.VFS.mount('/src', srcVFS);
+    if (ProjectService.VFS.readOnly) {
+      await ProjectService.VFS.mount('/dist', distVFS);
+    } else {
+      await ProjectService.VFS.deleteDirectory('/dist', true);
+      await ProjectService.VFS.makeDirectory('/dist', true);
+    }
     await ensureDependencies();
     await buildForEndUser({
       input: '/src/index.ts',
@@ -526,6 +621,10 @@ export class Editor {
       await zipDownloader.zipWriter.add(`${dir.path}/`);
     }
     await zipDownloader.finish();
+    if (ProjectService.VFS.readOnly) {
+      ProjectService.VFS.unmount('/dist');
+      distVFS.close();
+    }
   }
   private onAction(action: string, fileName: string, arg: string) {
     if (action === 'EDIT_CODE' && fileName) {
