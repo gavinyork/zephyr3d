@@ -584,7 +584,7 @@ export class GLTFImporter implements ModelImporter {
           ]
             .filter((v) => !!v)
             .join('');
-          const materialHash = [p.material ?? 'default', flagsHash].join('.');
+          const materialHash = [p.material ?? 'default', flagsHash].filter((v) => !!v).join('.');
           let material = model.getMaterial(materialHash);
           if (!material) {
             const materialInfo = p.material !== undefined ? gltf.materials[p.material] : null;

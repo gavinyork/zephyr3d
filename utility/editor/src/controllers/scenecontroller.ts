@@ -7,6 +7,7 @@ import { Dialog } from '../views/dlg/dlg';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
 import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
+import { DlgMessage } from '../views/dlg/messagedlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -175,10 +176,16 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
     this._view.update(dt);
   }
   private async saveScene() {
-    await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
-    this._editor.currentProject.lastEditScene = this._scenePath;
-    await this._editor.saveProject();
-    this._sceneChanged = false;
+    if (ProjectService.VFS.readOnly) {
+      const msg = 'Cannot save scene in read-only mode';
+      console.error(msg);
+      await DlgMessage.messageBox('Error', msg);
+    } else {
+      await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
+      this._editor.currentProject.lastEditScene = this._scenePath;
+      await this._editor.saveProject();
+      this._sceneChanged = false;
+    }
   }
   async loadScene(path: string): Promise<Scene> {
     return ProjectService.serializationManager.loadScene(path);

@@ -451,7 +451,8 @@ export class Editor {
     for (const file of files) {
       const content = (await ProjectService.VFS.readFile(file.path, { encoding: 'binary' })) as ArrayBuffer;
       const path = ProjectService.VFS.relative(file.path, '/');
-      await zipDownloader.zipWriter.add(path, new Blob([content]).stream());
+      const stream = new Blob([content]).stream();
+      await zipDownloader.zipWriter.add(path, stream);
       directories = directories.filter((dir) => !file.path.startsWith(`${dir.path}/`));
       addFile(file.path, file.size);
     }
