@@ -314,11 +314,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         vertices[i * 4 + 2] = points[i].z;
         vertices[i * 4 + 3] = i;
       }
-      if (primitive.indexCount < points.length) {
-        const positionBuffer = device.createVertexBuffer('position_f32x4', vertices, { dynamic: true });
-        primitive.setVertexBuffer(positionBuffer);
+      let vb = primitive.getVertexBuffer('position');
+      if (!vb || vb.byteLength !== vertices.byteLength) {
+        vb = device.createVertexBuffer('position_f32x4', vertices, { dynamic: true });
+        primitive.setVertexBuffer(vb);
       } else {
-        const vb = primitive.getVertexBuffer('position');
         vb.bufferSubData(0, vertices);
       }
       const fb = this._feedbackRenderTarget.get();
