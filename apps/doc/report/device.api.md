@@ -1812,7 +1812,7 @@ export interface ProgramBuilder {
     frexp(x: number | PBShaderExp): PBShaderExp;
     func(name: string, params: PBShaderExp[], body?: (this: PBFunctionScope) => void): void;
     fwidth(x: PBShaderExp): PBShaderExp;
-    getCurrentScope(): PBScope;
+    getCurrentScope<T extends PBScope = PBScope>(): T;
     getDevice(): AbstractDevice;
     getGlobalScope(): PBGlobalScope;
     greaterThan(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
@@ -1972,6 +1972,7 @@ export interface ProgramBuilder {
     sampler(rhs?: string): PBShaderExp;
     samplerComparison(rhs?: string): PBShaderExp;
     sar(a: number | PBShaderExp, b: number | PBShaderExp): any;
+    saturate(x: PBShaderExp): PBShaderExp;
     select(x: number | PBShaderExp, y: number | PBShaderExp, cond: boolean | PBShaderExp): PBShaderExp;
     sign(val: number | PBShaderExp): PBShaderExp;
     sin(val: number | PBShaderExp): PBShaderExp;
@@ -2403,6 +2404,8 @@ export type TextureColorSpace = 'srgb' | 'linear';
 
 // @public
 export interface TextureCreationOptions extends BaseCreationOptions {
+    // (undocumented)
+    mipmapping?: boolean;
     // (undocumented)
     samplerOptions?: SamplerOptions;
     // (undocumented)

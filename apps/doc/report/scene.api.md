@@ -27,6 +27,7 @@ import { GPUDataBuffer } from '@zephyr3d/device';
 import { GPUProgram } from '@zephyr3d/device';
 import { HttpRequest } from '@zephyr3d/base';
 import { IDisposable } from '@zephyr3d/base';
+import { IEventTarget } from '@zephyr3d/base';
 import { IndexBuffer } from '@zephyr3d/device';
 import { InterpolationMode } from '@zephyr3d/base';
 import { Interpolator } from '@zephyr3d/base';
@@ -52,7 +53,9 @@ import { ShaderTypeFunc } from '@zephyr3d/device';
 import { StructuredBuffer } from '@zephyr3d/device';
 import { Texture2D } from '@zephyr3d/device';
 import { Texture2DArray } from '@zephyr3d/device';
+import { TextureAddressMode } from '@zephyr3d/device';
 import { TextureCube } from '@zephyr3d/device';
+import { TextureFilterMode } from '@zephyr3d/device';
 import { TextureFormat } from '@zephyr3d/device';
 import { TextureSampler } from '@zephyr3d/device';
 import { TextureType } from '@zephyr3d/device';
@@ -67,6 +70,7 @@ import { VertexLayoutOptions } from '@zephyr3d/device';
 import { VertexSemantic } from '@zephyr3d/device';
 import { VertexStepMode } from '@zephyr3d/device';
 import { VFS } from '@zephyr3d/base';
+import { WriteOptions } from '@zephyr3d/base';
 import * as _zephyr3d_base from '@zephyr3d/base';
 import * as _zephyr3d_device from '@zephyr3d/device';
 
@@ -83,6 +87,13 @@ export class AABBTree {
     transform(matrix: Matrix4x4): void;
     // @internal (undocumented)
     verify(): void;
+}
+
+// @public
+export class AbsNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
 }
 
 // @public
@@ -149,7 +160,7 @@ export function aerialPerspectiveLut(scope: PBInsideFunctionScope, stParams: PBS
 // @public
 export class AnimationClip extends Disposable {
     constructor(name: string, animationSet: AnimationSet, embedded?: boolean);
-    addSkeleton(skeleton: Skeleton): void;
+    addSkeleton(skeletonId: string): void;
     addTrack(target: object, track: AnimationTrack): this;
     get animationSet(): AnimationSet;
     // @internal (undocumented)
@@ -168,9 +179,12 @@ export class AnimationClip extends Disposable {
     // @internal (undocumented)
     protected _name: string;
     protected onDispose(): void;
-    get skeletons(): Set<Skeleton>;
     // @internal (undocumented)
-    protected _skeletons: Set<Skeleton>;
+    resample(frames: number, callback: (frame: number) => void): void;
+    get skeletons(): Set<string>;
+    set skeletons(val: Set<string>);
+    // @internal (undocumented)
+    protected _skeletons: Set<string>;
     get timeDuration(): number;
     set timeDuration(val: number);
     get tracks(): Map<object, AnimationTrack<unknown>[]>;
@@ -196,6 +210,8 @@ export class AnimationSet extends Disposable implements IDisposable {
     protected onDispose(): void;
     playAnimation(name: string, options?: PlayAnimationOptions): void;
     setAnimationWeight(name: string, weight: number): void;
+    // @internal (undocumented)
+    get skeletons(): DRef<Skeleton>[];
     stopAnimation(name: string, options?: StopAnimationOptions): void;
     update(deltaInSeconds: number): void;
 }
@@ -214,12 +230,20 @@ export abstract class AnimationTrack<StateType = unknown> {
     protected _embedded: boolean;
     abstract getBlendId(): unknown;
     abstract getDuration(): number;
+    get jointIndex(): number;
+    set jointIndex(index: number);
+    // @internal (undocumented)
+    protected _jointIndex: number;
     abstract mixState(a: StateType, b: StateType, t: number): StateType;
     get name(): string;
     set name(val: string);
     // @internal (undocumented)
     protected _name: string;
     reset(_target: object): void;
+    get target(): string;
+    set target(val: string);
+    // @internal (undocumented)
+    protected _target: string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "appInstance" should be prefixed with an underscore because the declaration is marked as @internal
@@ -260,6 +284,55 @@ export type AppOptions = {
         enabled?: boolean;
     };
 };
+
+// @public
+export class ArccosineHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArcCosNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArcsineHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArcSinNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArcTan2Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArctangentHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ArcTanNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export interface AssetAnimationData {
@@ -320,35 +393,55 @@ export class AssetHierarchyNode extends NamedObject {
 
 // @public
 export class AssetManager {
-    constructor(vfs?: VFS);
+    constructor(serializationManager?: SerializationManager);
     // Warning: (ae-forgotten-export) The symbol "AbstractModelLoader" needs to be exported by the entry point index.d.ts
     static addModelLoader(loader: AbstractModelLoader): void;
     // Warning: (ae-forgotten-export) The symbol "AbstractTextureLoader" needs to be exported by the entry point index.d.ts
     static addTextureLoader(loader: AbstractTextureLoader): void;
     clearCache(): void;
+    // (undocumented)
+    createBluePrintDAG(nodeMap: Record<number, IGraphNode>, roots: number[], links: {
+        startNodeId: number;
+        startSlotId: number;
+        endNodeId: number;
+        endSlotId: number;
+    }[]): BlueprintDAG;
     // @internal
     doLoadTexture(loader: AbstractTextureLoader, mimeType: string, data: ArrayBuffer | TypedArray, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
-    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest): Promise<ArrayBuffer>;
+    fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<ArrayBuffer>;
+    // (undocumented)
+    fetchBluePrint(url: string, VFSs?: VFS[]): Promise<MaterialBlueprintIR>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T;
-    fetchJsonData<T = any>(url: string, postProcess?: (json: T) => T, httpRequest?: HttpRequest): Promise<T>;
-    fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo>;
+    fetchJsonData<T = any>(url: string, postProcess?: (json: T) => T, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<T>;
+    fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T>;
+    fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<ModelInfo>;
     // @internal
-    fetchModelData(url: string, options?: ModelFetchOptions): Promise<SharedModel>;
-    fetchTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest): Promise<string>;
-    fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T>;
+    fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel>;
+    fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T>;
+    fetchTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<string>;
+    fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>, VFSs?: VFS[]): Promise<T>;
     // @internal
-    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
+    loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, VFSs?: VFS[]): Promise<ArrayBuffer>;
+    // (undocumented)
+    loadBluePrint(path: string, VFSs?: VFS[]): Promise<MaterialBlueprintIR>;
     // @internal
-    loadJsonData(url: string, postProcess?: (json: any) => any): Promise<string>;
+    loadJsonData(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<string>;
     // @internal
-    loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel>;
+    loadMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T>;
     // @internal
-    loadTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
+    loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel>;
+    // (undocumented)
+    loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T>;
     // @internal
-    loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
+    loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]): Promise<string>;
+    // @internal
+    loadTexture(url: string, mimeType?: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture, VFSs?: VFS[]): Promise<BaseTexture>;
     loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
+    // @internal
+    readFileFromVFSs(path: string, options: ReadOptions, vfsList?: VFS[]): Promise<string | ArrayBuffer>;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void;
     get vfs(): VFS;
+    writeFileToVFSs(path: string, data: ArrayBuffer | string, options: WriteOptions, vfsList?: VFS[]): Promise<void>;
 }
 
 // @public
@@ -640,11 +733,31 @@ export class BaseCameraController {
 }
 
 // @public
+export abstract class BaseGraphNode extends Observable<{
+    changed: [];
+}> implements IGraphNode {
+    constructor();
+    check(): void;
+    get error(): string;
+    set error(str: string);
+    protected _error: string;
+    getOutputType(id: number): string;
+    protected abstract getType(_id?: number): string;
+    get inputs(): GraphNodeInput[];
+    protected _inputs: GraphNodeInput[];
+    get outputs(): GraphNodeOutput[];
+    protected _outputs: GraphNodeOutput[];
+    reset(): void;
+    setInput(id: number, node: BaseGraphNode, inputId: number): void;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export abstract class BaseLight extends GraphNode {
     constructor(scene: Scene, type: number);
     // @internal (undocumented)
     abstract computeUniforms(): void;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     get diffuseAndIntensity(): Vector4;
     // @internal (undocumented)
     protected _diffuseIntensity: Vector4;
@@ -673,6 +786,24 @@ export abstract class BaseLight extends GraphNode {
 }
 
 // @public
+export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> extends BaseGraphNode {
+    constructor();
+    addressU: TextureAddressMode;
+    addressV: TextureAddressMode;
+    filterMag: TextureFilterMode;
+    filterMin: TextureFilterMode;
+    filterMip: TextureFilterMode;
+    protected getType(): string;
+    get isUniform(): boolean;
+    get paramName(): string;
+    set paramName(val: string);
+    texture: DRef<T>;
+    textureId: string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export interface BatchDrawable extends Drawable {
     // @internal
     applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
@@ -687,10 +818,8 @@ export interface BatchDrawable extends Drawable {
 }
 
 // @public
-export class BatchGroup extends GraphNode implements NodeClonable<BatchGroup> {
+export class BatchGroup extends GraphNode {
     constructor(scene: Scene);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): BatchGroup;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
     // @internal (undocumented)
@@ -814,6 +943,14 @@ export class Bloom extends AbstractPostEffect {
 }
 
 // @public
+export interface BlueprintDAG {
+    graph: GraphStructure;
+    nodeMap: Record<number, IGraphNode>;
+    order: number[];
+    roots: number[];
+}
+
+// @public
 export class BoundingBox extends AABB implements BoundingVolume {
     constructor();
     constructor(box: AABB);
@@ -822,7 +959,7 @@ export class BoundingBox extends AABB implements BoundingVolume {
     clone(): BoundingVolume;
     outsideFrustum(frustum: Frustum | Matrix4x4): boolean;
     toAABB(): AABB;
-    transform(matrix: Matrix4x4): BoundingVolume;
+    transform(matrix: Matrix4x4): BoundingBox;
 }
 
 // @public
@@ -929,7 +1066,7 @@ export type CachedBindGroup = {
 };
 
 // @public
-export class Camera extends SceneNode implements NodeClonable<Camera> {
+export class Camera extends SceneNode {
     constructor(scene: Scene, projectionMatrix?: Matrix4x4);
     get bloom(): boolean;
     set bloom(val: boolean);
@@ -955,6 +1092,8 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set bloomThresholdKnee(val: number);
     // @internal
     protected _bloomThresholdKnee: number;
+    // @internal
+    protected _capturedButton: number;
     get clearColor(): Vector4;
     set clearColor(v: Vector4);
     // @internal
@@ -976,7 +1115,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set clipPlane(plane: Plane);
     // @internal
     protected _clipPlane: Plane;
-    clone(method: NodeCloneMethod, recursive: boolean): Camera;
     get commandBufferReuse(): boolean;
     set commandBufferReuse(val: boolean);
     // @internal
@@ -993,7 +1131,6 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set controller(controller: BaseCameraController);
     // @internal
     protected _controller: BaseCameraController;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     get depthPrePass(): boolean;
     set depthPrePass(val: boolean);
     // @internal
@@ -1036,6 +1173,10 @@ export class Camera extends SceneNode implements NodeClonable<Camera> {
     set HiZ(val: boolean);
     // @internal
     protected _HiZ: boolean;
+    get interactionRect(): [left: number, top: number, width: number, height: number];
+    set interactionRect(rect: [left: number, top: number, width: number, height: number]);
+    // @internal
+    protected _interactionRect: [left: number, top: number, width: number, height: number];
     // @internal (undocumented)
     protected _invalidate(projectMatrixChanged: boolean): void;
     // @internal
@@ -1245,6 +1386,38 @@ export type CameraHistoryData = {
     prevMotionVectorTex: BaseTexture;
 };
 
+// @public
+export class CameraNearFarNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class CameraPositionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class CeilNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ClampNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "Clipmap" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -1302,22 +1475,21 @@ export interface ClipmapGatherContext {
 // Warning: (ae-forgotten-export) The symbol "ClipmapTerrain_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable, NodeClonable<ClipmapTerrain> {
+export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable {
     constructor(scene: Scene, sizeX?: number, sizeZ?: number, clipMapTileSize?: number);
     calculateLocalTransform(outMatrix: Matrix4x4): void;
     calculateWorldTransform(outMatrix: Matrix4x4): void;
     get castShadow(): boolean;
     set castShadow(val: boolean);
-    clone(method: NodeCloneMethod, recursive: boolean): ClipmapTerrain;
+    clone(): Promise<this>;
     computeBoundingVolume(): BoundingVolume;
     computeWorldBoundingVolume(): BoundingVolume;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     // @internal (undocumented)
     createHeightMapTexture(width: number, height: number): Texture2D<unknown>;
     draw(ctx: DrawContext): void;
     getMaterial(): MeshMaterial;
-    getMorphData(): Texture2D;
-    getMorphInfo(): GPUDataBuffer<unknown>;
+    getMorphData(): MorphData;
+    getMorphInfo(): MorphInfo;
     getPickTarget(): PickTarget;
     getPrimitive(): Primitive;
     getQueueType(): number;
@@ -1444,6 +1616,29 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
 }
 
 // @public
+export class CompAddNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class CompDivNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class CompMulNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+    // (undocumented)
+    protected getType(): string;
+}
+
+// @public
 export class Compositor {
     constructor();
     appendPostEffect(postEffect: AbstractPostEffect): void;
@@ -1474,6 +1669,109 @@ export interface CompositorContext {
 }
 
 // @public
+export class CompSubNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ConstantScalarNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get isUniform(): boolean;
+    set isUniform(val: boolean);
+    get paramName(): string;
+    set paramName(val: string);
+    toString(): string;
+    protected validate(): string;
+    get x(): number;
+    set x(val: number);
+}
+
+// @public
+export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> {
+    constructor();
+    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    protected getType(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
+    constructor();
+    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    protected getType(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
+    constructor();
+    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    protected getType(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ConstantVec2Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    get isUniform(): boolean;
+    set isUniform(val: boolean);
+    get paramName(): string;
+    set paramName(val: string);
+    toString(): string;
+    protected validate(): string;
+    get x(): number;
+    set x(val: number);
+    get y(): number;
+    set y(val: number);
+}
+
+// @public
+export class ConstantVec3Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    get isUniform(): boolean;
+    set isUniform(val: boolean);
+    get paramName(): string;
+    set paramName(val: string);
+    toString(): string;
+    protected validate(): string;
+    get x(): number;
+    set x(val: number);
+    get y(): number;
+    set y(val: number);
+    get z(): number;
+    set z(val: number);
+}
+
+// @public
+export class ConstantVec4Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    get isUniform(): boolean;
+    set isUniform(val: boolean);
+    get paramName(): string;
+    set paramName(val: string);
+    toString(): string;
+    protected validate(): string;
+    get w(): number;
+    set w(val: number);
+    get x(): number;
+    set x(val: number);
+    get y(): number;
+    set y(val: number);
+    get z(): number;
+    set z(val: number);
+}
+
+// @public
 export class CopyBlitter extends Blitter {
     // @override
     protected calcHash(): string;
@@ -1485,6 +1783,20 @@ export class CopyBlitter extends Blitter {
 //
 // @internal
 export function copyTexture(src: BaseTexture, dest: BaseTexture | FrameBuffer, sampler?: TextureSampler, renderState?: RenderStateSet, layer?: number, srgbOut?: boolean): void;
+
+// @public
+export class CosHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class CosNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // Warning: (ae-internal-missing-underscore) The name "createAPLutProgram" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -1545,6 +1857,13 @@ export function createSkyViewLutProgram(device: AbstractDevice): GPUProgram<unkn
 //
 // @internal (undocumented)
 export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram;
+
+// @public
+export class CrossProductNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export class CubemapSHProjector extends Disposable {
@@ -1628,6 +1947,20 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
     get type(): string;
 }
 
+// @public
+export class DDXNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class DDYNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "debugTexture" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal
@@ -1644,6 +1977,13 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
 
 // @public
 export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxRange: PBShaderExp | number): PBShaderExp;
+
+// @public
+export class Degrees2RadiansNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export class DepthPass extends RenderPass {
@@ -1664,10 +2004,8 @@ export class DepthPass extends RenderPass {
 }
 
 // @public
-export class DirectionalLight extends PunctualLight implements NodeClonable<DirectionalLight> {
+export class DirectionalLight extends PunctualLight {
     constructor(scene: Scene);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): DirectionalLight;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
     // @internal (undocumented)
@@ -1683,6 +2021,29 @@ export class DirectionalLight extends PunctualLight implements NodeClonable<Dire
 }
 
 // @public
+export class DistanceNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class DotProductNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public (undocumented)
+export class DracoMeshDecoder {
+    constructor(data: Int8Array<ArrayBuffer>, decoderModule: DecoderModule);
+    // (undocumented)
+    getAttributeBuffer(id: number, buffer: TypedArray): TypedArray;
+    // (undocumented)
+    getIndexBuffer(): Uint32Array<ArrayBuffer>;
+}
+
+// @public
 export interface Drawable {
     applyTransformUniforms(renderQueue: RenderQueue): void;
     dispose(): void;
@@ -1690,8 +2051,8 @@ export interface Drawable {
     getBoneMatrices(): Texture2D;
     getDrawableId(): number;
     getMaterial(): MeshMaterial;
-    getMorphData(): Texture2D;
-    getMorphInfo(): GPUDataBuffer;
+    getMorphData(): MorphData;
+    getMorphInfo(): MorphInfo;
     getName(): string;
     getNode(): SceneNode;
     getObjectColor(): Vector4;
@@ -1770,6 +2131,15 @@ export interface DrawContext {
 }
 
 // @public
+export class ElapsedTimeNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export type EmitterBehavior = 'surface' | 'volume';
 
 // @public
@@ -1796,6 +2166,8 @@ export class Engine {
     detachAllScripts(): void;
     detachScript<T extends Host>(host: T, idOrInstance: string | RuntimeScript<T>): void;
     getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[];
+    // @internal (undocumented)
+    init(): Promise<void>;
     // (undocumented)
     loadSceneFromFile(path: string): Promise<Scene>;
     // (undocumented)
@@ -1809,6 +2181,7 @@ export class Engine {
     startup(startupScene: string, splashScreen: string, startupScript: string): Promise<void>;
     update(deltaTime: number, elapsedTime: number): void;
     get VFS(): VFS;
+    set VFS(vfs: VFS);
 }
 
 // @public
@@ -2061,10 +2434,31 @@ export class ESM extends ShadowImpl {
 }
 
 // @public
+export class Exp2Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ExpNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ? R : never;
 
 // @public
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
+
+// @public
+export class FaceForwardNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export class FBMWaveGenerator extends Disposable implements WaveGenerator {
@@ -2141,6 +2535,20 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     set wind(val: Vector2);
 }
 
+// @public
+export class FloorNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class FmaNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "Fog" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -2189,6 +2597,68 @@ export interface FPSCameraControllerOptions {
 }
 
 // @public
+export class FractNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class FunctionCallNode extends BaseGraphNode {
+    constructor(path: string, name: string, IR: MaterialBlueprintIR);
+    get args(): {
+        index: number;
+        name: string;
+        type: string;
+    }[];
+    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    protected getType(id: number): string;
+    get IR(): MaterialBlueprintIR;
+    get name(): string;
+    get outs(): {
+        index: number;
+        name: string;
+        type: string;
+    }[];
+    get path(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class FunctionInputNode extends BaseGraphNode {
+    constructor();
+    static argId: number;
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get name(): string;
+    set name(val: string);
+    toString(): string;
+    get type(): string;
+    protected validate(): string;
+}
+
+// @public
+export class FunctionOutputNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get name(): string;
+    set name(val: string);
+    static outId: number;
+    toString(): string;
+    get type(): string;
+    protected validate(): string;
+}
+
+// @public
+export class FWidthNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export class FXAA extends AbstractPostEffect {
     constructor();
     apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
@@ -2198,25 +2668,6 @@ export class FXAA extends AbstractPostEffect {
 
 // @public
 export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp): PBShaderExp;
-
-// Warning: (ae-internal-missing-underscore) The name "GatherVisitor" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export class GatherVisitor implements Visitor<SceneNode> {
-    constructor();
-    // (undocumented)
-    get materialSet(): Set<Material>;
-    // (undocumented)
-    get nodeList(): SceneNode[];
-    // (undocumented)
-    get primitiveSet(): Set<Primitive>;
-    // (undocumented)
-    visit(target: SceneNode): unknown;
-    // (undocumented)
-    visitMesh(node: Mesh): boolean;
-    // (undocumented)
-    visitParticleSystem(node: ParticleSystem): boolean;
-}
 
 // @public
 export class GaussianBlurBlitter extends Blitter {
@@ -2257,6 +2708,18 @@ export class GaussianBlurBlitter extends Blitter {
     setup(scope: PBGlobalScope, type: BlitType): void;
     // @internal (undocumented)
     protected _sigma: number;
+}
+
+// @public
+export abstract class GenericMathNode extends BaseGraphNode {
+    constructor(func: string, numArgs: number, outType?: string, inTypes?: string[], explicitInTypes?: Record<number, string[]>, additionalInTypes?: Record<number, string[]>, originTypes?: string[]);
+    readonly additionalInTypes: Record<number, string[]>;
+    readonly explicitInTypes: Record<number, string[]>;
+    readonly func: string;
+    protected getType(): string;
+    readonly outType: string;
+    toString(): string;
+    protected validate(): string;
 }
 
 // @public
@@ -2331,6 +2794,21 @@ export function getCameraClass(): SerializableClass;
 // @internal (undocumented)
 export function getDefaultAtmosphereParams(): AtmosphereParams;
 
+// Warning: (ae-internal-missing-underscore) The name "getDefaultTexture2D" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function getDefaultTexture2D(): Texture2D;
+
+// Warning: (ae-internal-missing-underscore) The name "getDefaultTexture2DArray" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function getDefaultTexture2DArray(): Texture2DArray;
+
+// Warning: (ae-internal-missing-underscore) The name "getDefaultTextureCube" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function getDefaultTextureCube(): TextureCube;
+
 // @public
 export function getDevice(): AbstractDevice;
 
@@ -2355,6 +2833,13 @@ export function getInput(): InputManager;
 // @internal (undocumented)
 export function getMeshClass(): SerializableClass;
 
+// Warning: (ae-internal-missing-underscore) The name "getMeshMaterialInstanceUniformsClass" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function getMeshMaterialInstanceUniformsClass(cls: {
+    new (...args: any[]): MeshMaterial;
+}): SerializableClass;
+
 // Warning: (ae-internal-missing-underscore) The name "getMultiScattering" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -2364,11 +2849,6 @@ export function getMultiScattering(scope: PBInsideFunctionScope, stParams: PBSha
 //
 // @internal (undocumented)
 export function getMultiScatteringLut(): Texture2D<unknown>;
-
-// Warning: (ae-internal-missing-underscore) The name "getNodeHierarchyClass" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export function getNodeHierarchyClass(): SerializableClass;
 
 // Warning: (ae-internal-missing-underscore) The name "getOrthoCameraClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2424,10 +2904,8 @@ export function getTransmittanceLut(): Texture2D<unknown>;
 export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number): any;
 
 // @public
-export class GraphNode extends SceneNode implements NodeClonable<GraphNode> {
+export class GraphNode extends SceneNode {
     constructor(scene: Scene);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): GraphNode;
     getBoneMatrices(): Texture2D;
     getName(): string;
     getNode(): SceneNode;
@@ -2440,6 +2918,32 @@ export class GraphNode extends SceneNode implements NodeClonable<GraphNode> {
     set octreeNode(node: OctreeNode);
     // @internal (undocumented)
     protected _visibleChanged(): void;
+}
+
+// @public
+export type GraphNodeInput = {
+    id: number;
+    name: string;
+    type: string[];
+    inputNode?: IGraphNode;
+    inputId?: number;
+    defaultValue?: number[] | number;
+    required?: boolean;
+    originType?: string;
+};
+
+// @public
+export type GraphNodeOutput = {
+    id: number;
+    name: string;
+    swizzle?: string;
+    cast?: number;
+};
+
+// @public
+export interface GraphStructure {
+    incoming: Record<number, NodeConnection[]>;
+    outgoing: Record<number, NodeConnection[]>;
 }
 
 // @public
@@ -2684,6 +3188,19 @@ export interface IAttachedScript {
 }
 
 // @public
+export interface IGraphNode extends IEventTarget<{
+    changed: [];
+}> {
+    check(): void;
+    error: string;
+    getOutputType(id: number): string;
+    readonly inputs: GraphNodeInput[];
+    readonly outputs: GraphNodeOutput[];
+    reset(): void;
+    toString(): string;
+}
+
+// @public
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
@@ -2726,6 +3243,8 @@ export type IMixinLight = {
     forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void): void;
 } & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
 
+// Warning: (ae-forgotten-export) The symbol "IMixinPBRBRDF" needs to be exported by the entry point index.d.ts
+//
 // @public
 export type IMixinPBRCommon = {
     ior: number;
@@ -2750,9 +3269,6 @@ export type IMixinPBRCommon = {
     iridescenceThicknessMax: number;
     getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
-    fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
-    distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
-    visGGX(scope: PBInsideFunctionScope, NdotV: PBShaderExp, NdotL: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
     getF0(scope: PBInsideFunctionScope): PBShaderExp;
@@ -2770,7 +3286,7 @@ export type IMixinPBRCommon = {
 'thickness',
 'iridescence',
 'iridescenceThickness'
-]>;
+]> & IMixinPBRBRDF;
 
 // @public
 export type IMixinPBRMetallicRoughness = {
@@ -2815,6 +3331,7 @@ export class InputManager {
     stop(): void;
     unuse(handler: InputEventHandler, ctx?: unknown): this;
     use(handler: InputEventHandler, ctx?: unknown): this;
+    useFirst(handler: InputEventHandler, ctx?: unknown): this;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "InstanceBindGroupAllocator" should be prefixed with an underscore because the declaration is marked as @internal
@@ -2856,10 +3373,50 @@ export function integralMultiScattering(scope: PBInsideFunctionScope, stParams: 
 export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp;
 
 // @public
+export class InvProjMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class InvSqrtNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class InvViewProjMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export interface IRenderable extends IDisposable {
     // (undocumented)
     render(): void;
 }
+
+// @public
+export type IRUniformTexture = {
+    name: string;
+    texture: DRef<BaseTexture>;
+    sampler: DRef<TextureSampler>;
+    node: IGraphNode;
+};
+
+// @public
+export type IRUniformValue = {
+    name: string;
+    value: Float32Array<ArrayBuffer> | number;
+    node: IGraphNode;
+};
 
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -2876,6 +3433,13 @@ export class LambertMaterial extends LambertMaterial_base implements Clonable<La
     vertexShader(scope: PBFunctionScope): void;
     get vertexTangent(): boolean;
     set vertexTangent(val: boolean);
+}
+
+// @public
+export class LengthNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
 }
 
 // @public
@@ -2914,7 +3478,30 @@ export class LightPass extends RenderPass {
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp): any;
 
 // @public
+export class Log2Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
+
+// @public
+export class LogNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class MakeVectorNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
 
 // @public
 export class Material extends Disposable implements Clonable<Material>, IDisposable {
@@ -2944,8 +3531,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
     drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void;
     // @internal
-    static findMaterialById(id: string): Material;
-    // @internal
     protected getHash(pass: number): string;
     getQueueType(): number;
     // @internal
@@ -2963,13 +3548,34 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     // @internal
     optionChanged(changeHash: boolean): void;
     passToHash(pass: number): string;
-    get persistentId(): string;
-    set persistentId(val: string);
-    // @internal
-    protected static _registry: Map<string, DWeakRef<Material>>;
     supportInstancing(): boolean;
     supportLighting(): boolean;
     protected updateRenderStates(_pass: number, _renderStates: RenderStateSet, _ctx: DrawContext): void;
+}
+
+// @public
+export class MaterialBlueprintIR {
+    constructor(dag: BlueprintDAG, hash: string);
+    get behaviors(): MaterialBlueprintIRBehaviors;
+    compile(): boolean;
+    create(pb: ProgramBuilder): {
+        name: string;
+        exp: PBShaderExp | number;
+    }[];
+    get DAG(): BlueprintDAG;
+    set DAG(dag: BlueprintDAG);
+    get hash(): string;
+    get ok(): boolean;
+    get uniformTextures(): IRUniformTexture[];
+    get uniformValues(): IRUniformValue[];
+}
+
+// @public
+export interface MaterialBlueprintIRBehaviors {
+    useCameraPosition: boolean;
+    useVertexColor: boolean;
+    useVertexTangent: boolean;
+    useVertexUV: boolean;
 }
 
 // @public
@@ -3021,36 +3627,38 @@ export const MAX_MORPH_TARGETS = 256;
 // @internal (undocumented)
 export const MAX_TERRAIN_MIPMAP_LEVELS = 64;
 
+// @public
+export class MaxNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-forgotten-export) The symbol "Mesh_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class Mesh extends Mesh_base implements BatchDrawable, NodeClonable<Mesh> {
+export class Mesh extends Mesh_base implements BatchDrawable {
     constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial);
     // @internal (undocumented)
     protected _animatedBoundingBox: BoundingBox;
     // @internal (undocumented)
     protected _batchable: boolean;
     // @internal (undocumented)
-    protected _boneMatrices: Texture2D;
-    // @internal (undocumented)
-    protected _boundingBoxNode: Mesh;
+    protected _boneMatrices: DRef<Texture2D>;
     get castShadow(): boolean;
     set castShadow(b: boolean);
     // @internal (undocumented)
     protected _castShadow: boolean;
-    clone(method: NodeCloneMethod, recursive: boolean): Mesh;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     draw(ctx: DrawContext, hash?: string): void;
-    get drawBoundingBox(): boolean;
-    set drawBoundingBox(val: boolean);
+    getAnimatedBoundingBox(): BoundingBox;
     getBoneMatrices(): Texture2D;
     getInstanceId(_renderPass: RenderPass): string;
     getInstanceUniforms(): Float32Array<ArrayBuffer>;
     getMaterial(): MeshMaterial;
-    getMorphData(): Texture2D;
-    getMorphInfo(): GPUDataBuffer<unknown>;
+    getMorphData(): MorphData;
+    getMorphInfo(): MorphInfo;
     getName(): string;
     getNode(): SceneNode;
     getPickTarget(): PickTarget;
@@ -3071,9 +3679,9 @@ export class Mesh extends Mesh_base implements BatchDrawable, NodeClonable<Mesh>
     // @internal (undocumented)
     protected _morphAnimation: boolean;
     // @internal (undocumented)
-    protected _morphData: Texture2D;
+    protected _morphData: MorphData;
     // @internal (undocumented)
-    protected _morphInfo: GPUDataBuffer;
+    protected _morphInfo: MorphInfo;
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
     protected onDispose(): void;
@@ -3087,15 +3695,27 @@ export class Mesh extends Mesh_base implements BatchDrawable, NodeClonable<Mesh>
     protected _renderBundle: Record<string, RenderBundle>;
     setAnimatedBoundingBox(bbox: BoundingBox): void;
     setBoneMatrices(matrices: Texture2D): void;
-    setMorphData(data: Texture2D): void;
-    setMorphInfo(info: GPUDataBuffer): void;
+    setMorphData(data: MorphData): void;
+    setMorphInfo(info: MorphInfo): void;
     // (undocumented)
     setPickTarget(node: SceneNode, label?: string): void;
+    // @internal (undocumented)
+    setSkinnedBoundingInfo(info: SkinnedBoundingBox): void;
+    // (undocumented)
+    get skeletonName(): string;
+    set skeletonName(name: string);
+    // @internal (undocumented)
+    protected _skeletonName: string;
     // @internal (undocumented)
     get skinAnimation(): boolean;
     set skinAnimation(val: boolean);
     // @internal (undocumented)
     protected _skinAnimation: boolean;
+    // @internal (undocumented)
+    get skinnedBoundingInfo(): SkinnedBoundingBox;
+    // @internal (undocumented)
+    protected _skinnedBoundingInfo: SkinnedBoundingBox;
+    update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number): void;
     // @internal (undocumented)
     protected _useRenderBundle: boolean;
 }
@@ -3125,7 +3745,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     set cullMode(val: FaceMode);
     static defineFeature(): number;
     // Warning: (ae-incompatible-release-tags) The symbol "defineInstanceUniform" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-    static defineInstanceUniform(prop: string, type: InstanceUniformType): number;
+    static defineInstanceUniform(prop: string, type: InstanceUniformType, name?: string): number;
     get drawContext(): DrawContext;
     featureUsed<T = unknown>(feature: number): T;
     fragmentShader(scope: PBFunctionScope): void;
@@ -3134,6 +3754,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         prop: string;
         type: InstanceUniformType;
         offset: number;
+        name: string;
     }[];
     getQueueType(): number;
     // @internal
@@ -3141,6 +3762,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         prop: string;
         type: InstanceUniformType;
         offset: number;
+        name: string;
     }[];
     isTransparentPass(_pass: number): boolean;
     needFragmentColor(ctx?: DrawContext): boolean;
@@ -3190,6 +3812,13 @@ export function mieCoefficient(scope: PBInsideFunctionScope, fMieScatteringHeigh
 export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp, fCosTheta: PBShaderExp): any;
 
 // @public
+export class MinNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinAlbedoColor);
 
 // @public
@@ -3220,6 +3849,13 @@ export function mixinTextureProps<U extends string>(name: U): <T extends typeof 
 export function mixinVertexColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinVertexColor);
 
 // @public
+export class MixNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export type ModelFetchOptions = {
     mimeType?: string;
     dracoDecoderModule?: DecoderModule;
@@ -3232,6 +3868,13 @@ export type ModelInfo = {
     group: SceneNode;
     animationSet: AnimationSet;
 };
+
+// @public
+export class ModNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // Warning: (ae-internal-missing-underscore) The name "MORPH_ATTRIBUTE_VECTOR_COUNT" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -3283,6 +3926,51 @@ export const MORPH_TARGET_TEX3 = 7;
 // @internal (undocumented)
 export const MORPH_WEIGHTS_VECTOR_COUNT: number;
 
+// @public
+export type MorphData = {
+    width: number;
+    height: number;
+    data: Float32Array<ArrayBuffer>;
+    texture?: DRef<Texture2D>;
+};
+
+// @public
+export type MorphInfo = {
+    data: TypedArray;
+    buffer?: DRef<GPUDataBuffer>;
+};
+
+// @public
+export type MorphState = {
+    numTargets: number;
+    weights: Float32Array<ArrayBuffer>;
+    boundingBox: BoundingBox;
+};
+
+// @public
+export class MorphTargetTrack extends AnimationTrack<MorphState> {
+    constructor();
+    constructor(interpolator?: Interpolator, defaultMorphWeights?: number[], targetBox?: BoundingBox[], originBox?: AABB, embedded?: boolean);
+    applyState(node: SceneNode, state: MorphState): void;
+    // (undocumented)
+    get boundingBox(): BoundingBox[];
+    set boundingBox(box: BoundingBox[]);
+    calculateState(target: object, currentTime: number): MorphState;
+    // (undocumented)
+    get defaultWeights(): number[];
+    set defaultWeights(value: number[]);
+    getBlendId(): unknown;
+    getDuration(): number;
+    // (undocumented)
+    get interpolator(): Interpolator;
+    set interpolator(interp: Interpolator);
+    mixState(a: MorphState, b: MorphState, t: number): MorphState;
+    // (undocumented)
+    get originBoundingBox(): AABB;
+    set originBoundingBox(box: AABB);
+    reset(node: SceneNode): void;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "multiScatteringLut" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -3296,15 +3984,18 @@ export class NamedObject {
 }
 
 // @public
-export interface NodeClonable<T extends SceneNode> {
-    clone(method: NodeCloneMethod, recursive: boolean): T;
+export interface NodeConnection {
+    // (undocumented)
+    endSlotId: number;
+    // (undocumented)
+    startSlotId: number;
+    // (undocumented)
+    targetNodeId: number;
 }
 
 // @public
-export type NodeCloneMethod = 'deep' | 'instance';
-
-// @public
 export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
+    constructor();
     constructor(interpolator: Interpolator, embedded?: boolean);
     constructor(mode: InterpolationMode, keyFrames: {
         time: number;
@@ -3314,23 +4005,10 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
     calculateState(target: object, currentTime: number): Quaternion;
     getBlendId(): unknown;
     getDuration(): number;
+    // (undocumented)
+    get interpolator(): Interpolator;
+    set interpolator(interp: Interpolator);
     mixState(a: Quaternion, b: Quaternion, t: number): Quaternion;
-}
-
-// Warning: (ae-internal-missing-underscore) The name "NodeHierarchy" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export class NodeHierarchy {
-    constructor(scene: Scene, node?: SceneNode);
-    // (undocumented)
-    get materialList(): Material[];
-    // (undocumented)
-    get primitiveList(): Primitive[];
-    // (undocumented)
-    get rootNode(): SceneNode;
-    set rootNode(node: SceneNode);
-    // (undocumented)
-    get scene(): Scene;
 }
 
 // @public
@@ -3338,6 +4016,7 @@ export type NodeIterateFunc = ((node: SceneNode) => boolean) | ((node: SceneNode
 
 // @public
 export class NodeRotationTrack extends AnimationTrack<Quaternion> {
+    constructor();
     constructor(interpolator: Interpolator, embedded?: boolean);
     constructor(mode: InterpolationMode, keyFrames: {
         time: number;
@@ -3347,11 +4026,15 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
     calculateState(target: object, currentTime: number): Quaternion;
     getBlendId(): unknown;
     getDuration(): number;
+    // (undocumented)
+    get interpolator(): Interpolator;
+    set interpolator(interp: Interpolator);
     mixState(a: Quaternion, b: Quaternion, t: number): Quaternion;
 }
 
 // @public
 export class NodeScaleTrack extends AnimationTrack<Vector3> {
+    constructor();
     constructor(interpolator: Interpolator, embedded?: boolean);
     constructor(mode: InterpolationMode, keyFrames: {
         time: number;
@@ -3361,11 +4044,15 @@ export class NodeScaleTrack extends AnimationTrack<Vector3> {
     calculateState(target: object, currentTime: number): Vector3;
     getBlendId(): unknown;
     getDuration(): number;
+    // (undocumented)
+    get interpolator(): Interpolator;
+    set interpolator(interp: Interpolator);
     mixState(a: Vector3, b: Vector3, t: number): Vector3;
 }
 
 // @public
 export class NodeTranslationTrack extends AnimationTrack<Vector3> {
+    constructor();
     constructor(interpolator: Interpolator, embedded?: boolean);
     constructor(mode: InterpolationMode, keyFrames: {
         time: number;
@@ -3375,11 +4062,21 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
     calculateState(target: object, currentTime: number): Vector3;
     getBlendId(): unknown;
     getDuration(): number;
+    // (undocumented)
+    get interpolator(): Interpolator;
+    set interpolator(interp: Interpolator);
     mixState(a: Vector3, b: Vector3, t: number): Vector3;
 }
 
 // @public
 export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export class NormalizeNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export class Octree {
@@ -3546,16 +4243,12 @@ export interface OrbitCameraControllerOptions {
 }
 
 // @public
-export class OrthoCamera extends Camera implements NodeClonable<OrthoCamera> {
+export class OrthoCamera extends Camera {
     constructor(scene: Scene, left?: number, right?: number, bottom?: number, top?: number, near?: number, far?: number);
     get bottom(): number;
     set bottom(val: number);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): OrthoCamera;
     // @internal (undocumented)
     protected _computeProj(): void;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     get far(): number;
     set far(val: number);
     get left(): number;
@@ -3605,16 +4298,14 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
 // Warning: (ae-forgotten-export) The symbol "ParticleSystem_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class ParticleSystem extends ParticleSystem_base implements Drawable, NodeClonable<ParticleSystem> {
+export class ParticleSystem extends ParticleSystem_base implements Drawable {
     constructor(scene: Scene);
     get airResistence(): boolean;
     set airResistence(value: boolean);
     get aspect(): number;
     set aspect(value: number);
-    clone(method: NodeCloneMethod, recursive: boolean): ParticleSystem;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     get directional(): boolean;
     set directional(val: boolean);
     draw(ctx: DrawContext): void;
@@ -3638,8 +4329,8 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable, Nod
     get flags(): number;
     set flags(value: number);
     getMaterial(): MeshMaterial;
-    getMorphData(): Texture2D;
-    getMorphInfo(): GPUDataBuffer<unknown>;
+    getMorphData(): MorphData;
+    getMorphInfo(): MorphInfo;
     getPickTarget(): PickTarget;
     getPrimitive(): Primitive;
     getQueueType(): number;
@@ -3698,6 +4389,43 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable, Nod
     set wind(value: Vector3);
     get worldSpace(): boolean;
     set worldSpace(value: boolean);
+}
+
+// @public
+export class PBRBlockNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// Warning: (ae-forgotten-export) The symbol "PBRBluePrintMaterial_base" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements Clonable<PBRBluePrintMaterial> {
+    constructor(ir: MaterialBlueprintIR);
+    // (undocumented)
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
+    clone(): PBRBluePrintMaterial;
+    // (undocumented)
+    copyFrom(other: this): void;
+    // (undocumented)
+    protected _createHash(): string;
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope): void;
+    // (undocumented)
+    get IR(): MaterialBlueprintIR;
+    set IR(ir: MaterialBlueprintIR);
+    // @internal (undocumented)
+    get uniformTextures(): IRUniformTexture[];
+    set uniformTextures(val: IRUniformTexture[]);
+    // @internal (undocumented)
+    get uniformValues(): IRUniformValue[];
+    set uniformValues(val: IRUniformValue[]);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
 }
 
 // Warning: (ae-forgotten-export) The symbol "PBRMetallicRoughnessMaterial_base" needs to be exported by the entry point index.d.ts
@@ -3847,19 +4575,15 @@ export function perlinNoise2D(scope: PBInsideFunctionScope, p: PBShaderExp): any
 export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any;
 
 // @public
-export class PerspectiveCamera extends Camera implements NodeClonable<PerspectiveCamera> {
+export class PerspectiveCamera extends Camera {
     constructor(scene: Scene, fovY?: number, aspect?: number, near?: number, far?: number);
     adjustAspectRatio(): void;
     get aspect(): number;
     set aspect(val: number);
     get autoAspect(): boolean;
     set autoAspect(val: boolean);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): PerspectiveCamera;
     // @internal (undocumented)
     protected _computeProj(): void;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     get far(): number;
     set far(val: number);
     get fovY(): number;
@@ -3929,16 +4653,12 @@ export type PlayAnimationOptions = {
 };
 
 // @public
-export class PointLight extends PunctualLight implements NodeClonable<PointLight> {
+export class PointLight extends PunctualLight {
     constructor(scene: Scene);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): PointLight;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
     // @internal (undocumented)
     computeUniforms(): void;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     // @override
     isPointLight(): this is PointLight;
     get range(): number;
@@ -3956,6 +4676,13 @@ export enum PostEffectLayer {
     opaque = 0,
     // (undocumented)
     transparent = 1
+}
+
+// @public
+export class PowNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
 }
 
 // Warning: (ae-forgotten-export) The symbol "DistributionType" needs to be exported by the entry point index.d.ts
@@ -3979,8 +4706,6 @@ export class Primitive extends Primitive_base implements Clonable<Primitive> {
     protected _defaultIndexCount: number;
     draw(): void;
     drawInstanced(numInstances: number): void;
-    // @internal
-    static findPrimitiveById(id: string): Primitive;
     getBoundingVolume(): BoundingVolume;
     getIndexBuffer(): IndexBuffer;
     getNumFaces(): number;
@@ -4000,10 +4725,6 @@ export class Primitive extends Primitive_base implements Clonable<Primitive> {
     // @internal
     protected _indexStart: number;
     protected onDispose(): void;
-    get persistentId(): string;
-    set persistentId(val: string);
-    // @internal
-    protected _persistentId: string;
     get primitiveType(): PrimitiveType;
     set primitiveType(type: PrimitiveType);
     // @internal
@@ -4033,6 +4754,15 @@ export type PrimitiveInstanceInfo = {
 };
 
 // @public
+export class ProjectionMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
 // @public
@@ -4042,7 +4772,6 @@ export type PropertyAccessor<T = object> = {
     phase?: number;
     readonly?: boolean;
     default?: any;
-    persistent?: boolean;
     options?: PropertyAccessorOptions;
     get: (this: T, value: PropertyValue) => void;
     set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
@@ -4050,8 +4779,9 @@ export type PropertyAccessor<T = object> = {
     delete?: (this: T, index: number) => void | Promise<void>;
     add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
     isValid?: (this: T) => boolean;
+    isPersistent?: (this: T) => boolean;
     isNullable?: (this: T, index: number) => boolean;
-    isHidden?: (this: T, index: number) => boolean;
+    isHidden?: (this: T, index: number, obj?: unknown) => boolean;
     command?: (this: T, index: number) => boolean;
     getDefaultValue?: (this: T) => any;
 };
@@ -4086,8 +4816,6 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
     get interpolatorAlpha(): Interpolator;
     set interpolatorAlpha(interpolator: Interpolator);
     mixState(a: PropertyValue, b: PropertyValue, t: number): PropertyValue;
-    get target(): string;
-    set target(val: string);
 }
 
 // @public
@@ -4114,8 +4842,6 @@ export class PunctualLight extends BaseLight {
     protected _color: Vector4;
     // @internal (undocumented)
     computeUniforms(): void;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     // @override
     isPunctualLight(): this is PunctualLight;
     // @internal (undocumented)
@@ -4215,6 +4941,13 @@ export const QUEUE_OPAQUE = 1;
 // @public
 export const QUEUE_TRANSPARENT = 2;
 
+// @public
+export class Radians2DegreesNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "rayIntersectSphere" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -4229,6 +4962,20 @@ export function rayleighCoefficient(scope: PBInsideFunctionScope, fRayleighScatt
 //
 // @internal (undocumented)
 export function rayleighPhase(scope: PBInsideFunctionScope, fCosTheta: PBShaderExp): any;
+
+// @public
+export class ReflectNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class RefractNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export const RENDER_PASS_TYPE_DEPTH = 2;
@@ -4462,6 +5209,13 @@ export class SAO extends AbstractPostEffect {
     set scale(val: number);
 }
 
+// @public
+export class SaturateNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "scattering" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -4531,7 +5285,7 @@ export class Scene extends Scene_base implements IRenderable {
 // Warning: (ae-forgotten-export) The symbol "SceneNode_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>, IDisposable {
+export class SceneNode extends SceneNode_base implements IDisposable {
     constructor(scene: Scene);
     get animationSet(): AnimationSet;
     // @internal
@@ -4562,14 +5316,17 @@ export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>
     protected _clipMode: boolean;
     get clipTestEnabled(): boolean;
     set clipTestEnabled(val: boolean);
-    clone(method: NodeCloneMethod, recursive: boolean): SceneNode;
+    clone(): Promise<this>;
     computeBoundingVolume(): BoundingVolume;
     get computedBoundingBoxDrawMode(): number;
     computeWorldBoundingVolume(localBV: BoundingVolume): BoundingVolume;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     // @internal (undocumented)
     protected _detached(): void;
+    findNodeById<T extends SceneNode>(id: string): T;
+    findNodeByName<T extends SceneNode>(name: string): T;
+    findSkeletonById(id: string): Skeleton;
     getBoundingVolume(): BoundingVolume;
+    getPrefabNode(): SceneNode;
     getWorldBoundingVolume(): BoundingVolume;
     getWorldPosition(outPos?: Vector3): Vector3;
     get gpuPickable(): boolean;
@@ -4598,6 +5355,18 @@ export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>
     isWater(): this is Water;
     iterate(callback: NodeIterateFunc): boolean;
     iterateBottomToTop(callback: NodeIterateFunc): boolean;
+    get jointTypeR(): "none" | "animated" | "static";
+    set jointTypeR(val: 'none' | 'animated' | 'static');
+    // @internal (undocumented)
+    protected _jointTypeR: 'none' | 'animated' | 'static';
+    get jointTypeS(): "none" | "animated" | "static";
+    set jointTypeS(val: 'none' | 'animated' | 'static');
+    // @internal (undocumented)
+    protected _jointTypeS: 'none' | 'animated' | 'static';
+    get jointTypeT(): "none" | "animated" | "static";
+    set jointTypeT(val: 'none' | 'animated' | 'static');
+    // @internal (undocumented)
+    protected _jointTypeT: 'none' | 'animated' | 'static';
     get localMatrix(): Matrix4x4;
     set localMatrix(matrix: Matrix4x4);
     // @internal
@@ -4617,6 +5386,7 @@ export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>
     protected _onAttached(): void;
     protected _onDetached(): void;
     protected onDispose(): void;
+    protected onPostClone(): void | Promise<void>;
     // @internal (undocumented)
     protected _onTransformChanged(invalidateLocal: boolean): void;
     otherToThis(other: SceneNode, v: Vector3, result?: Vector3): Vector3;
@@ -4638,6 +5408,10 @@ export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>
     set position(val: Vector3);
     // @internal
     protected _position: ObservableVector3;
+    get prefabId(): string;
+    set prefabId(id: string);
+    // @internal
+    protected _prefabId: string;
     remove(): this;
     removeChildren(): void;
     reparent(p?: SceneNode): this;
@@ -4645,6 +5419,9 @@ export class SceneNode extends SceneNode_base implements NodeClonable<SceneNode>
     set rotation(val: Quaternion);
     // @internal
     protected _rotation: ObservableQuaternion;
+    get runtimeId(): number;
+    // @internal
+    protected readonly _runtimeId: number;
     get scale(): Vector3;
     set scale(val: Vector3);
     scaleBy(factor: Vector3): this;
@@ -4777,25 +5554,31 @@ export type SerializableClass = {
         obj: any;
         loadProps?: boolean;
     }>;
-    getInitParams?: (obj: any) => any;
+    getInitParams?: (obj: any, flags: {
+        saveProps: boolean;
+    }) => any;
     getProps: () => PropertyAccessor<any>[];
 };
 
 // @public
 export class SerializationManager {
     constructor(vfs: VFS, editorMode?: boolean);
+    get assetManager(): AssetManager;
     clearCache(): void;
+    // (undocumented)
+    createBluePrintDAG(nodeMap: Record<number, IGraphNode>, roots: number[], links: {
+        startNodeId: number;
+        startSlotId: number;
+        endNodeId: number;
+        endSlotId: number;
+    }[]): BlueprintDAG;
     deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
-    // (undocumented)
-    protected doFetchBinary(path: string): Promise<ArrayBuffer>;
-    // (undocumented)
-    protected doFetchModel(path: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
-    // (undocumented)
-    protected doFetchTexture<T extends Texture2D | TextureCube>(path: string, options?: TextureFetchOptions<T>): Promise<T>;
     get editorMode(): boolean;
     fetchBinary(id: string): Promise<ArrayBuffer>;
+    fetchMaterial<T extends Material = Material>(id: string): Promise<T>;
     fetchModel(id: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
-    fetchTexture<T extends Texture2D | TextureCube>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
+    fetchPrimitive<T extends Primitive = Primitive>(id: string): Promise<T>;
+    fetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
     findAnimationTarget(node: SceneNode, track: PropertyTrack): object;
     getAssetId(asset: unknown): string;
     getClassByConstructor(ctor: GenericConstructor): SerializableClass;
@@ -4807,11 +5590,21 @@ export class SerializationManager {
     getPropertyByClass(cls: SerializableClass, name: string): PropertyAccessor;
     getPropertyByName(name: string): PropertyAccessor;
     getPropertyName(prop: PropertyAccessor): string;
+    instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode>;
+    // (undocumented)
+    loadBluePrint(path: string): Promise<MaterialBlueprintIR>;
+    loadPrefabContent(path: string): Promise<{
+        type: string;
+        data: object;
+    }>;
     loadScene(filename: string): Promise<Scene>;
+    loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
     registerClass(cls: SerializableClass): void;
     saveScene(scene: Scene, filename: string): Promise<void>;
-    serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): any;
-    get vfs(): VFS;
+    serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): Promise<any>;
+    setAssetId(asset: unknown, id: string): void;
+    get VFS(): VFS;
+    set VFS(vfs: VFS);
 }
 
 // Warning: (ae-internal-missing-underscore) The name "setApp" should be prefixed with an underscore because the declaration is marked as @internal
@@ -4905,6 +5698,8 @@ export class ShaderHelper {
     static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // @internal (undocumented)
     static getNumLights(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    static getObjectColorUniformName(): string;
     static getPrevUnjitteredViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getPrevWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
@@ -5197,10 +5992,37 @@ export class SharedModel extends Disposable {
 }
 
 // @public
+export class SignNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class SinHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class SinNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export class Skeleton extends Disposable {
-    constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], meshes: Mesh[], bounding: AssetSubMeshData[]);
+    constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], jointTransforms?: {
+        scale: Vector3;
+        rotation: Quaternion;
+        position: Vector3;
+    }[]);
     // @internal
     apply(): void;
+    // @internal (undocumented)
+    get bindPoseMatrices(): Matrix4x4[];
     // @internal (undocumented)
     protected _bindPoseMatrices: Matrix4x4[];
     // @internal
@@ -5209,6 +6031,18 @@ export class Skeleton extends Disposable {
     computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4): void;
     // @internal
     computeJoints(): void;
+    // @internal
+    static findSkeletonById(id: string): Skeleton;
+    // @internal
+    getBoundingInfo(data: {
+        positions: Float32Array;
+        blendIndices: TypedArray;
+        weights: TypedArray;
+    }): SkinnedBoundingBox;
+    // @internal (undocumented)
+    protected _id: string;
+    // @internal (undocumented)
+    get inverseBindMatrices(): Matrix4x4[];
     // @internal (undocumented)
     protected _inverseBindMatrices: Matrix4x4[];
     // @internal (undocumented)
@@ -5218,27 +6052,62 @@ export class Skeleton extends Disposable {
     // @internal (undocumented)
     protected _jointOffsets: Float32Array<ArrayBuffer>;
     // @internal (undocumented)
+    get joints(): SceneNode[];
+    // @internal (undocumented)
     protected _joints: SceneNode[];
     get jointTexture(): Texture2D;
     // @internal (undocumented)
-    protected _jointTexture: Texture2D;
+    protected _jointTexture: DRef<Texture2D>;
     // @internal (undocumented)
-    protected _meshes: {
-        mesh: Mesh;
-        bounding: SkinnedBoundingBox;
-        box: BoundingBox;
+    get jointTransforms(): {
+        scale: Vector3;
+        rotation: Quaternion;
+        position: Vector3;
+    }[];
+    // @internal (undocumented)
+    protected _jointTransforms: {
+        scale: Vector3;
+        rotation: Quaternion;
+        position: Vector3;
     }[];
     protected onDispose(): void;
+    // @internal (undocumented)
+    get persistentId(): string;
+    set persistentId(val: string);
+    // @internal (undocumented)
+    get playing(): boolean;
+    set playing(b: boolean);
+    // @internal (undocumented)
+    protected _playing: boolean;
     // @internal
     reset(): void;
     // @internal
     updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4): void;
 }
 
+// Warning: (ae-internal-missing-underscore) The name "SkinnedBoundingBox" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export interface SkinnedBoundingBox {
+    boundingBox: BoundingBox;
+    boundingVertexBlendIndices: Float32Array;
+    boundingVertexJointWeights: Float32Array;
+    boundingVertices: Vector3[];
+}
+
 // Warning: (ae-internal-missing-underscore) The name "skyBox" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
 export function skyBox(scope: PBInsideFunctionScope, stParams: PBShaderExp, f4SunColor: PBShaderExp, f3SkyBoxWorldPos: PBShaderExp, fSunSolidAngle: PBShaderExp, texTransmittanceLut: PBShaderExp, texSkyViewLut: PBShaderExp): any;
+
+// @public
+export class SkyEnvTextureNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
 
 // @public
 export class SkyRenderer extends Disposable {
@@ -5281,6 +6150,8 @@ export class SkyRenderer extends Disposable {
     set heightFogDirColor(val: Vector3);
     get heightFogDirExponent(): number;
     set heightFogDirExponent(val: number);
+    get heightFogEndDistance(): number;
+    set heightFogEndDistance(val: number);
     get heightFogFalloff(): number;
     set heightFogFalloff(val: number);
     get heightFogMaxOpacity(): number;
@@ -5383,16 +6254,12 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
 }
 
 // @public
-export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> {
+export class SpotLight extends PunctualLight {
     constructor(scene: Scene);
-    // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): SpotLight;
     // @internal (undocumented)
     computeBoundingVolume(): BoundingVolume;
     // @internal (undocumented)
     computeUniforms(): void;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: any): void;
     get cutoff(): number;
     set cutoff(val: number);
     // @internal (undocumented)
@@ -5405,6 +6272,20 @@ export class SpotLight extends PunctualLight implements NodeClonable<SpotLight> 
     protected _range: number;
     setCutoff(val: number): this;
     setRange(val: number): this;
+}
+
+// @public
+export class SqrtNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class StepNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
 }
 
 // @public
@@ -5468,19 +6349,31 @@ export const TAA_DEBUG_STRENGTH = 7;
 export const TAA_DEBUG_VELOCITY = 3;
 
 // @public
+export class TanHNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class TanNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export function temporalResolve(scope: PBInsideFunctionScope, currentColorTex: PBShaderExp, historyColorTex: PBShaderExp, currentDepthTex: PBShaderExp, motionVectorTex: PBShaderExp, prevMotionVectorTex: PBShaderExp, uv: PBShaderExp, workSize: PBShaderExp, debug?: number): PBShaderExp;
 
 // @public
-export class Terrain extends GraphNode implements NodeClonable<Terrain> {
+export class Terrain extends GraphNode {
     constructor(scene: Scene);
     get castShadow(): boolean;
     set castShadow(val: boolean);
     // (undocumented)
-    clone(method: NodeCloneMethod, recursive: boolean): Terrain;
+    clone(): Promise<this>;
     // @override
     computeBoundingVolume(): BoundingVolume;
-    // (undocumented)
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, patchSize: number, options?: TerrainMaterialOptions): boolean;
     createGrass(density: number[][], bladeWidth: number, bladeHeight: number, offset: number, grassTexture: Texture2D): void;
     // @internal (undocumented)
@@ -5614,9 +6507,9 @@ export class TerrainPatch extends TerrainPatch_base implements Drawable {
     // (undocumented)
     getMipLevel(): number;
     // (undocumented)
-    getMorphData(): Texture2D;
+    getMorphData(): MorphData;
     // (undocumented)
-    getMorphInfo(): GPUDataBuffer;
+    getMorphInfo(): MorphInfo;
     // (undocumented)
     getName(): string;
     // (undocumented)
@@ -5751,6 +6644,26 @@ export type TexturePropUniforms<U extends string> = {
 };
 
 // @public
+export class TextureSampleGrad extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    samplerType: 'Color' | 'Normal';
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class TextureSampleNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    samplerType: 'Color' | 'Normal';
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export type ToMixedTextureType<T> = T extends [infer First, ...infer Rest] ? [First extends string ? ReturnType<typeof mixinTextureProps<First>> : never, ...ToMixedTextureType<Rest>] : [];
 
 // @public
@@ -5790,6 +6703,15 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
     };
     static generateData(options: TorusCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): PrimitiveType;
     get type(): string;
+}
+
+// @public
+export class TransformNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): "" | "vec2" | "vec3" | "vec4" | "mat2" | "mat3" | "mat4";
+    toString(): string;
+    protected validate(): string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "transmittance" should be prefixed with an underscore because the declaration is marked as @internal
@@ -5842,10 +6764,82 @@ export function uvToTransmittanceLut(scope: PBInsideFunctionScope, f2UV: PBShade
 // @internal (undocumented)
 export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp): any;
 
+// @public
+export class VertexBinormalNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexColorNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexNormalNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexPositionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexTangentNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexUVNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "viewDirToUV" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
 export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp): any;
+
+// @public
+export class ViewMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ViewProjMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
 
 // @public
 export interface Visitor<T> {
@@ -5923,7 +6917,7 @@ export class VSM extends ShadowImpl {
 // Warning: (ae-forgotten-export) The symbol "Water_base" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class Water extends Water_base implements Drawable, NodeClonable<Water> {
+export class Water extends Water_base implements Drawable {
     constructor(scene: Scene);
     get animationSpeed(): number;
     set animationSpeed(val: number);
@@ -5931,14 +6925,12 @@ export class Water extends Water_base implements Drawable, NodeClonable<Water> {
     calculateLocalTransform(outMatrix: Matrix4x4): void;
     // (undocumented)
     calculateWorldTransform(outMatrix: Matrix4x4): void;
-    clone(method: NodeCloneMethod, recursive: boolean): Water;
     computeBoundingVolume(): BoundingVolume;
     computeWorldBoundingVolume(): BoundingVolume;
-    copyFrom(other: this, method: NodeCloneMethod, recursive: boolean): void;
     draw(ctx: DrawContext): void;
     getMaterial(): MeshMaterial;
-    getMorphData(): Texture2D;
-    getMorphInfo(): GPUDataBuffer<unknown>;
+    getMorphData(): MorphData;
+    getMorphInfo(): MorphInfo;
     getPickTarget(): PickTarget;
     getPrimitive(): Primitive;
     getQueueType(): number;
@@ -6040,8 +7032,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:3052:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
-// dist/index.d.ts:12596:9 - (ae-forgotten-export) The symbol "SkinnedBoundingBox" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:14902:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

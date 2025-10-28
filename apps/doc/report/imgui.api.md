@@ -43,6 +43,9 @@ export function imGuiSetCharCodeMap(map: Record<number, string>): void;
 // @public
 export function imGuiSetFontGlyph(charCode: number, font: Font): void;
 
+// @public
+export function imGuiWantCaptureKeyboard(capture: boolean): void;
+
 // (No @packageDocumentation comment for this package)
 
 ```

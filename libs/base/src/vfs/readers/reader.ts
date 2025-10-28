@@ -62,7 +62,7 @@ export interface HttpDirectoryReaderContext {
  * directory. This may involve parsing HTML indexes, JSON manifests, or custom APIs.
  *
  * Notes:
- * - A host VFS may register multiple readers and select one via {@link HttpDirectoryReader#canHandle}.
+ * - A host VFS may register multiple readers and select one via {@link HttpDirectoryReader.canHandle}.
  * - Readers should return a flat list of entries for the provided `dirPath` only
  *   (non-recursive). Recursion is orchestrated by the VFS if needed.
  *

@@ -46,6 +46,9 @@ export class AABB {
 export function applyMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): T & ExtractMixinType<M>;
 
 // @public
+export function applyPatch(base: DiffValue, patch: DiffPatch): DiffValue;
+
+// @public
 export function ASSERT(condition: boolean, message?: string): asserts condition;
 
 // @public
@@ -126,6 +129,8 @@ export class DataTransferVFS extends VFS {
     protected _move(): Promise<void>;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected setReadonly(readonly: boolean): void;
     protected _stat(path: string): Promise<FileStat>;
     protected _wipe(): Promise<void>;
     protected _writeFile(): Promise<void>;
@@ -133,6 +138,66 @@ export class DataTransferVFS extends VFS {
 
 // @public
 export function degree2radian(degree: number): number;
+
+// @public
+export function diff(base: DiffValue, target: DiffValue): DiffPatch;
+
+// @public
+export type DiffArray = DiffValue[];
+
+// @public
+export type DiffArrDel = {
+    op: 'del';
+    index: number;
+};
+
+// @public
+export type DiffArrIns = {
+    op: 'ins';
+    index: number;
+    value: DiffValue;
+};
+
+// @public
+export type DiffArrSet = {
+    op: 'set';
+    index: number;
+    value: DiffValue;
+};
+
+// @public
+export type DiffObject = {
+    [k: string]: DiffValue;
+};
+
+// @public
+export type DiffOpArr = {
+    kind: 'arr';
+    path: DiffPath;
+    ops: (DiffArrIns | DiffArrDel | DiffArrSet)[];
+};
+
+// @public
+export type DiffOpDel = {
+    kind: 'del';
+    path: DiffPath;
+};
+
+// @public
+export type DiffOpSet = {
+    kind: 'set';
+    path: DiffPath;
+    value: DiffValue;
+};
+
+// @public
+export type DiffPatch = (DiffOpSet | DiffOpDel | DiffOpArr)[];
+
+// @public
+export type DiffPath = (string | number)[];
+
+// @public
+export type DiffValue = null | boolean | number | string | DiffObject | DiffArray;
 
 // @public
 export class Disposable extends Observable<{
@@ -184,15 +249,11 @@ export interface FileMetadata {
     // (undocumented)
     created: Date;
     // (undocumented)
-    mimeType?: string;
-    // (undocumented)
     modified: Date;
     // (undocumented)
     name: string;
     // (undocumented)
     path: string;
-    // (undocumented)
-    permissions?: number;
     // (undocumented)
     size: number;
     // (undocumented)
@@ -355,6 +416,8 @@ export class HttpFS extends VFS {
     normalizePath(path: string): string;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected setReadonly(readonly: boolean): void;
     protected _stat(path: string): Promise<FileStat>;
     get urlResolver(): (url: string) => string;
     set urlResolver(resolver: (url: string) => string);
@@ -411,8 +474,6 @@ export interface IEventTarget<T extends EventMap = any> {
 export class IndexedDBFS extends VFS {
     constructor(dbName: string, storeName: string, readonly?: boolean);
     // (undocumented)
-    close(): Promise<void>;
-    // (undocumented)
     static deleteDatabase(name: string): Promise<void>;
     // (undocumented)
     protected _deleteDirectory(path: string, recursive: boolean): Promise<void>;
@@ -426,6 +487,8 @@ export class IndexedDBFS extends VFS {
     protected _makeDirectory(path: string, recursive: boolean): Promise<void>;
     // (undocumented)
     protected _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
+    // (undocumented)
+    protected onClose(): Promise<void>;
     // (undocumented)
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     // (undocumented)
@@ -770,6 +833,33 @@ export interface MoveOptions {
 export function nextPowerOf2(value: number): number;
 
 // @public
+export class NullVFS extends VFS {
+    constructor(readonly?: boolean);
+    // (undocumented)
+    protected _deleteDirectory(): Promise<void>;
+    // (undocumented)
+    protected _deleteFile(): Promise<void>;
+    // (undocumented)
+    protected _deleteFileSystem(): Promise<void>;
+    // (undocumented)
+    protected _exists(path: string): Promise<boolean>;
+    // (undocumented)
+    protected _makeDirectory(): Promise<void>;
+    // (undocumented)
+    protected _move(): Promise<void>;
+    // (undocumented)
+    protected _readDirectory(): Promise<FileMetadata[]>;
+    // (undocumented)
+    protected _readFile(path: string): Promise<ArrayBuffer | string>;
+    // (undocumented)
+    protected _stat(path: string): Promise<FileStat>;
+    // (undocumented)
+    protected _wipe(): Promise<void>;
+    // (undocumented)
+    protected _writeFile(): Promise<void>;
+}
+
+// @public
 export class Observable<X extends EventMap> implements IEventTarget<X> {
     constructor();
     dispatchEvent<K extends keyof X>(type: K, ...args: X[K]): void;
@@ -876,6 +966,11 @@ export class PathUtils {
     static join(...paths: string[]): string;
     static normalize(path: string): string;
     static relative(from: string, to: string): string;
+    static sanitizeFilename(filename: string, options?: {
+        replacement?: string;
+        maxLength?: number;
+        asciiOnly?: boolean;
+    }): string;
 }
 
 // @public
@@ -1271,7 +1366,7 @@ export abstract class VFS extends Observable<{
     changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
 }> {
     constructor(readOnly?: boolean);
-    basename(path: string): string;
+    basename(path: string, ext?: string): string;
     chdir(path: string): Promise<void>;
     close(): Promise<void>;
     copyFile(src: string, dest: string, options?: {
@@ -1295,6 +1390,7 @@ export abstract class VFS extends Observable<{
     dirname(path: string): string;
     exists(path: string): Promise<boolean>;
     protected abstract _exists(path: string): Promise<boolean>;
+    extname(path: string): string;
     getCwd(): string;
     getSimpleMountPoints(): string[];
     glob(pattern: string | string[], options?: GlobOptions): Promise<GlobResult[]>;
@@ -1302,12 +1398,13 @@ export abstract class VFS extends Observable<{
     guessMIMEType(path: string): string;
     hasMounts(): boolean;
     isAbsolute(path: string): boolean;
+    isAbsoluteURL(url: string): boolean;
     isObjectURL(url: string): boolean;
     isParentOf(parentPath: string, path: string): boolean;
     join(...paths: string[]): string;
     makeDirectory(path: string, recursive?: boolean): Promise<void>;
     protected abstract _makeDirectory(path: string, recursive: boolean): Promise<void>;
-    mount(path: string, vfs: VFS): void;
+    mount(path: string, vfs: VFS): Promise<void>;
     move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
     protected abstract _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
     normalizePath(path: string): string;
@@ -1320,11 +1417,13 @@ export abstract class VFS extends Observable<{
     protected abstract _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
     protected abstract _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
-    readonly readOnly: boolean;
+    get readOnly(): boolean;
+    set readOnly(val: boolean);
+    protected _readOnly: boolean;
     relative(path: string, parent?: string): string;
     stat(path: string): Promise<FileStat>;
     protected abstract _stat(path: string): Promise<FileStat>;
-    unmount(path: string): boolean;
+    unmount(path: string): Promise<boolean>;
     wipe(): Promise<void>;
     // (undocumented)
     protected abstract _wipe(): Promise<void>;
@@ -1376,7 +1475,6 @@ export class ZipFS extends VFS {
         filter?: (path: string) => boolean;
         progress?: (current: number, total: number, path: string) => void;
     }): Promise<void>;
-    close(): Promise<void>;
     protected _deleteDirectory(path: string, recursive: boolean): Promise<void>;
     protected _deleteFile(path: string): Promise<void>;
     protected _deleteFileSystem(): Promise<void>;
@@ -1401,6 +1499,7 @@ export class ZipFS extends VFS {
     protected _makeDirectory(path: string, recursive: boolean): Promise<void>;
     // (undocumented)
     protected _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
+    protected onClose(): Promise<void>;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
     saveToVFS(targetVFS: VFS, path: string): Promise<void>;
@@ -1482,7 +1581,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:364:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:517:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

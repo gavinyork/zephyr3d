@@ -6,7 +6,11 @@ import { calculateMorphBoundingBox } from './morphtarget';
 import type { AABB, Interpolator } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 
-/** Morph animation state */
+/**
+ * Morph animation state
+ *
+ * @public
+ **/
 export type MorphState = {
   numTargets: number;
   weights: Float32Array<ArrayBuffer>;

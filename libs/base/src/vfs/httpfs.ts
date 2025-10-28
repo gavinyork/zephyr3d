@@ -93,7 +93,7 @@ export class HttpFS extends VFS {
   /**
    * Optional URL resolver hook that transforms VFS paths into concrete URLs.
    *
-   * If present, it is applied by {@link VFS#normalizePath} before other checks.
+   * If present, it is applied by {@link VFS.normalizePath} before other checks.
    */
   get urlResolver(): (url: string) => string {
     return this.options.urlResolver ?? null;

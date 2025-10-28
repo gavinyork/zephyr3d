@@ -141,23 +141,15 @@ export class PathUtils {
    * - Replaces reserved names with safe alternatives.
    * - Optionally limits the length of the result.
    *
-   * Invalid characters replaced with underscore:
-   * - Control characters (0x00-0x1F, 0x7F)
-   * - Reserved characters: < > : " / \ | ? *
-   *
-   * Reserved names (Windows): CON, PRN, AUX, NUL, COM1-9, LPT1-9
-   *
    * Examples:
-   * - sanitizeFilename('my file.txt') -> 'my file.txt'
-   * - sanitizeFilename('file:name*.txt') -> 'file_name_.txt'
-   * - sanitizeFilename('  .hidden  ') -> 'hidden'
-   * - sanitizeFilename('CON') -> '_CON'
-   * - sanitizeFilename('a'.repeat(300)) -> (truncated to maxLength)
+   * - sanitizeFilename('my file.txt') -\> 'my file.txt'
+   * - sanitizeFilename('file:name*.txt') -\> 'file_name_.txt'
+   * - sanitizeFilename('  .hidden  ') -\> 'hidden'
+   * - sanitizeFilename('CON') -\> '_CON'
+   * - sanitizeFilename('a'.repeat(300)) -\> (truncated to maxLength)
    *
    * @param filename - Input filename to sanitize.
    * @param options - Optional configuration.
-   * @param options.replacement - Character to use for invalid chars (default: '_').
-   * @param options.maxLength - Maximum length of result (default: 255).
    * @returns Sanitized filename safe for use across platforms.
    */
   static sanitizeFilename(
