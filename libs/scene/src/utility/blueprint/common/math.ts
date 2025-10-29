@@ -1818,3 +1818,49 @@ export class CrossProductNode extends GenericMathNode {
     };
   }
 }
+
+/**
+ * Calculates a simple noise by input UV and scale value
+ *
+ * @remarks
+ * Returns a float value
+ *
+ * @public
+ */
+export class SimpleNoiseNode extends GenericMathNode {
+  constructor() {
+    super('Z_simpleNoise', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SimpleNoiseNode,
+      name: 'SimpleNoiseNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Calculates a gradient noise by input UV and scale value
+ *
+ * @remarks
+ * Returns a float value
+ *
+ * @public
+ */
+export class GradientNoiseNode extends GenericMathNode {
+  constructor() {
+    super('Z_gradientNoise', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: GradientNoiseNode,
+      name: 'GradientNoiseNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}

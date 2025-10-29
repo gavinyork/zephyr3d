@@ -16,10 +16,16 @@ import {
   ConstantVec4Node
 } from '../common/constants';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { DRef } from '@zephyr3d/base';
+import { ASSERT, DRef } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
-import { GenericMathNode, MakeVectorNode, TransformNode } from '../common/math';
+import {
+  GenericMathNode,
+  GradientNoiseNode,
+  MakeVectorNode,
+  SimpleNoiseNode,
+  TransformNode
+} from '../common/math';
 import {
   InvProjMatrixNode,
   InvViewProjMatrixNode,
@@ -169,6 +175,10 @@ abstract class IRExpression {
   asUniformTexture(_node: IGraphNode): IRUniformTexture {
     return null;
   }
+  /**
+   * Reset state for creation
+   */
+  reset() {}
 }
 
 /**
@@ -370,6 +380,8 @@ class IRFunc extends IRExpression {
   readonly params: (number | IRExpression)[];
   /** The function name (e.g., 'add', 'mul', 'sin', 'vec3') */
   readonly func: string;
+  /** The function implmentation */
+  readonly impl: (pb: ProgramBuilder) => string;
   /** Cached temporary variable name if expression is referenced multiple times */
   private tmpName: string;
   /**
@@ -381,10 +393,15 @@ class IRFunc extends IRExpression {
    * @remarks
    * Increments reference count for all expression parameters.
    */
-  constructor(params: (number | IRExpression)[], func: string) {
+  constructor(params: (number | IRExpression)[], func: string, impl?: (pb: ProgramBuilder) => string) {
     super();
     this.params = params.map((param) => (param instanceof IRExpression ? param.addRef() : param));
     this.func = func;
+    this.impl = impl;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
     this.tmpName = '';
   }
   /**
@@ -399,11 +416,20 @@ class IRFunc extends IRExpression {
    */
   create(pb: ProgramBuilder): PBShaderExp {
     if (this.tmpName) {
-      return pb.getCurrentScope()[this.tmpName];
+      const exp = pb.getCurrentScope()[this.tmpName];
+      ASSERT(exp, 'expression not exists');
+      return exp;
     }
-    const exp = pb[this.func](
-      ...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param))
-    );
+    const funcName = this.impl ? this.impl(pb) : this.func;
+    const exp = this.impl
+      ? pb
+          .getGlobalScope()
+          [
+            funcName
+          ](...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param)))
+      : pb[funcName](
+          ...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param))
+        );
     if (this._ref === 1) {
       return exp;
     } else {
@@ -433,7 +459,7 @@ class IRFunctionOutput extends IRExpression {
   /** Cached temporary variable name for the output */
   private tmpName: string;
   /** The input expression to output */
-  private input: IRExpression | number;
+  private readonly input: IRExpression | number;
   /**
    * Creates a function output expression
    *
@@ -442,6 +468,10 @@ class IRFunctionOutput extends IRExpression {
   constructor(input: IRExpression | number) {
     super();
     this.input = input;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
     this.tmpName = '';
   }
   /**
@@ -486,9 +516,9 @@ class IRFunctionOutput extends IRExpression {
  */
 class IRCallFunc extends IRExpression {
   /** The function call node from the graph */
-  node: FunctionCallNode;
+  readonly node: FunctionCallNode;
   /** Array of argument expressions */
-  args: IRExpression[];
+  readonly args: IRExpression[];
   /** Cached temporary variable name if result is referenced multiple times */
   tmpName: string;
   /**
@@ -501,6 +531,10 @@ class IRCallFunc extends IRExpression {
     super();
     this.node = node;
     this.args = args;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
     this.tmpName = '';
   }
   /**
@@ -675,11 +709,11 @@ class IRCast extends IRExpression {
  */
 class IRSampleTexture extends IRExpression {
   /** The texture constant expression */
-  tex: IRConstantTexture;
+  readonly tex: IRConstantTexture;
   /** The texture coordinate expression */
-  coord: IRExpression;
+  readonly coord: IRExpression;
   /** The sampler type determining how to interpret the sampled value */
-  samplerType: 'Color' | 'Normal';
+  readonly samplerType: 'Color' | 'Normal';
   /** Cached temporary variable name if result is referenced multiple times */
   tmpName: string;
   /**
@@ -694,6 +728,10 @@ class IRSampleTexture extends IRExpression {
     this.tex = tex.addRef();
     this.coord = coord.addRef();
     this.samplerType = samplerType;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
     this.tmpName = '';
   }
   /**
@@ -1032,6 +1070,9 @@ export class MaterialBlueprintIR {
     if (!this._outputs) {
       return null;
     }
+    for (const expr of this._expressions) {
+      expr.reset();
+    }
     const outputs: { name: string; exp: PBShaderExp | number }[] = [];
     for (const output of this._outputs) {
       outputs.push({ name: output.name, exp: output.expr.create(pb) });
@@ -1088,6 +1129,10 @@ export class MaterialBlueprintIR {
       expr = this.textureSample(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
+    } else if (node instanceof SimpleNoiseNode) {
+      expr = this.simpleNoise(node, output);
+    } else if (node instanceof GradientNoiseNode) {
+      expr = this.gradientNoise(node, output);
     } else if (node instanceof GenericMathNode) {
       expr = this.func(node, output);
     } else if (node instanceof TransformNode) {
@@ -1334,6 +1379,115 @@ export class MaterialBlueprintIR {
       output,
       IRInput,
       (scope: PBInsideFunctionScope) => scope[node.name]
+    );
+  }
+  /** Converts a simple noise node to IR */
+  private simpleNoise(node: SimpleNoiseNode, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    for (const input of node.inputs) {
+      if (input.inputNode) {
+        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+      }
+    }
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRFunc,
+      params,
+      node.toString(),
+      (pb: ProgramBuilder) => {
+        pb.func('Z_randomValue', [pb.vec2('uv')], function () {
+          this.$return(pb.fract(pb.mul(pb.sin(pb.dot(this.uv, pb.vec2(12.9898, 78.233))), 43758.5453)));
+        });
+        pb.func('Z_valueNoise', [pb.vec2('uv')], function () {
+          this.$l.i = pb.floor(this.uv);
+          this.$l.f = pb.fract(this.uv);
+          this.f = pb.mul(this.f, this.f, pb.sub(pb.vec2(3), pb.mul(this.f, 2)));
+          this.$l.t = pb.abs(pb.sub(pb.fract(this.uv), pb.vec2(0.5)));
+          this.$l.c0 = this.i;
+          this.$l.c1 = pb.add(this.i, pb.vec2(1, 0));
+          this.$l.c2 = pb.add(this.i, pb.vec2(0, 1));
+          this.$l.c3 = pb.add(this.i, pb.vec2(1));
+          this.$l.r0 = this.Z_randomValue(this.c0);
+          this.$l.r1 = this.Z_randomValue(this.c1);
+          this.$l.r2 = this.Z_randomValue(this.c2);
+          this.$l.r3 = this.Z_randomValue(this.c3);
+          this.$return(
+            pb.mix(pb.mix(this.r0, this.r1, this.f.x), pb.mix(this.r2, this.r3, this.f.x), this.f.y)
+          );
+        });
+        pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
+          this.$l.t = pb.float(0);
+          let freq = 1;
+          let amp = 0.5 * 0.5 * 0.5;
+          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          freq *= 2;
+          amp *= 2;
+          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          freq *= 2;
+          amp *= 2;
+          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          this.$return(this.t);
+        });
+        return node.toString();
+      }
+    );
+  }
+  /** Converts a gradient noise node to IR */
+  private gradientNoise(node: SimpleNoiseNode, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    for (const input of node.inputs) {
+      if (input.inputNode) {
+        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+      }
+    }
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRFunc,
+      params,
+      node.toString(),
+      (pb: ProgramBuilder) => {
+        pb.func('Z_gradientNoiseDir', [pb.vec2('uv')], function () {
+          this.$l.p = pb.mod(this.uv, pb.vec2(289));
+          this.$l.x = pb.add(pb.mod(pb.mul(pb.add(pb.mul(this.p.x, 34), 1), this.p.x), 289), this.p.y);
+          this.x = pb.mod(pb.mul(pb.add(pb.mul(this.x, 34), 1), this.x), 289);
+          this.x = pb.sub(pb.mul(pb.fract(pb.div(this.x, 41)), 2), 1);
+          this.$return(
+            pb.normalize(pb.vec2(pb.sub(this.x, pb.floor(pb.add(this.x, 0.5))), pb.sub(pb.abs(this.x), 0.5)))
+          );
+        });
+        pb.func('Z_valueNoiseImpl', [pb.vec2('uv')], function () {
+          this.$l.i = pb.floor(this.uv);
+          this.$l.f = pb.fract(this.uv);
+          this.$l.r00 = pb.dot(this.Z_gradientNoiseDir(this.i), this.f);
+          this.$l.r01 = pb.dot(
+            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(0, 1))),
+            pb.sub(this.f, pb.vec2(0, 1))
+          );
+          this.$l.r10 = pb.dot(
+            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(1, 0))),
+            pb.sub(this.f, pb.vec2(1, 0))
+          );
+          this.$l.r11 = pb.dot(
+            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(1, 1))),
+            pb.sub(this.f, pb.vec2(1, 1))
+          );
+          this.f = pb.mul(
+            this.f,
+            this.f,
+            this.f,
+            pb.add(pb.mul(this.f, pb.sub(pb.mul(this.f, 6), pb.vec2(15))), 10)
+          );
+          this.$return(
+            pb.mix(pb.mix(this.r00, this.r01, this.f.y), pb.mix(this.r10, this.r11, this.f.y), this.f.x)
+          );
+        });
+        pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
+          this.$return(pb.add(this.Z_valueNoiseImpl(pb.mul(this.uv, this.scale)), 0.5));
+        });
+        return node.toString();
+      }
     );
   }
   /** Converts a function call node to IR */

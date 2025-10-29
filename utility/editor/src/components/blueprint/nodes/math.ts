@@ -49,7 +49,9 @@ import {
   FmaNode,
   ClampNode,
   SaturateNode,
-  TransformNode
+  TransformNode,
+  SimpleNoiseNode,
+  GradientNoiseNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -261,6 +263,14 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Step',
           create: () => new StepNode()
+        },
+        {
+          name: 'SimpleNoise',
+          create: () => new SimpleNoiseNode()
+        },
+        {
+          name: 'GradientNoise',
+          create: () => new GradientNoiseNode()
         }
       ]
     }
