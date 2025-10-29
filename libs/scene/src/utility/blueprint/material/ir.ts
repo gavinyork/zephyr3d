@@ -21,9 +21,9 @@ import { BaseTextureNode, TextureSampleNode } from './texture';
 import { getDevice } from '../../../app/api';
 import {
   GenericMathNode,
-  GradientNoiseNode,
+  PerlinNoise2DNode,
   MakeVectorNode,
-  SimpleNoiseNode,
+  SimplexNoise2DNode,
   TransformNode
 } from '../common/math';
 import {
@@ -1129,10 +1129,10 @@ export class MaterialBlueprintIR {
       expr = this.textureSample(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
-    } else if (node instanceof SimpleNoiseNode) {
-      expr = this.simpleNoise(node, output);
-    } else if (node instanceof GradientNoiseNode) {
-      expr = this.gradientNoise(node, output);
+    } else if (node instanceof SimplexNoise2DNode) {
+      expr = this.simplexNoise2d(node, output);
+    } else if (node instanceof PerlinNoise2DNode) {
+      expr = this.perlinNoise2d(node, output);
     } else if (node instanceof GenericMathNode) {
       expr = this.func(node, output);
     } else if (node instanceof TransformNode) {
@@ -1382,7 +1382,7 @@ export class MaterialBlueprintIR {
     );
   }
   /** Converts a simple noise node to IR */
-  private simpleNoise(node: SimpleNoiseNode, output: number): IRExpression {
+  private simplexNoise2d(node: SimplexNoise2DNode, output: number): IRExpression {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
@@ -1434,7 +1434,7 @@ export class MaterialBlueprintIR {
     );
   }
   /** Converts a gradient noise node to IR */
-  private gradientNoise(node: SimpleNoiseNode, output: number): IRExpression {
+  private perlinNoise2d(node: SimplexNoise2DNode, output: number): IRExpression {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
@@ -1448,7 +1448,7 @@ export class MaterialBlueprintIR {
       params,
       node.toString(),
       (pb: ProgramBuilder) => {
-        pb.func('Z_gradientNoiseDir', [pb.vec2('uv')], function () {
+        pb.func('Z_perlinNoise2dDir', [pb.vec2('uv')], function () {
           this.$l.p = pb.mod(this.uv, pb.vec2(289));
           this.$l.x = pb.add(pb.mod(pb.mul(pb.add(pb.mul(this.p.x, 34), 1), this.p.x), 289), this.p.y);
           this.x = pb.mod(pb.mul(pb.add(pb.mul(this.x, 34), 1), this.x), 289);
@@ -1457,20 +1457,20 @@ export class MaterialBlueprintIR {
             pb.normalize(pb.vec2(pb.sub(this.x, pb.floor(pb.add(this.x, 0.5))), pb.sub(pb.abs(this.x), 0.5)))
           );
         });
-        pb.func('Z_valueNoiseImpl', [pb.vec2('uv')], function () {
+        pb.func('Z_perlinNoise2dImpl', [pb.vec2('uv')], function () {
           this.$l.i = pb.floor(this.uv);
           this.$l.f = pb.fract(this.uv);
-          this.$l.r00 = pb.dot(this.Z_gradientNoiseDir(this.i), this.f);
+          this.$l.r00 = pb.dot(this.Z_perlinNoise2dDir(this.i), this.f);
           this.$l.r01 = pb.dot(
-            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(0, 1))),
+            this.Z_perlinNoise2dDir(pb.add(this.i, pb.vec2(0, 1))),
             pb.sub(this.f, pb.vec2(0, 1))
           );
           this.$l.r10 = pb.dot(
-            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(1, 0))),
+            this.Z_perlinNoise2dDir(pb.add(this.i, pb.vec2(1, 0))),
             pb.sub(this.f, pb.vec2(1, 0))
           );
           this.$l.r11 = pb.dot(
-            this.Z_gradientNoiseDir(pb.add(this.i, pb.vec2(1, 1))),
+            this.Z_perlinNoise2dDir(pb.add(this.i, pb.vec2(1, 1))),
             pb.sub(this.f, pb.vec2(1, 1))
           );
           this.f = pb.mul(
@@ -1484,7 +1484,7 @@ export class MaterialBlueprintIR {
           );
         });
         pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
-          this.$return(pb.add(this.Z_valueNoiseImpl(pb.mul(this.uv, this.scale)), 0.5));
+          this.$return(pb.add(this.Z_perlinNoise2dImpl(pb.mul(this.uv, this.scale)), 0.5));
         });
         return node.toString();
       }

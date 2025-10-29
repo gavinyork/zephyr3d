@@ -1820,21 +1820,21 @@ export class CrossProductNode extends GenericMathNode {
 }
 
 /**
- * Calculates a simple noise by input UV and scale value
+ * Calculates a simplex noise by input UV and scale value
  *
  * @remarks
  * Returns a float value
  *
  * @public
  */
-export class SimpleNoiseNode extends GenericMathNode {
+export class SimplexNoise2DNode extends GenericMathNode {
   constructor() {
-    super('Z_simpleNoise', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
+    super('Z_simplexNoise2D', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
   }
   static getSerializationCls(): SerializableClass {
     return {
-      ctor: SimpleNoiseNode,
-      name: 'SimpleNoiseNode',
+      ctor: SimplexNoise2DNode,
+      name: 'SimplexNoise2DNode',
       getProps() {
         return [];
       }
@@ -1843,21 +1843,21 @@ export class SimpleNoiseNode extends GenericMathNode {
 }
 
 /**
- * Calculates a gradient noise by input UV and scale value
+ * Calculates a perlin noise by input UV and scale value
  *
  * @remarks
  * Returns a float value
  *
  * @public
  */
-export class GradientNoiseNode extends GenericMathNode {
+export class PerlinNoise2DNode extends GenericMathNode {
   constructor() {
-    super('Z_gradientNoise', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
+    super('Z_perlinNoise2D', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
   }
   static getSerializationCls(): SerializableClass {
     return {
-      ctor: GradientNoiseNode,
-      name: 'GradientNoiseNode',
+      ctor: PerlinNoise2DNode,
+      name: 'PerlinNoise2DNode',
       getProps() {
         return [];
       }

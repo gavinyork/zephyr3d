@@ -50,8 +50,8 @@ import {
   ClampNode,
   SaturateNode,
   TransformNode,
-  SimpleNoiseNode,
-  GradientNoiseNode
+  SimplexNoise2DNode,
+  PerlinNoise2DNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -265,12 +265,12 @@ export function getMathNodeCategories(): NodeCategory[] {
           create: () => new StepNode()
         },
         {
-          name: 'SimpleNoise',
-          create: () => new SimpleNoiseNode()
+          name: 'SimplexNoise2D',
+          create: () => new SimplexNoise2DNode()
         },
         {
-          name: 'GradientNoise',
-          create: () => new GradientNoiseNode()
+          name: 'PerlinNoise2D',
+          create: () => new PerlinNoise2DNode()
         }
       ]
     }
