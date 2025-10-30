@@ -2,7 +2,7 @@ import type { AABB } from '@zephyr3d/base';
 import { Disposable, Vector2 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { hash } from '../shaders';
+import { hash21 } from '../shaders';
 import { ShaderHelper } from '../material';
 
 const MAX_NUM_OCTAVES = 16;
@@ -284,10 +284,10 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
         this.f,
         pb.add(pb.mul(this.f, pb.sub(pb.mul(this.f, 6), pb.vec2(15))), pb.vec2(10))
       );
-      this.$l.a = hash(this, pb.add(this.i, pb.vec2(0)));
-      this.$l.b = hash(this, pb.add(this.i, pb.vec2(1, 0)));
-      this.$l.c = hash(this, pb.add(this.i, pb.vec2(0, 1)));
-      this.$l.d = hash(this, pb.add(this.i, pb.vec2(1, 1)));
+      this.$l.a = hash21(this, pb.add(this.i, pb.vec2(0)));
+      this.$l.b = hash21(this, pb.add(this.i, pb.vec2(1, 0)));
+      this.$l.c = hash21(this, pb.add(this.i, pb.vec2(0, 1)));
+      this.$l.d = hash21(this, pb.add(this.i, pb.vec2(1, 1)));
       this.$return(
         pb.add(
           this.a,

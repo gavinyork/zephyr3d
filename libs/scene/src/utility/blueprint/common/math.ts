@@ -1864,3 +1864,63 @@ export class PerlinNoise2DNode extends GenericMathNode {
     };
   }
 }
+
+/**
+ * Calculates float hash by input scalar value or vector value
+ *
+ * @public
+ */
+export class Hash1Node extends GenericMathNode {
+  constructor() {
+    super('Z_hash1', 1, 'float', null, { '1': ['float', 'vec2', 'vec3'] });
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: Hash1Node,
+      name: 'Hash1Node',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Calculates vec2 hash by input scalar value or vector value
+ *
+ * @public
+ */
+export class Hash2Node extends GenericMathNode {
+  constructor() {
+    super('Z_hash2', 1, 'vec2', null, { '1': ['float', 'vec2', 'vec3'] });
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: Hash2Node,
+      name: 'Hash2Node',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Calculates vec3 hash by input scalar value or vector value
+ *
+ * @public
+ */
+export class Hash3Node extends GenericMathNode {
+  constructor() {
+    super('Z_hash3', 1, 'vec3', null, { '1': ['float', 'vec2', 'vec3'] });
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: Hash3Node,
+      name: 'Hash3Node',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}

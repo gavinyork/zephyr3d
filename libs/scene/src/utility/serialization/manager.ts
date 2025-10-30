@@ -125,7 +125,10 @@ import {
   StepNode,
   TanHNode,
   TanNode,
-  TransformNode
+  TransformNode,
+  Hash1Node,
+  Hash2Node,
+  Hash3Node
 } from '../blueprint/common/math';
 import {
   CameraNearFarNode,
@@ -324,6 +327,9 @@ export class SerializationManager {
         DistanceNode.getSerializationCls(),
         DotProductNode.getSerializationCls(),
         CrossProductNode.getSerializationCls(),
+        Hash1Node.getSerializationCls(),
+        Hash2Node.getSerializationCls(),
+        Hash3Node.getSerializationCls(),
         SimplexNoise2DNode.getSerializationCls(),
         PerlinNoise2DNode.getSerializationCls(),
         VertexColorNode.getSerializationCls(),

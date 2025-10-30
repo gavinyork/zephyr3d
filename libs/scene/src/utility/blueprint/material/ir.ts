@@ -24,7 +24,10 @@ import {
   PerlinNoise2DNode,
   MakeVectorNode,
   SimplexNoise2DNode,
-  TransformNode
+  TransformNode,
+  Hash1Node,
+  Hash2Node,
+  Hash3Node
 } from '../common/math';
 import {
   InvProjMatrixNode,
@@ -47,6 +50,18 @@ import {
 } from './inputs';
 import { ShaderHelper } from '../../../material/shader/helper';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from './func';
+import {
+  hash11,
+  hash12,
+  hash13,
+  hash21,
+  hash22,
+  hash23,
+  hash31,
+  hash32,
+  hash33,
+  valueNoise
+} from '../../../shaders/noise';
 
 /**
  * Represents a uniform scalar or vector value in the intermediate representation
@@ -379,25 +394,25 @@ class IRFunc extends IRExpression {
   /** Array of parameters (can be expressions or literal numbers) */
   readonly params: (number | IRExpression)[];
   /** The function name (e.g., 'add', 'mul', 'sin', 'vec3') */
-  readonly func: string;
-  /** The function implmentation */
-  readonly impl: (pb: ProgramBuilder) => string;
+  readonly func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp);
   /** Cached temporary variable name if expression is referenced multiple times */
   private tmpName: string;
   /**
    * Creates a function call expression
    *
    * @param params - Array of parameters for the function
-   * @param func - The function name
+   * @param func - The function name or function implementation
    *
    * @remarks
    * Increments reference count for all expression parameters.
    */
-  constructor(params: (number | IRExpression)[], func: string, impl?: (pb: ProgramBuilder) => string) {
+  constructor(
+    params: (number | IRExpression)[],
+    func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp)
+  ) {
     super();
     this.params = params.map((param) => (param instanceof IRExpression ? param.addRef() : param));
     this.func = func;
-    this.impl = impl;
     this.tmpName = '';
   }
   /** Reset for next creation */
@@ -420,16 +435,8 @@ class IRFunc extends IRExpression {
       ASSERT(exp, 'expression not exists');
       return exp;
     }
-    const funcName = this.impl ? this.impl(pb) : this.func;
-    const exp = this.impl
-      ? pb
-          .getGlobalScope()
-          [
-            funcName
-          ](...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param)))
-      : pb[funcName](
-          ...this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param))
-        );
+    const params = this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param));
+    const exp = typeof this.func === 'string' ? pb[this.func](...params) : this.func(pb, ...params);
     if (this._ref === 1) {
       return exp;
     } else {
@@ -1129,6 +1136,12 @@ export class MaterialBlueprintIR {
       expr = this.textureSample(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
+    } else if (node instanceof Hash1Node) {
+      expr = this.hash1(node, output);
+    } else if (node instanceof Hash2Node) {
+      expr = this.hash2(node, output);
+    } else if (node instanceof Hash3Node) {
+      expr = this.hash3(node, output);
     } else if (node instanceof SimplexNoise2DNode) {
       expr = this.simplexNoise2d(node, output);
     } else if (node instanceof PerlinNoise2DNode) {
@@ -1381,6 +1394,78 @@ export class MaterialBlueprintIR {
       (scope: PBInsideFunctionScope) => scope[node.name]
     );
   }
+  /** Converts a hash1 node to IR */
+  private hash1(node: Hash1Node, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    const input = node.inputs[0];
+    ASSERT(!!input.inputNode);
+    const type = input.inputNode.getOutputType(input.inputId);
+    ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
+    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRFunc,
+      params,
+      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+        const scope = pb.getCurrentScope() as PBInsideFunctionScope;
+        const seed = params[0];
+        return type === 'float'
+          ? hash11(scope, seed)
+          : type === 'vec2'
+            ? hash21(scope, seed as PBShaderExp)
+            : hash31(scope, seed as PBShaderExp);
+      }
+    );
+  }
+  /** Converts a hash2 node to IR */
+  private hash2(node: Hash1Node, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    const input = node.inputs[0];
+    ASSERT(!!input.inputNode);
+    const type = input.inputNode.getOutputType(input.inputId);
+    ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
+    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRFunc,
+      params,
+      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+        const scope = pb.getCurrentScope() as PBInsideFunctionScope;
+        const seed = params[0];
+        return type === 'float'
+          ? hash12(scope, seed)
+          : type === 'vec2'
+            ? hash22(scope, seed as PBShaderExp)
+            : hash32(scope, seed as PBShaderExp);
+      }
+    );
+  }
+  /** Converts a hash3 node to IR */
+  private hash3(node: Hash1Node, output: number): IRExpression {
+    const params: IRExpression[] = [];
+    const input = node.inputs[0];
+    ASSERT(!!input.inputNode);
+    const type = input.inputNode.getOutputType(input.inputId);
+    ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
+    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRFunc,
+      params,
+      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+        const scope = pb.getCurrentScope() as PBInsideFunctionScope;
+        const seed = params[0];
+        return type === 'float'
+          ? hash13(scope, seed)
+          : type === 'vec2'
+            ? hash23(scope, seed as PBShaderExp)
+            : hash33(scope, seed as PBShaderExp);
+      }
+    );
+  }
   /** Converts a simple noise node to IR */
   private simplexNoise2d(node: SimplexNoise2DNode, output: number): IRExpression {
     const params: IRExpression[] = [];
@@ -1394,46 +1479,25 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      node.toString(),
-      (pb: ProgramBuilder) => {
-        pb.func('Z_randomValue', [pb.vec2('uv')], function () {
-          this.$return(pb.fract(pb.mul(pb.sin(pb.dot(this.uv, pb.vec2(12.9898, 78.233))), 43758.5453)));
-        });
-        pb.func('Z_valueNoise', [pb.vec2('uv')], function () {
-          this.$l.i = pb.floor(this.uv);
-          this.$l.f = pb.fract(this.uv);
-          this.f = pb.mul(this.f, this.f, pb.sub(pb.vec2(3), pb.mul(this.f, 2)));
-          this.$l.t = pb.abs(pb.sub(pb.fract(this.uv), pb.vec2(0.5)));
-          this.$l.c0 = this.i;
-          this.$l.c1 = pb.add(this.i, pb.vec2(1, 0));
-          this.$l.c2 = pb.add(this.i, pb.vec2(0, 1));
-          this.$l.c3 = pb.add(this.i, pb.vec2(1));
-          this.$l.r0 = this.Z_randomValue(this.c0);
-          this.$l.r1 = this.Z_randomValue(this.c1);
-          this.$l.r2 = this.Z_randomValue(this.c2);
-          this.$l.r3 = this.Z_randomValue(this.c3);
-          this.$return(
-            pb.mix(pb.mix(this.r0, this.r1, this.f.x), pb.mix(this.r2, this.r3, this.f.x), this.f.y)
-          );
-        });
+      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
         pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
           this.$l.t = pb.float(0);
           let freq = 1;
           let amp = 0.5 * 0.5 * 0.5;
-          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          this.t = pb.add(this.t, pb.mul(valueNoise(this, pb.mul(this.uv, this.scale, 1 / freq)), amp));
           freq *= 2;
           amp *= 2;
-          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          this.t = pb.add(this.t, pb.mul(valueNoise(this, pb.mul(this.uv, this.scale, 1 / freq)), amp));
           freq *= 2;
           amp *= 2;
-          this.t = pb.add(this.t, pb.mul(this.Z_valueNoise(pb.mul(this.uv, this.scale, 1 / freq)), amp));
+          this.t = pb.add(this.t, pb.mul(valueNoise(this, pb.mul(this.uv, this.scale, 1 / freq)), amp));
           this.$return(this.t);
         });
-        return node.toString();
+        return pb.getGlobalScope()[node.toString()](params[0], params[1]);
       }
     );
   }
-  /** Converts a gradient noise node to IR */
+  /** Converts a perlin noise node to IR */
   private perlinNoise2d(node: SimplexNoise2DNode, output: number): IRExpression {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
@@ -1446,8 +1510,7 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      node.toString(),
-      (pb: ProgramBuilder) => {
+      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
         pb.func('Z_perlinNoise2dDir', [pb.vec2('uv')], function () {
           this.$l.p = pb.mod(this.uv, pb.vec2(289));
           this.$l.x = pb.add(pb.mod(pb.mul(pb.add(pb.mul(this.p.x, 34), 1), this.p.x), 289), this.p.y);
@@ -1486,7 +1549,7 @@ export class MaterialBlueprintIR {
         pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
           this.$return(pb.add(this.Z_perlinNoise2dImpl(pb.mul(this.uv, this.scale)), 0.5));
         });
-        return node.toString();
+        return pb.getGlobalScope()[node.toString()](params[0], params[1]);
       }
     );
   }

@@ -51,7 +51,10 @@ import {
   SaturateNode,
   TransformNode,
   SimplexNoise2DNode,
-  PerlinNoise2DNode
+  PerlinNoise2DNode,
+  Hash1Node,
+  Hash2Node,
+  Hash3Node
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -263,6 +266,18 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Step',
           create: () => new StepNode()
+        },
+        {
+          name: 'Hash1',
+          create: () => new Hash1Node()
+        },
+        {
+          name: 'Hash2',
+          create: () => new Hash2Node()
+        },
+        {
+          name: 'Hash3',
+          create: () => new Hash3Node()
         },
         {
           name: 'SimplexNoise2D',
