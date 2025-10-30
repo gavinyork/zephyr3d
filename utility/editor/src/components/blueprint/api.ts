@@ -1,4 +1,5 @@
 import type { IGraphNode } from '@zephyr3d/scene';
+import type { NodeEditor } from './nodeeditor';
 
 export type NodeCategory = {
   name: string;
@@ -7,5 +8,5 @@ export type NodeCategory = {
 };
 
 export interface GraphEditorApi {
-  getNodeCategory(): NodeCategory[];
+  getNodeCategory(editor: NodeEditor): NodeCategory[];
 }

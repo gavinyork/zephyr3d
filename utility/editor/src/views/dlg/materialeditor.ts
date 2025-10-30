@@ -4,7 +4,7 @@ import { PBRMaterialEditor } from '../../components/blueprint/material/pbr';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { ProjectService } from '../../core/services/project';
 
-export class DlgPBMaterialEditor extends DialogRenderer<void> {
+export class DlgPBRMaterialEditor extends DialogRenderer<void> {
   private readonly editor: PBRMaterialEditor;
   private path: string;
   constructor(id: string, width: number, height: number, outputName: string, path: string) {
@@ -24,7 +24,7 @@ export class DlgPBMaterialEditor extends DialogRenderer<void> {
       ImGui.SetWindowFocus(title);
       return DialogRenderer.getModeless(existing).promise;
     } else {
-      return new DlgPBMaterialEditor(title, width, height, outptuName, path).show();
+      return new DlgPBRMaterialEditor(title, width, height, outptuName, path).show();
     }
   }
   public async show(): Promise<void> {

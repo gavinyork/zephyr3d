@@ -49,7 +49,6 @@ interface TraversalResult {
 export class NodeEditor extends Observable<{
   changed: [];
   dragdrop: [x: number, y: number, { isDir: boolean; path: string }[]];
-  save: [path: string];
   close: [changed: boolean];
 }> {
   private nodeId: number;
@@ -1219,7 +1218,7 @@ export class NodeEditor extends Observable<{
     this.isHoveringMenu = false;
     if (this.showCanvasContextMenu) {
       this.showCanvasContextMenu = false;
-      this.filteredCategory = this.api.getNodeCategory();
+      this.filteredCategory = this.api.getNodeCategory(this);
       focusOnSearch = true;
       ImGui.OpenPopup('CanvasContextMenu');
     }
@@ -1230,9 +1229,12 @@ export class NodeEditor extends Observable<{
         ImGui.SetNextItemWidth(-1);
         if (ImGui.InputTextWithHint('##CanvasContextMenuSearch', 'Search', this.nodeSearchBuf, undefined)) {
           if (this.nodeSearchBuf[0]) {
-            this.filteredCategory = this.filterCategory(this.nodeSearchBuf[0], this.api.getNodeCategory());
+            this.filteredCategory = this.filterCategory(
+              this.nodeSearchBuf[0],
+              this.api.getNodeCategory(this)
+            );
           } else {
-            this.filteredCategory = this.api.getNodeCategory();
+            this.filteredCategory = this.api.getNodeCategory(this);
           }
         }
         if (focusOnSearch) {
@@ -1354,18 +1356,6 @@ export class NodeEditor extends Observable<{
   }
 
   public render() {
-    if (ImGui.Button('Clear')) {
-      const emit = this.emitChange;
-      this.emitChange = false;
-      const changed = this.clear(false);
-      this.emitChange = emit;
-      if (changed) {
-        this.invalidateStructure();
-      }
-    }
-
-    ImGui.Separator();
-
     const canvasPos = ImGui.GetCursorScreenPos();
     this.canvasSize = ImGui.GetContentRegionAvail();
     const drawList = ImGui.GetWindowDrawList();

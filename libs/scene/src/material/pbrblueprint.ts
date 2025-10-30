@@ -23,7 +23,9 @@ export class PBRBluePrintMaterial
   /** @internal */
   private static readonly FEATURE_VERTEX_UV = this.defineFeature();
   /** @internal */
-  private _ir: MaterialBlueprintIR;
+  private _irFrag: MaterialBlueprintIR;
+  /** @internal */
+  private _irVertex: MaterialBlueprintIR;
   /** @internal */
   private _uniformValues: IRUniformValue[];
   /** @internal */
@@ -31,21 +33,42 @@ export class PBRBluePrintMaterial
   /**
    * Creates an instance of PBRMetallicRoughnessMaterial class
    */
-  constructor(ir: MaterialBlueprintIR) {
+  constructor(irFrag: MaterialBlueprintIR, irVertex: MaterialBlueprintIR) {
     super();
-    this._ir = ir ?? new MaterialBlueprintIR(null, '');
-    this._uniformValues = ir.uniformValues;
-    this._uniformTextures = ir.uniformTextures;
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._ir.behaviors.useVertexTangent);
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._ir.behaviors.useVertexColor);
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._ir.behaviors.useVertexUV);
+    this._irFrag = irFrag ?? new MaterialBlueprintIR(null, '');
+    this._irVertex = irVertex ?? new MaterialBlueprintIR(null, '');
+    this._uniformValues = [];
+    this._uniformTextures = [];
+    for (const u of [...(irFrag.uniformValues ?? []), ...(irVertex.uniformValues ?? [])]) {
+      if (!this._uniformValues.findIndex((val) => val.name === u.name)) {
+        this._uniformValues.push(u);
+      }
+    }
+    this._uniformTextures = [];
+    for (const u of [...(irFrag.uniformTextures ?? []), ...(irVertex.uniformTextures ?? [])]) {
+      if (!this._uniformTextures.findIndex((val) => val.name === u.name)) {
+        this._uniformTextures.push(u);
+      }
+    }
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._irFrag.behaviors.useVertexTangent);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irFrag.behaviors.useVertexColor);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irFrag.behaviors.useVertexUV);
   }
-  get IR() {
-    return this._ir;
+  get fragmentIR() {
+    return this._irFrag;
   }
-  set IR(ir: MaterialBlueprintIR) {
-    if (ir !== this._ir) {
-      this._ir = ir;
+  set fragmentIR(ir: MaterialBlueprintIR) {
+    if (ir !== this._irFrag) {
+      this._irFrag = ir;
+      this.optionChanged(true);
+    }
+  }
+  get vertexIR() {
+    return this._irVertex;
+  }
+  set vertexIR(ir: MaterialBlueprintIR) {
+    if (ir !== this._irVertex) {
+      this._irVertex = ir;
       this.optionChanged(true);
     }
   }
@@ -66,13 +89,13 @@ export class PBRBluePrintMaterial
     this.uniformChanged();
   }
   clone(): PBRBluePrintMaterial {
-    const other = new PBRBluePrintMaterial(this._ir);
+    const other = new PBRBluePrintMaterial(this._irFrag);
     other.copyFrom(this);
     return other;
   }
   copyFrom(other: this): void {
     super.copyFrom(other);
-    this._ir = other._ir;
+    this._irFrag = other._irFrag;
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
@@ -108,18 +131,21 @@ export class PBRBluePrintMaterial
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
-      scope.$l.commonData = this.getCommonData(
+      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+      scope.$l.commonData = this.getCommonDatasStruct(scope)();
+      this.getCommonData(
         scope,
+        scope.commonData,
+        scope.viewVec,
         scope.$inputs.worldPos,
         scope.$inputs.zVertexNormal,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexTangent : null,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexBinormal : null,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.zVertexColor : null,
         this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.zVertexUV : null,
-        this._ir
+        this._irFrag
       );
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
           scope.$l.outRoughness = pb.vec4();
           scope.$l.litColor = this.PBRLight(
@@ -159,6 +185,20 @@ export class PBRBluePrintMaterial
     }
   }
   protected _createHash(): string {
-    return this._ir.hash;
+    return this._irFrag.hash;
+  }
+  private updateUniforms() {
+    this._uniformValues = [];
+    for (const u of [...(this._irFrag.uniformValues ?? []), ...(this._irVertex.uniformValues ?? [])]) {
+      if (!this._uniformValues.findIndex((val) => val.name === u.name)) {
+        this._uniformValues.push(u);
+      }
+    }
+    this._uniformTextures = [];
+    for (const u of [...(this._irFrag.uniformTextures ?? []), ...(this._irVertex.uniformTextures ?? [])]) {
+      if (!this._uniformTextures.findIndex((val) => val.name === u.name)) {
+        this._uniformTextures.push(u);
+      }
+    }
   }
 }

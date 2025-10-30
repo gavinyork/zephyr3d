@@ -17,7 +17,8 @@ import {
   PerspectiveCamera,
   Scene,
   SphereShape,
-  UnlitMaterial
+  UnlitMaterial,
+  VertexBlockNode
 } from '@zephyr3d/scene';
 import { MaterialBlueprintIR, PBRBlockNode, PBRBluePrintMaterial } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
@@ -32,7 +33,7 @@ import type { FrameBuffer } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
-import type { NodeEditorState } from '../nodeeditor';
+import type { NodeEditor, NodeEditorState } from '../nodeeditor';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
@@ -43,12 +44,20 @@ export class PBRMaterialEditor extends GraphEditor {
   private _blendMode: BlendMode;
   private _doubleSided: boolean;
   constructor(label: string, outputName: string) {
-    super(label);
-    const block = this.nodeEditor.addNode(new GNode(this.nodeEditor, null, new PBRBlockNode()));
-    block.title = outputName;
-    block.locked = true;
-    block.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
-    block.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+    super(label, ['fragment', 'vertex']);
+    const fragEditor = this.getNodeEditor('fragment');
+    const fragBlock = fragEditor.addNode(new GNode(fragEditor, null, new PBRBlockNode()));
+    fragBlock.title = outputName;
+    fragBlock.locked = true;
+    fragBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+    fragBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+    const vertexEditor = this.getNodeEditor('vertex');
+    const vertexBlock = vertexEditor.addNode(new GNode(vertexEditor, null, new VertexBlockNode()));
+    vertexBlock.title = outputName;
+    vertexBlock.locked = true;
+    vertexBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+    vertexBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
     scene.env.sky.cameraHeightScale = 5000;
@@ -73,9 +82,16 @@ export class PBRMaterialEditor extends GraphEditor {
     this._doubleSided = false;
     this.applyPreviewMaterial();
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
-    this.nodeEditor.on('changed', this.graphChanged, this);
-    this.nodeEditor.on('save', this.save, this);
-    this.nodeEditor.on('dragdrop', this.dragdrop, this);
+    fragEditor.on('changed', this.graphChanged, this);
+    fragEditor.on('dragdrop', this.dragdropFrag, this);
+    vertexEditor.on('changed', this.graphChanged, this);
+    vertexEditor.on('dragdrop', this.dragdropVertex, this);
+  }
+  get fragmentEditor() {
+    return this.getNodeEditor('fragment');
+  }
+  get vertexEditor() {
+    return this.getNodeEditor('vertex');
   }
   open() {
     getApp().inputManager.useFirst(
@@ -92,9 +108,10 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewMesh.dispose();
     this._defaultMaterial.dispose();
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
-    this.nodeEditor.off('changed', this.graphChanged, this);
-    this.nodeEditor.off('save', this.save, this);
-    this.nodeEditor.off('dragdrop', this.dragdrop, this);
+    this.fragmentEditor.off('changed', this.graphChanged, this);
+    this.fragmentEditor.off('dragdrop', this.dragdropFrag, this);
+    this.vertexEditor.off('changed', this.graphChanged, this);
+    this.vertexEditor.off('dragdrop', this.dragdropFrag, this);
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -105,7 +122,7 @@ export class PBRMaterialEditor extends GraphEditor {
     ];
   }
   get saved() {
-    return this._version === this.nodeEditor.version;
+    return this._version === this.getNodeEditor('fragment').version;
   }
   async save(path: string) {
     if (path) {
@@ -114,19 +131,28 @@ export class PBRMaterialEditor extends GraphEditor {
         VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
       );
       // Save blueprint
-      const state = await this.nodeEditor.saveState();
+      const fragmentState = await this.fragmentEditor.saveState();
+      const vertexState = await this.vertexEditor.saveState();
       try {
-        await VFS.writeFile(bpPath, JSON.stringify({ type: 'PBRMaterial', state }, null, 2), {
-          encoding: 'utf8',
-          create: true
-        });
+        await VFS.writeFile(
+          bpPath,
+          JSON.stringify(
+            { type: 'PBRMaterial', state: { fragment: fragmentState, vertex: vertexState } },
+            null,
+            2
+          ),
+          {
+            encoding: 'utf8',
+            create: true
+          }
+        );
       } catch (err) {
         const msg = `Save material failed: ${err}`;
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
       // Save material
-      const ir = this.createIR();
+      const editors = [this.fragmentEditor, this.vertexEditor];
       const content: {
         type: string;
         data: {
@@ -155,32 +181,41 @@ export class PBRMaterialEditor extends GraphEditor {
           uniformTextures: []
         }
       };
-      for (const u of ir.uniformValues) {
-        const v = [...this.nodeEditor.nodes.values()].find((v) => v.impl === u.node);
-        ASSERT(!!v, 'Uniform node not found');
-        content.data.uniformValues.push({
-          name: u.name,
-          id: v.id,
-          value: typeof u.value === 'number' ? [u.value] : [...u.value]
-        });
-      }
-      for (const u of ir.uniformTextures) {
-        const texnode = u.node as
-          | ConstantTexture2DNode
-          | ConstantTexture2DArrayNode
-          | ConstantTextureCubeNode;
-        const v = [...this.nodeEditor.nodes.values()].find((v) => v.impl === u.node);
-        ASSERT(!!v, 'Uniform node not found');
-        content.data.uniformTextures.push({
-          name: u.name,
-          id: v.id,
-          texture: texnode.textureId,
-          wrapS: texnode.addressU,
-          wrapT: texnode.addressV,
-          minFilter: texnode.filterMin,
-          magFilter: texnode.filterMag,
-          mipFilter: texnode.filterMip
-        });
+      for (const editor of editors) {
+        const ir = this.createIR(editor);
+        for (const u of ir.uniformValues) {
+          const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
+          ASSERT(!!v, 'Uniform node not found');
+          if (content.data.uniformValues.find((v) => v.name === u.name)) {
+            continue;
+          }
+          content.data.uniformValues.push({
+            name: u.name,
+            id: v.id,
+            value: typeof u.value === 'number' ? [u.value] : [...u.value]
+          });
+        }
+        for (const u of ir.uniformTextures) {
+          const texnode = u.node as
+            | ConstantTexture2DNode
+            | ConstantTexture2DArrayNode
+            | ConstantTextureCubeNode;
+          const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
+          ASSERT(!!v, 'Uniform node not found');
+          if (content.data.uniformTextures.find((v) => v.name === u.name)) {
+            continue;
+          }
+          content.data.uniformTextures.push({
+            name: u.name,
+            id: v.id,
+            texture: texnode.textureId,
+            wrapS: texnode.addressU,
+            wrapT: texnode.addressV,
+            minFilter: texnode.filterMin,
+            magFilter: texnode.filterMag,
+            mipFilter: texnode.filterMip
+          });
+        }
       }
       try {
         await VFS.writeFile(path, JSON.stringify(content, null, 2), {
@@ -192,7 +227,7 @@ export class PBRMaterialEditor extends GraphEditor {
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
-      this._version = this.nodeEditor.version;
+      this._version = this.getNodeEditor('fragment').version;
     }
   }
   async load(path: string) {
@@ -204,22 +239,23 @@ export class PBRMaterialEditor extends GraphEditor {
       const blueprintContent = (await ProjectService.VFS.readFile(blueprint, { encoding: 'utf8' })) as string;
       const blueprintData = JSON.parse(blueprintContent);
       ASSERT(blueprintData.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
-      const state = blueprintData.state as NodeEditorState;
-      await this.nodeEditor.loadState(state);
-      this._version = this.nodeEditor.version;
+      const state = blueprintData.state as { fragment: NodeEditorState; vertex: NodeEditorState };
+      await this.fragmentEditor.loadState(state.fragment);
+      await this.vertexEditor.loadState(state.vertex);
+      this._version = this.fragmentEditor.version;
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);
       Dialog.messageBox('Error', msg);
     }
   }
-  createIR() {
-    const dag = this.createDAG();
-    for (const [, v] of this.nodeEditor.nodes) {
+  createIR(editor: NodeEditor) {
+    const dag = this.createDAG(editor);
+    for (const [, v] of editor.nodes) {
       v.impl.reset();
     }
     for (const i of dag.order) {
-      const node = this.nodeEditor.nodes.get(i);
+      const node = editor.nodes.get(i);
       node.impl.check();
       if (node.impl.error) {
         return null;
@@ -231,24 +267,16 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     return ir;
   }
-  createDAG(): BlueprintDAG {
+  createDAG(editor: NodeEditor): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};
     const roots: number[] = [];
-    for (const [k, v] of this.nodeEditor.nodes) {
+    for (const [k, v] of editor.nodes) {
       nodeMap[k] = v.impl;
       if (v.outputs.length === 0) {
         roots.push(v.id);
       }
     }
-    return ProjectService.serializationManager.createBluePrintDAG(nodeMap, roots, this.nodeEditor.links);
-    /*
-    return {
-      graph: this.nodeEditor.graph,
-      nodeMap,
-      roots,
-      order: this.nodeEditor.getReverseTopologicalOrderFromRoots(roots).order.reverse()
-    };
-    */
+    return ProjectService.serializationManager.createBluePrintDAG(nodeMap, roots, editor.links);
   }
   protected renderRightPanel() {
     const v = new ImGui.ImVec2();
@@ -334,7 +362,7 @@ export class PBRMaterialEditor extends GraphEditor {
       for (const u of [...ir.uniformValues, ...ir.uniformTextures]) {
         if (uniformNames.has(u.name)) {
           for (const i of ir.DAG.order) {
-            const node = this.nodeEditor.nodes.get(i);
+            const node = this.getNodeEditor('fragment').nodes.get(i);
             if (node.impl === u.node) {
               node.impl.error = `Duplicated uniform name: ${u.name}`;
               return;
@@ -386,17 +414,17 @@ export class PBRMaterialEditor extends GraphEditor {
   private graphChanged() {
     this.applyPreviewMaterial();
   }
-  private dragdrop(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
+  private dragdropFrag(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
     if (
       _payload.length === 1 &&
       guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
     ) {
       ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((DAG) => {
         if (DAG) {
-          const world = this.nodeEditor.canvasToWorld(new ImGui.ImVec2(x, y));
-          const snapped = this.nodeEditor.snapWorldToScreenGrid(world, this.nodeEditor.canvasScale);
+          const world = this.fragmentEditor.canvasToWorld(new ImGui.ImVec2(x, y));
+          const snapped = this.fragmentEditor.snapWorldToScreenGrid(world, this.fragmentEditor.canvasScale);
           const node = new GNode(
-            this.nodeEditor,
+            this.fragmentEditor,
             snapped,
             new FunctionCallNode(
               _payload[0].path,
@@ -404,7 +432,30 @@ export class PBRMaterialEditor extends GraphEditor {
               DAG
             )
           );
-          this.nodeEditor.addNode(node);
+          this.fragmentEditor.addNode(node);
+        }
+      });
+    }
+  }
+  private dragdropVertex(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
+    if (
+      _payload.length === 1 &&
+      guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
+    ) {
+      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((DAG) => {
+        if (DAG) {
+          const world = this.vertexEditor.canvasToWorld(new ImGui.ImVec2(x, y));
+          const snapped = this.vertexEditor.snapWorldToScreenGrid(world, this.vertexEditor.canvasScale);
+          const node = new GNode(
+            this.vertexEditor,
+            snapped,
+            new FunctionCallNode(
+              _payload[0].path,
+              ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
+              DAG
+            )
+          );
+          this.vertexEditor.addNode(node);
         }
       });
     }

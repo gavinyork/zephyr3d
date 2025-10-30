@@ -14,11 +14,10 @@ import { getFunctionNodeCategories } from '../nodes/func';
 export class MaterialFunctionEditor extends GraphEditor {
   private _version: number;
   constructor(label: string) {
-    super(label);
+    super(label, ['function']);
     this._version = 0;
     this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
-    this.nodeEditor.on('changed', this.graphChanged, this);
-    this.nodeEditor.on('save', this.save, this);
+    this.getNodeEditor('function').on('changed', this.graphChanged, this);
   }
   open() {}
   close() {}
@@ -32,13 +31,13 @@ export class MaterialFunctionEditor extends GraphEditor {
     ];
   }
   get saved() {
-    return this._version === this.nodeEditor.version;
+    return this._version === this.getNodeEditor('function').version;
   }
   async save(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
       // Save blueprint
-      const state = await this.nodeEditor.saveState();
+      const state = await this.getNodeEditor('function').saveState();
       try {
         await VFS.writeFile(path, JSON.stringify({ type: 'MaterialFunction', state }, null, 2), {
           encoding: 'utf8',
@@ -49,7 +48,7 @@ export class MaterialFunctionEditor extends GraphEditor {
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
-      this._version = this.nodeEditor.version;
+      this._version = this.getNodeEditor('function').version;
     }
   }
   async load(path: string) {
@@ -58,8 +57,8 @@ export class MaterialFunctionEditor extends GraphEditor {
       const blueprintData = JSON.parse(blueprintContent);
       ASSERT(blueprintData.type === 'MaterialFunction', 'Invalid PBR Material BluePrint');
       const state = blueprintData.state as NodeEditorState;
-      await this.nodeEditor.loadState(state);
-      this._version = this.nodeEditor.version;
+      await this.getNodeEditor('function').loadState(state);
+      this._version = this.getNodeEditor('function').version;
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);

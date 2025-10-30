@@ -904,8 +904,6 @@ export interface MaterialBlueprintIRBehaviors {
   useVertexUV: boolean;
   /** Whether the material uses tangent space (tangent/binormal) */
   useVertexTangent: boolean;
-  /** Whether the material uses camera position (for view-dependent effects) */
-  useCameraPosition: boolean;
 }
 
 /**
@@ -1102,8 +1100,7 @@ export class MaterialBlueprintIR {
     this._behaviors = {
       useVertexColor: false,
       useVertexUV: false,
-      useVertexTangent: false,
-      useCameraPosition: false
+      useVertexTangent: false
     };
   }
   /**
@@ -1359,7 +1356,6 @@ export class MaterialBlueprintIR {
   }
   /** Converts a camera position input node to IR */
   private cameraPosition(node: CameraPositionNode, output: number): IRExpression {
-    this._behaviors.useCameraPosition = true;
     return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
       ShaderHelper.getCameraPosition(scope)
     );

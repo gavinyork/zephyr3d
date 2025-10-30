@@ -23,8 +23,11 @@ export type IMixinPBRBluePrint = {
     commonData: PBShaderExp,
     outRoughness?: PBShaderExp
   ): PBShaderExp;
+  getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
   getCommonData(
     scope: PBInsideFunctionScope,
+    data: PBShaderExp,
+    viewVec: PBShaderExp,
     worldPos: PBShaderExp,
     worldNorm: PBShaderExp,
     worldTangent: PBShaderExp,
@@ -32,10 +35,11 @@ export type IMixinPBRBluePrint = {
     vertexColor: PBShaderExp,
     vertexUV: PBShaderExp,
     ir: MaterialBlueprintIR
-  ): PBShaderExp;
+  ): void;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     ir: MaterialBlueprintIR,
+    viewVec: PBShaderExp,
     worldPos: PBShaderExp,
     worldNorm: PBShaderExp,
     worldTangent: PBShaderExp,
@@ -82,9 +86,10 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     copyFrom(other: this): void {
       super.copyFrom(other);
     }
-
     getCommonData(
       scope: PBInsideFunctionScope,
+      data: PBShaderExp,
+      viewVec: PBShaderExp,
       worldPos: PBShaderExp,
       worldNorm: PBShaderExp,
       worldTangent: PBShaderExp,
@@ -92,26 +97,19 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       vertexColor: PBShaderExp,
       vertexUV: PBShaderExp,
       ir: MaterialBlueprintIR
-    ): PBShaderExp {
-      const pb = scope.$builder;
-      const that = this;
-      const funcName = 'Z_getCommonData';
-      pb.func(funcName, [], function () {
-        this.$l.data = that.getCommonDatasStruct(this)();
-        that.calculateCommonData(
-          this,
-          ir,
-          worldPos,
-          worldNorm,
-          worldTangent,
-          worldBinormal,
-          vertexColor,
-          vertexUV,
-          this.data
-        );
-        this.$return(this.data);
-      });
-      return scope.$g[funcName]();
+    ) {
+      this.calculateCommonData(
+        scope,
+        ir,
+        viewVec,
+        worldPos,
+        worldNorm,
+        worldTangent,
+        worldBinormal,
+        vertexColor,
+        vertexUV,
+        data
+      );
     }
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc {
       const pb = scope.$builder;
@@ -202,6 +200,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     calculateCommonData(
       scope: PBInsideFunctionScope,
       ir: MaterialBlueprintIR,
+      viewVec: PBShaderExp,
       worldPos: PBShaderExp,
       worldNorm: PBShaderExp,
       worldTangent: PBShaderExp,
@@ -215,10 +214,11 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       const funcName = 'zCalculateCommonDataPBRBluePrint';
       const params: PBShaderExp[] = [
         this.getCommonDatasStruct(scope)('zCommonData').out(),
+        pb.vec3('zViewVec'),
         pb.vec3('zWorldPos'),
         pb.vec3('zVertexNormal')
       ];
-      const paramValues: PBShaderExp[] = [data, worldPos, worldNorm];
+      const paramValues: PBShaderExp[] = [data, viewVec, worldPos, worldNorm];
       if (worldTangent) {
         params.push(pb.vec3('zVertexTangent'), pb.vec3('zVertexBinormal'));
         paramValues.push(worldTangent, worldBinormal);
@@ -232,9 +232,6 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         paramValues.push(vertexUV);
       }
       pb.func(funcName, params, function () {
-        if (ir.behaviors.useCameraPosition) {
-          this.$l.zCameraPos = ShaderHelper.getCameraPosition(this);
-        }
         const outputs = ir.create(pb);
         this.zCommonData.albedo = pb.vec4(
           (that.getOutput(outputs, 'BaseColor') as PBShaderExp)?.rgb ?? pb.vec3(1),

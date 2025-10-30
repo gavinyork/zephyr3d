@@ -216,3 +216,97 @@ export class PBRBlockNode extends BaseGraphNode {
     return '';
   }
 }
+
+/**
+ * Vertex output node
+ *
+ * @public
+ */
+export class VertexBlockNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'Position',
+        type: ['vec3'],
+        originType: 'vec3'
+      },
+      {
+        id: 2,
+        name: 'Normal',
+        type: ['vec3'],
+        originType: 'vec3'
+      },
+      {
+        id: 3,
+        name: 'Tangent',
+        type: ['vec3'],
+        originType: 'vec3'
+      },
+      {
+        id: 4,
+        name: 'Color',
+        type: ['vec4'],
+        defaultValue: [1, 1, 1, 1],
+        originType: 'vec4'
+      }
+    ];
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No additional properties need to be serialized beyond the base node data
+   * and input connections.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: VertexBlockNode,
+      name: 'VertexBlockNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Output'
+   *
+   * @remarks
+   * This node is typically labeled "Output" in the material editor UI
+   * as it represents the final material output.
+   */
+  toString(): string {
+    return 'VertexOutput';
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * The PBR output node is always valid because:
+   * - All inputs are optional (have default values)
+   * - Type conversions are handled automatically (float → vec3, etc.)
+   * - It's the terminal node with no type inference requirements
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type
+   *
+   * @returns Empty string (no outputs)
+   *
+   * @remarks
+   * As a terminal output node, PBRBlockNode has no outputs.
+   * It consumes the material graph data and provides it to the renderer.
+   */
+  protected getType(): string {
+    return '';
+  }
+}

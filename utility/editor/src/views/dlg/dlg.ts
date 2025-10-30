@@ -13,7 +13,7 @@ import { DlgSaveFile } from './savefiledlg';
 import { DlgOpenFile } from './openfiledlg';
 import { DlgProjectSettings } from './projectsettingsdlg';
 import type { ImGui } from '@zephyr3d/imgui';
-import { DlgPBMaterialEditor as DlgPBRMaterialEditor } from './materialeditor';
+import { DlgPBRMaterialEditor } from './materialeditor';
 import { DlgImport } from './importdlg';
 import { DlgMaterialFunctionEditor } from './materialfunceditor';
 

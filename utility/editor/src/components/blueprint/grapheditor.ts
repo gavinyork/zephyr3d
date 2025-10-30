@@ -12,18 +12,23 @@ export class GraphEditor
 {
   private _rightPanel: DockPannel;
   private _nodePropGrid: PropertyEditor;
-  private _nodeEditor: NodeEditor;
+  private _nodeEditor: Record<string, NodeEditor>;
+  private _activeTab: string;
   protected _label: string;
-  constructor(label: string) {
+  constructor(label: string, tabs: string[]) {
     super();
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
     this._nodePropGrid = new PropertyEditor(0.4);
-    this._nodeEditor = new NodeEditor(this);
+    this._nodeEditor = {};
+    this._activeTab = tabs[0] ?? '';
+    for (const tab of tabs) {
+      this._nodeEditor[tab] = new NodeEditor(this);
+    }
     this._label = label ?? 'Graph Editor';
     this._nodePropGrid.on('object_property_changed', this.onPropChanged, this);
   }
-  get nodeEditor() {
-    return this._nodeEditor;
+  getNodeEditor(tab: string) {
+    return this._nodeEditor[tab];
   }
 
   get nodePropEditor() {
@@ -31,8 +36,12 @@ export class GraphEditor
   }
 
   render() {
-    if (this._nodeEditor.selectedNodes.length === 1) {
-      const selectedNode = this._nodeEditor.nodes.get(this._nodeEditor.selectedNodes[0]);
+    const editor = this.getNodeEditor(this._activeTab);
+    if (!editor) {
+      return;
+    }
+    if (editor.selectedNodes.length === 1) {
+      const selectedNode = editor.nodes.get(editor.selectedNodes[0]);
       if (selectedNode && selectedNode.impl !== this._nodePropGrid.object) {
         this._nodePropGrid.clear();
         this._nodePropGrid.object = selectedNode.impl;
@@ -67,8 +76,34 @@ export class GraphEditor
         false,
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
       );
+      if (ImGui.BeginTabBar('##NodeEditorTab')) {
+        for (const tab of Object.keys(this._nodeEditor)) {
+          if (ImGui.BeginTabItem(tab)) {
+            this._activeTab = tab;
+            ImGui.BeginChild(
+              `##NodeEditor#${tab}`,
+              ImGui.GetContentRegionAvail(),
+              false,
+              ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+            );
+            this._nodeEditor[tab].render();
+            ImGui.EndChild();
+            ImGui.EndTabItem();
+          }
+        }
+        ImGui.EndTabBar();
+      }
+      ImGui.EndChild();
+      /*
+      ImGui.BeginChild(
+        '##NodeEditor',
+        new ImGui.ImVec2(nodeEditorWidth, nodeEditorHeight),
+        false,
+        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+      );
       this._nodeEditor.render();
       ImGui.EndChild();
+      */
     }
   }
   getNodeCategory(): NodeCategory[] {
