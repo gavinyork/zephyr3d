@@ -1,5 +1,5 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
@@ -39,17 +39,7 @@ export class PBRBluePrintMaterial
     this._irVertex = irVertex ?? new MaterialBlueprintIR(null, '');
     this._uniformValues = [];
     this._uniformTextures = [];
-    for (const u of [...(irFrag.uniformValues ?? []), ...(irVertex.uniformValues ?? [])]) {
-      if (!this._uniformValues.findIndex((val) => val.name === u.name)) {
-        this._uniformValues.push(u);
-      }
-    }
-    this._uniformTextures = [];
-    for (const u of [...(irFrag.uniformTextures ?? []), ...(irVertex.uniformTextures ?? [])]) {
-      if (!this._uniformTextures.findIndex((val) => val.name === u.name)) {
-        this._uniformTextures.push(u);
-      }
-    }
+    this.updateUniforms();
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._irFrag.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irFrag.behaviors.useVertexColor);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irFrag.behaviors.useVertexUV);
@@ -60,6 +50,7 @@ export class PBRBluePrintMaterial
   set fragmentIR(ir: MaterialBlueprintIR) {
     if (ir !== this._irFrag) {
       this._irFrag = ir;
+      this.updateUniforms();
       this.optionChanged(true);
     }
   }
@@ -69,6 +60,7 @@ export class PBRBluePrintMaterial
   set vertexIR(ir: MaterialBlueprintIR) {
     if (ir !== this._irVertex) {
       this._irVertex = ir;
+      this.updateUniforms();
       this.optionChanged(true);
     }
   }
@@ -89,43 +81,46 @@ export class PBRBluePrintMaterial
     this.uniformChanged();
   }
   clone(): PBRBluePrintMaterial {
-    const other = new PBRBluePrintMaterial(this._irFrag);
+    const other = new PBRBluePrintMaterial(this._irFrag, this._irVertex);
     other.copyFrom(this);
     return other;
-  }
-  copyFrom(other: this): void {
-    super.copyFrom(other);
-    this._irFrag = other._irFrag;
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
+    const outputs = this._irVertex.create(pb);
+    scope.$l.oPos = this.getOutput(outputs, 'Position') ?? ShaderHelper.resolveVertexPosition(scope);
     const worldMatrix = ShaderHelper.getWorldMatrix(scope);
-    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
     scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1));
     ShaderHelper.setClipSpacePosition(scope, scope.csPos);
     if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR)) {
       scope.$inputs.vertexColor = pb.vec4().attrib('diffuse');
-      scope.$outputs.zVertexColor = scope.$inputs.vertexColor;
     }
+    scope.$outputs.zVertexColor =
+      this.getOutput(outputs, 'Color') ??
+      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.vertexColor : pb.vec4(1));
     if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV)) {
       scope.$inputs.vertexUV = pb.vec2().attrib('texCoord0');
-      scope.$outputs.zVertexUV = scope.$inputs.vertexUV;
     }
-    scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    scope.$outputs.zVertexUV =
+      this.getOutput(outputs, 'UV') ??
+      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.vertexUV : pb.vec2(0));
+    scope.$l.oNorm = this.getOutput(outputs, 'Normal') ?? ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)) {
-      scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
-      scope.$outputs.zVertexTangent = pb.mul(
-        ShaderHelper.getNormalMatrix(scope),
-        pb.vec4(scope.oTangent.xyz, 0)
-      ).xyz;
-      scope.$outputs.zVertexBinormal = pb.mul(
-        pb.cross(scope.$outputs.zVertexNormal, scope.$outputs.zVertexTangent),
-        scope.oTangent.w
-      );
-    }
+    scope.$l.oTangent =
+      this.getOutput(outputs, 'Tangent') ??
+      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)
+        ? ShaderHelper.resolveVertexTangent(scope)
+        : pb.vec4(1, 0, 0, 1));
+    scope.$outputs.zVertexTangent = pb.mul(
+      ShaderHelper.getNormalMatrix(scope),
+      pb.vec4(scope.oTangent.xyz, 0)
+    ).xyz;
+    scope.$outputs.zVertexBinormal = pb.mul(
+      pb.cross(scope.$outputs.zVertexNormal, scope.$outputs.zVertexTangent),
+      scope.oTangent.w
+    );
   }
   fragmentShader(scope: PBFunctionScope): void {
     super.fragmentShader(scope);
@@ -186,6 +181,15 @@ export class PBRBluePrintMaterial
   }
   protected _createHash(): string {
     return this._irFrag.hash;
+  }
+  private getOutput(
+    outputs: {
+      name: string;
+      exp: number | PBShaderExp;
+    }[],
+    name: string
+  ) {
+    return outputs.find((output) => output.name === name)?.exp;
   }
   private updateUniforms() {
     this._uniformValues = [];

@@ -39,10 +39,14 @@ export class MaterialFunctionEditor extends GraphEditor {
       // Save blueprint
       const state = await this.getNodeEditor('function').saveState();
       try {
-        await VFS.writeFile(path, JSON.stringify({ type: 'MaterialFunction', state }, null, 2), {
-          encoding: 'utf8',
-          create: true
-        });
+        await VFS.writeFile(
+          path,
+          JSON.stringify({ type: 'MaterialFunction', state: { func: state } }, null, 2),
+          {
+            encoding: 'utf8',
+            create: true
+          }
+        );
       } catch (err) {
         const msg = `Save material failed: ${err}`;
         console.error(msg);
@@ -56,8 +60,8 @@ export class MaterialFunctionEditor extends GraphEditor {
       const blueprintContent = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
       const blueprintData = JSON.parse(blueprintContent);
       ASSERT(blueprintData.type === 'MaterialFunction', 'Invalid PBR Material BluePrint');
-      const state = blueprintData.state as NodeEditorState;
-      await this.getNodeEditor('function').loadState(state);
+      const state = blueprintData.state as { func: NodeEditorState };
+      await this.getNodeEditor('function').loadState(state.func);
       this._version = this.getNodeEditor('function').version;
     } catch (err) {
       const msg = `Load material failed: ${err}`;

@@ -176,7 +176,7 @@ export class AssetManager {
   };
   /** @internal */
   private _bluePrints: {
-    [url: string]: Promise<MaterialBlueprintIR>;
+    [url: string]: Promise<Record<string, MaterialBlueprintIR>>;
   };
   /** @internal */
   private _materials: {
@@ -363,7 +363,7 @@ export class AssetManager {
     }
     return P;
   }
-  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<MaterialBlueprintIR> {
+  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>> {
     const hash = url;
     let P = this._bluePrints[hash];
     if (!P) {
@@ -660,7 +660,7 @@ export class AssetManager {
       );
       if (content.type === 'PBRBluePrintMaterial') {
         const ir = await this.fetchBluePrint(content.data.IR as string, VFSs);
-        const material = new PBRBluePrintMaterial(ir);
+        const material = new PBRBluePrintMaterial(ir['fragment'], ir['vertex']);
         const uniformValues: IRUniformValue[] = (
           content.data.uniformValues as { name: string; value: number[] }[]
         ).map((v) => ({
@@ -849,31 +849,39 @@ export class AssetManager {
       const content = (await this.readFileFromVFSs(path, { encoding: 'utf8' }, VFSs)) as string;
       const bp = JSON.parse(content) as {
         type: string;
-        state: {
-          nodes: {
-            id: number;
-            locked: boolean;
-            node: object;
-          }[];
-          links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-        };
+        state: Record<
+          string,
+          {
+            nodes: {
+              id: number;
+              locked: boolean;
+              node: object;
+            }[];
+            links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+          }
+        >;
       };
       ASSERT(
         bp.type === 'PBRMaterial' || bp.type === 'MaterialFunction',
         `Unsupported blueprint type: ${bp.type}`
       );
-      const state = bp.state;
+      const states = bp.state;
       const nodeMap: Record<number, IGraphNode> = {};
       const roots: number[] = [];
-      for (const node of state.nodes) {
-        const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
-        nodeMap[node.id] = impl;
-        if (impl.outputs.length === 0) {
-          roots.push(node.id);
+      const result: Record<string, MaterialBlueprintIR> = {};
+      for (const k of Object.keys(states)) {
+        const state = states[k];
+        for (const node of state.nodes) {
+          const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
+          nodeMap[node.id] = impl;
+          if (impl.outputs.length === 0) {
+            roots.push(node.id);
+          }
         }
+        const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
+        result[k] = new MaterialBlueprintIR(dag, path);
       }
-      const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
-      return new MaterialBlueprintIR(dag, path);
+      return result;
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);

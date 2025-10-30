@@ -332,7 +332,8 @@ export class PBRMaterialEditor extends GraphEditor {
     camera.updateController();
   }
   private applyPreviewMaterial() {
-    const ir = this.createIR();
+    const irFrag = this.createIR(this.fragmentEditor);
+    const irVert = this.createIR(this.vertexEditor);
     /*
     const dag = this.createDAG();
     for (const [, v] of this.nodeEditor.nodes) {
@@ -355,14 +356,14 @@ export class PBRMaterialEditor extends GraphEditor {
       }
     }
     */
-    if (!ir) {
+    if (!irFrag || !irVert) {
       this._previewMesh.get().material = this._defaultMaterial.get();
     } else {
       const uniformNames: Set<string> = new Set();
-      for (const u of [...ir.uniformValues, ...ir.uniformTextures]) {
+      for (const u of [...irFrag.uniformValues, ...irFrag.uniformTextures]) {
         if (uniformNames.has(u.name)) {
-          for (const i of ir.DAG.order) {
-            const node = this.getNodeEditor('fragment').nodes.get(i);
+          for (const i of irFrag.DAG.order) {
+            const node = this.fragmentEditor.nodes.get(i);
             if (node.impl === u.node) {
               node.impl.error = `Duplicated uniform name: ${u.name}`;
               return;
@@ -372,7 +373,21 @@ export class PBRMaterialEditor extends GraphEditor {
           uniformNames.add(u.name);
         }
       }
-      const newMaterial = new PBRBluePrintMaterial(ir);
+      uniformNames.clear();
+      for (const u of [...irVert.uniformValues, ...irVert.uniformTextures]) {
+        if (uniformNames.has(u.name)) {
+          for (const i of irVert.DAG.order) {
+            const node = this.vertexEditor.nodes.get(i);
+            if (node.impl === u.node) {
+              node.impl.error = `Duplicated uniform name: ${u.name}`;
+              return;
+            }
+          }
+        } else {
+          uniformNames.add(u.name);
+        }
+      }
+      const newMaterial = new PBRBluePrintMaterial(irFrag, irVert);
       newMaterial.blendMode = this._blendMode;
       newMaterial.cullMode = this._doubleSided ? 'none' : 'back';
       newMaterial.doubleSidedLighting = !!this._doubleSided;
@@ -419,8 +434,8 @@ export class PBRMaterialEditor extends GraphEditor {
       _payload.length === 1 &&
       guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
     ) {
-      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((DAG) => {
-        if (DAG) {
+      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((IRs) => {
+        if (IRs) {
           const world = this.fragmentEditor.canvasToWorld(new ImGui.ImVec2(x, y));
           const snapped = this.fragmentEditor.snapWorldToScreenGrid(world, this.fragmentEditor.canvasScale);
           const node = new GNode(
@@ -429,7 +444,7 @@ export class PBRMaterialEditor extends GraphEditor {
             new FunctionCallNode(
               _payload[0].path,
               ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
-              DAG
+              IRs['func']
             )
           );
           this.fragmentEditor.addNode(node);
@@ -442,8 +457,8 @@ export class PBRMaterialEditor extends GraphEditor {
       _payload.length === 1 &&
       guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
     ) {
-      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((DAG) => {
-        if (DAG) {
+      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((IRs) => {
+        if (IRs) {
           const world = this.vertexEditor.canvasToWorld(new ImGui.ImVec2(x, y));
           const snapped = this.vertexEditor.snapWorldToScreenGrid(world, this.vertexEditor.canvasScale);
           const node = new GNode(
@@ -452,7 +467,7 @@ export class PBRMaterialEditor extends GraphEditor {
             new FunctionCallNode(
               _payload[0].path,
               ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
-              DAG
+              IRs['func']
             )
           );
           this.vertexEditor.addNode(node);

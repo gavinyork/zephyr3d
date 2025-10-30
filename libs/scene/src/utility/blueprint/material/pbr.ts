@@ -241,8 +241,8 @@ export class VertexBlockNode extends BaseGraphNode {
       {
         id: 3,
         name: 'Tangent',
-        type: ['vec3'],
-        originType: 'vec3'
+        type: ['vec4'],
+        originType: 'vec4'
       },
       {
         id: 4,
@@ -250,6 +250,12 @@ export class VertexBlockNode extends BaseGraphNode {
         type: ['vec4'],
         defaultValue: [1, 1, 1, 1],
         originType: 'vec4'
+      },
+      {
+        id: 5,
+        name: 'UV',
+        type: ['vec2'],
+        originType: 'vec2'
       }
     ];
   }

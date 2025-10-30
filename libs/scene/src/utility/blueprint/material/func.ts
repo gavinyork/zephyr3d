@@ -160,7 +160,7 @@ export class FunctionCallNode extends BaseGraphNode {
       async createFunc(_, init: string) {
         const IR = await manager.loadBluePrint(init);
         const funcName = manager.VFS.basename(init, manager.VFS.extname(init));
-        return { obj: new FunctionCallNode(init, funcName, IR) };
+        return { obj: new FunctionCallNode(init, funcName, IR['func']) };
       },
       getInitParams(obj: FunctionCallNode) {
         return obj.path;
