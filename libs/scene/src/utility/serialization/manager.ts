@@ -152,7 +152,7 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import type { Material } from '../../material';
+import type { Material, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 
@@ -719,6 +719,15 @@ export class SerializationManager {
       this._allocated.set(material, id);
     }
     return material;
+  }
+  /**
+   * Reload specific blue print materials
+   *
+   * @param filter - Determine whether a blue print material should reload.
+   *
+   */
+  async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
+    await this._assetManager.reloadBluePrintMaterials(filter);
   }
   /**
    * Load a primitive by ID and track the allocation for reverse lookup.

@@ -385,7 +385,7 @@ export class AssetManager {
     if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
       return P.get();
     } else if (!P || P instanceof DWeakRef) {
-      P = this.loadMaterial<T>(url, VFSs);
+      P = this.loadMaterial<T>(url, false, VFSs);
       this._materials[hash] = P;
     }
     const material = await P;
@@ -641,6 +641,30 @@ export class AssetManager {
       return null;
     }
   }
+  async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
+    const promises: Promise<Material>[] = [];
+    const paths: string[] = [];
+    for (const k of Object.keys(this._materials)) {
+      const m = this._materials[k];
+      if (m instanceof Promise) {
+        promises.push(m);
+        paths.push(k);
+      } else if (m instanceof DWeakRef && !!m.get()) {
+        promises.push(Promise.resolve(m.get()));
+        paths.push(k);
+      }
+    }
+    const materials = await Promise.all(promises);
+    for (let i = 0; i < materials.length; i++) {
+      const m = materials[i];
+      if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
+        const tmp = await this.loadMaterial<PBRBluePrintMaterial>(paths[i], true);
+        m.fragmentIR = tmp.fragmentIR;
+        m.vertexIR = tmp.vertexIR;
+        tmp.dispose();
+      }
+    }
+  }
   /**
    * Load a material.
    *
@@ -650,7 +674,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded material.
    * @internal
    */
-  async loadMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T> {
+  async loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; data: any };
@@ -659,7 +683,9 @@ export class AssetManager {
         `Unsupported material type: ${content.type}`
       );
       if (content.type === 'PBRBluePrintMaterial') {
-        const ir = await this.fetchBluePrint(content.data.IR as string, VFSs);
+        const ir = reload
+          ? await this.loadBluePrint(content.data.IR as string, VFSs)
+          : await this.fetchBluePrint(content.data.IR as string, VFSs);
         const material = new PBRBluePrintMaterial(ir['fragment'], ir['vertex']);
         const uniformValues: IRUniformValue[] = (
           content.data.uniformValues as { name: string; value: number[] }[]

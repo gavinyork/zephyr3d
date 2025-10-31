@@ -50,6 +50,7 @@ export class PBRBluePrintMaterial
   set fragmentIR(ir: MaterialBlueprintIR) {
     if (ir !== this._irFrag) {
       this._irFrag = ir;
+      this.clearCache();
       this.updateUniforms();
       this.optionChanged(true);
     }
@@ -60,6 +61,7 @@ export class PBRBluePrintMaterial
   set vertexIR(ir: MaterialBlueprintIR) {
     if (ir !== this._irVertex) {
       this._irVertex = ir;
+      this.clearCache();
       this.updateUniforms();
       this.optionChanged(true);
     }

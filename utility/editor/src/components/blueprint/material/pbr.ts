@@ -12,6 +12,7 @@ import {
   FunctionCallNode,
   getApp,
   getDevice,
+  getEngine,
   Mesh,
   OrbitCameraController,
   PerspectiveCamera,
@@ -147,9 +148,10 @@ export class PBRMaterialEditor extends GraphEditor {
           }
         );
       } catch (err) {
-        const msg = `Save material failed: ${err}`;
+        const msg = `Save BluePrint failed: ${err}`;
         console.error(msg);
         Dialog.messageBox('Error', msg);
+        return;
       }
       // Save material
       const editors = [this.fragmentEditor, this.vertexEditor];
@@ -228,6 +230,7 @@ export class PBRMaterialEditor extends GraphEditor {
         Dialog.messageBox('Error', msg);
       }
       this._version = this.getNodeEditor('fragment').version;
+      await getEngine().serializationManager.reloadBluePrintMaterials();
     }
   }
   async load(path: string) {

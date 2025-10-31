@@ -68,13 +68,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   private static _nextId = 0;
   /**
-   * Global GPU program cache shared across material instances.
-   *
-   * Key: `${constructor.name}:${hash}` from `createHash(pass)` + context hash.
-   * @internal
-   */
-  private static _programCache: { [hash: string]: GPUProgram } = {};
-  /**
    * Per-material state cache keyed by global hash (material + context + pass).
    * @internal
    */
@@ -150,12 +143,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param other - Source material.
    */
   copyFrom(other: this) {
-    if (this._states) {
-      for (const k in this._states) {
-        this._states[k]?.bindGroup?.dispose();
-      }
-      this._states = {};
-    }
+    this.clearCache();
     this._numPasses = other._numPasses;
     getEngine().serializationManager.setAssetId(
       this,
@@ -288,12 +276,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
-        const programHash = `${this.constructor.name}:${hash}`;
-        let program = Material._programCache[programHash];
-        if (!program) {
-          program = this.createProgram(ctx, pass) ?? null;
-          Material._programCache[programHash] = program;
-        }
+        const program = this.createProgram(ctx, pass) ?? null;
         const bindGroup =
           program.bindGroupLayouts.length > 2
             ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
@@ -412,6 +395,13 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       RenderBundleWrapper.materialChanged(this.coreMaterial);
     }
   }
+  clearCache() {
+    for (const k in this._states) {
+      this._states[k]?.bindGroup?.dispose();
+      this._states[k]?.program?.dispose();
+    }
+    this._states = {};
+  }
   /**
    * Convert a pass index to a hash seed string.
    *
@@ -465,12 +455,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   protected onDispose() {
     super.onDispose();
-    if (this._states) {
-      for (const k in this._states) {
-        this._states[k]?.bindGroup?.dispose();
-      }
-      this._states = {};
-    }
+    this.clearCache();
   }
   /**
    * Build the GPU program for a pass.
