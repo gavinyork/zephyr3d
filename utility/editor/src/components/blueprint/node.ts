@@ -95,7 +95,7 @@ export class GNode {
     return this._titleRect;
   }
   get position() {
-    if (!this._position) {
+    if (!this._position && this._editor.canvasSize) {
       const canvasSize = this._editor.canvasSize;
       const size = this.size;
       const x = Math.max(10, (canvasSize.x - size.x) >> 1);

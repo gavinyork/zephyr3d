@@ -92,6 +92,7 @@ export class NodeEditor extends Observable<{
   private readonly pinOuterRadius: number;
   private readonly pinHighlightColor: ImGui.ImVec4;
   private readonly pinHoverColor: ImGui.ImVec4;
+  private readonly nodeCategory: NodeCategory[];
 
   constructor(api: GraphEditorApi) {
     super();
@@ -136,6 +137,7 @@ export class NodeEditor extends Observable<{
     this.pinOuterRadius = 7; //SLOT_RADIUS + 3;
     this.pinHighlightColor = new ImGui.ImVec4(1.0, 0.8, 0.2, 1.0);
     this.pinHoverColor = new ImGui.ImVec4(1.0, 1.0, 1.0, 0.8);
+    this.nodeCategory = this.api.getNodeCategory(this);
   }
   get graph(): GraphStructure {
     this.rebuildGraphStructure();
@@ -276,7 +278,7 @@ export class NodeEditor extends Observable<{
       const impl = (await getEngine().serializationManager.serializeObject(node.impl)) as IGraphNode;
       return {
         id: node.id,
-        position: [node.position.x, node.position.y],
+        position: node.position ? [node.position.x, node.position.y] : null,
         title: node.title,
         titleBg: node.titleBg,
         titleTextCol: node.titleTextCol,
@@ -307,7 +309,11 @@ export class NodeEditor extends Observable<{
     let maxId = 0;
     for (const node of state.nodes) {
       const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.node);
-      const n = new GNode(this, new ImGui.ImVec2(node.position[0], node.position[1]), impl);
+      const n = new GNode(
+        this,
+        node.position ? new ImGui.ImVec2(node.position[0], node.position[1]) : null,
+        impl
+      );
       n.id = node.id;
       n.title = node.title;
       n.titleBg = node.titleBg;
@@ -1218,7 +1224,7 @@ export class NodeEditor extends Observable<{
     this.isHoveringMenu = false;
     if (this.showCanvasContextMenu) {
       this.showCanvasContextMenu = false;
-      this.filteredCategory = this.api.getNodeCategory(this);
+      this.filteredCategory = this.nodeCategory;
       focusOnSearch = true;
       ImGui.OpenPopup('CanvasContextMenu');
     }
@@ -1229,12 +1235,9 @@ export class NodeEditor extends Observable<{
         ImGui.SetNextItemWidth(-1);
         if (ImGui.InputTextWithHint('##CanvasContextMenuSearch', 'Search', this.nodeSearchBuf, undefined)) {
           if (this.nodeSearchBuf[0]) {
-            this.filteredCategory = this.filterCategory(
-              this.nodeSearchBuf[0],
-              this.api.getNodeCategory(this)
-            );
+            this.filteredCategory = this.filterCategory(this.nodeSearchBuf[0], this.nodeCategory);
           } else {
-            this.filteredCategory = this.api.getNodeCategory(this);
+            this.filteredCategory = this.nodeCategory;
           }
         }
         if (focusOnSearch) {

@@ -147,7 +147,7 @@ import {
   ViewMatrixNode,
   ViewProjMatrixNode
 } from '../blueprint/material/inputs';
-import { PBRBlockNode } from '../blueprint/material/pbr';
+import { PBRBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 import type { Material } from '../../material';
 import type { Primitive } from '../../render';
@@ -348,6 +348,7 @@ export class SerializationManager {
         SkyEnvTextureNode.getSerializationCls(),
         ElapsedTimeNode.getSerializationCls(),
         PBRBlockNode.getSerializationCls(),
+        VertexBlockNode.getSerializationCls(),
         FunctionInputNode.getSerializationCls(),
         FunctionOutputNode.getSerializationCls(),
         FunctionCallNode.getSerializationCls(this),
