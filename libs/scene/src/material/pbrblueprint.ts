@@ -40,9 +40,9 @@ export class PBRBluePrintMaterial
     this._uniformValues = [];
     this._uniformTextures = [];
     this.updateUniforms();
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._irFrag.behaviors.useVertexTangent);
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irFrag.behaviors.useVertexColor);
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irFrag.behaviors.useVertexUV);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._irVertex.behaviors.useVertexTangent);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irVertex.behaviors.useVertexUV);
   }
   get fragmentIR() {
     return this._irFrag;
@@ -182,6 +182,14 @@ export class PBRBluePrintMaterial
   protected _createHash(): string {
     return this._irFrag.hash;
   }
+  /*
+  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
+    const program = super.createProgram(ctx, pass);
+    console.log(program.getShaderSource('vertex'));
+    console.log(program.getShaderSource('fragment'));
+    return program;
+  }
+  */
   private getOutput(
     outputs: {
       name: string;

@@ -62,6 +62,7 @@ import {
   hash33,
   valueNoise
 } from '../../../shaders/noise';
+import { VertexBlockNode } from './pbr';
 
 /**
  * Represents a uniform scalar or vector value in the intermediate representation
@@ -1047,6 +1048,15 @@ export class MaterialBlueprintIR {
         } else if (input.required) {
           this._outputs = null;
           return false;
+        }
+        if (!input.inputNode && rootNode instanceof VertexBlockNode) {
+          if (input.name === 'Tangent') {
+            this._behaviors.useVertexTangent = true;
+          } else if (input.name === 'Color') {
+            this._behaviors.useVertexColor = true;
+          } else if (input.name === 'UV') {
+            this._behaviors.useVertexUV = true;
+          }
         }
       }
     }

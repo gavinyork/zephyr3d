@@ -866,10 +866,10 @@ export class AssetManager {
         `Unsupported blueprint type: ${bp.type}`
       );
       const states = bp.state;
-      const nodeMap: Record<number, IGraphNode> = {};
-      const roots: number[] = [];
       const result: Record<string, MaterialBlueprintIR> = {};
       for (const k of Object.keys(states)) {
+        const roots: number[] = [];
+        const nodeMap: Record<number, IGraphNode> = {};
         const state = states[k];
         for (const node of state.nodes) {
           const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
