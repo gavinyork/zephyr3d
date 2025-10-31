@@ -1380,3 +1380,180 @@ export class CameraNearFarNode extends BaseGraphNode {
     return id > 1 ? 'float' : 'vec2';
   }
 }
+
+/**
+ * Vertex position resolver node
+ *
+ * @remarks
+ * Provides the resolved vertex position in object space (After applying skinning and  morphing)
+ *
+ * @public
+ */
+export class ResolveVertexPositionNode extends BaseGraphNode {
+  /**
+   * Creates a new vertex position resolver node
+   */
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'vertex position resolved'
+   */
+  toString() {
+    return 'vertex position resolved';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ResolveVertexPositionNode,
+      name: 'ResolveVertexPositionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Vertex position resolver nodes are always valid as they have no inputs.
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @returns vec3
+   */
+  protected getType(): string {
+    return 'vec3';
+  }
+}
+
+/**
+ * Vertex normal resolver node
+ *
+ * @remarks
+ * Provides the resolved vertex normal in object space (After applying skinning and  morphing)
+ *
+ * @public
+ */
+export class ResolveVertexNormalNode extends BaseGraphNode {
+  /**
+   * Creates a new vertex normal resolver node
+   */
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'vertex normal resolved'
+   */
+  toString() {
+    return 'vertex normal resolved';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ResolveVertexNormalNode,
+      name: 'ResolveVertexNormalNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Vertex normal resolve node are always valid as they have no inputs.
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @returns vec3
+   */
+  protected getType(): string {
+    return 'vec3';
+  }
+}
+
+/**
+ * Vertex tangent resolver node
+ *
+ * @remarks
+ * Provides the resolved vertex tangent in object space (After applying skinning and  morphing)
+ *
+ * @public
+ */
+export class ResolveVertexTangentNode extends BaseGraphNode {
+  /**
+   * Creates a new vertex tangent resolver node
+   */
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'vertex tangent resolved'
+   */
+  toString() {
+    return 'vertex tangent resolved';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ResolveVertexTangentNode,
+      name: 'ResolveVertexTangentNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Vertex tangent resolve node are always valid as they have no inputs.
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @returns vec4
+   */
+  protected getType(): string {
+    return 'vec4';
+  }
+}

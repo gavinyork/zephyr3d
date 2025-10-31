@@ -33,6 +33,9 @@ import {
   InvProjMatrixNode,
   InvViewProjMatrixNode,
   ProjectionMatrixNode,
+  ResolveVertexNormalNode,
+  ResolveVertexPositionNode,
+  ResolveVertexTangentNode,
   ViewMatrixNode,
   ViewProjMatrixNode
 } from './inputs';
@@ -1143,6 +1146,12 @@ export class MaterialBlueprintIR {
       expr = this.textureSample(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
+    } else if (node instanceof ResolveVertexPositionNode) {
+      expr = this.resolveVertexPosition(node, output);
+    } else if (node instanceof ResolveVertexNormalNode) {
+      expr = this.resolveVertexNormal(node, output);
+    } else if (node instanceof ResolveVertexTangentNode) {
+      expr = this.resolveVertexTangent(node, output);
     } else if (node instanceof Hash1Node) {
       expr = this.hash1(node, output);
     } else if (node instanceof Hash2Node) {
@@ -1398,6 +1407,24 @@ export class MaterialBlueprintIR {
       output,
       IRInput,
       (scope: PBInsideFunctionScope) => scope[node.name]
+    );
+  }
+  /** Converts an vertex position resolver node to IR */
+  private resolveVertexPosition(node: ResolveVertexPositionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRFunc, [], (pb: ProgramBuilder) =>
+      ShaderHelper.resolveVertexPosition(pb.getCurrentScope() as PBInsideFunctionScope)
+    );
+  }
+  /** Converts an vertex normal resolver node to IR */
+  private resolveVertexNormal(node: ResolveVertexNormalNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRFunc, [], (pb: ProgramBuilder) =>
+      ShaderHelper.resolveVertexNormal(pb.getCurrentScope() as PBInsideFunctionScope)
+    );
+  }
+  /** Converts an vertex tangent resolver node to IR */
+  private resolveVertexTangent(node: ResolveVertexTangentNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRFunc, [], (pb: ProgramBuilder) =>
+      ShaderHelper.resolveVertexTangent(pb.getCurrentScope() as PBInsideFunctionScope)
     );
   }
   /** Converts a hash1 node to IR */

@@ -13,7 +13,10 @@ import {
   ProjectionMatrixNode,
   ViewProjMatrixNode,
   InvProjMatrixNode,
-  InvViewProjMatrixNode
+  InvViewProjMatrixNode,
+  ResolveVertexPositionNode,
+  ResolveVertexNormalNode,
+  ResolveVertexTangentNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -22,6 +25,18 @@ export function getInputNodeCategories(): NodeCategory[] {
     {
       name: 'Inputs',
       children: [
+        {
+          name: 'VertexPositionResolver',
+          create: () => new ResolveVertexPositionNode()
+        },
+        {
+          name: 'VertexNormalResolver',
+          create: () => new ResolveVertexNormalNode()
+        },
+        {
+          name: 'VertexTangentResolver',
+          create: () => new ResolveVertexTangentNode()
+        },
         {
           name: 'VertexColor',
           create: () => new VertexColorNode()
