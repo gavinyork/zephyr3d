@@ -134,10 +134,10 @@ export class PBRBluePrintMaterial
         scope.viewVec,
         scope.$inputs.worldPos,
         scope.$inputs.zVertexNormal,
-        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexTangent : null,
-        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT) ? scope.$inputs.zVertexBinormal : null,
-        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.zVertexColor : null,
-        this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.zVertexUV : null,
+        scope.$inputs.zVertexTangent,
+        scope.$inputs.zVertexBinormal,
+        scope.$inputs.zVertexColor,
+        scope.$inputs.zVertexUV,
         this._irFrag
       );
       if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
@@ -183,7 +183,7 @@ export class PBRBluePrintMaterial
     return this._irFrag.hash;
   }
   /*
-  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
+  protected createProgram(ctx: DrawContext, pass: number) {
     const program = super.createProgram(ctx, pass);
     console.log(program.getShaderSource('vertex'));
     console.log(program.getShaderSource('fragment'));
