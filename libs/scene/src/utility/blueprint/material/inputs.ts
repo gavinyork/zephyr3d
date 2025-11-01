@@ -997,6 +997,60 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
   }
 }
 
+export class BillboardMatrixNode extends BaseGraphNode {
+  /**
+   * Creates a new billboard matrix node
+   *
+   * @remarks
+   * Initializes with one output slot for the mat3 matrix.
+   */
+  constructor() {
+    super();
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'BillboardMatrix'
+   */
+  toString() {
+    return 'BillboardMatrix';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: BillboardMatrixNode,
+      name: 'BillboardMatrixNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Matrix nodes are always valid as they have no inputs.
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type
+   *
+   * @returns 'mat4'
+   */
+  protected getType(): string {
+    return 'mat3';
+  }
+}
+
 /**
  * Elapsed time input node
  *

@@ -184,14 +184,12 @@ export class PBRBluePrintMaterial
   protected _createHash(): string {
     return this._irFrag.hash;
   }
-  /*
   protected createProgram(ctx: DrawContext, pass: number) {
     const program = super.createProgram(ctx, pass);
     console.log(program.getShaderSource('vertex'));
     console.log(program.getShaderSource('fragment'));
     return program;
   }
-  */
   private getOutput(
     outputs: {
       name: string;

@@ -189,6 +189,7 @@ export class ShaderHelper {
       pb.mat4('unjitteredVPMatrix'),
       pb.mat4('jitteredInvVPMatrix'),
       pb.mat4('viewMatrix'),
+      pb.mat4('worldMatrix'),
       pb.mat4('projectionMatrix'),
       pb.mat4('invProjectionMatrix'),
       pb.vec4('params'),
@@ -787,6 +788,7 @@ export class ShaderHelper {
       projectionMatrix: ctx.camera.getProjectionMatrix(),
       invProjectionMatrix: ctx.camera.getInvProjectionMatrix(),
       viewMatrix: ctx.camera.viewMatrix,
+      worldMatrix: ctx.camera.worldMatrix,
       params: new Vector4(
         ctx.camera.getNearPlane(),
         ctx.camera.getFarPlane(),
@@ -1171,12 +1173,20 @@ export class ShaderHelper {
     return scope.camera.prevUnjitteredVPMatrix;
   }
   /**
-   * Gets the uniform variable of type mat4 which holds the view matrix of current camera
+   * Gets the uniform variable of type mat4 which holds the view matrix of current camera (world space to camera space)
    * @param scope - Current shader scope
    * @returns The view matrix of current camera
    */
   static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.camera.viewMatrix;
+  }
+  /**
+   * Gets the uniform variable of type mat4 which holds the inv-view matrix of current camera (camera space to world space)
+   * @param scope - Current shader scope
+   * @returns The inv-view matrix of current camera
+   */
+  static getInvViewMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.camera.worldMatrix;
   }
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {

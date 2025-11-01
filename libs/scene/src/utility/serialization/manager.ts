@@ -128,9 +128,11 @@ import {
   TransformNode,
   Hash1Node,
   Hash2Node,
-  Hash3Node
+  Hash3Node,
+  SwizzleNode
 } from '../blueprint/common/math';
 import {
+  BillboardMatrixNode,
   CameraNearFarNode,
   CameraPositionNode,
   ElapsedTimeNode,
@@ -279,6 +281,7 @@ export class SerializationManager {
         ConstantTexture2DArrayNode.getSerializationCls(this),
         ConstantTextureCubeNode.getSerializationCls(this),
         MakeVectorNode.getSerializationCls(),
+        SwizzleNode.getSerializationCls(),
         Degrees2RadiansNode.getSerializationCls(),
         Radians2DegreesNode.getSerializationCls(),
         SinNode.getSerializationCls(),
@@ -346,6 +349,7 @@ export class SerializationManager {
         ViewProjMatrixNode.getSerializationCls(),
         InvProjMatrixNode.getSerializationCls(),
         InvViewProjMatrixNode.getSerializationCls(),
+        BillboardMatrixNode.getSerializationCls(),
         CameraPositionNode.getSerializationCls(),
         CameraNearFarNode.getSerializationCls(),
         SkyEnvTextureNode.getSerializationCls(),

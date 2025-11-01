@@ -36,14 +36,14 @@ import {
 import type { StorageTextureConstructor } from './constructors';
 import { getCurrentProgramBuilder, setCurrentProgramBuilder } from './misc';
 
-const COMPUTE_UNIFORM_NAME = 'ch_compute_uniform_block';
-const COMPUTE_STORAGE_NAME = 'ch_compute_storage_block';
-const VERTEX_UNIFORM_NAME = 'ch_vertex_uniform_block';
-const FRAGMENT_UNIFORM_NAME = 'ch_fragment_uniform_block';
-const SHARED_UNIFORM_NAME = 'ch_shared_uniform_block';
-const VERTEX_STORAGE_NAME = 'ch_vertex_storage_block';
-const FRAGMENT_STORAGE_NAME = 'ch_fragment_storage_block';
-const SHARED_STORAGE_NAME = 'ch_shared_storage_block';
+const COMPUTE_UNIFORM_NAME = 'zUBC';
+const COMPUTE_STORAGE_NAME = 'zSBC';
+const VERTEX_UNIFORM_NAME = 'zUBV';
+const FRAGMENT_UNIFORM_NAME = 'zUBF';
+const SHARED_UNIFORM_NAME = 'zUBA';
+const VERTEX_STORAGE_NAME = 'zSBV';
+const FRAGMENT_STORAGE_NAME = 'zSBF';
+const SHARED_STORAGE_NAME = 'zSBA';
 interface UniformInfo {
   group: number;
   binding: number;

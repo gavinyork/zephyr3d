@@ -180,6 +180,167 @@ export class MakeVectorNode extends BaseGraphNode {
 }
 
 /**
+ * Vector swizzle node
+ *
+ * @public
+ */
+export class SwizzleNode extends BaseGraphNode {
+  private _swizzle: string;
+  /**
+   * Creates a new swizzle node
+   */
+  constructor() {
+    super();
+    this._swizzle = '';
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /** Swizzle */
+  get swizzle() {
+    return this._swizzle;
+  }
+  set swizzle(val: string) {
+    this._swizzle = val;
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Swizzle'
+   */
+  toString(): string {
+    return 'Swizzle';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SwizzleNode,
+      name: 'SwizzleNode',
+      getProps() {
+        return [
+          {
+            name: 'Swizzle',
+            type: 'string',
+            get(this: SwizzleNode, value) {
+              value.str[0] = this.swizzle;
+            },
+            set(this: SwizzleNode, value) {
+              this.swizzle = value.str[0];
+            }
+          }
+        ];
+      }
+    };
+  }
+  /**
+   * Validates the node state and input types
+   *
+   * @returns Error message if invalid, empty string if valid
+   *
+   * @remarks
+   * Validation checks:
+   * - At least one input must be connected
+   * - All inputs up to the last connected one must be present
+   * - Total component count must be between 2 and 4
+   * - All input types must be valid (float, vec2, or vec3)
+   */
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    if (!this._inputs[0].inputNode) {
+      return `Missing argument \`${name}\``;
+    }
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    if (!type) {
+      return `Cannot determine type of argument \`${name}\``;
+    }
+    if (!this._inputs[0].type.includes(type)) {
+      return `Invalid input type ${type}`;
+    }
+    let n: number;
+    if (type === 'float') {
+      n = 1;
+    } else if (type === 'vec2') {
+      n = 2;
+    } else if (type === 'vec3') {
+      n = 3;
+    } else {
+      n = 4;
+    }
+    if (
+      this._swizzle.length === 0 ||
+      this._swizzle.length > 4 ||
+      ([...this._swizzle].some((val) => 'xyzw'.slice(0, n).indexOf(val) < 0) &&
+        [...this._swizzle].some((val) => 'rgba'.slice(0, n).indexOf(val) < 0))
+    ) {
+      return `Invalid swizzle pattern: ${this._swizzle}`;
+    }
+    return '';
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'float', 'vec2', 'vec3', 'vec4', or empty string if invalid
+   *
+   */
+  protected getType() {
+    const err = super.validate();
+    if (err) {
+      return '';
+    }
+    if (!this._inputs[0].inputNode) {
+      return '';
+    }
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    if (!type) {
+      return '';
+    }
+    if (!this._inputs[0].type.includes(type)) {
+      return '';
+    }
+    let n: number;
+    if (type === 'float') {
+      n = 1;
+    } else if (type === 'vec2') {
+      n = 2;
+    } else if (type === 'vec3') {
+      n = 3;
+    } else {
+      n = 4;
+    }
+    if (
+      this._swizzle.length === 0 ||
+      this._swizzle.length > 4 ||
+      ([...this._swizzle].some((val) => 'xyzw'.slice(0, n).indexOf(val) < 0) &&
+        [...this._swizzle].some((val) => 'rgba'.slice(0, n).indexOf(val) < 0))
+    ) {
+      return '';
+    }
+    return this._swizzle.length === 1 ? 'float' : `vec${this._swizzle.length}`;
+  }
+}
+
+/**
  * Matrix-vector transformation node
  *
  * @remarks

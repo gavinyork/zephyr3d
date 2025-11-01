@@ -27,9 +27,11 @@ import {
   TransformNode,
   Hash1Node,
   Hash2Node,
-  Hash3Node
+  Hash3Node,
+  SwizzleNode
 } from '../common/math';
 import {
+  BillboardMatrixNode,
   InvProjMatrixNode,
   InvViewProjMatrixNode,
   ProjectionMatrixNode,
@@ -1146,6 +1148,8 @@ export class MaterialBlueprintIR {
       expr = this.textureSample(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
+    } else if (node instanceof SwizzleNode) {
+      expr = this.swizzle(node, output);
     } else if (node instanceof ResolveVertexPositionNode) {
       expr = this.resolveVertexPosition(node, output);
     } else if (node instanceof ResolveVertexNormalNode) {
@@ -1188,6 +1192,8 @@ export class MaterialBlueprintIR {
       expr = this.invProjectionMatrix(node, output);
     } else if (node instanceof InvViewProjMatrixNode) {
       expr = this.invViewProjectionMatrix(node, output);
+    } else if (node instanceof BillboardMatrixNode) {
+      expr = this.billboardMatrix(node, output);
     } else if (node instanceof CameraPositionNode) {
       expr = this.cameraPosition(node, output);
     } else if (node instanceof CameraNearFarNode) {
@@ -1288,6 +1294,16 @@ export class MaterialBlueprintIR {
     }
     const funcName = node.getOutputType(output);
     return this.getOrCreateIRExpression(node, output, IRFunc, params, funcName);
+  }
+  /** Converts a swizzle node to IR */
+  private swizzle(node: SwizzleNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRSwizzle,
+      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType),
+      node.swizzle
+    );
   }
   /** Converts a Transform node to IR */
   private transform(node: TransformNode, output: number): IRExpression {
@@ -1426,6 +1442,50 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRFunc, [], (pb: ProgramBuilder) =>
       ShaderHelper.resolveVertexTangent(pb.getCurrentScope() as PBInsideFunctionScope)
     );
+  }
+  /** Converts an billboard matrix input node to IR */
+  private billboardMatrix(node: BillboardMatrixNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRFunc, [], (pb: ProgramBuilder) => {
+      pb.func('Z_calcBillboardMatrix', [], function () {
+        this.$l.objScale = pb.vec3(
+          pb.length(ShaderHelper.getWorldMatrix(this)[0].xyz),
+          pb.length(ShaderHelper.getWorldMatrix(this)[1].xyz),
+          pb.length(ShaderHelper.getWorldMatrix(this)[2].xyz)
+        );
+        this.$l.rotation = pb.mat3(
+          pb.div(ShaderHelper.getWorldMatrix(this)[0].xyz, this.objScale.x),
+          pb.div(ShaderHelper.getWorldMatrix(this)[1].xyz, this.objScale.y),
+          pb.div(ShaderHelper.getWorldMatrix(this)[2].xyz, this.objScale.z)
+        );
+        this.$l.cameraForward = pb.normalize(ShaderHelper.getInvViewMatrix(this)[2].xyz);
+        this.$l.cameraUp = pb.normalize(ShaderHelper.getInvViewMatrix(this)[1].xyz);
+        this.$l.cameraRight = pb.normalize(ShaderHelper.getInvViewMatrix(this)[0].xyz);
+        this.$l.objForward = pb.normalize(pb.div(pb.mul(this.cameraForward, this.rotation), this.objScale));
+        this.$l.objUp = pb.normalize(pb.div(pb.mul(this.cameraUp, this.rotation), this.objScale));
+        this.$l.objRight = pb.normalize(pb.div(pb.mul(this.cameraRight, this.rotation), this.objScale));
+        // make ortho
+        /*
+        this.objRight = pb.normalize(
+          pb.sub(this.objRight, pb.mul(this.objUp, pb.dot(this.objRight, this.objUp)))
+        );
+        this.objForward = pb.cross(this.objUp, this.objRight);
+        */
+        // make rotation matrix
+        this.$l.billboardMatrix = pb.mat3(
+          this.objRight.x,
+          this.objUp.x,
+          this.objForward.x,
+          this.objRight.y,
+          this.objUp.y,
+          this.objForward.y,
+          this.objRight.z,
+          this.objUp.z,
+          this.objForward.z
+        );
+        this.$return(pb.transpose(this.billboardMatrix));
+      });
+      return pb.getGlobalScope().Z_calcBillboardMatrix();
+    });
   }
   /** Converts a hash1 node to IR */
   private hash1(node: Hash1Node, output: number): IRExpression {

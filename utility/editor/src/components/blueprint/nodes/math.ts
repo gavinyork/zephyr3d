@@ -54,7 +54,8 @@ import {
   PerlinNoise2DNode,
   Hash1Node,
   Hash2Node,
-  Hash3Node
+  Hash3Node,
+  SwizzleNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -66,6 +67,10 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'MakeVector',
           create: () => new MakeVectorNode()
+        },
+        {
+          name: 'Swizzle',
+          create: () => new SwizzleNode()
         },
         {
           name: 'Transform',

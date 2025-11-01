@@ -1107,14 +1107,20 @@ export class ASTHash extends ASTExpression {
     return this.source.getAddressSpace();
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    return `${this.source.toWebGL(indent, ctx)}.${this.field}`;
+    return this.source instanceof ASTScalar
+      ? `(${this.source.toWebGL(indent, ctx)}).${this.field}`
+      : `${this.source.toWebGL(indent, ctx)}.${this.field}`;
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
-    return `${this.source.toWebGL2(indent, ctx)}.${this.field}`;
+    return this.source instanceof ASTScalar
+      ? `(${this.source.toWebGL(indent, ctx)}).${this.field}`
+      : `${this.source.toWebGL(indent, ctx)}.${this.field}`;
   }
   toWGSL(indent: string, ctx: ASTContext): string {
     const source = this.source.isPointer() ? new ASTReferenceOf(this.source) : this.source;
-    return `${source.toWGSL(indent, ctx)}.${this.field}`;
+    return source instanceof ASTScalar
+      ? `(${source.toWGSL(indent, ctx)}).${this.field}`
+      : `${source.toWGSL(indent, ctx)}.${this.field}`;
   }
   toString(deviceType: string): string {
     const source = this.source.isPointer() ? new ASTReferenceOf(this.source) : this.source;

@@ -531,7 +531,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               }
               exp.$ast = new ASTHash(this.$ast, prop, element.type);
             } else {
-              if (!varType.isPrimitiveType() || !varType.isVectorType()) {
+              if (!varType.isPrimitiveType() || (!varType.isVectorType() && !varType.isScalarType())) {
                 throw new Error(
                   `invalid index operation: ${this.$ast.toString(
                     getCurrentProgramBuilder().getDevice().type
@@ -552,7 +552,11 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               }
               const type = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.resizeType(1, prop.length));
               exp = new PBShaderExp('', type);
-              exp.$ast = new ASTHash(this.$ast, prop, type);
+              if (varType.cols === 1) {
+                exp.$ast = new ASTShaderExpConstructor(type, [this.$ast]);
+              } else {
+                exp.$ast = new ASTHash(this.$ast, prop, type);
+              }
             }
           } else {
             if (varType.isArrayType()) {

@@ -16,7 +16,8 @@ import {
   InvViewProjMatrixNode,
   ResolveVertexPositionNode,
   ResolveVertexNormalNode,
-  ResolveVertexTangentNode
+  ResolveVertexTangentNode,
+  BillboardMatrixNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -80,6 +81,10 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'ClipToWorldMatrix',
           create: () => new InvViewProjMatrixNode()
+        },
+        {
+          name: 'BillboardMatrix',
+          create: () => new BillboardMatrixNode()
         },
         {
           name: 'CameraPositionWS',

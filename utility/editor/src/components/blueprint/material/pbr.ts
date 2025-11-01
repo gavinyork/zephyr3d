@@ -95,16 +95,10 @@ export class PBRMaterialEditor extends GraphEditor {
     return this.getNodeEditor('vertex');
   }
   open() {
-    getApp().inputManager.useFirst(
-      this._previewScene.get().mainCamera.handleEvent,
-      this._previewScene.get().mainCamera
-    );
+    getApp().inputManager.useFirst(this.handleEvent, this);
   }
   close() {
-    getApp().inputManager.unuse(
-      this._previewScene.get().mainCamera.handleEvent,
-      this._previewScene.get().mainCamera
-    );
+    getApp().inputManager.unuse(this.handleEvent, this);
     this._previewScene.dispose();
     this._previewMesh.dispose();
     this._defaultMaterial.dispose();
@@ -121,6 +115,15 @@ export class PBRMaterialEditor extends GraphEditor {
       ...getTextureNodeCategories(),
       ...getMathNodeCategories()
     ];
+  }
+  handleEvent(ev: Event, type?: string) {
+    if (!(ev instanceof PointerEvent)) {
+      return false;
+    }
+    if (ImGui.IsPopupOpen('', ImGui.PopupFlags.AnyPopupId)) {
+      return false;
+    }
+    return this._previewScene.get().mainCamera.handleEvent(ev, type);
   }
   get saved() {
     return this._version === this.getNodeEditor('fragment').version;
