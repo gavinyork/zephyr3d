@@ -518,12 +518,21 @@ export class Editor {
       await DlgMessage.messageBox('Error', `Cannot read remote project at <${url}>`);
       return;
     }
-    const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
-    this._currentProject = project;
-    this._scriptingSystem.registry.VFS = ProjectService.VFS;
-    this.loadDepTypes();
-    const settings = await ProjectService.getCurrentProjectSettings();
-    this._moduleManager.activate('Scene', settings.startupScene || this._currentProject.lastEditScene || '');
+    const loading = new DlgMessageBoxEx('Loading project, please wait...');
+    loading.showModal();
+    try {
+      const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
+      this._currentProject = project;
+      this._scriptingSystem.registry.VFS = ProjectService.VFS;
+      this.loadDepTypes();
+      const settings = await ProjectService.getCurrentProjectSettings();
+      await this._moduleManager.activate(
+        'Scene',
+        settings.startupScene || this._currentProject.lastEditScene || ''
+      );
+    } finally {
+      loading.close('');
+    }
   }
   async openProject() {
     const projects = await ProjectService.listProjects();
