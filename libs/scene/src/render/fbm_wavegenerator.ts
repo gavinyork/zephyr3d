@@ -2,7 +2,7 @@ import type { AABB } from '@zephyr3d/base';
 import { Disposable, Vector2 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { hash21 } from '../shaders';
+import { valueNoise } from '../shaders';
 import { ShaderHelper } from '../material';
 
 const MAX_NUM_OCTAVES = 16;
@@ -239,7 +239,6 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
   ) {
     const pb = scope.$builder;
     const funcName = 'FBM';
-    const that = this;
     pb.func(
       funcName,
       [pb.vec2('st'), pb.float('frequency'), pb.float('gain'), pb.float('lacunarity'), pb.int('numOctaves')],
@@ -259,7 +258,7 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
                 this.$break();
               });
             }
-            this.$l.n = pb.sub(that.noise2D(this, this.p), 0.5);
+            this.$l.n = pb.sub(valueNoise(this, this.p), 0.5);
             this.a = pb.add(this.a, pb.mul(this.n, this.b));
             this.c = pb.add(this.c, this.b);
             this.b = pb.mul(this.b, this.gain);
@@ -270,34 +269,6 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
       }
     );
     return scope[funcName](st, frequency, gain, lacunarity, numOctaves);
-  }
-  /** @internal */
-  private noise2D(scope: PBInsideFunctionScope, st: PBShaderExp) {
-    const pb = scope.$builder;
-    const funcName = 'noise2D';
-    pb.func(funcName, [pb.vec2('st')], function () {
-      this.$l.i = pb.floor(this.st);
-      this.$l.f = pb.fract(this.st);
-      this.$l.u = pb.mul(
-        this.f,
-        this.f,
-        this.f,
-        pb.add(pb.mul(this.f, pb.sub(pb.mul(this.f, 6), pb.vec2(15))), pb.vec2(10))
-      );
-      this.$l.a = hash21(this, pb.add(this.i, pb.vec2(0)));
-      this.$l.b = hash21(this, pb.add(this.i, pb.vec2(1, 0)));
-      this.$l.c = hash21(this, pb.add(this.i, pb.vec2(0, 1)));
-      this.$l.d = hash21(this, pb.add(this.i, pb.vec2(1, 1)));
-      this.$return(
-        pb.add(
-          this.a,
-          pb.mul(pb.sub(this.b, this.a), this.u.x),
-          pb.mul(pb.sub(this.c, this.a), this.u.y),
-          pb.mul(pb.sub(pb.add(this.a, this.d), pb.add(this.b, this.c)), this.u.x, this.u.y)
-        )
-      );
-    });
-    return scope[funcName](st);
   }
   /** {@inheritDoc WaveGenerator.update} */
   update(): void {}
