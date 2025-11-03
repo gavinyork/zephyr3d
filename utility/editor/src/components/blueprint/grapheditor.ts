@@ -11,47 +11,49 @@ export class GraphEditor
   implements GraphEditorApi
 {
   private _rightPanel: DockPannel;
-  private _nodePropGrid: PropertyEditor;
+  private _propGrid: PropertyEditor;
   private _nodeEditor: Record<string, NodeEditor>;
   private _activeTab: string;
   protected _label: string;
   constructor(label: string, tabs: string[]) {
     super();
     this._rightPanel = new DockPannel(0, 0, 300, 0, 8, 200, 400, ResizeDirection.Left);
-    this._nodePropGrid = new PropertyEditor(0.4);
+    this._propGrid = new PropertyEditor(0.4);
     this._nodeEditor = {};
     this._activeTab = tabs[0] ?? '';
-    for (const tab of tabs) {
-      this._nodeEditor[tab] = new NodeEditor(this);
+    if (tabs) {
+      for (const tab of tabs) {
+        this._nodeEditor[tab] = new NodeEditor(this);
+      }
     }
     this._label = label ?? 'Graph Editor';
-    this._nodePropGrid.on('object_property_changed', this.onPropChanged, this);
+    this._propGrid.on('object_property_changed', this.onPropChanged, this);
   }
   getNodeEditor(tab: string) {
     return this._nodeEditor[tab];
   }
-
-  get nodePropEditor() {
-    return this._nodePropGrid;
+  get propEditor() {
+    return this._propGrid;
   }
-
+  addTab(label: string) {
+    this._nodeEditor[label] = new NodeEditor(this);
+    return this._nodeEditor[label];
+  }
   render() {
     const editor = this.getNodeEditor(this._activeTab);
-    if (!editor) {
-      return;
-    }
-    if (editor.selectedNodes.length === 1) {
-      const selectedNode = editor.nodes.get(editor.selectedNodes[0]);
-      if (selectedNode && selectedNode.impl !== this._nodePropGrid.object) {
-        this._nodePropGrid.clear();
-        this._nodePropGrid.object = selectedNode.impl;
-        this.onSelectionChanged(selectedNode.impl);
+    if (editor) {
+      if (editor.selectedNodes.length === 1) {
+        const selectedNode = editor.nodes.get(editor.selectedNodes[0]);
+        if (selectedNode && selectedNode.impl !== this._propGrid.object) {
+          this._propGrid.clear();
+          this._propGrid.object = selectedNode.impl;
+          this.onSelectionChanged(selectedNode.impl);
+        }
+      } else if (this._propGrid.object) {
+        this._propGrid.clear();
+        this.onSelectionChanged(null);
       }
-    } else if (this._nodePropGrid.object) {
-      this._nodePropGrid.clear();
-      this.onSelectionChanged(null);
     }
-
     const regionAvail = ImGui.GetContentRegionAvail();
 
     const cursorPos = ImGui.GetCursorPos();
@@ -76,34 +78,28 @@ export class GraphEditor
         false,
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
       );
-      if (ImGui.BeginTabBar('##NodeEditorTab')) {
-        for (const tab of Object.keys(this._nodeEditor)) {
-          if (ImGui.BeginTabItem(tab)) {
-            this._activeTab = tab;
-            ImGui.BeginChild(
-              `##NodeEditor#${tab}`,
-              ImGui.GetContentRegionAvail(),
-              false,
-              ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
-            );
-            this._nodeEditor[tab].render();
-            ImGui.EndChild();
-            ImGui.EndTabItem();
-          }
+      this.renderNodeEditor();
+      ImGui.EndChild();
+    }
+  }
+
+  renderNodeEditor() {
+    if (ImGui.BeginTabBar('##NodeEditorTab')) {
+      for (const tab of Object.keys(this._nodeEditor)) {
+        if (ImGui.BeginTabItem(tab)) {
+          this._activeTab = tab;
+          ImGui.BeginChild(
+            `##NodeEditor#${tab}`,
+            ImGui.GetContentRegionAvail(),
+            false,
+            ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
+          );
+          this._nodeEditor[tab].render();
+          ImGui.EndChild();
+          ImGui.EndTabItem();
         }
-        ImGui.EndTabBar();
       }
-      ImGui.EndChild();
-      /*
-      ImGui.BeginChild(
-        '##NodeEditor',
-        new ImGui.ImVec2(nodeEditorWidth, nodeEditorHeight),
-        false,
-        ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
-      );
-      this._nodeEditor.render();
-      ImGui.EndChild();
-      */
+      ImGui.EndTabBar();
     }
   }
   getNodeCategory(): NodeCategory[] {
@@ -115,7 +111,7 @@ export class GraphEditor
   protected onPropChanged(_obj: object, _prop: PropertyAccessor) {}
   protected onSelectionChanged(_obj: IGraphNode) {}
   protected renderRightPanel() {
-    this._nodePropGrid.render();
+    this._propGrid.render();
   }
   protected updateToplevelPropertyEditor(_propEditor: PropertyEditor) {}
 }

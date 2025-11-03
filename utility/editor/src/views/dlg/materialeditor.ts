@@ -32,8 +32,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     if (exists) {
       const stat = await ProjectService.VFS.stat(this.path);
       if (stat.isFile) {
-        this.editor.load(this.path);
+        await this.editor.load(this.path);
       }
+    } else {
+      await this.editor.load('');
     }
     super.show();
     this.editor.open();

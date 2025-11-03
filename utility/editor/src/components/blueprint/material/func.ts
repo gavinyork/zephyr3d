@@ -16,7 +16,7 @@ export class MaterialFunctionEditor extends GraphEditor {
   constructor(label: string) {
     super(label, ['function']);
     this._version = 0;
-    this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
+    this.propEditor.on('object_property_changed', this.graphChanged, this);
     this.getNodeEditor('function').on('changed', this.graphChanged, this);
   }
   open() {}

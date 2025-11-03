@@ -5,6 +5,7 @@ import type {
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
   IGraphNode,
+  MeshMaterial,
   PropertyAccessor
 } from '@zephyr3d/scene';
 import {
@@ -40,25 +41,17 @@ export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
   private _previewMesh: DRef<Mesh>;
   private _defaultMaterial: DRef<UnlitMaterial>;
+  private _editMaterial: DRef<MeshMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
   private _version: number;
   private _blendMode: BlendMode;
   private _doubleSided: boolean;
+  private _isBlueprint: boolean;
+  private _outputName: string;
   constructor(label: string, outputName: string) {
-    super(label, ['fragment', 'vertex']);
-    const fragEditor = this.getNodeEditor('fragment');
-    const fragBlock = fragEditor.addNode(new GNode(fragEditor, null, new PBRBlockNode()));
-    fragBlock.title = outputName;
-    fragBlock.locked = true;
-    fragBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
-    fragBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
-    const vertexEditor = this.getNodeEditor('vertex');
-    const vertexBlock = vertexEditor.addNode(new GNode(vertexEditor, null, new VertexBlockNode()));
-    vertexBlock.title = outputName;
-    vertexBlock.locked = true;
-    vertexBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
-    vertexBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
-
+    super(label, []);
+    this._outputName = outputName;
+    this._isBlueprint = false;
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
     scene.env.sky.cameraHeightScale = 5000;
@@ -76,17 +69,14 @@ export class PBRMaterialEditor extends GraphEditor {
     const sphere = new SphereShape({ radius: 4, horizonalDetail: 50, verticalDetail: 50 });
     const defaultMat = new UnlitMaterial();
     defaultMat.albedoColor = new Vector4(1, 0, 1, 1);
+    this._editMaterial = new DRef();
     this._defaultMaterial = new DRef(defaultMat);
     const previewMesh = new Mesh(scene, sphere, this._defaultMaterial.get());
     this._previewMesh = new DRef(previewMesh);
     this._blendMode = 'none';
     this._doubleSided = false;
-    this.applyPreviewMaterial();
-    this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
-    fragEditor.on('changed', this.graphChanged, this);
-    fragEditor.on('dragdrop', this.dragdropFrag, this);
-    vertexEditor.on('changed', this.graphChanged, this);
-    vertexEditor.on('dragdrop', this.dragdropVertex, this);
+    //this.applyPreviewMaterial();
+    this.propEditor.on('object_property_changed', this.graphChanged, this);
   }
   get fragmentEditor() {
     return this.getNodeEditor('fragment');
@@ -102,11 +92,14 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewScene.dispose();
     this._previewMesh.dispose();
     this._defaultMaterial.dispose();
-    this.nodePropEditor.on('object_property_changed', this.graphChanged, this);
-    this.fragmentEditor.off('changed', this.graphChanged, this);
-    this.fragmentEditor.off('dragdrop', this.dragdropFrag, this);
-    this.vertexEditor.off('changed', this.graphChanged, this);
-    this.vertexEditor.off('dragdrop', this.dragdropFrag, this);
+    this._editMaterial.dispose();
+    this.propEditor.off('object_property_changed', this.graphChanged, this);
+    if (this._isBlueprint) {
+      this.fragmentEditor.off('changed', this.graphChanged, this);
+      this.fragmentEditor.off('dragdrop', this.dragdropFrag, this);
+      this.vertexEditor.off('changed', this.graphChanged, this);
+      this.vertexEditor.off('dragdrop', this.dragdropFrag, this);
+    }
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -126,129 +119,183 @@ export class PBRMaterialEditor extends GraphEditor {
     return this._previewScene.get().mainCamera.handleEvent(ev, type);
   }
   get saved() {
-    return this._version === this.getNodeEditor('fragment').version;
+    return this._version === (this._isBlueprint ? this.getNodeEditor('fragment').version : 0);
   }
   async save(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
-      const bpPath = VFS.normalizePath(
-        VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
-      );
-      // Save blueprint
-      const fragmentState = await this.fragmentEditor.saveState();
-      const vertexState = await this.vertexEditor.saveState();
-      try {
-        await VFS.writeFile(
-          bpPath,
-          JSON.stringify(
-            { type: 'PBRMaterial', state: { fragment: fragmentState, vertex: vertexState } },
-            null,
-            2
-          ),
-          {
+      if (this._isBlueprint) {
+        const bpPath = VFS.normalizePath(
+          VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
+        );
+        // Save blueprint
+        const fragmentState = await this.fragmentEditor.saveState();
+        const vertexState = await this.vertexEditor.saveState();
+        try {
+          await VFS.writeFile(
+            bpPath,
+            JSON.stringify(
+              { type: 'PBRMaterial', state: { fragment: fragmentState, vertex: vertexState } },
+              null,
+              2
+            ),
+            {
+              encoding: 'utf8',
+              create: true
+            }
+          );
+        } catch (err) {
+          const msg = `Save BluePrint failed: ${err}`;
+          console.error(msg);
+          Dialog.messageBox('Error', msg);
+          return;
+        }
+        // Save material
+        const editors = [this.fragmentEditor, this.vertexEditor];
+        const content: {
+          type: string;
+          data: {
+            IR: string;
+            uniformValues: {
+              name: string;
+              id: number;
+              value: number[];
+            }[];
+            uniformTextures: {
+              name: string;
+              id: number;
+              texture: string;
+              wrapS: string;
+              wrapT: string;
+              minFilter: string;
+              magFilter: string;
+              mipFilter: string;
+            }[];
+          };
+        } = {
+          type: 'PBRBluePrintMaterial',
+          data: {
+            IR: bpPath,
+            uniformValues: [],
+            uniformTextures: []
+          }
+        };
+        for (const editor of editors) {
+          const ir = this.createIR(editor);
+          for (const u of ir.uniformValues) {
+            const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
+            ASSERT(!!v, 'Uniform node not found');
+            if (content.data.uniformValues.find((v) => v.name === u.name)) {
+              continue;
+            }
+            content.data.uniformValues.push({
+              name: u.name,
+              id: v.id,
+              value: typeof u.value === 'number' ? [u.value] : [...u.value]
+            });
+          }
+          for (const u of ir.uniformTextures) {
+            const texnode = u.node as
+              | ConstantTexture2DNode
+              | ConstantTexture2DArrayNode
+              | ConstantTextureCubeNode;
+            const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
+            ASSERT(!!v, 'Uniform node not found');
+            if (content.data.uniformTextures.find((v) => v.name === u.name)) {
+              continue;
+            }
+            content.data.uniformTextures.push({
+              name: u.name,
+              id: v.id,
+              texture: texnode.textureId,
+              wrapS: texnode.addressU,
+              wrapT: texnode.addressV,
+              minFilter: texnode.filterMin,
+              magFilter: texnode.filterMag,
+              mipFilter: texnode.filterMip
+            });
+          }
+        }
+        try {
+          await VFS.writeFile(path, JSON.stringify(content, null, 2), {
             encoding: 'utf8',
             create: true
-          }
-        );
-      } catch (err) {
-        const msg = `Save BluePrint failed: ${err}`;
-        console.error(msg);
-        Dialog.messageBox('Error', msg);
-        return;
-      }
-      // Save material
-      const editors = [this.fragmentEditor, this.vertexEditor];
-      const content: {
-        type: string;
-        data: {
-          IR: string;
-          uniformValues: {
-            name: string;
-            id: number;
-            value: number[];
-          }[];
-          uniformTextures: {
-            name: string;
-            id: number;
-            texture: string;
-            wrapS: string;
-            wrapT: string;
-            minFilter: string;
-            magFilter: string;
-            mipFilter: string;
-          }[];
-        };
-      } = {
-        type: 'PBRBluePrintMaterial',
-        data: {
-          IR: bpPath,
-          uniformValues: [],
-          uniformTextures: []
-        }
-      };
-      for (const editor of editors) {
-        const ir = this.createIR(editor);
-        for (const u of ir.uniformValues) {
-          const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
-          ASSERT(!!v, 'Uniform node not found');
-          if (content.data.uniformValues.find((v) => v.name === u.name)) {
-            continue;
-          }
-          content.data.uniformValues.push({
-            name: u.name,
-            id: v.id,
-            value: typeof u.value === 'number' ? [u.value] : [...u.value]
           });
+        } catch (err) {
+          const msg = `Save material failed: ${err}`;
+          console.error(msg);
+          Dialog.messageBox('Error', msg);
         }
-        for (const u of ir.uniformTextures) {
-          const texnode = u.node as
-            | ConstantTexture2DNode
-            | ConstantTexture2DArrayNode
-            | ConstantTextureCubeNode;
-          const v = [...editor.nodes.values()].find((v) => v.impl === u.node);
-          ASSERT(!!v, 'Uniform node not found');
-          if (content.data.uniformTextures.find((v) => v.name === u.name)) {
-            continue;
-          }
-          content.data.uniformTextures.push({
-            name: u.name,
-            id: v.id,
-            texture: texnode.textureId,
-            wrapS: texnode.addressU,
-            wrapT: texnode.addressV,
-            minFilter: texnode.filterMin,
-            magFilter: texnode.filterMag,
-            mipFilter: texnode.filterMip
-          });
+        this._version = this.getNodeEditor('fragment').version;
+        await getEngine().serializationManager.reloadBluePrintMaterials();
+      } else {
+        try {
+          const json = {
+            type: 'Default',
+            data: await ProjectService.serializationManager.serializeObject(this._editMaterial.get())
+          };
+          await VFS.writeFile(path, JSON.stringify(json, null, 2), { encoding: 'utf8', create: true });
+        } catch (err) {
+          const msg = `Save material failed: ${err}`;
+          console.error(msg);
+          Dialog.messageBox('Error', msg);
         }
+        this._version = 0;
+        await getEngine().serializationManager.reloadBluePrintMaterials();
       }
-      try {
-        await VFS.writeFile(path, JSON.stringify(content, null, 2), {
-          encoding: 'utf8',
-          create: true
-        });
-      } catch (err) {
-        const msg = `Save material failed: ${err}`;
-        console.error(msg);
-        Dialog.messageBox('Error', msg);
-      }
-      this._version = this.getNodeEditor('fragment').version;
-      await getEngine().serializationManager.reloadBluePrintMaterials();
     }
   }
   async load(path: string) {
+    let blueprintState: { fragment: NodeEditorState; vertex: NodeEditorState } = null;
+    this._isBlueprint = true;
     try {
-      const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
-      const data = JSON.parse(content);
-      ASSERT(data.type === 'PBRBluePrintMaterial', 'Invalid PBR Material BluePrint');
-      const blueprint = data.data?.IR as string;
-      const blueprintContent = (await ProjectService.VFS.readFile(blueprint, { encoding: 'utf8' })) as string;
-      const blueprintData = JSON.parse(blueprintContent);
-      ASSERT(blueprintData.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
-      const state = blueprintData.state as { fragment: NodeEditorState; vertex: NodeEditorState };
-      await this.fragmentEditor.loadState(state.fragment);
-      await this.vertexEditor.loadState(state.vertex);
-      this._version = this.fragmentEditor.version;
+      if (path) {
+        const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+        const data = JSON.parse(content);
+        if (data.type === 'PBRBluePrintMaterial') {
+          const blueprint = data.data?.IR as string;
+          const blueprintContent = (await ProjectService.VFS.readFile(blueprint, {
+            encoding: 'utf8'
+          })) as string;
+          const blueprintData = JSON.parse(blueprintContent);
+          ASSERT(blueprintData.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
+          blueprintState = blueprintData.state;
+          this._isBlueprint = true;
+        } else {
+          const material = await ProjectService.serializationManager.deserializeObject<MeshMaterial>(
+            null,
+            data.data
+          );
+          this._editMaterial.set(material);
+          this._previewMesh.get().material = material;
+          this.propEditor.object = material;
+          this._isBlueprint = false;
+        }
+      }
+      if (this._isBlueprint) {
+        const fragEditor = this.addTab('fragment');
+        const fragBlock = fragEditor.addNode(new GNode(fragEditor, null, new PBRBlockNode()));
+        fragBlock.title = this._outputName;
+        fragBlock.locked = true;
+        fragBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+        fragBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+        const vertexEditor = this.addTab('vertex');
+        const vertexBlock = vertexEditor.addNode(new GNode(vertexEditor, null, new VertexBlockNode()));
+        vertexBlock.title = this._outputName;
+        vertexBlock.locked = true;
+        vertexBlock.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+        vertexBlock.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+        fragEditor.on('changed', this.graphChanged, this);
+        fragEditor.on('dragdrop', this.dragdropFrag, this);
+        vertexEditor.on('changed', this.graphChanged, this);
+        vertexEditor.on('dragdrop', this.dragdropVertex, this);
+        if (blueprintState) {
+          await fragEditor.loadState(blueprintState.fragment);
+          await vertexEditor.loadState(blueprintState.vertex);
+        }
+        this.applyPreviewMaterial();
+        this._version = fragEditor.version;
+      }
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);
@@ -284,19 +331,27 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     return ProjectService.serializationManager.createBluePrintDAG(nodeMap, roots, editor.links);
   }
+  renderNodeEditor() {
+    const v = ImGui.GetContentRegionAvail();
+    this.renderPreviewScene(v);
+  }
   protected renderRightPanel() {
-    const v = new ImGui.ImVec2();
-    ImGui.GetContentRegionAvail(v);
-    v.y >>= 1;
-    if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
+    if (this._isBlueprint) {
+      const v = new ImGui.ImVec2();
+      ImGui.GetContentRegionAvail(v);
+      v.y >>= 1;
+      if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
+        super.renderRightPanel();
+      }
+      ImGui.EndChild();
+      if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, -1), true)) {
+        ImGui.GetContentRegionAvail(v);
+        this.renderPreviewScene(v);
+      }
+      ImGui.EndChild();
+    } else {
       super.renderRightPanel();
     }
-    ImGui.EndChild();
-    if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, -1), true)) {
-      ImGui.GetContentRegionAvail(v);
-      this.renderPreviewScene(v);
-    }
-    ImGui.EndChild();
   }
   private renderPreviewScene(size: ImGui.ImVec2) {
     if (size.x <= 0 || size.y <= 0) {
@@ -338,6 +393,9 @@ export class PBRMaterialEditor extends GraphEditor {
     camera.updateController();
   }
   private applyPreviewMaterial() {
+    if (!this._isBlueprint) {
+      return;
+    }
     const irFrag = this.createIR(this.fragmentEditor);
     const irVert = this.createIR(this.vertexEditor);
     /*
@@ -397,6 +455,7 @@ export class PBRMaterialEditor extends GraphEditor {
       newMaterial.blendMode = this._blendMode;
       newMaterial.cullMode = this._doubleSided ? 'none' : 'back';
       newMaterial.doubleSidedLighting = !!this._doubleSided;
+      this._editMaterial.set(newMaterial);
       this._previewMesh.get().material = newMaterial;
     }
   }
@@ -405,7 +464,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   protected onSelectionChanged(object: IGraphNode): void {
     if (!object) {
-      this.nodePropEditor.root.addRawProperty(
+      this.propEditor.root.addRawProperty(
         'BlendMode',
         'string',
         (value) => {
@@ -419,7 +478,7 @@ export class PBRMaterialEditor extends GraphEditor {
           enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] }
         }
       );
-      this.nodePropEditor.root.addRawProperty(
+      this.propEditor.root.addRawProperty(
         'DoubleSided',
         'bool',
         (value) => {
@@ -433,7 +492,11 @@ export class PBRMaterialEditor extends GraphEditor {
     }
   }
   private graphChanged() {
-    this.applyPreviewMaterial();
+    if (this._isBlueprint) {
+      this.applyPreviewMaterial();
+    } else {
+      this._version = 1;
+    }
   }
   private dragdropFrag(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
     if (
