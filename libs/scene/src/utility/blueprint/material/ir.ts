@@ -1370,21 +1370,31 @@ export class MaterialBlueprintIR {
   /** Converts a vertex color input node to IR */
   private vertexColor(node: VertexColorNode, output: number): IRExpression {
     this._behaviors.useVertexColor = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexColor');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => scope.$inputs.zVertexColor);
   }
   /** Converts a vertex UV input node to IR */
   private vertexUV(node: VertexUVNode, output: number): IRExpression {
     this._behaviors.useVertexUV = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexUV');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => {
+      return scope.$inputs.zVertexUV;
+    });
   }
   /** Converts a vertex normal input node to IR */
   private vertexNormal(node: VertexNormalNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexNormal');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.getDevice().type === 'vertex'
+        ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
+        : scope.$inputs.zVertexNormal
+    );
   }
   /** Converts a vertex tangent input node to IR */
   private vertexTangent(node: VertexTangentNode, output: number): IRExpression {
     this._behaviors.useVertexTangent = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexTangent');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.getDevice().type === 'vertex'
+        ? (scope.$getVertexAttrib('tangent') ?? ShaderHelper.resolveVertexTangent(scope))
+        : scope.$inputs.zVertexTangent
+    );
   }
   /** Converts a vertex binormal input node to IR */
   private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {

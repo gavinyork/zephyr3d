@@ -117,6 +117,16 @@ export class PBRBluePrintMaterial
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);
     const pb = scope.$builder;
+    scope.$inputs.zVertexPos = pb.vec3().attrib('position');
+    scope.$inputs.zVertexNormal = pb.vec3().attrib('normal');
+    scope.$inputs.zVertexTangent = pb.vec4().attrib('tangent');
+    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR)) {
+      scope.$inputs.zVertexColor = pb.vec4().attrib('diffuse');
+    }
+    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV)) {
+      scope.$inputs.zVertexUV = pb.vec2().attrib('texCoord0');
+    }
+
     for (const u of [...this._uniformValues, ...this._uniformTextures]) {
       if (u.inVertexShader) {
         pb.getGlobalScope()[u.name] = pb[u.type].uniform(2);
@@ -128,18 +138,12 @@ export class PBRBluePrintMaterial
     scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
     scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1));
     ShaderHelper.setClipSpacePosition(scope, scope.csPos);
-    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR)) {
-      scope.$inputs.vertexColor = pb.vec4().attrib('diffuse');
-    }
     scope.$outputs.zVertexColor =
       this.getOutput(outputs, 'Color') ??
-      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.vertexColor : pb.vec4(1));
-    if (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV)) {
-      scope.$inputs.vertexUV = pb.vec2().attrib('texCoord0');
-    }
+      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR) ? scope.$inputs.zVertexColor : pb.vec4(1));
     scope.$outputs.zVertexUV =
       this.getOutput(outputs, 'UV') ??
-      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.vertexUV : pb.vec2(0));
+      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.zVertexUV : pb.vec2(0));
     scope.$l.oNorm = this.getOutput(outputs, 'Normal') ?? ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     scope.$l.oTangent =
