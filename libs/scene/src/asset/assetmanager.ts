@@ -8,7 +8,8 @@ import {
   base64ToUint8Array,
   Vector3,
   ASSERT,
-  VFSError
+  VFSError,
+  Vector4
 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
@@ -36,10 +37,10 @@ import { getDevice, getEngine } from '../app/api';
 import { Material, PBRBluePrintMaterial } from '../material';
 import type {
   BlueprintDAG,
+  BluePrintUniformTexture,
+  BluePrintUniformValue,
   GraphStructure,
   IGraphNode,
-  IRUniformTexture,
-  IRUniformValue,
   NodeConnection,
   SerializationManager
 } from '../utility';
@@ -658,13 +659,57 @@ export class AssetManager {
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
-        const tmp = await this.loadMaterial<PBRBluePrintMaterial>(paths[i], true);
-        m.fragmentIR = tmp.fragmentIR;
-        m.vertexIR = tmp.vertexIR;
-        tmp.dispose();
+        const data = await this.loadBluePrintMaterialData(paths[i], true);
+        m.fragmentIR = data.irFragment;
+        m.vertexIR = data.irVertex;
+        m.uniformValues = data.uniformValues;
+        m.uniformTextures = data.uniformTextures;
       }
     }
   }
+  private async loadBluePrintMaterialData(url: string, reload: boolean, VFSs?: VFS[]) {
+    try {
+      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+      const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(content.type === 'PBRBluePrintMaterial', `Unsupported material type: ${content.type}`);
+      const ir = reload
+        ? await this.loadBluePrint(content.data.IR as string, VFSs)
+        : await this.fetchBluePrint(content.data.IR as string, VFSs);
+      const uniformValues: BluePrintUniformValue[] = (
+        content.data.uniformValues as BluePrintUniformValue[]
+      ).map((v) => ({
+        ...v,
+        finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
+      }));
+      const uniformTextures: BluePrintUniformTexture[] = [];
+      const textures = content.data.uniformTextures as BluePrintUniformTexture[];
+      for (const v of textures) {
+        const tex = await this.fetchTexture(v.texture, null, VFSs);
+        uniformTextures.push({
+          ...v,
+          finalTexture: new DRef(tex),
+          finalSampler: getDevice().createSampler({
+            addressU: v.wrapS as TextureAddressMode,
+            addressV: v.wrapT as TextureAddressMode,
+            minFilter: v.minFilter as TextureFilterMode,
+            magFilter: v.magFilter as TextureFilterMode,
+            mipFilter: v.mipFilter as TextureFilterMode
+          }),
+          params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
+        });
+      }
+      return {
+        irFragment: ir['fragment'],
+        irVertex: ir['vertex'],
+        uniformValues,
+        uniformTextures
+      };
+    } catch (err) {
+      console.error(`Load material failed: ${err}`);
+      return null;
+    }
+  }
+
   /**
    * Load a material.
    *
@@ -683,47 +728,13 @@ export class AssetManager {
         `Unsupported material type: ${content.type}`
       );
       if (content.type === 'PBRBluePrintMaterial') {
-        const ir = reload
-          ? await this.loadBluePrint(content.data.IR as string, VFSs)
-          : await this.fetchBluePrint(content.data.IR as string, VFSs);
-        const material = new PBRBluePrintMaterial(ir['fragment'], ir['vertex']);
-        const uniformValues: IRUniformValue[] = (
-          content.data.uniformValues as { name: string; value: number[] }[]
-        ).map((v) => ({
-          node: null,
-          name: v.name,
-          value: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
-        }));
-        const uniformTextures: IRUniformTexture[] = [];
-        const textures = content.data.uniformTextures as {
-          name: string;
-          id: number;
-          texture: string;
-          wrapS: string;
-          wrapT: string;
-          minFilter: string;
-          magFilter: string;
-          mipFilter: string;
-        }[];
-        for (const v of textures) {
-          uniformTextures.push({
-            node: null,
-            name: v.name,
-            texture: new DRef(await this.fetchTexture(v.texture, null, VFSs)),
-            sampler: new DRef(
-              getDevice().createSampler({
-                addressU: v.wrapS as TextureAddressMode,
-                addressV: v.wrapT as TextureAddressMode,
-                minFilter: v.minFilter as TextureFilterMode,
-                magFilter: v.magFilter as TextureFilterMode,
-                mipFilter: v.mipFilter as TextureFilterMode
-              })
-            )
-          });
-        }
-        material.uniformValues = uniformValues;
-        material.uniformTextures = uniformTextures;
-        return material as unknown as T;
+        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
+        return new PBRBluePrintMaterial(
+          data.irFragment,
+          data.irVertex,
+          data.uniformValues,
+          data.uniformTextures
+        ) as unknown as T;
       } else {
         const obj = await this._serializationManager.deserializeObject<T>(null, content.data);
         if (!(obj instanceof Material)) {
