@@ -17,6 +17,7 @@ import { TreeViewData, TreeView } from './treeview';
 import { DlgImport } from '../views/dlg/importdlg';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
+import { DlgSaveFile } from '../views/dlg/savefiledlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -279,22 +280,21 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           if (mimeType === 'application/vnd.zephyr3d.material+json') {
             ImGui.Separator();
             if (ImGui.MenuItem('Create Material Instance...')) {
-              DlgPromptName.promptName('Create Material Instance', '', 'Material Instance Name').then(
-                (name) => {
-                  name = name.trim();
-                  if (name) {
-                    if (PathUtils.sanitizeFilename(name) !== name) {
-                      DlgMessage.messageBox('Error', 'Invalid file name');
-                    } else {
-                      if (!name.endsWith('.zmtl')) {
-                        name = `${name}.zmtl`;
-                      }
-                      const path = this.renderer.VFS.join(this.renderer.VFS.dirname(item.meta.path), name);
-                      this.renderer.copyFile(item.meta.path, path, 'prompt');
-                    }
+              DlgSaveFile.saveFile(
+                'Create Material Instance',
+                this.renderer.VFS,
+                '/assets',
+                'Material (*.zmtl)|*.zmtl',
+                500,
+                400
+              ).then((name) => {
+                if (name) {
+                  if (!name.endsWith('.zmtl')) {
+                    name = `${name}.zmtl`;
                   }
+                  this.renderer.copyFile(item.meta.path, name, 'prompt');
                 }
-              );
+              });
             }
           }
           ImGui.Separator();
