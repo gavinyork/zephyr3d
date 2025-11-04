@@ -15,10 +15,10 @@ import {
   ConstantVec3Node,
   ConstantVec4Node
 } from '../common/constants';
-import type { GenericConstructor } from '@zephyr3d/base';
-import { ASSERT, DRef } from '@zephyr3d/base';
+import type { GenericConstructor, DRef } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
+import { ASSERT } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
-import { getDevice } from '../../../app/api';
 import {
   GenericMathNode,
   PerlinNoise2DNode,
@@ -78,7 +78,17 @@ import { VertexBlockNode } from './pbr';
  *
  * @public
  */
-export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | number; node: IGraphNode };
+export interface IRUniformValue {
+  name: string;
+  type: string;
+  value: number[];
+}
+
+export interface BluePrintUniformValue extends IRUniformValue {
+  inVertexShader: boolean;
+  inFragmentShader: boolean;
+  finalValue?: number | Float32Array<ArrayBuffer>;
+}
 
 /**
  * Represents a uniform texture and its sampler in the intermediate representation
@@ -89,12 +99,25 @@ export type IRUniformValue = { name: string; value: Float32Array<ArrayBuffer> | 
  *
  * @public
  */
-export type IRUniformTexture = {
+export interface IRUniformTexture {
   name: string;
-  texture: DRef<BaseTexture>;
-  sampler: DRef<TextureSampler>;
-  node: IGraphNode;
-};
+  type: string;
+  texture: string;
+  sRGB: boolean;
+  wrapS: string;
+  wrapT: string;
+  minFilter: string;
+  magFilter: string;
+  mipFilter: string;
+}
+
+export interface BluePrintUniformTexture extends IRUniformTexture {
+  inVertexShader: boolean;
+  inFragmentShader: boolean;
+  finalTexture?: DRef<BaseTexture>;
+  finalSampler?: TextureSampler;
+  params?: Vector4;
+}
 
 /**
  * Abstract base class for intermediate representation expressions
@@ -261,12 +284,12 @@ class IRConstantf extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(node: IGraphNode): IRUniformValue {
+  asUniformValue(): IRUniformValue {
     return this.name
       ? {
           name: this.name,
-          value: this.value,
-          node
+          value: [this.value],
+          type: 'float'
         }
       : null;
   }
@@ -295,16 +318,20 @@ class IRConstantfv extends IRExpression {
   readonly value: number[];
   /** The uniform parameter name, or empty string for literals */
   readonly name: string;
+  /** vector type */
+  readonly type: string;
+
   /**
    * Creates a constant vector expression
    *
    * @param value - The vector value as an array (length 2-4)
    * @param paramName - The uniform parameter name, or empty string for literals
    */
-  constructor(value: number[], paramName: string) {
+  constructor(value: number[], paramName: string, type: string) {
     super();
     this.value = value;
     this.name = paramName;
+    this.type = type;
   }
   /**
    * Generates shader code for this constant vector
@@ -331,8 +358,14 @@ class IRConstantfv extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(node: IGraphNode): IRUniformValue {
-    return this.name ? { name: this.name, value: new Float32Array(this.value), node } : null;
+  asUniformValue(): IRUniformValue {
+    return this.name
+      ? {
+          name: this.name,
+          type: this.type,
+          value: this.value
+        }
+      : null;
   }
 }
 
@@ -813,8 +846,12 @@ class IRSampleTexture extends IRExpression {
 class IRConstantTexture extends IRExpression {
   /** The uniform texture variable name */
   readonly name: string;
+  /** The texture id */
+  readonly id: string;
   /** The texture type (e.g., 'tex2d', 'texCube') */
   readonly type: string;
+  /** Whether this texture should loaded in sRGB color space */
+  readonly sRGB: boolean;
   /** Horizontal texture addressing mode */
   readonly addressU: TextureAddressMode;
   /** Vertical texture addressing mode */
@@ -825,11 +862,15 @@ class IRConstantTexture extends IRExpression {
   readonly filterMag: TextureFilterMode;
   /** Mipmap filter mode */
   readonly filterMip: TextureFilterMode;
+  /** Whether texture params is used */
+  useParams: boolean;
   /**
    * Creates a texture constant expression
    *
    * @param name - The uniform variable name
+   * @param id - The texture id
    * @param type - The texture type
+   * @param sRGB - Whether this texture should be loaded in sRGB color space
    * @param addressU - Horizontal addressing mode
    * @param addressV - Vertical addressing mode
    * @param minFilter - Minification filter
@@ -838,7 +879,9 @@ class IRConstantTexture extends IRExpression {
    */
   constructor(
     name: string,
+    id: string,
     type: string,
+    sRGB: boolean,
     addressU: TextureAddressMode,
     addressV: TextureAddressMode,
     minFilter: TextureFilterMode,
@@ -847,12 +890,15 @@ class IRConstantTexture extends IRExpression {
   ) {
     super();
     this.name = name;
+    this.id = id;
     this.type = type;
+    this.sRGB = sRGB;
     this.addressU = addressU;
     this.addressV = addressV;
     this.filterMin = minFilter;
     this.filterMag = magFilter;
     this.filterMip = mipFilter;
+    this.useParams = false;
   }
   /**
    * Generates shader code for the texture uniform
@@ -875,20 +921,17 @@ class IRConstantTexture extends IRExpression {
    * @param node - The texture node
    * @returns Uniform texture descriptor with texture and sampler references
    */
-  asUniformTexture(node: BaseTextureNode): IRUniformTexture {
+  asUniformTexture(): IRUniformTexture {
     return {
       name: this.name,
-      texture: new DRef(node.texture.get()),
-      sampler: new DRef(
-        getDevice().createSampler({
-          addressU: this.addressU,
-          addressV: this.addressV,
-          minFilter: this.filterMin,
-          magFilter: this.filterMag,
-          mipFilter: this.filterMip
-        })
-      ),
-      node
+      texture: this.id,
+      wrapS: this.addressU,
+      wrapT: this.addressV,
+      minFilter: this.filterMin,
+      magFilter: this.filterMag,
+      mipFilter: this.filterMip,
+      type: this.type,
+      sRGB: this.sRGB
     };
   }
 }
@@ -908,8 +951,6 @@ export interface MaterialBlueprintIRBehaviors {
   useVertexColor: boolean;
   /** Whether the material uses texture coordinates */
   useVertexUV: boolean;
-  /** Whether the material uses tangent space (tangent/binormal) */
-  useVertexTangent: boolean;
 }
 
 /**
@@ -1048,16 +1089,14 @@ export class MaterialBlueprintIR {
         } else if (Array.isArray(input.defaultValue)) {
           this._outputs.push({
             name,
-            expr: new IRConstantfv(input.defaultValue, '').addRef()
+            expr: new IRConstantfv(input.defaultValue, '', `vec${input.defaultValue.length}`).addRef()
           });
         } else if (input.required) {
           this._outputs = null;
           return false;
         }
         if (!input.inputNode && rootNode instanceof VertexBlockNode) {
-          if (input.name === 'Tangent') {
-            this._behaviors.useVertexTangent = true;
-          } else if (input.name === 'Color') {
+          if (input.name === 'Color') {
             this._behaviors.useVertexColor = true;
           } else if (input.name === 'UV') {
             this._behaviors.useVertexUV = true;
@@ -1114,8 +1153,7 @@ export class MaterialBlueprintIR {
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
-      useVertexUV: false,
-      useVertexTangent: false
+      useVertexUV: false
     };
   }
   /**
@@ -1334,25 +1372,33 @@ export class MaterialBlueprintIR {
   /** Converts a vertex color input node to IR */
   private vertexColor(node: VertexColorNode, output: number): IRExpression {
     this._behaviors.useVertexColor = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexColor');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => scope.$inputs.zVertexColor);
   }
   /** Converts a vertex UV input node to IR */
   private vertexUV(node: VertexUVNode, output: number): IRExpression {
     this._behaviors.useVertexUV = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexUV');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => {
+      return scope.$inputs.zVertexUV;
+    });
   }
   /** Converts a vertex normal input node to IR */
   private vertexNormal(node: VertexNormalNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexNormal');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.getDevice().type === 'vertex'
+        ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
+        : scope.$inputs.zVertexNormal
+    );
   }
   /** Converts a vertex tangent input node to IR */
   private vertexTangent(node: VertexTangentNode, output: number): IRExpression {
-    this._behaviors.useVertexTangent = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexTangent');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.getDevice().type === 'vertex'
+        ? (scope.$getVertexAttrib('tangent') ?? ShaderHelper.resolveVertexTangent(scope))
+        : scope.$inputs.zVertexTangent
+    );
   }
   /** Converts a vertex binormal input node to IR */
   private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {
-    this._behaviors.useVertexTangent = true;
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexBinormal');
   }
   /** Converts a vertex position input node to IR */
@@ -1668,7 +1714,14 @@ export class MaterialBlueprintIR {
         : node instanceof ConstantVec3Node
           ? [node.x, node.y, node.z]
           : [node.x, node.y, node.z, node.w];
-    return this.getOrCreateIRExpression(node, output, IRConstantfv, value, node.paramName);
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRConstantfv,
+      value,
+      node.paramName,
+      `vec${value.length}`
+    );
   }
   /** Converts a texture constant node to IR */
   private constantTexture(node: BaseTextureNode, output: number): IRConstantTexture {
@@ -1677,7 +1730,9 @@ export class MaterialBlueprintIR {
       output,
       IRConstantTexture,
       node.paramName,
+      node.textureId,
       node.getOutputType(1),
+      node.sRGB,
       node.addressU,
       node.addressV,
       node.filterMin,

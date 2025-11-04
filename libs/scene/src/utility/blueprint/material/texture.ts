@@ -1,7 +1,6 @@
 import { BaseGraphNode } from '../node';
 import { getParamName } from '../common';
 import type {
-  BaseTexture,
   Texture2D,
   Texture2DArray,
   TextureAddressMode,
@@ -10,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { DRef } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
-import type { PropertyAccessor, SerializableClass, SerializationManager } from '../../serialization';
+import type { PropertyAccessor, SerializableClass } from '../../serialization';
 
 /**
  * Default 1x1 white 2D texture reference
@@ -104,6 +103,7 @@ export function getDefaultTextureCube(): TextureCube {
  * @remarks
  * Defines serialization properties shared by all texture node types:
  * - Name: Shader parameter name for the texture uniform
+ * - sRGB: Whether texture should be loaded into sRGB color space
  * - AddressU: Horizontal texture wrapping mode
  * - AddressV: Vertical texture wrapping mode
  * - MinFilter: Minification filter mode
@@ -125,6 +125,17 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
       },
       set(this: BaseTextureNode, value) {
         this.paramName = value.str[0];
+      }
+    },
+    {
+      name: 'sRGB',
+      type: 'bool',
+      default: true,
+      get(this: BaseTextureNode, value) {
+        value.bool[0] = this.sRGB;
+      },
+      set(this: BaseTextureNode, value) {
+        this.sRGB = value.bool[0];
       }
     },
     {
@@ -170,7 +181,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MinFilter',
       type: 'string',
-      default: 'nearest',
+      default: 'linear',
       options: {
         enum: {
           labels: ['nearest', 'linear'],
@@ -190,7 +201,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MagFilter',
       type: 'string',
-      default: 'nearest',
+      default: 'linear',
       options: {
         enum: {
           labels: ['nearest', 'linear'],
@@ -210,7 +221,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MipFilter',
       type: 'string',
-      default: 'none',
+      default: 'nearest',
       options: {
         enum: {
           labels: ['nearest', 'linear', 'none'],
@@ -260,9 +271,11 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
  *
  * @public
  */
-export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> extends BaseGraphNode {
+export abstract class BaseTextureNode extends BaseGraphNode {
   /** The shader parameter name for this texture uniform */
   private _paramName: string;
+  /** Whether this texture should be loaded in sRGB color space */
+  sRGB: boolean;
   /** Horizontal texture coordinate wrapping mode */
   addressU: TextureAddressMode;
   /** Vertical texture coordinate wrapping mode */
@@ -275,8 +288,6 @@ export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> exten
   filterMip: TextureFilterMode;
   /** Asset ID for the texture (for serialization) */
   textureId: string;
-  /** Reference to the GPU texture resource */
-  texture: DRef<T>;
   /**
    * Creates a new texture node
    *
@@ -291,13 +302,13 @@ export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> exten
   constructor() {
     super();
     this._paramName = getParamName();
+    this.sRGB = true;
     this.addressU = 'clamp';
     this.addressV = 'clamp';
-    this.filterMin = 'nearest';
-    this.filterMag = 'nearest';
-    this.filterMip = 'none';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
     this.textureId = '';
-    this.texture = new DRef();
   }
   /**
    * Gets the shader parameter name
@@ -401,7 +412,7 @@ export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> exten
  *
  * @public
  */
-export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
+export class ConstantTexture2DNode extends BaseTextureNode {
   /**
    * Creates a new 2D texture node
    *
@@ -412,7 +423,6 @@ export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
    */
   constructor() {
     super();
-    this.texture.set(getDefaultTexture2D());
     this._outputs = [
       {
         id: 1,
@@ -432,7 +442,7 @@ export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
    * - All common texture parameters (addressing, filtering)
    * - Error handling for invalid or missing textures
    */
-  static getSerializationCls(manager: SerializationManager): SerializableClass {
+  static getSerializationCls(): SerializableClass {
     return {
       ctor: ConstantTexture2DNode,
       name: 'Texture2DNode',
@@ -460,27 +470,7 @@ export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTexture2DNode, value) {
-              if (value?.str[0]) {
-                this.textureId = value.str[0];
-                let tex: Texture2D;
-                try {
-                  tex = await manager.fetchTexture<Texture2D>(this.textureId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  tex = null;
-                }
-                const isValidTextureType = tex?.isTexture2D();
-                if (isValidTextureType) {
-                  this.texture.set(tex);
-                } else {
-                  console.error('Invalid texture type');
-                }
-              } else {
-                this.textureId = '';
-              }
-              if (!this.texture.get()) {
-                this.texture.set(getDefaultTexture2D());
-              }
+              this.textureId = value.str[0] ?? '';
             }
           },
           ...textureNodeProps
@@ -546,7 +536,7 @@ export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
  *
  * @public
  */
-export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> {
+export class ConstantTexture2DArrayNode extends BaseTextureNode {
   /**
    * Creates a new 2D texture array node
    *
@@ -557,7 +547,6 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> 
    */
   constructor() {
     super();
-    this.texture.set(getDefaultTexture2DArray());
     this._outputs = [
       {
         id: 1,
@@ -575,7 +564,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> 
    * Only accepts DDS format, which is the standard format for texture arrays.
    * Includes validation to ensure the loaded texture is actually a 2D array.
    */
-  static getSerializationCls(manager: SerializationManager): SerializableClass {
+  static getSerializationCls(): SerializableClass {
     return {
       ctor: ConstantTexture2DArrayNode,
       name: 'Texture2DArrayNode',
@@ -596,27 +585,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> 
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTexture2DArrayNode, value) {
-              if (value?.str[0]) {
-                this.textureId = value.str[0];
-                let tex: Texture2DArray;
-                try {
-                  tex = await manager.fetchTexture<Texture2DArray>(this.textureId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  tex = null;
-                }
-                const isValidTextureType = tex?.isTexture2DArray();
-                if (isValidTextureType) {
-                  this.texture.set(tex);
-                } else {
-                  console.error('Invalid texture type');
-                }
-              } else {
-                this.textureId = '';
-              }
-              if (!this.texture.get()) {
-                this.texture.set(getDefaultTexture2DArray());
-              }
+              this.textureId = value.str[0] ?? '';
             }
           },
           ...textureNodeProps
@@ -693,7 +662,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> 
  *
  * @public
  */
-export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
+export class ConstantTextureCubeNode extends BaseTextureNode {
   /**
    * Creates a new cubemap texture node
    *
@@ -705,7 +674,6 @@ export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
    */
   constructor() {
     super();
-    this.texture.set(getDefaultTextureCube());
     this._inputs = [];
     this._outputs = [
       {
@@ -724,7 +692,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
    * Only accepts DDS format, which is the standard format for cubemaps.
    * Includes validation to ensure the loaded texture is actually a cubemap.
    */
-  static getSerializationCls(manager: SerializationManager): SerializableClass {
+  static getSerializationCls(): SerializableClass {
     return {
       ctor: ConstantTextureCubeNode,
       name: 'TextureCubeNode',
@@ -745,27 +713,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTextureCubeNode, value) {
-              if (value?.str[0]) {
-                this.textureId = value.str[0];
-                let tex: TextureCube;
-                try {
-                  tex = await manager.fetchTexture<TextureCube>(this.textureId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  tex = null;
-                }
-                const isValidTextureType = tex?.isTextureCube();
-                if (isValidTextureType) {
-                  this.texture.set(tex);
-                } else {
-                  console.error('Invalid texture type');
-                }
-              } else {
-                this.textureId = '';
-              }
-              if (!this.texture.get()) {
-                this.texture.set(getDefaultTextureCube());
-              }
+              this.textureId = value.str[0] ?? '';
             }
           },
           ...textureNodeProps

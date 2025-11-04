@@ -214,6 +214,10 @@ export interface IGraphNode extends IEventTarget<{ changed: [] }> {
   readonly inputs: GraphNodeInput[];
   /** Array of output slot definitions */
   readonly outputs: GraphNodeOutput[];
+  /** Whether this node has uniform value */
+  isUniform: boolean;
+  /** Uniform parameter name */
+  paramName: string;
   /** Current error message, empty string if no error */
   error: string;
   /**
@@ -330,6 +334,18 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
     this._inputs = [];
     this._outputs = [];
     this._error = '';
+  }
+  /**
+   * Whether this node contains uniform value/texture
+   */
+  get isUniform() {
+    return false;
+  }
+  /**
+   * Uniform parameter name
+   */
+  get paramName() {
+    return '';
   }
   /**
    * Gets the output type for a specific output slot
