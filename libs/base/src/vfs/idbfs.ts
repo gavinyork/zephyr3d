@@ -210,7 +210,7 @@ export class IndexedDBFS extends VFS {
         request.onsuccess = () => {
           const record = request.result;
           if (!record || record.type !== 'file') {
-            reject(new VFSError('File does not exist', 'ENOENT', path));
+            reject(new VFSError(`File does not exist: ${path}`, 'ENOENT', path));
             return;
           }
 
@@ -346,7 +346,7 @@ export class IndexedDBFS extends VFS {
         checkRequest.onsuccess = () => {
           const record = checkRequest.result;
           if (!record || record.type !== 'file') {
-            reject(new VFSError('File does not exist', 'ENOENT', path));
+            reject(new VFSError(`File does not exist: ${path}`, 'ENOENT', path));
             return;
           }
 

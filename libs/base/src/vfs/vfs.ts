@@ -930,7 +930,7 @@ export abstract class VFS extends Observable<{
 
     // Check source file
     if (!(await this.exists(normalizedSrc))) {
-      throw new VFSError('Source file does not exist', 'ENOENT', normalizedSrc);
+      throw new VFSError(`Source file does not exist: ${normalizedSrc}`, 'ENOENT', normalizedSrc);
     }
     const sourceStat = await this.stat(normalizedSrc);
     if (!sourceStat.isFile) {

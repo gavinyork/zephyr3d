@@ -22,7 +22,7 @@ export class NullVFS extends VFS {
   protected async _deleteDirectory(): Promise<void> {}
 
   protected async _readFile(path: string): Promise<ArrayBuffer | string> {
-    throw new VFSError('File does not exist', 'ENOENT', path);
+    throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
   }
 
   protected async _writeFile(): Promise<void> {}

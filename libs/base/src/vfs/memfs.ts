@@ -127,7 +127,7 @@ export class MemoryFS extends VFS {
 
   protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
     if (!this.files.has(path)) {
-      throw new VFSError('File does not exist', 'ENOENT', path);
+      throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
 
     let data = this.files.get(path)!;
@@ -238,7 +238,7 @@ export class MemoryFS extends VFS {
 
   protected async _deleteFile(path: string): Promise<void> {
     if (!this.files.has(path)) {
-      throw new VFSError('File does not exist', 'ENOENT', path);
+      throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
 
     this.files.delete(path);

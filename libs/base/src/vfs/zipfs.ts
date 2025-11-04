@@ -714,7 +714,7 @@ export class ZipFS extends VFS {
     const entry = Array.from(this.entries.values()).find((e) => e.filename === searchPath);
 
     if (!entry || entry.directory) {
-      throw new VFSError('File does not exist', 'ENOENT', path);
+      throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
 
     if (!entry.getData) {
@@ -838,7 +838,7 @@ export class ZipFS extends VFS {
   /** {@inheritDoc VFS._deleteFile} */
   protected async _deleteFile(path: string): Promise<void> {
     if (!(await this._exists(path))) {
-      throw new VFSError('File does not exist', 'ENOENT', path);
+      throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
 
     this.virtualFiles.delete(path);

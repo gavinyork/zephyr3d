@@ -129,7 +129,7 @@ export class DataTransferVFS extends VFS {
     const entry = this.entries.get(normalizedPath);
 
     if (!entry || entry.isDirectory) {
-      throw new VFSError('File does not exist', 'ENOENT', path);
+      throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
 
     let arrayBuffer: ArrayBuffer;

@@ -1177,7 +1177,7 @@ export class AssetManager {
       }
       return await vfs.readFile(path, options);
     }
-    throw new VFSError('File does not exist', 'ENOENT', path);
+    throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
   }
   /**
    * Write file to a list of VFSs
