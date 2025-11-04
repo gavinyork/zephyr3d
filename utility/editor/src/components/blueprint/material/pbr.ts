@@ -47,6 +47,7 @@ export class PBRMaterialEditor extends GraphEditor {
   private _doubleSided: boolean;
   private _isBlueprint: boolean;
   private _outputName: string;
+  private _blueprintPath: string;
   constructor(label: string, outputName: string) {
     super(label, []);
     this._outputName = outputName;
@@ -74,6 +75,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewMesh = new DRef(previewMesh);
     this._blendMode = 'none';
     this._doubleSided = false;
+    this._blueprintPath = '';
     //this.applyPreviewMaterial();
     this.propEditor.on('object_property_changed', this.graphChanged, this);
   }
@@ -124,9 +126,9 @@ export class PBRMaterialEditor extends GraphEditor {
     if (path) {
       const VFS = ProjectService.VFS;
       if (this._isBlueprint) {
-        const bpPath = VFS.normalizePath(
-          VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`)
-        );
+        const bpPath =
+          this._blueprintPath ||
+          VFS.normalizePath(VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`));
         // Save blueprint
         const fragmentState = await this.fragmentEditor.saveState();
         const vertexState = await this.vertexEditor.saveState();
@@ -244,6 +246,7 @@ export class PBRMaterialEditor extends GraphEditor {
           name: u.name,
           type: u.type,
           texture: u.texture,
+          sRGB: u.sRGB,
           wrapS: u.wrapS,
           wrapT: u.wrapT,
           minFilter: u.minFilter,
@@ -267,8 +270,8 @@ export class PBRMaterialEditor extends GraphEditor {
         const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
         const data = JSON.parse(content);
         if (data.type === 'PBRBluePrintMaterial') {
-          const blueprint = data.data?.IR as string;
-          const blueprintContent = (await ProjectService.VFS.readFile(blueprint, {
+          this._blueprintPath = data.data.IR as string;
+          const blueprintContent = (await ProjectService.VFS.readFile(this._blueprintPath, {
             encoding: 'utf8'
           })) as string;
           const blueprintData = JSON.parse(blueprintContent);
@@ -307,7 +310,7 @@ export class PBRMaterialEditor extends GraphEditor {
           await fragEditor.loadState(blueprintState.fragment);
           await vertexEditor.loadState(blueprintState.vertex);
         }
-        this.applyPreviewMaterial();
+        await this.applyPreviewMaterial();
         this._version = fragEditor.version;
       }
     } catch (err) {
@@ -412,7 +415,7 @@ export class PBRMaterialEditor extends GraphEditor {
     );
     camera.updateController();
   }
-  private applyPreviewMaterial() {
+  private async applyPreviewMaterial() {
     if (!this._isBlueprint) {
       return;
     }
@@ -462,6 +465,16 @@ export class PBRMaterialEditor extends GraphEditor {
         uniformNames.add(node.impl.paramName);
       }
       const uniforms = this.getUniforms();
+      for (const u of uniforms.uniformValues) {
+        u.finalValue = u.value.length === 1 ? u.value[0] : new Float32Array(u.value);
+      }
+      for (const u of uniforms.uniformTextures) {
+        const tex = await ProjectService.serializationManager.fetchTexture(u.texture, {
+          linearColorSpace: !u.sRGB
+        });
+        u.finalTexture?.dispose();
+        u.finalTexture = new DRef(tex);
+      }
       const newMaterial = new PBRBluePrintMaterial(
         irFrag,
         irVert,

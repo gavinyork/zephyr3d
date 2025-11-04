@@ -103,6 +103,7 @@ export interface IRUniformTexture {
   name: string;
   type: string;
   texture: string;
+  sRGB: boolean;
   wrapS: string;
   wrapT: string;
   minFilter: string;
@@ -849,6 +850,8 @@ class IRConstantTexture extends IRExpression {
   readonly id: string;
   /** The texture type (e.g., 'tex2d', 'texCube') */
   readonly type: string;
+  /** Whether this texture should loaded in sRGB color space */
+  readonly sRGB: boolean;
   /** Horizontal texture addressing mode */
   readonly addressU: TextureAddressMode;
   /** Vertical texture addressing mode */
@@ -867,6 +870,7 @@ class IRConstantTexture extends IRExpression {
    * @param name - The uniform variable name
    * @param id - The texture id
    * @param type - The texture type
+   * @param sRGB - Whether this texture should be loaded in sRGB color space
    * @param addressU - Horizontal addressing mode
    * @param addressV - Vertical addressing mode
    * @param minFilter - Minification filter
@@ -877,6 +881,7 @@ class IRConstantTexture extends IRExpression {
     name: string,
     id: string,
     type: string,
+    sRGB: boolean,
     addressU: TextureAddressMode,
     addressV: TextureAddressMode,
     minFilter: TextureFilterMode,
@@ -887,6 +892,7 @@ class IRConstantTexture extends IRExpression {
     this.name = name;
     this.id = id;
     this.type = type;
+    this.sRGB = sRGB;
     this.addressU = addressU;
     this.addressV = addressV;
     this.filterMin = minFilter;
@@ -924,7 +930,8 @@ class IRConstantTexture extends IRExpression {
       minFilter: this.filterMin,
       magFilter: this.filterMag,
       mipFilter: this.filterMip,
-      type: this.type
+      type: this.type,
+      sRGB: this.sRGB
     };
   }
 }
@@ -944,8 +951,6 @@ export interface MaterialBlueprintIRBehaviors {
   useVertexColor: boolean;
   /** Whether the material uses texture coordinates */
   useVertexUV: boolean;
-  /** Whether the material uses tangent space (tangent/binormal) */
-  useVertexTangent: boolean;
 }
 
 /**
@@ -1091,9 +1096,7 @@ export class MaterialBlueprintIR {
           return false;
         }
         if (!input.inputNode && rootNode instanceof VertexBlockNode) {
-          if (input.name === 'Tangent') {
-            this._behaviors.useVertexTangent = true;
-          } else if (input.name === 'Color') {
+          if (input.name === 'Color') {
             this._behaviors.useVertexColor = true;
           } else if (input.name === 'UV') {
             this._behaviors.useVertexUV = true;
@@ -1150,8 +1153,7 @@ export class MaterialBlueprintIR {
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
-      useVertexUV: false,
-      useVertexTangent: false
+      useVertexUV: false
     };
   }
   /**
@@ -1389,7 +1391,6 @@ export class MaterialBlueprintIR {
   }
   /** Converts a vertex tangent input node to IR */
   private vertexTangent(node: VertexTangentNode, output: number): IRExpression {
-    this._behaviors.useVertexTangent = true;
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('tangent') ?? ShaderHelper.resolveVertexTangent(scope))
@@ -1398,7 +1399,6 @@ export class MaterialBlueprintIR {
   }
   /** Converts a vertex binormal input node to IR */
   private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {
-    this._behaviors.useVertexTangent = true;
     return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexBinormal');
   }
   /** Converts a vertex position input node to IR */
@@ -1732,6 +1732,7 @@ export class MaterialBlueprintIR {
       node.paramName,
       node.textureId,
       node.getOutputType(1),
+      node.sRGB,
       node.addressU,
       node.addressV,
       node.filterMin,

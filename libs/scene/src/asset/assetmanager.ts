@@ -684,7 +684,13 @@ export class AssetManager {
       const uniformTextures: BluePrintUniformTexture[] = [];
       const textures = content.data.uniformTextures as BluePrintUniformTexture[];
       for (const v of textures) {
-        const tex = await this.fetchTexture(v.texture, null, VFSs);
+        const tex = await this.fetchTexture(
+          v.texture,
+          {
+            linearColorSpace: !v.sRGB
+          },
+          VFSs
+        );
         uniformTextures.push({
           ...v,
           finalTexture: new DRef(tex),

@@ -19,8 +19,6 @@ export class PBRBluePrintMaterial
   /** @internal */
   private static readonly FEATURE_VERTEX_COLOR = this.defineFeature();
   /** @internal */
-  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
-  /** @internal */
   private static readonly FEATURE_VERTEX_UV = this.defineFeature();
   /** @internal */
   private _irFrag: MaterialBlueprintIR;
@@ -44,7 +42,6 @@ export class PBRBluePrintMaterial
     this._irVertex = irVertex ?? new MaterialBlueprintIR(null, '');
     this._uniformValues = uniformValues;
     this._uniformTextures = uniformTextures;
-    this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT, this._irVertex.behaviors.useVertexTangent);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irVertex.behaviors.useVertexUV);
   }
@@ -89,6 +86,7 @@ export class PBRBluePrintMaterial
         params: v.params?.clone() ?? Vector4.zero(),
         texture: v.texture,
         type: v.type,
+        sRGB: v.sRGB,
         wrapS: v.wrapS,
         wrapT: v.wrapT,
         inFragmentShader: v.inFragmentShader,
@@ -129,7 +127,7 @@ export class PBRBluePrintMaterial
 
     for (const u of [...this._uniformValues, ...this._uniformTextures]) {
       if (u.inVertexShader) {
-        pb.getGlobalScope()[u.name] = pb[u.type].uniform(2);
+        pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
       }
     }
     const outputs = this._irVertex.create(pb);
@@ -146,11 +144,7 @@ export class PBRBluePrintMaterial
       (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_UV) ? scope.$inputs.zVertexUV : pb.vec2(0));
     scope.$l.oNorm = this.getOutput(outputs, 'Normal') ?? ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.zVertexNormal = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-    scope.$l.oTangent =
-      this.getOutput(outputs, 'Tangent') ??
-      (this.featureUsed(PBRBluePrintMaterial.FEATURE_VERTEX_TANGENT)
-        ? ShaderHelper.resolveVertexTangent(scope)
-        : pb.vec4(1, 0, 0, 1));
+    scope.$l.oTangent = this.getOutput(outputs, 'Tangent') ?? ShaderHelper.resolveVertexTangent(scope);
     scope.$outputs.zVertexTangent = pb.mul(
       ShaderHelper.getNormalMatrix(scope),
       pb.vec4(scope.oTangent.xyz, 0)
@@ -166,7 +160,7 @@ export class PBRBluePrintMaterial
     if (this.needFragmentColor()) {
       for (const u of [...this._uniformValues, ...this._uniformTextures]) {
         if (u.inFragmentShader) {
-          pb.getGlobalScope()[u.name] = pb[u.type].uniform(2);
+          pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
         }
       }
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);

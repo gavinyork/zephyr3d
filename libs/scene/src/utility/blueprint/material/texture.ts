@@ -103,6 +103,7 @@ export function getDefaultTextureCube(): TextureCube {
  * @remarks
  * Defines serialization properties shared by all texture node types:
  * - Name: Shader parameter name for the texture uniform
+ * - sRGB: Whether texture should be loaded into sRGB color space
  * - AddressU: Horizontal texture wrapping mode
  * - AddressV: Vertical texture wrapping mode
  * - MinFilter: Minification filter mode
@@ -124,6 +125,17 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
       },
       set(this: BaseTextureNode, value) {
         this.paramName = value.str[0];
+      }
+    },
+    {
+      name: 'sRGB',
+      type: 'bool',
+      default: true,
+      get(this: BaseTextureNode, value) {
+        value.bool[0] = this.sRGB;
+      },
+      set(this: BaseTextureNode, value) {
+        this.sRGB = value.bool[0];
       }
     },
     {
@@ -169,7 +181,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MinFilter',
       type: 'string',
-      default: 'nearest',
+      default: 'linear',
       options: {
         enum: {
           labels: ['nearest', 'linear'],
@@ -189,7 +201,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MagFilter',
       type: 'string',
-      default: 'nearest',
+      default: 'linear',
       options: {
         enum: {
           labels: ['nearest', 'linear'],
@@ -209,7 +221,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
     {
       name: 'MipFilter',
       type: 'string',
-      default: 'none',
+      default: 'nearest',
       options: {
         enum: {
           labels: ['nearest', 'linear', 'none'],
@@ -262,6 +274,8 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
 export abstract class BaseTextureNode extends BaseGraphNode {
   /** The shader parameter name for this texture uniform */
   private _paramName: string;
+  /** Whether this texture should be loaded in sRGB color space */
+  sRGB: boolean;
   /** Horizontal texture coordinate wrapping mode */
   addressU: TextureAddressMode;
   /** Vertical texture coordinate wrapping mode */
@@ -288,11 +302,12 @@ export abstract class BaseTextureNode extends BaseGraphNode {
   constructor() {
     super();
     this._paramName = getParamName();
+    this.sRGB = true;
     this.addressU = 'clamp';
     this.addressV = 'clamp';
-    this.filterMin = 'nearest';
-    this.filterMag = 'nearest';
-    this.filterMip = 'none';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
     this.textureId = '';
   }
   /**
