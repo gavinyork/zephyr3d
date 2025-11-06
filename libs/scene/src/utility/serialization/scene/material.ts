@@ -633,7 +633,17 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
           {
             name: 'AlphaMap',
             type: 'object',
-            default: '',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
             isNullable() {
               return true;
             },
@@ -645,7 +655,7 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
                 const assetId = value.str[0];
                 let tex: Texture2D;
                 try {
-                  tex = await manager.fetchTexture<Texture2D>(assetId);
+                  tex = await manager.fetchTexture<Texture2D>(assetId, { linearColorSpace: true });
                 } catch (err) {
                   console.error(`Load asset failed: ${value.str[0]}: ${err}`);
                 }
@@ -660,7 +670,17 @@ export function getParticleMaterialClass(manager: SerializationManager): Seriali
           {
             name: 'RampMap',
             type: 'object',
-            default: '',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
             isNullable() {
               return true;
             },

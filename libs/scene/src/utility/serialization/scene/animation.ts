@@ -631,7 +631,11 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
           },
           readonly: true,
           isHidden(this: AnimationClip, index: number, obj: unknown) {
-            return !(obj instanceof PropertyTrack);
+            if (index < 0) {
+              return false;
+            } else {
+              return !(obj instanceof PropertyTrack);
+            }
           },
           get(this: AnimationClip, value) {
             value.object = [];
@@ -642,7 +646,7 @@ export function getAnimationClass(manager: SerializationManager): SerializableCl
                 }
               }
               //value.object.push(...tracks[1].filter((track) => track instanceof PropertyTrack));
-              value.object.push(...tracks[1].filter((track) => !!track.target));
+              value.object.push(...tracks[1]);
             }
           },
           set(this: AnimationClip, value) {

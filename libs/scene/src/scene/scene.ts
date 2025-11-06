@@ -258,7 +258,7 @@ export class Scene
    * Queues a node for a one-shot update before the next render.
    *
    * The node's `update(frame, elapsedSeconds, deltaSeconds)` will be called
-   * during {@link Scene.frameUpdate} and then the node is removed from the queue.
+   * during Scene.frameUpdate and then the node is removed from the queue.
    *
    * @param node - Node to schedule.
    *

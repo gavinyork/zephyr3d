@@ -10,7 +10,6 @@ import type { Drawable, DrawContext, MorphData, MorphInfo, PickTarget } from '..
 import { Primitive } from '../render';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial, type MeshMaterial } from '../material';
-import { getDevice } from '../app/api';
 
 const tmpVec3 = new Vector3();
 
@@ -58,7 +57,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private _emitCount: number;
   private _startTick: number;
   private _startEmitTime: number;
-  private _lastUpdateTime: number;
   private _numEmitCount: number;
   private readonly _delay: number;
   private _airResistence: boolean;
@@ -103,7 +101,6 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._gravity = Vector3.zero();
     this._wind = Vector3.zero();
     this._startEmitTime = 0;
-    this._lastUpdateTime = 0;
     this._numEmitCount = 0;
     this._scalar = 1;
     this._airResistence = false;
@@ -134,6 +131,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox = new BoundingBox();
     this._instanceData = null;
     this._material = new DRef(new ParticleMaterial());
+    scene.queueUpdateNode(this);
   }
   /** Material of the particle system node */
   get material(): ParticleMaterial {
@@ -535,21 +533,24 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
         .createAndSetVertexBuffer(['tex0_f32x3', 'tex1_f32x4', 'tex2_f32x3'], this._instanceData, 'instance');
     }
   }
-  update() {
-    const tick = getDevice().frameInfo.elapsedOverall;
+  update(_frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
+    if (!this.attached) {
+      return;
+    }
+    this.scene.queueUpdateNode(this);
+    const animationSet = this._animationSet.get();
+    if (animationSet && animationSet.numAnimations > 0) {
+      animationSet.update(deltaInSeconds);
+    }
+    const tick = elapsedInSeconds;
     if (this._startTick === 0) {
       this._startTick = tick;
     }
     if (this._delay > 0 && tick - this._startTick < this._delay) {
       return;
     }
-    if (this._lastUpdateTime === 0) {
-      this._lastUpdateTime = tick;
-    }
-    const updateElapsed = tick - this._lastUpdateTime;
     this.invalidateBoundingVolume();
-    const elapsedInSecond = updateElapsed * 0.001;
-    this._lastUpdateTime = tick;
+    const elapsedInSecond = deltaInSeconds;
     for (let i = this._activeParticleList.length - 1; i >= 0; i--) {
       const node = this._activeParticleList[i];
       const p = node.particle;
@@ -586,7 +587,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
       this._startEmitTime = tick;
     } else {
       const emitElapsed = tick - this._startEmitTime;
-      const count = ((emitElapsed / this._emitInterval) >> 0) + 1;
+      const count = (((emitElapsed * 1000) / this._emitInterval) >> 0) + 1;
       if (count > this._numEmitCount) {
         newParticleCount = this._emitCount;
         this._numEmitCount = count;
@@ -752,21 +753,5 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     if (func) {
       this._scene.off('update', func);
     }
-  }
-  protected _onDetached(): void {
-    super._onDetached();
-    const func = ParticleSystem.updateFuncMap.get(this);
-    if (func) {
-      this._scene.off('update', func);
-    }
-  }
-  protected _onAttached(): void {
-    super._onAttached();
-    let func = ParticleSystem.updateFuncMap.get(this);
-    if (!func) {
-      func = this.update.bind(this);
-      ParticleSystem.updateFuncMap.set(this, func);
-    }
-    this._scene.on('update', func);
   }
 }

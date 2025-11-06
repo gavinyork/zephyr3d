@@ -1071,6 +1071,9 @@ export class SceneNode
    * @param deltaInSeconds - Elapsed time since previous frame in seconds
    */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
+    if (!this.attached) {
+      return;
+    }
     const animationSet = this._animationSet.get();
     if (animationSet) {
       if (animationSet.numAnimations > 0 || animationSet.skeletons.length > 0) {
