@@ -652,7 +652,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           const url = new URL(window.location.href);
           url.searchParams.append('project', projectId);
           url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
-          window.open(url.href, '_blank');
+          const a = document.createElement('a');
+          a.href = url.href;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.click();
         }
       });
     });
