@@ -198,7 +198,7 @@ export class LightPass extends RenderPass {
           );
         }
         if (i === 0) {
-          ctx.env.sky.renderFog(ctx);
+          ctx.env.sky.renderFog(ctx.camera);
         }
       }
     }

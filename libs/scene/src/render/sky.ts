@@ -91,6 +91,7 @@ export class SkyRenderer extends Disposable {
   private static readonly _programSky: Partial<Record<SkyType, GPUProgram>> = {};
   private static _programDistantLight: GPUProgram = null;
   private static _programFog: GPUProgram = null;
+  private static _programFogNoDepth: GPUProgram = null;
   private static _vertexLayout: VertexLayout = null;
   private static _primitiveSky: Primitive = null;
   private static _primitiveDistantLight: Primitive = null;
@@ -136,6 +137,7 @@ export class SkyRenderer extends Disposable {
   private readonly _bindgroupDistantLight: DRef<BindGroup> = null;
   private _bindgroupSky: Partial<Record<SkyType, DRef<BindGroup>>> = {};
   private readonly _bindgroupFog: DRef<BindGroup> = null;
+  private readonly _bindgroupFogNoDepth: DRef<BindGroup> = null;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -177,6 +179,7 @@ export class SkyRenderer extends Disposable {
     this._bindgroupDistantLight = new DRef();
     this._bindgroupSky = {};
     this._bindgroupFog = new DRef();
+    this._bindgroupFogNoDepth = new DRef();
   }
   /** @internal */
   getHash(_ctx: DrawContext): string {
@@ -567,7 +570,7 @@ export class SkyRenderer extends Disposable {
     }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
-      this.updateBakedSkyMap();
+      this.updateBakedSkyMap(ctx);
       this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get());
       if (
         ctx.scene.env.light.radianceMap &&
@@ -645,49 +648,47 @@ export class SkyRenderer extends Disposable {
     SkyRenderer._primitiveDistantLight.draw();
     ctx.device.popDeviceStates();
   }
-  updateBakedSkyMap() {
-    if (this._skyType === 'skybox' && this.skyboxTexture) {
-      this._bakedSkyboxTexture.set(this.skyboxTexture);
-    } else {
-      const device = getDevice();
-      const texCaps = device.getDeviceCaps().textureCaps;
-      const format: TextureFormat =
-        texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
-          ? 'rgba16f'
-          : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
-            ? 'rgba32f'
-            : 'rgba8unorm';
-      const tex =
-        this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get() !== this.skyboxTexture
-          ? this._bakedSkyboxTexture.get()
-          : device.createCubeTexture(format, this._scatterSkyboxTextureWidth, {
-              mipmapping: false
-            });
-      tex.name = 'BakedSkyboxTexture';
-      if (tex !== this._bakedSkyboxTexture.get()) {
-        this._bakedSkyboxFrameBuffer.set(device.createFrameBuffer([tex], null));
-      }
-      const camera = SkyRenderer._skyCamera;
-      const saveRenderStates = device.getRenderStates();
-      device.pushDeviceStates();
-      device.setFramebuffer(this._bakedSkyboxFrameBuffer.get());
-      for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
-        camera.lookAtCubeFace(face);
-        this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
-        this._renderSky(camera, false);
-      }
-      device.popDeviceStates();
-      device.setRenderStates(saveRenderStates);
-      this._bakedSkyboxTexture.set(tex);
-    }
-  }
-  renderUberFog(ctx: DrawContext, depthTexture: BaseTexture) {
-    const camera = ctx.camera;
+  updateBakedSkyMap(ctx: DrawContext) {
     const device = ctx.device;
-    const fogProgram = SkyRenderer._programFog;
+    const texCaps = device.getDeviceCaps().textureCaps;
+    const format: TextureFormat =
+      texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
+        ? 'rgba16f'
+        : texCaps.supportFloatColorBuffer && texCaps.supportLinearFloatTexture
+          ? 'rgba32f'
+          : 'rgba8unorm';
+    const tex =
+      this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get() !== this.skyboxTexture
+        ? this._bakedSkyboxTexture.get()
+        : device.createCubeTexture(format, this._scatterSkyboxTextureWidth, {
+            mipmapping: false
+          });
+    tex.name = 'BakedSkyboxTexture';
+    if (tex !== this._bakedSkyboxTexture.get()) {
+      this._bakedSkyboxFrameBuffer.set(device.createFrameBuffer([tex], null));
+    }
+    const camera = SkyRenderer._skyCamera;
+    const saveRenderStates = device.getRenderStates();
+    device.pushDeviceStates();
+    device.setFramebuffer(this._bakedSkyboxFrameBuffer.get());
+    for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
+      camera.lookAtCubeFace(face);
+      this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
+      this._renderSky(camera, false);
+      this.renderFog(camera);
+    }
+    device.popDeviceStates();
+    device.setRenderStates(saveRenderStates);
+    this._bakedSkyboxTexture.set(tex);
+  }
+  renderUberFog(camera: Camera, depthTexture: BaseTexture) {
+    const device = getDevice();
+    const fogProgram = depthTexture ? SkyRenderer._programFog : SkyRenderer._programFogNoDepth;
     const renderStates = SkyRenderer._renderStatesFog;
-    const bindgroup = this._bindgroupFog.get();
-    bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
+    const bindgroup = depthTexture ? this._bindgroupFog.get() : this._bindgroupFogNoDepth.get();
+    if (depthTexture) {
+      bindgroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
+    }
     bindgroup.setTexture(
       'skyDistantLightLut',
       this._skyDistantLightLut.get().getColorAttachments()[0],
@@ -710,25 +711,26 @@ export class SkyRenderer extends Disposable {
     device.draw('triangle-strip', 0, 4);
   }
   /** @internal */
-  renderFog(ctx: DrawContext) {
-    const currentFramebuffer = ctx.device.getFramebuffer();
+  renderFog(camera: Camera) {
+    const device = getDevice();
+    const currentFramebuffer = device.getFramebuffer();
     const depthBuffer = currentFramebuffer?.getDepthAttachment() ?? null;
     const colorBuffer = currentFramebuffer?.getColorAttachments()[0] ?? null;
     const fogFramebuffer =
       depthBuffer && colorBuffer
-        ? ctx.device.pool.fetchTemporalFramebuffer(false, 0, 0, colorBuffer, null, false)
+        ? device.pool.fetchTemporalFramebuffer(false, 0, 0, colorBuffer, null, false)
         : null;
     if (fogFramebuffer) {
-      const vp = ctx.device.getViewport();
-      const scissor = ctx.device.getScissor();
-      ctx.device.pushDeviceStates();
-      ctx.device.setFramebuffer(fogFramebuffer);
-      ctx.device.setViewport(vp);
-      ctx.device.setScissor(scissor);
+      const vp = device.getViewport();
+      const scissor = device.getScissor();
+      device.pushDeviceStates();
+      device.setFramebuffer(fogFramebuffer);
+      device.setViewport(vp);
+      device.setScissor(scissor);
     }
-    const savedRenderStates = ctx.device.getRenderStates();
-    this._prepareSkyBox(ctx.device);
-    this.renderUberFog(ctx, depthBuffer);
+    const savedRenderStates = device.getRenderStates();
+    this._prepareSkyBox(device);
+    this.renderUberFog(camera, depthBuffer);
     /*
     if (this._skyType === 'scatter') {
       this.renderAtmosphericFog(ctx, depthBuffer);
@@ -739,10 +741,10 @@ export class SkyRenderer extends Disposable {
       this.renderHeightFog(ctx, depthBuffer);
     }
     */
-    ctx.device.setRenderStates(savedRenderStates);
+    device.setRenderStates(savedRenderStates);
     if (fogFramebuffer) {
-      ctx.device.popDeviceStates();
-      ctx.device.pool.releaseFrameBuffer(fogFramebuffer);
+      device.popDeviceStates();
+      device.pool.releaseFrameBuffer(fogFramebuffer);
     }
   }
   /** @internal */
@@ -777,6 +779,7 @@ export class SkyRenderer extends Disposable {
     }
     this._bindgroupSky = {};
     this._bindgroupFog.dispose();
+    this._bindgroupFogNoDepth.dispose();
   }
   /** @internal */
   private _renderSky(camera: Camera, depthTest: boolean) {
@@ -970,72 +973,18 @@ export class SkyRenderer extends Disposable {
       );
     }
     if (!SkyRenderer._programFog) {
-      SkyRenderer._programFog = device.buildRenderProgram({
-        label: 'Fog',
-        vertex(pb) {
-          this.rt = pb.int().uniform(0);
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            if (device.type === 'webgpu') {
-              this.$if(pb.notEqual(this.rt, 0), function () {
-                this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-              });
-            }
-          });
-        },
-        fragment(pb) {
-          const AtmosphereParams = getAtmosphereParamsStruct(pb);
-          const HeightFogParams = getHeightFogParamsStruct(pb);
-          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-          this.apLut = pb.tex2D().uniform(0);
-          this.skyDistantLightLut = pb.tex2D().uniform(0);
-          this.invProjViewMatrix = pb.mat4().uniform(0);
-          this.cameraNearFar = pb.vec2().uniform(0);
-          this.cameraPosition = pb.vec3().uniform(0);
-          this.withAerialPerspective = pb.int().uniform(0);
-          this.fogType = pb.int().uniform(0);
-          this.atmosphereParams = AtmosphereParams().uniform(0);
-          this.heightFogParams = HeightFogParams().uniform(0);
-          this.srgbOut = pb.int().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$l.depthValue = pb.textureSample(this.depthTex, this.$inputs.uv).r;
-            this.$l.clipSpacePos = pb.vec4(
-              pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
-              pb.sub(pb.mul(this.depthValue, 2), 1),
-              1
-            );
-            this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
-            this.$l.worldPos = pb.div(this.$l.hPos, this.$l.hPos.w).xyz;
-            this.$l.isSky = pb.equal(this.$l.depthValue, 1);
-            this.$l.color = calculateFog(
-              this,
-              this.withAerialPerspective,
-              this.fogType,
-              this.atmosphereParams,
-              this.heightFogParams,
-              this.$inputs.uv,
-              this.isSky,
-              this.cameraPosition,
-              this.worldPos,
-              0,
-              this.apLut,
-              this.skyDistantLightLut
-            );
-            this.$if(pb.equal(this.srgbOut, 0), function () {
-              this.$outputs.outColor = this.color;
-            }).$else(function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), this.color.a);
-            });
-          });
-        }
-      });
+      SkyRenderer._programFog = SkyRenderer._createFogProgram(device, false);
+    }
+    if (!SkyRenderer._programFogNoDepth) {
+      SkyRenderer._programFogNoDepth = SkyRenderer._createFogProgram(device, true);
     }
     if (!this._bindgroupFog.get()) {
       this._bindgroupFog.set(device.createBindGroup(SkyRenderer._programFog.bindGroupLayouts[0]));
+    }
+    if (!this._bindgroupFogNoDepth.get()) {
+      this._bindgroupFogNoDepth.set(
+        device.createBindGroup(SkyRenderer._programFogNoDepth.bindGroupLayouts[0])
+      );
     }
     if (!SkyRenderer._programSky.image) {
       SkyRenderer._programSky.image = device.buildRenderProgram({
@@ -1189,6 +1138,74 @@ export class SkyRenderer extends Disposable {
       SkyRenderer._primitiveDistantLight.indexStart = 0;
       SkyRenderer._primitiveDistantLight.primitiveType = 'point-list';
     }
+  }
+  /** @internal */
+  private static _createFogProgram(device: AbstractDevice, noDepth: boolean) {
+    return device.buildRenderProgram({
+      label: 'Fog',
+      vertex(pb) {
+        this.rt = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          if (device.type === 'webgpu') {
+            this.$if(pb.notEqual(this.rt, 0), function () {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            });
+          }
+        });
+      },
+      fragment(pb) {
+        const AtmosphereParams = getAtmosphereParamsStruct(pb);
+        const HeightFogParams = getHeightFogParamsStruct(pb);
+        if (!noDepth) {
+          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
+        this.apLut = pb.tex2D().uniform(0);
+        this.skyDistantLightLut = pb.tex2D().uniform(0);
+        this.invProjViewMatrix = pb.mat4().uniform(0);
+        this.cameraNearFar = pb.vec2().uniform(0);
+        this.cameraPosition = pb.vec3().uniform(0);
+        this.withAerialPerspective = pb.int().uniform(0);
+        this.fogType = pb.int().uniform(0);
+        this.atmosphereParams = AtmosphereParams().uniform(0);
+        this.heightFogParams = HeightFogParams().uniform(0);
+        this.srgbOut = pb.int().uniform(0);
+        this.$outputs.outColor = pb.vec4();
+        pb.main(function () {
+          this.$l.depthValue = noDepth ? pb.float(1) : pb.textureSample(this.depthTex, this.$inputs.uv).r;
+          this.$l.clipSpacePos = pb.vec4(
+            pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
+            pb.sub(pb.mul(this.depthValue, 2), 1),
+            1
+          );
+          this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
+          this.$l.worldPos = pb.div(this.$l.hPos, this.$l.hPos.w).xyz;
+          this.$l.isSky = pb.equal(this.$l.depthValue, 1);
+          this.$l.color = calculateFog(
+            this,
+            this.withAerialPerspective,
+            this.fogType,
+            this.atmosphereParams,
+            this.heightFogParams,
+            this.$inputs.uv,
+            this.isSky,
+            this.cameraPosition,
+            this.worldPos,
+            0,
+            this.apLut,
+            this.skyDistantLightLut
+          );
+          this.$if(pb.equal(this.srgbOut, 0), function () {
+            this.$outputs.outColor = this.color;
+          }).$else(function () {
+            this.$outputs.outColor = pb.vec4(linearToGamma(this, this.color.rgb), this.color.a);
+          });
+        });
+      }
+    });
   }
   /** @internal */
   private static _getSunDir(sunLight: DirectionalLight) {
