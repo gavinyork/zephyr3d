@@ -675,9 +675,20 @@ export class SkyRenderer extends Disposable {
       camera.lookAtCubeFace(face);
       this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
       this._renderSky(camera, false);
+    }
+    device.popDeviceStates();
+
+    this.renderSkyDistantLut(ctx, tex);
+
+    device.pushDeviceStates();
+    device.setFramebuffer(this._bakedSkyboxFrameBuffer.get());
+    for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
+      camera.lookAtCubeFace(face);
+      this._bakedSkyboxFrameBuffer.get().setColorAttachmentCubeFace(0, face);
       this.renderFog(camera);
     }
     device.popDeviceStates();
+
     device.setRenderStates(saveRenderStates);
     this._bakedSkyboxTexture.set(tex);
   }
@@ -962,7 +973,7 @@ export class SkyRenderer extends Disposable {
           pb.main(function () {
             this.$l.sunColor = pb.vec4();
             this.$l.skyColor = pb.textureSampleLevel(this.skybox, this.$inputs.vector, 0).rgb;
-            this.$outputs.color = pb.vec4(pb.mul(this.skyColor, 1 / 32 /*1 / 64*/), 1);
+            this.$outputs.color = pb.vec4(pb.mul(this.skyColor, 1 / 64), 1);
           });
         }
       });

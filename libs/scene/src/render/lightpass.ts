@@ -134,7 +134,7 @@ export class LightPass extends RenderPass {
       if (lists[i]) {
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
         ctx.oit = i === 0 || !items ? null : oit;
-        if (ctx.queue === QUEUE_TRANSPARENT && ctx.scene.env.sky.fogPresents) {
+        if ((ctx.queue === QUEUE_TRANSPARENT || this._transmission) && ctx.scene.env.sky.fogPresents) {
           ctx.materialFlags |= MaterialVaryingFlags.APPLY_FOG;
         }
         const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;
@@ -185,6 +185,9 @@ export class LightPass extends RenderPass {
         }
         ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
+        if (ctx.env.sky.fogPresents) {
+          ctx.env.sky.renderFog(ctx.camera);
+        }
         if (tmpFramebuffer) {
           ctx.device.popDeviceStates();
         }
@@ -196,9 +199,6 @@ export class LightPass extends RenderPass {
             i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
             ctx.linearDepthTexture
           );
-        }
-        if (i === 0) {
-          ctx.env.sky.renderFog(ctx.camera);
         }
       }
     }
