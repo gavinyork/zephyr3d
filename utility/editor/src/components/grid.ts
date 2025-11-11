@@ -664,16 +664,15 @@ export class PropertyEditor extends Observable<{
     const animatable = value && !!value.options?.animatable;
     if (animatable && this.object instanceof SceneNode) {
       if (ImGui.Button('A')) {
-        const animationSet = this.object.animationSet;
         Dialog.selectAnimationAndTrack(
           'Create animation track',
-          animationSet ? animationSet.getAnimationNames() : [],
+          this.object.animationSet.getAnimationNames(),
           300
         ).then((val) => {
           if (val) {
-            let animation = animationSet.getAnimationClip(val.animationName);
+            let animation = this.object.animationSet.getAnimationClip(val.animationName);
             if (!animation) {
-              animation = animationSet.createAnimation(val.animationName, false);
+              animation = this.object.animationSet.createAnimation(val.animationName, false);
             }
             const propValue = { num: [0, 0, 0, 0] };
             value.get.call(object, propValue);

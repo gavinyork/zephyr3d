@@ -238,13 +238,12 @@ export class AnimationSet extends Disposable implements IDisposable {
             }
             return weight * fadeIn * fadeOut;
           });
-          const states = tracks.map((track) =>
-            track.calculateState(
-              k,
+          const states = tracks.map((track) => {
+            const t =
               (this._activeAnimations.get(track.animation).currentTime / track.animation.timeDuration) *
-                track.getDuration()
-            )
-          );
+              track.getDuration();
+            return track.calculateState(k, t);
+          });
           const state = weightedAverage(weights, states, (a, b, t) => {
             return tracks[0].mixState(a, b, t);
           });
