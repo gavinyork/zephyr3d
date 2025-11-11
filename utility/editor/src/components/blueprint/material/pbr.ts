@@ -7,6 +7,7 @@ import type {
   MeshMaterial,
   PropertyAccessor
 } from '@zephyr3d/scene';
+import { CopyBlitter } from '@zephyr3d/scene';
 import {
   DirectionalLight,
   FunctionCallNode,
@@ -30,7 +31,7 @@ import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
 import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { FrameBuffer } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
@@ -42,6 +43,8 @@ export class PBRMaterialEditor extends GraphEditor {
   private _defaultMaterial: DRef<UnlitMaterial>;
   private _editMaterial: DRef<MeshMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
+  private _previewTex: DRef<Texture2D>;
+  private _blitter: CopyBlitter;
   private _version: number;
   private _blendMode: BlendMode;
   private _doubleSided: boolean;
@@ -54,7 +57,6 @@ export class PBRMaterialEditor extends GraphEditor {
     this._isBlueprint = false;
     const scene = new Scene();
     scene.env.light.type = 'ibl-sh';
-    scene.env.sky.cameraHeightScale = 5000;
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
@@ -62,6 +64,9 @@ export class PBRMaterialEditor extends GraphEditor {
     this._version = 0;
     this._previewScene = new DRef(scene);
     this._framebuffer = new DRef();
+    this._previewTex = new DRef();
+    this._blitter = new CopyBlitter();
+    this._blitter.srgbOut = true;
     const light = new DirectionalLight(scene);
     light.intensity = 10;
     light.sunLight = true;
@@ -92,6 +97,12 @@ export class PBRMaterialEditor extends GraphEditor {
     getApp().inputManager.unuse(this.handleEvent, this);
     this._previewScene.dispose();
     this._previewMesh.dispose();
+    this._previewTex.dispose();
+    if (this._framebuffer.get()) {
+      this._framebuffer.get().getColorAttachment(0).dispose();
+      this._framebuffer.get().getDepthAttachment().dispose();
+      this._framebuffer.dispose();
+    }
     this._defaultMaterial.dispose();
     this._editMaterial.dispose();
     this.propEditor.off('object_property_changed', this.graphChanged, this);
@@ -386,6 +397,7 @@ export class PBRMaterialEditor extends GraphEditor {
       this._framebuffer.get().getColorAttachment(0).dispose();
       this._framebuffer.get().getDepthAttachment().dispose();
       this._framebuffer.dispose();
+      this._previewTex.dispose();
     }
     if (!this._framebuffer.get()) {
       const tex = device.createTexture2D('rgba16f', size.x, size.y, {
@@ -393,10 +405,13 @@ export class PBRMaterialEditor extends GraphEditor {
       });
       const depth = device.createTexture2D('d24s8', size.x, size.y);
       this._framebuffer.set(device.createFrameBuffer([tex], depth));
+      const previewTex = device.createTexture2D('rgba8unorm', size.x, size.y, { mipmapping: false });
+      this._previewTex.set(previewTex);
     }
     device.pushDeviceStates();
     device.setFramebuffer(this._framebuffer.get());
     this._previewScene.get().render();
+    this._blitter.blit(this._framebuffer.get().getColorAttachment(0), this._previewTex.get());
     device.popDeviceStates();
 
     const camera = this._previewScene.get().mainCamera;
@@ -407,12 +422,7 @@ export class PBRMaterialEditor extends GraphEditor {
       size.x < 0 ? 0 : size.x,
       size.y < 0 ? 0 : size.y
     ];
-    ImGui.Image(
-      this._framebuffer.get().getColorAttachment(0),
-      size,
-      new ImGui.ImVec2(0, 1),
-      new ImGui.ImVec2(1, 0)
-    );
+    ImGui.Image(this._previewTex.get(), size, new ImGui.ImVec2(0, 1), new ImGui.ImVec2(1, 0));
     camera.updateController();
   }
   private async applyPreviewMaterial() {
