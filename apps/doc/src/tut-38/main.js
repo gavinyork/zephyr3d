@@ -63,18 +63,10 @@ myApp.ready().then(async () => {
     return terrain;
   }
 
-  const device = myApp.device;
-
   const scene = new Scene();
   scene.env.light.strength = 0.1;
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   camera.lookAt(new Vector3(200, 40, 80), new Vector3(250, 0, 250), Vector3.axisPY());
   getInput().use(camera.handleEvent.bind(camera));

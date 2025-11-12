@@ -9,7 +9,8 @@ import {
   BoxShape,
   Mesh,
   NodeEulerRotationTrack,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -57,22 +58,13 @@ myApp.ready().then(async () => {
   box.animationSet.playAnimation('move');
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
-  camera.lookAt(new Vector3(0, 3, 8), Vector3.zero(), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
+  scene.mainCamera.lookAt(new Vector3(0, 3, 8), Vector3.zero(), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

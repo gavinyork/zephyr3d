@@ -2591,6 +2591,7 @@ export class VertexData {
     getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
     getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
     get indexBuffer(): IndexBuffer;
+    get numVertices(): number;
     removeVertexBuffer(buffer: StructuredBuffer): boolean;
     // (undocumented)
     setDrawOffset(offset: number): void;

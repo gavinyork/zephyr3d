@@ -34,13 +34,7 @@ myApp.ready().then(function () {
   new Mesh(scene, new SphereShape(), material);
 
   // Create camera with orbit controll
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
   camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 

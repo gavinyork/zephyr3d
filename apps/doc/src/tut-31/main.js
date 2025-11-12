@@ -8,7 +8,8 @@ import {
   Application,
   PerspectiveCamera,
   Terrain,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -127,17 +128,10 @@ myApp.ready().then(async () => {
     return terrain;
   }
 
-  const device = myApp.device;
   const scene = new Scene();
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.canvas.width / device.canvas.height,
-    1,
-    500
-  );
-  camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
-  getInput().use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.controller = new FPSCameraController({ moveSpeed: 0.5 });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   // Directional light，4 Cascade levels
   const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
@@ -147,8 +141,8 @@ myApp.ready().then(async () => {
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  camera.SSAO = true;
-  camera.FXAA = true;
+  scene.mainCamera.SSAO = true;
+  scene.mainCamera.FXAA = true;
 
   // Environment lighting and fogging
   scene.env.light.type = 'ibl';
@@ -160,32 +154,27 @@ myApp.ready().then(async () => {
   const terrain = await loadTerrain(scene);
 
   // Sets the Terrain as the camera's parent node
-  camera.parent = terrain;
+  scene.mainCamera.parent = terrain;
 
-  camera.lookAt(new Vector3(223, 10, 10), new Vector3(222, 10, 15), Vector3.axisPY());
+  scene.mainCamera.lookAt(new Vector3(223, 10, 10), new Vector3(222, 10, 15), Vector3.axisPY());
 
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', (width, height) => {
-    camera.aspect = width / height;
-  });
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    // Correct the height if the camera is within terrain,
-    if (
-      camera.position.x > 0 &&
-      camera.position.x < terrain.scaledWidth &&
-      camera.position.z > 0 &&
-      camera.position.z < terrain.scaledHeight
-    ) {
-      // retreive height for current position
-      const height = terrain.getElevation(camera.position.x, camera.position.z);
-      // Fix camera position
-      if (camera.position.y < height + 3) {
-        camera.position.y = height + 3;
+  getEngine().setRenderable(scene, 0, {
+    beforeRender(scene) {
+      const camera = scene.mainCamera;
+      if (
+        camera.position.x > 0 &&
+        camera.position.x < terrain.scaledWidth &&
+        camera.position.z > 0 &&
+        camera.position.z < terrain.scaledHeight
+      ) {
+        // retreive height for current position
+        const height = terrain.getElevation(camera.position.x, camera.position.z);
+        // Fix camera position
+        if (camera.position.y < height + 3) {
+          camera.position.y = height + 3;
+        }
       }
     }
-    camera.render(scene);
   });
 
   myApp.run();

@@ -84,6 +84,11 @@ export interface IRUniformValue {
   value: number[];
 }
 
+/**
+ * Represents a uniform scalar or vector value in the blueprint intermediate representation
+ *
+ * @public
+ */
 export interface BluePrintUniformValue extends IRUniformValue {
   inVertexShader: boolean;
   inFragmentShader: boolean;
@@ -111,6 +116,11 @@ export interface IRUniformTexture {
   mipFilter: string;
 }
 
+/**
+ * Represents a uniform texture and its sampler in the blueprint intermediate representation
+ *
+ * @public
+ */
 export interface BluePrintUniformTexture extends IRUniformTexture {
   inVertexShader: boolean;
   inFragmentShader: boolean;

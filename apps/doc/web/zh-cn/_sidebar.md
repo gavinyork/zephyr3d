@@ -42,7 +42,6 @@
   - 自然景观
     - [地形渲染](zh-cn/terrain.md)
     - [天空渲染](zh-cn/sky.md)
-    - [大气及雾效](zh-cn/fog.md)
     - [水面渲染](zh-cn/water.md)
   - 场景拾取
     - [概述](zh-cn/picking.md)

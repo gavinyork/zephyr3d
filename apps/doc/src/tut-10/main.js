@@ -29,22 +29,13 @@ myApp.ready().then(function () {
     });
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
-  camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

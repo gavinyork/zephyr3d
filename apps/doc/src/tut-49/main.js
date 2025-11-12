@@ -17,8 +17,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
   scene.env.sky.skyType = 'scatter';
   scene.env.sky.fogType = 'none';
@@ -36,28 +34,19 @@ myApp.ready().then(async () => {
   );
   room.group.parent = batchGroup;
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
-  camera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());
-  camera.controller = new FPSCameraController();
-  camera.HiZ = true;
-  camera.SSR = true;
-  camera.ssrRoughnessFactor = 0.01;
-  camera.ssrBlurScale = 0.06;
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new FPSCameraController();
+  scene.mainCamera.HiZ = true;
+  scene.mainCamera.SSR = true;
+  scene.mainCamera.ssrRoughnessFactor = 0.01;
+  scene.mainCamera.ssrBlurScale = 0.06;
 
-  camera.FXAA = true;
+  scene.mainCamera.FXAA = true;
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

@@ -9,7 +9,8 @@ import {
   DirectionalLight,
   BoxShape,
   LambertMaterial,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -18,8 +19,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -29,31 +28,20 @@ myApp.ready().then(async () => {
   const boxShape = new BoxShape();
   const material = new LambertMaterial();
   new Mesh(scene, boxShape, material);
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
-  camera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  getInput().use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 4), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    // Obtain the canvas width in CSS pixels
-    const canvasWidth = myApp.device.deviceToScreen(myApp.device.canvas.width);
-    // Obtain the canvas height in CSS pixels
-    const canvasHeight = myApp.device.deviceToScreen(myApp.device.canvas.height);
-    // Full-screen rendering
-    camera.viewport = [0, 0, canvasWidth, canvasHeight];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
-    // Picture-in-Picture Rendering
-    camera.viewport = [30, 30, 200, 160];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
+  getEngine().setRenderable(scene, 0);
+
+  getEngine().setRenderable(scene, 1, {
+    beforeRender(scene) {
+      scene.mainCamera.viewport = [30, 30, 200, 160];
+    },
+    afterRender(scene) {
+      scene.mainCamera.viewport = null;
+    }
   });
 
   myApp.run();

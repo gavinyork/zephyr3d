@@ -26,6 +26,18 @@ export interface IRenderable extends IDisposable {
 }
 
 /**
+ * Interface for render hooks to customize rendering behavior.
+ *
+ * @public
+ */
+export interface IRenderHook {
+  // If presents, called before rendering the renderable. Return `false` to skip rendering.
+  beforeRender?: (renderable: any) => boolean | void;
+  // If presents, called after rendering the renderable.
+  afterRender?: (renderable: any) => void;
+}
+
+/**
  * Core engine class managing scripting, serialization, and rendering.
  *
  * Responsibilities:
@@ -47,7 +59,10 @@ export class Engine {
   private _scriptingSystem: ScriptingSystem;
   private _serializationManager: SerializationManager;
   private _enabled: boolean;
-  protected _activeRenderables: DRef<IRenderable>[];
+  protected _activeRenderables: {
+    renderable: DRef<IRenderable>;
+    hook?: IRenderHook;
+  }[];
   private _loadingScenes: Record<string, Promise<Scene>>[];
   /**
    * Creates a new runtime manager.
@@ -159,17 +174,14 @@ export class Engine {
     }
     return this._loadingScenes[path];
   }
-  setRenderable(renderable: IRenderable, layer = 0) {
-    if (this._activeRenderables[layer]) {
-      if (renderable) {
-        this._activeRenderables[layer].set(renderable);
-      } else {
-        this._activeRenderables[layer].dispose();
-        delete this._activeRenderables[layer];
-      }
-    } else if (renderable) {
-      this._activeRenderables[layer] = new DRef(renderable);
+  setRenderable(renderable: IRenderable, layer = 0, hook?: IRenderHook) {
+    if (!this._activeRenderables[layer]) {
+      this._activeRenderables[layer] = {
+        renderable: new DRef<IRenderable>(null)
+      };
     }
+    this._activeRenderables[layer].hook = hook;
+    this._activeRenderables[layer].renderable.set(renderable);
   }
   async readFile<T extends ReadOptions['encoding'] = 'binary'>(
     path: string,
@@ -206,7 +218,16 @@ export class Engine {
   }
   render() {
     for (const k of Object.keys(this._activeRenderables)) {
-      this._activeRenderables[k].get().render();
+      const info = this._activeRenderables[k];
+      const render = info.hook?.beforeRender
+        ? (info.hook.beforeRender(info.renderable.get() ?? null) ?? true)
+        : true;
+      if (render && info.renderable.get()) {
+        info.renderable.get().render();
+      }
+      if (info.hook?.afterRender) {
+        info.hook.afterRender(info.renderable.get() ?? null);
+      }
     }
   }
   private async ensureBuiltinVFS() {

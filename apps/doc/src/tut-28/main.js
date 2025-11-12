@@ -19,7 +19,7 @@ myApp.ready().then(function () {
   // Create scene and light
   const scene = new Scene();
   const light = new DirectionalLight(scene);
-  light.intensity = 30;
+  light.intensity = 20;
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   // Loads a model
@@ -30,32 +30,29 @@ myApp.ready().then(function () {
     });
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
-  camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', function () {
-    camera.updateController();
-    const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-    const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
-    // The lower half of the screen uses Bloom
-    camera.bloom = true;
-    camera.viewport = [0, 0, width, height >> 1];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
-    // No Bloom on the upper half of the screen
-    camera.bloom = false;
-    camera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
+  getEngine().setRenderable(scene, 0, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      // The lower half of the screen uses Bloom
+      scene.mainCamera.viewport = [0, 0, width, height >> 1];
+      scene.mainCamera.bloom = true;
+    }
+  });
+
+  getEngine().setRenderable(scene, 1, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
+      scene.mainCamera.bloom = false;
+    }
   });
 
   myApp.run();

@@ -71,13 +71,7 @@ myApp.ready().then(async function () {
   */
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
   camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 

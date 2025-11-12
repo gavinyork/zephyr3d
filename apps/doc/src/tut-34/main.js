@@ -6,7 +6,8 @@ import {
   PerspectiveCamera,
   OrbitCameraController,
   DirectionalLight,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -15,21 +16,13 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.canvas.width / device.canvas.height,
-    1,
-    500
-  );
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  getInput().use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   // Create a directional light (which automatically sets the sunlight properties)
   const sunLight = new DirectionalLight(scene);
@@ -39,19 +32,11 @@ myApp.ready().then(async () => {
   // Set the sky rendering mode to Atmospheric Scattering
   scene.env.sky.skyType = 'scatter';
   // Set cloud density
-  scene.env.sky.cloudy = 0.7;
+  scene.env.sky.cloudy = 0.5;
   // Set cloud move speed
   scene.env.sky.wind.setXY(600, 0);
 
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', (width, height) => {
-    camera.aspect = width / height;
-  });
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

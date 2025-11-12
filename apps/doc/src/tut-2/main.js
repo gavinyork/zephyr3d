@@ -1,4 +1,4 @@
-import { Application, PerspectiveCamera } from '@zephyr3d/scene';
+import { Application, getEngine, PerspectiveCamera } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Scene } from '@zephyr3d/scene';
 
@@ -16,22 +16,9 @@ myApp.ready().then(function () {
   // Create scene
   const scene = new Scene();
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', function (width, height) {
-    camera.aspect = width / height;
-  });
-  // Frame event handler
-  myApp.on('tick', function () {
-    // Render scene
-    camera.render(scene);
-  });
+  new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  // Set scene as active renderable object as layer 0
+  getEngine().setRenderable(scene, 0);
   // The app has been initialized and the rendering loop begins
   myApp.run();
 });

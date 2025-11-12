@@ -31,13 +31,7 @@ ssrApp.ready().then(async () => {
   scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
   scene.env.sky.fogType = 'none';
   scene.env.sky.skyType = 'scatter';
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    300
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 300);
   camera.lookAt(new Vector3(2, 8, 2), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
   camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();

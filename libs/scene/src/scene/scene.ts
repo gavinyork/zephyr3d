@@ -360,9 +360,9 @@ export class Scene
     const frameInfo = getDevice().frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
-      //this.updateAnimations();
       this.updateEnvLight();
       this.dispatchEvent('update', this);
+      this.mainCamera?.updateController();
       if (this._nodeUpdateQueue.length > 0) {
         const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
         const deltaInSeconds = frameInfo.elapsedFrame * 0.001;

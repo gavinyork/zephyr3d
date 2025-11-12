@@ -9,7 +9,8 @@ import {
   BoxShape,
   LambertMaterial,
   PlaneShape,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -44,23 +45,17 @@ myApp.ready().then(function () {
   new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
 
   // create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    200
-  );
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 200);
   const eyePos = new Vector3(30, 30, 30);
-  camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
 
   myApp.on('tick', function () {
     light.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
-    camera.updateController();
-    camera.render(scene);
   });
 
   myApp.run();

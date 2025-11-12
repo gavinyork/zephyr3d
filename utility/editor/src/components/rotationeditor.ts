@@ -50,7 +50,7 @@ export class RotationEditor {
       this._scene = this._createScene();
     }
     if (!this._camera) {
-      this._camera = new PerspectiveCamera(this._scene, Math.PI * 0.5, 1, 1, 200);
+      this._camera = new PerspectiveCamera(this._scene, Math.PI * 0.5, 1, 200);
       this._camera.position = new Vector3(0, 0, this._axisLength + this._arrowLength * 3);
     }
     if (!this._mesh) {

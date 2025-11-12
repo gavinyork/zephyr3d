@@ -25,22 +25,13 @@ myApp.ready().then(async () => {
   actor.animationSet.playAnimation(actor.animationSet.getAnimationNames()[0]);
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
-  camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 8, 0) });
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
+  scene.mainCamera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 8, 0) });
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

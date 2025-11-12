@@ -32,10 +32,10 @@ const sphere = new Mesh(scene, new SphereShape(), material);
 
 // 创建相机
 // 创建的网格默认位于世界坐标系原点，我们将摄像机放置在(0,0,4)并看向原点
-const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
 // Orbit控制器旋转中心设为原点
-camera.controller = new OrbitCameraController({ center: Vector3.zero() });
+scene.mainCamera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
 ```
 

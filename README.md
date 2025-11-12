@@ -126,10 +126,11 @@ app.ready().then(() => {
   const mat = new LambertMaterial();
   mat.albedoColor = new Vector4(0.9, 0.1, 0.1, 1);
   new Mesh(scene, new SphereShape(), mat);
-  const cam = new PerspectiveCamera(scene, Math.PI/3, app.aspect, 1, 100);
-  cam.lookAt(new Vector3(0,0,4), Vector3.zero(), Vector3.axisPY());
-  cam.controller = new OrbitCameraController({ center: Vector3.zero() });
-  app.on('tick', () => { cam.updateController(); cam.render(scene); });
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0,0,4), Vector3.zero(), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController({ center: Vector3.zero() });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+  getEngine().setRenderable(scene, 0);
   app.run();
 });
 ```

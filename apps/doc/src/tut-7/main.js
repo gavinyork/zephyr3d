@@ -9,7 +9,8 @@ import {
   BlinnMaterial,
   DirectionalLight,
   AssetManager,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -43,17 +44,13 @@ myApp.ready().then(function () {
   const sphere = new Mesh(scene, new SphereShape(), material);
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
-  camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
 
   let x = 0;
   myApp.on('tick', function () {
@@ -62,8 +59,6 @@ myApp.ready().then(function () {
     // Update sphere position
     sphere.position.y = Math.sin(x);
     x += 0.04;
-    camera.updateController();
-    camera.render(scene);
   });
 
   myApp.run();

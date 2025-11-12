@@ -66,13 +66,7 @@ PhysicsApp.ready().then(async () => {
   light.shadow.numShadowCascades = 4;
   light.shadow.shadowRegion = new AABB(new Vector3(-100, -1, -100), new Vector3(100, 50, 100));
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    200
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 200);
   camera.lookAt(new Vector3(0, 40, 40), Vector3.zero(), Vector3.axisPY());
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
 

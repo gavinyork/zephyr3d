@@ -1031,7 +1031,7 @@ export class ASTScalar extends ASTExpression {
       case PBPrimitiveType.I32:
         return toInt(this.value as number);
       case PBPrimitiveType.U32:
-        return toUint(this.value as number);
+        return `${toUint(this.value as number)}u`;
       case PBPrimitiveType.BOOL:
         return String(!!this.value);
       default:

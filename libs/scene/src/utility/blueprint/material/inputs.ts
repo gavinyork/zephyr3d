@@ -997,6 +997,11 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
   }
 }
 
+/**
+ * Billboard matrix input node
+ *
+ * @public
+ */
 export class BillboardMatrixNode extends BaseGraphNode {
   /**
    * Creates a new billboard matrix node

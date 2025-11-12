@@ -22,13 +22,7 @@ myApp.ready().then(async () => {
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController();
   getInput().use(camera.handleEvent.bind(camera));

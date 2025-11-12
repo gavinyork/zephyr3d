@@ -41,16 +41,9 @@ const app = new Application({
 });
 
 app.ready().then(async () => {
-  const device = app.device;
   const scene = new Scene();
   scene.env.light.strength = 0.1;
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    1000
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   camera.position.setXYZ(0, 0, 100);
   camera.controller = new OrbitCameraController();
   getInput().use(camera.handleEvent.bind(camera));

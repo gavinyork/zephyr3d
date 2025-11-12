@@ -35,7 +35,6 @@ export class GLTFViewer {
   private _dracoModule: draco3d.DecoderModule;
   private _bboxNoScale: AABB;
   constructor(scene: Scene) {
-    const device = getDevice();
     this._currentAnimation = null;
     this._modelNode = new DRef();
     this._animationSet = new DRef();
@@ -52,13 +51,7 @@ export class GLTFViewer {
     this._fov = Math.PI / 3;
     this._nearPlane = 1;
     this._bboxNoScale = null;
-    this._camera = new PerspectiveCamera(
-      scene,
-      Math.PI / 3,
-      device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-      1,
-      160
-    );
+    this._camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 160);
     this._camera.oit = this._oit;
     this._camera.position.setXYZ(0, 0, 15);
     this._camera.controller = new OrbitCameraController();

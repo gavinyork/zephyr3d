@@ -410,7 +410,7 @@ export class AssetManager {
     doLoadTexture(loader: AbstractTextureLoader, mimeType: string, data: ArrayBuffer | TypedArray, srgb: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<BaseTexture>;
     fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<ArrayBuffer>;
     // (undocumented)
-    fetchBluePrint(url: string, VFSs?: VFS[]): Promise<MaterialBlueprintIR>;
+    fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>>;
     fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T;
     fetchJsonData<T = any>(url: string, postProcess?: (json: T) => T, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<T>;
     fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T>;
@@ -423,11 +423,11 @@ export class AssetManager {
     // @internal
     loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, VFSs?: VFS[]): Promise<ArrayBuffer>;
     // (undocumented)
-    loadBluePrint(path: string, VFSs?: VFS[]): Promise<MaterialBlueprintIR>;
+    loadBluePrint(path: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>>;
     // @internal
     loadJsonData(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<string>;
     // @internal
-    loadMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T>;
+    loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T>;
     // @internal
     loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel>;
     // (undocumented)
@@ -439,6 +439,8 @@ export class AssetManager {
     loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
     // @internal
     readFileFromVFSs(path: string, options: ReadOptions, vfsList?: VFS[]): Promise<string | ArrayBuffer>;
+    // (undocumented)
+    reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean): Promise<void>;
     static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void;
     get vfs(): VFS;
     writeFileToVFSs(path: string, data: ArrayBuffer | string, options: WriteOptions, vfsList?: VFS[]): Promise<void>;
@@ -745,8 +747,10 @@ export abstract class BaseGraphNode extends Observable<{
     protected abstract getType(_id?: number): string;
     get inputs(): GraphNodeInput[];
     protected _inputs: GraphNodeInput[];
+    get isUniform(): boolean;
     get outputs(): GraphNodeOutput[];
     protected _outputs: GraphNodeOutput[];
+    get paramName(): string;
     reset(): void;
     setInput(id: number, node: BaseGraphNode, inputId: number): void;
     toString(): string;
@@ -786,7 +790,7 @@ export abstract class BaseLight extends GraphNode {
 }
 
 // @public
-export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> extends BaseGraphNode {
+export abstract class BaseTextureNode extends BaseGraphNode {
     constructor();
     addressU: TextureAddressMode;
     addressV: TextureAddressMode;
@@ -797,7 +801,7 @@ export abstract class BaseTextureNode<T extends BaseTexture = BaseTexture> exten
     get isUniform(): boolean;
     get paramName(): string;
     set paramName(val: string);
-    texture: DRef<T>;
+    sRGB: boolean;
     textureId: string;
     toString(): string;
     protected validate(): string;
@@ -833,6 +837,15 @@ export class BatchGroup extends GraphNode {
     protected _onDetached(): void;
     // @internal (undocumented)
     setBoundingVolume(bv: BoundingVolume): void;
+}
+
+// @public (undocumented)
+export class BillboardMatrixNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
 }
 
 // @public
@@ -948,6 +961,30 @@ export interface BlueprintDAG {
     nodeMap: Record<number, IGraphNode>;
     order: number[];
     roots: number[];
+}
+
+// @public (undocumented)
+export interface BluePrintUniformTexture extends IRUniformTexture {
+    // (undocumented)
+    finalSampler?: TextureSampler;
+    // (undocumented)
+    finalTexture?: DRef<BaseTexture>;
+    // (undocumented)
+    inFragmentShader: boolean;
+    // (undocumented)
+    inVertexShader: boolean;
+    // (undocumented)
+    params?: Vector4;
+}
+
+// @public (undocumented)
+export interface BluePrintUniformValue extends IRUniformValue {
+    // (undocumented)
+    finalValue?: number | Float32Array<ArrayBuffer>;
+    // (undocumented)
+    inFragmentShader: boolean;
+    // (undocumented)
+    inVertexShader: boolean;
 }
 
 // @public
@@ -1691,25 +1728,25 @@ export class ConstantScalarNode extends BaseGraphNode {
 }
 
 // @public
-export class ConstantTexture2DArrayNode extends BaseTextureNode<Texture2DArray> {
+export class ConstantTexture2DArrayNode extends BaseTextureNode {
     constructor();
-    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    static getSerializationCls(): SerializableClass;
     protected getType(): string;
     protected validate(): string;
 }
 
 // @public
-export class ConstantTexture2DNode extends BaseTextureNode<Texture2D> {
+export class ConstantTexture2DNode extends BaseTextureNode {
     constructor();
-    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    static getSerializationCls(): SerializableClass;
     protected getType(): string;
     protected validate(): string;
 }
 
 // @public
-export class ConstantTextureCubeNode extends BaseTextureNode<TextureCube> {
+export class ConstantTextureCubeNode extends BaseTextureNode {
     constructor();
-    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    static getSerializationCls(): SerializableClass;
     protected getType(): string;
     protected validate(): string;
 }
@@ -3075,7 +3112,52 @@ export class Grayscale extends AbstractPostEffect {
 }
 
 // @public
-export function hash(scope: PBInsideFunctionScope, p: PBShaderExp): any;
+export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp;
+
+// @public
+export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp;
+
+// @public
+export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp;
+
+// @public
+export class Hash1Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export class Hash2Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
+export class Hash3Node extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export const HEIGHT_FOG_BIT: number;
@@ -3195,7 +3277,9 @@ export interface IGraphNode extends IEventTarget<{
     error: string;
     getOutputType(id: number): string;
     readonly inputs: GraphNodeInput[];
+    isUniform: boolean;
     readonly outputs: GraphNodeOutput[];
+    paramName: string;
     reset(): void;
     toString(): string;
 }
@@ -3404,19 +3488,36 @@ export interface IRenderable extends IDisposable {
 }
 
 // @public
-export type IRUniformTexture = {
+export interface IRUniformTexture {
+    // (undocumented)
+    magFilter: string;
+    // (undocumented)
+    minFilter: string;
+    // (undocumented)
+    mipFilter: string;
+    // (undocumented)
     name: string;
-    texture: DRef<BaseTexture>;
-    sampler: DRef<TextureSampler>;
-    node: IGraphNode;
-};
+    // (undocumented)
+    sRGB: boolean;
+    // (undocumented)
+    texture: string;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    wrapS: string;
+    // (undocumented)
+    wrapT: string;
+}
 
 // @public
-export type IRUniformValue = {
+export interface IRUniformValue {
+    // (undocumented)
     name: string;
-    value: Float32Array<ArrayBuffer> | number;
-    node: IGraphNode;
-};
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    value: number[];
+}
 
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -3516,6 +3617,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     // @internal
     bind(device: AbstractDevice, pass: number): boolean;
     get changeTag(): number;
+    // (undocumented)
+    clearCache(): void;
     clone(): Material;
     copyFrom(other: this): void;
     // @internal
@@ -3572,9 +3675,7 @@ export class MaterialBlueprintIR {
 
 // @public
 export interface MaterialBlueprintIRBehaviors {
-    useCameraPosition: boolean;
     useVertexColor: boolean;
-    useVertexTangent: boolean;
     useVertexUV: boolean;
 }
 
@@ -4350,10 +4451,6 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable {
     needSceneDepth(): boolean;
     // (undocumented)
     newParticle(num: number, worldMatrix: Matrix4x4): void;
-    // (undocumented)
-    protected _onAttached(): void;
-    // (undocumented)
-    protected _onDetached(): void;
     onDispose(): void;
     get particleAccelMax(): number;
     set particleAccelMax(value: number);
@@ -4384,7 +4481,7 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable {
     get scalar(): number;
     set scalar(value: number);
     // (undocumented)
-    update(): void;
+    update(_frameId: number, elapsedInSeconds: number, deltaInSeconds: number): void;
     get wind(): Vector3;
     set wind(value: Vector3);
     get worldSpace(): boolean;
@@ -4404,26 +4501,31 @@ export class PBRBlockNode extends BaseGraphNode {
 //
 // @public
 export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements Clonable<PBRBluePrintMaterial> {
-    constructor(ir: MaterialBlueprintIR);
+    constructor(irFrag: MaterialBlueprintIR, irVertex: MaterialBlueprintIR, uniformValues: BluePrintUniformValue[], uniformTextures: BluePrintUniformTexture[]);
     // (undocumented)
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     // (undocumented)
     clone(): PBRBluePrintMaterial;
     // (undocumented)
-    copyFrom(other: this): void;
-    // (undocumented)
     protected _createHash(): string;
+    // (undocumented)
+    protected createProgram(ctx: DrawContext, pass: number): _zephyr3d_device.GPUProgram<unknown>;
+    // (undocumented)
+    get fragmentIR(): MaterialBlueprintIR;
+    set fragmentIR(ir: MaterialBlueprintIR);
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
     // (undocumented)
-    get IR(): MaterialBlueprintIR;
-    set IR(ir: MaterialBlueprintIR);
+    protected onDispose(): void;
     // @internal (undocumented)
-    get uniformTextures(): IRUniformTexture[];
-    set uniformTextures(val: IRUniformTexture[]);
+    get uniformTextures(): BluePrintUniformTexture[];
+    set uniformTextures(val: BluePrintUniformTexture[]);
     // @internal (undocumented)
-    get uniformValues(): IRUniformValue[];
-    set uniformValues(val: IRUniformValue[]);
+    get uniformValues(): BluePrintUniformValue[];
+    set uniformValues(val: BluePrintUniformValue[]);
+    // (undocumented)
+    get vertexIR(): MaterialBlueprintIR;
+    set vertexIR(ir: MaterialBlueprintIR);
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
@@ -4570,6 +4672,13 @@ export class PCFPD extends ShadowImpl {
 
 // @public
 export function perlinNoise2D(scope: PBInsideFunctionScope, p: PBShaderExp): any;
+
+// @public
+export class PerlinNoise2DNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
 
 // @public
 export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any;
@@ -5174,6 +5283,33 @@ export function renderSkyViewLut(params: AtmosphereParams): void;
 export function renderTransmittanceLut(params: AtmosphereParams): void;
 
 // @public
+export class ResolveVertexNormalNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ResolveVertexPositionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class ResolveVertexTangentNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export class RuntimeScript<T extends IDisposable | null> {
     onAttached(_host: T): void | Promise<void>;
     onCreated(): void | Promise<void>;
@@ -5592,7 +5728,7 @@ export class SerializationManager {
     getPropertyName(prop: PropertyAccessor): string;
     instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode>;
     // (undocumented)
-    loadBluePrint(path: string): Promise<MaterialBlueprintIR>;
+    loadBluePrint(path: string): Promise<Record<string, MaterialBlueprintIR>>;
     loadPrefabContent(path: string): Promise<{
         type: string;
         data: object;
@@ -5600,6 +5736,7 @@ export class SerializationManager {
     loadScene(filename: string): Promise<Scene>;
     loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
     registerClass(cls: SerializableClass): void;
+    reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean): Promise<void>;
     saveScene(scene: Scene, filename: string): Promise<void>;
     serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): Promise<any>;
     setAssetId(asset: unknown, id: string): void;
@@ -5673,6 +5810,7 @@ export class ShaderHelper {
     static getInstanceDataUniformName(): string;
     static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp;
     static getInvProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
+    static getInvViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getInvViewProjectionMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     static getJitteredInvVPMatrix(scope: PBInsideFunctionScope): PBShaderExp;
     // (undocumented)
@@ -5999,6 +6137,13 @@ export class SignNode extends GenericMathNode {
 }
 
 // @public
+export class SimplexNoise2DNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export class SinHNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -6184,13 +6329,13 @@ export class SkyRenderer extends Disposable {
     // (undocumented)
     renderAtmosphereLUTs(ctx: DrawContext): void;
     // @internal (undocumented)
-    renderFog(ctx: DrawContext): void;
+    renderFog(camera: Camera): void;
     // @internal (undocumented)
     renderSky(ctx: DrawContext): void;
     // (undocumented)
     renderSkyDistantLut(ctx: DrawContext, skybox: TextureCube): void;
     // (undocumented)
-    renderUberFog(ctx: DrawContext, depthTexture: BaseTexture): void;
+    renderUberFog(camera: Camera, depthTexture: BaseTexture): void;
     get shWindowWeights(): Vector3;
     set shWindowWeights(weights: Vector3);
     get skyboxTexture(): TextureCube;
@@ -6209,7 +6354,7 @@ export class SkyRenderer extends Disposable {
     // (undocumented)
     update(ctx: DrawContext): Vector4;
     // (undocumented)
-    updateBakedSkyMap(): void;
+    updateBakedSkyMap(ctx: DrawContext): void;
     get wind(): Vector2;
     set wind(val: Vector2);
 }
@@ -6292,6 +6437,17 @@ export class StepNode extends GenericMathNode {
 export type StopAnimationOptions = {
     fadeOut?: number;
 };
+
+// @public
+export class SwizzleNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get swizzle(): string;
+    set swizzle(val: string);
+    toString(): string;
+    protected validate(): string;
+}
 
 // Warning: (ae-internal-missing-underscore) The name "TAA" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -6765,10 +6921,22 @@ export function uvToTransmittanceLut(scope: PBInsideFunctionScope, f2UV: PBShade
 export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp): any;
 
 // @public
+export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
 export class VertexBinormalNode extends BaseGraphNode {
     constructor();
     static getSerializationCls(): SerializableClass;
     protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class VertexBlockNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
     toString(): string;
     protected validate(): string;
 }
@@ -7025,6 +7193,9 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
 }
 
 // @public
+export function whiteNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
+
+// @public
 export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PBShaderExp | number): PBShaderExp;
 
 // @public
@@ -7032,7 +7203,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:14902:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:15053:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

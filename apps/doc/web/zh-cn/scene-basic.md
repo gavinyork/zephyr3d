@@ -160,7 +160,7 @@
 
   首先我们需要通过构造一个Scene对象来创建一个场景。场景是一个包含了若干需要渲染的元素的容器。
   另外我们还需要一个摄像机对象来执行对场景的渲染。我们可以通过构造PerspectiveCamera对象来创建一个透视相机或通过构造一个OrthoCamera来创建一个正交相机。
-  最后我们调用摄像机的render方法来进行渲染。
+  最后我们调用引擎实例的setRenderable方法将场景设置为活动渲染对象。
 
   ```javascript
 
@@ -181,17 +181,10 @@
   myApp.ready().then(function () {
     // 创建场景
     const scene = new Scene();
-    // 创建相机
-    const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-    // 当缓冲区大小发生变化时重新设置相机长宽比以避免图像变形
-    myApp.on('resize', function(width, height){
-      camera.aspect = width / height;
-    });
-    // 添加帧事件处理
-    myApp.on('tick', function(){
-      // 渲染场景
-      camera.render(scene);
-    });
+    // 创建主相机
+    scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+    // 将场景设置为第0层的活动渲染对象
+    getEngine().setRenderable(scene, 0);
     // 应用已经初始化完成，开始渲染循环
     myApp.run();
   });
@@ -224,25 +217,15 @@
   // ...
 
   // 创建相机
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
 
   // 添加代码，设置摄像机控制器
-  camera.controller = new OrbitCameraController();
-
-  //...
+  scene.mainCamera.controller = new OrbitCameraController();
 
   // 添加一个中间件用于更新摄像机控制器
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   //...
-
-  //在帧事件回调中更新控制器状态
-  app.on('tick', function(){
-    // 更新控制器
-    camera.updateController();
-    // ...
-    // ...
-  });
 
   ```  
 

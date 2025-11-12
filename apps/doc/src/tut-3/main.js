@@ -16,13 +16,7 @@ myApp.ready().then(function () {
   // Create scene
   const scene = new Scene();
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    100
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
   // Frame event handler
   myApp.on('tick', function () {
     // Render scene

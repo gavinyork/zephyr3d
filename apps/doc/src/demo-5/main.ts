@@ -42,15 +42,8 @@ const instancingApp = new Application({
 });
 
 instancingApp.ready().then(async () => {
-  const device = instancingApp.device;
   const scene = new Scene();
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    1000
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   camera.position.setXYZ(0, 0, 60);
   camera.controller = new OrbitCameraController();
   getInput().use(camera.handleEvent.bind(camera));

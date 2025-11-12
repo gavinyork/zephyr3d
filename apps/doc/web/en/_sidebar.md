@@ -46,7 +46,6 @@
   - Nature
     - [Terrain](en/terrain.md)
     - [Sky](en/sky.md)
-    - [Fog](en/fog.md)
     - [Water](en/water.md)
   - Picking
     - [Introduction](en/picking.md)

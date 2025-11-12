@@ -173,13 +173,7 @@ myApp.ready().then(async function () {
   meshes.push({ node: sceneColorMesh, material: sceneColorMaterial, name: 'SceneColor' });
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    1000
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   camera.lookAt(new Vector3(0, 0, 12), Vector3.zero(), new Vector3(0, 1, 0));
   camera.controller = new OrbitCameraController();
 

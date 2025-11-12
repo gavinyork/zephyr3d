@@ -13,7 +13,8 @@ import {
   applyMaterialMixins,
   DirectionalLight,
   mixinLight,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 // 自定义Lambert材质
@@ -140,8 +141,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -158,26 +157,13 @@ myApp.ready().then(async () => {
 
   new Mesh(scene, new TorusShape(), material);
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
-  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(5, 3, 0), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('resize', (width, height) => {
-    camera.aspect = width / height;
-  });
-
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

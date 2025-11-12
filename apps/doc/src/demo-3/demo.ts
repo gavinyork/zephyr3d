@@ -126,13 +126,7 @@ export class Demo {
     return scene;
   }
   createCamera(scene: Scene): PerspectiveCamera {
-    const camera = new PerspectiveCamera(
-      scene,
-      Math.PI / 3,
-      getDevice().getDrawingBufferWidth() / getDevice().getDrawingBufferHeight(),
-      1,
-      1500
-    );
+    const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1500);
     return camera;
   }
   async load() {

@@ -10,7 +10,8 @@ import {
   PlaneShape,
   TorusShape,
   PBRMetallicRoughnessMaterial,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -40,34 +41,31 @@ myApp.ready().then(function () {
   torus.position.setXYZ(0, 3, 0);
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
-  camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
-  camera.SSAOIntensity = 0.03;
-  camera.SSAORadius = 100;
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
+  scene.mainCamera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
+  scene.mainCamera.SSAOIntensity = 0.03;
+  scene.mainCamera.SSAORadius = 100;
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', function () {
-    camera.updateController();
-    const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-    const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
-    // The lower half of the screen uses SAO
-    camera.SSAO = true;
-    camera.viewport = [0, 0, width, height >> 1];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
-    // No SAO on the upper half of the screen
-    camera.SSAO = false;
-    camera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
+  getEngine().setRenderable(scene, 0, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      // The lower half of the screen uses SSAO
+      scene.mainCamera.viewport = [0, 0, width, height >> 1];
+      scene.mainCamera.SSAO = true;
+    }
+  });
+
+  getEngine().setRenderable(scene, 1, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
+      scene.mainCamera.SSAO = false;
+    }
   });
 
   myApp.run();

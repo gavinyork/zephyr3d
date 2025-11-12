@@ -44,13 +44,7 @@ app.ready().then(async () => {
   const device = app.device;
   const scene = new Scene();
   scene.env.sky.fogType = 'none';
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    1000
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   camera.position.setXYZ(0, 0, 12);
   camera.controller = new OrbitCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();

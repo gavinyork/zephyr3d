@@ -147,7 +147,7 @@ getInput().use(function(evt, type){
 
 ## Render scene
 
-Let's demonstrate how to render a scene. First, we need to create a scene by constructing a [Scene](/doc/markdown/./scene.scene) object. A scene acts as a container that holds various elements that need to be rendered. Additionally, we require a camera object to perform the rendering of the scene. We can create a perspective camera by constructing a [PerspectiveCamera](/doc/markdown/./scene.perspectivecamera) object or an orthographic camera by constructing an [OrthoCamera](/doc/markdown/./scene.orthocamera). Finally, we render by calling the [camera.render()](/doc/markdown/./scene.camera.render) method.
+Let's demonstrate how to render a scene. First, we need to create a scene by constructing a [Scene](/doc/markdown/./scene.scene) object. A scene acts as a container that holds various elements that need to be rendered. Additionally, we require a camera object to perform the rendering of the scene. We can create a perspective camera by constructing a [PerspectiveCamera](/doc/markdown/./scene.perspectivecamera) object or an orthographic camera by constructing an [OrthoCamera](/doc/markdown/./scene.orthocamera). Finally, we set the scene as active renderable object by calling the [Engine.setRenderable()](/doc/markdown/./scene.engine.setrenderable) method.
 
 ```javascript
 
@@ -165,17 +165,10 @@ const myApp = new Application({
 myApp.ready().then(function () {
   // Creates a scene
   const scene = new Scene();
-  // Creates a perspective camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  // When the frame buffer size changes, reset the camera aspect ratio to avoid image distortion
-  myApp.on('resize', function(width, height){
-    camera.aspect = width / height;
-  });
-  // Process the frame event
-  myApp.on('tick', function(){
-    // Render the scene
-    camera.render(scene);
-  });
+  // Creates a perspective camera as main camera for the scene
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+  // Set scene as active renderable object as layer 0
+  getEngine().setRenderable(scene, 0);
   // Starts the rendering loop
   myApp.run();
 });
@@ -185,24 +178,6 @@ myApp.ready().then(function () {
 Running this code, we rendered an empty scene that only contains a default sky, with the following effect:
 
 <div class="showcase" case="tut-2"></div>
-
-## Tone mapping
-
-The sky colors we rendered earlier looked a bit odd, and this is because the sky simulating atmospheric scattering requires tonemapping to achieve the correct visual effect. Let's proceed by adding a tonemapping post-process.
-
-```javascript
-
-// Enable tonemapping for camera. (tonemapping is enabled by default)
-camera.toneMap = true;
-
-// Passes the compositor as a second parameter to the render emthod
-camera.render(scene, compositor);
-
-```
-
-Here is the effect after adding tonemapping:
-
-<div class="showcase" case="tut-3"></div>
 
 ## Camera control
 
@@ -225,25 +200,17 @@ import { Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d
 // ...
 
 // Creates the camera
-const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
 
 // Creates an orbit camera controller
-camera.controller = new OrbitCameraController();
+scene.mainCamera.controller = new OrbitCameraController();
 
 //...
 
 // Add an input middleware to update the camera controller
-getInput().use(camera.handleEvent.bind(camera));
+getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
 //...
-
-// We should update the controller state in the frame event callback
-app.on('tick', function(){
-  // Update camera controller state
-  camera.updateController();
-  // ...
-  // ...
-});
 
 ```  
 

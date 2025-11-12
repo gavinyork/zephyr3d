@@ -89,13 +89,7 @@ lightApp.ready().then(async () => {
   const device = lightApp.device;
   device.setFont('24px arial');
   const scene = new Scene();
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    260
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 260);
   camera.controller = new FPSCameraController({ moveSpeed: 0.05 });
 
   getInput().use(camera.handleEvent.bind(camera));

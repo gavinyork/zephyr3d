@@ -8,7 +8,8 @@ import {
   panoramaToCubemap,
   prefilterCubemap,
   DirectionalLight,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -55,35 +56,29 @@ myApp.ready().then(function () {
     });
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
   const eyePos = new Vector3(0, 0, 30);
-  camera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera.lookAt(eyePos, Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  getInput().use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', function () {
-    camera.updateController();
+  getEngine().setRenderable(scene, 0, {
+    beforeRender: (scene) => {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      scene.env.light.type = 'ibl';
+      scene.mainCamera.viewport = [0, 0, width, height >> 1];
+    }
+  });
 
-    const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-    const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
-
-    // The lower half of the screen has ambient light
-    scene.env.light.type = 'ibl';
-    camera.viewport = [0, 0, width, height >> 1];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
-    // No ambient light on the upper half of the screen
-    scene.env.light.type = 'none';
-    camera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    camera.aspect = camera.viewport[2] / camera.viewport[3];
-    camera.render(scene);
+  getEngine().setRenderable(scene, 1, {
+    beforeRender: (scene) => {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      scene.env.light.type = 'none';
+      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
+    }
   });
 
   myApp.run();

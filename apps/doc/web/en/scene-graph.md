@@ -19,8 +19,6 @@ The following code demonstrates how to control the rotation and position of a no
     // Update the sphere position
     sphere.position.y = Math.sin(x);
     x += 0.04;
-    camera.updateController();
-    camera.render(scene, compositor);
   });
 
 ```
@@ -53,8 +51,6 @@ Nodes in a scene are stored in a tree structure, with each node's spatial transf
     // Sphere2 rotates about the x-axis
     sphere2.rotation = Quaternion.fromAxisAngle(new Vector3(1, 0, 0), x * 8);
     x += 0.01;
-    camera.updateController();
-    camera.render(scene, compositor);
   });
 
 ```
