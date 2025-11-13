@@ -1,4 +1,4 @@
-import { Vector2, Vector3 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import type {
   BindGroup,
   FrameBuffer,
@@ -85,7 +85,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
       if (type === 'ggx') {
         this.alphaG = pb.float().uniform(0);
       }
-      this.vFilteringInfo = pb.vec2().uniform(0);
+      this.vFilteringInfo = pb.vec3().uniform(0);
       this.hdrScale = pb.float().uniform(0);
       this.inputTexture = pb.texCube().uniform(0);
       this.NUM_SAMPLES_FLOAT = pb.float(numSamples);
@@ -156,7 +156,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
             )
           );
         });
-        pb.func('irradiance', [pb.vec3('direction'), pb.vec2('vFilteringInfo')], function () {
+        pb.func('irradiance', [pb.vec3('direction'), pb.vec3('vFilteringInfo')], function () {
           this.$l.n = pb.normalize(this.direction);
           this.$l.result = pb.vec3(0);
           this.$l.tangent = pb.vec3();
@@ -170,6 +170,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
           this.$l.tbn = pb.mat3(this.tangent, this.bitangent, this.n);
           this.$l.maxLevel = this.vFilteringInfo.y;
           this.$l.dim0 = this.vFilteringInfo.x;
+          this.$l.colorScale = this.vFilteringInfo.z;
           this.$l.omegaP = pb.div(4 * Math.PI, pb.mul(this.dim0, this.dim0, 6));
           this.$for(pb.int('i'), 0, numSamples, function () {
             this.$l.Xi = this.hammersley2d(this.i, numSamples);
@@ -189,7 +190,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
               this.result = pb.add(this.result, this.c);
             });
           });
-          this.result = pb.mul(this.result, this.NUM_SAMPLES_FLOAT_INVERSED);
+          this.result = pb.mul(this.result, this.NUM_SAMPLES_FLOAT_INVERSED, this.colorScale);
           this.$return(this.result);
         });
       }
@@ -221,7 +222,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
         );
         pb.func(
           'radiance',
-          [pb.float('alphaG'), pb.vec3('direction'), pb.vec2('vFilteringInfo')],
+          [pb.float('alphaG'), pb.vec3('direction'), pb.vec3('vFilteringInfo')],
           function () {
             this.$l.n = pb.normalize(this.direction);
             this.$if(pb.equal(this.alphaG, 0), function () {
@@ -296,7 +297,7 @@ function doPrefilterCubemap(
   miplevel: number,
   srcTexture: TextureCube,
   dstFramebuffer: FrameBuffer,
-  filteringInfo: Vector2,
+  filteringInfo: Vector3,
   numSamples: number
 ): void {
   const device = getDevice();
@@ -337,7 +338,8 @@ export function prefilterCubemap(
   tex: TextureCube,
   type: DistributionType,
   destTexture: TextureCube | FrameBuffer,
-  numSamples?: number
+  numSamples?: number,
+  radianceSource?: boolean
 ): void {
   if (!tex || !tex.isTextureCube()) {
     console.error('prefilterCubemap(): source texture must be cube texture');
@@ -348,11 +350,12 @@ export function prefilterCubemap(
     init();
   }
   device.pushDeviceStates();
+  radianceSource = radianceSource ?? true;
   const rs = device.getRenderStates();
   const srcTex = tex;
   const width = tex.width;
   const mipmapsCount = tex.mipLevelCount;
-  const filteringInfo = new Vector2(width, mipmapsCount);
+  const filteringInfo = new Vector3(width, mipmapsCount, radianceSource ? 1 : Math.PI);
   const fb = destTexture.isFramebuffer() ? destTexture : device.createFrameBuffer([destTexture], null);
   const attachMiplevel = fb.getColorAttachmentMipLevel(0);
   const generateMipmap = fb.getColorAttachmentGenerateMipmaps(0);

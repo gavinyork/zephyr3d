@@ -589,7 +589,8 @@ export class SkyRenderer extends Disposable {
           this._bakedSkyboxTexture.get(),
           'lambertian',
           this.irradianceFramebuffer,
-          this._irradianceConvSamples
+          this._irradianceConvSamples,
+          !useScatter
         );
         if (ctx.device.type === 'webgl' || !ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending) {
           this._shProjector.projectCubemapToTexture(
