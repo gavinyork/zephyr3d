@@ -541,6 +541,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'PanoramaTexture',
           type: 'object',
           phase: 1,
+          options: {
+            mimeTypes: ['image/vnd.radiance']
+          },
           get(this: Scene, value) {
             value.str[0] = this.env.sky.panoramaTextureAsset;
           },
@@ -566,6 +569,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
                 panoramaToCubemap(tex, skyBoxTexture);
                 prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
                 prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
+                skyBoxTexture.name = 'SkyboxTexture';
                 this.env.sky.skyboxTexture = skyBoxTexture;
                 this.env.light.radianceMap = radianceMap;
                 this.env.light.irradianceMap = irradianceMap;

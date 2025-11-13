@@ -173,7 +173,7 @@ export class SkyRenderer extends Disposable {
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
     this._shProjector = new CubemapSHProjector(10000);
-    this._shWindowWeights = new Vector3(1, 0.8, 0.6);
+    this._shWindowWeights = new Vector3(1, 1, 1);
     this._radianceConvSamples = 64;
     this._irradianceConvSamples = 256;
     this._bindgroupDistantLight = new DRef();

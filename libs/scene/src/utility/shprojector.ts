@@ -231,6 +231,15 @@ export class CubemapSHProjector extends Disposable {
       fragment(pb) {
         this.$outputs.color = pb.vec4();
         this.cubemap = pb.texCube().uniform(0);
+        pb.func('cosineLobeBandFactor', [pb.int('l')], function () {
+          this.$if(pb.equal(this.l, 0), function () {
+            this.$return(pb.float(1));
+          });
+          this.$if(pb.lessThanEqual(this.l, 3), function () {
+            this.$return(2 / 3);
+          });
+          this.$return(1 / 4);
+        });
         pb.func('Y0', [pb.vec3('v')], function () {
           this.$return(0.282094791773878);
         });
@@ -292,11 +301,17 @@ export class CubemapSHProjector extends Disposable {
         });
         pb.main(function () {
           this.$l.radiance = pb.textureSampleLevel(this.cubemap, this.$inputs.direction, 0).rgb;
+          this.$l.bandFactor = this.cosineLobeBandFactor(
+            pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
+          );
           this.$l.sh = this.evalBasis(
             this.$inputs.direction,
             pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
           );
-          this.$outputs.color = pb.vec4(pb.mul(this.radiance, this.sh, this.$inputs.weight), 1);
+          this.$outputs.color = pb.vec4(
+            pb.mul(this.radiance, this.sh, this.$inputs.weight, this.bandFactor),
+            1
+          );
         });
       }
     });
