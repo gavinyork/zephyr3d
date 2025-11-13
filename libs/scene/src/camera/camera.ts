@@ -5,7 +5,16 @@ import type { Drawable, PickTarget } from '../render/drawable';
 import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
-import type { BaseCameraController } from './base';
+import type {
+  BaseCameraController,
+  IBaseEvent,
+  IControllerKeydownEvent,
+  IControllerKeyupEvent,
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent,
+  IControllerWheelEvent
+} from './base';
 import type { OIT } from '../render/oit';
 import { TAA } from '../posteffect/taa';
 import { SSR } from '../posteffect/ssr';
@@ -750,7 +759,7 @@ export class Camera extends SceneNode {
    * @param type - event type, default to ev.type
    * @returns Boolean value indicates whether the event was handled.
    */
-  handleEvent(ev: Event, type?: string): boolean {
+  handleEvent<T extends IBaseEvent<any>>(ev: T, type?: string): boolean {
     let handled = false;
     if (this._controller) {
       if (
@@ -763,24 +772,24 @@ export class Camera extends SceneNode {
       type = type ?? ev.type;
       if (type === 'pointerdown') {
         if (this._capturedButton < 0) {
-          this._capturedButton = (ev as PointerEvent).button;
+          this._capturedButton = (ev as unknown as IControllerPointerDownEvent).button;
         }
-        handled = this._controller.onMouseDown(ev as PointerEvent);
+        handled = this._controller.onMouseDown(ev as unknown as IControllerPointerDownEvent);
       } else if (type === 'pointerup') {
-        handled = this._controller.onMouseUp(ev as PointerEvent);
-        if (this._capturedButton === (ev as PointerEvent).button) {
+        handled = this._controller.onMouseUp(ev as unknown as IControllerPointerUpEvent);
+        if (this._capturedButton === (ev as unknown as IControllerPointerUpEvent).button) {
           this._capturedButton = -1;
         }
       } else if (type === 'pointermove') {
-        handled = this._controller.onMouseMove(ev as PointerEvent);
+        handled = this._controller.onMouseMove(ev as unknown as IControllerPointerMoveEvent);
       } else if (type === 'wheel') {
-        handled = this._controller.onMouseWheel(ev as WheelEvent);
+        handled = this._controller.onMouseWheel(ev as unknown as IControllerWheelEvent);
       } else if (type === 'keydown') {
-        handled = this._controller.onKeyDown(ev as KeyboardEvent);
+        handled = this._controller.onKeyDown(ev as unknown as IControllerKeydownEvent);
       } else if (type === 'keyup') {
-        handled = this._controller.onKeyUp(ev as KeyboardEvent);
+        handled = this._controller.onKeyUp(ev as unknown as IControllerKeyupEvent);
       }
-      if (handled) {
+      if (handled && ev.preventDefault) {
         ev.preventDefault();
       }
     }

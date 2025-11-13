@@ -1,4 +1,11 @@
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import type {
+  IControllerKeydownEvent,
+  IControllerKeyupEvent,
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent
+} from './base';
 import { BaseCameraController } from './base';
 
 /**
@@ -88,7 +95,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: PointerEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
     if (evt.button === 0) {
       this.mouseDown = true;
       this.lastMouseX = evt.offsetX;
@@ -101,7 +108,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: PointerEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
     if (evt.button === 0 && this.mouseDown) {
       this.mouseDown = false;
       return true;
@@ -112,7 +119,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: PointerEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     if (this.mouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -157,7 +164,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyDown}
    * @override
    */
-  protected _onKeyDown(evt: KeyboardEvent): boolean {
+  protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = true;
@@ -186,7 +193,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyUp}
    * @override
    */
-  protected _onKeyUp(evt: KeyboardEvent): boolean {
+  protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = false;

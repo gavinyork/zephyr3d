@@ -1,4 +1,11 @@
 import { Vector3, Quaternion } from '@zephyr3d/base';
+import type {
+  IControllerMouseEvent,
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent,
+  IControllerWheelEvent
+} from './base';
 import { BaseCameraController } from './base';
 
 /**
@@ -162,7 +169,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: PointerEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
     if (this.matchesControl(evt, this.options.controls.rotate)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
@@ -197,7 +204,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: PointerEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
     const control =
       this.currentOp === OperationType.ROTATE
         ? this.options.controls.rotate
@@ -216,7 +223,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseWheel}
    * @override
    */
-  protected _onMouseWheel(evt: WheelEvent): boolean {
+  protected _onMouseWheel(evt: IControllerWheelEvent): boolean {
     this.zoom(evt.deltaY);
     return true;
   }
@@ -224,7 +231,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: PointerEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     if (this.currentOp !== OperationType.NONE) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -252,7 +259,7 @@ export class OrbitCameraController extends BaseCameraController {
     }
   }
   private matchesControl(
-    evt: PointerEvent | WheelEvent,
+    evt: IControllerMouseEvent<any>,
     control: {
       button: number;
       shiftKey: boolean;
@@ -262,7 +269,6 @@ export class OrbitCameraController extends BaseCameraController {
     }
   ): boolean {
     return (
-      evt instanceof PointerEvent &&
       evt.button === control.button &&
       evt.shiftKey === control.shiftKey &&
       evt.ctrlKey === control.ctrlKey &&

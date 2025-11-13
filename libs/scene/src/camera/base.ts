@@ -1,6 +1,43 @@
 import type { Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
 
+export interface IBaseEvent<T extends string> {
+  type: T;
+  preventDefault?: () => void;
+}
+
+export interface IModKey {
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly shiftKey: boolean;
+  readonly altKey: boolean;
+}
+
+export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, IModKey {
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly button: number;
+}
+
+export interface IControllerPointerDownEvent extends IControllerMouseEvent<'pointerdown'> {}
+export interface IControllerPointerUpEvent extends IControllerMouseEvent<'pointerup'> {}
+export interface IControllerPointerMoveEvent extends IControllerMouseEvent<'pointermove'> {}
+export interface IControllerPointerCancelEvent extends IControllerMouseEvent<'pointercancel'> {}
+
+export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
+  readonly deltaX: number;
+  readonly deltaY: number;
+}
+
+export interface IControllerKeyboardEvent<T extends string> extends IBaseEvent<T>, IModKey {
+  readonly code: string;
+  readonly key: string;
+}
+
+export interface IControllerKeydownEvent extends IControllerKeyboardEvent<'keydown'> {}
+export interface IControllerKeyupEvent extends IControllerKeyboardEvent<'keyup'> {}
+export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keypress'> {}
+
 /**
  * Base class for camera controllers.
  *
@@ -96,7 +133,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled and should stop further processing; otherwise `false`.
    */
-  onMouseDown(evt: PointerEvent): boolean {
+  onMouseDown(evt: IControllerPointerDownEvent): boolean {
     return this._onMouseDown(evt);
   }
   /**
@@ -105,7 +142,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseUp(evt: PointerEvent): boolean {
+  onMouseUp(evt: IControllerPointerUpEvent): boolean {
     return this._onMouseUp(evt);
   }
   /**
@@ -116,7 +153,7 @@ export class BaseCameraController {
    * @param evt - The wheel event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseWheel(evt: WheelEvent): boolean {
+  onMouseWheel(evt: IControllerWheelEvent): boolean {
     return this._onMouseWheel(evt);
   }
   /**
@@ -127,7 +164,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseMove(evt: PointerEvent): boolean {
+  onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     return this._onMouseMove(evt);
   }
   /**
@@ -138,7 +175,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyDown(evt: KeyboardEvent): boolean {
+  onKeyDown(evt: IControllerKeydownEvent): boolean {
     return this._onKeyDown(evt);
   }
   /**
@@ -147,7 +184,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyUp(evt: KeyboardEvent): boolean {
+  onKeyUp(evt: IControllerKeyupEvent): boolean {
     return this._onKeyUp(evt);
   }
   /**
@@ -166,7 +203,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseDown(_evt: PointerEvent): boolean {
+  protected _onMouseDown(_evt: IControllerPointerDownEvent): boolean {
     return false;
   }
   /**
@@ -175,7 +212,7 @@ export class BaseCameraController {
    * @param _evt - Pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onMouseUp(_evt: PointerEvent): boolean {
+  protected _onMouseUp(_evt: IControllerPointerUpEvent): boolean {
     return false;
   }
   /**
@@ -184,7 +221,7 @@ export class BaseCameraController {
    * @param _evt - Wheel event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onMouseWheel(_evt: WheelEvent): boolean {
+  protected _onMouseWheel(_evt: IControllerWheelEvent): boolean {
     return false;
   }
   /**
@@ -193,7 +230,7 @@ export class BaseCameraController {
    * @param _evt - Pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onMouseMove(_evt: PointerEvent): boolean {
+  protected _onMouseMove(_evt: IControllerPointerMoveEvent): boolean {
     return false;
   }
   /**
@@ -202,7 +239,7 @@ export class BaseCameraController {
    * @param _evt - Keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onKeyDown(_evt: KeyboardEvent): boolean {
+  protected _onKeyDown(_evt: IControllerKeydownEvent): boolean {
     return false;
   }
   /**
@@ -211,7 +248,7 @@ export class BaseCameraController {
    * @param _evt - Keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onKeyUp(_evt: KeyboardEvent): boolean {
+  protected _onKeyUp(_evt: IControllerKeyupEvent): boolean {
     return false;
   }
 }

@@ -260,8 +260,8 @@ export function getSceneClass(manager: SerializationManager): SerializableClass 
           phase: 0,
           options: {
             enum: {
-              labels: ['None', 'Linear', 'Exp', 'Exp2', 'ExponentialHeight'],
-              values: ['none', 'linear', 'exp', 'exp2', 'height_fog']
+              labels: ['None', 'ExponentialHeightFog'],
+              values: ['none', 'height_fog']
             }
           },
           default: 'none',

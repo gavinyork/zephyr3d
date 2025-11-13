@@ -3,6 +3,10 @@ import type {
   BlueprintDAG,
   BluePrintUniformTexture,
   BluePrintUniformValue,
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent,
+  IControllerWheelEvent,
   IGraphNode,
   MeshMaterial,
   PropertyAccessor
@@ -36,6 +40,8 @@ import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
 import type { NodeEditor, NodeEditorState } from '../nodeeditor';
+
+let wasDragging = false;
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
@@ -91,7 +97,7 @@ export class PBRMaterialEditor extends GraphEditor {
     return this.getNodeEditor('vertex');
   }
   open() {
-    getApp().inputManager.useFirst(this.handleEvent, this);
+    //getApp().inputManager.useFirst(this.handleEvent, this);
   }
   close() {
     getApp().inputManager.unuse(this.handleEvent, this);
@@ -422,7 +428,68 @@ export class PBRMaterialEditor extends GraphEditor {
       size.x < 0 ? 0 : size.x,
       size.y < 0 ? 0 : size.y
     ];
+    const cursorPos = ImGui.GetCursorPos();
     ImGui.Image(this._previewTex.get(), size, new ImGui.ImVec2(0, 1), new ImGui.ImVec2(1, 0));
+    ImGui.SetCursorPos(cursorPos);
+    ImGui.InvisibleButton('Button##previewScene', size);
+    const io = ImGui.GetIO();
+    if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
+      const evtWheel: IControllerWheelEvent = {
+        type: 'wheel',
+        offsetX: io.MousePos.x,
+        offsetY: io.MousePos.y,
+        ctrlKey: io.KeyCtrl,
+        shiftKey: io.KeyShift,
+        altKey: io.KeyAlt,
+        metaKey: io.KeySuper,
+        deltaX: 0,
+        deltaY: -io.MouseWheel * 100,
+        button: 1
+      };
+      this._previewScene.get()?.mainCamera?.handleEvent(evtWheel);
+    }
+    if (ImGui.IsItemActive()) {
+      if (ImGui.IsMouseClicked(ImGui.MouseButton.Left)) {
+        const evtPointerDown: IControllerPointerDownEvent = {
+          type: 'pointerdown',
+          offsetX: io.MousePos.x,
+          offsetY: io.MousePos.y,
+          ctrlKey: io.KeyCtrl,
+          shiftKey: io.KeyShift,
+          altKey: io.KeyAlt,
+          metaKey: io.KeySuper,
+          button: 0
+        };
+        this._previewScene.get()?.mainCamera?.handleEvent(evtPointerDown);
+        wasDragging = true;
+      } else if (io.MouseDelta.x !== 0 || io.MouseDelta.y !== 0) {
+        const evtPointerMove: IControllerPointerMoveEvent = {
+          type: 'pointermove',
+          offsetX: io.MousePos.x,
+          offsetY: io.MousePos.y,
+          ctrlKey: io.KeyCtrl,
+          shiftKey: io.KeyShift,
+          altKey: io.KeyAlt,
+          metaKey: io.KeySuper,
+          button: 0
+        };
+        this._previewScene.get()?.mainCamera?.handleEvent(evtPointerMove);
+      }
+    } else if (wasDragging) {
+      // 鼠标释放时触发
+      const evtPointerUp: IControllerPointerUpEvent = {
+        type: 'pointerup',
+        offsetX: io.MousePos.x,
+        offsetY: io.MousePos.y,
+        ctrlKey: io.KeyCtrl,
+        shiftKey: io.KeyShift,
+        altKey: io.KeyAlt,
+        metaKey: io.KeySuper,
+        button: 0
+      };
+      this._previewScene.get()?.mainCamera?.handleEvent(evtPointerUp);
+      wasDragging = false;
+    }
     camera.updateController();
   }
   private async applyPreviewMaterial() {

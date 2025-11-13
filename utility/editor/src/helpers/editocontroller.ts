@@ -1,4 +1,10 @@
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import type {
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent,
+  IControllerWheelEvent
+} from '@zephyr3d/scene';
 import { BaseCameraController } from '@zephyr3d/scene';
 
 export interface EditorCameraControllerOptions {
@@ -51,7 +57,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: PointerEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
     if (evt.button === 1) {
       this.middleMouseDown = true;
     } else if (evt.button === 2) {
@@ -67,7 +73,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: PointerEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
     if (evt.button === 1 && this.middleMouseDown) {
       this.middleMouseDown = false;
       return true;
@@ -81,7 +87,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: PointerEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     if (this.rightMouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -146,7 +152,7 @@ export class EditorCameraController extends BaseCameraController {
     }
     return false;
   }
-  protected _onMouseWheel(evt: WheelEvent): boolean {
+  protected _onMouseWheel(evt: IControllerWheelEvent): boolean {
     const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
     const move = z.scaleBy(this.options.zoomSpeed * evt.deltaY);
     this._moveCamera(move);

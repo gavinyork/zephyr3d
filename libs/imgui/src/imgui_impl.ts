@@ -203,7 +203,13 @@ function canvas_on_pointermove(event: PointerEvent): boolean {
 // 2: Secondary button pressed, usually the right button
 // 3: Fourth button, typically the Browser Back button
 // 4: Fifth button, typically the Browser Forward button
-const mouse_button_map: number[] = [0, 2, 1, 3, 4];
+const mouse_button_map: number[] = [
+  ImGui.MouseButton.Left,
+  ImGui.MouseButton.Middle,
+  ImGui.MouseButton.Right,
+  3,
+  4
+];
 
 export function any_pointerdown(): boolean {
   const io = ImGui.GetIO();
@@ -219,7 +225,7 @@ function canvas_on_pointerdown(event: PointerEvent): boolean {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
-  io.MouseDown[mouse_button_map[event.button]] = true;
+  io.MouseDown[mouseButtonToImGui(event.button)] = true;
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -926,6 +932,13 @@ export function captureKeyboard(capture: boolean) {
   wantKeyboard = !!capture;
 }
 
+export function mouseButtonToImGui(button: number) {
+  return mouse_button_map[button] ?? -1;
+}
+
+export function mouseButtonFromImGui(button: ImGui.MouseButton) {
+  return mouse_button_map.indexOf(button);
+}
 export interface ITextureParam {
   internalFormat?: number;
   srcFormat?: number;
