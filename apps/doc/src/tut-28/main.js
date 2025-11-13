@@ -24,7 +24,7 @@ myApp.ready().then(function () {
 
   // Loads a model
   getEngine()
-    .serializationManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb', scene)
+    .resourceManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb', scene)
     .then((info) => {
       info.group.position.setXYZ(0, -0.5, 0);
     });

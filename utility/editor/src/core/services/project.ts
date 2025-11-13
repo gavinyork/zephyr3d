@@ -57,9 +57,6 @@ export class ProjectService {
   static get assetDir() {
     return '/assets';
   }
-  static get serializationManager() {
-    return getEngine().serializationManager;
-  }
   static get currentProject() {
     return this._currentProject;
   }

@@ -133,7 +133,7 @@ export class GLTFImporter implements ModelImporter {
             model.VFS.parseDataURI(buffer.uri) || model.VFS.isAbsoluteURL(buffer.uri)
               ? buffer.uri
               : model.VFS.normalizePath(model.VFS.join(gltf._baseURI, buffer.uri));
-          const buf = (await model.VFS.readFile(uri, { encoding: 'binary' })) as ArrayBuffer; // ProjectService.serializationManager.fetchBinary(uri);
+          const buf = (await model.VFS.readFile(uri, { encoding: 'binary' })) as ArrayBuffer;
           ASSERT(buffer.byteLength === buf.byteLength, 'Invalid GLTF: buffer byte length error.');
           gltf._loadedBuffers.push(buf);
         }

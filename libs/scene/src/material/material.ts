@@ -145,10 +145,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   copyFrom(other: this) {
     this.clearCache();
     this._numPasses = other._numPasses;
-    getEngine().serializationManager.setAssetId(
-      this,
-      getEngine().serializationManager.getAssetId(other.coreMaterial)
-    );
+    getEngine().resourceManager.setAssetId(this, getEngine().resourceManager.getAssetId(other.coreMaterial));
   }
   /**
    * Incremented when the material’s GPU-relevant state changes and render bundles

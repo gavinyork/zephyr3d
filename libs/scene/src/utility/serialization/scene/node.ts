@@ -5,12 +5,12 @@ import type { SerializableClass } from '../types';
 import type { DiffPatch, DiffValue } from '@zephyr3d/base';
 import { applyPatch, ASSERT, degree2radian, diff, DRef, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 
 /** @internal */
-export function getSceneNodeClass(manager: SerializationManager): SerializableClass {
+export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: SceneNode,
     name: 'SceneNode',

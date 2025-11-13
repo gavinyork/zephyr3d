@@ -66,7 +66,7 @@ class MyAnimationTrack extends AnimationTrack {
 // 创建动画并使用自定义轨道
 
 // 假定model是一个加载好的模型
-const model = await getEngine().serializationManager.fetchModel(MODEL_URL, scene);
+const model = await getEngine().resourceManager.fetchModel(MODEL_URL, scene);
 // 获取model的动画集
 const animationSet = model.group.animationSet;
 // 创建一个动画

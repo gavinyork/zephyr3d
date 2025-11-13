@@ -65,7 +65,7 @@ class MyAnimationTrack extends AnimationTrack {
 // Create animations and use custom tracks
 
 // Assume model is a loaded model
-const model = await getEngine().serializationManager.fetchModel(MODEL_URL, scene);
+const model = await getEngine().resourceManager.fetchModel(MODEL_URL, scene);
 // Get the animation set object of this model
 const animationSet = model.group.animationSet;
 // Create an animation

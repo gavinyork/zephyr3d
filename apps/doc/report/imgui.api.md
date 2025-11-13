@@ -34,6 +34,14 @@ export function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?
 // @public
 export function imGuiInjectEvent(ev: Event, type?: string): boolean;
 
+// Warning: (ae-forgotten-export) The symbol "ImGuiMouseButton" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function imGuiMouseButtonFromImGui(button: ImGuiMouseButton): number;
+
+// @public (undocumented)
+export function imGuiMouseButtonToImGui(button: number): number;
+
 // @public
 export function imGuiNewFrame(): void;
 

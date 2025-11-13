@@ -5,14 +5,14 @@ import type { SerializableClass } from '../types';
 import { panoramaToCubemap } from '../../panorama';
 import { prefilterCubemap } from '../../pmrem';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
 import { getDevice } from '../../../app/api';
 import type { SceneNode } from '../../../scene';
 
 /** @internal */
-export function getSceneClass(manager: SerializationManager): SerializableClass {
+export function getSceneClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: Scene,
     name: 'Scene',

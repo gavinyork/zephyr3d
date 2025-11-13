@@ -8,11 +8,11 @@ import type {
 import type { PropertyAccessor } from '../types';
 import type { Material } from '../../../material';
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import { getDevice } from '../../../app/api';
 
 export function getTextureProps<T extends Material>(
-  manager: SerializationManager,
+  manager: ResourceManager,
   name: keyof T & string & { [P in keyof T]: T[P] extends Texture2D | TextureCube ? P : never }[keyof T],
   type: T[typeof name] extends Texture2D ? '2D' : T[typeof name] extends TextureCube ? 'Cube' : never,
   sRGB: boolean,

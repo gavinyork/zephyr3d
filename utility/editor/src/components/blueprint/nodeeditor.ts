@@ -275,7 +275,7 @@ export class NodeEditor extends Observable<{
   }
   public async saveState(): Promise<NodeEditorState> {
     const nodes = [...this.nodes.values()].map(async (node) => {
-      const impl = (await getEngine().serializationManager.serializeObject(node.impl)) as IGraphNode;
+      const impl = (await getEngine().resourceManager.serializeObject(node.impl)) as IGraphNode;
       return {
         id: node.id,
         position: node.position ? [node.position.x, node.position.y] : null,
@@ -308,7 +308,7 @@ export class NodeEditor extends Observable<{
     // load nodes
     let maxId = 0;
     for (const node of state.nodes) {
-      const impl = await getEngine().serializationManager.deserializeObject<IGraphNode>(null, node.node);
+      const impl = await getEngine().resourceManager.deserializeObject<IGraphNode>(null, node.node);
       const n = new GNode(
         this,
         node.position ? new ImGui.ImVec2(node.position[0], node.position[1]) : null,

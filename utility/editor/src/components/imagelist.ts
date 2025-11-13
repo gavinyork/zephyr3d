@@ -1,7 +1,7 @@
 import { DRef, Disposable, makeObservable } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import { getDevice } from '@zephyr3d/scene';
+import { getDevice, getEngine } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
 
 type ImageInfo = {
@@ -151,8 +151,8 @@ export class ImageList extends makeObservable(Disposable)<{
         const mimeType = ProjectService.VFS.guessMIMEType(assetId);
         if (this._mimeTypes.includes(mimeType)) {
           const path = assetId;
-          ProjectService.serializationManager
-            .fetchTexture<Texture2D>(path, {
+          getEngine()
+            .resourceManager.fetchTexture<Texture2D>(path, {
               linearColorSpace: this._linearColorSpace
             })
             .then((tex) => {

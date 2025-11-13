@@ -2,7 +2,7 @@ import { ASSERT, type VFS } from '@zephyr3d/base';
 import { SharedModel } from '../../loaders/model';
 import type { ModelImporter } from '../../loaders/importer';
 import { GLTFImporter } from '../../loaders/gltf/gltf_importer';
-import type { SceneNode, SerializationManager } from '@zephyr3d/scene';
+import type { SceneNode, ResourceManager } from '@zephyr3d/scene';
 
 export class ResourceService {
   static async importModel(srcVFS: VFS, path: string): Promise<SharedModel> {
@@ -23,7 +23,7 @@ export class ResourceService {
   }
   static async savePrefab(
     node: SceneNode,
-    manager: SerializationManager,
+    manager: ResourceManager,
     path: string,
     name: string
   ): Promise<void> {

@@ -5,7 +5,7 @@
 ```javascript
 
 // 载入动画模型，fetchModel()返回的对象包含一个模型节点和一个AnimationSet对象，如果模型不包含动画，AnimationSet对象为null。
-const model = await getEngine().serializationManager.fetchModel('assets/models/CesiumMan.glb', scene);
+const model = await getEngine().resourceManager.fetchModel('assets/models/CesiumMan.glb', scene);
 // 如果模型包含动画
 if (model.animationSet) {
   // AnimationSet.getAnimationNames()方法用来获取所有动画名字

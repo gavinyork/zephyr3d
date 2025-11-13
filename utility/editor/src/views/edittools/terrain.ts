@@ -647,7 +647,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
         } else {
           files[0].arrayBuffer().then((buffer) => {
             getEngine()
-              .serializationManager.loadTextureFromBuffer(buffer, files[0].type, false, { mipFilter: 'none' })
+              .resourceManager.loadTextureFromBuffer(buffer, files[0].type, false, { mipFilter: 'none' })
               .then((tex) => {
                 if (!tex || !tex.isTexture2D()) {
                   Dialog.messageBox('Error', 'Invalid texture');

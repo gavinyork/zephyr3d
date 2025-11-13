@@ -2,6 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { PropertyType } from '@zephyr3d/scene';
 import {
   AnimationClip,
+  getEngine,
   PropertyTrack,
   SceneNode,
   type PropertyAccessor,
@@ -192,7 +193,7 @@ class PropertyGroup {
   }
   setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any, index?: number, count?: number) {
     if (this.value.object[0] !== obj || this.prop !== prop) {
-      const serializationManager = ProjectService.serializationManager;
+      const resourceManager = getEngine().resourceManager;
       this.value.object[0] = obj ?? null;
       this.property = null;
       this.object = parentObj;
@@ -205,7 +206,7 @@ class PropertyGroup {
       }
       this.objectTypes =
         prop?.options?.objectTypes?.length > 0
-          ? (prop.options.objectTypes.map((ctor) => serializationManager.getClassByConstructor(ctor)) ?? [])
+          ? (prop.options.objectTypes.map((ctor) => resourceManager.getClassByConstructor(ctor)) ?? [])
           : null;
       if (this.objectTypes?.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
         this.objectTypes.unshift(null);
@@ -225,9 +226,9 @@ class PropertyGroup {
         let cls: SerializableClass = null;
         let ctor = this.value.object[0].constructor as GenericConstructor;
         while (ctor) {
-          cls = serializationManager.getClassByConstructor(ctor);
+          cls = resourceManager.getClassByConstructor(ctor);
           if (cls) {
-            const props = serializationManager
+            const props = resourceManager
               .getPropertiesByClass(cls)
               .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0], -1));
             if (props.length > 0) {
@@ -432,7 +433,7 @@ export class PropertyEditor extends Observable<{
                   this.dispatchEvent(
                     'end_edit_track',
                     group.value.object[0],
-                    ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0]),
+                    getEngine().resourceManager.findAnimationTarget(node, group.value.object[0]),
                     false
                   );
                 }
@@ -455,7 +456,7 @@ export class PropertyEditor extends Observable<{
                 this.dispatchEvent(
                   'request_edit_track',
                   group.value.object[0],
-                  ProjectService.serializationManager.findAnimationTarget(node, group.value.object[0])
+                  getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])
                 );
               }
             }
@@ -895,7 +896,7 @@ export class PropertyEditor extends Observable<{
                 ImGui.OpenPopup('X##list');
                 if (ImGui.BeginPopup('X##list')) {
                   for (const t of property.value.options.objectTypes) {
-                    const cls = ProjectService.serializationManager.getClassByConstructor(t);
+                    const cls = getEngine().resourceManager.getClassByConstructor(t);
                     if (cls && ImGui.MenuItem(`${cls.name}##create`)) {
                       alert(cls.name);
                     }

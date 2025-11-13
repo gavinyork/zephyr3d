@@ -54,7 +54,7 @@ const myApp = new Application({
 
 myApp.ready().then(async () => {
   const scene = new Scene();
-  const model = await getEngine().serializationManager.fetchModel(
+  const model = await getEngine().resourceManager.fetchModel(
     'https://cdn.zephyr3d.org/doc/assets/models/BoxTextured.glb',
     scene
   );

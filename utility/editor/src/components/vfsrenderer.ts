@@ -18,6 +18,7 @@ import { DlgImport } from '../views/dlg/importdlg';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
+import { getEngine } from '@zephyr3d/scene';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -1220,7 +1221,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             dlgProgressBar.setProgress(i + 1, result.paths.length);
             try {
               const sharedModel = await ResourceService.importModel(dtVFS, result.paths[i]);
-              await sharedModel.savePrefab(ProjectService.serializationManager, info.targetDirectory.path);
+              await sharedModel.savePrefab(getEngine().resourceManager, info.targetDirectory.path);
             } catch (err) {
               console.error(`Load model ${result.paths[i]} failed: ${err}`);
             }

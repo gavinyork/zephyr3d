@@ -196,12 +196,12 @@ export class PBRMaterialEditor extends GraphEditor {
           Dialog.messageBox('Error', msg);
         }
         this._version = this.getNodeEditor('fragment').version;
-        await getEngine().serializationManager.reloadBluePrintMaterials();
+        await getEngine().resourceManager.reloadBluePrintMaterials();
       } else {
         try {
           const json = {
             type: 'Default',
-            data: await ProjectService.serializationManager.serializeObject(this._editMaterial.get())
+            data: await getEngine().resourceManager.serializeObject(this._editMaterial.get())
           };
           await VFS.writeFile(path, JSON.stringify(json, null, 2), { encoding: 'utf8', create: true });
         } catch (err) {
@@ -210,7 +210,7 @@ export class PBRMaterialEditor extends GraphEditor {
           Dialog.messageBox('Error', msg);
         }
         this._version = 0;
-        await getEngine().serializationManager.reloadBluePrintMaterials();
+        await getEngine().resourceManager.reloadBluePrintMaterials();
       }
     }
   }
@@ -296,10 +296,7 @@ export class PBRMaterialEditor extends GraphEditor {
           blueprintState = blueprintData.state;
           this._isBlueprint = true;
         } else {
-          const material = await ProjectService.serializationManager.deserializeObject<MeshMaterial>(
-            null,
-            data.data
-          );
+          const material = await getEngine().resourceManager.deserializeObject<MeshMaterial>(null, data.data);
           this._editMaterial.set(material);
           this._previewMesh.get().material = material;
           this.propEditor.object = material;
@@ -363,7 +360,7 @@ export class PBRMaterialEditor extends GraphEditor {
         roots.push(v.id);
       }
     }
-    return ProjectService.serializationManager.createBluePrintDAG(nodeMap, roots, editor.links);
+    return getEngine().resourceManager.createBluePrintDAG(nodeMap, roots, editor.links);
   }
   renderNodeEditor() {
     if (this._isBlueprint) {
@@ -546,7 +543,7 @@ export class PBRMaterialEditor extends GraphEditor {
         u.finalValue = u.value.length === 1 ? u.value[0] : new Float32Array(u.value);
       }
       for (const u of uniforms.uniformTextures) {
-        const tex = await ProjectService.serializationManager.fetchTexture(u.texture, {
+        const tex = await getEngine().resourceManager.fetchTexture(u.texture, {
           linearColorSpace: !u.sRGB
         });
         u.finalTexture?.dispose();
@@ -609,22 +606,24 @@ export class PBRMaterialEditor extends GraphEditor {
       _payload.length === 1 &&
       guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
     ) {
-      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((IRs) => {
-        if (IRs) {
-          const world = this.fragmentEditor.canvasToWorld(new ImGui.ImVec2(x, y));
-          const snapped = this.fragmentEditor.snapWorldToScreenGrid(world, this.fragmentEditor.canvasScale);
-          const node = new GNode(
-            this.fragmentEditor,
-            snapped,
-            new FunctionCallNode(
-              _payload[0].path,
-              ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
-              IRs['func']
-            )
-          );
-          this.fragmentEditor.addNode(node);
-        }
-      });
+      getEngine()
+        .resourceManager.loadBluePrint(_payload[0].path)
+        .then((IRs) => {
+          if (IRs) {
+            const world = this.fragmentEditor.canvasToWorld(new ImGui.ImVec2(x, y));
+            const snapped = this.fragmentEditor.snapWorldToScreenGrid(world, this.fragmentEditor.canvasScale);
+            const node = new GNode(
+              this.fragmentEditor,
+              snapped,
+              new FunctionCallNode(
+                _payload[0].path,
+                ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
+                IRs['func']
+              )
+            );
+            this.fragmentEditor.addNode(node);
+          }
+        });
     }
   }
   private dragdropVertex(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
@@ -632,22 +631,24 @@ export class PBRMaterialEditor extends GraphEditor {
       _payload.length === 1 &&
       guessMimeType(_payload[0].path) === 'application/vnd.zephyr3d.blueprint.mf+json'
     ) {
-      ProjectService.serializationManager.loadBluePrint(_payload[0].path).then((IRs) => {
-        if (IRs) {
-          const world = this.vertexEditor.canvasToWorld(new ImGui.ImVec2(x, y));
-          const snapped = this.vertexEditor.snapWorldToScreenGrid(world, this.vertexEditor.canvasScale);
-          const node = new GNode(
-            this.vertexEditor,
-            snapped,
-            new FunctionCallNode(
-              _payload[0].path,
-              ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
-              IRs['func']
-            )
-          );
-          this.vertexEditor.addNode(node);
-        }
-      });
+      getEngine()
+        .resourceManager.loadBluePrint(_payload[0].path)
+        .then((IRs) => {
+          if (IRs) {
+            const world = this.vertexEditor.canvasToWorld(new ImGui.ImVec2(x, y));
+            const snapped = this.vertexEditor.snapWorldToScreenGrid(world, this.vertexEditor.canvasScale);
+            const node = new GNode(
+              this.vertexEditor,
+              snapped,
+              new FunctionCallNode(
+                _payload[0].path,
+                ProjectService.VFS.basename(_payload[0].path, ProjectService.VFS.extname(_payload[0].path)),
+                IRs['func']
+              )
+            );
+            this.vertexEditor.addNode(node);
+          }
+        });
     }
   }
 }

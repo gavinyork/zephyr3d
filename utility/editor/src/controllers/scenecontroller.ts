@@ -1,4 +1,4 @@
-import type { Scene } from '@zephyr3d/scene';
+import { getEngine, type Scene } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -181,14 +181,14 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
       console.error(msg);
       await DlgMessage.messageBox('Error', msg);
     } else {
-      await ProjectService.serializationManager.saveScene(this.model.scene, this._scenePath);
+      await getEngine().resourceManager.saveScene(this.model.scene, this._scenePath);
       this._editor.currentProject.lastEditScene = this._scenePath;
       await this._editor.saveProject();
       this._sceneChanged = false;
     }
   }
   async loadScene(path: string): Promise<Scene> {
-    return ProjectService.serializationManager.loadScene(path);
+    return getEngine().resourceManager.loadScene(path);
   }
   async openScene(path: string, resetView: boolean) {
     const scene = await this.loadScene(path);

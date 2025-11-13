@@ -127,7 +127,7 @@ export class GLTFViewer {
   }
   async loadModel(url: string) {
     getEngine()
-      .serializationManager.fetchModel(url, this._scene, {
+      .resourceManager.fetchModel(url, this._scene, {
         enableInstancing: true,
         dracoDecoderModule: this._dracoModule
       })

@@ -11,7 +11,7 @@ import type {
   VertexSemantic
 } from '@zephyr3d/device';
 import { getVertexFormatComponentCount } from '@zephyr3d/device';
-import type { MeshMaterial, SerializationManager } from '@zephyr3d/scene';
+import type { MeshMaterial, ResourceManager } from '@zephyr3d/scene';
 import { Scene } from '@zephyr3d/scene';
 import {
   PBRMetallicRoughnessMaterial,
@@ -633,7 +633,7 @@ export class SharedModel extends Disposable {
     this._animations.push(animation);
   }
   /** save as prefab */
-  async savePrefab(manager: SerializationManager, path: string): Promise<void> {
+  async savePrefab(manager: ResourceManager, path: string): Promise<void> {
     await this.preprocess(manager, path);
     const tmpScene = new Scene();
     const node = await this.createSceneNode(manager, tmpScene, false);
@@ -646,7 +646,7 @@ export class SharedModel extends Disposable {
     );
   }
   /** preprocess */
-  async preprocess(manager: SerializationManager, destPath: string): Promise<void> {
+  async preprocess(manager: ResourceManager, destPath: string): Promise<void> {
     const srcVFS = this._vfs ?? manager.VFS;
     const destName = this._name;
     if (this._imageList.length > 0) {
@@ -731,11 +731,7 @@ export class SharedModel extends Disposable {
       }
     }
   }
-  async createSceneNode(
-    manager: SerializationManager,
-    scene: Scene,
-    instancing: boolean
-  ): Promise<SceneNode> {
+  async createSceneNode(manager: ResourceManager, scene: Scene, instancing: boolean): Promise<SceneNode> {
     const group = new SceneNode(scene);
     group.name = this.name;
     const animationSet = group.animationSet;
@@ -842,7 +838,7 @@ export class SharedModel extends Disposable {
     this._animations = [];
   }
   private async setAssetNodeToSceneNode(
-    manager: SerializationManager,
+    manager: ResourceManager,
     scene: Scene,
     parent: SceneNode,
     assetNode: AssetHierarchyNode,
@@ -891,7 +887,7 @@ export class SharedModel extends Disposable {
       await this.setAssetNodeToSceneNode(manager, scene, node, child, skeletonMeshMap, nodeMap, instancing);
     }
   }
-  private async image2Texture(manager: SerializationManager, info: AssetTextureInfo): Promise<Texture2D> {
+  private async image2Texture(manager: ResourceManager, info: AssetTextureInfo): Promise<Texture2D> {
     if (info.image.uri) {
       const texture = await manager.fetchTexture<Texture2D>(info.image.uri, {
         linearColorSpace: !info.sRGB
@@ -908,7 +904,7 @@ export class SharedModel extends Disposable {
     }
   }
   private async createTexture(
-    manager: SerializationManager,
+    manager: ResourceManager,
     info: AssetTextureInfo
   ): Promise<MaterialTextureInfo> {
     const texture = await this.image2Texture(manager, info);
@@ -929,7 +925,7 @@ export class SharedModel extends Disposable {
     };
   }
 
-  private async createPrimitive(manager: SerializationManager, info: AssetPrimitiveInfo): Promise<Primitive> {
+  private async createPrimitive(manager: ResourceManager, info: AssetPrimitiveInfo): Promise<Primitive> {
     if (info.path) {
       return manager.fetchPrimitive(info.path);
     }
@@ -947,7 +943,7 @@ export class SharedModel extends Disposable {
     return primitive;
   }
   private async createMaterial(
-    manager: SerializationManager,
+    manager: ResourceManager,
     assetMaterial: AssetMaterial
   ): Promise<MeshMaterial> {
     if (assetMaterial.path) {

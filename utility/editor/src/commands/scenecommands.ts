@@ -5,8 +5,6 @@ import { Mesh } from '@zephyr3d/scene';
 import { Command } from '../core/command';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
-import { ProjectService } from '../core/services/project';
-//import { importModel } from '../loaders/importer';
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
@@ -57,7 +55,7 @@ export class AddPrefabCommand extends Command<SceneNode> {
   async execute() {
     let prefab: SceneNode = null;
     try {
-      prefab = await getEngine().serializationManager.instantiatePrefab(this._scene.rootNode, this._prefab);
+      prefab = await getEngine().resourceManager.instantiatePrefab(this._scene.rootNode, this._prefab);
     } catch (err) {
       console.error(`Load prefab failed: ${this._prefab}: ${err}`);
     }
@@ -99,8 +97,8 @@ export class AddAssetCommand extends Command<SceneNode> {
     let asset: SceneNode = null;
     try {
       //const model = await importModel(this._asset);
-      //asset = await model.createSceneNode(ProjectService.serializationManager, this._scene, false);
-      asset = (await ProjectService.serializationManager.fetchModel(this._asset, this._scene)).group;
+      //asset = await model.createSceneNode(ProjectService.resourceManager, this._scene, false);
+      asset = (await getEngine().resourceManager.fetchModel(this._asset, this._scene)).group;
     } catch (err) {
       console.error(`Load asset failed: ${this._asset}: ${err}`);
     }
@@ -205,8 +203,8 @@ export class AddShapeCommand extends Command<Mesh> {
     this._shapeCls = shapeCls;
   }
   async execute() {
-    const shape = await getEngine().serializationManager.fetchPrimitive(this._shapeCls);
-    const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
+    const shape = await getEngine().resourceManager.fetchPrimitive(this._shapeCls);
+    const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(
       '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
     );
     const mesh = new Mesh(this._scene, shape, material);
@@ -240,16 +238,13 @@ export class NodeDeleteCommand extends Command {
   }
   async execute(): Promise<void> {
     const node = findNodeByPath(this._scene.rootNode, this._nodeId);
-    this._archive = await ProjectService.serializationManager.serializeObject(node, null, null);
+    this._archive = await getEngine().resourceManager.serializeObject(node, null, null);
     node.remove();
   }
   async undo() {
     if (this._archive) {
       const parent = findNodeByPath(this._scene.rootNode, this._parentId);
-      const node = await ProjectService.serializationManager.deserializeObject<SceneNode>(
-        parent,
-        this._archive
-      );
+      const node = await getEngine().resourceManager.deserializeObject<SceneNode>(parent, this._archive);
       if (node) {
         node.persistentId = this._nodeId.split('/').at(-1);
         node.parent = parent;

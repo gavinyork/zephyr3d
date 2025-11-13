@@ -1,4 +1,4 @@
-import type { SerializableClass, SerializationManager } from '../../serialization';
+import type { SerializableClass, ResourceManager } from '../../serialization';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
@@ -153,7 +153,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * Uses a custom createFunc to asynchronously load the function blueprint
    * from the file system. The initialization parameter is the blueprint path.
    */
-  static getSerializationCls(manager: SerializationManager): SerializableClass {
+  static getSerializationCls(manager: ResourceManager): SerializableClass {
     return {
       ctor: FunctionCallNode,
       name: 'FunctionCallNode',

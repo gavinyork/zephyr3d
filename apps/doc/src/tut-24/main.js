@@ -17,7 +17,7 @@ const myApp = new Application({
 myApp.ready().then(async () => {
   const scene = new Scene();
 
-  const actor = await getEngine().serializationManager.fetchModel(
+  const actor = await getEngine().resourceManager.fetchModel(
     'https://cdn.zephyr3d.org/doc/assets/models/CesiumMan.glb',
     scene
   );

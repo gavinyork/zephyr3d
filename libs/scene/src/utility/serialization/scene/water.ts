@@ -6,7 +6,7 @@ import type { SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 
 /** @internal */
 export function getFBMWaveGeneratorClass(): SerializableClass {
@@ -181,7 +181,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
 }
 
 /** @internal */
-export function getWaterClass(manager: SerializationManager): SerializableClass {
+export function getWaterClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: Water,
     name: 'Water',

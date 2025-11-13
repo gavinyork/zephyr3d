@@ -201,7 +201,7 @@ const defaultValues: Record<PropertyType, any> = {
  *
  * @public
  */
-export class SerializationManager {
+export class ResourceManager {
   private readonly _classMap: Map<GenericConstructor, SerializableClass>;
   private _vfs: VFS;
   private _propMap: Record<string, PropertyAccessor>;
@@ -211,7 +211,7 @@ export class SerializationManager {
   private readonly _editorMode: boolean;
   private _allocated: WeakMap<any, string>;
   /**
-   * Create a SerializationManager bound to a virtual file system.
+   * Create a ResourceManager bound to a virtual file system.
    *
    * @param vfs - Virtual file system used for reading/writing assets and scenes.
    */
@@ -999,7 +999,7 @@ export class SerializationManager {
     let targetObj: object = node;
     while (parts.length > 0) {
       const propName = parts.shift();
-      const info = SerializationManager.parsePropertyPath(propName);
+      const info = ResourceManager.parsePropertyPath(propName);
       if (!info) {
         return null;
       }

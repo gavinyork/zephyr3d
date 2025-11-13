@@ -23,7 +23,7 @@ myApp.ready().then(function () {
 
   // Load a model
   getEngine()
-    .serializationManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/Duck.glb', scene)
+    .resourceManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/Duck.glb', scene)
     .then((info) => {
       info.group.position.setXYZ(0, -0.5, 0);
     });

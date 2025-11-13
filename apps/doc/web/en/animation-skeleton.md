@@ -6,7 +6,7 @@ Each vertex of the model is influenced by several joints, resulting in motion. T
 
 // When loading an animation model, the object returned by fetchModel() contains a model node and an AnimationSet object,
 // and if the model does not contain animations, the AnimationSet object is null.
-const model = await getEngine().serializationManager.fetchModel('assets/models/CesiumMan.glb', scene);
+const model = await getEngine().resourceManager.fetchModel('assets/models/CesiumMan.glb', scene);
 // If the model contains animations
 if (model.animationSet) {
   // The AnimationSet.getAnimationNames() method is used to get all animation names

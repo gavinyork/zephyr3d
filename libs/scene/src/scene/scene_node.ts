@@ -415,8 +415,8 @@ export class SceneNode
     });
     const parent = this.parent;
     const tmpParent = new SceneNode(this.scene);
-    const data = await getEngine().serializationManager.serializeObject(this);
-    const other = await getEngine().serializationManager.deserializeObject<this>(tmpParent, data);
+    const data = await getEngine().resourceManager.serializeObject(this);
+    const other = await getEngine().resourceManager.deserializeObject<this>(tmpParent, data);
     other.persistentId = randomUUID();
     other.parent = parent;
     tmpParent.dispose();

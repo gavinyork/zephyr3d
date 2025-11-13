@@ -393,7 +393,7 @@ export class AssetHierarchyNode extends NamedObject {
 
 // @public
 export class AssetManager {
-    constructor(serializationManager?: SerializationManager);
+    constructor(resourceManager?: ResourceManager);
     // Warning: (ae-forgotten-export) The symbol "AbstractModelLoader" needs to be exported by the entry point index.d.ts
     static addModelLoader(loader: AbstractModelLoader): void;
     // Warning: (ae-forgotten-export) The symbol "AbstractTextureLoader" needs to be exported by the entry point index.d.ts
@@ -716,18 +716,18 @@ export class BaseCameraController {
     // @internal
     _getCamera(): Camera;
     lookAt(from: Vector3, to: Vector3, up: Vector3): void;
-    onKeyDown(evt: KeyboardEvent): boolean;
-    protected _onKeyDown(_evt: KeyboardEvent): boolean;
-    onKeyUp(evt: KeyboardEvent): boolean;
-    protected _onKeyUp(_evt: KeyboardEvent): boolean;
-    onMouseDown(evt: PointerEvent): boolean;
-    protected _onMouseDown(_evt: PointerEvent): boolean;
-    onMouseMove(evt: PointerEvent): boolean;
-    protected _onMouseMove(_evt: PointerEvent): boolean;
-    onMouseUp(evt: PointerEvent): boolean;
-    protected _onMouseUp(_evt: PointerEvent): boolean;
-    onMouseWheel(evt: WheelEvent): boolean;
-    protected _onMouseWheel(_evt: WheelEvent): boolean;
+    onKeyDown(evt: IControllerKeydownEvent): boolean;
+    protected _onKeyDown(_evt: IControllerKeydownEvent): boolean;
+    onKeyUp(evt: IControllerKeyupEvent): boolean;
+    protected _onKeyUp(_evt: IControllerKeyupEvent): boolean;
+    onMouseDown(evt: IControllerPointerDownEvent): boolean;
+    protected _onMouseDown(_evt: IControllerPointerDownEvent): boolean;
+    onMouseMove(evt: IControllerPointerMoveEvent): boolean;
+    protected _onMouseMove(_evt: IControllerPointerMoveEvent): boolean;
+    onMouseUp(evt: IControllerPointerUpEvent): boolean;
+    protected _onMouseUp(_evt: IControllerPointerUpEvent): boolean;
+    onMouseWheel(evt: IControllerWheelEvent): boolean;
+    protected _onMouseWheel(_evt: IControllerWheelEvent): boolean;
     reset(): void;
     // @internal
     _setCamera(camera: Camera): void;
@@ -839,7 +839,7 @@ export class BatchGroup extends GraphNode {
     setBoundingVolume(bv: BoundingVolume): void;
 }
 
-// @public (undocumented)
+// @public
 export class BillboardMatrixNode extends BaseGraphNode {
     constructor();
     static getSerializationCls(): SerializableClass;
@@ -963,7 +963,7 @@ export interface BlueprintDAG {
     roots: number[];
 }
 
-// @public (undocumented)
+// @public
 export interface BluePrintUniformTexture extends IRUniformTexture {
     // (undocumented)
     finalSampler?: TextureSampler;
@@ -977,7 +977,7 @@ export interface BluePrintUniformTexture extends IRUniformTexture {
     params?: Vector4;
 }
 
-// @public (undocumented)
+// @public
 export interface BluePrintUniformValue extends IRUniformValue {
     // (undocumented)
     finalValue?: number | Float32Array<ArrayBuffer>;
@@ -1201,7 +1201,7 @@ export class Camera extends SceneNode {
     // (undocumented)
     getRotationMatrix(): Matrix4x4;
     getTanHalfFovy(): number;
-    handleEvent(ev: Event, type?: string): boolean;
+    handleEvent<T extends IBaseEvent<any>>(ev: T, type?: string): boolean;
     get HDR(): boolean;
     set HDR(val: boolean);
     // @internal
@@ -2198,7 +2198,10 @@ export function encodeRGBM(scope: PBInsideFunctionScope, rgb: PBShaderExp, maxRa
 export class Engine {
     constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean);
     // (undocumented)
-    protected _activeRenderables: DRef<IRenderable>[];
+    protected _activeRenderables: {
+        renderable: DRef<IRenderable>;
+        hook?: IRenderHook;
+    }[];
     attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>>;
     detachAllScripts(): void;
     detachScript<T extends Host>(host: T, idOrInstance: string | RuntimeScript<T>): void;
@@ -2211,9 +2214,9 @@ export class Engine {
     readFile<T extends ReadOptions['encoding'] = 'binary'>(path: string, encoding?: T): Promise<T extends 'binary' ? ArrayBuffer : string>;
     // (undocumented)
     render(): void;
-    get serializationManager(): SerializationManager;
+    get resourceManager(): ResourceManager;
     // (undocumented)
-    setRenderable(renderable: IRenderable, layer?: number): void;
+    setRenderable(renderable: IRenderable, layer?: number, hook?: IRenderHook): void;
     // (undocumented)
     startup(startupScene: string, splashScreen: string, startupScript: string): Promise<void>;
     update(deltaTime: number, elapsedTime: number): void;
@@ -2603,15 +2606,15 @@ export type FogType = 'height_fog' | 'none';
 export class FPSCameraController extends BaseCameraController {
     constructor(options?: FPSCameraControllerOptions);
     // @override
-    protected _onKeyDown(evt: KeyboardEvent): boolean;
+    protected _onKeyDown(evt: IControllerKeydownEvent): boolean;
     // @override
-    protected _onKeyUp(evt: KeyboardEvent): boolean;
+    protected _onKeyUp(evt: IControllerKeyupEvent): boolean;
     // @override
-    protected _onMouseDown(evt: PointerEvent): boolean;
+    protected _onMouseDown(evt: IControllerPointerDownEvent): boolean;
     // @override
-    protected _onMouseMove(evt: PointerEvent): boolean;
+    protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean;
     // @override
-    protected _onMouseUp(evt: PointerEvent): boolean;
+    protected _onMouseUp(evt: IControllerPointerUpEvent): boolean;
     // @override
     reset(): void;
     setOptions(opt?: FPSCameraControllerOptions): void;
@@ -2648,7 +2651,7 @@ export class FunctionCallNode extends BaseGraphNode {
         name: string;
         type: string;
     }[];
-    static getSerializationCls(manager: SerializationManager): SerializableClass;
+    static getSerializationCls(manager: ResourceManager): SerializableClass;
     protected getType(id: number): string;
     get IR(): MaterialBlueprintIR;
     get name(): string;
@@ -2915,7 +2918,7 @@ export function getPunctualLightClass(): SerializableClass;
 // Warning: (ae-internal-missing-underscore) The name "getSceneNodeClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function getSceneNodeClass(manager: SerializationManager): SerializableClass;
+export function getSceneNodeClass(manager: ResourceManager): SerializableClass;
 
 // Warning: (ae-internal-missing-underscore) The name "getSkyView" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -3269,6 +3272,68 @@ export interface IAttachedScript {
     url: string;
 }
 
+// @public (undocumented)
+export interface IBaseEvent<T extends string> {
+    // (undocumented)
+    preventDefault?: () => void;
+    // (undocumented)
+    type: T;
+}
+
+// @public (undocumented)
+export interface IControllerKeyboardEvent<T extends string> extends IBaseEvent<T>, IModKey {
+    // (undocumented)
+    readonly code: string;
+    // (undocumented)
+    readonly key: string;
+}
+
+// @public (undocumented)
+export interface IControllerKeydownEvent extends IControllerKeyboardEvent<'keydown'> {
+}
+
+// @public (undocumented)
+export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keypress'> {
+}
+
+// @public (undocumented)
+export interface IControllerKeyupEvent extends IControllerKeyboardEvent<'keyup'> {
+}
+
+// @public (undocumented)
+export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, IModKey {
+    // (undocumented)
+    readonly button: number;
+    // (undocumented)
+    readonly offsetX: number;
+    // (undocumented)
+    readonly offsetY: number;
+}
+
+// @public (undocumented)
+export interface IControllerPointerCancelEvent extends IControllerMouseEvent<'pointercancel'> {
+}
+
+// @public (undocumented)
+export interface IControllerPointerDownEvent extends IControllerMouseEvent<'pointerdown'> {
+}
+
+// @public (undocumented)
+export interface IControllerPointerMoveEvent extends IControllerMouseEvent<'pointermove'> {
+}
+
+// @public (undocumented)
+export interface IControllerPointerUpEvent extends IControllerMouseEvent<'pointerup'> {
+}
+
+// @public (undocumented)
+export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
+    // (undocumented)
+    readonly deltaX: number;
+    // (undocumented)
+    readonly deltaY: number;
+}
+
 // @public
 export interface IGraphNode extends IEventTarget<{
     changed: [];
@@ -3400,6 +3465,18 @@ export interface IMixinVertexColor {
     vertexColor: boolean;
 }
 
+// @public (undocumented)
+export interface IModKey {
+    // (undocumented)
+    readonly altKey: boolean;
+    // (undocumented)
+    readonly ctrlKey: boolean;
+    // (undocumented)
+    readonly metaKey: boolean;
+    // (undocumented)
+    readonly shiftKey: boolean;
+}
+
 // @public
 export type InputEventHandler = (ev: Event, type?: string) => boolean;
 
@@ -3485,6 +3562,14 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
 export interface IRenderable extends IDisposable {
     // (undocumented)
     render(): void;
+}
+
+// @public
+export interface IRenderHook {
+    // (undocumented)
+    afterRender?: (renderable: any) => void;
+    // (undocumented)
+    beforeRender?: (renderable: any) => boolean | void;
 }
 
 // @public
@@ -4295,13 +4380,13 @@ export class OrbitCameraController extends BaseCameraController {
     // (undocumented)
     lookAt(from: Vector3, to: Vector3, up: Vector3): void;
     // @override
-    protected _onMouseDown(evt: PointerEvent): boolean;
+    protected _onMouseDown(evt: IControllerPointerDownEvent): boolean;
     // @override
-    protected _onMouseMove(evt: PointerEvent): boolean;
+    protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean;
     // @override
-    protected _onMouseUp(evt: PointerEvent): boolean;
+    protected _onMouseUp(evt: IControllerPointerUpEvent): boolean;
     // @override
-    protected _onMouseWheel(evt: WheelEvent): boolean;
+    protected _onMouseWheel(evt: IControllerWheelEvent): boolean;
     // @override
     reset(): void;
     setOptions(opt?: OrbitCameraControllerOptions): void;
@@ -4685,7 +4770,7 @@ export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): any
 
 // @public
 export class PerspectiveCamera extends Camera {
-    constructor(scene: Scene, fovY?: number, aspect?: number, near?: number, far?: number);
+    constructor(scene: Scene, fovY?: number, near?: number, far?: number, aspect?: number);
     adjustAspectRatio(): void;
     get aspect(): number;
     set aspect(val: number);
@@ -5310,6 +5395,54 @@ export class ResolveVertexTangentNode extends BaseGraphNode {
 }
 
 // @public
+export class ResourceManager {
+    constructor(vfs: VFS, editorMode?: boolean);
+    get assetManager(): AssetManager;
+    clearCache(): void;
+    // (undocumented)
+    createBluePrintDAG(nodeMap: Record<number, IGraphNode>, roots: number[], links: {
+        startNodeId: number;
+        startSlotId: number;
+        endNodeId: number;
+        endSlotId: number;
+    }[]): BlueprintDAG;
+    deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
+    get editorMode(): boolean;
+    fetchBinary(id: string): Promise<ArrayBuffer>;
+    fetchMaterial<T extends Material = Material>(id: string): Promise<T>;
+    fetchModel(id: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
+    fetchPrimitive<T extends Primitive = Primitive>(id: string): Promise<T>;
+    fetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
+    findAnimationTarget(node: SceneNode, track: PropertyTrack): object;
+    getAssetId(asset: unknown): string;
+    getClassByConstructor(ctor: GenericConstructor): SerializableClass;
+    getClassByName(className: string): SerializableClass;
+    getClassByObject(obj: object): SerializableClass;
+    getClassByProperty(prop: PropertyAccessor): SerializableClass;
+    getClasses(): SerializableClass[];
+    getPropertiesByClass(cls: SerializableClass): PropertyAccessor[];
+    getPropertyByClass(cls: SerializableClass, name: string): PropertyAccessor;
+    getPropertyByName(name: string): PropertyAccessor;
+    getPropertyName(prop: PropertyAccessor): string;
+    instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode>;
+    // (undocumented)
+    loadBluePrint(path: string): Promise<Record<string, MaterialBlueprintIR>>;
+    loadPrefabContent(path: string): Promise<{
+        type: string;
+        data: object;
+    }>;
+    loadScene(filename: string): Promise<Scene>;
+    loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
+    registerClass(cls: SerializableClass): void;
+    reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean): Promise<void>;
+    saveScene(scene: Scene, filename: string): Promise<void>;
+    serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): Promise<any>;
+    setAssetId(asset: unknown, id: string): void;
+    get VFS(): VFS;
+    set VFS(vfs: VFS);
+}
+
+// @public
 export class RuntimeScript<T extends IDisposable | null> {
     onAttached(_host: T): void | Promise<void>;
     onCreated(): void | Promise<void>;
@@ -5695,54 +5828,6 @@ export type SerializableClass = {
     }) => any;
     getProps: () => PropertyAccessor<any>[];
 };
-
-// @public
-export class SerializationManager {
-    constructor(vfs: VFS, editorMode?: boolean);
-    get assetManager(): AssetManager;
-    clearCache(): void;
-    // (undocumented)
-    createBluePrintDAG(nodeMap: Record<number, IGraphNode>, roots: number[], links: {
-        startNodeId: number;
-        startSlotId: number;
-        endNodeId: number;
-        endSlotId: number;
-    }[]): BlueprintDAG;
-    deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
-    get editorMode(): boolean;
-    fetchBinary(id: string): Promise<ArrayBuffer>;
-    fetchMaterial<T extends Material = Material>(id: string): Promise<T>;
-    fetchModel(id: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
-    fetchPrimitive<T extends Primitive = Primitive>(id: string): Promise<T>;
-    fetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
-    findAnimationTarget(node: SceneNode, track: PropertyTrack): object;
-    getAssetId(asset: unknown): string;
-    getClassByConstructor(ctor: GenericConstructor): SerializableClass;
-    getClassByName(className: string): SerializableClass;
-    getClassByObject(obj: object): SerializableClass;
-    getClassByProperty(prop: PropertyAccessor): SerializableClass;
-    getClasses(): SerializableClass[];
-    getPropertiesByClass(cls: SerializableClass): PropertyAccessor[];
-    getPropertyByClass(cls: SerializableClass, name: string): PropertyAccessor;
-    getPropertyByName(name: string): PropertyAccessor;
-    getPropertyName(prop: PropertyAccessor): string;
-    instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode>;
-    // (undocumented)
-    loadBluePrint(path: string): Promise<Record<string, MaterialBlueprintIR>>;
-    loadPrefabContent(path: string): Promise<{
-        type: string;
-        data: object;
-    }>;
-    loadScene(filename: string): Promise<Scene>;
-    loadTextureFromBuffer<T extends BaseTexture>(arrayBuffer: ArrayBuffer | TypedArray, mimeType: string, srgb?: boolean, samplerOptions?: SamplerOptions, texture?: BaseTexture): Promise<T>;
-    registerClass(cls: SerializableClass): void;
-    reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean): Promise<void>;
-    saveScene(scene: Scene, filename: string): Promise<void>;
-    serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): Promise<any>;
-    setAssetId(asset: unknown, id: string): void;
-    get VFS(): VFS;
-    set VFS(vfs: VFS);
-}
 
 // Warning: (ae-internal-missing-underscore) The name "setApp" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -7203,7 +7288,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:15053:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:15112:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

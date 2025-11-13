@@ -5,7 +5,7 @@ import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
-import { SerializationManager } from '../utility';
+import { ResourceManager } from '../utility';
 import type { Scene } from '../scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
 import {
@@ -42,7 +42,7 @@ export interface IRenderHook {
  *
  * Responsibilities:
  * - Manages a {@link ScriptingSystem} for dynamic script attachment and lifecycle.
- * - Manages a {@link SerializationManager} for loading scenes and assets.
+ * - Manages a {@link ResourceManager} for loading scenes and assets.
  * - Maintains a list of active renderable objects to be rendered each frame.
  * - Provides methods to attach/detach scripts, update scripts, load scenes, and read files.
  * - Supports enabling/disabling of runtime operations.
@@ -57,7 +57,7 @@ export interface IRenderHook {
 export class Engine {
   private _builtinsVFS: MemoryFS;
   private _scriptingSystem: ScriptingSystem;
-  private _serializationManager: SerializationManager;
+  private _resourceManager: ResourceManager;
   private _enabled: boolean;
   protected _activeRenderables: {
     renderable: DRef<IRenderable>;
@@ -76,7 +76,7 @@ export class Engine {
     VFS = VFS ?? new HttpFS('./');
     this._builtinsVFS = null;
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });
-    this._serializationManager = new SerializationManager(VFS);
+    this._resourceManager = new ResourceManager(VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
     this._loadingScenes = [];
@@ -88,18 +88,18 @@ export class Engine {
     return this._scriptingSystem.registry.VFS;
   }
   set VFS(vfs: VFS) {
-    if (vfs !== this._serializationManager.VFS) {
-      this._serializationManager.VFS?.close();
-      this._serializationManager.VFS = vfs;
+    if (vfs !== this._resourceManager.VFS) {
+      this._resourceManager.VFS?.close();
+      this._resourceManager.VFS = vfs;
       this._scriptingSystem.registry.VFS = vfs;
       this.ensureBuiltinVFS();
     }
   }
   /**
-   * Exposes the instance of {@link SerializationManager}.
+   * Exposes the instance of {@link ResourceManager}.
    */
-  get serializationManager() {
-    return this._serializationManager;
+  get resourceManager() {
+    return this._resourceManager;
   }
   /** @internal */
   async init() {
@@ -262,7 +262,7 @@ export class Engine {
   }
   private async writeSerializableObject(VFS: VFS, type: string, obj: any, path: string) {
     try {
-      const data = await this.serializationManager.serializeObject(obj);
+      const data = await this.resourceManager.serializeObject(obj);
       const content = JSON.stringify({ type, data }, null, 2);
       await VFS.writeFile(path, content, { encoding: 'utf8', create: true });
     } catch (err) {
@@ -271,7 +271,7 @@ export class Engine {
   }
   private async _loadScene(path: string): Promise<Scene> {
     try {
-      const scene = await this._serializationManager.loadScene(path);
+      const scene = await this._resourceManager.loadScene(path);
       if (scene) {
         if (scene.script) {
           try {

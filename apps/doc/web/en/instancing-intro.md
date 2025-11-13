@@ -75,14 +75,14 @@ this attribute is added, the material will automatically call the createInstance
   for (let i = 0; i < 100; i++) {
     // Loading the same model and setting the enableInstancing property to true
     // automatically utilizes instanced rendering for these models.
-    instancedModels.push(await getEngine().serializationManager.fetchModel(url, scene, {
+    instancedModels.push(await getEngine().resourceManager.fetchModel(url, scene, {
       enableInstancing: true
     }));
   }
   for (let i = 0; i < 100; i++) {
     // Loading the same model without setting the enableInstancing property to true
     // will not use instanced rendering
-    nonInstancedModels.push(await getEngine().serializationManager.fetchModel(url, scene));
+    nonInstancedModels.push(await getEngine().resourceManager.fetchModel(url, scene));
   }
 
 ```

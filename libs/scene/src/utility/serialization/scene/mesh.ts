@@ -21,14 +21,14 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
     class C {
       materialId: string;
       constructor(public material: MeshMaterial) {
-        this.materialId = getEngine().serializationManager.getAssetId(material.coreMaterial) ?? '';
+        this.materialId = getEngine().resourceManager.getAssetId(material.coreMaterial) ?? '';
       }
     }
     const S: SerializableClass = {
       ctor: C,
       name: `${cls.name}InstanceUniforms`,
       async createFunc(_ctx, init) {
-        const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(init);
+        const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
         return { obj: new C(material.createInstance()) };
       },
       getInitParams(obj: C) {
@@ -247,11 +247,11 @@ export function getMeshClass(): SerializableClass {
             mimeTypes: ['application/vnd.zephyr3d.mesh+json']
           },
           get(this: Mesh, value) {
-            value.str[0] = this.primitive ? getEngine().serializationManager.getAssetId(this.primitive) : '';
+            value.str[0] = this.primitive ? getEngine().resourceManager.getAssetId(this.primitive) : '';
           },
           async set(this: Mesh, value) {
             if (value?.str[0]) {
-              const primitive = await getEngine().serializationManager.fetchPrimitive(value.str[0]);
+              const primitive = await getEngine().resourceManager.fetchPrimitive(value.str[0]);
               if (primitive) {
                 this.primitive = primitive;
               } else {
@@ -268,13 +268,11 @@ export function getMeshClass(): SerializableClass {
           },
           get(this: Mesh, value) {
             const m = this.material?.coreMaterial;
-            value.str[0] = getEngine().serializationManager.getAssetId(m) ?? '';
+            value.str[0] = getEngine().resourceManager.getAssetId(m) ?? '';
           },
           async set(this: Mesh, value) {
             if (value?.str[0]) {
-              const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
-                value.str[0]
-              );
+              const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(value.str[0]);
               if (material) {
                 this.material = material;
               } else {

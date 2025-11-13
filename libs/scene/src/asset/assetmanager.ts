@@ -42,7 +42,7 @@ import type {
   GraphStructure,
   IGraphNode,
   NodeConnection,
-  SerializationManager
+  ResourceManager
 } from '../utility';
 import { BoundingBox } from '../utility/bounding_volume';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
@@ -196,12 +196,12 @@ export class AssetManager {
     [url: string]: Promise<any>;
   };
   /** @internal */
-  private readonly _serializationManager: SerializationManager;
+  private readonly _resourceManager: ResourceManager;
   /**
    * Creates an instance of AssetManager
    */
-  constructor(serializationManager?: SerializationManager) {
-    this._serializationManager = serializationManager ?? getEngine().serializationManager;
+  constructor(resourceManager?: ResourceManager) {
+    this._resourceManager = resourceManager ?? getEngine().resourceManager;
     this._textures = {};
     this._models = {};
     this._materials = {};
@@ -215,7 +215,7 @@ export class AssetManager {
    * VFS used to read resources (files, URLs, virtual mounts).
    */
   get vfs() {
-    return this._serializationManager.VFS;
+    return this._resourceManager.VFS;
   }
   /**
    * Clear cached references and promises.
@@ -628,7 +628,7 @@ export class AssetManager {
         );
         return primitive as T;
       } else {
-        const obj = await this._serializationManager.deserializeObject<T>(null, content.data);
+        const obj = await this._resourceManager.deserializeObject<T>(null, content.data);
         if (!(obj instanceof Primitive)) {
           if (typeof (obj as any).dispose === 'function') {
             (obj as any).dispose();
@@ -742,7 +742,7 @@ export class AssetManager {
           data.uniformTextures
         ) as unknown as T;
       } else {
-        const obj = await this._serializationManager.deserializeObject<T>(null, content.data);
+        const obj = await this._resourceManager.deserializeObject<T>(null, content.data);
         if (!(obj instanceof Material)) {
           if (typeof (obj as any).dispose === 'function') {
             (obj as any).dispose();
@@ -915,7 +915,7 @@ export class AssetManager {
         const nodeMap: Record<number, IGraphNode> = {};
         const state = states[k];
         for (const node of state.nodes) {
-          const impl = await this._serializationManager.deserializeObject<IGraphNode>(null, node.node);
+          const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
           nodeMap[node.id] = impl;
           if (impl.outputs.length === 0) {
             roots.push(node.id);

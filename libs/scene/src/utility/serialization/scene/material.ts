@@ -13,14 +13,14 @@ import {
 import type { PropertyAccessor, SerializableClass } from '../types';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import { getMeshMaterialInstanceUniformsClass } from './mesh';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
-function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRMaterial>[] {
+function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMaterial>[] {
   return [
     {
       name: 'IOR',
@@ -427,7 +427,7 @@ function getPBRCommonProps(manager: SerializationManager): PropertyAccessor<PBRM
   ];
 }
 
-function getLitMaterialProps(manager: SerializationManager): PropertyAccessor<LitPropTypes>[] {
+function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitPropTypes>[] {
   return [
     ...getUnlitMaterialProps(manager),
     {
@@ -462,7 +462,7 @@ function getLitMaterialProps(manager: SerializationManager): PropertyAccessor<Li
   ];
 }
 
-function getUnlitMaterialProps(manager: SerializationManager): PropertyAccessor<UnlitPropTypes>[] {
+function getUnlitMaterialProps(manager: ResourceManager): PropertyAccessor<UnlitPropTypes>[] {
   return [
     {
       name: 'vertexColor',
@@ -622,7 +622,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
 }
 
 /** @internal */
-export function getParticleMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getParticleMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: ParticleMaterial,
@@ -717,7 +717,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
 }
 
 /** @internal */
-export function getUnlitMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getUnlitMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: UnlitMaterial,
@@ -732,7 +732,7 @@ export function getUnlitMaterialClass(manager: SerializationManager): Serializab
 }
 
 /** @internal */
-export function getLambertMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getLambertMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: LambertMaterial,
@@ -747,7 +747,7 @@ export function getLambertMaterialClass(manager: SerializationManager): Serializ
 }
 
 /** @internal */
-export function getBlinnMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getBlinnMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: BlinnMaterial,
@@ -782,7 +782,7 @@ export function getBlinnMaterialClass(manager: SerializationManager): Serializab
 }
 
 /** @internal */
-export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: PBRMetallicRoughnessMaterial,
@@ -862,7 +862,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: SerializationManag
 }
 
 /** @internal */
-export function getPBRSpecularGlossinessMaterialClass(manager: SerializationManager): SerializableClass[] {
+export function getPBRSpecularGlossinessMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
       ctor: PBRSpecularGlossinessMaterial,

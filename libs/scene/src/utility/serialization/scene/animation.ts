@@ -12,7 +12,7 @@ import {
   NodeTranslationTrack,
   PropertyTrack
 } from '../../../animation';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import type { SerializableClass } from '../types';
 import { SceneNode } from '../../../scene';
 import { BoundingBox } from '../../bounding_volume';
@@ -412,7 +412,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
 }
 
 /** @internal */
-export function getPropTrackClass(manager: SerializationManager): SerializableClass {
+export function getPropTrackClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: PropertyTrack,
     name: 'PropertyTrack',
@@ -552,7 +552,7 @@ export function getSkeletonClass(): SerializableClass {
 }
 
 /** @internal */
-export function getAnimationClass(manager: SerializationManager): SerializableClass {
+export function getAnimationClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: AnimationClip,
     name: 'AnimationClip',

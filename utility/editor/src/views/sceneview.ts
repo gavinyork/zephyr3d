@@ -834,7 +834,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         ) {
           if (node) {
             let assetNode = node;
-            while (assetNode && !ProjectService.serializationManager.getAssetId(assetNode)) {
+            while (assetNode && !getEngine().resourceManager.getAssetId(assetNode)) {
               assetNode = assetNode.parent;
             }
             if (assetNode) {
@@ -1129,8 +1129,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (!id) {
       const label =
         prop.type === 'rgb' || prop.type === 'rgba'
-          ? `Edit animation track - ${ProjectService.serializationManager.getPropertyName(prop)}`
-          : `Edit animation track - ${ProjectService.serializationManager.getPropertyName(prop)}`;
+          ? `Edit animation track - ${getEngine().resourceManager.getPropertyName(prop)}`
+          : `Edit animation track - ${getEngine().resourceManager.getPropertyName(prop)}`;
       const value: PropertyValue = { num: [0, 0, 0, 0] };
       prop.get.call(target, value);
       id = { id: `${label}##EditTrack${this._trackId++}`, value: value.num };
@@ -1356,8 +1356,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._nodeToBePlaced.dispose();
       this._typeToBePlaced = 'none';
     }
-    const shape = await getEngine().serializationManager.fetchPrimitive(shapeCls);
-    const material = await getEngine().serializationManager.fetchMaterial<MeshMaterial>(
+    const shape = await getEngine().resourceManager.fetchPrimitive(shapeCls);
+    const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(
       '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
     );
     const mesh = new Mesh(this.controller.model.scene, shape, material);
@@ -1393,7 +1393,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._typeToBePlaced = 'none';
     }
     getEngine()
-      .serializationManager.instantiatePrefab(this.controller.model.scene.rootNode, prefab)
+      .resourceManager.instantiatePrefab(this.controller.model.scene.rootNode, prefab)
       .then((node) => {
         node.parent = null;
         node.iterate((node) => {
@@ -1413,7 +1413,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._typeToBePlaced = 'none';
     }
     getEngine()
-      .serializationManager.fetchModel(asset, this.controller.model.scene)
+      .resourceManager.fetchModel(asset, this.controller.model.scene)
       .then((node) => {
         node.group.parent = null;
         node.group.iterate((node) => {
@@ -1458,7 +1458,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (name) {
         ResourceService.savePrefab(
           node,
-          getEngine().serializationManager,
+          getEngine().resourceManager,
           getEngine().VFS.dirname(name),
           getEngine().VFS.basename(name)
         );
@@ -1515,7 +1515,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectService.serializationManager.getPropertyByName('/SceneNode/Position')
+      getEngine().resourceManager.getPropertyByName('/SceneNode/Position')
     );
   }
   private handleEndRotateNode(node: SceneNode) {
@@ -1523,7 +1523,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectService.serializationManager.getPropertyByName('/SceneNode/Rotation')
+      getEngine().resourceManager.getPropertyByName('/SceneNode/Rotation')
     );
   }
   private handleEndScaleNode(node: SceneNode) {
@@ -1531,7 +1531,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.dispatchEvent(
       'object_property_changed',
       node,
-      ProjectService.serializationManager.getPropertyByName('/SceneNode/Scale')
+      getEngine().resourceManager.getPropertyByName('/SceneNode/Scale')
     );
   }
   private handleEditAABB(aabb: AABB) {

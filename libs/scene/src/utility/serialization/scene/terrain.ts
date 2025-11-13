@@ -5,7 +5,7 @@ import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
 import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
-import type { SerializationManager } from '../manager';
+import type { ResourceManager } from '../manager';
 import { JSONArray } from '../json';
 import { getDevice } from '../../../app/api';
 
@@ -106,7 +106,7 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Array
 }
 
 /** @internal */
-export function getTerrainClass(manager: SerializationManager): SerializableClass {
+export function getTerrainClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: ClipmapTerrain,
     name: 'ClipmapTerrain',

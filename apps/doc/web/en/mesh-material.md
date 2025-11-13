@@ -113,7 +113,7 @@ The most common method for creating meshes is to load existing models. Currently
 ```javascript
 
   // Load model into scene
-  getEngine().serializationManager.fetchModel('assets/models/Duck.glb', scene).then(info => {
+  getEngine().resourceManager.fetchModel('assets/models/Duck.glb', scene).then(info => {
     info.group.position.setXYZ(0, 0, -10);
   });
 

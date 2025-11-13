@@ -28,7 +28,7 @@ myApp.ready().then(async () => {
 
   // Load mesh
   const batchGroup = new BatchGroup(scene);
-  const room = await getEngine().serializationManager.fetchModel(
+  const room = await getEngine().resourceManager.fetchModel(
     'https://cdn.zephyr3d.org/doc/assets/models/sitting_room_with_baked_textures.glb',
     scene
   );
