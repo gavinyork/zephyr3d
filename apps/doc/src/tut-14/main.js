@@ -40,7 +40,6 @@ myApp.ready().then(function () {
     // Set the environment lighting mode to IBL and set the radiance map and irradiance map
     scene.env.light.type = 'ibl';
     scene.env.light.radianceMap = radianceMap;
-    scene.env.light.irradianceMap = irradianceMap;
   });
 
   // Create directional light

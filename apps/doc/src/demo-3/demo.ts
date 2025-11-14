@@ -110,7 +110,6 @@ export class Demo {
     scene.env.light.type = 'ibl';
     scene.env.light.strength = 1;
     scene.env.light.radianceMap = scene.env.sky.radianceMap;
-    scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
     scene.env.sky.skyType = 'scatter';
     scene.env.sky.cloudy = 0.6;
 

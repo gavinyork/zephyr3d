@@ -56,8 +56,7 @@ export class EnvMaps {
       const panorama = await assetManager.fetchTexture<Texture2D>(path);
       panoramaToCubemap(panorama, maps[0]);
       prefilterCubemap(maps[0], 'ggx', maps[1]);
-      prefilterCubemap(maps[0], 'lambertian', maps[2]);
-      this._shProjector.projectCubemap(maps[2], sh);
+      this._shProjector.projectCubemap(maps[0], sh, true);
     } catch (err) {
       console.error(err);
     }
@@ -81,7 +80,6 @@ export class EnvMaps {
     scene.env.sky.fogType = 'none';
     scene.env.light.type = 'ibl';
     scene.env.light.radianceMap = maps[1].get();
-    scene.env.light.irradianceMap = maps[2].get();
     scene.env.light.irradianceSH = sh.get();
   }
   async selectById(id: string, scene: Scene) {
@@ -96,7 +94,6 @@ export class EnvMaps {
     scene.env.sky.skyboxTexture = maps[0].get();
     scene.env.sky.fogType = 'none';
     scene.env.light.radianceMap = maps[1].get();
-    scene.env.light.irradianceMap = maps[2].get();
     scene.env.light.irradianceSH = sh.get();
   }
 }

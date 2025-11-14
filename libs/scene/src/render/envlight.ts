@@ -16,7 +16,7 @@ import { getDevice } from '../app/api';
  * Environment light type
  * @public
  */
-export type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none';
+export type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
 
 /**
  * Base class for any kind of environment light
@@ -104,7 +104,7 @@ export class EnvShIBL extends EnvironmentLighting {
    * @override
    */
   getType(): EnvLightType {
-    return 'ibl-sh';
+    return 'ibl';
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
@@ -190,11 +190,11 @@ export class EnvShIBL extends EnvironmentLighting {
     const pb = scope.$builder;
     return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
       ? pb.textureSampleLevel(
-          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
+          scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
           refl,
-          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
+          pb.mul(roughness, scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
         ).rgb
-      : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
+      : pb.textureSample(scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
@@ -376,127 +376,6 @@ export class EnvShIBL extends EnvironmentLighting {
     this._radianceMap.dispose();
     this._irradianceSH.dispose();
     this._irradianceSHFB.dispose();
-  }
-}
-
-/**
- * IBL based environment lighting
- * @public
- */
-export class EnvIBL extends EnvironmentLighting {
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = 'zIBLRadianceMap';
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = 'zIBLRadianceMapMaxLOD';
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = 'zIBLIrradianceMap';
-  /** @internal */
-  private readonly _radianceMap: DRef<TextureCube>;
-  /** @internal */
-  private readonly _irradianceMap: DRef<TextureCube>;
-  /**
-   * Creates an instance of EnvIBL
-   * @param radianceMap - The radiance map
-   * @param irradianceMap - The irradiance map
-   */
-  constructor(radianceMap?: TextureCube, irradianceMap?: TextureCube) {
-    super();
-    this._radianceMap = new DRef(radianceMap);
-    this._irradianceMap = new DRef(irradianceMap);
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getType}
-   * @override
-   */
-  getType(): EnvLightType {
-    return 'ibl';
-  }
-  /** The radiance map */
-  get radianceMap(): TextureCube {
-    return this._radianceMap.get();
-  }
-  set radianceMap(tex: TextureCube) {
-    this._radianceMap.set(tex);
-  }
-  /** The irradiance map */
-  get irradianceMap(): TextureCube {
-    return this._irradianceMap.get();
-  }
-  set irradianceMap(tex: TextureCube) {
-    this._irradianceMap.set(tex);
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.initShaderBindings}
-   * @override
-   */
-  initShaderBindings(pb: ProgramBuilder): void {
-    if (pb.shaderKind === 'fragment') {
-      if (this._radianceMap.get()) {
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
-      }
-      if (this._irradianceMap.get()) {
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP] = pb.texCube().uniform(0);
-      }
-    }
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.updateBindGroup}
-   * @override
-   */
-  updateBindGroup(bg: BindGroup): void {
-    if (this._radianceMap.get()) {
-      bg.setValue(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
-    }
-    if (this._irradianceMap.get()) {
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP, this.irradianceMap);
-    }
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getRadiance}
-   * @override
-   */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
-      ? pb.textureSampleLevel(
-          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
-          refl,
-          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
-        ).rgb
-      : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getIrradiance}
-   * @override
-   */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    return pb.textureSampleLevel(scope[EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP], normal, 0).rgb;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.hasRadiance}
-   * @override
-   */
-  hasRadiance(): boolean {
-    return !!this._radianceMap;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.hasIrradiance}
-   * @override
-   */
-  hasIrradiance(): boolean {
-    return !!this._irradianceMap;
-  }
-  /**
-   * Disposes the EnvIBL object
-   * @override
-   */
-  protected onDispose() {
-    super.onDispose();
-    this._radianceMap.dispose();
-    this._irradianceMap.dispose();
   }
 }
 

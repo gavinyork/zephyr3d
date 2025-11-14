@@ -43,7 +43,6 @@ app.ready().then(async () => {
   scene.env.sky.fogType = 'none';
   scene.env.sky.skyType = 'scatter';
   scene.env.light.radianceMap = scene.env.sky.radianceMap;
-  scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
   scene.env.light.strength = 0.8;
 
   const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);

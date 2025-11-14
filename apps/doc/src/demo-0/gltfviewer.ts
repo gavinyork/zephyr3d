@@ -406,7 +406,6 @@ export class GLTFViewer {
     if (this._useScatter) {
       this._scene.env.sky.skyType = 'scatter';
       this._scene.env.light.radianceMap = this._scene.env.sky.radianceMap;
-      this._scene.env.light.irradianceMap = this._scene.env.sky.irradianceMap;
     } else {
       this._envMaps.selectById(this._envMaps.getCurrentId(), this._scene);
     }

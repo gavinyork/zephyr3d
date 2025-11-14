@@ -111,13 +111,11 @@ export class SkyRenderer extends Disposable {
   private readonly _bakedSkyboxFrameBuffer: DRef<FrameBuffer>;
   private readonly _radianceMap: DRef<TextureCube>;
   private readonly _radianceFrameBuffer: DRef<FrameBuffer>;
-  private readonly _irradianceMap: DRef<TextureCube>;
   private readonly _irradianceSH: DRef<GPUDataBuffer>;
   private readonly _irradianceSHFB: DRef<FrameBuffer>;
   private readonly _skyDistantLightLut: DRef<FrameBuffer>;
   private readonly _irradianceFrameBuffer: DRef<FrameBuffer>;
   private readonly _radianceMapWidth: number;
-  private readonly _irradianceMapWidth: number;
   private readonly _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
   private _fogType: FogType;
@@ -154,12 +152,10 @@ export class SkyRenderer extends Disposable {
     this._radianceMap = new DRef();
     this._radianceFrameBuffer = new DRef();
     this._radianceMapWidth = 128;
-    this._irradianceMap = new DRef();
     this._irradianceSH = new DRef();
     this._irradianceSHFB = new DRef();
     this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
-    this._irradianceMapWidth = 64;
     this._atmosphereParams = getDefaultAtmosphereParams();
     this._atmosphereExposure = 1;
     this._debugAerialPerspective = 0;
@@ -173,7 +169,7 @@ export class SkyRenderer extends Disposable {
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
     this._shProjector = new CubemapSHProjector(10000);
-    this._shWindowWeights = new Vector3(1, 1, 1);
+    this._shWindowWeights = new Vector3(1, 0.8, 0.6);
     this._radianceConvSamples = 64;
     this._irradianceConvSamples = 256;
     this._bindgroupDistantLight = new DRef();
@@ -229,7 +225,10 @@ export class SkyRenderer extends Disposable {
     return this._skyImage.get();
   }
   set skyImage(texture: Texture2D) {
-    this._skyImage.set(texture);
+    if (texture !== this._skyImage.get()) {
+      this._skyImage.set(texture);
+      this.invalidate();
+    }
   }
   /**
    * Window weights for SH projection
@@ -270,7 +269,10 @@ export class SkyRenderer extends Disposable {
     return this._atmosphereParams.apDistance;
   }
   set aerialPerspectiveDistance(val: number) {
-    this._atmosphereParams.apDistance = val;
+    if (val !== this._atmosphereParams.apDistance) {
+      this._atmosphereParams.apDistance = val;
+      this.invalidate();
+    }
   }
   /** Atmosphere exposure */
   get atmosphereExposure() {
@@ -297,70 +299,100 @@ export class SkyRenderer extends Disposable {
     return this._heightFogParams.parameter1.xyz();
   }
   set heightFogColor(val: Vector3) {
-    this._heightFogParams.parameter1.set(val);
+    if (!val.equalsTo(this._heightFogParams.parameter1.xyz())) {
+      this._heightFogParams.parameter1.set(val);
+      this.invalidate();
+    }
   }
   /** Height fog density */
   get heightFogDensity() {
     return this._heightFogParams.parameter2.x;
   }
   set heightFogDensity(val: number) {
-    this._heightFogParams.parameter2.x = val;
+    if (val !== this._heightFogParams.parameter2.x) {
+      this._heightFogParams.parameter2.x = val;
+      this.invalidate();
+    }
   }
   /** Height fog falloff */
   get heightFogFalloff() {
     return this._heightFogParams.parameter1.w;
   }
   set heightFogFalloff(val: number) {
-    this._heightFogParams.parameter1.w = val;
+    if (val !== this._heightFogParams.parameter1.w) {
+      this._heightFogParams.parameter1.w = val;
+      this.invalidate();
+    }
   }
   /** Height fog start height */
   get heightFogStartHeight() {
     return this._heightFogParams.parameter2.y;
   }
   set heightFogStartHeight(val: number) {
-    this._heightFogParams.parameter2.y = val;
+    if (val !== this._heightFogParams.parameter2.y) {
+      this._heightFogParams.parameter2.y = val;
+      this.invalidate();
+    }
   }
   /** Height fog start distance */
   get heightFogStartDistance() {
     return this._heightFogParams.parameter2.z;
   }
   set heightFogStartDistance(val: number) {
-    this._heightFogParams.parameter2.z = val;
+    if (val !== this._heightFogParams.parameter2.z) {
+      this._heightFogParams.parameter2.z = val;
+      this.invalidate();
+    }
   }
   /** Height fog end distance */
   get heightFogEndDistance() {
     return this._heightFogParams.parameter2.w;
   }
   set heightFogEndDistance(val: number) {
-    this._heightFogParams.parameter2.w = val;
+    if (val !== this._heightFogParams.parameter2.w) {
+      this._heightFogParams.parameter2.w = val;
+      this.invalidate();
+    }
   }
   /** Height fog maximum opacity */
   get heightFogMaxOpacity() {
     return this._heightFogParams.parameter3.x;
   }
   set heightFogMaxOpacity(val: number) {
-    this._heightFogParams.parameter3.x = val;
+    if (val !== this._heightFogParams.parameter3.x) {
+      this._heightFogParams.parameter3.x = val;
+      this.invalidate();
+    }
   }
   /** Height fog atmosphere contribution strength */
   get heightFogAtmosphereContribution() {
     return this._heightFogParams.parameter3.y;
   }
   set heightFogAtmosphereContribution(val: number) {
-    this._heightFogParams.parameter3.y = val;
+    if (val !== this._heightFogParams.parameter3.y) {
+      this._heightFogParams.parameter3.y = val;
+      this.invalidate();
+    }
   }
   /** Height fog directional exponent */
   get heightFogDirExponent() {
     return this._heightFogParams.parameter3.w;
   }
   set heightFogDirExponent(val: number) {
-    this._heightFogParams.parameter3.w = val;
+    if (val !== this._heightFogParams.parameter3.w) {
+      this._heightFogParams.parameter3.w = val;
+      this.invalidate();
+    }
   }
   /** Height fog directional inscattering color */
   get heightFogDirColor() {
     return this._heightFogParams.parameter4.xyz();
   }
   set heightFogDirColor(val: Vector3) {
-    this._heightFogParams.parameter4.set(val);
+    if (!val.equalsTo(this._heightFogParams.parameter4.xyz())) {
+      this._heightFogParams.parameter4.set(val);
+      this.invalidate();
+    }
   }
   /**
    * Light density of the sky.
@@ -428,20 +460,6 @@ export class SkyRenderer extends Disposable {
     return this._radianceFrameBuffer.get();
   }
   /**
-   * Irradiance map of the sky.
-   */
-  get irradianceMap(): TextureCube {
-    if (!this._irradianceMap.get()) {
-      this._irradianceMap.set(
-        getDevice().createCubeTexture('rgba16f', this._irradianceMapWidth, {
-          mipmapping: false
-        })
-      );
-      this._irradianceMap.get().name = 'SkyIrradianceMap';
-    }
-    return this._irradianceMap.get();
-  }
-  /**
    * Irradiance SH coeffecients buffer
    */
   get irradianceSH(): GPUDataBuffer {
@@ -468,13 +486,6 @@ export class SkyRenderer extends Disposable {
       this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
     }
     return this._irradianceSHFB.get();
-  }
-  /** @internal */
-  get irradianceFramebuffer() {
-    if (!this._irradianceFrameBuffer.get()) {
-      this._irradianceFrameBuffer.set(getDevice().createFrameBuffer([this.irradianceMap], null));
-    }
-    return this._irradianceFrameBuffer.get();
   }
   /**
    * Cube texture for skybox.
@@ -510,7 +521,10 @@ export class SkyRenderer extends Disposable {
     return this._fogType;
   }
   set fogType(val: FogType) {
-    this._fogType = val;
+    if (val !== this._fogType) {
+      this._fogType = val;
+      this.invalidate();
+    }
   }
   /** @internal */
   get aerialPerspectiveDebug() {
@@ -575,7 +589,6 @@ export class SkyRenderer extends Disposable {
       if (
         ctx.scene.env.light.radianceMap &&
         (ctx.scene.env.light.radianceMap === this.radianceMap ||
-          ctx.scene.env.light.irradianceMap === this.irradianceMap ||
           (this._irradianceSH.get() && ctx.scene.env.light.irradianceSH === this.irradianceSH) ||
           (this._irradianceSHFB.get() && ctx.scene.env.light.irradianceSHFB === this.irradianceSHFB))
       ) {
@@ -585,23 +598,14 @@ export class SkyRenderer extends Disposable {
           this.radianceFramebuffer,
           this._radianceConvSamples
         );
-        prefilterCubemap(
-          this._bakedSkyboxTexture.get(),
-          'lambertian',
-          this.irradianceFramebuffer,
-          this._irradianceConvSamples,
-          !useScatter
-        );
         if (ctx.device.type === 'webgl' || !ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending) {
           this._shProjector.projectCubemapToTexture(
-            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
-            this.irradianceSHFB
+            this._bakedSkyboxTexture.get(),
+            this.irradianceSHFB,
+            !useScatter
           );
         } else {
-          this._shProjector.projectCubemap(
-            this.irradianceFramebuffer.getColorAttachments()[0] as TextureCube,
-            this.irradianceSH
-          );
+          this._shProjector.projectCubemap(this._bakedSkyboxTexture.get(), this.irradianceSH, !useScatter);
         }
         ctx.scene.env.light.irradianceSH = this.irradianceSH;
         ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
@@ -776,7 +780,6 @@ export class SkyRenderer extends Disposable {
     this._bakedSkyboxFrameBuffer.dispose();
     this._radianceMap.dispose();
     this._radianceFrameBuffer.dispose();
-    this._irradianceMap.dispose();
     this._irradianceSH.dispose();
     this._irradianceSHFB.dispose();
     this._irradianceFrameBuffer.dispose();

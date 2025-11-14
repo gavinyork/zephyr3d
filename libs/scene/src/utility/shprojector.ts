@@ -70,8 +70,8 @@ export class CubemapSHProjector extends Disposable {
    * projector.projectCubemap(environmentMap, shBuffer);
    * ```
    */
-  projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer) {
-    this.projectCubemapToTexture(cubemap, this._renderTarget.get());
+  projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer, radianceSource = true) {
+    this.projectCubemapToTexture(cubemap, this._renderTarget.get(), radianceSource);
     this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
   /**
@@ -94,7 +94,7 @@ export class CubemapSHProjector extends Disposable {
    * projector.projectCubemapToTexture(environmentMap, shFramebuffer);
    * ```
    */
-  projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer) {
+  projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer, radianceSource = true) {
     const device = getDevice();
     const clearColor = new Vector4(0, 0, 0, 1);
     this.init(device);
@@ -105,6 +105,7 @@ export class CubemapSHProjector extends Disposable {
     device.clearFrameBuffer(clearColor, null, null);
     const bindGroup = CubemapSHProjector._bindGroupInst;
     bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('scale', radianceSource ? 1.0 : Math.PI);
     device.setBindGroup(0, bindGroup);
     this._primitive.get().drawInstanced(9);
     device.popDeviceStates();
@@ -231,6 +232,7 @@ export class CubemapSHProjector extends Disposable {
       fragment(pb) {
         this.$outputs.color = pb.vec4();
         this.cubemap = pb.texCube().uniform(0);
+        this.scale = pb.float().uniform(0);
         pb.func('cosineLobeBandFactor', [pb.int('l')], function () {
           this.$if(pb.equal(this.l, 0), function () {
             this.$return(pb.float(1));
@@ -309,7 +311,7 @@ export class CubemapSHProjector extends Disposable {
             pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
           );
           this.$outputs.color = pb.vec4(
-            pb.mul(this.radiance, this.sh, this.$inputs.weight, this.bandFactor),
+            pb.mul(this.radiance, this.sh, this.$inputs.weight, this.bandFactor, this.scale),
             1
           );
         });

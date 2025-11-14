@@ -62,7 +62,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this._outputName = outputName;
     this._isBlueprint = false;
     const scene = new Scene();
-    scene.env.light.type = 'ibl-sh';
+    scene.env.light.type = 'ibl';
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());

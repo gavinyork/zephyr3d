@@ -46,8 +46,7 @@ export class Panel {
         this._deviceList[this._deviceList.findIndex((val) => val.toLowerCase() === getDevice().type)],
       vSync: getDevice().vSync,
       environment: this._viewer.envMaps.getCurrentId(),
-      iblLighting:
-        this._viewer.scene.env.light.type === 'ibl' || this._viewer.scene.env.light.type === 'ibl-sh',
+      iblLighting: this._viewer.scene.env.light.type === 'ibl',
       useSH: false,
       punctualLighting: this._viewer.punctualLightEnabled,
       tonemap: this._viewer.tonemapEnabled(),
@@ -147,15 +146,7 @@ export class Panel {
       .add(this._params, 'iblLighting')
       .name('IBL lighting')
       .onChange((value) => {
-        this._viewer.scene.env.light.type = value ? (this._params.useSH ? 'ibl-sh' : 'ibl') : 'none';
-      });
-    lightSettings
-      .add(this._params, 'useSH')
-      .name('use SH')
-      .onChange((value: boolean) => {
-        if (this._params.iblLighting) {
-          this._viewer.scene.env.light.type = value ? 'ibl-sh' : 'ibl';
-        }
+        this._viewer.scene.env.light.type = value ? 'ibl' : 'none';
       });
     lightSettings
       .add(this._params, 'punctualLighting')

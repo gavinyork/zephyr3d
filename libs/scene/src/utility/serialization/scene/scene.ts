@@ -41,8 +41,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           type: 'string',
           options: {
             enum: {
-              labels: ['None', 'Constant', 'Hemispheric', 'IBL', 'IBL-SH'],
-              values: ['none', 'constant', 'hemisphere', 'ibl', 'ibl-sh']
+              labels: ['None', 'Constant', 'Hemispheric', 'IBL'],
+              values: ['none', 'constant', 'hemisphere', 'ibl']
             }
           },
           default: 'ibl',
@@ -561,18 +561,11 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
                 const device = getDevice();
                 const skyBoxTexture = this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
                 const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
-                const irradianceMap =
-                  this.env.light.irradianceMap ??
-                  device.createCubeTexture('rgba16f', 64, {
-                    mipmapping: false
-                  });
                 panoramaToCubemap(tex, skyBoxTexture);
                 prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
-                prefilterCubemap(skyBoxTexture, 'lambertian', irradianceMap);
                 skyBoxTexture.name = 'SkyboxTexture';
                 this.env.sky.skyboxTexture = skyBoxTexture;
                 this.env.light.radianceMap = radianceMap;
-                this.env.light.irradianceMap = irradianceMap;
                 this.env.sky.panoramaTextureAsset = assetId;
                 this.env.sky.invalidate();
                 tex.dispose();
