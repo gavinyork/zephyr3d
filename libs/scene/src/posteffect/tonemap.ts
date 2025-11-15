@@ -116,6 +116,7 @@ export class Tonemap extends AbstractPostEffect {
           });
         }
       });
+      Tonemap._programTonemap.name = '@Tonemap';
       Tonemap._bindgroupTonemap = device.createBindGroup(Tonemap._programTonemap.bindGroupLayouts[0]);
     }
   }

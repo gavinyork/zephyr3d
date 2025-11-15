@@ -433,6 +433,7 @@ export class SceneRenderer {
           });
         }
       });
+      this._skyMotionVectorProgram.name = '@TAA_SkyMotionVector';
     }
     return this._skyMotionVectorProgram;
   }

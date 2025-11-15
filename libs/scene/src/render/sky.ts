@@ -599,13 +599,9 @@ export class SkyRenderer extends Disposable {
           this._radianceConvSamples
         );
         if (ctx.device.type === 'webgl' || !ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending) {
-          this._shProjector.projectCubemapToTexture(
-            this._bakedSkyboxTexture.get(),
-            this.irradianceSHFB,
-            !useScatter
-          );
+          this._shProjector.projectCubemapToTexture(this._bakedSkyboxTexture.get(), this.irradianceSHFB);
         } else {
-          this._shProjector.projectCubemap(this._bakedSkyboxTexture.get(), this.irradianceSH, !useScatter);
+          this._shProjector.projectCubemap(this._bakedSkyboxTexture.get(), this.irradianceSH);
         }
         ctx.scene.env.light.irradianceSH = this.irradianceSH;
         ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
@@ -981,6 +977,7 @@ export class SkyRenderer extends Disposable {
           });
         }
       });
+      SkyRenderer._programDistantLight.name = '@SkyDistantLight';
     }
     if (!this._bindgroupDistantLight.get()) {
       this._bindgroupDistantLight.set(
@@ -1032,6 +1029,7 @@ export class SkyRenderer extends Disposable {
           });
         }
       });
+      SkyRenderer._programSky.image.name = '@SkyImage';
     }
     if (!this._bindgroupSky.image) {
       this._bindgroupSky.image = new DRef(
@@ -1081,6 +1079,7 @@ export class SkyRenderer extends Disposable {
           });
         }
       });
+      SkyRenderer._programSky.skybox.name = '@SkySkybox';
     }
     if (!this._bindgroupSky.skybox) {
       this._bindgroupSky.skybox = new DRef(
@@ -1156,7 +1155,7 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal */
   private static _createFogProgram(device: AbstractDevice, noDepth: boolean) {
-    return device.buildRenderProgram({
+    const program = device.buildRenderProgram({
       label: 'Fog',
       vertex(pb) {
         this.rt = pb.int().uniform(0);
@@ -1221,6 +1220,8 @@ export class SkyRenderer extends Disposable {
         });
       }
     });
+    program.name = noDepth ? '@FogNoDepth' : '@Fog';
+    return program;
   }
   /** @internal */
   private static _getSunDir(sunLight: DirectionalLight) {
@@ -1247,7 +1248,7 @@ export class SkyRenderer extends Disposable {
     }
   }
   private static _createScatterProgram(device: AbstractDevice, cloud: boolean) {
-    return device.buildRenderProgram({
+    const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
         this.worldMatrix = pb.mat4().uniform(0);
@@ -1359,5 +1360,7 @@ export class SkyRenderer extends Disposable {
         });
       }
     });
+    program.name = cloud ? '@SkyScatterCloud' : '@SkyScatter';
+    return program;
   }
 }

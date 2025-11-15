@@ -636,6 +636,9 @@ function createBlitProgram(
       });
     }
   });
+  if (program) {
+    program.name = `@Blit_${type}_${st}_${bilinearFiltering ? 'bilinear' : 'point'}_${flip ? 'flip' : 'noflip'}`;
+  }
   return program
     ? {
         program,

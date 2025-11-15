@@ -139,6 +139,7 @@ export abstract class RenderMipmap {
           });
         }
       });
+      program.name = '@RenderMipmap';
       this._program.set(program);
       this._bindGroup.set(device.createBindGroup(program.bindGroupLayouts[0]));
     }

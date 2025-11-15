@@ -255,7 +255,7 @@ export class SAO extends AbstractPostEffect {
           .setBlendFuncAlpha('zero', 'one');
       }
       function createProgram(packed: boolean) {
-        return device.buildRenderProgram({
+        const program = device.buildRenderProgram({
           vertex(pb) {
             this.flip = pb.int().uniform(0);
             this.$inputs.pos = pb.vec2().attrib('position');
@@ -379,6 +379,8 @@ export class SAO extends AbstractPostEffect {
             });
           }
         });
+        program.name = packed ? '@SAO_Packed' : '@SAO';
+        return program;
       }
       if (!SAO._program) {
         SAO._program = createProgram(false);

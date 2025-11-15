@@ -112,6 +112,7 @@ export class MotionBlur extends AbstractPostEffect {
           });
         }
       });
+      MotionBlur._programMotionBlur.name = '@MotionBlur';
       MotionBlur._bindgroupMotionBlur = device.createBindGroup(
         MotionBlur._programMotionBlur.bindGroupLayouts[0]
       );

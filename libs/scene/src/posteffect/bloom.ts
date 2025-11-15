@@ -214,6 +214,7 @@ export class Bloom extends AbstractPostEffect {
           });
         }
       });
+      Bloom._programFinalCompose.name = '@Bloom_FinalCompose';
       Bloom._bindgroupFinalCompose = device.createBindGroup(Bloom._programFinalCompose.bindGroupLayouts[0]);
     }
     if (!Bloom._programPrefilter) {
@@ -247,6 +248,7 @@ export class Bloom extends AbstractPostEffect {
           });
         }
       });
+      Bloom._programPrefilter.name = '@Bloom_Prefilter';
       Bloom._bindgroupPrefilter = device.createBindGroup(Bloom._programPrefilter.bindGroupLayouts[0]);
     }
     if (!Bloom._programUpsample) {
@@ -271,6 +273,7 @@ export class Bloom extends AbstractPostEffect {
           });
         }
       });
+      Bloom._programUpsample.name = '@Bloom_Upsample';
       Bloom._bindgroupUpsample = device.createBindGroup(Bloom._programUpsample.bindGroupLayouts[0]);
     }
     if (!Bloom._programDownsampleH) {
@@ -313,6 +316,7 @@ export class Bloom extends AbstractPostEffect {
           });
         }
       });
+      Bloom._programDownsampleH.name = '@Bloom_DownsampleH';
       Bloom._bindgroupDownsampleH = device.createBindGroup(Bloom._programDownsampleH.bindGroupLayouts[0]);
     }
     if (!Bloom._programDownsampleV) {
@@ -352,6 +356,7 @@ export class Bloom extends AbstractPostEffect {
           });
         }
       });
+      Bloom._programDownsampleV.name = '@Bloom_DownsampleV';
       Bloom._bindgroupDownsampleV = device.createBindGroup(Bloom._programDownsampleV.bindGroupLayouts[0]);
     }
     if (!Bloom._renderStateAdditive) {

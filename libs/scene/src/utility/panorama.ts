@@ -49,7 +49,7 @@ function init() {
 function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
   const device = getDevice();
   const pb = device;
-  return pb.buildRenderProgram({
+  const program = pb.buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
       this.up = pb.vec3().uniform(0);
@@ -87,6 +87,8 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
       });
     }
   });
+  program.name = rgbm ? '@PanoramaToCubemap_RGBM' : '@PanoramaToCubemap';
+  return program;
 }
 
 function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCube) {

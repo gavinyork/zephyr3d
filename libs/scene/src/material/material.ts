@@ -93,7 +93,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Unique runtime instance ID.
    * @internal
    */
-  private readonly _id: number;
+  protected readonly _id: number;
   /**
    * Latest computed global hash per pass, set during `apply()`, read in `bind()`.
    * @internal
@@ -106,6 +106,11 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   private _changeTag: number;
   /**
+   * Unique program id counter for naming compiled programs.
+   * @internal
+   */
+  private _nextProgramId = 0;
+  /**
    * Create a new material instance.
    *
    * - Initializes one pass by default.
@@ -115,6 +120,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   constructor() {
     super();
     this._id = ++Material._nextId;
+    this._nextProgramId = 0;
     this._states = {};
     this._numPasses = 1;
     this._hash = [null];
@@ -274,6 +280,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       let state = this._states[hash];
       if (!state) {
         const program = this.createProgram(ctx, pass) ?? null;
+        program.name = `@${this.constructor.name}_program_${this._nextProgramId++}`;
         const bindGroup =
           program.bindGroupLayouts.length > 2
             ? ctx.device.createBindGroup(program.bindGroupLayouts[2])

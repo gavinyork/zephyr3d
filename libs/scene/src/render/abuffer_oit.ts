@@ -364,6 +364,7 @@ export class ABufferOIT extends Disposable implements OIT {
           });
         }
       });
+      this._compositeProgram.name = '@ABufferOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates

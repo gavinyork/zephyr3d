@@ -311,7 +311,7 @@ export class SSR extends AbstractPostEffect {
   }
   /** @internal */
   private _createCombineProgrm(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -364,10 +364,12 @@ export class SSR extends AbstractPostEffect {
         });
       }
     });
+    program.name = '@SSR_Combine';
+    return program;
   }
   /** @internal */
   private _createResolveProgram(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -522,10 +524,12 @@ export class SSR extends AbstractPostEffect {
         });
       }
     });
+    program.name = '@SSR_Resolve';
+    return program;
   }
   /** @internal */
   private _createIntersectProgram(ctx: DrawContext, blur: boolean): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -697,5 +701,7 @@ export class SSR extends AbstractPostEffect {
         });
       }
     });
+    program.name = blur ? '@SSR_Intersect_Blur' : '@SSR_Intersect';
+    return program;
   }
 }

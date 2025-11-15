@@ -365,7 +365,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /** @internal */
   private _createFeedbackProgram(device: AbstractDevice) {
     const that = this;
-    return device.buildRenderProgram({
+    const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec4().attrib('position');
         this.textureWidth = pb.float().uniform(0);
@@ -405,5 +405,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         });
       }
     });
+    program.name = '@Water_Feedback';
+    return program;
   }
 }

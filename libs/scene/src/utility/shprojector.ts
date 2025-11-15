@@ -205,7 +205,7 @@ export class CubemapSHProjector extends Disposable {
    * @internal
    */
   private static _createProgram(device: AbstractDevice) {
-    return device.buildRenderProgram({
+    const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.directionWeight = pb.vec4().attrib('position');
         if (device.type === 'webgl') {
@@ -317,5 +317,7 @@ export class CubemapSHProjector extends Disposable {
         });
       }
     });
+    program.name = '@CubemapSHProjector_SHProject';
+    return program;
   }
 }

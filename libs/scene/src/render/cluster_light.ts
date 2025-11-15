@@ -307,6 +307,7 @@ export class ClusteredLight {
         });
       }
     });
+    this._lightIndexProgram.name = '@ClusteredLight_Index';
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
     this._lightBuffer?.dispose();
     const lightBufferType = this._lightIndexProgram.getBindingInfo(

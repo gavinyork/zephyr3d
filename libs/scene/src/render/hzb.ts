@@ -189,7 +189,7 @@ float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
 */
 
 function buildHZBProgram(device: AbstractDevice): GPUProgram {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     label: 'HZBBuilder',
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -225,6 +225,8 @@ function buildHZBProgram(device: AbstractDevice): GPUProgram {
       });
     }
   });
+  program.name = '@HZB_Builder';
+  return program;
 }
 
 function buildHiZLevel(

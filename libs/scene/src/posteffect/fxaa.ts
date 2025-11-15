@@ -303,6 +303,7 @@ export class FXAA extends AbstractPostEffect {
           });
         }
       });
+      FXAA._program.name = '@FXAA_program';
       FXAA._bindgroup = device.createBindGroup(FXAA._program.bindGroupLayouts[0]);
     }
   }

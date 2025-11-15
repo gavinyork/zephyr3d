@@ -216,6 +216,7 @@ function createGGXLUT(size: number) {
       });
     }
   });
+  program.name = '@GGXLUT_Generation';
   const vertexLayout = device.createVertexLayout({
     vertexBuffers: [
       { buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }

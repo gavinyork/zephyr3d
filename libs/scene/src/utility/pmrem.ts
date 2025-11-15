@@ -5,9 +5,11 @@ import type {
   GPUProgram,
   RenderStateSet,
   TextureCube,
+  TextureSampler,
   VertexLayout
 } from '@zephyr3d/device';
 import { getDevice } from '../app/api';
+import { fetchSampler } from './misc';
 
 // reference: https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
 
@@ -296,6 +298,7 @@ function doPrefilterCubemap(
   roughness: number,
   miplevel: number,
   srcTexture: TextureCube,
+  sampler: TextureSampler,
   dstFramebuffer: FrameBuffer,
   filteringInfo: Vector3,
   numSamples: number
@@ -363,7 +366,16 @@ export function prefilterCubemap(
   const mips = type === 'ggx' ? destTex.mipLevelCount : 1;
   for (let i = 0; i < mips; i++) {
     const alpha = i === 0 ? 0 : Math.pow(2, i) / width;
-    doPrefilterCubemap(type, alpha, i, srcTex, fb, filteringInfo, numSamples ?? 64);
+    doPrefilterCubemap(
+      type,
+      alpha,
+      i,
+      srcTex,
+      fetchSampler(type === 'ggx' ? 'clamp_nearest_nomip' : 'clamp_linear'),
+      fb,
+      filteringInfo,
+      numSamples ?? 64
+    );
   }
   device.popDeviceStates();
   device.setRenderStates(rs);

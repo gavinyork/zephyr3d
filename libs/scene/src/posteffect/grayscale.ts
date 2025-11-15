@@ -68,6 +68,7 @@ export class Grayscale extends AbstractPostEffect {
           });
         }
       });
+      Grayscale._program.name = '@Grayscale';
       Grayscale._bindgroup = device.createBindGroup(Grayscale._program.bindGroupLayouts[0]);
     }
   }

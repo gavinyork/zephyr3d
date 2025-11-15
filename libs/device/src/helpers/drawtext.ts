@@ -218,6 +218,7 @@ export class DrawText {
           });
         }
       });
+      this.textProgram.name = '@DrawText';
       this.textBindGroup = device.createBindGroup(this.textProgram.bindGroupLayouts[0]);
       this.textRenderStates = device.createRenderStateSet();
       this.textRenderStates

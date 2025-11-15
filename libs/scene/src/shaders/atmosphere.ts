@@ -1008,7 +1008,7 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
 
 /** @internal */
 export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -1030,6 +1030,8 @@ export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgra
       });
     }
   });
+  program.name = '@TransmittanceLutProgram';
+  return program;
 }
 
 /** @internal */
@@ -1065,7 +1067,7 @@ export function renderTransmittanceLut(params: AtmosphereParams) {
 
 /** @internal */
 export function createMultiScatteringLutProgram(device: AbstractDevice) {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -1094,6 +1096,8 @@ export function createMultiScatteringLutProgram(device: AbstractDevice) {
       });
     }
   });
+  program.name = '@MultiScatteringLutProgram';
+  return program;
 }
 
 /** @internal */
@@ -1144,7 +1148,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
 
 /** @internal */
 export function createSkyViewLutProgram(device: AbstractDevice) {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -1174,6 +1178,8 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
       });
     }
   });
+  program.name = '@SkyViewLutProgram';
+  return program;
 }
 
 /** @internal */
@@ -1215,7 +1221,7 @@ export function renderSkyViewLut(params: AtmosphereParams) {
 
 /** @internal */
 export function createAPLutProgram(device: AbstractDevice) {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -1246,6 +1252,8 @@ export function createAPLutProgram(device: AbstractDevice) {
       });
     }
   });
+  program.name = '@APLutProgram';
+  return program;
 }
 
 /** @internal */

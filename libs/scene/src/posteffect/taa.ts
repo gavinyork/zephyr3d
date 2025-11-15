@@ -145,6 +145,7 @@ export class TAA extends AbstractPostEffect {
           });
         }
       });
+      this._skyMotionVectorProgram.name = '@TAA_SkyMotionVector';
     }
     return this._skyMotionVectorProgram;
   }
@@ -159,7 +160,7 @@ export class TAA extends AbstractPostEffect {
     return this._box;
   }
   private static _getResolveProgram(ctx: DrawContext, debug: number): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -202,5 +203,7 @@ export class TAA extends AbstractPostEffect {
         });
       }
     });
+    program.name = '@TAA_Resolve';
+    return program;
   }
 }

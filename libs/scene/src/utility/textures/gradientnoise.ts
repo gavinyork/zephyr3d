@@ -51,6 +51,7 @@ export function createGradientNoiseTexture(
         });
       }
     });
+    gradientNoiseProgram.name = '@GradientNoise';
     gradientNoiseBindGroup = device.createBindGroup(gradientNoiseProgram.bindGroupLayouts[0]);
   }
   const tex = device.createTexture2D('rgba8unorm', size, size);

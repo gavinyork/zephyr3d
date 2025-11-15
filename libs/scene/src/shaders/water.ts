@@ -1,6 +1,7 @@
 // copy from: https://github.com/codeagent/webgl-ocean/
 
 import type {
+  GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -109,7 +110,7 @@ export class WaterShaderImpl {
 
 /** @internal */
 export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: WaterShaderImpl) {
-  return getDevice().buildRenderProgram({
+  const program = getDevice().buildRenderProgram({
     vertex(pb) {
       this.$inputs.position = pb.vec3().attrib('position');
       this.$outputs.outPos = pb.vec3();
@@ -174,6 +175,8 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       });
     }
   });
+  program.name = '@Ocean_Render';
+  return program;
 }
 
 /** @internal */
@@ -259,13 +262,14 @@ export function createProgramPostFFT2(
       });
     };
   }
+  let program: GPUProgram;
   if (useComputeShader) {
-    return getDevice().buildComputeProgram({
+    program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return getDevice().buildRenderProgram({
+    program = getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -275,6 +279,8 @@ export function createProgramPostFFT2(
       fragment: getComputeFunc(useComputeShader, targetFormat)
     });
   }
+  program.name = '@Water_PostFFT2';
+  return program;
 }
 
 /** @internal */
@@ -474,13 +480,14 @@ export function createProgramHk(
       });
     };
   }
+  let program: GPUProgram;
   if (useComputeShader) {
-    return getDevice().buildComputeProgram({
+    program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return getDevice().buildRenderProgram({
+    program = getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -490,6 +497,8 @@ export function createProgramHk(
       fragment: getComputeFunc(useComputeShader, targetFormat)
     });
   }
+  program.name = '@Water_Hk';
+  return program;
 }
 
 /** @internal */
@@ -635,13 +644,14 @@ export function createProgramH0(
       });
     };
   }
+  let program: GPUProgram;
   if (useComputeShader) {
-    return getDevice().buildComputeProgram({
+    program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return getDevice().buildRenderProgram({
+    program = getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -651,6 +661,8 @@ export function createProgramH0(
       fragment: getComputeFunc(useComputeShader, targetFormat)
     });
   }
+  program.name = '@Water_H0';
+  return program;
 }
 
 /** @internal */
@@ -827,13 +839,14 @@ export function createProgramFFT2V(
       });
     };
   }
+  let program: GPUProgram;
   if (useComputeShader) {
-    return getDevice().buildComputeProgram({
+    program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return getDevice().buildRenderProgram({
+    program = getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -843,6 +856,8 @@ export function createProgramFFT2V(
       fragment: getComputeFunc(useComputeShader, targetFormat)
     });
   }
+  program.name = '@Water_PreFFT2';
+  return program;
 }
 
 /** @internal */
@@ -1019,13 +1034,14 @@ export function createProgramFFT2H(
       });
     };
   }
+  let program: GPUProgram;
   if (useComputeShader) {
-    return getDevice().buildComputeProgram({
+    program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
     });
   } else {
-    return getDevice().buildRenderProgram({
+    program = getDevice().buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec3().attrib('position');
         pb.main(function () {
@@ -1035,4 +1051,6 @@ export function createProgramFFT2H(
       fragment: getComputeFunc(useComputeShader, targetFormat)
     });
   }
+  program.name = '@Water_FFT2H';
+  return program;
 }

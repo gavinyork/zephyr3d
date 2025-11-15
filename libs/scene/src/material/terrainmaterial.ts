@@ -407,6 +407,7 @@ export class TerrainMaterial
           });
         }
       });
+      TerrainMaterial._metallicRoughnessGenerationProgram.name = '@TerrainMetallicRoughnessGeneration';
       TerrainMaterial._metallicRoughnessGenerationBindGroup = device.createBindGroup(
         TerrainMaterial._metallicRoughnessGenerationProgram.bindGroupLayouts[0]
       );

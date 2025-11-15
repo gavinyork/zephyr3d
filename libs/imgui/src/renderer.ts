@@ -270,7 +270,7 @@ export class Renderer extends Disposable {
   }
   /** @internal */
   private createProgram(diffuseMap: boolean): GPUProgram {
-    return this._device.buildRenderProgram({
+    const program = this._device.buildRenderProgram({
       label: 'UI',
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -304,5 +304,7 @@ export class Renderer extends Disposable {
         });
       }
     });
+    program.name = diffuseMap ? '@UI_withDiffuse' : '@UI_noDiffuse';
+    return program;
   }
 }

@@ -244,6 +244,7 @@ export class Compositor {
           });
         }
       });
+      this._blitProgram.name = '@Compositor_blit';
       this._blitBindgroup = device.createBindGroup(this._blitProgram.bindGroupLayouts[0]);
       this._blitVertexLayout = device.createVertexLayout({
         vertexBuffers: [

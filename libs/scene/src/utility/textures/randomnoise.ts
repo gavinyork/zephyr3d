@@ -28,6 +28,7 @@ export function createRandomNoiseTexture(device: AbstractDevice, size: number) {
         });
       }
     });
+    randomNoiseProgram.name = '@RandomNoise';
   }
   const tex = device.createTexture2D('rgba8unorm', size, size);
   const fb = device.createFrameBuffer([tex], null);

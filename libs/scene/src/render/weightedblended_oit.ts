@@ -199,6 +199,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
           });
         }
       });
+      this._compositeProgram.name = '@WBOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates
