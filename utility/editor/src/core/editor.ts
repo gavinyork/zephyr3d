@@ -17,7 +17,7 @@ import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
-import { ZipDownloader } from '../helpers/zipdownload';
+import { ZipDownloader } from '../helpers/downloader';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
 import { initLogView } from '../components/logview';
@@ -390,6 +390,7 @@ export class Editor {
       this._currentProject = null;
     }
   }
+
   async exportProject() {
     if (!this._currentProject) {
       return;

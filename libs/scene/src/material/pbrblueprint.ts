@@ -221,8 +221,8 @@ export class PBRBluePrintMaterial
   }
   protected createProgram(ctx: DrawContext, pass: number) {
     const program = super.createProgram(ctx, pass);
-    console.log(program.getShaderSource('vertex'));
-    console.log(program.getShaderSource('fragment'));
+    //console.log(program.getShaderSource('vertex'));
+    //console.log(program.getShaderSource('fragment'));
     return program;
   }
   protected onDispose(): void {

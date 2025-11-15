@@ -1,41 +1,146 @@
 import type { Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
 
+/**
+ * Base structure for all controller events.
+ *
+ * Represents a typed event emitted or handled by a camera controller.
+ *
+ * @public
+ */
 export interface IBaseEvent<T extends string> {
+  /** Event type identifier. */
   type: T;
+  /**
+   * Optional method to cancel the default event behavior.
+   * May be provided by the event source.
+   */
   preventDefault?: () => void;
 }
 
+/**
+ * Standard modifier key set for mouse/keyboard events.
+ *
+ * Encapsulates common modifier keys such as Ctrl, Alt, Shift, and Meta.
+ *
+ * @public
+ */
 export interface IModKey {
+  /** Whether the Control key is pressed. */
   readonly ctrlKey: boolean;
+  /** Whether the Meta (Command on macOS) key is pressed. */
   readonly metaKey: boolean;
+  /** Whether the Shift key is pressed. */
   readonly shiftKey: boolean;
+  /** Whether the Alt/Option key is pressed. */
   readonly altKey: boolean;
 }
 
+/**
+ * Base interface for all controller mouse and pointer events.
+ *
+ * Extends the base event with positional and button information, as well as modifier keys.
+ *
+ * @public
+ */
 export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, IModKey {
+  /** Pointer offset along the X-axis, typically relative to the event target. */
   readonly offsetX: number;
+  /** Pointer offset along the Y-axis, typically relative to the event target. */
   readonly offsetY: number;
+  /** Mouse button index: `0` for left, `1` for middle, `2` for right, etc. */
   readonly button: number;
 }
 
+/**
+ * Pointer down event for camera controllers.
+ *
+ * Triggered when a mouse, pen, or touch pointer is pressed down.
+ *
+ * @public
+ */
 export interface IControllerPointerDownEvent extends IControllerMouseEvent<'pointerdown'> {}
+
+/**
+ * Pointer up event for camera controllers.
+ *
+ * Triggered when a mouse, pen, or touch pointer is released.
+ *
+ * @public
+ */
 export interface IControllerPointerUpEvent extends IControllerMouseEvent<'pointerup'> {}
+
+/**
+ * Pointer move event for camera controllers.
+ *
+ * Triggered when the pointer (mouse, pen, or touch) moves across the viewport.
+ *
+ * @public
+ */
 export interface IControllerPointerMoveEvent extends IControllerMouseEvent<'pointermove'> {}
+
+/**
+ * Pointer cancel event for camera controllers.
+ *
+ * Triggered when the pointer operation is canceled (e.g., touch canceled, system interruption).
+ *
+ * @public
+ */
 export interface IControllerPointerCancelEvent extends IControllerMouseEvent<'pointercancel'> {}
 
+/**
+ * Wheel (scroll) event for camera controllers.
+ *
+ * Extends a mouse event with wheel delta values for scroll-based input (e.g., zoom).
+ *
+ * @public
+ */
 export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
+  /** Horizontal wheel scroll delta. */
   readonly deltaX: number;
+  /** Vertical wheel scroll delta. */
   readonly deltaY: number;
 }
 
+/**
+ * Base interface for all controller keyboard events.
+ *
+ * Provides key identification along with standard modifier flags.
+ *
+ * @public
+ */
 export interface IControllerKeyboardEvent<T extends string> extends IBaseEvent<T>, IModKey {
+  /** key code */
   readonly code: string;
+  /** Character value */
   readonly key: string;
 }
 
+/**
+ * Key down event for camera controllers.
+ *
+ * Triggered when a keyboard key is pressed down.
+ *
+ * @public
+ */
 export interface IControllerKeydownEvent extends IControllerKeyboardEvent<'keydown'> {}
+
+/**
+ * Key up event for camera controllers.
+ *
+ * Triggered when a keyboard key is released.
+ *
+ * @public
+ */
 export interface IControllerKeyupEvent extends IControllerKeyboardEvent<'keyup'> {}
+
+/**
+ * Key press event for camera controllers.
+ *
+ * Triggered when a key is pressed and generates a character value (legacy usage).
+ *
+ * @public
+ */
 export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keypress'> {}
 
 /**

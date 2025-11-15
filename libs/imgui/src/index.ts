@@ -143,11 +143,3 @@ export function imGuiSetCharCodeMap(map: Record<number, string>) {
 export function imGuiWantCaptureKeyboard(capture: boolean) {
   ImGui_Impl.captureKeyboard(capture);
 }
-
-export function imGuiMouseButtonToImGui(button: number) {
-  return ImGui_Impl.mouseButtonToImGui(button);
-}
-
-export function imGuiMouseButtonFromImGui(button: ImGui.MouseButton) {
-  return ImGui_Impl.mouseButtonFromImGui(button);
-}

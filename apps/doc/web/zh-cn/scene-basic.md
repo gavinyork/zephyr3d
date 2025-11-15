@@ -92,15 +92,13 @@
   // 等待渲染设备就绪
   myApp.ready().then(function () {
     let str = '';
-    // 定义清除色
-    const clearColor = new Vector4(0, 0, 0, 1);
     // 设置字体
     myApp.device.setFont('16px arial');
     // 添加帧事件处理
     myApp.on('tick', function () {
       // device是渲染设备，我们调用其clearFrameBuffer方法把屏幕清为绿色
       // 其中，第一个参数为清除颜色缓冲区的RGBA颜色，第二个参数指定深度缓冲区的清除值，第三个指定模板缓冲区的清除值。
-      myApp.device.clearFrameBuffer(clearColor, 1, 0);
+      myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
       // 调用device的drawText方法在屏幕上渲染文字
       myApp.device.drawText(str, 30, 30, '#ffff00');
     });
@@ -118,7 +116,7 @@
   <div class="showcase" case="tut-1"></div>
 
 
-  目前支持捕获以下输入事件：
+  目前，画布会绑定以下事件并通过App透传给用户：
 
   - pointerdown
   - pointerup
@@ -135,15 +133,22 @@
   - dragover
   - drop
   - wheel
+  - compositionstart
+  - compositionupdate
+  - compositionend
 
   很多情况下，我们处理输入事件的时候是有优先级的，例如在某些场合下，我们需要先处理UI部分的输入，在UI系统未处理该输入的情况下，我们才触发场景的点击。针对这种情况，
   我们也提供了中间件模式。你可以依次注册事件处理函数作为中间件，当有用户输入的时候，中间件将会按照注册次序被依次调用，直到某个中间件函数返回true为止。如果所有中间件
   都返回false，则通过```Application.on```注册的事件回调将被调用。下面是一个使用中间件的例子：
 
   ```javascript
+
+  // 优先响应用户界面交互事件
   getInput().use(function(evt, type){
     return processGUIEvent(evt, type);
   });
+
+  // 如果用户界面未处理此事件(processGUIEvent方法返回false)则轮到此中间件，
   getInput().use(function(evt, type){
     if(type === 'pointerdown') {
       onPointerDown();
@@ -152,6 +157,7 @@
       return false;
     }
   });
+
   ```
 
 ## 渲染场景
@@ -191,7 +197,7 @@
 
   ```
 
-  运行这段代码，我们渲染了一个空的场景，里面仅包含了一个默认的天空，效果如下：
+  通过以上代码，我们渲染了一个空的场景，效果如下：
 
   <div class="showcase" case="tut-2"></div>
 
@@ -222,7 +228,7 @@
   // 添加代码，设置摄像机控制器
   scene.mainCamera.controller = new OrbitCameraController();
 
-  // 添加一个中间件用于更新摄像机控制器
+  // camera.handleEvent可作为输入事件中间件，允许摄像机控制器接受交互
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   //...

@@ -1853,32 +1853,32 @@ export function createMultiScatteringLutProgram(device: AbstractDevice): GPUProg
 // Warning: (ae-internal-missing-underscore) The name "createProgramFFT2H" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramFFT2H(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramFFT2H(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramFFT2V" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramFFT2V(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramFFT2V(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramH0" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramH0(useComputeShader?: boolean, threadGroupSize?: number, targetFormat?: TextureFormat): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramH0(useComputeShader?: boolean, threadGroupSize?: number, targetFormat?: TextureFormat): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramHk" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramHk(useComputeShader?: boolean, threadGroupSize?: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramHk(useComputeShader?: boolean, threadGroupSize?: number, targetFormat?: TextureFormat, limit?: 4 | 2): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramOcean" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: WaterShaderImpl): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: WaterShaderImpl): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createProgramPostFFT2" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
-export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): _zephyr3d_device.GPUProgram<unknown>;
+export function createProgramPostFFT2(useComputeShader: boolean, threadGroupSize: number, targetFormat?: TextureFormat, limit?: 4 | 2): GPUProgram<unknown>;
 
 // Warning: (ae-internal-missing-underscore) The name "createRandomNoiseTexture" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -1906,8 +1906,8 @@ export class CrossProductNode extends GenericMathNode {
 export class CubemapSHProjector extends Disposable {
     constructor(numSamples?: number);
     protected onDispose(): void;
-    projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer): void;
-    projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer): void;
+    projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer, radianceSource?: boolean): void;
+    projectCubemapToTexture(cubemap: TextureCube, framebuffer: FrameBuffer, radianceSource?: boolean): void;
 }
 
 // @public
@@ -2275,37 +2275,6 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
 }
 
 // @public
-export class EnvIBL extends EnvironmentLighting {
-    constructor(radianceMap?: TextureCube, irradianceMap?: TextureCube);
-    // @override
-    getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
-    // @override
-    getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
-    // @override
-    getType(): EnvLightType;
-    // @override
-    hasIrradiance(): boolean;
-    // @override
-    hasRadiance(): boolean;
-    // @override
-    initShaderBindings(pb: ProgramBuilder): void;
-    get irradianceMap(): TextureCube;
-    set irradianceMap(tex: TextureCube);
-    // @override
-    protected onDispose(): void;
-    get radianceMap(): TextureCube;
-    set radianceMap(tex: TextureCube);
-    // @internal (undocumented)
-    static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = "zIBLIrradianceMap";
-    // @internal (undocumented)
-    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = "zIBLRadianceMap";
-    // @internal (undocumented)
-    static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = "zIBLRadianceMapMaxLOD";
-    // @override
-    updateBindGroup(bg: BindGroup): void;
-}
-
-// @public
 export class Environment extends Disposable {
     // @internal
     constructor();
@@ -2330,7 +2299,7 @@ export abstract class EnvironmentLighting extends Disposable {
 }
 
 // @public
-export type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none';
+export type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
 
 // @public
 export class EnvLightWrapper extends Disposable {
@@ -2346,8 +2315,6 @@ export class EnvLightWrapper extends Disposable {
     get envLight(): EnvironmentLighting;
     // @internal (undocumented)
     getHash(ctx?: DrawContext): string;
-    get irradianceMap(): TextureCube;
-    set irradianceMap(tex: TextureCube);
     get irradianceSH(): GPUDataBuffer;
     set irradianceSH(value: GPUDataBuffer);
     get irradianceSHFB(): FrameBuffer;
@@ -3272,65 +3239,56 @@ export interface IAttachedScript {
     url: string;
 }
 
-// @public (undocumented)
+// @public
 export interface IBaseEvent<T extends string> {
-    // (undocumented)
     preventDefault?: () => void;
-    // (undocumented)
     type: T;
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerKeyboardEvent<T extends string> extends IBaseEvent<T>, IModKey {
-    // (undocumented)
     readonly code: string;
-    // (undocumented)
     readonly key: string;
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerKeydownEvent extends IControllerKeyboardEvent<'keydown'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keypress'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerKeyupEvent extends IControllerKeyboardEvent<'keyup'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, IModKey {
-    // (undocumented)
     readonly button: number;
-    // (undocumented)
     readonly offsetX: number;
-    // (undocumented)
     readonly offsetY: number;
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerPointerCancelEvent extends IControllerMouseEvent<'pointercancel'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerPointerDownEvent extends IControllerMouseEvent<'pointerdown'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerPointerMoveEvent extends IControllerMouseEvent<'pointermove'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerPointerUpEvent extends IControllerMouseEvent<'pointerup'> {
 }
 
-// @public (undocumented)
+// @public
 export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
-    // (undocumented)
     readonly deltaX: number;
-    // (undocumented)
     readonly deltaY: number;
 }
 
@@ -3465,15 +3423,11 @@ export interface IMixinVertexColor {
     vertexColor: boolean;
 }
 
-// @public (undocumented)
+// @public
 export interface IModKey {
-    // (undocumented)
     readonly altKey: boolean;
-    // (undocumented)
     readonly ctrlKey: boolean;
-    // (undocumented)
     readonly metaKey: boolean;
-    // (undocumented)
     readonly shiftKey: boolean;
 }
 
@@ -3723,6 +3677,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     getQueueType(): number;
     // @internal
     protected _hash: string[];
+    // @internal
+    protected readonly _id: number;
     get instanceId(): number;
     isBatchable(): boolean;
     isTransparentPass(_pass: number): boolean;
@@ -4882,7 +4838,7 @@ export class PowNode extends GenericMathNode {
 // Warning: (ae-forgotten-export) The symbol "DistributionType" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function prefilterCubemap(tex: TextureCube, type: DistributionType, destTexture: TextureCube | FrameBuffer, numSamples?: number): void;
+export function prefilterCubemap(tex: TextureCube, type: DistributionType, destTexture: TextureCube | FrameBuffer, numSamples?: number, radianceSource?: boolean): void;
 
 // Warning: (ae-forgotten-export) The symbol "Primitive_base" needs to be exported by the entry point index.d.ts
 //
@@ -6395,9 +6351,6 @@ export class SkyRenderer extends Disposable {
     invalidate(): void;
     get irradianceConvSamples(): number;
     set irradianceConvSamples(val: number);
-    // @internal (undocumented)
-    get irradianceFramebuffer(): FrameBuffer<unknown>;
-    get irradianceMap(): TextureCube;
     get irradianceSH(): GPUDataBuffer;
     get irradianceSHFB(): FrameBuffer;
     // @internal (undocumented)
@@ -7288,7 +7241,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:15112:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:15138:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

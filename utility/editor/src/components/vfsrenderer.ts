@@ -19,6 +19,7 @@ import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import { getEngine } from '@zephyr3d/scene';
+import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -311,6 +312,10 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
       ImGui.Separator();
       if (ImGui.MenuItem(`Delete (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
         this.renderer.deleteSelectedItems();
+      }
+      ImGui.Separator();
+      if (ImGui.MenuItem(`Export (${selectedCount} item${selectedCount > 1 ? 's' : ''})`)) {
+        this.renderer.exportSelectedItems();
       }
     }
   }
@@ -937,6 +942,27 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           DlgMessage.messageBox('Error', `Create file failed: ${err}`);
         }
       }
+    }
+  }
+
+  exportSelectedItems() {
+    if (this.selectedItems.size === 0) {
+      return;
+    }
+    const items = Array.from(this.selectedItems);
+    if (items.length === 1 && !('subDir' in items[0])) {
+      const filename = this._vfs.basename(items[0].meta.path);
+      this._vfs.readFile(items[0].meta.path, { encoding: 'binary' }).then((data) => {
+        exportFile(data as ArrayBuffer, filename);
+      });
+    } else {
+      const files = (items.filter((items) => !('subDir' in items)) as FileInfo[]).map(
+        (item: FileInfo) => item.meta.path
+      );
+      const dirs = (items.filter((items) => 'subDir' in items) as DirectoryInfo[]).map(
+        (item: DirectoryInfo) => item.path
+      );
+      exportMultipleFilesAsZip(files, dirs, 'export.zip');
     }
   }
 

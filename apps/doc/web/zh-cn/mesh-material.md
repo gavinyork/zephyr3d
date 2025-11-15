@@ -111,7 +111,7 @@ assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnorma
 
 最常用的创建网格的方法就是加载现有的模型。目前我们支持GLTF/GLB模型。
 
-加载模型可以很方便地通过AssetManager完成。
+加载模型可以通过ResourceManager完成。
 
 ```javascript
 
