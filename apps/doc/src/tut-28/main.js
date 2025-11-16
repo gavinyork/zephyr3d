@@ -1,4 +1,4 @@
-import { Vector3 } from '@zephyr3d/base';
+import { HttpFS, Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -12,7 +12,10 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
   backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-14')
+  }
 });
 
 myApp.ready().then(function () {
@@ -23,11 +26,7 @@ myApp.ready().then(function () {
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   // Loads a model
-  getEngine()
-    .resourceManager.fetchModel('https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb', scene)
-    .then((info) => {
-      info.group.position.setXYZ(0, -0.5, 0);
-    });
+  getEngine().resourceManager.instantiatePrefab(scene.rootNode, '/assets/DamagedHelmet.zprefab');
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);

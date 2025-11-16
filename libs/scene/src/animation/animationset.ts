@@ -35,6 +35,13 @@ export type PlayAnimationOptions = {
    * Default is 0 (no fade-in).
    */
   fadeIn?: number;
+  /**
+   * Weight of the animation clip.
+   *
+   * Used during blending when multiple animations affect the same property.
+   * Default is the clip's configured weight.
+   */
+  weight?: number;
 };
 
 /**
@@ -316,7 +323,7 @@ export class AnimationSet extends Disposable implements IDisposable {
     } else {
       const repeat = options?.repeat ?? 0;
       const speedRatio = options?.speedRatio ?? 1;
-      const weight = ani.weight;
+      const weight = options?.weight ?? ani.weight ?? 1;
       this._activeAnimations.set(ani, {
         repeat,
         weight,

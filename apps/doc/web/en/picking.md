@@ -1,108 +1,110 @@
 # Scene Picking
 
-Scene picking is a technique for selecting objects in a virtual scene using a mouse or other input device, and it is crucial for implementing scene interactions. There are mainly two picking techniques: Raycasting and Color Picking.
+## Overview
 
-## Raycasting
+**Scene Picking** refers to the technique of selecting or identifying objects in a virtual 3D scene through mouse, touch, or other input devices.  
+It provides the foundation for interactive systems, enabling users to select, manipulate, or interact with objects in three‑dimensional space.
 
-Raycasting is a CPU-based picking algorithm. The principle is to generate a ray in the world coordinate system (or camera coordinate system) based on the position of the mouse or other input device and then perform collision detection between the ray and the objects in the scene to identify the picked object.
+The engine provides two main picking methods:
 
-### Implementation Steps:
+1. **Ray‑based Picking** — a CPU‑driven geometric intersection algorithm  
+2. **Color‑based Picking** — a GPU‑driven pixel‑accurate method  
 
-1. Construct a ray passing through the screen coordinates based on the mouse position.
-2. Detect intersections between the ray and the scene.
-3. Return the picked scene node, intersection distance, and intersection point.
+---
 
-```javascript
+## Ray‑based Picking
 
-// Assuming x and y are the screen coordinates relative to the top-left corner of the viewport, pick the object at that position.
+**Ray‑based picking** is a picking algorithm executed on the CPU.  
+The principle is simple: based on the input position on screen, a ray is generated from the camera through that position in world (or camera) space.  
+This ray is then tested against the bounding volumes of scene objects to determine which object is intersected.
 
-const ray = camera.constructRay(x, y);
-// Perform raycasting on the scene
-const pickResult = scene.raycast(ray);
-// Return the picked scene node, intersection distance, and intersection point; otherwise, return null.
-if (pickResult) {
-  console.log(`Node: ${pickResult.target.node}`);
-  console.log(`Distance: ${pickResult.dist}`);
-  console.log(`Intersection Point: ${pickResult.point}`);
-}
+Example:
 
+```javascript  
+// Assume (x, y) are the screen coordinates relative to the top-left of the viewport  
+// Construct a ray from the camera through this screen position  
+const ray = camera.constructRay(x, y);  
+
+// Perform ray intersection test in the scene  
+const pickResult = scene.raycast(ray);  
+
+// If an object is hit, pickResult contains intersection information  
+if (pickResult) {  
+  console.log(`Node: ${pickResult.target.node}`);  
+  console.log(`Distance: ${pickResult.dist}`);  
+  console.log(`Intersection: ${pickResult.point}`);  
+}  
 ```
+
+> Ray‑based picking tests intersections using object **bounding boxes**,  
+> so it is approximate by nature — for irregular meshes, transparent surfaces, or skinned/animated geometry,  
+> the picked result may be inaccurate.  
+> For pixel‑level accuracy or complex object selection, **Color‑based Picking** is recommended.
 
 <div class="showcase" case="tut-47"></div>
 
-## Color Picking
+---
 
-Color Picking uses the GPU for pixel-level picking. The principle is to render objects with different colors to a 1x1 texture, then read that texture to determine the picked object based on the color.
+## Color‑based Picking
 
-Notes:
-- For WebGL devices, reading textures is a blocking operation and may cause stuttering. Therefore, it is recommended to use Color Picking on WebGL2 or WebGPU devices.
-- Color Picking requires a scene rendering.
-- For scenarios where picking is performed every frame, the result is from the previous frame. For single-shot picking, the result needs to be obtained asynchronously.
+**Color‑based picking** is a GPU‑based picking method capable of **pixel‑accurate selection**.  
+The principle is: render each selectable object using a **unique encoded color** into a very small offscreen texture (usually 1×1),  
+then read that pixel asynchronously to determine which object was picked.
 
-### Implementation Steps:
+Example usage:
 
-1. Enable the camera's picking functionality.
-2. Update the picking position in the mouse move event.
-3. Render the scene and get the picking result.
+```javascript  
+let lastPickResult;  
 
-```javascript
+let x = 0;  
+let y = 0;  
 
-// Enable picking while rendering
-camera.enablePicking = true;
+// Update picking position on mouse movement  
+myApp.on('pointermove', (ev) => {  
+  x = ev.offsetX;  
+  y = ev.offsetY;  
+});  
 
-// Update picking position on mouse move
-app.device.canvas.addEventListener('pointermove', (ev) => {
-  camera.pickPosX = ev.offsetX;
-  camera.pickPosY = ev.offsetY;
-});
+// Asynchronous picking routine  
+function picking() {  
+  scene.mainCamera.pickAsync(x, y).then((pickResult) => {  
+    if (lastPickResult !== pickResult?.target.node) {  
+      // Reset previously picked object  
+      if (lastPickResult) {  
+        lastPickResult.material.emissiveColor = Vector3.zero();  
+        lastPickResult = null;  
+      }  
+      // Highlight newly picked object  
+      if (pickResult) {  
+        lastPickResult = pickResult.target.node;  
+        lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);  
+      }  
+    }  
+  });  
+}  
 
-// After rendering, get the picking result
-// Note: For WebGL2 and WebGPU devices, picking is an asynchronous process, so the result obtained this time is actually from the previous frame.
-app.on('tick', () => {
-  // Render the scene first
-  camera.render(scene);
-  // Get the picking result. If no object is picked, return null.
-  const pickResult = camera.pickResult;
-  if (pickResult) {
-    // drawable is the picked rendering object
-    console.log(pickResult.drawable);
-    // node is the picked node
-    console.log(pickResult.target.node);
-  }
-});
-
+// Perform picking once per frame  
+myApp.on('tick', picking);  
 ```
 
 <div class="showcase" case="tut-48"></div>
 
-### Asynchronously Getting Single-Shot Picking Results
+---
 
-When picking is not needed every frame, it is possible to get the result asynchronously. 
-For example, picking once upon a mouse click:
+## Method Comparison and Recommendations
 
-```javascript
+| Method | Execution | Precision | Use Case | Advantages | Limitations |
+|---------|------------|------------|------------|-------------|--------------|
+| **Ray‑based Picking** | CPU | Bounding box (approximate) | Simple models, low‑precision selection | High performance, no GPU dependency | Inaccurate for detailed or deforming meshes |
+| **Color‑based Picking** | GPU | Pixel‑accurate | Editors, precise user interaction | High accuracy, supports complex geometry | May cause stalls under WebGL due to synchronous readback |
 
-// Enable picking while rendering
-camera.enablePicking = true;
+---
 
-// Update picking position on mouse move
-app.device.canvas.addEventListener('pointermove', (ev) => {
-  camera.pickPosX = ev.offsetX;
-  camera.pickPosY = ev.offsetY;
-});
+## Summary
 
-app.on('tick', () => {
-  // Render the scene first
-  camera.render(scene);
-  // Asynchronously get the picking result. If no object is picked, return null.
-  camera.pickResultAsync.then((pickResult) => {
-    if (pickResult) {
-      // drawable is the picked rendering object
-      console.log(pickResult.drawable);
-      // node is the picked node
-      console.log(pickResult.target.node);
-    }
-  });
-});
+Scene picking is a fundamental feature for building interactive 3D applications.  
+Zephyr3D provides both **Ray‑based** and **Color‑based** picking solutions, allowing developers to balance precision and performance based on their needs:
 
-```
+- For simple scenes or frequent, lightweight interactions, use **Ray‑based Picking** (fast but approximate).  
+- For high‑precision selection or editor‑style tools, use **Color‑based Picking** (accurate but more demanding).  
+- On **WebGL2** or **WebGPU**, color‑based picking is recommended as the preferred approach.

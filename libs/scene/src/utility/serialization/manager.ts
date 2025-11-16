@@ -154,7 +154,7 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import type { Material, PBRBluePrintMaterial } from '../../material';
+import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 
@@ -717,7 +717,7 @@ export class ResourceManager {
    *
    * @returns A Promise resolving to the loaded material, or `null` if failed.
    */
-  async fetchMaterial<T extends Material = Material>(id: string) {
+  async fetchMaterial<T extends Material = MeshMaterial>(id: string) {
     const material = await this._assetManager.fetchMaterial<T>(id);
     if (material) {
       this._allocated.set(material, id);

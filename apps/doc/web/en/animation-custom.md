@@ -1,114 +1,173 @@
-# Custom animations
 
-In addition to predefined tracks, custom tracks can be added to implement custom animations.
+# Custom Animation
 
-Custom tracks need to inherit the AnimationTrack class and implement the following methods:
+In addition to built‑in animation tracks (such as translation, rotation, and scaling),  
+**Zephyr3D** allows developers to **create custom tracks** by extending the `AnimationTrack` class.  
+This enables you to implement fully customized animations — for example, **UV scrolling**, **material changes**, or **color fading**.
 
-- [AnimationTrack.calculateState()](/doc/markdown/./scene.animationtrack.calculatestate)
+---
 
-  This method is used to calculate and return the state of an animation track at a specific time. For example, it can return a Vector3 type displacement, a Quaternion type rotation, or a Number type transparency, etc. The state value is used for the track itself, so it can be a member of the track.
+## Core Concept of Custom Tracks
 
-- [AnimationTrack.mixState()](/doc/markdown/./scene.animationtrack.mixstate)
+A **custom animation track** is implemented by subclassing `AnimationTrack`.  
+You must override four key methods to define how the track computes, mixes, and applies animation states.
 
-  This method is used to interpolate between two track states, mainly for action blending. This method must return a new state object.
+| Method | Description |
+|---------|-------------|
+| **`calculateState(target, currentTime)`** | Calculates the track’s state at a given time (e.g., position, rotation, number, etc.) and returns a state object. The type can be `Vector3`, `Quaternion`, `Number`, or any custom data type. |
+| **`mixState(stateA, stateB, t)`** | Interpolates between two states. Used during animation blending and must return a **new state object**. |
+| **`applyState(target, state)`** | Applies the current track state to the target object. The target is typically a `SceneNode`. |
+| **`getBlendId()`** | Returns a unique identifier for the track type. Tracks sharing the same `blendId` can be blended, but they cannot coexist within the same `AnimationClip`. |
 
-- [AnimationTrack.applyState()](/doc/markdown/./scene.animationtrack.applystate)
+> 💡 **Note:**  
+> You cannot add two tracks with the same `blendId` to a single `AnimationClip`,  
+> as the system assumes they control the same property.
 
-  This method is used to apply the track state to a node.
+---
 
-- [AnimationTrack.getBlendId()](/doc/markdown/./scene.animationtrack.getblendid)
+## Example: Creating a Custom UV Animation Track
 
-  This method returns a value (usually a string, but can also be an object). Tracks in the system with the same BlendID are considered blendable. Additionally, tracks with the same BlendID are not allowed to be added to the same AnimationClip.
+The following example shows how to create a custom animation track that moves a material’s texture coordinates,  
+producing a looping UV scroll effect.
 
 ```javascript
-
-// Custom animation track for UV animation and opacity animation of nodes
+// Custom animation track: UV animation
 class MyAnimationTrack extends AnimationTrack {
-  // Track state, a Float32Array of length 2, the first element stores the UV displacement, the second element stores the opacity
-  _state;
-  // The constructor takes an interpolator object that stores keyframes
+  _state; // Current track state (Float32Array)
+  _interpolator; // Interpolator used to calculate keyframe values
+
+  // Constructor: receives a keyframe interpolator
   constructor(interpolator) {
-    super(interpolator);
-    this._state = new Float32Array(2);
+    super();
+    this._interpolator = interpolator;
+    this._state = new Float32Array(1);
   }
-  // Use the interpolator to calculate and return the track state at a given time
+
+  // Calculate and return the state at the given time
   calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }
-  // Blend two tracks by interpolation and return the blended state
-  mixState(stateA, stateB, t) {
-    const result = new Float32Array(2);
+
+  // Blend two states (used for animation blending)
+  mixState(a, b, t) {
+    const result = new Float32Array(1);
     result[0] = a[0] + (b[0] - a[0]) * t;
-    result[1] = a[1] + (b[1] - a[1]) * t;
     return result;
   }
-  // Apply the track state to the node
-  applyState(node, state) {
-    // Here we apply the track animation to the node and all its child Mesh nodes node
-    node.iterate((child) => {
+
+  // Apply the computed state to the target node
+  applyState(target, state) {
+    // Traverse all meshes under the node
+    target.iterate((child) => {
       if (child.isMesh()) {
-        // Set the UV transformation matrix
-        mesh.material.albedoTexCoordMatrix = Matrix4x4.translation(new Vector3(state[0], 0, 0));
-        // Set the opacity
-        mesh.material.opacity = state[1];
+        // Apply UV transformation (UV scroll effect)
+        child.material.albedoTexCoordMatrix = Matrix4x4.translation(
+          new Vector3(state[0], 0, 0)
+        );
       }
     });
   }
-  // The BlendId of this track type
+
+  // Unique identifier for this type of track
   getBlendId() {
-    // Return a unique id so that all MyAnimationTracks can blend with each other
-    return 'my-animation-track';
+    return 'uv-animation';
   }
 }
-
-// Create animations and use custom tracks
-
-// Assume model is a loaded model
-const model = await getEngine().resourceManager.fetchModel(MODEL_URL, scene);
-// Get the animation set object of this model
-const animationSet = model.group.animationSet;
-// Create an animation
-const animation = new AnimationClip('UserTrackTest');
-// Create an interpolator to store keyframes for the custom animation
-const interpolator = new Interpolator(
-  // Linear interpolation
-  'linear',
-  // Automatically calculate the number of elements per keyframe: output.length/input.length
-  null,
-  // input, the time of each keyframe in seconds
-  new Float32Array([0, 1, 2]),
-  // output, each keyframe data has two elements, the first is the UV displacement, the second is the opacity
-  // Three keyframe data:
-  // (0, 0.9), (0.5, 0), (1, 0.9)
-  new Float32Array([0, 0.9, 0.5, 0, 1, 0.9])
-);
-// Create a custom track using the keyframe data
-const track = new MyAnimationTrack(interpolator);
-// Add the track to the animation and specify the node that the track should control
-animation.addTrack(model.group, track);
-// Add the animation to the animation set
-animationSet.add(animation);
-
-// Start playing this animation
-animationSet.playAnimation('UserTrackTest', {
-  // Number of loops, 0 for infinite loops. Default value is 0
-  repeat: 0,
-  // Speed factor, the larger the absolute value, the faster the speed.
-  // If it is a negative value, it plays in reverse. Default value is 1
-  speedRatio: 1,
-  // Blending weight, when multiple animations are playing at the same time,
-  // all animations are weighted and averaged using this weight. Default value is 1
-  weight: 1,
-  // How long it takes for the animation weight to increase from 0 to weight,
-  // default is 0, indicating no fade-in effect. Usually used in conjunction
-  // with the fadeOut parameter of stopAnimation() for seamless transition
-  // between two animations
-  fadeIn: 0, 
-});
-
 ```
 
-In the following example, we have implemented UV animation and opacity fading through custom tracks.
+---
+
+## Using a Custom Track
+
+The full process includes five steps:
+
+1. **Load a model**  
+2. **Create an animation clip**  
+3. **Create an interpolator**  
+4. **Create and add the custom track**  
+5. **Play the animation**
+
+```javascript
+// Step 1: Load a model
+const model = await getEngine().resourceManager.instantiatePrefab(
+  scene.rootNode,
+  '/assets/BoxTextured.zprefab'
+);
+
+// Step 2: Create an animation clip
+const animation = model.animationSet.createAnimation('UserTrackTest');
+
+// Step 3: Create a keyframe interpolator
+const interpolator = new Interpolator(
+  'linear',                  // Interpolation mode ('linear', 'step', 'cubicspline')
+  null,                      // Automatically infer element size from arrays
+  new Float32Array([0, 2]),  // Time keyframes: 0s → 2s
+  new Float32Array([0, 1])   // Value keyframes: UV offset from 0 → 1
+);
+
+// Step 4: Create and add the custom track
+const track = new MyAnimationTrack(interpolator);
+animation.addTrack(model, track);
+
+// Step 5: Play the animation
+model.animationSet.playAnimation('UserTrackTest', {
+  repeat: 0,     // Loop count (0 = infinite loop)
+  speedRatio: 1, // Playback speed multiplier
+  weight: 1,     // Blending weight when multiple animations are playing
+  fadeIn: 0,     // Fade‑in duration
+});
+```
 
 <div class="showcase" case="tut-26"></div>
+
+---
+
+## Method Implementations Explained
+
+### `calculateState()`
+Computes the state of the track based on the current playback time.  
+This method is called every frame, and the result is later applied via `applyState()`.
+
+### `mixState()`
+Called when two animations with the same `blendId` are played simultaneously.  
+Returns a new blended state by interpolating between `stateA` and `stateB` using ratio `t`.
+
+### `applyState()`
+Applies the computed state to the target object.  
+This can include actions like:
+- Updating position, rotation, or scale  
+- Adjusting material or color properties  
+- Controlling custom attributes like light intensity or texture offsets  
+
+### `getBlendId()`
+Defines the unique identity of the track type.  
+Tracks with identical `blendId` can be blended; otherwise, they are handled independently.
+
+---
+
+## Practical Tips
+
+| Use Case | Recommended Implementation |
+|-----------|----------------------------|
+| Custom material animations (UV scroll, flicker) | Modify material properties like `UV` or `emission` |
+| Camera effects (focus, depth‑of‑field) | Animate camera parameters directly |
+| Light animations (intensity, color) | Track modifies lighting attributes |
+| Environment transitions (fog, exposure) | Animate global rendering parameters |
+
+---
+
+## Summary
+
+- Extend **`AnimationTrack`** to create fully custom animations  
+- Implement the four essential methods: `calculateState()`, `mixState()`, `applyState()`, and `getBlendId()`  
+- Combine with **Interpolator** for precise keyframe‑based control  
+- Custom tracks are powerful — they can animate **any property** in the engine
+
+---
+
+> 💡 **Suggestions:**  
+> - Keep each track’s `blendId` unique to prevent conflicts  
+> - Custom animations are suitable for complex material, environment, or effect systems  
+> - The **Zephyr3D Editor** supports creating keyframe animations for most object properties directly
+

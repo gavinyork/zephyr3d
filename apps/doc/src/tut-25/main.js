@@ -10,7 +10,8 @@ import {
   Mesh,
   NodeEulerRotationTrack,
   getInput,
-  getEngine
+  getEngine,
+  DirectionalLight
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -22,9 +23,14 @@ const myApp = new Application({
 myApp.ready().then(async () => {
   const scene = new Scene();
 
+  // Create directional light
+  const light = new DirectionalLight(scene);
+  light.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
+
+  // Create a box mesh and add animation
   const box = new Mesh(scene, new BoxShape(), new LambertMaterial());
-  const animationClip = box.animationSet.createAnimation('move');
-  animationClip
+  const clip = box.animationSet.createAnimation('animation');
+  clip
     .addTrack(
       box,
       new NodeTranslationTrack('linear', [
@@ -55,7 +61,7 @@ myApp.ready().then(async () => {
         }
       ])
     );
-  box.animationSet.playAnimation('move');
+  box.animationSet.playAnimation('animation');
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);

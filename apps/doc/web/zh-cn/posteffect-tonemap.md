@@ -1,13 +1,16 @@
-# 色调映射 (Tonemap)
+# Tonemap（色调映射）
 
-色调映射用来将HDR图像映射为LDR图像。
-我们的色调映射采用ACES编码实现。
+**用途**：针对 HDR 渲染输出执行色调映射，使其匹配标准 LDR 显示设备。  
 
-```javascript
-// 对摄像机启用Tonemapping(默认Tonemapping是启用的)
-camera.toneMap = true;
-// toneMapExposure属性控制曝光度
-camera.toneMapExposure = 1.5;
+**属性接口：**
+- `camera.toneMap`: `boolean` — 启用或禁用色调映射。  
+- `camera.toneMapExposure`: `number` — 曝光控制，默认值 `1`。
+
+**示例：**
+```javascript  
+camera.HDR = true;  
+camera.toneMap = true;  
+camera.toneMapExposure = 1.2;  
 ```
 
 <div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>

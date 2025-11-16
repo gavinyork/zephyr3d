@@ -7,7 +7,6 @@ import {
   PerspectiveCamera,
   SphereShape,
   DirectionalLight,
-  AssetManager,
   PBRMetallicRoughnessMaterial,
   getInput,
   getEngine
@@ -32,12 +31,13 @@ myApp.ready().then(function () {
   // roughness 0.6
   material.roughness = 0.6;
   // Load albedo map and normal map
-  const assetManager = new AssetManager();
-  assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg').then((texture) => {
-    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
-  });
-  assetManager
-    .fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
+  getEngine()
+    .resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg')
+    .then((texture) => {
+      material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
+    });
+  getEngine()
+    .resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
       linearColorSpace: true
     })
     .then((texture) => {

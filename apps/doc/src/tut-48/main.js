@@ -53,12 +53,12 @@ myApp.ready().then(async () => {
 
   let x = 0;
   let y = 0;
-  myApp.device.canvas.addEventListener('pointermove', (ev) => {
+  myApp.on('pointermove', (ev) => {
     x = ev.offsetX;
     y = ev.offsetY;
   });
 
-  function continusPicking() {
+  function picking() {
     scene.mainCamera.pickAsync(x, y).then((pickResult) => {
       if (lastPickResult !== pickResult?.target.node) {
         if (lastPickResult) {
@@ -73,7 +73,7 @@ myApp.ready().then(async () => {
     });
   }
 
-  myApp.on('tick', continusPicking);
+  myApp.on('tick', picking);
 
   myApp.run();
 });

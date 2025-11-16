@@ -1,5 +1,5 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Vector3 } from '@zephyr3d/base';
+import { HttpFS, Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -13,7 +13,10 @@ import {
 
 const myApp = new Application({
   backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-49')
+  }
 });
 
 myApp.ready().then(async () => {
@@ -26,13 +29,13 @@ myApp.ready().then(async () => {
   const light = new DirectionalLight(scene);
   light.lookAt(new Vector3(1, 4, -1), new Vector3(0, 0, 0), new Vector3(0, 1, 1));
 
-  // Load mesh
+  // Load model
   const batchGroup = new BatchGroup(scene);
-  const room = await getEngine().resourceManager.fetchModel(
-    'https://cdn.zephyr3d.org/doc/assets/models/sitting_room_with_baked_textures.glb',
-    scene
+  const room = await getEngine().resourceManager.instantiatePrefab(
+    scene.rootNode,
+    '/assets/sitting_room_with_baked_textures.zprefab'
   );
-  room.group.parent = batchGroup;
+  room.parent = batchGroup;
 
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
   scene.mainCamera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());

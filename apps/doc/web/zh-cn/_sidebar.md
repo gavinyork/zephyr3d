@@ -38,6 +38,7 @@
     - [Bloom](zh-cn/posteffect-bloom.md)
     - [SSAO](zh-cn/posteffect-sao.md)
     - [FXAA](zh-cn/posteffect-fxaa.md)
+    - [TAA](zh-cn/posteffect-taa.md)
     - [SSR](zh-cn/posteffect-ssr.md)
   - 自然景观
     - [地形渲染](zh-cn/terrain.md)

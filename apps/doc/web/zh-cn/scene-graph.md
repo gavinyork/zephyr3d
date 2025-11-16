@@ -31,7 +31,6 @@
 
 ```javascript
 
-  // 所有球体网格共用相同的顶点数据和材质允许在WebGL2和WebGPU设备上使用几何体实例化渲染
   const spherePrimitive = new SphereShape();
   // 创建一个球体网格父节点
   const sphere1 = new Mesh(scene, spherePrimitive, material);

@@ -1,43 +1,56 @@
-# Skeletal animation
 
-Each vertex of the model is influenced by several joints, resulting in motion. This type of animation is known as skeletal animation. We only support loading skeletal animations from models and do not allow for their creation.
+# Skeletal Animation
+
+In skeletal animation, each vertex of a model is influenced by one or more **joints (bones)** that define how the mesh deforms and moves.  
+This technique is primarily used for animating characters, creatures, and other articulated objects.
+
+Zephyr3D **supports loading skeletal animations from models**, but **you cannot create skeletal animations manually** via code.
+
+---
+
+## Example
 
 ```javascript
+// Load a model that contains skeletal animation.
+// The returned object includes both a model node and an associated AnimationSet.
+// If the model has no animations, the AnimationSet will be null.
 
-// When loading an animation model, the object returned by fetchModel() contains a model node and an AnimationSet object,
-// and if the model does not contain animations, the AnimationSet object is null.
-const model = await getEngine().resourceManager.fetchModel('assets/models/CesiumMan.glb', scene);
-// If the model contains animations
+const model = await getEngine().resourceManager.instantiatePrefab(
+  scene.rootNode,
+  '/assets/CesiumMan.zprefab'
+);
+
+// Play the first animation included in the model
+model.animationSet.playAnimation(model.animationSet.getAnimationNames()[0]);
+
 if (model.animationSet) {
-  // The AnimationSet.getAnimationNames() method is used to get all animation names
+  // Get all animation names available in the model
   const animationNames = model.animationSet ? model.animationSet.getAnimationNames() : [];
-  // Start play specific animation
-  model.animationSet.playAnimation(animationNames[0], {
-    // Number of loops, 0 for infinite loops. Default value is 0
-    repeat: 0,
-    // Speed factor, the larger the absolute value, the faster the speed.
-    // If it is a negative value, it plays in reverse. Default value is 1
-    speedRatio: 1,
-    // Blending weight, when multiple animations are playing at the same time,
-    // all animations are weighted and averaged using this weight. Default value is 1
-    weight: 1,
-    // How long it takes for the animation weight to increase from 0 to weight,
-    // default is 0, indicating no fade-in effect. Usually used in conjunction
-    // with the fadeOut parameter of stopAnimation() for seamless transition
-    // between two animations
-    fadeIn: 0, 
-  });
-  // Stop playing specific animation
-  model.animationSet.stopAnimation(animationNames[0], {
-    // How long it takes for the animation weight to decrease from current weight
-    // to 0, default is 0, indicating no fade-out effect. Usually used in conjunction
-    // with the fadeIn parameter of playAnimation() for seamless transition between
-    // two animations
-    fadeOut: 0
-  });
-}
 
+  // Play one of the animations
+  model.animationSet.playAnimation(animationNames[0], {
+    // Number of loops; use 0 for infinite looping (default is 0)
+    repeat: 0,
+    // Playback speed multiplier; higher = faster, negative = reverse playback (default is 1)
+    speedRatio: 1,
+    // Duration for fade‑in effect, in seconds; set to 0 for instant start.
+    // Often used with stopAnimation()’s fadeOut parameter for seamless cross‑fading.
+    fadeIn: 0,
+  });
+
+  // ...
+
+  // Stop playback of the animation
+  model.animationSet.stopAnimation(animationNames[0]);
+}
 ```
 
 <div class="showcase" case="tut-24"></div>
 
+---
+
+> 💡 **Note:**  
+> - The **`AnimationSet`** object manages all animations linked to a model.  
+> - Use `getAnimationNames()` to retrieve available animation names.  
+> - Playback options such as *repeat*, *speedRatio*, and *fadeIn* allow fine‑grained control.  
+> - For smooth transitions between animations, use `fadeIn` with a corresponding `fadeOut` parameter when stopping another animation.

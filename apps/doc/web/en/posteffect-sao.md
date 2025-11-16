@@ -1,16 +1,20 @@
-# SAO
+# SSAO (Screen Space Ambient Occlusion)
 
-SAO is a screen-space AO algorithm designed to approximate shadows from indirect light, enhancing the realism of rendered scenes.
+**Purpose**: Simulates light occlusion to generate subtle shadowing in object creases and contact areas, enhancing depth perception and spatial realism.
 
-```javascript
-// Enable SSAO post effect for a camera
-camera.SSAO = true;
-// SSAO intensity
-camera.SSAOIntensity = 0.03;
-// SSAO radius
-camera.SSAORadius = 100;
+**Property Interface**:
 
+- `camera.SSAO`: `boolean` — Enables or disables the SSAO effect.  
+- `camera.SSAOScale`: `number` — Sampling scale factor (radius multiplier).  
+- `camera.SSAOBias`: `number` — Bias value to reduce self‑occlusion artifacts.  
+- `camera.SSAORadius`: `number` — Sampling radius controlling the area of influence.  
+- `camera.SSAOIntensity`: `number` — Shadow intensity (overall darkness of the ambient occlusion).  
+- `camera.SSAOBlurDepthCutoff`: `number` — Depth cutoff threshold used when blurring the AO result.
+
+**Example**:
+```javascript  
+camera.SSAO = true;  
+camera.SSAOIntensity = 0.05;  
 ```
 
 <div class="showcase" case="tut-29" style="width:600px;height:800px;"></div>
-

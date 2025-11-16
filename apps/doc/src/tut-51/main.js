@@ -52,7 +52,7 @@ myApp.ready().then(function () {
       const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
       // The lower half of the screen uses FXAA
       scene.mainCamera.viewport = [0, 0, width, height >> 1];
-      scene.mainCamera.FXAA = true;
+      scene.mainCamera.TAA = true;
     }
   });
 
@@ -62,7 +62,7 @@ myApp.ready().then(function () {
       const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
       // The lower half of the screen uses Tonemap
       scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
-      scene.mainCamera.FXAA = false;
+      scene.mainCamera.TAA = false;
     }
   });
 

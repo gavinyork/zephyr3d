@@ -31,7 +31,6 @@ Nodes in a scene are stored in a tree structure, with each node's spatial transf
 
 ```javascript
 
-  // All sphere meshes share the same vertex data and materials, allowing for rendering with geometry instances on WebGL2 and WebGPU devices
   const spherePrimitive = new SphereShape();
   // Create a sphere mesh as the parent node
   const sphere1 = new Mesh(scene, spherePrimitive, material);
