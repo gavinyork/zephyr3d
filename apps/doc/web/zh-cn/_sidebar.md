@@ -40,10 +40,6 @@
     - [FXAA](zh-cn/posteffect-fxaa.md)
     - [TAA](zh-cn/posteffect-taa.md)
     - [SSR](zh-cn/posteffect-ssr.md)
-  - 自然景观
-    - [地形渲染](zh-cn/terrain.md)
-    - [天空渲染](zh-cn/sky.md)
-    - [水面渲染](zh-cn/water.md)
   - 场景拾取
     - [概述](zh-cn/picking.md)
   - 几何体实例化
@@ -52,12 +48,9 @@
     - [概述](zh-cn/oit.md)
   - 多视口渲染
     - [概述](zh-cn/multi-views.md)
-  - 自定义材质
-    - [材质基础](zh-cn/user-material.md)
-    - [无光照材质](zh-cn/user-material-unlit.md)
-    - [光照材质](zh-cn/user-material-lit.md)
-    - [多遍材质](zh-cn/user-material-multipass.md)
-    - [Shader变体](zh-cn/user-material-var.md)
+  - 进阶内容
+    - [内存管理](zh-cn/lifetime.md)
+    - [虚拟文件系统](zh-cn/vfs.md)
 
 - 使用编辑器
 

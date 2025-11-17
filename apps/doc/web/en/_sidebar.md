@@ -44,10 +44,6 @@
     - [FXAA](en/posteffect-fxaa.md)
     - [TAA](en/posteffect-taa.md)
     - [SSR](en/posteffect-ssr.md)
-  - Nature
-    - [Terrain](en/terrain.md)
-    - [Sky](en/sky.md)
-    - [Water](en/water.md)
   - Picking
     - [Introduction](en/picking.md)
   - Geometry instancing
@@ -56,10 +52,7 @@
     - [Introduction](en/oit.md)
   - Multi-viewport Rendering
     - [Introduction](en/multi-views.md)
-  - Custom material
-    - [Basics](en/user-material.md)
-    - [Unlit material](en/user-material-unlit.md)
-    - [Light material](en/user-material-lit.md)
-    - [Multi-pass material](en/user-material-multipass.md)
-    - [Shader variants](en/user-material-var.md)
+  - Advanced
+    - [Memory Management](en/lifetime.md)
+    - [VFS](en/vfs.md)
 
