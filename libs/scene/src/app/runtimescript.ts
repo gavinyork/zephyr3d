@@ -45,8 +45,8 @@ export class RuntimeScript<T extends IDisposable | null> {
    *
    * Typical usage includes per-frame logic, animation, and input handling.
    *
-   * @param _deltaTime - Time since last update (engine-defined units, e.g., seconds or ms).
-   * @param _elapsedTime - Total elapsed time since start (engine-defined units).
+   * @param _deltaTime - Time since last update in seconds.
+   * @param _elapsedTime - Total elapsed time since start in seconds.
    */
   onUpdate(_deltaTime: number, _elapsedTime: number) {}
   /**

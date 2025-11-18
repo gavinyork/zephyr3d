@@ -68,8 +68,7 @@
     - [自定义材质](zh-cn/editor/custom-material.md)
 
   - 脚本系统
-    - [脚本结构与生命周期](zh-cn/editor/script-lifecycle.md)
-    - [脚本调试](zh-cn/editor/script-debug.md)
+    - [概述](zh-cn/editor/scripting.md)
 
   - 地形系统
     - [地形创建与笔刷工具](zh-cn/editor/terrain-tools.md)
