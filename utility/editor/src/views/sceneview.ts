@@ -964,6 +964,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           this._proxy.hideProxy(node);
         }
       });
+      this._propGrid.clear();
+      this._propGrid.object = this.controller.model.scene;
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
       this.controller.model.scene.on('endrender', this.handleEndRender, this);
       this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
@@ -977,6 +979,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private sceneFinialize() {
     this._leftDockPanel = null;
+    this._propGrid.object = null;
+    this._propGrid.clear();
     if (this._sceneHierarchy) {
       this._sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
       this._sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
@@ -1250,7 +1254,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.selectNode(null);
     }
     if (this._propGrid.object instanceof SceneNode && node.isParentOf(this._propGrid.object)) {
-      this._propGrid.object = null;
+      this._propGrid.object = this.controller.model.scene;
     }
     if (node.isParentOf(this._postGizmoRenderer.node)) {
       this._postGizmoRenderer.node = null;
@@ -1336,8 +1340,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleNodeDeselected(node: SceneNode) {
     this._postGizmoRenderer.node = null;
     if (this._propGrid.object === node) {
-      this._propGrid.object = null;
-      this._propGrid.clear();
+      this._propGrid.object = this.controller.model.scene;
     }
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {

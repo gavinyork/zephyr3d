@@ -52,13 +52,48 @@
     - [内存管理](zh-cn/lifetime.md)
     - [虚拟文件系统](zh-cn/vfs.md)
 
+- Zephyr3d Editor 使用指南
+
+  - 总体介绍
+    - [概述](zh-cn/editor/overview.md)
+    - [快速开始](zh-cn/editor/getting-started.md)
+
+  - 编辑器界面
+    - [总体布局](zh-cn/editor/ui-layout.md)
+    - [场景编辑](zh-cn/editor/scene-editor.md)
+    - [资产管理](zh-cn/editor/content-browser.md)
+
+  - 材质系统
+    - [材质蓝图基础](zh-cn/editor/material-blueprint.md)
+    - [自定义材质](zh-cn/editor/custom-material.md)
+
+  - 脚本系统
+    - [脚本结构与生命周期](zh-cn/editor/script-lifecycle.md)
+    - [脚本调试](zh-cn/editor/script-debug.md)
+
+  - 地形系统
+    - [地形创建与笔刷工具](zh-cn/editor/terrain-tools.md)
+    - [导入高度图](zh-cn/editor/terrain-heightmap.md)
+
+  - 动画系统
+    - [动画曲线编辑](zh-cn/editor/animation-editor.md)
+    - [动画绑定与属性控制](zh-cn/editor/animation-binding.md)
+
+  - 项目构建与发布
+    - [实时预览与运行](zh-cn/editor/preview.md)
+    - [构建与部署](zh-cn/editor/build-deploy.md)
+
+  - 高级内容
+    - [快捷键与技巧](zh-cn/editor/tips.md)
+    - [开发者扩展与源码编译](zh-cn/editor/developer-extension.md)
+    - [版本更新记录](zh-cn/editor/release-notes.md)
+    - [附录与术语表](zh-cn/editor/appendix.md)
+    - 
 - 使用编辑器
 
   - 编辑器概述
     - [概述](zh-cn/editor-introduction.md)
     - [快速开始](zh-cn/editor-getting-start.md)
-  - 项目管理
-    - [概述](zh-cn/editor-project-introduction.md)
   - 用户界面
     - [概述](zh-cn/editor-layout-introduction.md)
   - 资产管理
