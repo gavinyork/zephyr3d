@@ -3,10 +3,6 @@
   - [Introduction](en/intro.md)
   - [Installation](en/installation.md)
 
-- Demos
-
-  - [GLTF viewer](en/gltf.md)
-
 - DeviceAPI
 
   - [Device](en/device.md)

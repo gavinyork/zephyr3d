@@ -782,9 +782,9 @@ device.setBindGroup(1, bindgroup1);
 
 ```
 
-## 计算Shader
+## 计算着色器
 
-计算Shader(Compute Shader)主要用于在GPU上运行大量的并行运算，在WebGPU设备上可用。
+计算着色器(Compute Shader)主要用于在GPU上运行大量的并行运算，在WebGPU设备上可用。
 
 可以使用[Device.buildComputeProgram()](/doc/markdown/./device.abstractdevice.buildcomputeprogram)方法来创建计算Shader。
 

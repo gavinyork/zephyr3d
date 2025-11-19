@@ -315,8 +315,8 @@ export class Editor {
       ImGui.TextColored(new ImGui.ImVec4(0.3, 1, 0.3, 1), 'Welcome to zephyr3d editor');
       ImGui.Separator();
       const panelHeight = 10 * frameHeight + 9 * itemSpacing;
-      const iconTex = this._assetImages.app.icon.get();
-      const imageSize = new ImGui.ImVec2(160, 160);
+      const iconTex = this._assetImages.app.logo_i.get();
+      const imageSize = new ImGui.ImVec2(320, Math.floor((320 / iconTex.width) * iconTex.height));
       let cursorPosY = Math.max(imageSize.y + 10, (displaySize.y - panelHeight) >> 1);
       ImGui.SetCursorPosX(Math.max(0, (displaySize.x - imageSize.x) >> 1));
       ImGui.SetCursorPosY((cursorPosY - imageSize.y) >> 1);
