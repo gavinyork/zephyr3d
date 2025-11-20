@@ -72,8 +72,7 @@
     - [创建脚本](zh-cn/editor/create-script.md)
 
   - 地形系统
-    - [地形创建与笔刷工具](zh-cn/editor/terrain-tools.md)
-    - [导入高度图](zh-cn/editor/terrain-heightmap.md)
+    - [编辑地形](zh-cn/editor/terrain-tools.md)
 
   - 动画系统
     - [动画曲线编辑](zh-cn/editor/animation-editor.md)
