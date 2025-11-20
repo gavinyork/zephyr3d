@@ -19,6 +19,10 @@
   - 粒子系统
 - 可在资产视图中拖动预制体(模型等)到Viewport将其添加到场景。
 
+<video src="https://video.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>
+
 ## 编辑节点变换
 - 平移变换
   - 激活：`T` 键或工具栏平移按钮

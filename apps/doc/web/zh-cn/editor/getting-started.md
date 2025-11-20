@@ -17,7 +17,7 @@
 - **Import Project** ：导入本地硬盘上的项目到IndexedDB；
 
 
-<img src="https://cdn.zephyr3d.org/doc/assets/images/editor-main.jpg" width="1024"/>
+<img src="https://cdn.zephyr3d.org/doc/assets/images/editor-main.png" width="1024"/>
 
 **项目功能**
 打开项目后，您可以：

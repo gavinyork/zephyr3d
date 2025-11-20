@@ -2,6 +2,8 @@
 
 Zephyr3d是一个面向浏览器的3D渲染框架，提供了两套API接口及所见即所得的编辑器
 
+---
+
 ## API
 
 ### Device API
@@ -25,6 +27,8 @@ Zephyr3d是一个面向浏览器的3D渲染框架，提供了两套API接口及�
   - 水面渲染
   - 后处理(Tonemap, Bloom, TAA, FXAA, SSAO等)
   - ImGui绑定
+
+---
 
 ## 编辑器
 
