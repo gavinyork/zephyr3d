@@ -8,9 +8,13 @@
 4. 点击`Save`保存为`.zmtl`材质文件以及`.zbpt`蓝图文件；
 5. 场景中选择Mesh对象，将资产视图中的`.zmtl`材质文件拖动到右侧材质属性编辑框内即可为Mesh应用材质；
 
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/create-material.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>
+
 ## 创建材质实例
 
-资产视图中右键点击一个材质，选择`Create Material Instance`为此材质创建一个新的实例。材质实例之间共享蓝图，但可应用不同的`uniform`参数。
+资产视图中右键点击一个材质，选择`Create Material Instance`为此材质创建一个新的实例。材质实例之间共享蓝图（如果是通过蓝图创建），但可应用不同的`uniform`参数。
 
 ## 编辑自定义材质
 

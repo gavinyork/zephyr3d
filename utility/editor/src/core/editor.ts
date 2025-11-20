@@ -5,7 +5,7 @@ import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneController } from '../controllers/scenecontroller';
 import { FontGlyph } from './fontglyph';
-import { AssetManager, ScriptingSystem, ResourceManager } from '@zephyr3d/scene';
+import { AssetManager, ResourceManager, getEngine } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
   analyzeGPUObjectGrowth,
@@ -92,7 +92,6 @@ export class Editor {
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
   private _codeEditor: CodeEditor;
-  private _scriptingSystem: ScriptingSystem;
   private _extraLibs: Record<string, Monaco.IDisposable>;
   constructor() {
     this._moduleManager = new ModuleManager();
@@ -101,20 +100,13 @@ export class Editor {
     this._currentProject = null;
     this._codeEditor = null;
     this._extraLibs = {};
-    this._scriptingSystem = new ScriptingSystem({
-      onLoadError(e) {
-        console.error(e);
-      }
-    });
-    this._scriptingSystem.registry.VFS = ProjectService.VFS;
-    this._scriptingSystem.registry.editorMode = true;
   }
   get sceneChanged() {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
   }
   async loadScriptDependencies(path: string) {
     const dependencies: Record<string, string> = {};
-    await this._scriptingSystem.registry.getDependencies(path, null, dependencies);
+    await getEngine().scriptingSystem.registry.getDependencies(path, null, dependencies);
     for (const k of Object.keys(dependencies)) {
       // Must delete old lib reference first!!!
       const oldDisposable = this._extraLibs[k];
@@ -191,8 +183,7 @@ export class Editor {
   resize(w: number, h: number) {
     eventBus.dispatchEvent('resize', w, h);
   }
-  update(dt: number, elapsed: number) {
-    this._scriptingSystem.update(dt, elapsed);
+  update(dt: number) {
     eventBus.dispatchEvent('update', dt);
   }
   getBrushes() {
@@ -473,7 +464,6 @@ export class Editor {
         const project = await ProjectService.openProject(uuid);
         const settings = await ProjectService.getCurrentProjectSettings();
         this._currentProject = project;
-        this._scriptingSystem.registry.VFS = ProjectService.VFS;
         this._moduleManager.activate('Scene', settings.startupScene ?? project.lastEditScene ?? '');
         for (const dep of Object.keys(settings.dependencies ?? {})) {
           const depName = dep;
@@ -503,7 +493,6 @@ export class Editor {
       const uuid = await ProjectService.createProject(name);
       const project = await ProjectService.openProject(uuid);
       this._currentProject = project;
-      this._scriptingSystem.registry.VFS = ProjectService.VFS;
       this._moduleManager.activate('Scene', '');
     }
   }
@@ -522,7 +511,6 @@ export class Editor {
     try {
       const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
       this._currentProject = project;
-      this._scriptingSystem.registry.VFS = ProjectService.VFS;
       this.loadDepTypes();
       const settings = await ProjectService.getCurrentProjectSettings();
       await this._moduleManager.activate(

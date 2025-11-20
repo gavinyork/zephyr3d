@@ -19,7 +19,7 @@
   - 粒子系统
 - 可在资产视图中拖动预制体(模型等)到Viewport将其添加到场景。
 
-<video src="https://video.mp4" controls width="640">
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/add-object-1080p.mp4" controls width="640">
   您的浏览器不支持 video 标签。
 </video>
 
@@ -43,15 +43,22 @@
     - 拖拽坐标轴圆环进行轴向旋转
     - 点击空白区域进入轨迹球自由旋转模式
 
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/transform-object-1080p.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>
+
 ## 节点操作
 - `Ctrl + D`或使用工具栏的复制粘贴按钮可以复制当前选中对象
 - `Delete`删除当前选中节点
+
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/duplicate-object-1080p.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>
 
 ## 编辑属性
 
 当选中场景对象，可以在右侧Inspector编辑属性：
 - Transform；
-- 材质属性；
 - 可见性；
 - 绑定脚本；
 - 动画属性；
@@ -59,3 +66,7 @@
 ## 特殊编辑
 
 某些节点需要特殊的编辑方式，例如地形需要使用笔刷编辑地貌和地表纹理。对于这类节点，选中后可通过点击工具栏中的编辑按钮进入特殊编辑模式，再次点击该按钮则退出特殊编辑模式
+
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/edit-object-1080p.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>

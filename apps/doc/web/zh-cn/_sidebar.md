@@ -69,6 +69,7 @@
 
   - 脚本系统
     - [概述](zh-cn/editor/scripting.md)
+    - [创建脚本](zh-cn/editor/create-script.md)
 
   - 地形系统
     - [地形创建与笔刷工具](zh-cn/editor/terrain-tools.md)

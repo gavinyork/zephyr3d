@@ -82,6 +82,12 @@ export class Engine {
     this._loadingScenes = [];
   }
   /**
+   * Exposes the instance of {@link ScriptingSystem}.
+   */
+  get scriptingSystem() {
+    return this._scriptingSystem;
+  }
+  /**
    * Exposes the virtual file system used by the underlying {@link ScriptingSystem}'s registry.
    */
   get VFS() {

@@ -11,4 +11,7 @@
 - Math 运算 (Add / Multiply)；
 - Output 终点。
 
-*示意图：材质蓝图编辑器界面*
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/material-blueprint.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>
+
