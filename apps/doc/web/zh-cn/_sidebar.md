@@ -60,7 +60,7 @@
 
   - 编辑器界面
     - [总体布局](zh-cn/editor/ui-layout.md)
-    - [场景编辑](zh-cn/editor/scene-editor.md)
+    - [编辑场景](zh-cn/editor/scene-editor.md)
     - [资产管理](zh-cn/editor/content-browser.md)
 
   - 材质系统
@@ -75,8 +75,8 @@
     - [编辑地形](zh-cn/editor/terrain-tools.md)
 
   - 动画系统
-    - [动画曲线编辑](zh-cn/editor/animation-editor.md)
-    - [动画绑定与属性控制](zh-cn/editor/animation-binding.md)
+    - [概述](zh-cn/editor/animation-overview.md)
+    - [编辑动画](zh-cn/editor/edit-animation.md)
 
   - 项目构建与发布
     - [实时预览与运行](zh-cn/editor/preview.md)

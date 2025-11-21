@@ -1,6 +1,6 @@
 import { base64ToUint8Array, uint8ArrayToBase64, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { getEngine } from '../../../app/api';
-import type { MeshMaterial } from '../../../material/meshmaterial';
+import { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, Mesh, type SceneNode } from '../../../scene';
 import type { SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';
@@ -279,6 +279,16 @@ export function getMeshClass(): SerializableClass {
                 console.error(`Material not found: ${value.str[0]}`);
               }
             }
+          }
+        },
+        {
+          name: 'Material Object',
+          type: 'object',
+          options: {
+            objectTypes: [MeshMaterial]
+          },
+          get(this: Mesh, value) {
+            value.object[0] = this.material ?? null;
           }
         },
         {
