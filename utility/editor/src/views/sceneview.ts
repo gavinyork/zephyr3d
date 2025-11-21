@@ -645,7 +645,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   play() {
     ensureDependencies().then(() => {
       this.controller.editor.getProjectSettings().then((settings) => {
-        if (!settings.startupScene) {
+        if (!settings.startupScene && !settings.startupScript) {
           DlgMessage.messageBox('Error', 'Please select startup scene in <Project Settings>');
         } else {
           const projectId = this.controller.editor.currentProject.uuid;
