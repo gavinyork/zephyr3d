@@ -776,12 +776,14 @@ export class CurveEditor extends Observable<{
     const outputs = new Float32Array(this._points.length * stride);
     for (let i = 0; i < this._points.length; i++) {
       inputs[i] = this._points[i].x;
-      if (stride > 1) {
-        for (let j = 0; j < stride; j++) {
-          outputs[i * stride + j] = this._points[i].value[j];
+      for (let j = 0; j < stride; j++) {
+        const val = this._points[i].value[j];
+        outputs[i * stride + j] = val;
+        if (val < this._settings.valueRange[0]) {
+          this._settings.valueRange[0] = val;
+        } else if (val > this._settings.valueRange[1]) {
+          this._settings.valueRange[1] = val;
         }
-      } else {
-        outputs[i] = this._points[i].value[0];
       }
     }
     if (!this._interpolator) {

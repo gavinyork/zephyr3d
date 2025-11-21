@@ -143,3 +143,20 @@
 
     - 在轨道编辑器中拖动红色竖线可预览动画效果
 
+---
+
+**步骤 6：播放已创建的动画**
+
+可以通过以下两种方式播放动画：
+
+- 在属性编辑器面板中设置为动画选中自动播放，这样当该节点加载完毕后会自动循环播放指定的动画。
+- 在代码中手动播放：
+```ts
+node.animationSet.playAnimation('Transform');
+```
+
+---
+
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/create-animation.mp4" controls width="640">
+  您的浏览器不支持 video 标签。
+</video>

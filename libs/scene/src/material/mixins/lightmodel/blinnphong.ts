@@ -122,7 +122,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-              this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
+              this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
               this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, shininess));
               if (shadow) {
                 this.$if(pb.greaterThan(this.NoL, 0), function () {
