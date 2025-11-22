@@ -646,7 +646,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     ensureDependencies().then(() => {
       this.controller.editor.getProjectSettings().then((settings) => {
         if (!settings.startupScene && !settings.startupScript) {
-          DlgMessage.messageBox('Error', 'Please select startup scene in <Project Settings>');
+          DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
         } else {
           const projectId = this.controller.editor.currentProject.uuid;
           const url = new URL(window.location.href);

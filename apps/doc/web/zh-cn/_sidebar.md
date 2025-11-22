@@ -79,6 +79,6 @@
     - [编辑动画](zh-cn/editor/edit-animation.md)
 
   - 项目构建与发布
-    - [实时预览与运行](zh-cn/editor/preview.md)
+    - [实时预览](zh-cn/editor/preview.md)
     - [构建与部署](zh-cn/editor/build-deploy.md)
 
