@@ -262,6 +262,7 @@ export function temporalResolve(
     );
     this.$l.disocclusionFactor = this.getDisocclusionFactor(this.reprojectedUV, this.velocity, this.texSize);
     this.$l.alpha = pb.clamp(pb.add(this.blendFactor, this.screenFactor, this.disocclusionFactor), 0, 1);
+    //this.alpha = 0.1;
     this.prevColor = this.reinhard(this.prevColor);
     this.currentColor = this.reinhard(this.sampleColor);
     this.$l.currentLum = this.luminance(this.currentColor);
@@ -272,7 +273,7 @@ export function temporalResolve(
     );
     this.diff = pb.sub(1, this.diff);
     this.diff = pb.mul(this.diff, this.diff);
-    this.alpha = pb.mix(0, this.alpha, this.diff);
+    this.alpha = pb.clamp(pb.mix(0, this.alpha, this.diff), 0.1, 1);
     this.$l.resolvedColor = pb.vec3();
     if (debug === TAA_DEBUG_CURRENT_COLOR) {
       this.resolvedColor = this.currentColor.rgb;

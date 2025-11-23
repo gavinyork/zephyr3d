@@ -112,7 +112,7 @@ editorApp.ready().then(async () => {
     });
 
     editorApp.on('tick', () => {
-      editor.update(device.frameInfo.elapsedFrame, device.frameInfo.elapsedOverall);
+      editor.update(device.frameInfo.elapsedFrame);
       editor.render();
     });
   } else {

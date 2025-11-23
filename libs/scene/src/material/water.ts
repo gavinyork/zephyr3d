@@ -441,7 +441,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         });
         if (that.needCalculateEnvLight()) {
           this.$l.irradiance = that.getEnvLightIrradiance(this, this.normal);
-          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance);
+          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance, 1 / Math.PI);
           this.finalColor = pb.add(this.finalColor, this.sss);
         }
         this.$return(this.finalColor);

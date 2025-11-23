@@ -2,13 +2,10 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { panoramaToCubemap } from '../../panorama';
-import { prefilterCubemap } from '../../pmrem';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
-import { getDevice } from '../../../app/api';
 import type { SceneNode } from '../../../scene';
 
 /** @internal */
@@ -538,6 +535,20 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'SkyBoxTextureSize',
+          type: 'int',
+          default: 1024,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.skyboxTextureSize;
+          },
+          set(this: Scene, value) {
+            this.env.sky.skyboxTextureSize = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'skybox';
+          }
+        },
+        {
           name: 'PanoramaTexture',
           type: 'object',
           phase: 1,
@@ -548,31 +559,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             value.str[0] = this.env.sky.panoramaTextureAsset;
           },
           async set(this: Scene, value) {
-            if (value.str[0]) {
-              const assetId = value.str[0];
-              let tex: Texture2D;
-              try {
-                tex = await manager.fetchTexture<Texture2D>(assetId);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                tex = null;
-              }
-              if (tex?.isTexture2D()) {
-                const device = getDevice();
-                const skyBoxTexture = this.env.sky.skyboxTexture ?? device.createCubeTexture('rgba16f', 1024);
-                const radianceMap = this.env.light.radianceMap ?? device.createCubeTexture('rgba16f', 256);
-                panoramaToCubemap(tex, skyBoxTexture);
-                prefilterCubemap(skyBoxTexture, 'ggx', radianceMap);
-                skyBoxTexture.name = 'SkyboxTexture';
-                this.env.sky.skyboxTexture = skyBoxTexture;
-                this.env.light.radianceMap = radianceMap;
-                this.env.sky.panoramaTextureAsset = assetId;
-                this.env.sky.invalidate();
-                tex.dispose();
-              } else {
-                console.error('Invalid skybox texture');
-              }
-            }
+            this.env.sky.panoramaTextureAsset = value.str[0];
           },
           isValid() {
             return this.env.sky.skyType === 'skybox';
