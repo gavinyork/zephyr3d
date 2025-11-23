@@ -282,8 +282,11 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
-          name: 'Material Object',
+          name: 'MaterialObject',
           type: 'object',
+          isPersistent() {
+            return false;
+          },
           options: {
             objectTypes: [MeshMaterial]
           },

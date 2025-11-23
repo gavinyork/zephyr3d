@@ -285,9 +285,9 @@ export class Camera extends SceneNode {
     this._ssrRoughnessFactor = 1;
     this._ssrStride = 2;
     this._ssrCalcThickness = false;
-    this._ssrBlurriness = 0.05;
+    this._ssrBlurriness = 0.01;
     this._ssrBlurDepthCutoff = 2;
-    this._ssrBlurKernelSize = 17;
+    this._ssrBlurKernelSize = 10;
     this._ssrBlurStdDev = 10;
     this._SSAO = false;
     this._postEffectSSAO = new DRef();

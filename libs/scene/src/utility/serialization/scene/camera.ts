@@ -432,7 +432,7 @@ export function getCameraClass(): SerializableClass {
           name: 'SSRBlurScale',
           phase: 1,
           type: 'float',
-          default: 0.05,
+          default: 0.01,
           options: {
             label: 'BlurScale',
             group: 'PostProcessing/SSR',
@@ -474,7 +474,7 @@ export function getCameraClass(): SerializableClass {
           name: 'SSRBlurKernelSize',
           type: 'int',
           phase: 1,
-          default: 17,
+          default: 10,
           options: {
             label: 'BlurKernelSize',
             group: 'PostProcessing/SSR',
