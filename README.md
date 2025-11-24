@@ -52,10 +52,10 @@
 </div>
 
 **Highlights**
-- 🧱 Scene, Material, Terrain editors  
-- 🧩 TypeScript scripting & animation tools  
-- 💡 Built with Zephyr3D Scene + Device APIs  
-- 🚀 Instant preview & 1-click export  
+- Scene, Material, Terrain editors  
+- TypeScript scripting & animation tools  
+- Built with Zephyr3D Scene + Device APIs  
+- Instant preview & 1-click export  
 
 ---
 
