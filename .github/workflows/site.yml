@@ -22,7 +22,7 @@ jobs:
       - name: Rush rebuild
         run: node common/scripts/install-run-rush.js rebuild --verbose
       - name: Build site
-        run: pushd site && npm run build:site && popd
+        run: pushd apps/doc && npm run build:site && popd
 
       - name: Deploy to GitHub Pages
         uses: Cecilapp/GitHub-Pages-deploy@v3
@@ -30,4 +30,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SITE_TOKEN }}
         with:
           email: gavinyork2024@outlook.com
-          build_dir: ./site/dist/web
+          build_dir: ./apps/doc/dist/web
