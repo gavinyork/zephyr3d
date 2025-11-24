@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/imgui",
+      "comment": "Add some API",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/imgui"
+}

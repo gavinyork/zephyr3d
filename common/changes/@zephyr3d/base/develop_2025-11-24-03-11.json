@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Add VFS implementation",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

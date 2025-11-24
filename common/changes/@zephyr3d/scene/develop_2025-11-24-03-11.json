@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add TAA support",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
