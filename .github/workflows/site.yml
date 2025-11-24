@@ -12,9 +12,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
+          cache: 'pnpm'
       - name: Rush Update
         run: node common/scripts/install-run-rush.js update
       - name: Rush Install
