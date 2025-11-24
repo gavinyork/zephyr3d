@@ -42,7 +42,7 @@
 
 <div align="center">
 
-**Try it Online → [Zephyr3D Editor](https://gavinyork.github.io/zephyr3d/editor.html)**  
+**Try it Online → [Zephyr3D Editor](https://zephyr3d.org/editor/)**  
 *(No install required — runs completely in the browser)*  
 
 <br/>
