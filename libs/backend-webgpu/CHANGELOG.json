@@ -2,6 +2,21 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.8",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.8",
+      "date": "Mon, 24 Nov 2025 05:23:10 GMT",
+      "comments": {
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.5` to `0.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.4` to `0.2.5`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.7",
       "tag": "@zephyr3d/backend-webgpu_v0.1.7",
       "date": "Mon, 04 Nov 2024 16:42:57 GMT",

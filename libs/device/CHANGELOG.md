@@ -1,6 +1,11 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Mon, 04 Nov 2024 16:42:57 GMT and should not be manually modified.
+This log was last generated on Mon, 24 Nov 2025 05:23:10 GMT and should not be manually modified.
+
+## 0.2.5
+Mon, 24 Nov 2025 05:23:10 GMT
+
+_Version update only_
 
 ## 0.2.4
 Mon, 04 Nov 2024 16:42:57 GMT

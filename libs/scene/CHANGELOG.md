@@ -1,6 +1,18 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Mon, 04 Nov 2024 16:42:57 GMT and should not be manually modified.
+This log was last generated on Mon, 24 Nov 2025 05:23:10 GMT and should not be manually modified.
+
+## 0.7.0
+Mon, 24 Nov 2025 05:23:10 GMT
+
+### Minor changes
+
+- Add TAA support
+- Add blueprint material support
+
+### Patches
+
+- Fix crash due to memory leak
 
 ## 0.6.1
 Mon, 04 Nov 2024 16:42:57 GMT

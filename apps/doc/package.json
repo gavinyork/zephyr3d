@@ -75,11 +75,11 @@
     "lil-gui": "^0.19.2",
     "@zip.js/zip.js": "^2.7.54",
     "@popperjs/core": "^2.11.8",
-    "@zephyr3d/base": "workspace:^0.1.5",
-    "@zephyr3d/device": "workspace:^0.2.4",
-    "@zephyr3d/scene": "workspace:^0.6.1",
-    "@zephyr3d/imgui": "workspace:^0.1.4",
-    "@zephyr3d/backend-webgl": "workspace:^0.1.8",
-    "@zephyr3d/backend-webgpu": "workspace:^0.1.7"
+    "@zephyr3d/base": "workspace:^0.2.0",
+    "@zephyr3d/device": "workspace:^0.2.5",
+    "@zephyr3d/scene": "workspace:^0.7.0",
+    "@zephyr3d/imgui": "workspace:^0.2.0",
+    "@zephyr3d/backend-webgl": "workspace:^0.1.9",
+    "@zephyr3d/backend-webgpu": "workspace:^0.1.8"
   }
 }

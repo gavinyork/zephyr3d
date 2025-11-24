@@ -25,12 +25,12 @@ importers:
       '@typescript-eslint/parser': ~8.46.1
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/backend-webgl': workspace:*
-      '@zephyr3d/backend-webgpu': workspace:*
-      '@zephyr3d/base': workspace:*
-      '@zephyr3d/device': workspace:*
-      '@zephyr3d/imgui': workspace:*
-      '@zephyr3d/scene': workspace:*
+      '@zephyr3d/backend-webgl': workspace:^0.1.8
+      '@zephyr3d/backend-webgpu': workspace:^0.1.7
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
+      '@zephyr3d/imgui': workspace:^0.1.4
+      '@zephyr3d/scene': workspace:^0.6.1
       '@zip.js/zip.js': ^2.7.54
       bootstrap: ^5.3.1
       chalk: ^5.2.0
@@ -134,11 +134,11 @@ importers:
       '@typescript-eslint/parser': ~8.46.1
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/backend-webgl': workspace:*
-      '@zephyr3d/backend-webgpu': workspace:*
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
-      '@zephyr3d/imgui': workspace:^0.1.2
+      '@zephyr3d/backend-webgl': workspace:^0.1.8
+      '@zephyr3d/backend-webgpu': workspace:^0.1.7
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
+      '@zephyr3d/imgui': workspace:^0.1.4
       cross-env: ^7.0.3
       diff: ^5.0.0
       eslint: ~9.38.0
@@ -220,8 +220,8 @@ importers:
       '@typescript-eslint/eslint-plugin': ~8.46.1
       '@typescript-eslint/parser': ~8.46.1
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
       cross-env: ^7.0.3
       eslint: ~9.38.0
       eslint-config-prettier: ~10.1.8
@@ -291,8 +291,8 @@ importers:
       '@typescript-eslint/eslint-plugin': ~8.46.1
       '@typescript-eslint/parser': ~8.46.1
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
       cross-env: ^7.0.3
       eslint: ~9.38.0
       eslint-config-prettier: ~10.1.8
@@ -427,7 +427,7 @@ importers:
       '@typescript-eslint/eslint-plugin': ~8.46.1
       '@typescript-eslint/parser': ~8.46.1
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/base': workspace:^0.1.2
+      '@zephyr3d/base': workspace:^0.1.5
       cross-env: ^7.0.3
       eslint: ~9.38.0
       eslint-config-prettier: ~10.1.8
@@ -497,8 +497,8 @@ importers:
       '@typescript-eslint/eslint-plugin': ~8.46.1
       '@typescript-eslint/parser': ~8.46.1
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
       cross-env: ^7.0.3
       eslint: ~9.38.0
       eslint-config-prettier: ~10.1.8
@@ -568,8 +568,8 @@ importers:
       '@typescript-eslint/eslint-plugin': ~8.46.1
       '@typescript-eslint/parser': ~8.46.1
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
       cross-env: ^7.0.3
       es-module-lexer: ^1.7.0
       eslint: ~9.38.0
@@ -639,12 +639,12 @@ importers:
       '@typescript-eslint/parser': ~8.46.1
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/backend-webgl': workspace:^0.1.2
-      '@zephyr3d/backend-webgpu': workspace:^0.1.2
-      '@zephyr3d/base': workspace:^0.1.2
-      '@zephyr3d/device': workspace:^0.1.2
-      '@zephyr3d/imgui': workspace:^0.1.2
-      '@zephyr3d/scene': workspace:^0.1.2
+      '@zephyr3d/backend-webgl': workspace:^0.1.8
+      '@zephyr3d/backend-webgpu': workspace:^0.1.7
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
+      '@zephyr3d/imgui': workspace:^0.1.4
+      '@zephyr3d/scene': workspace:^0.6.1
       '@zip.js/zip.js': ^2.7.54
       cross-env: ^7.0.3
       eslint: ~9.38.0
@@ -733,12 +733,12 @@ importers:
       '@typescript-eslint/parser': ~8.46.1
       '@web/dev-server': ^0.1.35
       '@webgpu/types': ^0.1.65
-      '@zephyr3d/backend-webgl': workspace:*
-      '@zephyr3d/backend-webgpu': workspace:*
-      '@zephyr3d/base': workspace:*
-      '@zephyr3d/device': workspace:*
-      '@zephyr3d/imgui': workspace:*
-      '@zephyr3d/scene': workspace:*
+      '@zephyr3d/backend-webgl': workspace:^0.1.8
+      '@zephyr3d/backend-webgpu': workspace:^0.1.7
+      '@zephyr3d/base': workspace:^0.1.5
+      '@zephyr3d/device': workspace:^0.2.4
+      '@zephyr3d/imgui': workspace:^0.1.4
+      '@zephyr3d/scene': workspace:^0.6.1
       '@zip.js/zip.js': ^2.7.54
       cross-env: ^7.0.3
       es-module-lexer: ^1.7.0

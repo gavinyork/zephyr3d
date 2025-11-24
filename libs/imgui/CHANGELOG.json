@@ -2,6 +2,26 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.0",
+      "tag": "@zephyr3d/imgui_v0.2.0",
+      "date": "Mon, 24 Nov 2025 05:23:10 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Add some API"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.1.5` to `0.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.4` to `0.2.5`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.4",
       "tag": "@zephyr3d/imgui_v0.1.4",
       "date": "Mon, 04 Nov 2024 16:42:57 GMT",
