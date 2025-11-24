@@ -9,31 +9,276 @@ Model information that can be shared by multiple model nodes
 **Signature:**
 
 ```typescript
-declare class SharedModel 
+declare class SharedModel extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name)](doc/markdown/./scene.sharedmodel._constructor_.md) |  | Creates an instance of SharedModel |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name)](doc/markdown/./scene.sharedmodel._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of SharedModel
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [activeScene](doc/markdown/./scene.sharedmodel.activescene.md) |  | number | The active scene of the model |
-|  [animations](doc/markdown/./scene.sharedmodel.animations.md) | <code>readonly</code> | [AssetAnimationData](doc/markdown/./scene.assetanimationdata.md)<!-- -->\[\] | All animations that the model contains |
-|  [name](doc/markdown/./scene.sharedmodel.name.md) |  | string | Name of the model |
-|  [nodes](doc/markdown/./scene.sharedmodel.nodes.md) | <code>readonly</code> | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] | All nodes that the model contains |
-|  [scenes](doc/markdown/./scene.sharedmodel.scenes.md) | <code>readonly</code> | [AssetScene](doc/markdown/./scene.assetscene.md)<!-- -->\[\] | All scenes that the model contains |
-|  [skeletons](doc/markdown/./scene.sharedmodel.skeletons.md) | <code>readonly</code> | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->\[\] | All skeletons that the model contains |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[activeScene](doc/markdown/./scene.sharedmodel.activescene.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The active scene of the model
+
+
+</td></tr>
+<tr><td>
+
+[animations](doc/markdown/./scene.sharedmodel.animations.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetAnimationData](doc/markdown/./scene.assetanimationdata.md)<!-- -->\[\]
+
+
+</td><td>
+
+All animations that the model contains
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./scene.sharedmodel.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the model
+
+
+</td></tr>
+<tr><td>
+
+[nodes](doc/markdown/./scene.sharedmodel.nodes.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\]
+
+
+</td><td>
+
+All nodes that the model contains
+
+
+</td></tr>
+<tr><td>
+
+[scenes](doc/markdown/./scene.sharedmodel.scenes.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetScene](doc/markdown/./scene.assetscene.md)<!-- -->\[\]
+
+
+</td><td>
+
+All scenes that the model contains
+
+
+</td></tr>
+<tr><td>
+
+[skeletons](doc/markdown/./scene.sharedmodel.skeletons.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->\[\]
+
+
+</td><td>
+
+All skeletons that the model contains
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addAnimation(animation)](doc/markdown/./scene.sharedmodel.addanimation.md) |  | Adds an animation to the scene |
-|  [addNode(parent, index, name)](doc/markdown/./scene.sharedmodel.addnode.md) |  | Adds a node to the scene |
-|  [addSkeleton(skeleton)](doc/markdown/./scene.sharedmodel.addskeleton.md) |  | Adds a skeleton to the scene |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addAnimation(animation)](doc/markdown/./scene.sharedmodel.addanimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds an animation to the scene
+
+
+</td></tr>
+<tr><td>
+
+[addNode(parent, index, name)](doc/markdown/./scene.sharedmodel.addnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds a node to the scene
+
+
+</td></tr>
+<tr><td>
+
+[addSkeleton(skeleton)](doc/markdown/./scene.sharedmodel.addskeleton.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds a skeleton to the scene
+
+
+</td></tr>
+<tr><td>
+
+[createSceneNode(scene, instancing)](doc/markdown/./scene.sharedmodel.createscenenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.sharedmodel.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -9,14 +9,42 @@ Checks whether this post effect requires the linear depth texture
 **Signature:**
 
 ```typescript
-abstract requireLinearDepthTexture(ctx: DrawContext): boolean;
+requireLinearDepthTexture(_ctx: DrawContext): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,9 +14,39 @@ setViewport(vp?: DeviceViewport | number[]): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vp | [DeviceViewport](doc/markdown/./device.deviceviewport.md) \| number\[\] | _(Optional)_ The viewport position and size, if not specified, the viewport will be set to \[0, 0, drawingBufferWidth, drawingBufferHeight\] |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vp
+
+
+</td><td>
+
+[DeviceViewport](doc/markdown/./device.deviceviewport.md) \| number\[\]
+
+
+</td><td>
+
+_(Optional)_ The viewport position and size, if not specified, the viewport will be set to \[0, 0, drawingBufferWidth, drawingBufferHeight\]
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -1,10 +1,22 @@
-import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, AssetManager } from '@zephyr3d/scene';
+import { HttpFS, Vector3 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
   backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    // When using the editor workflow, the asset path must be correctly configured
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-10')
+  }
 });
 
 myApp.ready().then(function () {
@@ -13,27 +25,21 @@ myApp.ready().then(function () {
   const light = new DirectionalLight(scene);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const assetManager = new AssetManager();
   // Load a model
-  assetManager.fetchModel(scene, 'assets/models/Duck.glb').then(info => {
-    info.group.position.setXYZ(0, -0.5, 0);
-  });
+  getEngine()
+    .resourceManager.instantiatePrefab(scene.rootNode, '/assets/Duck.zprefab')
+    .then((model) => {
+      model.position.setXYZ(0, -0.5, 0);
+    });
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

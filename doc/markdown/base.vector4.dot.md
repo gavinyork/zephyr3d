@@ -14,10 +14,55 @@ static dot(a: Vector4, b: Vector4): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Vector4](doc/markdown/./base.vector4.md) | The first operand. |
-|  b | [Vector4](doc/markdown/./base.vector4.md) | The second operand. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

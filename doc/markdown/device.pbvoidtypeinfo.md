@@ -15,14 +15,83 @@ declare class PBVoidTypeInfo extends PBTypeInfo<null>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.pbvoidtypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBVoidTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.pbvoidtypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBVoidTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isVoidType()](doc/markdown/./device.pbvoidtypeinfo.isvoidtype.md) |  | returns true if this is a void type |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbvoidtypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isVoidType()](doc/markdown/./device.pbvoidtypeinfo.isvoidtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a void type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbvoidtypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

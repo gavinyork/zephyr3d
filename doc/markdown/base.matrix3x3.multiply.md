@@ -14,11 +14,71 @@ static multiply(m1: Matrix3x3, m2: Matrix3x3, result?: Matrix3x3): Matrix3x3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  m1 | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | The first operand. |
-|  m2 | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | The second operand. |
-|  result | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | _(Optional)_ The output matrix (can be the same as m1 or m2), if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+m1
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+m2
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix (can be the same as m1 or m2), if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

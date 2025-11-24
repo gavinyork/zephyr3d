@@ -4,7 +4,7 @@
 
 ## WeightedBlendedOIT.(constructor)
 
-Creates an instance of WeightedBlendedOIT class.
+Constructs a new instance of the `WeightedBlendedOIT` class
 
 **Signature:**
 

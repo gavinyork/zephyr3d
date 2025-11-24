@@ -4,7 +4,7 @@
 
 ## SceneNode.isBatchGroup() method
 
-true if this is a batch group, false otherwise
+Type guard: true if this node is a batch group.
 
 **Signature:**
 

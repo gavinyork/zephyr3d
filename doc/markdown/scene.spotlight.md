@@ -15,22 +15,160 @@ declare class SpotLight extends PunctualLight
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.spotlight._constructor_.md) |  | Creates an instance of spot light |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.spotlight._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of spot light
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [cutoff](doc/markdown/./scene.spotlight.cutoff.md) |  | number | The cutoff of the light |
-|  [range](doc/markdown/./scene.spotlight.range.md) |  | number | The range of the light |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[cutoff](doc/markdown/./scene.spotlight.cutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The cutoff of the light
+
+
+</td></tr>
+<tr><td>
+
+[range](doc/markdown/./scene.spotlight.range.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The range of the light
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isSpotLight()](doc/markdown/./scene.spotlight.isspotlight.md) |  | returns true if this is a spot light |
-|  [setCutoff(val)](doc/markdown/./scene.spotlight.setcutoff.md) |  | Sets the cutoff of the light |
-|  [setRange(val)](doc/markdown/./scene.spotlight.setrange.md) |  | Sets the range of the light |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isSpotLight()](doc/markdown/./scene.spotlight.isspotlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a spot light
+
+
+</td></tr>
+<tr><td>
+
+[setCutoff(val)](doc/markdown/./scene.spotlight.setcutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the cutoff of the light
+
+
+</td></tr>
+<tr><td>
+
+[setRange(val)](doc/markdown/./scene.spotlight.setrange.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the range of the light
+
+
+</td></tr>
+</tbody></table>
 

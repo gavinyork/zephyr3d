@@ -14,9 +14,39 @@ assign(other: ArrayLike<number>): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | ArrayLike&lt;number&gt; | An array holding the coefficients. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+ArrayLike&lt;number&gt;
+
+
+</td><td>
+
+An array holding the coefficients.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

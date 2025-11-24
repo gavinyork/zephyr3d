@@ -14,12 +14,59 @@ createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): Textu
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  el | HTMLVideoElement | The video element |
-|  samplerOptions | [SamplerOptions](doc/markdown/./device.sampleroptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+el
+
+
+</td><td>
+
+HTMLVideoElement
+
+
+</td><td>
+
+The video element
+
+
+</td></tr>
+<tr><td>
+
+samplerOptions
+
+
+</td><td>
+
+[SamplerOptions](doc/markdown/./device.sampleroptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [TextureVideo](doc/markdown/./device.texturevideo.md)
+
+The created video texture.
 

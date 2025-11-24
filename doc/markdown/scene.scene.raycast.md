@@ -4,7 +4,7 @@
 
 ## Scene.raycast() method
 
-Cast a ray into the scene to get the closest object hit by the ray
+Casts a ray into the scene and returns the closest intersection, if any.
 
 **Signature:**
 
@@ -18,14 +18,59 @@ raycast(ray: Ray, length?: number): {
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ray | [Ray](doc/markdown/./base.ray.md) | The ray in world coordinate space |
-|  length | number | _(Optional)_ Length of the ray |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ray
+
+
+</td><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+The ray in world space.
+
+
+</td></tr>
+<tr><td>
+
+length
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Maximum ray length. Defaults to `Infinity`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 { target: [PickTarget](doc/markdown/./scene.picktarget.md)<!-- -->; dist: number; point: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }
 
-The closest object hit by the ray
+Intersection info `{ target, dist, point }`<!-- -->, or `null` if no hit.
 

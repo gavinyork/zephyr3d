@@ -15,9 +15,83 @@ interface SphereCreationOptions extends ShapeCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [horizonalDetail?](doc/markdown/./scene.spherecreationoptions.horizonaldetail.md) |  | number | _(Optional)_ The horizonal detail level, default 20 |
-|  [radius?](doc/markdown/./scene.spherecreationoptions.radius.md) |  | number | _(Optional)_ Radius of the sphere, default 1 |
-|  [verticalDetail?](doc/markdown/./scene.spherecreationoptions.verticaldetail.md) |  | number | _(Optional)_ The vertical detail level, default 20 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[horizonalDetail?](doc/markdown/./scene.spherecreationoptions.horizonaldetail.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The horizonal detail level, default 20
+
+
+</td></tr>
+<tr><td>
+
+[radius?](doc/markdown/./scene.spherecreationoptions.radius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Radius of the sphere, default 1
+
+
+</td></tr>
+<tr><td>
+
+[verticalDetail?](doc/markdown/./scene.spherecreationoptions.verticaldetail.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The vertical detail level, default 20
+
+
+</td></tr>
+</tbody></table>
 

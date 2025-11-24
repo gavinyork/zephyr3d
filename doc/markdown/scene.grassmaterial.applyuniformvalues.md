@@ -12,11 +12,65 @@ applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) |  |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
-|  pass | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

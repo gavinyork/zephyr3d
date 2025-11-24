@@ -15,12 +15,178 @@ interface CylinderCreationOptions extends ShapeCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [anchor?](doc/markdown/./scene.cylindercreationoptions.anchor.md) |  | number | _(Optional)_ Anchor point, default is 0 |
-|  [bottomRadius?](doc/markdown/./scene.cylindercreationoptions.bottomradius.md) |  | number | _(Optional)_ Top radius, default is 1.0 \* |
-|  [height?](doc/markdown/./scene.cylindercreationoptions.height.md) |  | number | _(Optional)_ Height, default is 1.0 |
-|  [heightDetail?](doc/markdown/./scene.cylindercreationoptions.heightdetail.md) |  | number | _(Optional)_ Height detail, default is 1 |
-|  [radialDetail?](doc/markdown/./scene.cylindercreationoptions.radialdetail.md) |  | number | _(Optional)_ Radial detail, default is 20 |
-|  [topRadius?](doc/markdown/./scene.cylindercreationoptions.topradius.md) |  | number | _(Optional)_ Bottom radius, default is 1.0 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[anchor?](doc/markdown/./scene.cylindercreationoptions.anchor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Anchor point, default is 0
+
+
+</td></tr>
+<tr><td>
+
+[bottomCap?](doc/markdown/./scene.cylindercreationoptions.bottomcap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Generate bottom cap, default is true
+
+
+</td></tr>
+<tr><td>
+
+[bottomRadius?](doc/markdown/./scene.cylindercreationoptions.bottomradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Top radius, default is 1.0 \*
+
+
+</td></tr>
+<tr><td>
+
+[height?](doc/markdown/./scene.cylindercreationoptions.height.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Height, default is 1.0
+
+
+</td></tr>
+<tr><td>
+
+[heightDetail?](doc/markdown/./scene.cylindercreationoptions.heightdetail.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Height detail, default is 1
+
+
+</td></tr>
+<tr><td>
+
+[radialDetail?](doc/markdown/./scene.cylindercreationoptions.radialdetail.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Radial detail, default is 20
+
+
+</td></tr>
+<tr><td>
+
+[topCap?](doc/markdown/./scene.cylindercreationoptions.topcap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Generate top cap, default is true
+
+
+</td></tr>
+<tr><td>
+
+[topRadius?](doc/markdown/./scene.cylindercreationoptions.topradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Bottom radius, default is 1.0
+
+
+</td></tr>
+</tbody></table>
 

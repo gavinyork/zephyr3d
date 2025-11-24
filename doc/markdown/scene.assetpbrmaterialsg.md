@@ -15,9 +15,83 @@ interface AssetPBRMaterialSG extends AssetPBRMaterialCommon
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [glossness?](doc/markdown/./scene.assetpbrmaterialsg.glossness.md) |  | number | _(Optional)_ |
-|  [specular?](doc/markdown/./scene.assetpbrmaterialsg.specular.md) |  | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ |
-|  [specularGlossnessMap?](doc/markdown/./scene.assetpbrmaterialsg.specularglossnessmap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[glossness?](doc/markdown/./scene.assetpbrmaterialsg.glossness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[specular?](doc/markdown/./scene.assetpbrmaterialsg.specular.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[specularGlossnessMap?](doc/markdown/./scene.assetpbrmaterialsg.specularglossnessmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

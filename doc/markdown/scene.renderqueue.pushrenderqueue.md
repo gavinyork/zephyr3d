@@ -14,9 +14,39 @@ pushRenderQueue(queue: RenderQueue): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  queue | [RenderQueue](doc/markdown/./scene.renderqueue.md) | The render queue to be pushed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+queue
+
+
+</td><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+The render queue to be pushed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

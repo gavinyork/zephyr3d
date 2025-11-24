@@ -14,9 +14,39 @@ enable(b: boolean): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  b | boolean | true if enable |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+b
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if enable
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

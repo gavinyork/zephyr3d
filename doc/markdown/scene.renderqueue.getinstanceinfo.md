@@ -14,9 +14,39 @@ getInstanceInfo(drawable: Drawable): DrawableInstanceInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  drawable | [Drawable](doc/markdown/./scene.drawable.md) | The drawable object |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+drawable
+
+
+</td><td>
+
+[Drawable](doc/markdown/./scene.drawable.md)
+
+
+</td><td>
+
+The drawable object
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

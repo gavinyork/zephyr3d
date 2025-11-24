@@ -14,11 +14,71 @@ static sub(a: Vector4, b: Vector4, result?: Vector4): Vector4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Vector4](doc/markdown/./base.vector4.md) | The first operand. |
-|  b | [Vector4](doc/markdown/./base.vector4.md) | The second operand. |
-|  result | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ The output vector (can be the same vector as a or b). if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

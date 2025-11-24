@@ -15,10 +15,51 @@ setup(scope: PBGlobalScope, type: BlitType): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | The shader scope |
-|  type | [BlitType](doc/markdown/./scene.blittype.md) | The blit type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

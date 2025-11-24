@@ -14,14 +14,83 @@ declare class RectsPacker
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(width, height, maxBins)](doc/markdown/./base.rectspacker._constructor_.md) |  | Constructs a new instance of the <code>RectsPacker</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(width, height, maxBins)](doc/markdown/./base.rectspacker._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `RectsPacker` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [clear()](doc/markdown/./base.rectspacker.clear.md) |  | Clear all image bins of the packer |
-|  [insert(width, height)](doc/markdown/./base.rectspacker.insert.md) |  | Inserts a new rectangle |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clear()](doc/markdown/./base.rectspacker.clear.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clear all image bins of the packer
+
+
+</td></tr>
+<tr><td>
+
+[insert(width, height)](doc/markdown/./base.rectspacker.insert.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inserts a new rectangle
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,10 +14,55 @@ setWaveDirection(waveIndex: number, angle: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  waveIndex | number | index of the wave to set. |
-|  angle | number | angle of the wave direction in radians. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+waveIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the wave to set.
+
+
+</td></tr>
+<tr><td>
+
+angle
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+angle of the wave direction in radians.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

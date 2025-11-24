@@ -9,8 +9,9 @@ Wrapper for environmant lighting
 **Signature:**
 
 ```typescript
-declare class EnvLightWrapper 
+declare class EnvLightWrapper extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Remarks
 
@@ -18,14 +19,233 @@ The constructor for this class is marked as internal. Third-party code should no
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [ambientColor](doc/markdown/./scene.envlightwrapper.ambientcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Ambient light color for environment light type constant |
-|  [ambientDown](doc/markdown/./scene.envlightwrapper.ambientdown.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Down color for environment light type hemisphere |
-|  [ambientUp](doc/markdown/./scene.envlightwrapper.ambientup.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Up color for environment light type hemisphere |
-|  [irradianceMap](doc/markdown/./scene.envlightwrapper.irradiancemap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Irradiance map for environment light type ibl |
-|  [irradianceSH](doc/markdown/./scene.envlightwrapper.irradiancesh.md) |  | Float32Array | Irradiance SH for environment light type ibl-sh |
-|  [radianceMap](doc/markdown/./scene.envlightwrapper.radiancemap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Radiance map for environment light type ibl |
-|  [strength](doc/markdown/./scene.envlightwrapper.strength.md) |  | number | The strength of environment lighting |
-|  [type](doc/markdown/./scene.envlightwrapper.type.md) |  | [EnvLightType](doc/markdown/./scene.envlighttype.md) | The environment light type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ambientColor](doc/markdown/./scene.envlightwrapper.ambientcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Ambient light color for environment light type constant
+
+
+</td></tr>
+<tr><td>
+
+[ambientDown](doc/markdown/./scene.envlightwrapper.ambientdown.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Down color for environment light type hemisphere
+
+
+</td></tr>
+<tr><td>
+
+[ambientUp](doc/markdown/./scene.envlightwrapper.ambientup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Up color for environment light type hemisphere
+
+
+</td></tr>
+<tr><td>
+
+[irradianceSH](doc/markdown/./scene.envlightwrapper.irradiancesh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+Irradiance SH buffer for environment light type ibl
+
+
+</td></tr>
+<tr><td>
+
+[irradianceSHFB](doc/markdown/./scene.envlightwrapper.irradianceshfb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Irradiance SH texture for environment light type ibl
+
+
+</td></tr>
+<tr><td>
+
+[irradianceWindow](doc/markdown/./scene.envlightwrapper.irradiancewindow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Irradiance SH window for environment light type ibl
+
+
+</td></tr>
+<tr><td>
+
+[radianceMap](doc/markdown/./scene.envlightwrapper.radiancemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+Radiance map for environment light type ibl
+
+
+</td></tr>
+<tr><td>
+
+[strength](doc/markdown/./scene.envlightwrapper.strength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The strength of environment lighting
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.envlightwrapper.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[EnvLightType](doc/markdown/./scene.envlighttype.md)
+
+
+</td><td>
+
+The environment light type
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[onDispose()](doc/markdown/./scene.envlightwrapper.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the environment lighting wrapper
+
+
+</td></tr>
+</tbody></table>
 

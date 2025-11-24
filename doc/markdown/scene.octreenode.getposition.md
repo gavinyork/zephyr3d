@@ -4,7 +4,7 @@
 
 ## OctreeNode.getPosition() method
 
-Gets the position of the octree node
+Get the node's linear position index within the owning chunk.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getPosition(): number;
 
 number
 
-Position of the octree node
+The linear position index of this node.
 

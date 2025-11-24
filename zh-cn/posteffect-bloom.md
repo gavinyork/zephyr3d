@@ -1,27 +1,21 @@
-# Bloom 辉光
+# Bloom（泛光）
 
-辉光效果用来将渲染图像中高亮的部分溢出产生朦胧的效果，位于Transparent分组。
+**用途**：在高亮区域生成柔和的光晕效果，提升画面亮度层次与氛围感。
 
-如果将Bloom效果应用于HDR图像可能产生明显的高光闪烁，建议放在ToneMap之后。
+**属性接口**：
 
+- `camera.bloom`: `boolean` — 启用 Bloom。
+- `camera.bloomIntensity`: `number` — 泛光强度。
+- `camera.bloomThreshold`: `number` — 阈值，高于该亮度的像素将产生 Bloom。
+- `camera.bloomThresholdKnee`: `number` — 平滑阈值过渡范围。
+- `camera.bloomMaxDownsampleLevels`: `number` — 最大降采样层级。
+- `camera.bloomDownsampleLimit`: `number` — 降采样分辨率下限。
+
+**示例**：
 ```javascript
-
-// 创建Compositor实例
-const compositor = new Compositor();
-// 创建Bloom后处理实例
-const bloom = new Bloom();
-// threshold属性为亮度阈值，亮度低于此值的部分将不产生辉光，默认值为0.8
-bloom.threshold = 0.85;
-// intensity属性为强度，值越大辉光效果越强烈，默认值为1
-bloom.intensity = 2;
-// downsampleLimit属性为downsample的最小贴图尺寸，默认值为32
-bloom.downsampleLimit = 64;
-// 添加该效果到compositor
-compositor.appendPostEffect(bloom);
-// ...
-// 渲染场景并应用效果
-camera.render(scene, compositor);
-
+camera.bloom = true;
+camera.bloomIntensity = 1.5;
+camera.bloomThreshold = 0.9;
 ```
 
 <div class="showcase" case="tut-28" style="width:600px;height:800px;"></div>

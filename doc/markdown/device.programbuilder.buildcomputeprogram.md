@@ -14,9 +14,39 @@ buildComputeProgram(options: PBComputeOptions): GPUProgram;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md) | The build options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md)
+
+
+</td><td>
+
+The build options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

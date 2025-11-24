@@ -14,12 +14,105 @@ declare enum CubeFace
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  NX | <code>1</code> |  |
-|  NY | <code>3</code> |  |
-|  NZ | <code>5</code> |  |
-|  PX | <code>0</code> |  |
-|  PY | <code>2</code> |  |
-|  PZ | <code>4</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+NX
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+NY
+
+
+</td><td>
+
+`3`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+NZ
+
+
+</td><td>
+
+`5`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PX
+
+
+</td><td>
+
+`0`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PY
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PZ
+
+
+</td><td>
+
+`4`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

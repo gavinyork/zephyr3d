@@ -14,9 +14,39 @@ declare function isPowerOf2(value: number): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  value | number | The number to be checked. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+value
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The number to be checked.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

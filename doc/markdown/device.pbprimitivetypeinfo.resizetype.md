@@ -14,10 +14,55 @@ resizeType(rows: number, cols: number): PBPrimitiveType;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rows | number | The new value of row |
-|  cols | number | The new value of column |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rows
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The new value of row
+
+
+</td></tr>
+<tr><td>
+
+cols
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The new value of column
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

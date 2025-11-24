@@ -12,9 +12,37 @@ $while(condition: ExpValueNonArrayType): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  condition | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+condition
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

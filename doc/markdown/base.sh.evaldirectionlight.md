@@ -14,11 +14,71 @@ static evalDirectionLight(direction: Vector3, color: Vector3, order: number): Ve
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  direction | [Vector3](doc/markdown/./base.vector3.md) | Direction of the light |
-|  color | [Vector3](doc/markdown/./base.vector3.md) | Light color |
-|  order | number | SH order |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+direction
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Direction of the light
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Light color
+
+
+</td></tr>
+<tr><td>
+
+order
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SH order
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

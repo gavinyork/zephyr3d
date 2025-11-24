@@ -15,27 +15,252 @@ declare class GaussianBlurBlitter extends Blitter
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(phase, kernalSize, sigma, blurSize)](doc/markdown/./scene.gaussianblurblitter._constructor_.md) |  | Creates an instance of GaussianBlurBlitter |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(phase, kernalSize, sigma, blurSize)](doc/markdown/./scene.gaussianblurblitter._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of GaussianBlurBlitter
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [blurSize](doc/markdown/./scene.gaussianblurblitter.blursize.md) |  | number | Blur radius |
-|  [depthCutoff](doc/markdown/./scene.gaussianblurblitter.depthcutoff.md) |  | number | Depth cutoff |
-|  [depthTexture](doc/markdown/./scene.gaussianblurblitter.depthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | Linear depth texture |
-|  [kernelSize](doc/markdown/./scene.gaussianblurblitter.kernelsize.md) |  | number | Kernel size |
-|  [logSpace](doc/markdown/./scene.gaussianblurblitter.logspace.md) |  | boolean | true if the box filter will be applied in logarithmic space |
-|  [logSpaceMultiplier](doc/markdown/./scene.gaussianblurblitter.logspacemultiplier.md) |  | number | Multiplier for logarithmic space blur |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[blurSize](doc/markdown/./scene.gaussianblurblitter.blursize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blur radius
+
+
+</td></tr>
+<tr><td>
+
+[depthCutoff](doc/markdown/./scene.gaussianblurblitter.depthcutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Depth cutoff
+
+
+</td></tr>
+<tr><td>
+
+[depthTexture](doc/markdown/./scene.gaussianblurblitter.depthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Linear depth texture
+
+
+</td></tr>
+<tr><td>
+
+[kernelSize](doc/markdown/./scene.gaussianblurblitter.kernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Kernel size
+
+
+</td></tr>
+<tr><td>
+
+[logSpace](doc/markdown/./scene.gaussianblurblitter.logspace.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the box filter will be applied in logarithmic space
+
+
+</td></tr>
+<tr><td>
+
+[logSpaceMultiplier](doc/markdown/./scene.gaussianblurblitter.logspacemultiplier.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Multiplier for logarithmic space blur
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [calcHash()](doc/markdown/./scene.gaussianblurblitter.calchash.md) | <code>protected</code> | Calculates the hash code |
-|  [filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.gaussianblurblitter.filter.md) |  | Calculates the destination texel by the source texel |
-|  [setUniforms(bindGroup)](doc/markdown/./scene.gaussianblurblitter.setuniforms.md) |  | Update uniforms of the bind group |
-|  [setup(scope, type)](doc/markdown/./scene.gaussianblurblitter.setup.md) |  | Initialize uniforms of the blit program |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[calcHash()](doc/markdown/./scene.gaussianblurblitter.calchash.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Calculates the hash code
+
+
+</td></tr>
+<tr><td>
+
+[filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.gaussianblurblitter.filter.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the destination texel by the source texel
+
+
+</td></tr>
+<tr><td>
+
+[setUniforms(bindGroup)](doc/markdown/./scene.gaussianblurblitter.setuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update uniforms of the bind group
+
+
+</td></tr>
+<tr><td>
+
+[setup(scope, type)](doc/markdown/./scene.gaussianblurblitter.setup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize uniforms of the blit program
+
+
+</td></tr>
+</tbody></table>
 

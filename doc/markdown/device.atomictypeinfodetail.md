@@ -14,7 +14,45 @@ interface AtomicTypeInfoDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [type](doc/markdown/./device.atomictypeinfodetail.type.md) |  | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | Primitive type of the atomic type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[type](doc/markdown/./device.atomictypeinfodetail.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+Primitive type of the atomic type
+
+
+</td></tr>
+</tbody></table>
 

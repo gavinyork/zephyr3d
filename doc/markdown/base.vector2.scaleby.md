@@ -9,18 +9,48 @@ Scale this vector by a scalar number.
 **Signature:**
 
 ```typescript
-scaleBy(f: number): Vector2;
+scaleBy(f: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  f | number | amount to scale this vector by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+f
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+amount to scale this vector by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector2](doc/markdown/./base.vector2.md)
+this
 
 self
 

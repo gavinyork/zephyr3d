@@ -4,7 +4,7 @@
 
 ## AnimationSet.isPlayingAnimation() method
 
-Checks whether an animation is playing
+Check whether an animation is currently playing.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ isPlayingAnimation(name?: string): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | _(Optional)_ Name of the animation to be checked |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Optional animation name. If omitted, returns true if any animation is playing.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-true if the animation is playing, otherwise false
+True if playing; otherwise false.
 

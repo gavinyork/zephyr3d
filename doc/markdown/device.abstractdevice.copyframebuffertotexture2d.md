@@ -14,12 +14,87 @@ copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, leve
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  src | [FrameBuffer](doc/markdown/./device.framebuffer.md) | Framebuffer that will be copied from. |
-|  index | number | Color attachment index of the framebuffer. |
-|  dst | [Texture2D](doc/markdown/./device.texture2d.md) | Texture that will be copied to. |
-|  level | number | Which mipmap level should be copied to. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+src
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Framebuffer that will be copied from.
+
+
+</td></tr>
+<tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Color attachment index of the framebuffer.
+
+
+</td></tr>
+<tr><td>
+
+dst
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Texture that will be copied to.
+
+
+</td></tr>
+<tr><td>
+
+level
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Which mipmap level should be copied to.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

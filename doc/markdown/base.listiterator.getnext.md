@@ -17,7 +17,5 @@ getNext(): ListIterator<T>;
 
 the new iterator
 
-## Exceptions
-
-Error The exception is thrown if the iterator is not valid
+The exception is thrown if the iterator is not valid
 

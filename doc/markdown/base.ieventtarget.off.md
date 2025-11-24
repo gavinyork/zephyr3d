@@ -9,15 +9,76 @@ Removes an event listener function previously registered.
 **Signature:**
 
 ```typescript
-off<K extends keyof T>(type: K, listener: EventListener<T, K>): void;
+off<K extends keyof T>(type: K, listener: EventListener<T, K>, context?: unknown): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | K | The event type for which to remove an event listener |
-|  listener | [EventListener](doc/markdown/./base.eventlistener_2.md)<!-- -->&lt;T, K&gt; | The callback function to be removed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+K
+
+
+</td><td>
+
+The event type for which to remove an event listener
+
+
+</td></tr>
+<tr><td>
+
+listener
+
+
+</td><td>
+
+[EventListener](doc/markdown/./base.eventlistener_2.md)<!-- -->&lt;T, K&gt;
+
+
+</td><td>
+
+The callback function to be removed
+
+
+</td></tr>
+<tr><td>
+
+context
+
+
+</td><td>
+
+unknown
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

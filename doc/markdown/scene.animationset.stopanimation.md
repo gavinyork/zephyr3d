@@ -4,7 +4,9 @@
 
 ## AnimationSet.stopAnimation() method
 
-Stops playing an animation of the model
+Stop playback of an animation clip.
+
+Behavior: - If `options.fadeOut > 0`<!-- -->, marks the clip for fade-out; actual removal occurs after fade completes. - If `fadeOut` is 0 or omitted, immediately: - Removes the clip from active animations. - Unregisters its tracks from active track maps. - Decrements skeleton reference counts; resets and removes skeletons when refcount reaches 0.
 
 **Signature:**
 
@@ -14,10 +16,55 @@ stopAnimation(name: string, options?: StopAnimationOptions): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the animation to stop playing |
-|  options | [StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the animation to stop.
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Optional fade-out configuration.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

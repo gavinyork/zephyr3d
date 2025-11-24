@@ -14,9 +14,39 @@ sort(compareFn?: (a: number, b: number) => number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  compareFn | (a: number, b: number) =&gt; number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+compareFn
+
+
+</td><td>
+
+(a: number, b: number) =&gt; number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

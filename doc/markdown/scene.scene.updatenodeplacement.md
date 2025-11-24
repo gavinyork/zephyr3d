@@ -4,7 +4,9 @@
 
 ## Scene.updateNodePlacement() method
 
-Update node placement in the octree
+Applies placement changes for nodes in `list` to the given `octree`<!-- -->.
+
+Rules: - If node is not disposed, attached, not hidden, and `placeToOctree` is true, it is placed; otherwise removed. - Drains `list` until empty.
 
 **Signature:**
 
@@ -14,10 +16,55 @@ updateNodePlacement(octree: Octree, list: Set<GraphNode>): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  octree | [Octree](doc/markdown/./scene.octree.md) |  |
-|  list | Set&lt;[GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->&gt; |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+octree
+
+
+</td><td>
+
+[Octree](doc/markdown/./scene.octree.md)
+
+
+</td><td>
+
+Target spatial index.
+
+
+</td></tr>
+<tr><td>
+
+list
+
+
+</td><td>
+
+Set&lt;[GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->&gt;
+
+
+</td><td>
+
+Set of nodes awaiting placement evaluation.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

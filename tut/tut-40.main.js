@@ -1,6 +1,21 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, mixinBlinnPhong, DirectionalLight } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  MeshMaterial,
+  ShaderHelper,
+  OrbitCameraController,
+  Mesh,
+  TorusShape,
+  AssetManager,
+  applyMaterialMixins,
+  mixinBlinnPhong,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 // 自定义Blinn-phong材质
 class MyBlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong) {
@@ -49,7 +64,10 @@ class MyBlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong)
     // ShaderHelper.getViewProjectionMatrix()获取当前的世界空间到剪裁空间的变换矩阵。
     // 注意不要直接给scope.$builtins.position赋值，因为在WebGPU设备下渲染到纹理时需要上下翻转
     // 需要使用ShaderHelper.setClipSpacePosition()方法。
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
   }
   // FragmentShader实现
   // scope是fragmentShader的main函数作用域
@@ -74,9 +92,18 @@ class MyBlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong)
       // 利用mixinLight提供的calculateViewVector方法计算视线向量（从片元世界坐标指向摄像机世界坐标的单位向量）
       scope.$l.viewVec = pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), scope.$inputs.worldPos));
       // 计算漫反射颜色（漫反射贴图颜色乘以漫反射颜色）
-      scope.$l.diffuse = pb.mul(pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord), scope.diffuseColor);
+      scope.$l.diffuse = pb.mul(
+        pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord),
+        scope.diffuseColor
+      );
       // 计算光照，结果是vec3类型的光照以后的颜色
-      scope.$l.litColor = this.blinnPhongLight(scope, scope.$inputs.worldPos, scope.normal, scope.viewVec, scope.diffuse);
+      scope.$l.litColor = this.blinnPhongLight(
+        scope,
+        scope.$inputs.worldPos,
+        scope.normal,
+        scope.viewVec,
+        scope.diffuse
+      );
       // 合并漫反射的alpha通道到最终颜色
       scope.$l.finalColor = pb.vec4(scope.litColor, scope.diffuse.a);
       // 输出片元颜色
@@ -87,14 +114,14 @@ class MyBlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong)
     }
   }
   // 设置材质的Uniform常量
-  applyUniformValues(bindGroup, ctx, pass){
+  applyUniformValues(bindGroup, ctx, pass) {
     // 必须调用父类
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor(ctx)) {
       // 漫反射颜色
       bindGroup.setValue('diffuseColor', this.color);
       // 漫反射贴图（不可以是null）
-      bindGroup.setTexture('diffuseTexture', this.diffuseTexture)
+      bindGroup.setTexture('diffuseTexture', this.diffuseTexture);
     }
   }
 }
@@ -105,8 +132,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -118,27 +143,19 @@ myApp.ready().then(async () => {
   material.color.setXYZW(1, 1, 0, 1);
   // shininess是mixinBlinnPhong引入的属性
   material.shininess = 64;
-  material.diffuseTexture = await assetManager.loadTexture('./assets/images/layer.jpg');
+  material.diffuseTexture = await assetManager.loadTexture(
+    'https://cdn.zephyr3d.org/doc/assets/images/layer.jpg'
+  );
   material.uniformChanged();
 
   new Mesh(scene, new TorusShape(), material);
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
-  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(5, 3, 0), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', ev => {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

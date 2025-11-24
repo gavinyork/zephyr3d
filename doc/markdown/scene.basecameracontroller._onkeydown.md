@@ -4,23 +4,53 @@
 
 ## BaseCameraController.\_onKeyDown() method
 
-Key down event handler
+Key down handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
-protected _onKeyDown(evt: KeyboardEvent): boolean;
+protected _onKeyDown(_evt: IControllerKeydownEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | KeyboardEvent | Keyboard event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_evt
+
+
+</td><td>
+
+[IControllerKeydownEvent](doc/markdown/./scene.icontrollerkeydownevent.md)
+
+
+</td><td>
+
+Keyboard event.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

@@ -14,7 +14,37 @@ constructor(scene: Scene);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the mesh node belongs |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene to which the mesh node belongs
+
+
+</td></tr>
+</tbody></table>
 

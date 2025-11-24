@@ -14,10 +14,55 @@ static setFont(device: AbstractDevice, name: string): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The render device |
-|  name | string | The font name |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The render device
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The font name
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

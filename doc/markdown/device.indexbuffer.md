@@ -15,8 +15,64 @@ interface IndexBuffer<T = unknown> extends GPUDataBuffer<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [indexType](doc/markdown/./device.indexbuffer.indextype.md) | <code>readonly</code> | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) |  |
-|  [length](doc/markdown/./device.indexbuffer.length.md) | <code>readonly</code> | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[indexType](doc/markdown/./device.indexbuffer.indextype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[length](doc/markdown/./device.indexbuffer.length.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

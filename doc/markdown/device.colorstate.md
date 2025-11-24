@@ -14,17 +14,139 @@ interface ColorState
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [alphaMask](doc/markdown/./device.colorstate.alphamask.md) |  | boolean | true if it is enabled to write to the alpha channel |
-|  [blueMask](doc/markdown/./device.colorstate.bluemask.md) |  | boolean | true if it is enabled to write to the blue channel |
-|  [greenMask](doc/markdown/./device.colorstate.greenmask.md) |  | boolean | true if it is enabled to write to the green channel |
-|  [redMask](doc/markdown/./device.colorstate.redmask.md) |  | boolean | true if it is enabled to write to the red channel |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[alphaMask](doc/markdown/./device.colorstate.alphamask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it is enabled to write to the alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[blueMask](doc/markdown/./device.colorstate.bluemask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it is enabled to write to the blue channel
+
+
+</td></tr>
+<tr><td>
+
+[greenMask](doc/markdown/./device.colorstate.greenmask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it is enabled to write to the green channel
+
+
+</td></tr>
+<tr><td>
+
+[redMask](doc/markdown/./device.colorstate.redmask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it is enabled to write to the red channel
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [clone()](doc/markdown/./device.colorstate.clone.md) | Creates a new ColorState by copying this one |
-|  [setColorMask(r, g, b, a)](doc/markdown/./device.colorstate.setcolormask.md) | Set fragment write mask |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.colorstate.clone.md)
+
+
+</td><td>
+
+Creates a new ColorState by copying this one
+
+
+</td></tr>
+<tr><td>
+
+[setColorMask(r, g, b, a)](doc/markdown/./device.colorstate.setcolormask.md)
+
+
+</td><td>
+
+Set fragment write mask
+
+
+</td></tr>
+</tbody></table>
 

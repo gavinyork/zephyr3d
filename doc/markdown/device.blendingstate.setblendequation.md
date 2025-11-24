@@ -14,10 +14,55 @@ setBlendEquation(rgb: BlendEquation, alpha: BlendEquation): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rgb | [BlendEquation](doc/markdown/./device.blendequation.md) | The blending equation for RGB channels |
-|  alpha | [BlendEquation](doc/markdown/./device.blendequation.md) | The blending equation for the alpha channel |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rgb
+
+
+</td><td>
+
+[BlendEquation](doc/markdown/./device.blendequation.md)
+
+
+</td><td>
+
+The blending equation for RGB channels
+
+
+</td></tr>
+<tr><td>
+
+alpha
+
+
+</td><td>
+
+[BlendEquation](doc/markdown/./device.blendequation.md)
+
+
+</td><td>
+
+The blending equation for the alpha channel
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

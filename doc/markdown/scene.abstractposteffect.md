@@ -9,37 +9,264 @@ Base class for any type of post effect
 **Signature:**
 
 ```typescript
-declare abstract class AbstractPostEffect<ClassName extends string> 
+declare class AbstractPostEffect extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.abstractposteffect._constructor_.md) |  | Creates an instance of a post effect |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.abstractposteffect._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of a post effect
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [\_enabled](doc/markdown/./scene.abstractposteffect._enabled.md) | <code>protected</code> | boolean |  |
-|  [\_opaque](doc/markdown/./scene.abstractposteffect._opaque.md) | <code>protected</code> | boolean |  |
-|  [\_outputTexture](doc/markdown/./scene.abstractposteffect._outputtexture.md) | <code>protected</code> | [Texture2D](doc/markdown/./device.texture2d.md) |  |
-|  [\_quadRenderStateSet](doc/markdown/./scene.abstractposteffect._quadrenderstateset.md) | <code>protected</code> | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
-|  [\_quadVertexLayout](doc/markdown/./scene.abstractposteffect._quadvertexlayout.md) | <code>protected</code> | [VertexLayout](doc/markdown/./device.vertexlayout.md) |  |
-|  [className](doc/markdown/./scene.abstractposteffect.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | string |  |
-|  [enabled](doc/markdown/./scene.abstractposteffect.enabled.md) |  | boolean | Whether this post effect is enabled |
-|  [opaque](doc/markdown/./scene.abstractposteffect.opaque.md) | <code>readonly</code> | boolean | Whether this post effect will be rendered at opaque phase |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_enabled](doc/markdown/./scene.abstractposteffect._enabled.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[\_layer](doc/markdown/./scene.abstractposteffect._layer.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+[PostEffectLayer](doc/markdown/./scene.posteffectlayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[enabled](doc/markdown/./scene.abstractposteffect.enabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this post effect is enabled
+
+
+</td></tr>
+<tr><td>
+
+[layer](doc/markdown/./scene.abstractposteffect.layer.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PostEffectLayer](doc/markdown/./scene.posteffectlayer.md)
+
+
+</td><td>
+
+Whether this post effect will be rendered at opaque phase
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.abstractposteffect.apply.md) | <code>abstract</code> | Apply the post effect |
-|  [dispose()](doc/markdown/./scene.abstractposteffect.dispose.md) |  | Disposes the post effect. |
-|  [drawFullscreenQuad(renderStateSet)](doc/markdown/./scene.abstractposteffect.drawfullscreenquad.md) | <code>protected</code> | Draws a fullscreen quad |
-|  [getClassName()](doc/markdown/./scene.abstractposteffect.getclassname.md) |  | Gets class name of this instance |
-|  [needFlip(device)](doc/markdown/./scene.abstractposteffect.needflip.md) |  | Check if the post effect should be rendered upside down. |
-|  [requireDepthAttachment(ctx)](doc/markdown/./scene.abstractposteffect.requiredepthattachment.md) | <code>abstract</code> | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture(ctx)](doc/markdown/./scene.abstractposteffect.requirelineardepthtexture.md) | <code>abstract</code> | Checks whether this post effect requires the linear depth texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.abstractposteffect.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply the post effect
+
+
+</td></tr>
+<tr><td>
+
+[drawFullscreenQuad(renderStateSet)](doc/markdown/./scene.abstractposteffect.drawfullscreenquad.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Draws a fullscreen quad
+
+
+</td></tr>
+<tr><td>
+
+[needFlip(device)](doc/markdown/./scene.abstractposteffect.needflip.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the post effect should be rendered upside down.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.abstractposteffect.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[passThrough(ctx, inputColorTexture, srgbOutput, renderStates)](doc/markdown/./scene.abstractposteffect.passthrough.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[requireDepthAttachment(\_ctx)](doc/markdown/./scene.abstractposteffect.requiredepthattachment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the scene depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[requireLinearDepthTexture(\_ctx)](doc/markdown/./scene.abstractposteffect.requirelineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the linear depth texture
+
+
+</td></tr>
+</tbody></table>
 

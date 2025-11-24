@@ -4,29 +4,103 @@
 
 ## AssetManager.fetchModel() method
 
-Fetches a model resource from a given URL and adds it to a scene
+Fetch a model resource and instantiate it under a scene.
+
+- Loads or retrieves a cached SharedModel, then creates a SceneNode hierarchy. - Returns both the created group node and any associated AnimationSet.
 
 **Signature:**
 
 ```typescript
-fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo>;
+fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<ModelInfo>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the model node belongs |
-|  url | string | The URL from where to fetch the resource |
-|  options | [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | _(Optional)_ Options for model fetching |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+Scene into which the model node will be created.
+
+
+</td></tr>
+<tr><td>
+
+url
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Model URL or VFS path.
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Model loader options and instancing hint.
+
+
+</td></tr>
+<tr><td>
+
+VFSs
+
+
+</td><td>
+
+[VFS](doc/markdown/./base.vfs.md)<!-- -->\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 Promise&lt;[ModelInfo](doc/markdown/./scene.modelinfo.md)<!-- -->&gt;
 
-The created model node
-
-## Remarks
-
-If a model has already been loaded, the function will ignore the postProcess parameter and directly return the model loaded previously. To load the same model with different postProcess parameters, use different AssetManager instances separately.
+A promise with the created node group and animation set info.
 

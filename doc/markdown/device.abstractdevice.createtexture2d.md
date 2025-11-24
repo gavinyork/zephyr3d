@@ -14,14 +14,91 @@ createTexture2D(format: TextureFormat, width: number, height: number, options?: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format |
-|  width | number | Pixel width of the texture |
-|  height | number | Pixel height of the texture |
-|  options | [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+The texture format
+
+
+</td></tr>
+<tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pixel width of the texture
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pixel height of the texture
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [Texture2D](doc/markdown/./device.texture2d.md)
+
+The created 2D texture
 

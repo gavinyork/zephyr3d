@@ -14,9 +14,83 @@ interface TextureMipmapLevelData
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [data](doc/markdown/./device.texturemipmapleveldata.data.md) |  | [TypedArray](doc/markdown/./base.typedarray.md) | The texture data |
-|  [height](doc/markdown/./device.texturemipmapleveldata.height.md) |  | number | Height of the mipmap level |
-|  [width](doc/markdown/./device.texturemipmapleveldata.width.md) |  | number | Width of the mipmap level |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[data](doc/markdown/./device.texturemipmapleveldata.data.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+The texture data
+
+
+</td></tr>
+<tr><td>
+
+[height](doc/markdown/./device.texturemipmapleveldata.height.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height of the mipmap level
+
+
+</td></tr>
+<tr><td>
+
+[width](doc/markdown/./device.texturemipmapleveldata.width.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Width of the mipmap level
+
+
+</td></tr>
+</tbody></table>
 

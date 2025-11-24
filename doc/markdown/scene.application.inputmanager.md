@@ -4,7 +4,7 @@
 
 ## Application.inputManager property
 
-The input manager instance
+The input manager instance handling pointer/keyboard event routing.
 
 **Signature:**
 

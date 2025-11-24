@@ -9,15 +9,8 @@ Update the wave generator.
 **Signature:**
 
 ```typescript
-update(timeInSeconds: number): void;
+update(): void;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  timeInSeconds | number | Time in seconds. |
-
 **Returns:**
 
 void

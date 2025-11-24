@@ -14,7 +14,45 @@ interface SamplerBindingLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [type](doc/markdown/./device.samplerbindinglayout.type.md) |  | 'filtering' \| 'non-filtering' \| 'comparison' | The bind type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[type](doc/markdown/./device.samplerbindinglayout.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'filtering' \| 'non-filtering' \| 'comparison'
+
+
+</td><td>
+
+The bind type
+
+
+</td></tr>
+</tbody></table>
 

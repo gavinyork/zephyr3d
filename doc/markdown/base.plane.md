@@ -15,37 +15,386 @@ declare class Plane extends VectorBase
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./base.plane._constructor_.md) |  | Construct a plane lying on the XZ axis with upwards normal |
-|  [(constructor)(a, b, c, d)](doc/markdown/./base.plane._constructor__1.md) |  | Construct a plane that satisfies the equation Ax+By+Cz+D=0 |
-|  [(constructor)(other)](doc/markdown/./base.plane._constructor__2.md) |  | Construct a plane by copying another plane |
-|  [(constructor)(origin, normal)](doc/markdown/./base.plane._constructor__3.md) |  | Construct a plane from normal and a point on the plane. |
-|  [(constructor)(p0, p1, p2)](doc/markdown/./base.plane._constructor__4.md) |  | Construct a plane from three points on the plane. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./base.plane._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a plane lying on the XZ axis with upwards normal
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(a, b, c, d)](doc/markdown/./base.plane._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a plane that satisfies the equation Ax+By+Cz+D=0
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(other)](doc/markdown/./base.plane._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a plane by copying another plane
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(origin, normal)](doc/markdown/./base.plane._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a plane from normal and a point on the plane.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(p0, p1, p2)](doc/markdown/./base.plane._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a plane from three points on the plane.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [a](doc/markdown/./base.plane.a.md) |  | number | Get the coefficient A of the plane equation |
-|  [b](doc/markdown/./base.plane.b.md) |  | number | Get the coefficient B of the plane equation |
-|  [c](doc/markdown/./base.plane.c.md) |  | number | Get the coefficient C of the plane equation |
-|  [d](doc/markdown/./base.plane.d.md) |  | number | Get the coefficient D of the plane equation |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[a](doc/markdown/./base.plane.a.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the coefficient A of the plane equation
+
+
+</td></tr>
+<tr><td>
+
+[b](doc/markdown/./base.plane.b.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the coefficient B of the plane equation
+
+
+</td></tr>
+<tr><td>
+
+[c](doc/markdown/./base.plane.c.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the coefficient C of the plane equation
+
+
+</td></tr>
+<tr><td>
+
+[d](doc/markdown/./base.plane.d.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the coefficient D of the plane equation
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [assign(other)](doc/markdown/./base.plane.assign.md) |  | Set coefficients of the plane equation. |
-|  [distanceToPoint(p)](doc/markdown/./base.plane.distancetopoint.md) |  | Calculate the distance from a point to the plane. |
-|  [flip(plane, result)](doc/markdown/./base.plane.flip.md) | <code>static</code> | Create a new plane object by flipping another plane's normal. |
-|  [getNormal(result)](doc/markdown/./base.plane.getnormal.md) |  | Get normal vector of the plane. |
-|  [initWithOriginNormal(origin, normal)](doc/markdown/./base.plane.initwithoriginnormal.md) |  | Initialize the plane by normal vector and a point on the plane. |
-|  [initWithPoints(p0, p1, p2)](doc/markdown/./base.plane.initwithpoints.md) |  | Initialize the plane by three points on the plane. |
-|  [inplaceFlip()](doc/markdown/./base.plane.inplaceflip.md) |  | Inplace flip the normal vector . |
-|  [inplaceNormalize()](doc/markdown/./base.plane.inplacenormalize.md) |  | Inplace normalize the plane equation. |
-|  [nearestPointToPoint(p, result)](doc/markdown/./base.plane.nearestpointtopoint.md) |  | Given a point, calucate the closest point on the plane to that point. |
-|  [normalize(plane, result)](doc/markdown/./base.plane.normalize.md) | <code>static</code> | Create a new plane object by normalizing another plane. |
-|  [setEquation(a, b, c, d)](doc/markdown/./base.plane.setequation.md) |  | Set coefficients of the plane equation. |
-|  [transform(plane, matrix, result)](doc/markdown/./base.plane.transform.md) | <code>static</code> | Create a new plane object by transforming another plane. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[assign(other)](doc/markdown/./base.plane.assign.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set coefficients of the plane equation.
+
+
+</td></tr>
+<tr><td>
+
+[distanceToPoint(p)](doc/markdown/./base.plane.distancetopoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate the distance from a point to the plane.
+
+
+</td></tr>
+<tr><td>
+
+[flip(plane, result)](doc/markdown/./base.plane.flip.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Create a new plane object by flipping another plane's normal.
+
+
+</td></tr>
+<tr><td>
+
+[getNormal(result)](doc/markdown/./base.plane.getnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get normal vector of the plane.
+
+
+</td></tr>
+<tr><td>
+
+[initWithOriginNormal(origin, normal)](doc/markdown/./base.plane.initwithoriginnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize the plane by normal vector and a point on the plane.
+
+
+</td></tr>
+<tr><td>
+
+[initWithPoints(p0, p1, p2)](doc/markdown/./base.plane.initwithpoints.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize the plane by three points on the plane.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceFlip()](doc/markdown/./base.plane.inplaceflip.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inplace flip the normal vector .
+
+
+</td></tr>
+<tr><td>
+
+[inplaceNormalize()](doc/markdown/./base.plane.inplacenormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inplace normalize the plane equation.
+
+
+</td></tr>
+<tr><td>
+
+[nearestPointToPoint(p, result)](doc/markdown/./base.plane.nearestpointtopoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Given a point, calucate the closest point on the plane to that point.
+
+
+</td></tr>
+<tr><td>
+
+[normalize(plane, result)](doc/markdown/./base.plane.normalize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Create a new plane object by normalizing another plane.
+
+
+</td></tr>
+<tr><td>
+
+[setEquation(a, b, c, d)](doc/markdown/./base.plane.setequation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set coefficients of the plane equation.
+
+
+</td></tr>
+<tr><td>
+
+[transform(plane, matrix, result)](doc/markdown/./base.plane.transform.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Create a new plane object by transforming another plane.
+
+
+</td></tr>
+</tbody></table>
 

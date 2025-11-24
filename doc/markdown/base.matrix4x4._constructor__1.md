@@ -14,7 +14,37 @@ constructor(elements: number[]);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  elements | number\[\] | Array that contains the values. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+elements
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Array that contains the values.
+
+
+</td></tr>
+</tbody></table>
 

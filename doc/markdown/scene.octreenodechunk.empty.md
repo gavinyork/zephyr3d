@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.empty() method
 
-Check if this chunk is empty
+Whether this chunk currently has no created nodes.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ empty(): boolean;
 
 boolean
 
-true if this chunk is empty, otherwise false
+True if the chunk has no nodes; otherwise false.
 

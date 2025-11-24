@@ -14,10 +14,55 @@ transform(matrix: Matrix4x4, other?: Ray): Ray;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix. |
-|  other | [Ray](doc/markdown/./base.ray.md) | _(Optional)_ A ray object to which the result will be written, if not specified, a new ray object will be returned. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The transform matrix.
+
+
+</td></tr>
+<tr><td>
+
+other
+
+
+</td><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+_(Optional)_ A ray object to which the result will be written, if not specified, a new ray object will be returned.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

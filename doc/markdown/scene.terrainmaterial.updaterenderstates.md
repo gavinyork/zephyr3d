@@ -12,11 +12,65 @@ protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawCo
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number |  |
-|  stateSet | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+stateSet
+
+
+</td><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

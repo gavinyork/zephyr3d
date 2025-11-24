@@ -9,19 +9,212 @@ Abstract base class for any kind of shapes
 **Signature:**
 
 ```typescript
-declare abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive 
+declare abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive implements Clonable<Shape<T>> 
 ```
 **Extends:** [Primitive](doc/markdown/./scene.primitive.md)
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;T&gt;&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.shape._constructor_.md) |  | Creates an instance of shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.shape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of shape
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [options](doc/markdown/./scene.shape.options.md) | <code>readonly</code> | T | Creation options |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.shape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[\_options](doc/markdown/./scene.shape._options.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[options](doc/markdown/./scene.shape.options.md)
+
+
+</td><td>
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+Get shape creation options
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.shape.type.md)
+
+
+</td><td>
+
+`abstract`
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get shape type
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.shape.clone.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[computeTangent(v0, v1, v2, uv0, uv1, uv2, normal)](doc/markdown/./scene.shape.computetangent.md)
+
+
+</td><td>
+
+`protected`
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[normalizeOptions(options)](doc/markdown/./scene.shape.normalizeoptions.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Normalize options
+
+
+</td></tr>
+</tbody></table>
 

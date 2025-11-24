@@ -4,7 +4,7 @@
 
 ## ExtractMixinType type
 
-Extract mixin type
+Produces the intersection type of multiple mixins’ return types.
 
 **Signature:**
 

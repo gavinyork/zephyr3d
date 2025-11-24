@@ -14,222 +14,2621 @@ interface ProgramBuilder
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [atomic\_int](doc/markdown/./device.programbuilder.atomic_int.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | Atomic int type variable constructors |
-|  [atomic\_uint](doc/markdown/./device.programbuilder.atomic_uint.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | Atomic uint type variable constructors |
-|  [bool](doc/markdown/./device.programbuilder.bool.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | boolean type variable constructors |
-|  [bvec2](doc/markdown/./device.programbuilder.bvec2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | bvec2 type variable constructors |
-|  [bvec3](doc/markdown/./device.programbuilder.bvec3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | bvec3 type variable constructors |
-|  [bvec4](doc/markdown/./device.programbuilder.bvec4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | bvec4 type variable constructors |
-|  [float](doc/markdown/./device.programbuilder.float.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | float type variable constructors |
-|  [int](doc/markdown/./device.programbuilder.int.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | int type variable constructors |
-|  [ivec2](doc/markdown/./device.programbuilder.ivec2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | ivec2 type variable constructors |
-|  [ivec3](doc/markdown/./device.programbuilder.ivec3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | ivec3 type variable constructors |
-|  [ivec4](doc/markdown/./device.programbuilder.ivec4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | ivec4 type variable constructors |
-|  [mat2](doc/markdown/./device.programbuilder.mat2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat2 type variable constructors |
-|  [mat2x3](doc/markdown/./device.programbuilder.mat2x3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat2x3 type variable constructors |
-|  [mat2x4](doc/markdown/./device.programbuilder.mat2x4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat2x4 type variable constructors |
-|  [mat3](doc/markdown/./device.programbuilder.mat3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat3 type variable constructors |
-|  [mat3x2](doc/markdown/./device.programbuilder.mat3x2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat3x2 type variable constructors |
-|  [mat3x4](doc/markdown/./device.programbuilder.mat3x4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m23: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat3x4 type variable constructors |
-|  [mat4](doc/markdown/./device.programbuilder.mat4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m23: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m32: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m33: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat4 type variable constructors |
-|  [mat4x2](doc/markdown/./device.programbuilder.mat4x2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat4x2 type variable constructors |
-|  [mat4x3](doc/markdown/./device.programbuilder.mat4x3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m32: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | mat4x3 type variable constructors |
-|  [texStorage1D](doc/markdown/./device.programbuilder.texstorage1d.md) |  | StorageTextureConstructor | texStorage1D type variable constructors |
-|  [texStorage2D](doc/markdown/./device.programbuilder.texstorage2d.md) |  | StorageTextureConstructor | texStorage2D type variable constructors |
-|  [texStorage2DArray](doc/markdown/./device.programbuilder.texstorage2darray.md) |  | StorageTextureConstructor | texStorage2DArray type variable constructors |
-|  [texStorage3D](doc/markdown/./device.programbuilder.texstorage3d.md) |  | StorageTextureConstructor | texStorage3D type variable constructors |
-|  [uint](doc/markdown/./device.programbuilder.uint.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | uint type variable constructors |
-|  [uvec2](doc/markdown/./device.programbuilder.uvec2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | uvec2 type variable constructors |
-|  [uvec3](doc/markdown/./device.programbuilder.uvec3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | uvec3 type variable constructors |
-|  [uvec4](doc/markdown/./device.programbuilder.uvec4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | uvec4 type variable constructors |
-|  [vec2](doc/markdown/./device.programbuilder.vec2.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | vec2 type variable constructors |
-|  [vec3](doc/markdown/./device.programbuilder.vec3.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | vec3 type variable constructors |
-|  [vec4](doc/markdown/./device.programbuilder.vec4.md) |  | { (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; } | vec4 type variable constructors |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[atomic\_int](doc/markdown/./device.programbuilder.atomic_int.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+Atomic int type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[atomic\_uint](doc/markdown/./device.programbuilder.atomic_uint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+Atomic uint type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[bool](doc/markdown/./device.programbuilder.bool.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+boolean type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[bvec2](doc/markdown/./device.programbuilder.bvec2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+bvec2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[bvec3](doc/markdown/./device.programbuilder.bvec3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+bvec3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[bvec4](doc/markdown/./device.programbuilder.bvec4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+bvec4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[float](doc/markdown/./device.programbuilder.float.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: boolean): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+float type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[int](doc/markdown/./device.programbuilder.int.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+int type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[ivec2](doc/markdown/./device.programbuilder.ivec2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+ivec2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[ivec3](doc/markdown/./device.programbuilder.ivec3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+ivec3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[ivec4](doc/markdown/./device.programbuilder.ivec4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+ivec4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat2](doc/markdown/./device.programbuilder.mat2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat2x3](doc/markdown/./device.programbuilder.mat2x3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat2x3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat2x4](doc/markdown/./device.programbuilder.mat2x4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat2x4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat3](doc/markdown/./device.programbuilder.mat3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat3x2](doc/markdown/./device.programbuilder.mat3x2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat3x2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat3x4](doc/markdown/./device.programbuilder.mat3x4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m23: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat3x4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat4](doc/markdown/./device.programbuilder.mat4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m03: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m13: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m23: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m32: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m33: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat4x2](doc/markdown/./device.programbuilder.mat4x2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat4x2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[mat4x3](doc/markdown/./device.programbuilder.mat4x3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m00: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m01: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m02: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m10: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m11: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m12: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m20: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m21: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m22: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m30: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m31: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m32: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (m0: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m1: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m2: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, m3: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+mat4x3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texStorage1D](doc/markdown/./device.programbuilder.texstorage1d.md)
+
+
+</td><td>
+
+
+</td><td>
+
+StorageTextureConstructor
+
+
+</td><td>
+
+texStorage1D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texStorage2D](doc/markdown/./device.programbuilder.texstorage2d.md)
+
+
+</td><td>
+
+
+</td><td>
+
+StorageTextureConstructor
+
+
+</td><td>
+
+texStorage2D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texStorage2DArray](doc/markdown/./device.programbuilder.texstorage2darray.md)
+
+
+</td><td>
+
+
+</td><td>
+
+StorageTextureConstructor
+
+
+</td><td>
+
+texStorage2DArray type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texStorage3D](doc/markdown/./device.programbuilder.texstorage3d.md)
+
+
+</td><td>
+
+
+</td><td>
+
+StorageTextureConstructor
+
+
+</td><td>
+
+texStorage3D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[uint](doc/markdown/./device.programbuilder.uint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+uint type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[uvec2](doc/markdown/./device.programbuilder.uvec2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+uvec2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[uvec3](doc/markdown/./device.programbuilder.uvec3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+uvec3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[uvec4](doc/markdown/./device.programbuilder.uvec4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+uvec4 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[vec2](doc/markdown/./device.programbuilder.vec2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (rhs: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+vec2 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[vec3](doc/markdown/./device.programbuilder.vec3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+vec3 type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[vec4](doc/markdown/./device.programbuilder.vec4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ (): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (name: string): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, y: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (x: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, yzw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, z: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xy: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, zw: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; (xyz: [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, w: number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->): [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->; ptr: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; \[dim: number\]: [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->; }
+
+
+</td><td>
+
+vec4 type variable constructors
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [$query(name)](doc/markdown/./device.programbuilder._query.md) | Query the global variable by the name |
-|  [abs(val)](doc/markdown/./device.programbuilder.abs.md) | Same as abs builtin function in GLSL and WGSL |
-|  [acos(val)](doc/markdown/./device.programbuilder.acos.md) | Same as acos builtin function in GLSL and WGSL |
-|  [acosh(val)](doc/markdown/./device.programbuilder.acosh.md) | Same as acosh builtin function in GLSL and WGSL |
-|  [add\_2(x, y)](doc/markdown/./device.programbuilder.add_2.md) | add two values |
-|  [add(x, rest)](doc/markdown/./device.programbuilder.add.md) | add a couple of values togeter |
-|  [addressOf(ref)](doc/markdown/./device.programbuilder.addressof.md) | Create an 'AddressOf' expression for WGSL |
-|  [all(x)](doc/markdown/./device.programbuilder.all.md) | check whether all elements of a boolean vector are true |
-|  [and\_2(x, y)](doc/markdown/./device.programbuilder.and_2.md) | return x &amp;&amp; y |
-|  [and(x, y, rest)](doc/markdown/./device.programbuilder.and.md) | return x &amp;&amp; y &amp;&amp; ... |
-|  [any(x)](doc/markdown/./device.programbuilder.any.md) | check whether any element of a boolean vector is true |
-|  [arrayLength(x)](doc/markdown/./device.programbuilder.arraylength.md) | Same as the arrayLength builtin function in WGSL, only valid for WebGPU device |
-|  [asin(val)](doc/markdown/./device.programbuilder.asin.md) | Same as asin builtin function in GLSL and WGSL |
-|  [asinh(val)](doc/markdown/./device.programbuilder.asinh.md) | Same as asinh builtin function in GLSL and WGSL |
-|  [atan(val)](doc/markdown/./device.programbuilder.atan.md) | Same as atan builtin function in GLSL and WGSL |
-|  [atan2(y, x)](doc/markdown/./device.programbuilder.atan2.md) | Same as atan builtin function in GLSL and atan2 builtin function in WGSL |
-|  [atanh(val)](doc/markdown/./device.programbuilder.atanh.md) | Same as atanh builtin function in GLSL and WGSL |
-|  [atomicAdd(ptr, value)](doc/markdown/./device.programbuilder.atomicadd.md) | atomicAdd, only valid for WebGPU device |
-|  [atomicAnd(ptr, value)](doc/markdown/./device.programbuilder.atomicand.md) | atomicAnd, only valid for WebGPU device |
-|  [atomicExchange(ptr, value)](doc/markdown/./device.programbuilder.atomicexchange.md) | atomicExchange, only valid for WebGPU device |
-|  [atomicLoad(ptr)](doc/markdown/./device.programbuilder.atomicload.md) | atomicLoad, only valid for WebGPU device |
-|  [atomicMax(ptr, value)](doc/markdown/./device.programbuilder.atomicmax.md) | atomicMax, only valid for WebGPU device |
-|  [atomicMin(ptr, value)](doc/markdown/./device.programbuilder.atomicmin.md) | atomicMin, only valid for WebGPU device |
-|  [atomicOr(ptr, value)](doc/markdown/./device.programbuilder.atomicor.md) | atomicOr, only valid for WebGPU device |
-|  [atomicStore(ptr, value)](doc/markdown/./device.programbuilder.atomicstore.md) | atomicStore, only valid for WebGPU device |
-|  [atomicSub(ptr, value)](doc/markdown/./device.programbuilder.atomicsub.md) | atomicSub, only valid for WebGPU device |
-|  [atomicXor(ptr, value)](doc/markdown/./device.programbuilder.atomicxor.md) | atomicXor, only valid for WebGPU device |
-|  [buildCompute(options)](doc/markdown/./device.programbuilder.buildcompute.md) | Generates shader code for a compute program |
-|  [buildComputeProgram(options)](doc/markdown/./device.programbuilder.buildcomputeprogram.md) | Creates a shader program for compute |
-|  [buildRender(options)](doc/markdown/./device.programbuilder.buildrender.md) | Generates shader codes for a render program |
-|  [buildRenderProgram(options)](doc/markdown/./device.programbuilder.buildrenderprogram.md) | Creates a shader program for render |
-|  [ceil(val)](doc/markdown/./device.programbuilder.ceil.md) | Same as ceil builtin function in GLSL and WGSL |
-|  [clamp(x, y, z)](doc/markdown/./device.programbuilder.clamp.md) | Same as clamp builtin function in GLSL and WGSL |
-|  [compAnd(x, y)](doc/markdown/./device.programbuilder.compand.md) | return x &amp; y, per component |
-|  [compEqual(x, y)](doc/markdown/./device.programbuilder.compequal.md) | return true if x equals y, otherwise false, per component |
-|  [compNotEqual(x, y)](doc/markdown/./device.programbuilder.compnotequal.md) | return true if x is not equal to y, otherwise false, per component |
-|  [compOr(x, y)](doc/markdown/./device.programbuilder.compor.md) | return x \|\| y, per component |
-|  [compXor(x, y)](doc/markdown/./device.programbuilder.compxor.md) | return x ^ y, per component |
-|  [cos(val)](doc/markdown/./device.programbuilder.cos.md) | Same as cos builtin function in GLSL and WGSL |
-|  [cosh(val)](doc/markdown/./device.programbuilder.cosh.md) | Same as cosh builtin function in GLSL and WGSL |
-|  [cross(x, y)](doc/markdown/./device.programbuilder.cross.md) | Same as cross builtin function in GLSL and WGSL |
-|  [defineStruct(members, structName)](doc/markdown/./device.programbuilder.definestruct.md) | Defines a structure type |
-|  [defineStructByType(structType)](doc/markdown/./device.programbuilder.definestructbytype.md) | Defines a structure type |
-|  [degrees(val)](doc/markdown/./device.programbuilder.degrees.md) | Same as degrees builtin function in GLSL and WGSL |
-|  [determinant(mat)](doc/markdown/./device.programbuilder.determinant.md) | Same as determinant builtin function in GLSL and WGSL, only valid for WebGL2 and WebGPU device |
-|  [discard()](doc/markdown/./device.programbuilder.discard.md) | Creates a 'discard' statement |
-|  [distance(x, y)](doc/markdown/./device.programbuilder.distance.md) | Same as distance builtin function in GLSL and WGSL |
-|  [div(x, y)](doc/markdown/./device.programbuilder.div.md) | divide the first number by the second number |
-|  [dot(x, y)](doc/markdown/./device.programbuilder.dot.md) | Same as dot builtin function in GLSL and WGSL |
-|  [dpdx(x)](doc/markdown/./device.programbuilder.dpdx.md) | Same as dFdx builtin function in GLSL and dpdx builtin function in WGSL |
-|  [dpdxCoarse(x)](doc/markdown/./device.programbuilder.dpdxcoarse.md) | Same as dFdx builtin function in GLSL and dpdxCoarse builtin function in WGSL |
-|  [dpdxFine(x)](doc/markdown/./device.programbuilder.dpdxfine.md) | Same as dFdx builtin function in GLSL and dpdxFine builtin function in WGSL |
-|  [dpdy(x)](doc/markdown/./device.programbuilder.dpdy.md) | Same as dFdy builtin function in GLSL and dpdy builtin function in WGSL |
-|  [dpdyCoarse(x)](doc/markdown/./device.programbuilder.dpdycoarse.md) | Same as dFdy builtin function in GLSL and dpdyCoarse builtin function in WGSL |
-|  [dpdyFine(x)](doc/markdown/./device.programbuilder.dpdyfine.md) | Same as dFdy builtin function in GLSL and dpdyFine builtin function in WGSL |
-|  [equal(x, y)](doc/markdown/./device.programbuilder.equal.md) | return true if x equals y, otherwise false |
-|  [exp(val)](doc/markdown/./device.programbuilder.exp.md) | Same as exp builtin function in GLSL and WGSL |
-|  [exp2(val)](doc/markdown/./device.programbuilder.exp2.md) | Same as exp2 builtin function in GLSL and WGSL |
-|  [faceForward(x, y, z)](doc/markdown/./device.programbuilder.faceforward.md) | Same as faceForward builtin function in WGSL, only valid for WebGPU device |
-|  [floatBitsToInt(x)](doc/markdown/./device.programbuilder.floatbitstoint.md) | Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
-|  [floatBitsToUint(x)](doc/markdown/./device.programbuilder.floatbitstouint.md) | Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
-|  [floor(val)](doc/markdown/./device.programbuilder.floor.md) | Same as floor builtin function in GLSL and WGSL |
-|  [fma(x, y, z)](doc/markdown/./device.programbuilder.fma.md) | Same as fma builtin function in WGSL, only valid for WebGPU device |
-|  [fract(val)](doc/markdown/./device.programbuilder.fract.md) | Same as fract builtin function in GLSL and WGSL |
-|  [frexp(x)](doc/markdown/./device.programbuilder.frexp.md) | Same as frexp builtin function in WGSL, only valid for WebGPU device |
-|  [func(name, params, body)](doc/markdown/./device.programbuilder.func.md) | Creates a function |
-|  [fwidth(x)](doc/markdown/./device.programbuilder.fwidth.md) | Same as fwidth builtin function in GLSL and WGSL |
-|  [getCurrentScope()](doc/markdown/./device.programbuilder.getcurrentscope.md) | Gets the current scope |
-|  [getDevice()](doc/markdown/./device.programbuilder.getdevice.md) | Get the device |
-|  [getGlobalScope()](doc/markdown/./device.programbuilder.getglobalscope.md) | Gets the global scope |
-|  [greaterThan(x, y)](doc/markdown/./device.programbuilder.greaterthan.md) | return true if x is greater than y, otherwise false, per component |
-|  [greaterThanEqual(x, y)](doc/markdown/./device.programbuilder.greaterthanequal.md) | return true if x is greater than or equals y, otherwise false, per component |
-|  [intBitsToFloat(x)](doc/markdown/./device.programbuilder.intbitstofloat.md) | Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
-|  [inverse(mat)](doc/markdown/./device.programbuilder.inverse.md) | Same as inverse builtin function in GLSL, only valid for WebGL2 device |
-|  [inverseSqrt(val)](doc/markdown/./device.programbuilder.inversesqrt.md) | Same as inversesqrt builtin function in GLSL and WGSL |
-|  [isinf(x)](doc/markdown/./device.programbuilder.isinf.md) | Same as isinf builtin function in GLSL, only valid for WebGL2 device |
-|  [isnan(x)](doc/markdown/./device.programbuilder.isnan.md) | Same as isnan builtin function in GLSL, only valid for WebGL2 device |
-|  [itex1D(rhs)](doc/markdown/./device.programbuilder.itex1d.md) | itex1D type variable constructors |
-|  [itex2D(rhs)](doc/markdown/./device.programbuilder.itex2d.md) | itex2D type variable constructors |
-|  [itex2DArray(rhs)](doc/markdown/./device.programbuilder.itex2darray.md) | itex2DArray type variable constructors |
-|  [itex3D(rhs)](doc/markdown/./device.programbuilder.itex3d.md) | itex3D type variable constructors |
-|  [itexCube(rhs)](doc/markdown/./device.programbuilder.itexcube.md) | itexCube type variable constructors |
-|  [length(x)](doc/markdown/./device.programbuilder.length.md) | Same as length builtin function in GLSL and WGSL |
-|  [lessThan(x, y)](doc/markdown/./device.programbuilder.lessthan.md) | return true if x is less than y, otherwise false |
-|  [lessThanEqual(x, y)](doc/markdown/./device.programbuilder.lessthanequal.md) | return true if x is less than or equals y, otherwise false, per component |
-|  [log(val)](doc/markdown/./device.programbuilder.log.md) | Same as log builtin function in GLSL and WGSL |
-|  [log2(val)](doc/markdown/./device.programbuilder.log2.md) | Same as log2 builtin function in GLSL and WGSL |
-|  [main(body)](doc/markdown/./device.programbuilder.main.md) | Create the main entry function of the shader |
-|  [matrixCompMult(x, y)](doc/markdown/./device.programbuilder.matrixcompmult.md) | Same as matrixCompMult builtin function in GLSL, only valid for WebGL/WebGL2 device |
-|  [max(x, y)](doc/markdown/./device.programbuilder.max.md) | Same as max builtin function in GLSL and WGSL |
-|  [min(x, y)](doc/markdown/./device.programbuilder.min.md) | Same as min builtin function in GLSL and WGSL |
-|  [mix(x, y, z)](doc/markdown/./device.programbuilder.mix.md) | Same as mix builtin function in GLSL and WGSL |
-|  [mod(x, y)](doc/markdown/./device.programbuilder.mod.md) | Same as mod builtin function in GLSL and WGSL |
-|  [mul\_2(x, y)](doc/markdown/./device.programbuilder.mul_2.md) | multiply two values |
-|  [mul(x, rest)](doc/markdown/./device.programbuilder.mul.md) | multiply a couple of values togeter |
-|  [neg(x)](doc/markdown/./device.programbuilder.neg.md) | return the negate of the given value |
-|  [normalize(x)](doc/markdown/./device.programbuilder.normalize.md) | Same as normalize builtin function in GLSL and WGSL. |
-|  [not(x)](doc/markdown/./device.programbuilder.not.md) | logically invert a boolean vector |
-|  [notEqual(x, y)](doc/markdown/./device.programbuilder.notequal.md) | return true if x is not equal to y, otherwise false |
-|  [or\_2(x, y)](doc/markdown/./device.programbuilder.or_2.md) | return x \|\| y |
-|  [or(x, y, rest)](doc/markdown/./device.programbuilder.or.md) | return x \|\| y |
-|  [outerProduct(x, y)](doc/markdown/./device.programbuilder.outerproduct.md) | Same as outerProduct builtin function in GLSL, only valid for WebGL2 device |
-|  [pack2x16float(x)](doc/markdown/./device.programbuilder.pack2x16float.md) | Same as pack2x16float builtin function in WGSL, only valid for WebGPU device |
-|  [pack2x16snorm(x)](doc/markdown/./device.programbuilder.pack2x16snorm.md) | Same as pack2x16snom builtin function in WGSL, only valid for WebGPU device |
-|  [pack2x16unorm(x)](doc/markdown/./device.programbuilder.pack2x16unorm.md) | Same as pack2x16unorm builtin function in WGSL, only valid for WebGPU device |
-|  [pack4x8snorm(x)](doc/markdown/./device.programbuilder.pack4x8snorm.md) | Same as pack4x8snorm builtin function in WGSL, only valid for WebGPU device |
-|  [pack4x8unorm(x)](doc/markdown/./device.programbuilder.pack4x8unorm.md) | Same as pack4x8unorm builtin function in WGSL, only valid for WebGPU device |
-|  [pow(x, y)](doc/markdown/./device.programbuilder.pow.md) | Same as pow builtin function in GLSL and WGSL |
-|  [queryGlobal(name)](doc/markdown/./device.programbuilder.queryglobal.md) | Query the global variable by the name |
-|  [radians(val)](doc/markdown/./device.programbuilder.radians.md) | Same as radians builtin function in GLSL and WGSL |
-|  [referenceOf(ptr)](doc/markdown/./device.programbuilder.referenceof.md) | Creates a 'referenceOf' expression for WGSL |
-|  [reflect(x, y)](doc/markdown/./device.programbuilder.reflect.md) | Same as reflect builtin function in GLSL and WGSL |
-|  [refract(x, y, z)](doc/markdown/./device.programbuilder.refract.md) | Same as refract builtin function in GLSL and WGSL |
-|  [round(val)](doc/markdown/./device.programbuilder.round.md) | Same as round builtin function in WGSL, only valid for WebGPU device |
-|  [sal(a, b)](doc/markdown/./device.programbuilder.sal.md) | shift arithmetic left, not valid for WebGL1 device |
-|  [sampler(rhs)](doc/markdown/./device.programbuilder.sampler.md) | sampler type variable constructors |
-|  [samplerComparison(rhs)](doc/markdown/./device.programbuilder.samplercomparison.md) | samplerComparison type variable constructors |
-|  [sar(a, b)](doc/markdown/./device.programbuilder.sar.md) | shift arithmetic right, not valid for WebGL1 device |
-|  [select(x, y, cond)](doc/markdown/./device.programbuilder.select.md) | Same as the select builtin function in WGSL, only valid for WebGPU device |
-|  [sign(val)](doc/markdown/./device.programbuilder.sign.md) | Same as sign builtin function in GLSL and WGSL |
-|  [sin(val)](doc/markdown/./device.programbuilder.sin.md) | Same as sin builtin function in GLSL and WGSL |
-|  [sinh(val)](doc/markdown/./device.programbuilder.sinh.md) | Same as sinh builtin function in GLSL and WGSL |
-|  [smoothStep(x, y, z)](doc/markdown/./device.programbuilder.smoothstep.md) | Same as smoothstep builtin function in GLSL and WGSL |
-|  [sqrt(val)](doc/markdown/./device.programbuilder.sqrt.md) | Same as sqrt builtin function in GLSL and WGSL |
-|  [step(x, y)](doc/markdown/./device.programbuilder.step.md) | Same as step builtin function in GLSL and WGSL |
-|  [storageBarrier()](doc/markdown/./device.programbuilder.storagebarrier.md) | Same as storageBarrier builtin function in WebGPU, only valid for WebGPU device |
-|  [struct(structName, instanceName)](doc/markdown/./device.programbuilder.struct.md) | Creates a structure type variable |
-|  [sub(x, y)](doc/markdown/./device.programbuilder.sub.md) | subtract two values |
-|  [tan(val)](doc/markdown/./device.programbuilder.tan.md) | Same as tan builtin function in GLSL and WGSL |
-|  [tanh(val)](doc/markdown/./device.programbuilder.tanh.md) | Same as tanh builtin function in GLSL and WGSL |
-|  [tex1D(rhs)](doc/markdown/./device.programbuilder.tex1d.md) | tex1D type variable constructors |
-|  [tex2D(rhs)](doc/markdown/./device.programbuilder.tex2d.md) | tex2D type variable constructors |
-|  [tex2DArray(rhs)](doc/markdown/./device.programbuilder.tex2darray.md) | tex2DArray type variable constructors |
-|  [tex2DArrayShadow(rhs)](doc/markdown/./device.programbuilder.tex2darrayshadow.md) | tex2DArrayShadow type variable constructors |
-|  [tex2DShadow(rhs)](doc/markdown/./device.programbuilder.tex2dshadow.md) | tex2DShadow type variable constructors |
-|  [tex3D(rhs)](doc/markdown/./device.programbuilder.tex3d.md) | tex3D type variable constructors |
-|  [texCube(rhs)](doc/markdown/./device.programbuilder.texcube.md) | texCube type variable constructors |
-|  [texCubeShadow(rhs)](doc/markdown/./device.programbuilder.texcubeshadow.md) | texCubeShadow type variable constructors |
-|  [texExternal(rhs)](doc/markdown/./device.programbuilder.texexternal.md) | texExternal type variable constructors |
-|  [textureArrayGather(tex, sampler, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraygather.md) | Same as textureGather builtin function in WGSL, only valid for WebGPU device |
-|  [textureArrayGather(component, tex, sampler, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraygather_1.md) | Same as textureGather builtin function in WGSL, only valid for WebGPU device |
-|  [textureArrayGatherCompare(tex, samplerCompare, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraygathercompare.md) | Same as textureGatherCompare builtin function in WGSL, only valid for WebGPU device |
-|  [textureArrayLoad(tex, coords, arrayIndex, level)](doc/markdown/./device.programbuilder.texturearrayload.md) | Same as texelFetch builtin function in GLSL and textureLoad builtin function in WGSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySample(tex, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraysample.md) | Same as textureSample builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySampleBias(tex, coords, arrayIndex, bias)](doc/markdown/./device.programbuilder.texturearraysamplebias.md) | Same as textureSampleBias builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySampleCompare(tex, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraysamplecompare.md) | Same as textureSampleCompare builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySampleCompareLevel(tex, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraysamplecomparelevel.md) | Same as textureSampleCompareLevel builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySampleGrad(tex, coords, arrayIndex, ddx, ddy)](doc/markdown/./device.programbuilder.texturearraysamplegrad.md) | Same as textureSampleGrad builtin function in WebGPU and textureGrad builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArraySampleLevel(tex, coords, arrayIndex, level)](doc/markdown/./device.programbuilder.texturearraysamplelevel.md) | Same as textureSampleLevel builtin function in WebGPU and textureLod builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureArrayStore(tex, coords, arrayIndex, value)](doc/markdown/./device.programbuilder.texturearraystore.md) | Same as textureStore builtin function in WGSL, only valid for WebGPU device |
-|  [textureDimensions(tex, level)](doc/markdown/./device.programbuilder.texturedimensions.md) | Same as textureSize builtin function in GLSL and textureDimensions builtin function in WGSL, only valid for WebGL2 device and WebGPU device |
-|  [textureGather(tex, sampler, coords)](doc/markdown/./device.programbuilder.texturegather.md) | Same as textureGather builtin function in WGSL, only valid for WebGPU device |
-|  [textureGather(component, tex, sampler, coords)](doc/markdown/./device.programbuilder.texturegather_1.md) | Same as textureGather builtin function in WGSL, only valid for WebGPU device |
-|  [textureGatherCompare(tex, samplerCompare, coords, depthRef)](doc/markdown/./device.programbuilder.texturegathercompare.md) | Same as textureGatherCompare builtin function in WGSL, only valid for WebGPU device |
-|  [textureLoad(tex, coords, levelOrSampleIndex)](doc/markdown/./device.programbuilder.textureload.md) | Same as texelFetch builtin function in GLSL and textureLoad builtin function in WGSL, only valid for WebGL2 and WebGPU device |
-|  [textureNumLayers(tex)](doc/markdown/./device.programbuilder.texturenumlayers.md) | Same as textureNumLayers builtin function in WGSL, only valid for WebGPU device |
-|  [textureNumLevels(tex)](doc/markdown/./device.programbuilder.texturenumlevels.md) | Same as textureNumLevels builtin function in WGSL, only valid for WebGPU device |
-|  [textureNumSamples(tex)](doc/markdown/./device.programbuilder.texturenumsamples.md) | Same as textureNumSamples builtin function in WGSL, only valid for WebGPU device |
-|  [textureSample(tex, coords)](doc/markdown/./device.programbuilder.texturesample.md) | Same as textureSample builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL |
-|  [textureSampleBias(tex, coords, bias)](doc/markdown/./device.programbuilder.texturesamplebias.md) | Same as textureSampleBias builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL |
-|  [textureSampleCompare(tex, coords, depthRef)](doc/markdown/./device.programbuilder.texturesamplecompare.md) | Same as textureSampleCompare builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureSampleCompareLevel(tex, coords, depthRef)](doc/markdown/./device.programbuilder.texturesamplecomparelevel.md) | Same as textureSampleCompareLevel builtin function in WebGPU and texture/textureLod builtin function in GLSL, only valid for WebGL2 and WebGPU device |
-|  [textureSampleGrad(tex, coords, ddx, ddy)](doc/markdown/./device.programbuilder.texturesamplegrad.md) | Same as textureSampleGrad builtin function in WebGPU and textureGrad/texture2DGradExt/textureCubeGradExt builtin function in GLSL |
-|  [textureSampleLevel(tex, coords)](doc/markdown/./device.programbuilder.texturesamplelevel.md) | Same as textureSampleLevel builtin function in WebGPU and textureLod/texture2DLodExt/textureCubeLodExt builtin function in GLSL |
-|  [textureSampleLevel(tex, coords, level)](doc/markdown/./device.programbuilder.texturesamplelevel_1.md) | Same as textureSampleLevel builtin function in WebGPU and textureLod/texture2DLodExt/textureCubeLodExt builtin function in GLSL |
-|  [textureStore(tex, coords, value)](doc/markdown/./device.programbuilder.texturestore.md) | Same as textureStore builtin function in WGSL, only valid for WebGPU device |
-|  [transpose(mat)](doc/markdown/./device.programbuilder.transpose.md) | Same as transpose builtin function in GLSL and WGSL, only valid for WebGL2 and WebGPU device |
-|  [trunc(val)](doc/markdown/./device.programbuilder.trunc.md) | Same as trunc builtin function in WGSL, only valid for WebGPU device |
-|  [uintBitsToFloat(x)](doc/markdown/./device.programbuilder.uintbitstofloat.md) | Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device |
-|  [unpack2x16float(x)](doc/markdown/./device.programbuilder.unpack2x16float.md) | Same as unpack2x16float builtin function in WGSL, only valid for WebGPU device |
-|  [unpack2x16snorm(x)](doc/markdown/./device.programbuilder.unpack2x16snorm.md) | Same as unpack2x16snorm builtin function in WGSL, only valid for WebGPU device |
-|  [unpack2x16unorm(x)](doc/markdown/./device.programbuilder.unpack2x16unorm.md) | Same as unpack2x16unorm builtin function in WGSL, only valid for WebGPU device |
-|  [unpack4x8snorm(x)](doc/markdown/./device.programbuilder.unpack4x8snorm.md) | Same as unpack4x8snorm builtin function in WGSL, only valid for WebGPU device |
-|  [unpack4x8unorm(x)](doc/markdown/./device.programbuilder.unpack4x8unorm.md) | Same as unpack4x8unorm builtin function in WGSL, only valid for WebGPU device |
-|  [utex1D(rhs)](doc/markdown/./device.programbuilder.utex1d.md) | utex1D type variable constructors |
-|  [utex2D(rhs)](doc/markdown/./device.programbuilder.utex2d.md) | utex2D type variable constructors |
-|  [utex2DArray(rhs)](doc/markdown/./device.programbuilder.utex2darray.md) | utex2DArray type variable constructors |
-|  [utex3D(rhs)](doc/markdown/./device.programbuilder.utex3d.md) | utex3D type variable constructors |
-|  [utexCube(rhs)](doc/markdown/./device.programbuilder.utexcube.md) | utexCube type variable constructors |
-|  [workgroupBarrier()](doc/markdown/./device.programbuilder.workgroupbarrier.md) | Same as workgroupBarrier builtin function in WebGPU, only valid for WebGPU device |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$query(name)](doc/markdown/./device.programbuilder._query.md)
+
+
+</td><td>
+
+Query the global variable by the name
+
+
+</td></tr>
+<tr><td>
+
+[abs(val)](doc/markdown/./device.programbuilder.abs.md)
+
+
+</td><td>
+
+Same as abs builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[acos(val)](doc/markdown/./device.programbuilder.acos.md)
+
+
+</td><td>
+
+Same as acos builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[acosh(val)](doc/markdown/./device.programbuilder.acosh.md)
+
+
+</td><td>
+
+Same as acosh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[add\_2(x, y)](doc/markdown/./device.programbuilder.add_2.md)
+
+
+</td><td>
+
+add two values
+
+
+</td></tr>
+<tr><td>
+
+[add(x, y, rest)](doc/markdown/./device.programbuilder.add.md)
+
+
+</td><td>
+
+add a couple of values togeter
+
+
+</td></tr>
+<tr><td>
+
+[addressOf(ref)](doc/markdown/./device.programbuilder.addressof.md)
+
+
+</td><td>
+
+Create an 'AddressOf' expression for WGSL
+
+
+</td></tr>
+<tr><td>
+
+[all(x)](doc/markdown/./device.programbuilder.all.md)
+
+
+</td><td>
+
+check whether all elements of a boolean vector are true
+
+
+</td></tr>
+<tr><td>
+
+[and\_2(x, y)](doc/markdown/./device.programbuilder.and_2.md)
+
+
+</td><td>
+
+return x &amp;&amp; y
+
+
+</td></tr>
+<tr><td>
+
+[and(x, y, rest)](doc/markdown/./device.programbuilder.and.md)
+
+
+</td><td>
+
+return x &amp;&amp; y &amp;&amp; ...
+
+
+</td></tr>
+<tr><td>
+
+[any(x)](doc/markdown/./device.programbuilder.any.md)
+
+
+</td><td>
+
+check whether any element of a boolean vector is true
+
+
+</td></tr>
+<tr><td>
+
+[arrayLength(x)](doc/markdown/./device.programbuilder.arraylength.md)
+
+
+</td><td>
+
+Same as the arrayLength builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[asin(val)](doc/markdown/./device.programbuilder.asin.md)
+
+
+</td><td>
+
+Same as asin builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[asinh(val)](doc/markdown/./device.programbuilder.asinh.md)
+
+
+</td><td>
+
+Same as asinh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[atan(val)](doc/markdown/./device.programbuilder.atan.md)
+
+
+</td><td>
+
+Same as atan builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[atan2(y, x)](doc/markdown/./device.programbuilder.atan2.md)
+
+
+</td><td>
+
+Same as atan builtin function in GLSL and atan2 builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[atanh(val)](doc/markdown/./device.programbuilder.atanh.md)
+
+
+</td><td>
+
+Same as atanh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[atomicAdd(ptr, value)](doc/markdown/./device.programbuilder.atomicadd.md)
+
+
+</td><td>
+
+atomicAdd, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicAnd(ptr, value)](doc/markdown/./device.programbuilder.atomicand.md)
+
+
+</td><td>
+
+atomicAnd, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicExchange(ptr, value)](doc/markdown/./device.programbuilder.atomicexchange.md)
+
+
+</td><td>
+
+atomicExchange, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicLoad(ptr)](doc/markdown/./device.programbuilder.atomicload.md)
+
+
+</td><td>
+
+atomicLoad, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicMax(ptr, value)](doc/markdown/./device.programbuilder.atomicmax.md)
+
+
+</td><td>
+
+atomicMax, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicMin(ptr, value)](doc/markdown/./device.programbuilder.atomicmin.md)
+
+
+</td><td>
+
+atomicMin, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicOr(ptr, value)](doc/markdown/./device.programbuilder.atomicor.md)
+
+
+</td><td>
+
+atomicOr, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicStore(ptr, value)](doc/markdown/./device.programbuilder.atomicstore.md)
+
+
+</td><td>
+
+atomicStore, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicSub(ptr, value)](doc/markdown/./device.programbuilder.atomicsub.md)
+
+
+</td><td>
+
+atomicSub, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[atomicXor(ptr, value)](doc/markdown/./device.programbuilder.atomicxor.md)
+
+
+</td><td>
+
+atomicXor, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[buildCompute(options)](doc/markdown/./device.programbuilder.buildcompute.md)
+
+
+</td><td>
+
+Generates shader code for a compute program
+
+
+</td></tr>
+<tr><td>
+
+[buildComputeProgram(options)](doc/markdown/./device.programbuilder.buildcomputeprogram.md)
+
+
+</td><td>
+
+Creates a shader program for compute
+
+
+</td></tr>
+<tr><td>
+
+[buildRender(options)](doc/markdown/./device.programbuilder.buildrender.md)
+
+
+</td><td>
+
+Generates shader codes for a render program
+
+
+</td></tr>
+<tr><td>
+
+[buildRenderProgram(options)](doc/markdown/./device.programbuilder.buildrenderprogram.md)
+
+
+</td><td>
+
+Creates a shader program for render
+
+
+</td></tr>
+<tr><td>
+
+[ceil(val)](doc/markdown/./device.programbuilder.ceil.md)
+
+
+</td><td>
+
+Same as ceil builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[clamp(x, y, z)](doc/markdown/./device.programbuilder.clamp.md)
+
+
+</td><td>
+
+Same as clamp builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[compAnd(x, y)](doc/markdown/./device.programbuilder.compand.md)
+
+
+</td><td>
+
+return x &amp; y, per component
+
+
+</td></tr>
+<tr><td>
+
+[compEqual(x, y)](doc/markdown/./device.programbuilder.compequal.md)
+
+
+</td><td>
+
+return true if x equals y, otherwise false, per component
+
+
+</td></tr>
+<tr><td>
+
+[compNotEqual(x, y)](doc/markdown/./device.programbuilder.compnotequal.md)
+
+
+</td><td>
+
+return true if x is not equal to y, otherwise false, per component
+
+
+</td></tr>
+<tr><td>
+
+[compOr(x, y)](doc/markdown/./device.programbuilder.compor.md)
+
+
+</td><td>
+
+return x \|\| y, per component
+
+
+</td></tr>
+<tr><td>
+
+[compXor(x, y)](doc/markdown/./device.programbuilder.compxor.md)
+
+
+</td><td>
+
+return x ^ y, per component
+
+
+</td></tr>
+<tr><td>
+
+[cos(val)](doc/markdown/./device.programbuilder.cos.md)
+
+
+</td><td>
+
+Same as cos builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[cosh(val)](doc/markdown/./device.programbuilder.cosh.md)
+
+
+</td><td>
+
+Same as cosh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[cross(x, y)](doc/markdown/./device.programbuilder.cross.md)
+
+
+</td><td>
+
+Same as cross builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[defineStruct(members, structName)](doc/markdown/./device.programbuilder.definestruct.md)
+
+
+</td><td>
+
+Defines a structure type
+
+
+</td></tr>
+<tr><td>
+
+[defineStructByType(structType)](doc/markdown/./device.programbuilder.definestructbytype.md)
+
+
+</td><td>
+
+Defines a structure type
+
+
+</td></tr>
+<tr><td>
+
+[degrees(val)](doc/markdown/./device.programbuilder.degrees.md)
+
+
+</td><td>
+
+Same as degrees builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[determinant(mat)](doc/markdown/./device.programbuilder.determinant.md)
+
+
+</td><td>
+
+Same as determinant builtin function in GLSL and WGSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[discard()](doc/markdown/./device.programbuilder.discard.md)
+
+
+</td><td>
+
+Creates a 'discard' statement
+
+
+</td></tr>
+<tr><td>
+
+[distance(x, y)](doc/markdown/./device.programbuilder.distance.md)
+
+
+</td><td>
+
+Same as distance builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[div(x, y)](doc/markdown/./device.programbuilder.div.md)
+
+
+</td><td>
+
+divide the first number by the second number
+
+
+</td></tr>
+<tr><td>
+
+[dot(x, y)](doc/markdown/./device.programbuilder.dot.md)
+
+
+</td><td>
+
+Same as dot builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdx(x)](doc/markdown/./device.programbuilder.dpdx.md)
+
+
+</td><td>
+
+Same as dFdx builtin function in GLSL and dpdx builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdxCoarse(x)](doc/markdown/./device.programbuilder.dpdxcoarse.md)
+
+
+</td><td>
+
+Same as dFdx builtin function in GLSL and dpdxCoarse builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdxFine(x)](doc/markdown/./device.programbuilder.dpdxfine.md)
+
+
+</td><td>
+
+Same as dFdx builtin function in GLSL and dpdxFine builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdy(x)](doc/markdown/./device.programbuilder.dpdy.md)
+
+
+</td><td>
+
+Same as dFdy builtin function in GLSL and dpdy builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdyCoarse(x)](doc/markdown/./device.programbuilder.dpdycoarse.md)
+
+
+</td><td>
+
+Same as dFdy builtin function in GLSL and dpdyCoarse builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[dpdyFine(x)](doc/markdown/./device.programbuilder.dpdyfine.md)
+
+
+</td><td>
+
+Same as dFdy builtin function in GLSL and dpdyFine builtin function in WGSL
+
+
+</td></tr>
+<tr><td>
+
+[equal(x, y)](doc/markdown/./device.programbuilder.equal.md)
+
+
+</td><td>
+
+return true if x equals y, otherwise false
+
+
+</td></tr>
+<tr><td>
+
+[exp(val)](doc/markdown/./device.programbuilder.exp.md)
+
+
+</td><td>
+
+Same as exp builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[exp2(val)](doc/markdown/./device.programbuilder.exp2.md)
+
+
+</td><td>
+
+Same as exp2 builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[faceForward(x, y, z)](doc/markdown/./device.programbuilder.faceforward.md)
+
+
+</td><td>
+
+Same as faceForward builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[floatBitsToInt(x)](doc/markdown/./device.programbuilder.floatbitstoint.md)
+
+
+</td><td>
+
+Same as floatBitsToInt builtin function in GLSL, only valid for WebGL2 device and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[floatBitsToUint(x)](doc/markdown/./device.programbuilder.floatbitstouint.md)
+
+
+</td><td>
+
+Same as floatBitsToUint builtin function in GLSL, only valid for WebGL2 device and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[floor(val)](doc/markdown/./device.programbuilder.floor.md)
+
+
+</td><td>
+
+Same as floor builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[fma(x, y, z)](doc/markdown/./device.programbuilder.fma.md)
+
+
+</td><td>
+
+Same as fma builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[fract(val)](doc/markdown/./device.programbuilder.fract.md)
+
+
+</td><td>
+
+Same as fract builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[frexp(x)](doc/markdown/./device.programbuilder.frexp.md)
+
+
+</td><td>
+
+Same as frexp builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[func(name, params, body)](doc/markdown/./device.programbuilder.func.md)
+
+
+</td><td>
+
+Creates a function
+
+
+</td></tr>
+<tr><td>
+
+[fwidth(x)](doc/markdown/./device.programbuilder.fwidth.md)
+
+
+</td><td>
+
+Same as fwidth builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[getCurrentScope()](doc/markdown/./device.programbuilder.getcurrentscope.md)
+
+
+</td><td>
+
+Gets the current scope
+
+
+</td></tr>
+<tr><td>
+
+[getDevice()](doc/markdown/./device.programbuilder.getdevice.md)
+
+
+</td><td>
+
+Get the device
+
+
+</td></tr>
+<tr><td>
+
+[getGlobalScope()](doc/markdown/./device.programbuilder.getglobalscope.md)
+
+
+</td><td>
+
+Gets the global scope
+
+
+</td></tr>
+<tr><td>
+
+[greaterThan(x, y)](doc/markdown/./device.programbuilder.greaterthan.md)
+
+
+</td><td>
+
+return true if x is greater than y, otherwise false, per component
+
+
+</td></tr>
+<tr><td>
+
+[greaterThanEqual(x, y)](doc/markdown/./device.programbuilder.greaterthanequal.md)
+
+
+</td><td>
+
+return true if x is greater than or equals y, otherwise false, per component
+
+
+</td></tr>
+<tr><td>
+
+[intBitsToFloat(x)](doc/markdown/./device.programbuilder.intbitstofloat.md)
+
+
+</td><td>
+
+Same as intBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[inverse(mat)](doc/markdown/./device.programbuilder.inverse.md)
+
+
+</td><td>
+
+Same as inverse builtin function in GLSL, only valid for WebGL2 device
+
+
+</td></tr>
+<tr><td>
+
+[inverseSqrt(val)](doc/markdown/./device.programbuilder.inversesqrt.md)
+
+
+</td><td>
+
+Same as inversesqrt builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[isinf(x)](doc/markdown/./device.programbuilder.isinf.md)
+
+
+</td><td>
+
+Same as isinf builtin function in GLSL, only valid for WebGL2 device
+
+
+</td></tr>
+<tr><td>
+
+[isnan(x)](doc/markdown/./device.programbuilder.isnan.md)
+
+
+</td><td>
+
+Same as isnan builtin function in GLSL, only valid for WebGL2 device
+
+
+</td></tr>
+<tr><td>
+
+[itex1D(rhs)](doc/markdown/./device.programbuilder.itex1d.md)
+
+
+</td><td>
+
+itex1D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[itex2D(rhs)](doc/markdown/./device.programbuilder.itex2d.md)
+
+
+</td><td>
+
+itex2D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[itex2DArray(rhs)](doc/markdown/./device.programbuilder.itex2darray.md)
+
+
+</td><td>
+
+itex2DArray type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[itex3D(rhs)](doc/markdown/./device.programbuilder.itex3d.md)
+
+
+</td><td>
+
+itex3D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[itexCube(rhs)](doc/markdown/./device.programbuilder.itexcube.md)
+
+
+</td><td>
+
+itexCube type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[length(x)](doc/markdown/./device.programbuilder.length.md)
+
+
+</td><td>
+
+Same as length builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[lessThan(x, y)](doc/markdown/./device.programbuilder.lessthan.md)
+
+
+</td><td>
+
+return true if x is less than y, otherwise false
+
+
+</td></tr>
+<tr><td>
+
+[lessThanEqual(x, y)](doc/markdown/./device.programbuilder.lessthanequal.md)
+
+
+</td><td>
+
+return true if x is less than or equals y, otherwise false, per component
+
+
+</td></tr>
+<tr><td>
+
+[log(val)](doc/markdown/./device.programbuilder.log.md)
+
+
+</td><td>
+
+Same as log builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[log2(val)](doc/markdown/./device.programbuilder.log2.md)
+
+
+</td><td>
+
+Same as log2 builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[main(body)](doc/markdown/./device.programbuilder.main.md)
+
+
+</td><td>
+
+Create the main entry function of the shader
+
+
+</td></tr>
+<tr><td>
+
+[matrixCompMult(x, y)](doc/markdown/./device.programbuilder.matrixcompmult.md)
+
+
+</td><td>
+
+Same as matrixCompMult builtin function in GLSL, only valid for WebGL/WebGL2 device
+
+
+</td></tr>
+<tr><td>
+
+[max(x, y)](doc/markdown/./device.programbuilder.max.md)
+
+
+</td><td>
+
+Same as max builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[min(x, y)](doc/markdown/./device.programbuilder.min.md)
+
+
+</td><td>
+
+Same as min builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[mix(x, y, z)](doc/markdown/./device.programbuilder.mix.md)
+
+
+</td><td>
+
+Same as mix builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[mod(x, y)](doc/markdown/./device.programbuilder.mod.md)
+
+
+</td><td>
+
+Same as mod builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[mul\_2(x, y)](doc/markdown/./device.programbuilder.mul_2.md)
+
+
+</td><td>
+
+multiply two values
+
+
+</td></tr>
+<tr><td>
+
+[mul(x, y, rest)](doc/markdown/./device.programbuilder.mul.md)
+
+
+</td><td>
+
+multiply a couple of values togeter
+
+
+</td></tr>
+<tr><td>
+
+[neg(x)](doc/markdown/./device.programbuilder.neg.md)
+
+
+</td><td>
+
+return the negate of the given value
+
+
+</td></tr>
+<tr><td>
+
+[normalize(x)](doc/markdown/./device.programbuilder.normalize.md)
+
+
+</td><td>
+
+Same as normalize builtin function in GLSL and WGSL.
+
+
+</td></tr>
+<tr><td>
+
+[not(x)](doc/markdown/./device.programbuilder.not.md)
+
+
+</td><td>
+
+logically invert a boolean vector
+
+
+</td></tr>
+<tr><td>
+
+[notEqual(x, y)](doc/markdown/./device.programbuilder.notequal.md)
+
+
+</td><td>
+
+return true if x is not equal to y, otherwise false
+
+
+</td></tr>
+<tr><td>
+
+[or\_2(x, y)](doc/markdown/./device.programbuilder.or_2.md)
+
+
+</td><td>
+
+return x \|\| y
+
+
+</td></tr>
+<tr><td>
+
+[or(x, y, rest)](doc/markdown/./device.programbuilder.or.md)
+
+
+</td><td>
+
+return x \|\| y
+
+
+</td></tr>
+<tr><td>
+
+[outerProduct(x, y)](doc/markdown/./device.programbuilder.outerproduct.md)
+
+
+</td><td>
+
+Same as outerProduct builtin function in GLSL, only valid for WebGL2 device
+
+
+</td></tr>
+<tr><td>
+
+[pack2x16float(x)](doc/markdown/./device.programbuilder.pack2x16float.md)
+
+
+</td><td>
+
+Same as pack2x16float builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[pack2x16snorm(x)](doc/markdown/./device.programbuilder.pack2x16snorm.md)
+
+
+</td><td>
+
+Same as pack2x16snom builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[pack2x16unorm(x)](doc/markdown/./device.programbuilder.pack2x16unorm.md)
+
+
+</td><td>
+
+Same as pack2x16unorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[pack4x8snorm(x)](doc/markdown/./device.programbuilder.pack4x8snorm.md)
+
+
+</td><td>
+
+Same as pack4x8snorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[pack4x8unorm(x)](doc/markdown/./device.programbuilder.pack4x8unorm.md)
+
+
+</td><td>
+
+Same as pack4x8unorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[pow(x, y)](doc/markdown/./device.programbuilder.pow.md)
+
+
+</td><td>
+
+Same as pow builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[queryGlobal(name)](doc/markdown/./device.programbuilder.queryglobal.md)
+
+
+</td><td>
+
+Query the global variable by the name
+
+
+</td></tr>
+<tr><td>
+
+[radians(val)](doc/markdown/./device.programbuilder.radians.md)
+
+
+</td><td>
+
+Same as radians builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[referenceOf(ptr)](doc/markdown/./device.programbuilder.referenceof.md)
+
+
+</td><td>
+
+Creates a 'referenceOf' expression for WGSL
+
+
+</td></tr>
+<tr><td>
+
+[reflect(x, y)](doc/markdown/./device.programbuilder.reflect.md)
+
+
+</td><td>
+
+Same as reflect builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[refract(x, y, z)](doc/markdown/./device.programbuilder.refract.md)
+
+
+</td><td>
+
+Same as refract builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[round(val)](doc/markdown/./device.programbuilder.round.md)
+
+
+</td><td>
+
+Same as round builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[sal(a, b)](doc/markdown/./device.programbuilder.sal.md)
+
+
+</td><td>
+
+shift arithmetic left, not valid for WebGL1 device
+
+
+</td></tr>
+<tr><td>
+
+[sampler(rhs)](doc/markdown/./device.programbuilder.sampler.md)
+
+
+</td><td>
+
+sampler type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[samplerComparison(rhs)](doc/markdown/./device.programbuilder.samplercomparison.md)
+
+
+</td><td>
+
+samplerComparison type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[sar(a, b)](doc/markdown/./device.programbuilder.sar.md)
+
+
+</td><td>
+
+shift arithmetic right, not valid for WebGL1 device
+
+
+</td></tr>
+<tr><td>
+
+[saturate(x)](doc/markdown/./device.programbuilder.saturate.md)
+
+
+</td><td>
+
+Clamp to \[0, 1\]
+
+
+</td></tr>
+<tr><td>
+
+[select(x, y, cond)](doc/markdown/./device.programbuilder.select.md)
+
+
+</td><td>
+
+Same as the select builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[sign(val)](doc/markdown/./device.programbuilder.sign.md)
+
+
+</td><td>
+
+Same as sign builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[sin(val)](doc/markdown/./device.programbuilder.sin.md)
+
+
+</td><td>
+
+Same as sin builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[sinh(val)](doc/markdown/./device.programbuilder.sinh.md)
+
+
+</td><td>
+
+Same as sinh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[smoothStep(x, y, z)](doc/markdown/./device.programbuilder.smoothstep.md)
+
+
+</td><td>
+
+Same as smoothstep builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[sqrt(val)](doc/markdown/./device.programbuilder.sqrt.md)
+
+
+</td><td>
+
+Same as sqrt builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[step(x, y)](doc/markdown/./device.programbuilder.step.md)
+
+
+</td><td>
+
+Same as step builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[storageBarrier()](doc/markdown/./device.programbuilder.storagebarrier.md)
+
+
+</td><td>
+
+Same as storageBarrier builtin function in WebGPU, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[struct(structName, instanceName)](doc/markdown/./device.programbuilder.struct.md)
+
+
+</td><td>
+
+Creates a structure type variable
+
+
+</td></tr>
+<tr><td>
+
+[sub(x, y)](doc/markdown/./device.programbuilder.sub.md)
+
+
+</td><td>
+
+subtract two values
+
+
+</td></tr>
+<tr><td>
+
+[tan(val)](doc/markdown/./device.programbuilder.tan.md)
+
+
+</td><td>
+
+Same as tan builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[tanh(val)](doc/markdown/./device.programbuilder.tanh.md)
+
+
+</td><td>
+
+Same as tanh builtin function in GLSL and WGSL
+
+
+</td></tr>
+<tr><td>
+
+[tex1D(rhs)](doc/markdown/./device.programbuilder.tex1d.md)
+
+
+</td><td>
+
+tex1D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[tex2D(rhs)](doc/markdown/./device.programbuilder.tex2d.md)
+
+
+</td><td>
+
+tex2D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[tex2DArray(rhs)](doc/markdown/./device.programbuilder.tex2darray.md)
+
+
+</td><td>
+
+tex2DArray type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[tex2DArrayShadow(rhs)](doc/markdown/./device.programbuilder.tex2darrayshadow.md)
+
+
+</td><td>
+
+tex2DArrayShadow type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[tex2DShadow(rhs)](doc/markdown/./device.programbuilder.tex2dshadow.md)
+
+
+</td><td>
+
+tex2DShadow type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[tex3D(rhs)](doc/markdown/./device.programbuilder.tex3d.md)
+
+
+</td><td>
+
+tex3D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texCube(rhs)](doc/markdown/./device.programbuilder.texcube.md)
+
+
+</td><td>
+
+texCube type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texCubeShadow(rhs)](doc/markdown/./device.programbuilder.texcubeshadow.md)
+
+
+</td><td>
+
+texCubeShadow type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[texExternal(rhs)](doc/markdown/./device.programbuilder.texexternal.md)
+
+
+</td><td>
+
+texExternal type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[textureArrayGather(tex, sampler, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraygather.md)
+
+
+</td><td>
+
+Same as textureGather builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArrayGather(component, tex, sampler, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraygather_1.md)
+
+
+</td><td>
+
+Same as textureGather builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArrayGatherCompare(tex, samplerCompare, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraygathercompare.md)
+
+
+</td><td>
+
+Same as textureGatherCompare builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArrayLoad(tex, coords, arrayIndex, level)](doc/markdown/./device.programbuilder.texturearrayload.md)
+
+
+</td><td>
+
+Same as texelFetch builtin function in GLSL and textureLoad builtin function in WGSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySample(tex, coords, arrayIndex)](doc/markdown/./device.programbuilder.texturearraysample.md)
+
+
+</td><td>
+
+Same as textureSample builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySampleBias(tex, coords, arrayIndex, bias)](doc/markdown/./device.programbuilder.texturearraysamplebias.md)
+
+
+</td><td>
+
+Same as textureSampleBias builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySampleCompare(tex, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraysamplecompare.md)
+
+
+</td><td>
+
+Same as textureSampleCompare builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySampleCompareLevel(tex, coords, arrayIndex, depthRef)](doc/markdown/./device.programbuilder.texturearraysamplecomparelevel.md)
+
+
+</td><td>
+
+Same as textureSampleCompareLevel builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySampleGrad(tex, coords, arrayIndex, ddx, ddy)](doc/markdown/./device.programbuilder.texturearraysamplegrad.md)
+
+
+</td><td>
+
+Same as textureSampleGrad builtin function in WebGPU and textureGrad builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArraySampleLevel(tex, coords, arrayIndex, level)](doc/markdown/./device.programbuilder.texturearraysamplelevel.md)
+
+
+</td><td>
+
+Same as textureSampleLevel builtin function in WebGPU and textureLod builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureArrayStore(tex, coords, arrayIndex, value)](doc/markdown/./device.programbuilder.texturearraystore.md)
+
+
+</td><td>
+
+Same as textureStore builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureDimensions(tex, level)](doc/markdown/./device.programbuilder.texturedimensions.md)
+
+
+</td><td>
+
+Same as textureSize builtin function in GLSL and textureDimensions builtin function in WGSL, only valid for WebGL2 device and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureGather(tex, sampler, coords)](doc/markdown/./device.programbuilder.texturegather.md)
+
+
+</td><td>
+
+Same as textureGather builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureGather(component, tex, sampler, coords)](doc/markdown/./device.programbuilder.texturegather_1.md)
+
+
+</td><td>
+
+Same as textureGather builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureGatherCompare(tex, samplerCompare, coords, depthRef)](doc/markdown/./device.programbuilder.texturegathercompare.md)
+
+
+</td><td>
+
+Same as textureGatherCompare builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureLoad(tex, coords, levelOrSampleIndex)](doc/markdown/./device.programbuilder.textureload.md)
+
+
+</td><td>
+
+Same as texelFetch builtin function in GLSL and textureLoad builtin function in WGSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureNumLayers(tex)](doc/markdown/./device.programbuilder.texturenumlayers.md)
+
+
+</td><td>
+
+Same as textureNumLayers builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureNumLevels(tex)](doc/markdown/./device.programbuilder.texturenumlevels.md)
+
+
+</td><td>
+
+Same as textureNumLevels builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureNumSamples(tex)](doc/markdown/./device.programbuilder.texturenumsamples.md)
+
+
+</td><td>
+
+Same as textureNumSamples builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureSample(tex, coords)](doc/markdown/./device.programbuilder.texturesample.md)
+
+
+</td><td>
+
+Same as textureSample builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleBias(tex, coords, bias)](doc/markdown/./device.programbuilder.texturesamplebias.md)
+
+
+</td><td>
+
+Same as textureSampleBias builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleCompare(tex, coords, depthRef)](doc/markdown/./device.programbuilder.texturesamplecompare.md)
+
+
+</td><td>
+
+Same as textureSampleCompare builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleCompareLevel(tex, coords, depthRef)](doc/markdown/./device.programbuilder.texturesamplecomparelevel.md)
+
+
+</td><td>
+
+Same as textureSampleCompareLevel builtin function in WebGPU and texture/textureLod builtin function in GLSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleGrad(tex, coords, ddx, ddy)](doc/markdown/./device.programbuilder.texturesamplegrad.md)
+
+
+</td><td>
+
+Same as textureSampleGrad builtin function in WebGPU and textureGrad/texture2DGradExt/textureCubeGradExt builtin function in GLSL
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleLevel(tex, coords)](doc/markdown/./device.programbuilder.texturesamplelevel.md)
+
+
+</td><td>
+
+Same as textureSampleLevel builtin function in WebGPU and textureLod/texture2DLodExt/textureCubeLodExt builtin function in GLSL
+
+
+</td></tr>
+<tr><td>
+
+[textureSampleLevel(tex, coords, level)](doc/markdown/./device.programbuilder.texturesamplelevel_1.md)
+
+
+</td><td>
+
+Same as textureSampleLevel builtin function in WebGPU and textureLod/texture2DLodExt/textureCubeLodExt builtin function in GLSL
+
+
+</td></tr>
+<tr><td>
+
+[textureStore(tex, coords, value)](doc/markdown/./device.programbuilder.texturestore.md)
+
+
+</td><td>
+
+Same as textureStore builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[transpose(mat)](doc/markdown/./device.programbuilder.transpose.md)
+
+
+</td><td>
+
+Same as transpose builtin function in GLSL and WGSL, only valid for WebGL2 and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[trunc(val)](doc/markdown/./device.programbuilder.trunc.md)
+
+
+</td><td>
+
+Same as trunc builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[uintBitsToFloat(x)](doc/markdown/./device.programbuilder.uintbitstofloat.md)
+
+
+</td><td>
+
+Same as uintBitsToFloat builtin function in GLSL, only valid for WebGL2 device and WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[unpack2x16float(x)](doc/markdown/./device.programbuilder.unpack2x16float.md)
+
+
+</td><td>
+
+Same as unpack2x16float builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[unpack2x16snorm(x)](doc/markdown/./device.programbuilder.unpack2x16snorm.md)
+
+
+</td><td>
+
+Same as unpack2x16snorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[unpack2x16unorm(x)](doc/markdown/./device.programbuilder.unpack2x16unorm.md)
+
+
+</td><td>
+
+Same as unpack2x16unorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[unpack4x8snorm(x)](doc/markdown/./device.programbuilder.unpack4x8snorm.md)
+
+
+</td><td>
+
+Same as unpack4x8snorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[unpack4x8unorm(x)](doc/markdown/./device.programbuilder.unpack4x8unorm.md)
+
+
+</td><td>
+
+Same as unpack4x8unorm builtin function in WGSL, only valid for WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[utex1D(rhs)](doc/markdown/./device.programbuilder.utex1d.md)
+
+
+</td><td>
+
+utex1D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[utex2D(rhs)](doc/markdown/./device.programbuilder.utex2d.md)
+
+
+</td><td>
+
+utex2D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[utex2DArray(rhs)](doc/markdown/./device.programbuilder.utex2darray.md)
+
+
+</td><td>
+
+utex2DArray type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[utex3D(rhs)](doc/markdown/./device.programbuilder.utex3d.md)
+
+
+</td><td>
+
+utex3D type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[utexCube(rhs)](doc/markdown/./device.programbuilder.utexcube.md)
+
+
+</td><td>
+
+utexCube type variable constructors
+
+
+</td></tr>
+<tr><td>
+
+[workgroupBarrier()](doc/markdown/./device.programbuilder.workgroupbarrier.md)
+
+
+</td><td>
+
+Same as workgroupBarrier builtin function in WebGPU, only valid for WebGPU device
+
+
+</td></tr>
+</tbody></table>
 

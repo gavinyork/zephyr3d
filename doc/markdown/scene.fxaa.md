@@ -9,28 +9,103 @@ FXAA post effect
 **Signature:**
 
 ```typescript
-declare class FXAA extends AbstractPostEffect<'FXAA'> 
+declare class FXAA extends AbstractPostEffect 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'FXAA'&gt;
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.fxaa._constructor_.md) |  | Creates an instance of grayscale post effect |
+<table><thead><tr><th>
 
-## Properties
+Constructor
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [className](doc/markdown/./scene.fxaa.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "FXAA" |  |
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.fxaa._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of grayscale post effect
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.fxaa.apply.md) |  | Apply the post effect |
-|  [dispose()](doc/markdown/./scene.fxaa.dispose.md) |  | Disposes the post effect. |
-|  [requireDepthAttachment()](doc/markdown/./scene.fxaa.requiredepthattachment.md) |  | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture()](doc/markdown/./scene.fxaa.requirelineardepthtexture.md) |  | Checks whether this post effect requires the linear depth texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.fxaa.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply the post effect
+
+
+</td></tr>
+<tr><td>
+
+[requireDepthAttachment()](doc/markdown/./scene.fxaa.requiredepthattachment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the scene depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[requireLinearDepthTexture()](doc/markdown/./scene.fxaa.requirelineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the linear depth texture
+
+
+</td></tr>
+</tbody></table>
 

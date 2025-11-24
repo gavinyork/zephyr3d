@@ -4,14 +4,16 @@
 
 ## Mesh.getInstanceUniforms() method
 
-Gets the instance uniforms
+Returns a tightly-packed float array of instance uniforms for GPU upload.
+
+The returned memory should be compatible with ArrayBuffer views used by the renderer.
 
 **Signature:**
 
 ```typescript
-getInstanceUniforms(): Float32Array;
+getInstanceUniforms(): Float32Array<ArrayBuffer>;
 ```
 **Returns:**
 
-Float32Array
+Float32Array&lt;ArrayBuffer&gt;
 

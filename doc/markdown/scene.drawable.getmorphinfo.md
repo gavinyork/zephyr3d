@@ -4,14 +4,14 @@
 
 ## Drawable.getMorphInfo() method
 
-Gets the morph information buffer
+Returns the morph information buffer (weights, ranges, etc.).
 
 **Signature:**
 
 ```typescript
-getMorphInfo(): GPUDataBuffer;
+getMorphInfo(): MorphInfo;
 ```
 **Returns:**
 
-[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+[MorphInfo](doc/markdown/./scene.morphinfo.md)
 

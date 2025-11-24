@@ -12,9 +12,37 @@ runLoop(func: (device: AbstractDevice) => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  func | (device: [AbstractDevice](doc/markdown/./device.abstractdevice.md)<!-- -->) =&gt; void |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+func
+
+
+</td><td>
+
+(device: [AbstractDevice](doc/markdown/./device.abstractdevice.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

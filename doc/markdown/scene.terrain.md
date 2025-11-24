@@ -15,39 +15,436 @@ declare class Terrain extends GraphNode
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.terrain._constructor_.md) |  | Creates an instance of Terrain |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.terrain._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of Terrain
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [castShadow](doc/markdown/./scene.terrain.castshadow.md) |  | boolean | Wether the mesh node casts shadows |
-|  [grassMaterial](doc/markdown/./scene.terrain.grassmaterial.md) | <code>readonly</code> | [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | Grass material |
-|  [height](doc/markdown/./scene.terrain.height.md) | <code>readonly</code> | number | Height of the terrain |
-|  [heightFieldScale](doc/markdown/./scene.terrain.heightfieldscale.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Scale value of the height field |
-|  [LODCamera](doc/markdown/./scene.terrain.lodcamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | Camera that will be used to compute LOD level of terrain patches |
-|  [material](doc/markdown/./scene.terrain.material.md) | <code>readonly</code> | [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) | Material of the terrain |
-|  [maxPixelError](doc/markdown/./scene.terrain.maxpixelerror.md) |  | number | The maximum pixel error for terrain LOD |
-|  [normalMap](doc/markdown/./scene.terrain.normalmap.md) | <code>readonly</code> | [Texture2D](doc/markdown/./device.texture2d.md) | Normal map of the terrain |
-|  [scaledHeight](doc/markdown/./scene.terrain.scaledheight.md) | <code>readonly</code> | number | Scaled terrain height |
-|  [scaledWidth](doc/markdown/./scene.terrain.scaledwidth.md) | <code>readonly</code> | number | Scaled terrain width |
-|  [width](doc/markdown/./scene.terrain.width.md) | <code>readonly</code> | number | Width of the terrain |
-|  [wireframe](doc/markdown/./scene.terrain.wireframe.md) |  | boolean | Whether the terrain should be rendered in wireframe mode |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[castShadow](doc/markdown/./scene.terrain.castshadow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Wether the mesh node casts shadows
+
+
+</td></tr>
+<tr><td>
+
+[height](doc/markdown/./scene.terrain.height.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height of the terrain
+
+
+</td></tr>
+<tr><td>
+
+[heightFieldScale](doc/markdown/./scene.terrain.heightfieldscale.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Scale value of the height field
+
+
+</td></tr>
+<tr><td>
+
+[LODCamera](doc/markdown/./scene.terrain.lodcamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+Camera that will be used to compute LOD level of terrain patches
+
+
+</td></tr>
+<tr><td>
+
+[material](doc/markdown/./scene.terrain.material.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TerrainMaterial](doc/markdown/./scene.terrainmaterial.md)
+
+
+</td><td>
+
+Material of the terrain
+
+
+</td></tr>
+<tr><td>
+
+[maxPixelError](doc/markdown/./scene.terrain.maxpixelerror.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum pixel error for terrain LOD
+
+
+</td></tr>
+<tr><td>
+
+[normalMap](doc/markdown/./scene.terrain.normalmap.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Normal map of the terrain
+
+
+</td></tr>
+<tr><td>
+
+[scaledHeight](doc/markdown/./scene.terrain.scaledheight.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Scaled terrain height
+
+
+</td></tr>
+<tr><td>
+
+[scaledWidth](doc/markdown/./scene.terrain.scaledwidth.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Scaled terrain width
+
+
+</td></tr>
+<tr><td>
+
+[width](doc/markdown/./scene.terrain.width.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Width of the terrain
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [computeBoundingVolume()](doc/markdown/./scene.terrain.computeboundingvolume.md) |  | Computes the bounding volume of the node |
-|  [create(sizeX, sizeZ, elevations, scale, patchSize, options)](doc/markdown/./scene.terrain.create.md) |  | Creates the terrain |
-|  [createGrass(density, bladeWidth, bladeHeight, offset, grassTexture)](doc/markdown/./scene.terrain.creategrass.md) |  | Create grass fields |
-|  [getElevation(x, z)](doc/markdown/./scene.terrain.getelevation.md) |  | Get elevation at specified position in terrain coordinate space |
-|  [getInstanceColor()](doc/markdown/./scene.terrain.getinstancecolor.md) |  | Gets the instance color |
-|  [getName()](doc/markdown/./scene.terrain.getname.md) |  | Gets name of the drawable object |
-|  [getNormal(x, z, normal)](doc/markdown/./scene.terrain.getnormal.md) |  | Get normal at specified position in terrain coordinate space |
-|  [isTerrain()](doc/markdown/./scene.terrain.isterrain.md) |  | true if this is a terrain node, false otherwise |
-|  [rayIntersect(ray)](doc/markdown/./scene.terrain.rayintersect.md) |  | Get intersection distance by a ray in terrain coordinate space |
-|  [traverseQuadtree(callback)](doc/markdown/./scene.terrain.traversequadtree.md) |  | Traverse quadtree node top down |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.terrain.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[computeBoundingVolume()](doc/markdown/./scene.terrain.computeboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Computes the bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[create(sizeX, sizeZ, elevations, scale, patchSize, options)](doc/markdown/./scene.terrain.create.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates the terrain
+
+
+</td></tr>
+<tr><td>
+
+[createGrass(density, bladeWidth, bladeHeight, offset, grassTexture)](doc/markdown/./scene.terrain.creategrass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create grass fields
+
+
+</td></tr>
+<tr><td>
+
+[getElevation(x, z)](doc/markdown/./scene.terrain.getelevation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get elevation at specified position in terrain coordinate space
+
+
+</td></tr>
+<tr><td>
+
+[getName()](doc/markdown/./scene.terrain.getname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the display name of the drawable object (for debugging/UI).
+
+
+</td></tr>
+<tr><td>
+
+[getNormal(x, z, normal)](doc/markdown/./scene.terrain.getnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get normal at specified position in terrain coordinate space
+
+
+</td></tr>
+<tr><td>
+
+[isTerrain()](doc/markdown/./scene.terrain.isterrain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a terrain.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.terrain.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[rayIntersect(ray)](doc/markdown/./scene.terrain.rayintersect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get intersection distance by a ray in terrain coordinate space
+
+
+</td></tr>
+<tr><td>
+
+[traverseQuadtree(callback)](doc/markdown/./scene.terrain.traversequadtree.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Traverse quadtree node top down
+
+
+</td></tr>
+</tbody></table>
 

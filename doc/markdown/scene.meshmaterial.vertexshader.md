@@ -4,7 +4,7 @@
 
 ## MeshMaterial.vertexShader() method
 
-Vertex shader implementation of this material
+Vertex shader hook. Prepares common inputs (skin/morph/instancing), varyings, and pass-dependent outputs. Override to implement per-vertex logic; use `ShaderHelper` as needed.
 
 **Signature:**
 
@@ -14,11 +14,43 @@ vertexShader(scope: PBFunctionScope): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md) | Shader scope |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)
+
+
+</td><td>
+
+Vertex shader function scope.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

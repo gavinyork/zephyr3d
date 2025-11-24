@@ -14,10 +14,55 @@ cullScene(ctx: DrawContext, cullCamera: Camera): RenderQueue;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The draw context |
-|  cullCamera | [Camera](doc/markdown/./scene.camera.md) | The camera that will be used to cull the scene |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+The draw context
+
+
+</td></tr>
+<tr><td>
+
+cullCamera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera that will be used to cull the scene
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

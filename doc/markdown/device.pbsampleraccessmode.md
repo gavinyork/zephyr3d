@@ -14,9 +14,63 @@ declare enum PBSamplerAccessMode
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  COMPARISON | <code>2</code> |  |
-|  SAMPLE | <code>1</code> |  |
-|  UNKNOWN | <code>0</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+COMPARISON
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+SAMPLE
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+UNKNOWN
+
+
+</td><td>
+
+`0`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

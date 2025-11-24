@@ -9,13 +9,156 @@ The plane shape
 **Signature:**
 
 ```typescript
-declare class PlaneShape extends Shape<PlaneCreationOptions> 
+declare class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<PlaneShape> 
 ```
 **Extends:** [Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;[PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md)<!-- -->&gt;
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[PlaneShape](doc/markdown/./scene.planeshape.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.planeshape._constructor_.md) |  | Creates an instance of plane shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.planeshape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of plane shape
+
+
+</td></tr>
+</tbody></table>
+
+## Properties
+
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.planeshape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ size: number; resolution: number; twoSided: boolean; anchor: number; needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.planeshape.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+type of the shape
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.planeshape.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateData(options, vertices, normals, tangents, uvs, indices, bbox, indexOffset, vertexCallback)](doc/markdown/./scene.planeshape.generatedata.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Generates the data for the cylinder shape
+
+
+</td></tr>
+</tbody></table>
 

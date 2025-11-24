@@ -14,9 +14,39 @@ enableDepthClamp(enable: boolean): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  enable | boolean | Enables depth clamp if true, otherwise disable |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+enable
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Enables depth clamp if true, otherwise disable
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

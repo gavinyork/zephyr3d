@@ -4,7 +4,7 @@
 
 ## Drawable.getObjectColor() method
 
-Gets the object color used for GPU picking
+Returns the unique color used for GPU picking (object ID in color).
 
 **Signature:**
 

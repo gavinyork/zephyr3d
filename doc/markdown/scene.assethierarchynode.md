@@ -15,33 +15,383 @@ declare class AssetHierarchyNode extends NamedObject
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name, parent)](doc/markdown/./scene.assethierarchynode._constructor_.md) |  | Creates an instance of AssetHierarchyNode |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name, parent)](doc/markdown/./scene.assethierarchynode._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of AssetHierarchyNode
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [children](doc/markdown/./scene.assethierarchynode.children.md) | <code>readonly</code> | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] | Children of the node |
-|  [instances](doc/markdown/./scene.assethierarchynode.instances.md) | <code>readonly</code> | { t: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; s: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; r: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; }\[\] | instances |
-|  [matrix](doc/markdown/./scene.assethierarchynode.matrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Local transformation matrix of the node |
-|  [mesh](doc/markdown/./scene.assethierarchynode.mesh.md) |  | [AssetMeshData](doc/markdown/./scene.assetmeshdata.md) | Mesh data of the node, or null if this is not a mesh node |
-|  [meshAttached](doc/markdown/./scene.assethierarchynode.meshattached.md) | <code>readonly</code> | boolean | true if the node is parent of a mesh node |
-|  [parent](doc/markdown/./scene.assethierarchynode.parent.md) | <code>readonly</code> | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | Parent of the node |
-|  [position](doc/markdown/./scene.assethierarchynode.position.md) |  | [Vector3](doc/markdown/./base.vector3.md) | The translation of the node |
-|  [rotation](doc/markdown/./scene.assethierarchynode.rotation.md) |  | [Quaternion](doc/markdown/./base.quaternion.md) | The rotation of the node |
-|  [scaling](doc/markdown/./scene.assethierarchynode.scaling.md) |  | [Vector3](doc/markdown/./base.vector3.md) | The scale of the node |
-|  [skeleton](doc/markdown/./scene.assethierarchynode.skeleton.md) |  | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | The skeleton used to control the node |
-|  [skeletonAttached](doc/markdown/./scene.assethierarchynode.skeletonattached.md) | <code>readonly</code> | Set&lt;[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->&gt; | The skeleton to which the node belongs if this is a joint node |
-|  [weights](doc/markdown/./scene.assethierarchynode.weights.md) |  | number\[\] | Default morph target weights |
-|  [worldMatrix](doc/markdown/./scene.assethierarchynode.worldmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | World transformation matrix of the node |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[children](doc/markdown/./scene.assethierarchynode.children.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\]
+
+
+</td><td>
+
+Children of the node
+
+
+</td></tr>
+<tr><td>
+
+[instances](doc/markdown/./scene.assethierarchynode.instances.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+{ t: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; s: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; r: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; }\[\]
+
+
+</td><td>
+
+instances
+
+
+</td></tr>
+<tr><td>
+
+[matrix](doc/markdown/./scene.assethierarchynode.matrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+Local transformation matrix of the node
+
+
+</td></tr>
+<tr><td>
+
+[mesh](doc/markdown/./scene.assethierarchynode.mesh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetMeshData](doc/markdown/./scene.assetmeshdata.md)
+
+
+</td><td>
+
+Mesh data of the node, or null if this is not a mesh node
+
+
+</td></tr>
+<tr><td>
+
+[meshAttached](doc/markdown/./scene.assethierarchynode.meshattached.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the node is parent of a mesh node
+
+
+</td></tr>
+<tr><td>
+
+[parent](doc/markdown/./scene.assethierarchynode.parent.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+Parent of the node
+
+
+</td></tr>
+<tr><td>
+
+[position](doc/markdown/./scene.assethierarchynode.position.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The translation of the node
+
+
+</td></tr>
+<tr><td>
+
+[rotation](doc/markdown/./scene.assethierarchynode.rotation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The rotation of the node
+
+
+</td></tr>
+<tr><td>
+
+[scaling](doc/markdown/./scene.assethierarchynode.scaling.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The scale of the node
+
+
+</td></tr>
+<tr><td>
+
+[skeleton](doc/markdown/./scene.assethierarchynode.skeleton.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)
+
+
+</td><td>
+
+The skeleton used to control the node
+
+
+</td></tr>
+<tr><td>
+
+[skeletonAttached](doc/markdown/./scene.assethierarchynode.skeletonattached.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+Set&lt;[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->&gt;
+
+
+</td><td>
+
+The skeleton to which the node belongs if this is a joint node
+
+
+</td></tr>
+<tr><td>
+
+[weights](doc/markdown/./scene.assethierarchynode.weights.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Default morph target weights
+
+
+</td></tr>
+<tr><td>
+
+[worldMatrix](doc/markdown/./scene.assethierarchynode.worldmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+World transformation matrix of the node
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addChild(child)](doc/markdown/./scene.assethierarchynode.addchild.md) |  | Adds a child to this node |
-|  [attachToSkeleton(skeleton, index)](doc/markdown/./scene.assethierarchynode.attachtoskeleton.md) |  | Attach this node to a skeleton |
-|  [removeChild(child)](doc/markdown/./scene.assethierarchynode.removechild.md) |  | Removes a child of this node |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addChild(child)](doc/markdown/./scene.assethierarchynode.addchild.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds a child to this node
+
+
+</td></tr>
+<tr><td>
+
+[attachToSkeleton(skeleton)](doc/markdown/./scene.assethierarchynode.attachtoskeleton.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Attach this node to a skeleton
+
+
+</td></tr>
+<tr><td>
+
+[removeChild(child)](doc/markdown/./scene.assethierarchynode.removechild.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes a child of this node
+
+
+</td></tr>
+</tbody></table>
 

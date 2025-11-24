@@ -4,20 +4,67 @@
 
 ## AssetManager.setBuiltinTextureLoader() method
 
-Sets the loader for a given builtin-texture
+Override or unregister the loader for a named built-in texture.
+
+- Passing a valid loader function sets/overrides the creation path. - Passing `undefined` removes the loader mapping for the given name.
 
 **Signature:**
 
 ```typescript
-static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => Promise<BaseTexture>): void;
+static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the builtin texture |
-|  loader | (assetManager: [AssetManager](doc/markdown/./scene.assetmanager.md)<!-- -->) =&gt; Promise&lt;[BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->&gt; | Loader for the builtin texture |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Built-in texture identifier.
+
+
+</td></tr>
+<tr><td>
+
+loader
+
+
+</td><td>
+
+(assetManager: [AssetManager](doc/markdown/./scene.assetmanager.md)<!-- -->) =&gt; [BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+Factory that creates the built-in texture using the provided AssetManager.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

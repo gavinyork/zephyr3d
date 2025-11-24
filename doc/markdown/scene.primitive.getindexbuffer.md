@@ -4,7 +4,7 @@
 
 ## Primitive.getIndexBuffer() method
 
-Gets the index buffer of the primitive
+Get the current index buffer.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getIndexBuffer(): IndexBuffer;
 
 [IndexBuffer](doc/markdown/./device.indexbuffer.md)
 
-The index buffer of the primitive
+The index buffer, or `undefined`<!-- -->/`null` if none set.
 

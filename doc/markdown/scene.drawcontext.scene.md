@@ -4,7 +4,7 @@
 
 ## DrawContext.scene property
 
-The scene that is currently been drawing
+The scene currently being drawn.
 
 **Signature:**
 

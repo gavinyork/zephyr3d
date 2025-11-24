@@ -9,14 +9,44 @@ Sets up the fragment output.
 **Signature:**
 
 ```typescript
-abstract setupFragmentOutput(scope: PBGlobalScope): any;
+setupFragmentOutput(scope: PBGlobalScope): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | The global shader scope. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+The global shader scope.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

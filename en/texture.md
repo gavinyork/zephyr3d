@@ -23,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // Create writable 2D textures with a given pixel format and width and height (WebGPU only)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  samplerOptions: { mipFilter: 'none' },
+  mipmapping: false,
   writable: true
 });
 
@@ -66,12 +66,11 @@ const texture = device.createTexture2DFromMipmapData(data, false, {
 
 The above are the primary ways to create 2D textures. Additionally, there are methods for creating 2D array textures, 3D textures, and cube textures.
 
+- [device.createTextureFromMipmapData](/doc/markdown/./device.abstractdevice.createtexturefrommipmapdata)
 - [device.createTexture2DArray()](/doc/markdown/./device.abstractdevice.createtexture2darray)
 - [device.createTexture2DArrayFromImages()](/doc/markdown/./device.abstractdevice.createtexture2darrayfromimages)
-- [device.createTexture2DArrayFromMipmapData](/doc/markdown/./device.abstractdevice.createtexture2darrayfrommipmapdata)
 - [device.createTexture3D()](/doc/markdown/./device.abstractdevice.createtexture3d)
 - [device.createCubeTexture()](/doc/markdown/./device.abstractdevice.createcubetexture)
-- [device.createCubeTextureFromMipmapData()](/doc/markdown/./device.abstractdevice.createcubetexturefrommipmapdata)
 - [device.createTextureVideo()](/doc/markdown/./device.abstractdevice.createtexturevideo)
 
 For available texture formats, refer to the documentation: [Texture formats](/doc/markdown/./device.textureformat)
@@ -111,7 +110,7 @@ When the content of a texture changes, the texture interface's [generateMipmaps(
 
 // Update texture
 texture.update(pixels, 0, 0, textureWidth, textureHeight);
-// Generates mipmaps
+// Generates mipmaps, can be omitted here because generateMipmaps() will be miplicity called by texture.update()
 texture.generateMipmaps();
 
 ```

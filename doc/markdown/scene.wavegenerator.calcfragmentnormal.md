@@ -7,16 +7,76 @@
 **Signature:**
 
 ```typescript
-abstract calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
+calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Global scope of the shader program. |
-|  xz | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | XZ position. |
-|  vertexNormal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Vertex normal. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Global scope of the shader program.
+
+
+</td></tr>
+<tr><td>
+
+xz
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+XZ position.
+
+
+</td></tr>
+<tr><td>
+
+vertexNormal
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Vertex normal.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

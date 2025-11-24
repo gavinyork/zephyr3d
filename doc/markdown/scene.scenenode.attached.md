@@ -4,7 +4,7 @@
 
 ## SceneNode.attached property
 
-true if the node is attached to the scene node, false otherwise
+Whether this node is currently attached under the scene's root.
 
 **Signature:**
 

@@ -14,25 +14,221 @@ declare class HttpRequest
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./base.httprequest._constructor_.md) |  | Constructs a new instance of the <code>HttpRequest</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(urlResolver)](doc/markdown/./base.httprequest._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `HttpRequest` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [crossOrigin](doc/markdown/./base.httprequest.crossorigin.md) |  | string | Get the cross origin property |
-|  [headers](doc/markdown/./base.httprequest.headers.md) |  | Record&lt;string, string&gt; | Get the request headers |
-|  [urlResolver](doc/markdown/./base.httprequest.urlresolver.md) |  | (url: string) =&gt; string | Get the custom URL resolver |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[crossOrigin](doc/markdown/./base.httprequest.crossorigin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get the cross origin property
+
+
+</td></tr>
+<tr><td>
+
+[headers](doc/markdown/./base.httprequest.headers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;string, string&gt;
+
+
+</td><td>
+
+Get the request headers
+
+
+</td></tr>
+<tr><td>
+
+[urlResolver](doc/markdown/./base.httprequest.urlresolver.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(url: string) =&gt; string
+
+
+</td><td>
+
+Get the custom URL resolver
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [request(url)](doc/markdown/./base.httprequest.request.md) |  | Send a GET request. |
-|  [requestArrayBuffer(url)](doc/markdown/./base.httprequest.requestarraybuffer.md) |  | Fetch an array buffer from remote. |
-|  [requestBlob(url)](doc/markdown/./base.httprequest.requestblob.md) |  | Fetch a blob object from remote. |
-|  [requestText(url)](doc/markdown/./base.httprequest.requesttext.md) |  | Fetch a text string from remote. |
-|  [resolveURL(url)](doc/markdown/./base.httprequest.resolveurl.md) |  | Resolves a URL string. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[request(url)](doc/markdown/./base.httprequest.request.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Send a GET request.
+
+
+</td></tr>
+<tr><td>
+
+[requestArrayBuffer(url)](doc/markdown/./base.httprequest.requestarraybuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch an array buffer from remote.
+
+
+</td></tr>
+<tr><td>
+
+[requestBlob(url)](doc/markdown/./base.httprequest.requestblob.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a blob object from remote.
+
+
+</td></tr>
+<tr><td>
+
+[requestJson(url)](doc/markdown/./base.httprequest.requestjson.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a json object from remote.
+
+
+</td></tr>
+<tr><td>
+
+[requestText(url)](doc/markdown/./base.httprequest.requesttext.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a text string from remote.
+
+
+</td></tr>
+<tr><td>
+
+[resolveURL(url)](doc/markdown/./base.httprequest.resolveurl.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Resolves a URL string.
+
+
+</td></tr>
+</tbody></table>
 

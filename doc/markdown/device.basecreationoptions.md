@@ -14,7 +14,45 @@ interface BaseCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [dynamic?](doc/markdown/./device.basecreationoptions.dynamic.md) |  | boolean | _(Optional)_ Whether the object should be dynamic, default is false |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[dynamic?](doc/markdown/./device.basecreationoptions.dynamic.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether the object should be dynamic, default is false
+
+
+</td></tr>
+</tbody></table>
 

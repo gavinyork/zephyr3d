@@ -4,7 +4,7 @@
 
 ## Octree.getRootSize() method
 
-Gets the root size of the octree
+Root world size (edge length).
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getRootSize(): number;
 
 number
 
-The root size of the octree
+The current root world size.
 

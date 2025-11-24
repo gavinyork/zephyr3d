@@ -12,9 +12,39 @@ abstract setScissor(scissor?: number[] | DeviceViewport): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scissor | number\[\] \| [DeviceViewport](doc/markdown/./device.deviceviewport.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scissor
+
+
+</td><td>
+
+number\[\] \| [DeviceViewport](doc/markdown/./device.deviceviewport.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,9 @@
 
 ## Material.passToHash() method
 
-Convert pass to hash
+Convert a pass index to a hash seed string.
+
+Subclasses may override to encode per-pass role (e.g., "depth", "forward", "shadow").
 
 **Signature:**
 
@@ -14,13 +16,43 @@ passToHash(pass: number): string;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number | pass number |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pass number.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 string
 
-String hash
+String used when building full hash.
 

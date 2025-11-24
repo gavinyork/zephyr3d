@@ -4,7 +4,7 @@
 
 ## MeshMaterial.alphaCutoff property
 
-A value between 0 and 1, presents the cutoff for alpha testing
+Alpha test cutoff in \[0, 1\]. - 0 disables alpha testing. - &gt; 0 discards fragments with alpha &lt; cutoff. Changing this marks uniforms dirty (no shader rebuild).
 
 **Signature:**
 

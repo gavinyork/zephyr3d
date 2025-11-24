@@ -4,7 +4,7 @@
 
 ## AnimationSet.getAnimationNames() method
 
-Gets names of all the animations of the model
+Get the list of all registered animation names.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getAnimationNames(): string[];
 
 string\[\]
 
-An array of string that contains the animation names
+An array of clip names.
 

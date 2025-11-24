@@ -14,23 +14,226 @@ declare class Interpolator
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(mode, target, inputs, outputs)](doc/markdown/./base.interpolator._constructor_.md) |  | Creates a interpolator instance |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(mode, target, inputs, outputs)](doc/markdown/./base.interpolator._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a interpolator instance
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [maxTime](doc/markdown/./base.interpolator.maxtime.md) | <code>readonly</code> | number |  |
-|  [mode](doc/markdown/./base.interpolator.mode.md) | <code>readonly</code> | [InterpolationMode](doc/markdown/./base.interpolationmode.md) | Gets the interpolation mode |
-|  [stride](doc/markdown/./base.interpolator.stride.md) | <code>readonly</code> | number | stride |
-|  [target](doc/markdown/./base.interpolator.target.md) | <code>readonly</code> | [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | Gets the interpolation target |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[inputs](doc/markdown/./base.interpolator.inputs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[InterpolateData](doc/markdown/./base.interpolatedata.md)
+
+
+</td><td>
+
+inputs
+
+
+</td></tr>
+<tr><td>
+
+[maxTime](doc/markdown/./base.interpolator.maxtime.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[mode](doc/markdown/./base.interpolator.mode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[InterpolationMode](doc/markdown/./base.interpolationmode.md)
+
+
+</td><td>
+
+Gets the interpolation mode
+
+
+</td></tr>
+<tr><td>
+
+[outputs](doc/markdown/./base.interpolator.outputs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[InterpolateData](doc/markdown/./base.interpolatedata.md)
+
+
+</td><td>
+
+outputs
+
+
+</td></tr>
+<tr><td>
+
+[stride](doc/markdown/./base.interpolator.stride.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+stride
+
+
+</td></tr>
+<tr><td>
+
+[target](doc/markdown/./base.interpolator.target.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[InterpolationTarget](doc/markdown/./base.interpolationtarget.md)
+
+
+</td><td>
+
+Gets the interpolation target
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getTargetStride(target)](doc/markdown/./base.interpolator.gettargetstride.md) | <code>static</code> | Interpolation target to stride |
-|  [interpolate(t, result)](doc/markdown/./base.interpolator.interpolate.md) |  | Calculates the interpolated value at a given time |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getTargetStride(target)](doc/markdown/./base.interpolator.gettargetstride.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Interpolation target to stride
+
+
+</td></tr>
+<tr><td>
+
+[interpolate(t, result)](doc/markdown/./base.interpolator.interpolate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the interpolated value at a given time
+
+
+</td></tr>
+</tbody></table>
 

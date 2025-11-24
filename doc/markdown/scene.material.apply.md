@@ -4,7 +4,9 @@
 
 ## Material.apply() method
 
-Apply material
+Prepare the material for drawing across all passes for the given draw context.
+
+Steps per pass: - Compute global hash (material variant + context). - Retrieve or build the GPU program, cache in `_programCache`<!-- -->. - Create per-material bind group (index 2) if the program exposes it. - Update uniforms if `_optionTag` indicates changes since last apply. - Update and cache render states for the pass. - Detect bind group GPU ID changes to bump `changeTag` and notify `RenderBundleWrapper`<!-- -->.
 
 **Signature:**
 
@@ -14,13 +16,43 @@ apply(ctx: DrawContext): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context (device, flags, pass hash, instance data, etc.).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-true if no error, otherwise false
+`true` if successful; `false` if any pass lacks a valid program.
 

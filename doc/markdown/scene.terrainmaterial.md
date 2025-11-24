@@ -9,38 +9,300 @@ Terrain material class
 **Signature:**
 
 ```typescript
-declare class TerrainMaterial extends TerrainMaterial_base 
+declare class TerrainMaterial extends TerrainMaterial_base implements Clonable<TerrainMaterial> 
 ```
 **Extends:** TerrainMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[TerrainMaterial](doc/markdown/./scene.terrainmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.terrainmaterial._constructor_.md) |  | Constructs a new instance of the <code>TerrainMaterial</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.terrainmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `TerrainMaterial` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [terrainInfo](doc/markdown/./scene.terrainmaterial.terraininfo.md) |  | [Vector4](doc/markdown/./base.vector4.md) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getAlbedoTexCoord](doc/markdown/./scene.terrainmaterial.getalbedotexcoord.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(scope: [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->) =&gt; [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getMetallicRoughnessTexCoord](doc/markdown/./scene.terrainmaterial.getmetallicroughnesstexcoord.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(scope: [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->) =&gt; [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getNormalTexCoord](doc/markdown/./scene.terrainmaterial.getnormaltexcoord.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(scope: [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->) =&gt; [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[terrainInfo](doc/markdown/./scene.terrainmaterial.terraininfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.terrainmaterial.applyuniformvalues.md) |  |  |
-|  [calculateAlbedoColor(scope)](doc/markdown/./scene.terrainmaterial.calculatealbedocolor.md) |  |  |
-|  [fragmentShader(scope)](doc/markdown/./scene.terrainmaterial.fragmentshader.md) |  |  |
-|  [generateMetallicRoughnessMap()](doc/markdown/./scene.terrainmaterial.generatemetallicroughnessmap.md) |  |  |
-|  [getAlbedoTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getalbedotexcoord.md) |  | @<!-- -->ts-ignore |
-|  [getMetallicRoughnessTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getmetallicroughnesstexcoord.md) |  | @<!-- -->ts-ignore |
-|  [getNormalTexCoord(scope)](doc/markdown/./scene.terrainmaterial.getnormaltexcoord.md) |  | @<!-- -->ts-ignore |
-|  [isBatchable()](doc/markdown/./scene.terrainmaterial.isbatchable.md) |  | Returns true if this material supports geometry instancing |
-|  [isTransparentPass(pass)](doc/markdown/./scene.terrainmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
-|  [sampleDetailNormalMap(scope, tex, texCoord, normalScale, TBN)](doc/markdown/./scene.terrainmaterial.sampledetailnormalmap.md) |  |  |
-|  [supportInstancing()](doc/markdown/./scene.terrainmaterial.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
-|  [supportLighting()](doc/markdown/./scene.terrainmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
-|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.terrainmaterial.updaterenderstates.md) | <code>protected</code> |  |
-|  [vertexShader(scope)](doc/markdown/./scene.terrainmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.terrainmaterial.applyuniformvalues.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calculateAlbedoColor(scope)](doc/markdown/./scene.terrainmaterial.calculatealbedocolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.terrainmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.terrainmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateMetallicRoughnessMap()](doc/markdown/./scene.terrainmaterial.generatemetallicroughnessmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTransparentPass(\_pass)](doc/markdown/./scene.terrainmaterial.istransparentpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the given pass is transparent. Default returns true when `blendMode !== 'none'`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[sampleDetailNormalMap(scope, tex, texCoord, normalScale, TBN)](doc/markdown/./scene.terrainmaterial.sampledetailnormalmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[supportInstancing()](doc/markdown/./scene.terrainmaterial.supportinstancing.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material supports hardware instancing.
+
+Override and return `false` if per-instance data is not supported in the shader.
+
+
+</td></tr>
+<tr><td>
+
+[supportLighting()](doc/markdown/./scene.terrainmaterial.supportlighting.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material's shading is affected by scene lights.
+
+Override and return `false` for unlit materials.
+
+
+</td></tr>
+<tr><td>
+
+[updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.terrainmaterial.updaterenderstates.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.terrainmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

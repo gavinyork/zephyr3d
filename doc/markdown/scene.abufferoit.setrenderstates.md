@@ -16,9 +16,39 @@ setRenderStates(rs: RenderStateSet): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rs | [RenderStateSet](doc/markdown/./device.renderstateset.md) | The render states. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rs
+
+
+</td><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+The render states.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

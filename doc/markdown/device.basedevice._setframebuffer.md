@@ -12,9 +12,37 @@ protected abstract _setFramebuffer(fb: FrameBuffer): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  fb | [FrameBuffer](doc/markdown/./device.framebuffer.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+fb
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

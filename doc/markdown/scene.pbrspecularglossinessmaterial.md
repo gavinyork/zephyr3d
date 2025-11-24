@@ -9,27 +9,174 @@ PBRSpecularGlossinessMaterial class
 **Signature:**
 
 ```typescript
-declare class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial_base 
+declare class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial_base implements Clonable<PBRSpecularGlossinessMaterial> 
 ```
 **Extends:** PBRSpecularGlossinessMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.pbrspecularglossinessmaterial._constructor_.md) |  | Creates an instance of PBRSpecularGlossinessMaterial class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.pbrspecularglossinessmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of PBRSpecularGlossinessMaterial class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [vertexNormal](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
-|  [vertexTangent](doc/markdown/./scene.pbrspecularglossinessmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vertexNormal](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+<tr><td>
+
+[vertexTangent](doc/markdown/./scene.pbrspecularglossinessmaterial.vertextangent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [fragmentShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.pbrspecularglossinessmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[copyFrom(other)](doc/markdown/./scene.pbrspecularglossinessmaterial.copyfrom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.pbrspecularglossinessmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

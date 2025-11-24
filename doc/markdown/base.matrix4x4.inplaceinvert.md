@@ -9,11 +9,11 @@ Invert this matrix inplace.
 **Signature:**
 
 ```typescript
-inplaceInvert(): Matrix4x4;
+inplaceInvert(): this;
 ```
 **Returns:**
 
-[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+this
 
 self
 

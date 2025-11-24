@@ -14,9 +14,39 @@ declare function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format to be converted |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+The texture format to be converted
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

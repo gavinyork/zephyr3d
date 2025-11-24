@@ -14,10 +14,83 @@ constructor(textureType: PBTextureType, texelFormat?: TextureFormat, readable?: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  textureType | [PBTextureType](doc/markdown/./device.pbtexturetype.md) |  |
-|  texelFormat | [TextureFormat](doc/markdown/./device.textureformat.md) | _(Optional)_ |
-|  readable | boolean | _(Optional)_ |
-|  writable | boolean | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+textureType
+
+
+</td><td>
+
+[PBTextureType](doc/markdown/./device.pbtexturetype.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+texelFormat
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+readable
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+writable
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

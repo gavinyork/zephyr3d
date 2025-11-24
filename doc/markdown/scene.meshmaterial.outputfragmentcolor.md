@@ -4,7 +4,11 @@
 
 ## MeshMaterial.outputFragmentColor() method
 
-Calculate final fragment color for output.
+Centralized final color write and per-pass output composition.
+
+Behavior by pass: - LIGHT: clipping, alpha handling, optional OIT integration, fog application, color output encoding. - DEPTH: encoded depth; optional motion vectors (TAA enabled/disabled handling). - OBJECT\_COLOR: object color and distance output (linear depth or world-pos + distance). - SHADOWMAP: writes shadow depth via light’s shadow implementation.
+
+Also writes SSR roughness/normal buffers when requested via material flags.
 
 **Signature:**
 
@@ -14,17 +18,107 @@ outputFragmentColor(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Shader scope |
-|  worldPos | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
-|  color | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Lit fragment color |
-|  ssrRoughness | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ |
-|  ssrNormal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Inside-function shader scope.
+
+
+</td></tr>
+<tr><td>
+
+worldPos
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Fragment world-space position expression.
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Lit fragment color expression; may be undefined for depth-only paths.
+
+
+</td></tr>
+<tr><td>
+
+ssrRoughness
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+_(Optional)_ Optional SSR roughness output expression.
+
+
+</td></tr>
+<tr><td>
+
+ssrNormal
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+_(Optional)_ Optional SSR normal output expression.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
 
-The final fragment color
+void
 

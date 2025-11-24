@@ -14,8 +14,53 @@ declare class DrawText
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [drawText(device, text, color, x, y)](doc/markdown/./device.drawtext.drawtext.md) | <code>static</code> | Draw text onto the screen |
-|  [setFont(device, name)](doc/markdown/./device.drawtext.setfont.md) | <code>static</code> | Set the font that will be used to draw strings |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[drawText(device, text, color, x, y)](doc/markdown/./device.drawtext.drawtext.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Draw text onto the screen
+
+
+</td></tr>
+<tr><td>
+
+[setFont(device, name)](doc/markdown/./device.drawtext.setfont.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Set the font that will be used to draw strings
+
+
+</td></tr>
+</tbody></table>
 

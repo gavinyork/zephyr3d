@@ -9,11 +9,11 @@ Normalize this vector inplace.
 **Signature:**
 
 ```typescript
-inplaceNormalize(): Vector3;
+inplaceNormalize(): this;
 ```
 **Returns:**
 
-[Vector3](doc/markdown/./base.vector3.md)
+this
 
 self
 

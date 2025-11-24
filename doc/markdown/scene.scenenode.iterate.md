@@ -4,25 +4,55 @@
 
 ## SceneNode.iterate() method
 
-Iterate self and all of the children
+Iterate self and descendants in pre-order.
+
+Warning: Do not remove children during this iteration. To allow removal, use `iterateBottomToTop`<!-- -->.
 
 **Signature:**
 
 ```typescript
-iterate(callback: (node: SceneNode) => void): void;
+iterate(callback: NodeIterateFunc): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  callback | (node: [SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->) =&gt; void | callback function that will be called on each node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+callback
+
+
+</td><td>
+
+[NodeIterateFunc](doc/markdown/./scene.nodeiteratefunc.md)
+
+
+</td><td>
+
+Called for each node; if returns true, iteration stops.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-void
+boolean
 
-## Remarks
-
-DO NOT remove child duration iteration!
+true if iteration was aborted early.
 

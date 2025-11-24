@@ -15,19 +15,115 @@ declare class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(accessMode)](doc/markdown/./device.pbsamplertypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBSamplerTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(accessMode)](doc/markdown/./device.pbsamplertypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBSamplerTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [accessMode](doc/markdown/./device.pbsamplertypeinfo.accessmode.md) | <code>readonly</code> | [PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md) | Get the access mode |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[accessMode](doc/markdown/./device.pbsamplertypeinfo.accessmode.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md)
+
+
+</td><td>
+
+Get the access mode
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbsamplertypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbsamplertypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,11 +14,121 @@ interface FrameBufferTextureAttachment
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [face?](doc/markdown/./device.framebuffertextureattachment.face.md) |  | number | _(Optional)_ The attached face index for cube texture |
-|  [generateMipmaps?](doc/markdown/./device.framebuffertextureattachment.generatemipmaps.md) |  | boolean | _(Optional)_ Whether automatically generate mipmaps for color attachments |
-|  [layer?](doc/markdown/./device.framebuffertextureattachment.layer.md) |  | number | _(Optional)_ The layer index for array texture |
-|  [level?](doc/markdown/./device.framebuffertextureattachment.level.md) |  | number | _(Optional)_ Which mipmap level is currently attached |
-|  [texture?](doc/markdown/./device.framebuffertextureattachment.texture.md) |  | [BaseTexture](doc/markdown/./device.basetexture.md) | _(Optional)_ Texture for this attachment |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[face?](doc/markdown/./device.framebuffertextureattachment.face.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The attached face index for cube texture
+
+
+</td></tr>
+<tr><td>
+
+[generateMipmaps?](doc/markdown/./device.framebuffertextureattachment.generatemipmaps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether automatically generate mipmaps for color attachments
+
+
+</td></tr>
+<tr><td>
+
+[layer?](doc/markdown/./device.framebuffertextureattachment.layer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The layer index for array texture
+
+
+</td></tr>
+<tr><td>
+
+[level?](doc/markdown/./device.framebuffertextureattachment.level.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Which mipmap level is currently attached
+
+
+</td></tr>
+<tr><td>
+
+[texture?](doc/markdown/./device.framebuffertextureattachment.texture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+_(Optional)_ Texture for this attachment
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,7 +4,9 @@
 
 ## OrbitCameraController.reset() method
 
-Resets state
+Reset the controller's internal state.
+
+Called automatically when a camera is attached via `_setCamera`<!-- -->. Subclasses should override this to reset accumulators, velocities, targets, etc.
 
 **Signature:**
 

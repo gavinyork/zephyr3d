@@ -4,7 +4,7 @@
 
 ## OctreeNode.getMinPoint() method
 
-Gets min point of the node
+Get the minimum (tight) corner point of this node in world space.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getMinPoint(): Vector3;
 
 [Vector3](doc/markdown/./base.vector3.md)
 
-Min point of the node
+The minimum corner as a `Vector3`<!-- -->.
 

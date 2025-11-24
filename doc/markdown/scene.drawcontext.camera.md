@@ -4,7 +4,7 @@
 
 ## DrawContext.camera property
 
-The camera for current drawing task
+The camera associated with the current drawing task (may differ from primaryCamera).
 
 **Signature:**
 

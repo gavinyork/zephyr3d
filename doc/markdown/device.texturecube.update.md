@@ -12,14 +12,107 @@ update(data: TypedArray, xOffset: number, yOffset: number, width: number, height
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TypedArray](doc/markdown/./base.typedarray.md) |  |
-|  xOffset | number |  |
-|  yOffset | number |  |
-|  width | number |  |
-|  height | number |  |
-|  face | [CubeFace](doc/markdown/./base.cubeface.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+xOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+yOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+face
+
+
+</td><td>
+
+[CubeFace](doc/markdown/./base.cubeface.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

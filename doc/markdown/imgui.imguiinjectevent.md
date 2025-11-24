@@ -14,10 +14,55 @@ declare function imGuiInjectEvent(ev: Event, type?: string): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ev | Event | The event object |
-|  type | string | _(Optional)_ Event type, default to ev.type if not specified. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ev
+
+
+</td><td>
+
+Event
+
+
+</td><td>
+
+The event object
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Event type, default to ev.type if not specified.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

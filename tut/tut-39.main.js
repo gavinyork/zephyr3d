@@ -1,6 +1,17 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  MeshMaterial,
+  ShaderHelper,
+  OrbitCameraController,
+  Mesh,
+  TorusShape,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 // 定义边缘光材质
 class RimColorMaterial extends MeshMaterial {
@@ -10,7 +21,7 @@ class RimColorMaterial extends MeshMaterial {
     this.color = new Vector3(1, 1, 1);
   }
   // 不透明材质
-  isTransparentPass(pass) {
+  isTransparentPass() {
     return false;
   }
   // 不受光照影响
@@ -47,7 +58,10 @@ class RimColorMaterial extends MeshMaterial {
     // ShaderHelper.getViewProjectionMatrix()获取当前的世界空间到剪裁空间的变换矩阵。
     // 注意不要直接给scope.$builtins.position赋值，因为在WebGPU设备下渲染到纹理时需要上下翻转
     // 需要使用ShaderHelper.setClipSpacePosition()方法。
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
   }
   // FragmentShader实现
   // scope是fragmentShader的main函数作用域
@@ -82,11 +96,11 @@ class RimColorMaterial extends MeshMaterial {
     }
   }
   // 设置材质的Uniform常量
-  applyUniformValues(bindGroup, ctx, pass){
+  applyUniformValues(bindGroup, ctx, pass) {
     // 必须调用父类
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
-    // 需要计算片元颜色时我们才定义此Uniform
+    if (this.needFragmentColor(ctx)) {
+      // 需要计算片元颜色时我们才定义此Uniform
       bindGroup.setValue('rimColor', this.color);
     }
   }
@@ -98,8 +112,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
   scene.env.sky.skyType = 'scatter';
   const material = new RimColorMaterial();
@@ -108,22 +120,12 @@ myApp.ready().then(async () => {
 
   new Mesh(scene, new TorusShape(), material);
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
-  camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(5, 3, 0), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', ev => {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

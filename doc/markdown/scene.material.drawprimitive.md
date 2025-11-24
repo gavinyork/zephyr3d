@@ -4,7 +4,9 @@
 
 ## Material.drawPrimitive() method
 
-Draw primitve
+Issue the actual draw call for a pass.
+
+Override for custom per-pass draw behavior if necessary. The default implementation: - Draws instanced if `numInstances > 0`<!-- -->. - Else uses `ctx.instanceData.numInstances` if available. - Else issues a non-instanced draw.
 
 **Signature:**
 
@@ -14,12 +16,87 @@ drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number |  |
-|  primitive | [Primitive](doc/markdown/./scene.primitive.md) | Primitive to be drawn |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
-|  numInstances | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pass number.
+
+
+</td></tr>
+<tr><td>
+
+primitive
+
+
+</td><td>
+
+[Primitive](doc/markdown/./scene.primitive.md)
+
+
+</td><td>
+
+Primitive to draw.
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context.
+
+
+</td></tr>
+<tr><td>
+
+numInstances
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Explicit instance count (0 = auto).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

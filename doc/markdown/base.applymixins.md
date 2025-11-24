@@ -14,10 +14,55 @@ declare function applyMixins<M extends ((target: any) => any)[], T>(target: T, .
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  target | T | The constructor function of the class that will receive the mixins. |
-|  mixins | M | mixins |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The constructor function of the class that will receive the mixins.
+
+
+</td></tr>
+<tr><td>
+
+mixins
+
+
+</td><td>
+
+M
+
+
+</td><td>
+
+mixins
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

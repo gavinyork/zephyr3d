@@ -12,10 +12,51 @@ abstract createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUD
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sizeInBytes | number |  |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sizeInBytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

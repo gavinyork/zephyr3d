@@ -9,15 +9,44 @@ Calculates the vertex position of type vec3 in object space
 **Signature:**
 
 ```typescript
-static resolveVertexPosition(scope: PBInsideFunctionScope, pos?: PBShaderExp): PBShaderExp;
+static resolveVertexPosition(scope: PBInsideFunctionScope): PBShaderExp;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  pos | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ Vertex position input, must be type of vec3, null if no vertex position input |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

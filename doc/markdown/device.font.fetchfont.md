@@ -14,10 +14,55 @@ static fetchFont(name: string, scale: number): Font;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | The font name |
-|  scale | number | The scale value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The font name
+
+
+</td></tr>
+<tr><td>
+
+scale
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The scale value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

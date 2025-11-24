@@ -4,7 +4,7 @@
 
 ## SceneNode.isTerrain() method
 
-true if this is a terrain node, false otherwise
+Type guard: true if this node is a terrain.
 
 **Signature:**
 

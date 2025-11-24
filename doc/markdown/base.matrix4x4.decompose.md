@@ -14,11 +14,71 @@ decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, transl
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scale | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output scale vector. |
-|  rotation | [Quaternion](doc/markdown/./base.quaternion.md) \| [Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output rotation matrix or quaternion. |
-|  translation | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output translation vector. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scale
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output scale vector.
+
+
+</td></tr>
+<tr><td>
+
+rotation
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md) \| [Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output rotation matrix or quaternion.
+
+
+</td></tr>
+<tr><td>
+
+translation
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output translation vector.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

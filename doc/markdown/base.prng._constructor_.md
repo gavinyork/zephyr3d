@@ -14,7 +14,37 @@ constructor(seed?: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  seed | number | _(Optional)_ The random seed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+seed
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The random seed
+
+
+</td></tr>
+</tbody></table>
 

@@ -9,9 +9,11 @@ per-pixel linked list OIT renderer using ABuffer.
 **Signature:**
 
 ```typescript
-declare class ABufferOIT extends OIT 
+declare class ABufferOIT extends Disposable implements OIT 
 ```
-**Extends:** [OIT](doc/markdown/./scene.oit.md)
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [OIT](doc/markdown/./scene.oit.md)
 
 ## Remarks
 
@@ -19,30 +21,310 @@ The ABuffer OIT renderer only supports WebGPU device.
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(numLayers)](doc/markdown/./scene.abufferoit._constructor_.md) |  | Creates an instance of ABufferOIT class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(numLayers)](doc/markdown/./scene.abufferoit._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of ABufferOIT class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [type](doc/markdown/./scene.abufferoit.type.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) | Type name of ABufferOIT |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[type](doc/markdown/./scene.abufferoit.type.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Type name of ABufferOIT
+
+
+</td></tr>
+<tr><td>
+
+[usePremultipliedAlpha](doc/markdown/./scene.abufferoit.usepremultipliedalpha.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyUniforms(ctx, bindGroup)](doc/markdown/./scene.abufferoit.applyuniforms.md) |  | <p>Applies the uniforms for the given draw context and bind group.</p><p>This function will be called when ever the transparent material will upload uniform variables.</p> |
-|  [begin(ctx)](doc/markdown/./scene.abufferoit.begin.md) |  | Begins rendering the transparent objects. |
-|  [beginPass(ctx, pass)](doc/markdown/./scene.abufferoit.beginpass.md) |  | Begins rendering for the given pass. |
-|  [calculateHash()](doc/markdown/./scene.abufferoit.calculatehash.md) |  | Calculates the hash of the renderer. |
-|  [dispose()](doc/markdown/./scene.abufferoit.dispose.md) |  | Disposes the renderer. |
-|  [end(ctx)](doc/markdown/./scene.abufferoit.end.md) |  | Ends rendering the transparent objects. |
-|  [endPass(ctx, pass)](doc/markdown/./scene.abufferoit.endpass.md) |  | Ends rendering for the given pass. |
-|  [getType()](doc/markdown/./scene.abufferoit.gettype.md) |  | Returns the type of the renderer. |
-|  [outputFragmentColor(scope, color)](doc/markdown/./scene.abufferoit.outputfragmentcolor.md) |  | Do the fragment color output. |
-|  [setRenderStates(rs)](doc/markdown/./scene.abufferoit.setrenderstates.md) |  | <p>Sets the render states for the renderer.</p><p>This function will be called when the transparent object will be rendered.</p> |
-|  [setupFragmentOutput(scope)](doc/markdown/./scene.abufferoit.setupfragmentoutput.md) |  | Sets up the fragment output. |
-|  [supportDevice(deviceType)](doc/markdown/./scene.abufferoit.supportdevice.md) |  | Checks whether the renderer supports the given device type. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyUniforms(ctx, bindGroup)](doc/markdown/./scene.abufferoit.applyuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Applies the uniforms for the given draw context and bind group.
+
+This function will be called when ever the transparent material will upload uniform variables.
+
+
+</td></tr>
+<tr><td>
+
+[begin(ctx)](doc/markdown/./scene.abufferoit.begin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Begins rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[beginPass(ctx, pass)](doc/markdown/./scene.abufferoit.beginpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Begins rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[calculateHash()](doc/markdown/./scene.abufferoit.calculatehash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the hash of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[end(ctx)](doc/markdown/./scene.abufferoit.end.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Ends rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[endPass(ctx, pass)](doc/markdown/./scene.abufferoit.endpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Ends rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.abufferoit.gettype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the type of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.abufferoit.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[outputFragmentColor(scope, color)](doc/markdown/./scene.abufferoit.outputfragmentcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do the fragment color output.
+
+
+</td></tr>
+<tr><td>
+
+[setRenderStates(rs)](doc/markdown/./scene.abufferoit.setrenderstates.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the render states for the renderer.
+
+This function will be called when the transparent object will be rendered.
+
+
+</td></tr>
+<tr><td>
+
+[setupFragmentOutput(scope)](doc/markdown/./scene.abufferoit.setupfragmentoutput.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets up the fragment output.
+
+
+</td></tr>
+<tr><td>
+
+[supportDevice(deviceType)](doc/markdown/./scene.abufferoit.supportdevice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether the renderer supports the given device type.
+
+
+</td></tr>
+<tr><td>
+
+[wantsPremultipliedAlpha()](doc/markdown/./scene.abufferoit.wantspremultipliedalpha.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this OIT algorithm wants pre-multiplied alpha
+
+
+</td></tr>
+</tbody></table>
 

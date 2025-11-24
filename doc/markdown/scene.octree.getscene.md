@@ -4,7 +4,7 @@
 
 ## Octree.getScene() method
 
-Gets the scene to which the octree belongs
+Owning scene.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getScene(): Scene;
 
 [Scene](doc/markdown/./scene.scene.md)
 
-The scene
+The `Scene` that owns this octree.
 

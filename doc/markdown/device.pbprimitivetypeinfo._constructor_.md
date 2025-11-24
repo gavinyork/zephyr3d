@@ -14,7 +14,35 @@ constructor(type: PBPrimitiveType);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

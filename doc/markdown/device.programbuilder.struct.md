@@ -14,10 +14,55 @@ struct(structName: string, instanceName: string): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  structName | string | Name of the structure type |
-|  instanceName | string | Name of the variable |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+structName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the structure type
+
+
+</td></tr>
+<tr><td>
+
+instanceName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the variable
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

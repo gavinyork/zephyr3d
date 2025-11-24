@@ -14,11 +14,71 @@ setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<numb
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | index of the bind group |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group to be set |
-|  dynamicOffsets | Iterable&lt;number&gt; | _(Optional)_ dynamic uniform buffer offsets of the bind group or null |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the bind group
+
+
+</td></tr>
+<tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+The bind group to be set
+
+
+</td></tr>
+<tr><td>
+
+dynamicOffsets
+
+
+</td><td>
+
+Iterable&lt;number&gt;
+
+
+</td><td>
+
+_(Optional)_ dynamic uniform buffer offsets of the bind group or null
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,15 +15,161 @@ declare class PBInsideFunctionScope extends PBScope
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [$break()](doc/markdown/./device.pbinsidefunctionscope._break.md) |  | Creates a 'break' statement |
-|  [$choice(condition, first, second)](doc/markdown/./device.pbinsidefunctionscope._choice.md) |  | Creates a select statement: condition ? first : second |
-|  [$continue()](doc/markdown/./device.pbinsidefunctionscope._continue.md) |  | Creates a 'continue' statement |
-|  [$do(body)](doc/markdown/./device.pbinsidefunctionscope._do.md) |  | Creates a 'do..while' statement |
-|  [$for(counter, init, end, body)](doc/markdown/./device.pbinsidefunctionscope._for.md) |  | Creates a 'for' statement |
-|  [$if(condition, body)](doc/markdown/./device.pbinsidefunctionscope._if.md) |  | Creates an 'if' statement |
-|  [$return(retval)](doc/markdown/./device.pbinsidefunctionscope._return.md) |  | Creates a 'return' statement |
-|  [$scope(body)](doc/markdown/./device.pbinsidefunctionscope._scope.md) |  | Creates a new scope |
-|  [$while(condition, body)](doc/markdown/./device.pbinsidefunctionscope._while.md) |  | Creates a 'while' statement |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$break()](doc/markdown/./device.pbinsidefunctionscope._break.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'break' statement
+
+
+</td></tr>
+<tr><td>
+
+[$choice(condition, first, second)](doc/markdown/./device.pbinsidefunctionscope._choice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a select statement: condition ? first : second
+
+
+</td></tr>
+<tr><td>
+
+[$continue()](doc/markdown/./device.pbinsidefunctionscope._continue.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'continue' statement
+
+
+</td></tr>
+<tr><td>
+
+[$do(body)](doc/markdown/./device.pbinsidefunctionscope._do.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'do..while' statement
+
+
+</td></tr>
+<tr><td>
+
+[$for(counter, init, end, open, reverse, body)](doc/markdown/./device.pbinsidefunctionscope._for.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'for' statement
+
+
+</td></tr>
+<tr><td>
+
+[$getMainScope()](doc/markdown/./device.pbinsidefunctionscope._getmainscope.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets main function scope
+
+
+</td></tr>
+<tr><td>
+
+[$if(condition, body)](doc/markdown/./device.pbinsidefunctionscope._if.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an 'if' statement
+
+
+</td></tr>
+<tr><td>
+
+[$return(retval)](doc/markdown/./device.pbinsidefunctionscope._return.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'return' statement
+
+
+</td></tr>
+<tr><td>
+
+[$scope(body)](doc/markdown/./device.pbinsidefunctionscope._scope.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new scope
+
+
+</td></tr>
+<tr><td>
+
+[$while(condition, body)](doc/markdown/./device.pbinsidefunctionscope._while.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a 'while' statement
+
+
+</td></tr>
+</tbody></table>
 

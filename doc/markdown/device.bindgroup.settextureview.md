@@ -12,14 +12,115 @@ setTextureView(name: string, value: BaseTexture, level?: number, face?: number, 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
-|  value | [BaseTexture](doc/markdown/./device.basetexture.md) |  |
-|  level | number | _(Optional)_ |
-|  face | number | _(Optional)_ |
-|  mipCount | number | _(Optional)_ |
-|  sampler | [TextureSampler](doc/markdown/./device.texturesampler.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+value
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+level
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+face
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+mipCount
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

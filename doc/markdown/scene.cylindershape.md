@@ -9,13 +9,156 @@ Box shape
 **Signature:**
 
 ```typescript
-declare class CylinderShape extends Shape<CylinderCreationOptions> 
+declare class CylinderShape extends Shape<CylinderCreationOptions> implements Clonable<CylinderShape> 
 ```
 **Extends:** [Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;[CylinderCreationOptions](doc/markdown/./scene.cylindercreationoptions.md)<!-- -->&gt;
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[CylinderShape](doc/markdown/./scene.cylindershape.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.cylindershape._constructor_.md) |  | Creates an instance of cylinder shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.cylindershape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of cylinder shape
+
+
+</td></tr>
+</tbody></table>
+
+## Properties
+
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.cylindershape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ topCap: boolean; bottomCap: boolean; bottomRadius: number; topRadius: number; heightDetail: number; radialDetail: number; height: number; anchor: number; needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.cylindershape.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+type of the shape
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.cylindershape.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateData(options, vertices, normals, tangents, uvs, indices, bbox, indexOffset, vertexCallback)](doc/markdown/./scene.cylindershape.generatedata.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Generates the data for the cylinder shape
+
+
+</td></tr>
+</tbody></table>
 

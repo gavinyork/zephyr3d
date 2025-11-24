@@ -14,7 +14,37 @@ constructor(other: Plane);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Plane](doc/markdown/./base.plane.md) | The plane to be copied from. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+The plane to be copied from.
+
+
+</td></tr>
+</tbody></table>
 

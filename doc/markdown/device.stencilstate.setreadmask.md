@@ -14,9 +14,39 @@ setReadMask(mask: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  mask | number | The read mask |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+mask
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The read mask
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

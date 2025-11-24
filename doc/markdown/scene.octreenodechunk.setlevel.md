@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.setLevel() method
 
-Sets the level index of this chunk
+Set the level index.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setLevel(level: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  level | number | The level index to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+level
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Level index for this chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

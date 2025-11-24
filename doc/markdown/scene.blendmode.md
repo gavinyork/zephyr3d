@@ -4,7 +4,11 @@
 
 ## BlendMode type
 
-Blending mode for mesh material
+Blending mode for mesh materials.
+
+- `none`<!-- -->: No blending (opaque). - `blend`<!-- -->: Standard alpha blending (srcAlpha, 1 - srcAlpha). - `additive`<!-- -->: Additive blending (1, 1), commonly for glow/FX.
+
+May be combined with alpha-to-coverage and alpha test.
 
 **Signature:**
 

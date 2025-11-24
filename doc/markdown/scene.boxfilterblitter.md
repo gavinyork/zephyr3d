@@ -15,23 +15,176 @@ declare class BoxFilterBlitter extends Blitter
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(phase, kernelSize, blurSize)](doc/markdown/./scene.boxfilterblitter._constructor_.md) |  | Creates an instance of BoxFilterBlitter |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(phase, kernelSize, blurSize)](doc/markdown/./scene.boxfilterblitter._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of BoxFilterBlitter
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [logSpace](doc/markdown/./scene.boxfilterblitter.logspace.md) |  | boolean | true if the box filter will be applied in logarithmic space |
-|  [logSpaceMultiplier](doc/markdown/./scene.boxfilterblitter.logspacemultiplier.md) |  | number | Multiplier for logarithmic space blur |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[logSpace](doc/markdown/./scene.boxfilterblitter.logspace.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the box filter will be applied in logarithmic space
+
+
+</td></tr>
+<tr><td>
+
+[logSpaceMultiplier](doc/markdown/./scene.boxfilterblitter.logspacemultiplier.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Multiplier for logarithmic space blur
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [calcHash()](doc/markdown/./scene.boxfilterblitter.calchash.md) | <code>protected</code> | Calculates the hash code |
-|  [filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.boxfilterblitter.filter.md) |  | Calculates the destination texel by the source texel |
-|  [setUniforms(bindGroup)](doc/markdown/./scene.boxfilterblitter.setuniforms.md) |  | Update uniforms of the bind group |
-|  [setup(scope, type)](doc/markdown/./scene.boxfilterblitter.setup.md) |  | Initialize uniforms of the blit program |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[calcHash()](doc/markdown/./scene.boxfilterblitter.calchash.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Calculates the hash code
+
+
+</td></tr>
+<tr><td>
+
+[filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.boxfilterblitter.filter.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the destination texel by the source texel
+
+
+</td></tr>
+<tr><td>
+
+[setUniforms(bindGroup)](doc/markdown/./scene.boxfilterblitter.setuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update uniforms of the bind group
+
+
+</td></tr>
+<tr><td>
+
+[setup(scope, type)](doc/markdown/./scene.boxfilterblitter.setup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize uniforms of the blit program
+
+
+</td></tr>
+</tbody></table>
 

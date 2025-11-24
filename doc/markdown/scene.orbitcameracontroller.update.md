@@ -4,7 +4,11 @@
 
 ## OrbitCameraController.update() method
 
-Updates state
+Per-frame update.
+
+Subclasses should override this to: - Integrate velocities/accelerations and apply damping. - Smoothly interpolate camera transforms. - Clamp angles/distances/FOV, etc.
+
+Called once per frame by the owning system.
 
 **Signature:**
 

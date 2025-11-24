@@ -14,7 +14,35 @@ constructor(accessMode: PBSamplerAccessMode);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  accessMode | [PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+accessMode
+
+
+</td><td>
+
+[PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

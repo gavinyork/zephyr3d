@@ -4,7 +4,7 @@
 
 ## Application.deviceType property
 
-Gets the device type
+Convenience accessor for the device type name provided by the backend.
 
 **Signature:**
 

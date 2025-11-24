@@ -4,18 +4,47 @@
 
 ## AnimationSet.(constructor)
 
-Creates an instance of AnimationSet
+Create an AnimationSet controlling the provided model.
 
 **Signature:**
 
 ```typescript
-constructor(scene: Scene, model: SceneNode);
+constructor(model: SceneNode);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the animation set belongs |
-|  model | [SceneNode](doc/markdown/./scene.scenenode.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+model
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+The SceneNode (model root) controlled by this animation set.
+
+
+</td></tr>
+</tbody></table>
 

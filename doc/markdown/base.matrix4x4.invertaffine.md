@@ -14,10 +14,55 @@ static invertAffine(matrix: Matrix4x4, result?: Matrix4x4): Matrix4x4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The matrix to be inverted. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix (can be the same as matrix). if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The matrix to be inverted.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix (can be the same as matrix). if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

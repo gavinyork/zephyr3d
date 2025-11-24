@@ -14,9 +14,83 @@ interface FunctionTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [argTypes](doc/markdown/./device.functiontypedetail.argtypes.md) |  | { type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\] | Type information for function arguments |
-|  [name](doc/markdown/./device.functiontypedetail.name.md) |  | string | The function name |
-|  [returnType](doc/markdown/./device.functiontypedetail.returntype.md) |  | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Return type of the function |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[argTypes](doc/markdown/./device.functiontypedetail.argtypes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\]
+
+
+</td><td>
+
+Type information for function arguments
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./device.functiontypedetail.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The function name
+
+
+</td></tr>
+<tr><td>
+
+[returnType](doc/markdown/./device.functiontypedetail.returntype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Return type of the function
+
+
+</td></tr>
+</tbody></table>
 

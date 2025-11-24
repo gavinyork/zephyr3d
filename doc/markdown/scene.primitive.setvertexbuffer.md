@@ -4,7 +4,9 @@
 
 ## Primitive.setVertexBuffer() method
 
-Adds a vertex buffer to the primitive
+Add an existing vertex buffer to the primitive.
+
+Ownership note: The primitive retains the buffer; it will be released or disposed when replaced or on dispose.
 
 **Signature:**
 
@@ -14,14 +16,59 @@ setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): Structured
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) | The vertex buffer to be added |
-|  stepMode | [VertexStepMode](doc/markdown/./device.vertexstepmode.md) | _(Optional)_ Step mode of the vertex buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
+
+
+</td><td>
+
+The vertex buffer to add.
+
+
+</td></tr>
+<tr><td>
+
+stepMode
+
+
+</td><td>
+
+[VertexStepMode](doc/markdown/./device.vertexstepmode.md)
+
+
+</td><td>
+
+_(Optional)_ Optional step mode for the buffer.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [StructuredBuffer](doc/markdown/./device.structuredbuffer.md)<!-- -->&lt;unknown&gt;
 
-The added vertex buffer
+The same buffer.
 

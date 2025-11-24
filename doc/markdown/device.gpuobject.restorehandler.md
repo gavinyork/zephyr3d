@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-restoreHandler: (tex: GPUObject) => Promise<void>;
+restoreHandler: (tex: GPUObject) => void;
 ```

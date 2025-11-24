@@ -4,24 +4,52 @@
 
 ## FPSCameraController.\_onMouseMove() method
 
-Mouse move event handler
+Pointer move handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
 /** @override */
-protected _onMouseMove(evt: PointerEvent): boolean;
+protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | PointerEvent | Mouse event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+evt
+
+
+</td><td>
+
+[IControllerPointerMoveEvent](doc/markdown/./scene.icontrollerpointermoveevent.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

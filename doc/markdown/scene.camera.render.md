@@ -9,15 +9,44 @@ Renders a scene
 **Signature:**
 
 ```typescript
-render(scene: Scene, compositor?: Compositor): void;
+render(scene: Scene): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to be rendered |
-|  compositor | [Compositor](doc/markdown/./scene.compositor.md) | _(Optional)_ Compositor instance that will be used to apply postprocess effects |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene to be rendered
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

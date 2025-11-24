@@ -14,9 +14,39 @@ getOriginX(waveIndex: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  waveIndex | number | index of the wave to set. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+waveIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the wave to set.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

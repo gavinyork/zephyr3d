@@ -14,10 +14,55 @@ static inverse(v: Vector4, result?: Vector4): Vector4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v | [Vector4](doc/markdown/./base.vector4.md) | The input vector |
-|  result | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ The output vector (can be the same vector as v). if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The input vector
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector (can be the same vector as v). if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

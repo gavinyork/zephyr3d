@@ -9,15 +9,60 @@ Initialize uniforms of the blit program
 **Signature:**
 
 ```typescript
-setup(scope: PBGlobalScope, type: BlitType): void;
+setup(_scope: PBGlobalScope, _type: BlitType): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | The shader scope |
-|  type | [BlitType](doc/markdown/./scene.blittype.md) | The blit type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+\_type
+
+
+</td><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+The blit type
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

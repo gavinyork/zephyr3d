@@ -4,10 +4,15 @@
 
 ## OctreeNode.(constructor)
 
-Creates an instance of octree node
+Create an empty octree node.
 
 **Signature:**
 
 ```typescript
 constructor();
 ```
+
+## Remarks
+
+Nodes are created and wired by `OctreeNodeChunk`<!-- -->.
+

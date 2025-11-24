@@ -4,7 +4,7 @@
 
 ## MeshMaterial.blendMode property
 
-Blending mode
+Blending mode of this material. - 'none' for opaque, 'blend' for standard alpha, 'additive' for emissive FX. - Changing the mode toggles an internal feature and rebuilds variants.
 
 **Signature:**
 

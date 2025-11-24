@@ -10,13 +10,13 @@ The device event map
 
 ```typescript
 type DeviceEventMap = {
-    [DeviceResizeEvent.NAME]: DeviceResizeEvent;
-    [DeviceLostEvent.NAME]: DeviceLostEvent;
-    [DeviceRestoreEvent.NAME]: DeviceRestoreEvent;
-    [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent;
-    [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent;
-    [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent;
+    resize: [width: number, height: number];
+    devicelost: [];
+    devicerestored: [];
+    gpuobject_added: [obj: GPUObject];
+    gpuobject_removed: [obj: GPUObject];
+    gpuobject_rename: [obj: GPUObject, lastName: string];
 };
 ```
-**References:** [DeviceResizeEvent](doc/markdown/./device.deviceresizeevent.md)<!-- -->, [DeviceLostEvent](doc/markdown/./device.devicelostevent.md)<!-- -->, [DeviceRestoreEvent](doc/markdown/./device.devicerestoreevent.md)<!-- -->, [DeviceGPUObjectAddedEvent](doc/markdown/./device.devicegpuobjectaddedevent.md)<!-- -->, [DeviceGPUObjectRemovedEvent](doc/markdown/./device.devicegpuobjectremovedevent.md)<!-- -->, [DeviceGPUObjectRenameEvent](doc/markdown/./device.devicegpuobjectrenameevent.md)
+**References:** [GPUObject](doc/markdown/./device.gpuobject.md)
 

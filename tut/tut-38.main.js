@@ -6,13 +6,9 @@ import {
   DirectionalLight,
   AssetManager,
   Application,
-  Tonemap,
   PerspectiveCamera,
-  Compositor,
   Terrain,
-  FXAA,
-  PostWater,
-  FFTWaveGenerator
+  getInput
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -67,59 +63,38 @@ myApp.ready().then(async () => {
     return terrain;
   }
 
-  const device = myApp.device;
-
   const scene = new Scene();
-  scene.env.sky.aerialPerspectiveDensity = 8;
   scene.env.light.strength = 0.1;
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
   camera.controller = new FPSCameraController({ moveSpeed: 0.5 });
   camera.lookAt(new Vector3(200, 40, 80), new Vector3(250, 0, 250), Vector3.axisPY());
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   const light = new DirectionalLight(scene).setColor(new Vector4(1, 1, 1, 1)).setCastShadow(false);
   light.lookAt(new Vector3(1, 1, 1), new Vector3(0, 0, 0), Vector3.axisPY());
-  light.intensity = 4;
   light.shadow.shadowMapSize = 2048;
   light.shadow.numShadowCascades = 4;
   light.castShadow = true;
   light.shadow.mode = 'pcf-opt';
 
-  const water = new PostWater(0, new FFTWaveGenerator());
-  water.boundary.setXYZW(0, 0, 500, 500);
-  water.depthMulti = 0.06;
-  water.refractionStrength = 0.12;
-  water.elevation = 6;
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  compositor.appendPostEffect(water);
-  compositor.appendPostEffect(new FXAA());
+  camera.FXAA = true;
 
   scene.env.light.type = 'ibl';
   scene.env.light.strength = 0.35;
   scene.env.light.radianceMap = scene.env.sky.radianceMap;
-  scene.env.light.irradianceMap = scene.env.sky.irradianceMap;
   scene.env.sky.skyType = 'scatter';
-  scene.env.sky.fogType = 'scatter';
 
   const assetManager = new AssetManager();
   loadTerrain(scene, assetManager);
 
-  myApp.on('resize', (ev) => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
-  myApp.on('tick', (ev) => {
+  myApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

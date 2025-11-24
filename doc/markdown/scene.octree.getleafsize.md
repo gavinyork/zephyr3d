@@ -4,7 +4,7 @@
 
 ## Octree.getLeafSize() method
 
-Gets the leaf size of the octree
+Minimum leaf cell size (edge length).
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getLeafSize(): number;
 
 number
 
-The leaf size of the octree
+The current leaf cell size.
 

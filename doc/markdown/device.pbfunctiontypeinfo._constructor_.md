@@ -17,9 +17,63 @@ constructor(name: string, returnType: PBTypeInfo, argTypes: {
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
-|  returnType | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) |  |
-|  argTypes | { type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\] |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+returnType
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+argTypes
+
+
+</td><td>
+
+{ type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

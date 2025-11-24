@@ -4,7 +4,11 @@
 
 ## AssetManager class
 
-The asset manager
+Centralized asset manager for loading and caching resources.
+
+Responsibilities: - Abstracts resource loading via VFS (text/json/binary). - Dispatches texture/model loading to registered loaders by MIME type. - Caches results and uses weak references to allow GPU resources to be GC'd when unused. - Harmonizes cross-backend constraints (e.g., WebGL non-power-of-two rules and sRGB handling). - Provides access to built-in textures with device-restore handlers.
+
+Threading/async model: - All I/O is async; repeated calls are coalesced via internal promise caches keyed by URL or hash.
 
 **Signature:**
 
@@ -14,28 +18,385 @@ declare class AssetManager
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.assetmanager._constructor_.md) |  | Creates an instance of AssetManager |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(resourceManager)](doc/markdown/./scene.assetmanager._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of AssetManager
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [httpRequest](doc/markdown/./scene.assetmanager.httprequest.md) | <code>readonly</code> | [HttpRequest](doc/markdown/./base.httprequest.md) | HttpRequest instance of the asset manager |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vfs](doc/markdown/./scene.assetmanager.vfs.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[VFS](doc/markdown/./base.vfs.md)
+
+
+</td><td>
+
+VFS used to read resources (files, URLs, virtual mounts).
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addModelLoader(loader)](doc/markdown/./scene.assetmanager.addmodelloader.md) |  | Adds a model loader to the asset manager |
-|  [addTextureLoader(loader)](doc/markdown/./scene.assetmanager.addtextureloader.md) |  | Adds a texture loader to the asset manager |
-|  [clearCache()](doc/markdown/./scene.assetmanager.clearcache.md) |  | Removes all cached assets |
-|  [fetchBinaryData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchbinarydata.md) |  | Fetches a binary resource from a given URL |
-|  [fetchBuiltinTexture(name, texture)](doc/markdown/./scene.assetmanager.fetchbuiltintexture.md) |  | Fetches a built-in texture |
-|  [fetchModel(scene, url, options)](doc/markdown/./scene.assetmanager.fetchmodel.md) |  | Fetches a model resource from a given URL and adds it to a scene |
-|  [fetchTextData(url, postProcess)](doc/markdown/./scene.assetmanager.fetchtextdata.md) |  | Fetches a text resource from a given URL |
-|  [fetchTexture(url, options)](doc/markdown/./scene.assetmanager.fetchtexture.md) |  | Fetches a texture resource from a given URL |
-|  [purgeCache()](doc/markdown/./scene.assetmanager.purgecache.md) |  | Remove and dispose all cached assets |
-|  [setBuiltinTextureLoader(name, loader)](doc/markdown/./scene.assetmanager.setbuiltintextureloader.md) | <code>static</code> | Sets the loader for a given builtin-texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addModelLoader(loader)](doc/markdown/./scene.assetmanager.addmodelloader.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Register a model loader (highest priority first).
+
+Note: This is a static registry shared by all AssetManager instances.
+
+
+</td></tr>
+<tr><td>
+
+[addTextureLoader(loader)](doc/markdown/./scene.assetmanager.addtextureloader.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Register a texture loader (highest priority first).
+
+Note: This is a static registry shared by all AssetManager instances.
+
+
+</td></tr>
+<tr><td>
+
+[clearCache()](doc/markdown/./scene.assetmanager.clearcache.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clear cached references and promises.
+
+- Disposes any DWeakRef holders maintained by this manager. - Empties internal maps for textures, models, and raw data (text/json/binary). - Does not forcibly dispose GPU resources; it only clears references so they can be GC'd if no other owners are holding them.
+
+
+</td></tr>
+<tr><td>
+
+[createBluePrintDAG(nodeMap, roots, links)](doc/markdown/./scene.assetmanager.createblueprintdag.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fetchBinaryData(url, postProcess, httpRequest, VFSs)](doc/markdown/./scene.assetmanager.fetchbinarydata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a binary resource via VFS.
+
+- Cached per resolved URL. Post-process is applied only on first load for a given key.
+
+
+</td></tr>
+<tr><td>
+
+[fetchBluePrint(url, VFSs)](doc/markdown/./scene.assetmanager.fetchblueprint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fetchBuiltinTexture(name, texture)](doc/markdown/./scene.assetmanager.fetchbuiltintexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a built-in texture synchronously by name.
+
+- If this built-in was not created yet, the registered loader is invoked. - Registers a device restore handler so the texture can be re-initialized after device loss. - If an existing texture is provided, the loader uploads into it.
+
+
+</td></tr>
+<tr><td>
+
+[fetchJsonData(url, postProcess, httpRequest, VFSs)](doc/markdown/./scene.assetmanager.fetchjsondata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a JSON resource via VFS.
+
+- Parses as JSON after text load. - Cached per resolved URL. Post-process is applied only on the first load for a given cache key.
+
+
+</td></tr>
+<tr><td>
+
+[fetchMaterial(url, VFSs)](doc/markdown/./scene.assetmanager.fetchmaterial.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a material resource.
+
+
+</td></tr>
+<tr><td>
+
+[fetchModel(scene, url, options, VFSs)](doc/markdown/./scene.assetmanager.fetchmodel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a model resource and instantiate it under a scene.
+
+- Loads or retrieves a cached SharedModel, then creates a SceneNode hierarchy. - Returns both the created group node and any associated AnimationSet.
+
+
+</td></tr>
+<tr><td>
+
+[fetchPrimitive(url, VFSs)](doc/markdown/./scene.assetmanager.fetchprimitive.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a primitive resource.
+
+
+</td></tr>
+<tr><td>
+
+[fetchTextData(url, postProcess, httpRequest, VFSs)](doc/markdown/./scene.assetmanager.fetchtextdata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a UTF-8 text resource via VFS.
+
+- Results are cached per resolved URL (via HttpRequest.urlResolver if provided; otherwise the raw URL). - If cached, any provided postProcess is ignored for subsequent calls; create a separate AssetManager if you need different post-processing of the same URL.
+
+
+</td></tr>
+<tr><td>
+
+[fetchTexture(url, options, VFSs)](doc/markdown/./scene.assetmanager.fetchtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fetch a texture resource via registered loaders.
+
+- Chooses loader by explicit MIME type or by VFS file extension inference. - Deduplicates in-flight requests and caches ready textures. - If `options.texture` is provided, the asset will be uploaded/blitted into that texture. - On WebGL backends, enforces constraints by repacking non-power-of-two or sRGB textures.
+
+
+</td></tr>
+<tr><td>
+
+[loadBluePrint(path, VFSs)](doc/markdown/./scene.assetmanager.loadblueprint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[loadPrimitive(url, VFSs)](doc/markdown/./scene.assetmanager.loadprimitive.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[loadTextureFromBuffer(arrayBuffer, mimeType, srgb, samplerOptions, texture)](doc/markdown/./scene.assetmanager.loadtexturefrombuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Load a texture directly from an ArrayBuffer or typed array.
+
+- Chooses an appropriate loader based on the provided MIME type. - Can upload into an existing texture if `texture` is specified.
+
+
+</td></tr>
+<tr><td>
+
+[reloadBluePrintMaterials(filter)](doc/markdown/./scene.assetmanager.reloadblueprintmaterials.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setBuiltinTextureLoader(name, loader)](doc/markdown/./scene.assetmanager.setbuiltintextureloader.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Override or unregister the loader for a named built-in texture.
+
+- Passing a valid loader function sets/overrides the creation path. - Passing `undefined` removes the loader mapping for the given name.
+
+
+</td></tr>
+<tr><td>
+
+[writeFileToVFSs(path, data, options, vfsList)](doc/markdown/./scene.assetmanager.writefiletovfss.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Write file to a list of VFSs
+
+
+</td></tr>
+</tbody></table>
 

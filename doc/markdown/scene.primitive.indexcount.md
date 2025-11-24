@@ -4,7 +4,7 @@
 
 ## Primitive.indexCount property
 
-The number of the indices or vertices to be drawn
+Number of indices/vertices to draw.
 
 **Signature:**
 

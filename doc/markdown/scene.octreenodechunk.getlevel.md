@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getLevel() method
 
-Gets the level index of this chunk
+Level index of this chunk (0 = root/coarsest).
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getLevel(): number;
 
 number
 
-Level index of this chunk
+The level index of this chunk.
 

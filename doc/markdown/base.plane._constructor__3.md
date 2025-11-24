@@ -14,8 +14,53 @@ constructor(origin: Vector3, normal: Vector3);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  origin | [Vector3](doc/markdown/./base.vector3.md) | The point on the plane. |
-|  normal | [Vector3](doc/markdown/./base.vector3.md) | Normal of the plane. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+origin
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point on the plane.
+
+
+</td></tr>
+<tr><td>
+
+normal
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Normal of the plane.
+
+
+</td></tr>
+</tbody></table>
 

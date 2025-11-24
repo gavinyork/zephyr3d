@@ -4,7 +4,7 @@
 
 ## Drawable.needSceneColor() method
 
-Need scene color
+Whether the object requires access to the scene color buffer.
 
 **Signature:**
 

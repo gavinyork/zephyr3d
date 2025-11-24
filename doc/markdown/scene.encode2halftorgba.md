@@ -14,11 +14,71 @@ declare function encode2HalfToRGBA(scope: PBInsideFunctionScope, a: PBShaderExp 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  a | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | The first half float to be encode |
-|  b | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | The second half float to be encode |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+a
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+The first half float to be encode
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+The second half float to be encode
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

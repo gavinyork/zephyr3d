@@ -9,18 +9,48 @@ Scale this matrix by a scalar number component-wise.
 **Signature:**
 
 ```typescript
-scaleBy(f: number): Matrix4x4;
+scaleBy(f: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  f | number | amount to scale this matrix by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+f
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+amount to scale this matrix by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+this
 
 self
 

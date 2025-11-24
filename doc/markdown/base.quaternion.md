@@ -15,61 +15,754 @@ declare class Quaternion extends VectorBase
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(x, y, z, w)](doc/markdown/./base.quaternion._constructor_.md) |  | Creates a new Quaternion initialized with values. |
-|  [(constructor)(elements)](doc/markdown/./base.quaternion._constructor__1.md) |  | Creates a new Quaternion initialized with values in an array. |
-|  [(constructor)(array)](doc/markdown/./base.quaternion._constructor__2.md) |  | Creates a new Quaternion initialized with values in a Float32Array. |
-|  [(constructor)(buffer, offset)](doc/markdown/./base.quaternion._constructor__3.md) |  | Creates a new Quaternion placed on a given ArrayBuffer object. |
-|  [(constructor)()](doc/markdown/./base.quaternion._constructor__4.md) |  | Creates a new identity Quaternion. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(x, y, z, w)](doc/markdown/./base.quaternion._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Quaternion initialized with values.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(elements)](doc/markdown/./base.quaternion._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Quaternion initialized with values in an array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(array)](doc/markdown/./base.quaternion._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Quaternion initialized with values in a Float32Array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(buffer, offset)](doc/markdown/./base.quaternion._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Quaternion placed on a given ArrayBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)()](doc/markdown/./base.quaternion._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new identity Quaternion.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [magnitude](doc/markdown/./base.quaternion.magnitude.md) | <code>readonly</code> | number | Get the length of the quaternion. |
-|  [magnitudeSq](doc/markdown/./base.quaternion.magnitudesq.md) | <code>readonly</code> | number | Get the squared length of the quaternion. |
-|  [w](doc/markdown/./base.quaternion.w.md) |  | number | Get the w component value. |
-|  [x](doc/markdown/./base.quaternion.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.quaternion.y.md) |  | number | Get the y component value. |
-|  [z](doc/markdown/./base.quaternion.z.md) |  | number | Get the z component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[magnitude](doc/markdown/./base.quaternion.magnitude.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the length of the quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[magnitudeSq](doc/markdown/./base.quaternion.magnitudesq.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the squared length of the quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[w](doc/markdown/./base.quaternion.w.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the w component value.
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.quaternion.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.quaternion.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+<tr><td>
+
+[z](doc/markdown/./base.quaternion.z.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the z component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [angleBetween(a, b)](doc/markdown/./base.quaternion.anglebetween.md) | <code>static</code> | Gets the angular distance between two unit quaternions. |
-|  [clone()](doc/markdown/./base.quaternion.clone.md) |  | Creates a new Quaternion initialized with values from this quaternion. |
-|  [conjugate(q, result)](doc/markdown/./base.quaternion.conjugate.md) | <code>static</code> | Gets the conjugate of a quaternion |
-|  [dot(a, b)](doc/markdown/./base.quaternion.dot.md) | <code>static</code> | Calculates the dot product of two Quaternion's. |
-|  [fromAxisAngle(axis, angle)](doc/markdown/./base.quaternion.fromaxisangle.md) |  | Calculates the quaternion from the given angle and rotation axis inplace. |
-|  [fromAxisAngle(axis, angle, result)](doc/markdown/./base.quaternion.fromaxisangle.md) | <code>static</code> | Creates a quaternion from the given angle and rotation axis. |
-|  [fromEulerAngle(x, y, z, order)](doc/markdown/./base.quaternion.fromeulerangle.md) |  | Calculates the quaternion from an euler angle in specific order inplace. |
-|  [fromEulerAngle(a, b, c, order, result)](doc/markdown/./base.quaternion.fromeulerangle.md) | <code>static</code> | Creates a quaternion from an euler angle in specific order. |
-|  [fromRotationMatrix(matrix)](doc/markdown/./base.quaternion.fromrotationmatrix.md) |  | Calculates the quaternion from a rotation matrix inplace. |
-|  [fromRotationMatrix(matrix, result)](doc/markdown/./base.quaternion.fromrotationmatrix.md) | <code>static</code> | Creates a quaternion from a rotation matrix. |
-|  [getAxisAngle(result)](doc/markdown/./base.quaternion.getaxisangle.md) |  | Get the rotate angle and the rotation axis for this quaternion. |
-|  [getDirectionX(result)](doc/markdown/./base.quaternion.getdirectionx.md) |  | Get the direction of axis x |
-|  [getDirectionY(result)](doc/markdown/./base.quaternion.getdirectiony.md) |  | Get the direction of axis y |
-|  [getDirectionZ(result)](doc/markdown/./base.quaternion.getdirectionz.md) |  | Get the direction of axis z |
-|  [identity()](doc/markdown/./base.quaternion.identity.md) |  | Make this quaternion an identity quaternion |
-|  [identity(q)](doc/markdown/./base.quaternion.identity.md) | <code>static</code> | Create an identity quaternion |
-|  [inplaceConjugate()](doc/markdown/./base.quaternion.inplaceconjugate.md) |  | Calculates the conjugate of this quaternion inplace. |
-|  [inplaceNormalize()](doc/markdown/./base.quaternion.inplacenormalize.md) |  | Normalize this quaternion inplace. |
-|  [multiply(a, b, result)](doc/markdown/./base.quaternion.multiply.md) | <code>static</code> | Multiply two Quaternion's. |
-|  [multiplyLeft(other)](doc/markdown/./base.quaternion.multiplyleft.md) |  | Multiply this quaternion by another quaternion at the left side inplace. |
-|  [multiplyRight(other)](doc/markdown/./base.quaternion.multiplyright.md) |  | Multiply this quaternion by another quaternion at the right side inplace. |
-|  [normalize(q, result)](doc/markdown/./base.quaternion.normalize.md) | <code>static</code> | Normalize a quaternion |
-|  [scale(q, t, result)](doc/markdown/./base.quaternion.scale.md) | <code>static</code> | Scale a Quaternion by a scalar number. |
-|  [scaleBy(f)](doc/markdown/./base.quaternion.scaleby.md) |  | Scale this quaternion by a scalar number. |
-|  [setAndNormalize(x, y, z, w)](doc/markdown/./base.quaternion.setandnormalize.md) |  | Set component values and then normalize the quaternion. |
-|  [setXYZW(x, y, z, w)](doc/markdown/./base.quaternion.setxyzw.md) |  | Set component values. |
-|  [slerp(a, b, t, result)](doc/markdown/./base.quaternion.slerp.md) | <code>static</code> | Performs a spherical linear interpolation between two quat. |
-|  [toAxisAngle(axis)](doc/markdown/./base.quaternion.toaxisangle.md) |  | Calculates the rotation axis and angle for this quaternion |
-|  [toEulerAngles(angles)](doc/markdown/./base.quaternion.toeulerangles.md) |  | Convert this rotation to euler angles in ZYX order |
-|  [toMatrix3x3(matrix)](doc/markdown/./base.quaternion.tomatrix3x3.md) |  | Convert this quaternion to a 3x3 rotation matrix. |
-|  [toMatrix4x4(matrix)](doc/markdown/./base.quaternion.tomatrix4x4.md) |  | Convert this quaternion to a 4x4 rotation matrix. |
-|  [transform(v, result)](doc/markdown/./base.quaternion.transform.md) |  | Rotate a vector |
-|  [unitVectorToUnitVector(from, to)](doc/markdown/./base.quaternion.unitvectortounitvector.md) |  | Make a quaternion used to rotate a unit vector to another inplace. |
-|  [unitVectorToUnitVector(from, to, result)](doc/markdown/./base.quaternion.unitvectortounitvector.md) | <code>static</code> | Creates a quaternion used to rotate a unit vector to another. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[angleBetween(a, b)](doc/markdown/./base.quaternion.anglebetween.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the angular distance between two unit quaternions.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./base.quaternion.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Quaternion initialized with values from this quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[conjugate(q, result)](doc/markdown/./base.quaternion.conjugate.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the conjugate of a quaternion
+
+
+</td></tr>
+<tr><td>
+
+[dot(a, b)](doc/markdown/./base.quaternion.dot.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the dot product of two Quaternion's.
+
+
+</td></tr>
+<tr><td>
+
+[fromAxisAngle(axis, angle)](doc/markdown/./base.quaternion.fromaxisangle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the quaternion from the given angle and rotation axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[fromAxisAngle(axis, angle, result)](doc/markdown/./base.quaternion.fromaxisangle.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a quaternion from the given angle and rotation axis.
+
+
+</td></tr>
+<tr><td>
+
+[fromEulerAngle(x, y, z, order)](doc/markdown/./base.quaternion.fromeulerangle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the quaternion from an euler angle in specific order inplace.
+
+
+</td></tr>
+<tr><td>
+
+[fromEulerAngle(a, b, c, order, result)](doc/markdown/./base.quaternion.fromeulerangle.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a quaternion from an euler angle in specific order.
+
+
+</td></tr>
+<tr><td>
+
+[fromRotationMatrix(matrix)](doc/markdown/./base.quaternion.fromrotationmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the quaternion from a rotation matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[fromRotationMatrix(matrix, result)](doc/markdown/./base.quaternion.fromrotationmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a quaternion from a rotation matrix.
+
+
+</td></tr>
+<tr><td>
+
+[getAxisAngle(result)](doc/markdown/./base.quaternion.getaxisangle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the rotate angle and the rotation axis for this quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[getDirectionX(result)](doc/markdown/./base.quaternion.getdirectionx.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the direction of axis x
+
+
+</td></tr>
+<tr><td>
+
+[getDirectionY(result)](doc/markdown/./base.quaternion.getdirectiony.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the direction of axis y
+
+
+</td></tr>
+<tr><td>
+
+[getDirectionZ(result)](doc/markdown/./base.quaternion.getdirectionz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the direction of axis z
+
+
+</td></tr>
+<tr><td>
+
+[identity()](doc/markdown/./base.quaternion.identity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Make this quaternion an identity quaternion
+
+
+</td></tr>
+<tr><td>
+
+[identity(q)](doc/markdown/./base.quaternion.identity.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Create an identity quaternion
+
+
+</td></tr>
+<tr><td>
+
+[inplaceConjugate()](doc/markdown/./base.quaternion.inplaceconjugate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the conjugate of this quaternion inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceNormalize()](doc/markdown/./base.quaternion.inplacenormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Normalize this quaternion inplace.
+
+
+</td></tr>
+<tr><td>
+
+[multiply(a, b, result)](doc/markdown/./base.quaternion.multiply.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiply two Quaternion's.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyLeft(other)](doc/markdown/./base.quaternion.multiplyleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiply this quaternion by another quaternion at the left side inplace.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyRight(other)](doc/markdown/./base.quaternion.multiplyright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiply this quaternion by another quaternion at the right side inplace.
+
+
+</td></tr>
+<tr><td>
+
+[normalize(q, result)](doc/markdown/./base.quaternion.normalize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Normalize a quaternion
+
+
+</td></tr>
+<tr><td>
+
+[scale(q, t, result)](doc/markdown/./base.quaternion.scale.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Scale a Quaternion by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(f)](doc/markdown/./base.quaternion.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scale this quaternion by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[setAndNormalize(x, y, z, w)](doc/markdown/./base.quaternion.setandnormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values and then normalize the quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[setXYZW(x, y, z, w)](doc/markdown/./base.quaternion.setxyzw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[slerp(a, b, t, result)](doc/markdown/./base.quaternion.slerp.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Performs a spherical linear interpolation between two quat.
+
+
+</td></tr>
+<tr><td>
+
+[toAxisAngle(axis)](doc/markdown/./base.quaternion.toaxisangle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the rotation axis and angle for this quaternion
+
+
+</td></tr>
+<tr><td>
+
+[toEulerAngles(angles)](doc/markdown/./base.quaternion.toeulerangles.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convert this rotation to euler angles in ZYX order
+
+
+</td></tr>
+<tr><td>
+
+[toMatrix3x3(matrix)](doc/markdown/./base.quaternion.tomatrix3x3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convert this quaternion to a 3x3 rotation matrix.
+
+
+</td></tr>
+<tr><td>
+
+[toMatrix4x4(matrix)](doc/markdown/./base.quaternion.tomatrix4x4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convert this quaternion to a 4x4 rotation matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transform(v, result)](doc/markdown/./base.quaternion.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Rotate a vector
+
+
+</td></tr>
+<tr><td>
+
+[unitVectorToUnitVector(from, to)](doc/markdown/./base.quaternion.unitvectortounitvector.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Make a quaternion used to rotate a unit vector to another inplace.
+
+
+</td></tr>
+<tr><td>
+
+[unitVectorToUnitVector(from, to, result)](doc/markdown/./base.quaternion.unitvectortounitvector.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a quaternion used to rotate a unit vector to another.
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,39 @@ declare function toFloat(val: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number | The number to be converted |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The number to be converted
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

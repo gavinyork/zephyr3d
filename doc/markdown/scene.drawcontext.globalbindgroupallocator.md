@@ -4,7 +4,7 @@
 
 ## DrawContext.globalBindGroupAllocator property
 
-Global bind group allocator
+Allocator for global (frame/pass) bind groups and descriptor resources.
 
 **Signature:**
 

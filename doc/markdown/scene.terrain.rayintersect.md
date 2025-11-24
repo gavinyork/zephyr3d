@@ -14,9 +14,37 @@ rayIntersect(ray: Ray): number | null;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ray | [Ray](doc/markdown/./base.ray.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ray
+
+
+</td><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

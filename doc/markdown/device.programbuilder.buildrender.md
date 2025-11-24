@@ -14,9 +14,39 @@ buildRender(options: PBRenderOptions): readonly [string, string, BindGroupLayout
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [PBRenderOptions](doc/markdown/./device.pbrenderoptions.md) | The build options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[PBRenderOptions](doc/markdown/./device.pbrenderoptions.md)
+
+
+</td><td>
+
+The build options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

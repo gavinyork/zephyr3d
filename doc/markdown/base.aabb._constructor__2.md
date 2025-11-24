@@ -14,8 +14,53 @@ constructor(minPoint: Vector3, maxPoint: Vector3);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  minPoint | [Vector3](doc/markdown/./base.vector3.md) | The min point of the AABB. |
-|  maxPoint | [Vector3](doc/markdown/./base.vector3.md) | The max point of the AABB. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+minPoint
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The min point of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+maxPoint
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The max point of the AABB.
+
+
+</td></tr>
+</tbody></table>
 

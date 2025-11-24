@@ -14,8 +14,53 @@ constructor(minPoint: Vector3, maxPoint: Vector3);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  minPoint | [Vector3](doc/markdown/./base.vector3.md) | Min point of the box |
-|  maxPoint | [Vector3](doc/markdown/./base.vector3.md) | Max point of the box |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+minPoint
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Min point of the box
+
+
+</td></tr>
+<tr><td>
+
+maxPoint
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Max point of the box
+
+
+</td></tr>
+</tbody></table>
 

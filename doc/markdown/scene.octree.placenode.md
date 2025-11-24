@@ -4,7 +4,7 @@
 
 ## Octree.placeNode() method
 
-Place a scene node into the octree
+Place or update a scene node in the octree.
 
 **Signature:**
 
@@ -14,11 +14,45 @@ placeNode(node: GraphNode): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [GraphNode](doc/markdown/./scene.graphnode.md) | The scene node to be placed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+node
+
+
+</td><td>
+
+[GraphNode](doc/markdown/./scene.graphnode.md)
+
+
+</td><td>
+
+Scene graph node to place.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
+
+## Remarks
+
+- Uses the node's world-space AABB to determine size and best-fit level. - If the node does not fit within current bounds and growth is allowed, the octree resizes (up to `maxRootSize`<!-- -->) and reinserts nodes. - Nodes without valid bounds or with clip tests disabled fall back to the root.
 

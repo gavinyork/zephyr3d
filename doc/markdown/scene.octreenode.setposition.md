@@ -4,7 +4,7 @@
 
 ## OctreeNode.setPosition() method
 
-Sets the position of the node
+Set the node's linear position index within the owning chunk.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setPosition(index: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Position of the node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Position index.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

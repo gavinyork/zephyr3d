@@ -9,18 +9,80 @@ Extend the AABB so that it can contain specified point.
 **Signature:**
 
 ```typescript
-extend3(x: number, y: number, z: number): void;
+extend3(x: number, y: number, z: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  x | number | The x coordinate of the point. |
-|  y | number | The y coordinate of the point. |
-|  z | number | The z coordinate of the point. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The x coordinate of the point.
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The y coordinate of the point.
+
+
+</td></tr>
+<tr><td>
+
+z
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The z coordinate of the point.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-void
+this
+
+self
 

@@ -14,10 +14,55 @@ setBlendFuncAlpha(src: BlendFunc, dest: BlendFunc): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  src | [BlendFunc](doc/markdown/./device.blendfunc.md) | The source blending function |
-|  dest | [BlendFunc](doc/markdown/./device.blendfunc.md) | The destination blending function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+src
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The source blending function
+
+
+</td></tr>
+<tr><td>
+
+dest
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The destination blending function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

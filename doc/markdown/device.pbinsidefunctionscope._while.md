@@ -14,10 +14,55 @@ $while(condition: ExpValueNonArrayType, body: (this: PBWhileScope) => void): voi
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  condition | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | Condition expression for the while statement |
-|  body | (this: [PBWhileScope](doc/markdown/./device.pbwhilescope.md)<!-- -->) =&gt; void | Generator function for the scope that inside the while statement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+condition
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+Condition expression for the while statement
+
+
+</td></tr>
+<tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBWhileScope](doc/markdown/./device.pbwhilescope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Generator function for the scope that inside the while statement
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

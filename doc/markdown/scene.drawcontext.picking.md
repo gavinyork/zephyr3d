@@ -4,7 +4,7 @@
 
 ## DrawContext.picking property
 
-whether GPU picking is enabled
+Whether GPU-based picking is currently enabled.
 
 **Signature:**
 

@@ -9,29 +9,208 @@ Base class for any kind of render passes
 **Signature:**
 
 ```typescript
-declare abstract class RenderPass 
+declare abstract class RenderPass extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(type)](doc/markdown/./scene.renderpass._constructor_.md) |  | Creates an instanceof RenderPass |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(type)](doc/markdown/./scene.renderpass._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instanceof RenderPass
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [clearColor](doc/markdown/./scene.renderpass.clearcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Color value that is used to clear the frame buffer |
-|  [clearDepth](doc/markdown/./scene.renderpass.cleardepth.md) |  | number | Depth value that is used to clear the frame buffer |
-|  [clearStencil](doc/markdown/./scene.renderpass.clearstencil.md) |  | number | Stencil value that is used to clear the frame buffer |
-|  [type](doc/markdown/./scene.renderpass.type.md) | <code>readonly</code> | number | The render pass type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clearColor](doc/markdown/./scene.renderpass.clearcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Color value that is used to clear the frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[clearDepth](doc/markdown/./scene.renderpass.cleardepth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Depth value that is used to clear the frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[clearStencil](doc/markdown/./scene.renderpass.clearstencil.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Stencil value that is used to clear the frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.renderpass.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The render pass type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [cullScene(ctx, cullCamera)](doc/markdown/./scene.renderpass.cullscene.md) |  | Culls a scene by a given camera |
-|  [dispose()](doc/markdown/./scene.renderpass.dispose.md) |  | Disposes the render pass |
-|  [render(ctx, cullCamera, renderQueue)](doc/markdown/./scene.renderpass.render.md) |  | Renders a scene |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[cullScene(ctx, cullCamera)](doc/markdown/./scene.renderpass.cullscene.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Culls a scene by a given camera
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.renderpass.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the render pass
+
+
+</td></tr>
+<tr><td>
+
+[render(ctx, cullCamera, renderQueue)](doc/markdown/./scene.renderpass.render.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Renders a scene
+
+
+</td></tr>
+</tbody></table>
 

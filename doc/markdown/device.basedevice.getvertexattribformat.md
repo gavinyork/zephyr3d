@@ -12,11 +12,65 @@ getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCou
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  semantic | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) |  |
-|  dataType | [DataType](doc/markdown/./device.datatype.md) |  |
-|  componentCount | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dataType
+
+
+</td><td>
+
+[DataType](doc/markdown/./device.datatype.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+componentCount
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

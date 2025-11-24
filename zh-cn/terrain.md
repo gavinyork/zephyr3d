@@ -36,19 +36,19 @@ for (let i = 0; i < TERRAIN_WIDTH * TERRAIN_HEIGHT; i++) {
   heightmap = heightsInt16[i] / 65535;
 }
 // 载入SplatMap，
-const splatMap = await assetManager.fetchTexture('assets/maps/map1/splatmap.tga', { linearColorSpace: true });
+const splatMap = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/splatmap.tga', { linearColorSpace: true });
 // 细节纹理1
-const detailAlbedo0 = await assetManager.fetchTexture('assets/maps/map1/detail1.jpg', { linearColorSpace: false });
-const detailNormal0 = await assetManager.fetchTexture('assets/maps/map1/detail1_norm.jpg', { linearColorSpace: true });
+const detailAlbedo0 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1.jpg', { linearColorSpace: false });
+const detailNormal0 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1_norm.jpg', { linearColorSpace: true });
 // 细节纹理2
-const detailAlbedo1 = await assetManager.fetchTexture('assets/maps/map1/detail2.jpg', { linearColorSpace: false });
-const detailNormal1 = await assetManager.fetchTexture('assets/maps/map1/detail2_norm.jpg', { linearColorSpace: true });
+const detailAlbedo1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2.jpg', { linearColorSpace: false });
+const detailNormal1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2_norm.jpg', { linearColorSpace: true });
 // 细节纹理3
-const detailAlbedo2 = await assetManager.fetchTexture('assets/maps/map1/detail3.jpg', { linearColorSpace: false });
-const detailNormal2 = await assetManager.fetchTexture('assets/maps/map1/detail3_norm.jpg', { linearColorSpace: true });
+const detailAlbedo2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3.jpg', { linearColorSpace: false });
+const detailNormal2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3_norm.jpg', { linearColorSpace: true });
 // 草贴图
-const grass1 = await assetManager.fetchTexture('assets/images/grass1.dds');
-const grass2 = await assetManager.fetchTexture('assets/images/grass2.dds');
+const grass1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/grass1.dds');
+const grass2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/grass2.dds');
 
 // 创建地形
 const terrain = new Terrain(scene);
@@ -104,7 +104,7 @@ terrain.create(TERRAIN_WIDTH, TERRAIN_HEIGHT, heightmap, new Vector3(1, maxHeigh
 ```javascript
 
 // 每一帧修正摄像机位置
-myApp.on('tick', ev => {
+myApp.on('tick', () => {
   camera.updateController();
   // 获取相机在世界坐标系的位置
   const cameraPos = camera.getWorldPosition();
@@ -130,7 +130,7 @@ myApp.on('tick', ev => {
 // 设置camera为地形的子节点
 camera.parent = terrain
 
-myApp.on('tick', ev => {
+myApp.on('tick', () => {
   camera.updateController();
 
   // 摄像机位置处于地形坐标系内，可以直接用来获取高度

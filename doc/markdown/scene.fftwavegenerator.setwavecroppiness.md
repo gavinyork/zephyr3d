@@ -14,10 +14,55 @@ setWaveCroppiness(cascade: number, croppiness: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cascade | number | The cascade index |
-|  croppiness | number | The new wave croppiness for the specified cascade |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cascade
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The cascade index
+
+
+</td></tr>
+<tr><td>
+
+croppiness
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The new wave croppiness for the specified cascade
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

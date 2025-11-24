@@ -17,5 +17,5 @@ boolean
 
 ## Remarks
 
-All rendering call must occur between the [AbstractDevice.beginFrame()](doc/markdown/./device.abstractdevice.beginframe.md) and [AbstractDevice.endFrame()](doc/markdown/./device.abstractdevice.endframe.md) methods
+All rendering call must occur between the
 

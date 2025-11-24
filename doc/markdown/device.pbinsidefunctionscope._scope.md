@@ -14,9 +14,39 @@ $scope(body: (this: PBInsideFunctionScope) => void): PBInsideFunctionScope;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  body | (this: [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->) =&gt; void | Generator function for the scope |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Generator function for the scope
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,11 +14,69 @@ createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(data: TextureMi
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TextureMipmapData](doc/markdown/./device.texturemipmapdata.md) | Mipmap data |
-|  sRGB | boolean |  |
-|  options | [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | _(Optional)_ Texture creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TextureMipmapData](doc/markdown/./device.texturemipmapdata.md)
+
+
+</td><td>
+
+Mipmap data
+
+
+</td></tr>
+<tr><td>
+
+sRGB
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Texture creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

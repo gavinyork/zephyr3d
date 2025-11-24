@@ -4,7 +4,11 @@
 
 ## AnimationTrack class
 
-Base class for any kind of animation track
+Base class for animation tracks.
+
+A track produces time-varying state for a specific target and defines how to: - Compute state at a given time (`calculateState`<!-- -->) - Apply that state to a target (`applyState`<!-- -->) - Blend between two states (`mixState`<!-- -->) - Report its blend compatibility (`getBlendId`<!-- -->) - Report its intrinsic duration (`getDuration`<!-- -->)
+
+Generic: - `StateType` is the shape of the computed/applied state (e.g., number, vector, pose).
 
 **Signature:**
 
@@ -14,24 +18,281 @@ declare abstract class AnimationTrack<StateType = unknown>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(interpolator)](doc/markdown/./scene.animationtrack._constructor_.md) |  | Creates a new animation track |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(embedded)](doc/markdown/./scene.animationtrack._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a new animation track.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [animation](doc/markdown/./scene.animationtrack.animation.md) |  | [AnimationClip](doc/markdown/./scene.animationclip.md) | Animation this track belongs to |
-|  [interpolator](doc/markdown/./scene.animationtrack.interpolator.md) | <code>readonly</code> | [Interpolator](doc/markdown/./base.interpolator.md) | Gets the interpolator of the track |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[animation](doc/markdown/./scene.animationtrack.animation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AnimationClip](doc/markdown/./scene.animationclip.md)
+
+
+</td><td>
+
+The `AnimationClip` that owns this track.
+
+
+</td></tr>
+<tr><td>
+
+[embedded](doc/markdown/./scene.animationtrack.embedded.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this track is embedded (owned inline by a resource/container).
+
+
+</td></tr>
+<tr><td>
+
+[jointIndex](doc/markdown/./scene.animationtrack.jointindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Joint index if this track controls a joint, otherwise -1
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./scene.animationtrack.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Human-readable name of the track.
+
+
+</td></tr>
+<tr><td>
+
+[target](doc/markdown/./scene.animationtrack.target.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Logical target identifier for this track (optional metadata).
+
+This does not affect application; it can be used by tooling or higher-level systems to label/group tracks.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyState(node, state)](doc/markdown/./scene.animationtrack.applystate.md) | <code>abstract</code> | Applys animation state to node |
-|  [calculateState(currentTime)](doc/markdown/./scene.animationtrack.calculatestate.md) | <code>abstract</code> | Calculates current animation state |
-|  [getBlendId()](doc/markdown/./scene.animationtrack.getblendid.md) | <code>abstract</code> | Get the blend ID |
-|  [mixState(a, b, t)](doc/markdown/./scene.animationtrack.mixstate.md) | <code>abstract</code> | Mixes two animation state according to specific weight value |
-|  [reset(node)](doc/markdown/./scene.animationtrack.reset.md) |  | Stops playing the track and rewind to the first frame |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyState(target, state)](doc/markdown/./scene.animationtrack.applystate.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Apply a previously computed animation state to the target.
+
+
+</td></tr>
+<tr><td>
+
+[calculateState(target, currentTime)](doc/markdown/./scene.animationtrack.calculatestate.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Compute the animation state at the specified time.
+
+Implementations should be pure with respect to inputs: given the same `target` and `currentTime`<!-- -->, return the same `StateType`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[getBlendId()](doc/markdown/./scene.animationtrack.getblendid.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Get the blend identifier for this track.
+
+Tracks with the same blend ID are considered compatible for blending on the same target channel/property.
+
+
+</td></tr>
+<tr><td>
+
+[getDuration()](doc/markdown/./scene.animationtrack.getduration.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Get the intrinsic duration of this track in seconds.
+
+Used by clips to determine overall clip duration and looping behavior.
+
+
+</td></tr>
+<tr><td>
+
+[mixState(a, b, t)](doc/markdown/./scene.animationtrack.mixstate.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Blend two states into a new state using a weight.
+
+
+</td></tr>
+<tr><td>
+
+[reset(\_target)](doc/markdown/./scene.animationtrack.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Reset the track to its initial state for the given target.
+
+Intended to stop playback and rewind the target to the first frame or default state.
+
+
+</td></tr>
+</tbody></table>
 

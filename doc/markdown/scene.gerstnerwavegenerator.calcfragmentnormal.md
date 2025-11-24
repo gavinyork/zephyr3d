@@ -12,10 +12,55 @@ calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Global scope of the shader program. |
-|  xz | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | XZ position. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Global scope of the shader program.
+
+
+</td></tr>
+<tr><td>
+
+xz
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+XZ position.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,32 +14,368 @@ interface StencilState
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [enabled](doc/markdown/./device.stencilstate.enabled.md) |  | boolean | true if stencil testing should be enabled |
-|  [failOp](doc/markdown/./device.stencilstate.failop.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for front stencil state when the stencil test fails |
-|  [failOpBack](doc/markdown/./device.stencilstate.failopback.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for back stencil state when the stencil test fails of the back stencil state |
-|  [func](doc/markdown/./device.stencilstate.func.md) |  | [CompareFunc](doc/markdown/./device.comparefunc.md) | The test function for front stencil state |
-|  [funcBack](doc/markdown/./device.stencilstate.funcback.md) |  | [CompareFunc](doc/markdown/./device.comparefunc.md) | The test function for back stencil state |
-|  [passOp](doc/markdown/./device.stencilstate.passop.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for front stencil state when both the stencil test and the depth test pass |
-|  [passOpBack](doc/markdown/./device.stencilstate.passopback.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for back stencil state when both the stencil test and the depth test pass |
-|  [readMask](doc/markdown/./device.stencilstate.readmask.md) |  | number | A bit mask that is used to AND the reference value and the stored stencil value |
-|  [ref](doc/markdown/./device.stencilstate.ref.md) |  | number | The reference value for the stencil test |
-|  [writeMask](doc/markdown/./device.stencilstate.writemask.md) |  | number | A bit mask to control which bits can be written while writing to the stencil buffer |
-|  [zFailOp](doc/markdown/./device.stencilstate.zfailop.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for front stencil state when the stencil test passes but depth test fails |
-|  [zFailOpBack](doc/markdown/./device.stencilstate.zfailopback.md) |  | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use for back stencil state when the stencil test passes but depth test fails |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[enabled](doc/markdown/./device.stencilstate.enabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if stencil testing should be enabled
+
+
+</td></tr>
+<tr><td>
+
+[failOp](doc/markdown/./device.stencilstate.failop.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for front stencil state when the stencil test fails
+
+
+</td></tr>
+<tr><td>
+
+[failOpBack](doc/markdown/./device.stencilstate.failopback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for back stencil state when the stencil test fails of the back stencil state
+
+
+</td></tr>
+<tr><td>
+
+[func](doc/markdown/./device.stencilstate.func.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CompareFunc](doc/markdown/./device.comparefunc.md)
+
+
+</td><td>
+
+The test function for front stencil state
+
+
+</td></tr>
+<tr><td>
+
+[funcBack](doc/markdown/./device.stencilstate.funcback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CompareFunc](doc/markdown/./device.comparefunc.md)
+
+
+</td><td>
+
+The test function for back stencil state
+
+
+</td></tr>
+<tr><td>
+
+[passOp](doc/markdown/./device.stencilstate.passop.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for front stencil state when both the stencil test and the depth test pass
+
+
+</td></tr>
+<tr><td>
+
+[passOpBack](doc/markdown/./device.stencilstate.passopback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for back stencil state when both the stencil test and the depth test pass
+
+
+</td></tr>
+<tr><td>
+
+[readMask](doc/markdown/./device.stencilstate.readmask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+A bit mask that is used to AND the reference value and the stored stencil value
+
+
+</td></tr>
+<tr><td>
+
+[ref](doc/markdown/./device.stencilstate.ref.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The reference value for the stencil test
+
+
+</td></tr>
+<tr><td>
+
+[writeMask](doc/markdown/./device.stencilstate.writemask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+A bit mask to control which bits can be written while writing to the stencil buffer
+
+
+</td></tr>
+<tr><td>
+
+[zFailOp](doc/markdown/./device.stencilstate.zfailop.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for front stencil state when the stencil test passes but depth test fails
+
+
+</td></tr>
+<tr><td>
+
+[zFailOpBack](doc/markdown/./device.stencilstate.zfailopback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use for back stencil state when the stencil test passes but depth test fails
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [clone()](doc/markdown/./device.stencilstate.clone.md) | Creates a new StencilState by copying this one |
-|  [enable(b)](doc/markdown/./device.stencilstate.enable.md) | Enables or disables the stencil test |
-|  [setBackCompareFunc(func)](doc/markdown/./device.stencilstate.setbackcomparefunc.md) | Sets the compare function for back stencil state |
-|  [setBackOp(fail, zfail, pass)](doc/markdown/./device.stencilstate.setbackop.md) | Sets the stencil operations for back stencil state |
-|  [setFrontCompareFunc(func)](doc/markdown/./device.stencilstate.setfrontcomparefunc.md) | Sets the compare function for front stencil state |
-|  [setFrontOp(fail, zfail, pass)](doc/markdown/./device.stencilstate.setfrontop.md) | Sets the stencil operations for front stencil state |
-|  [setReadMask(mask)](doc/markdown/./device.stencilstate.setreadmask.md) | Sets the bit mask for reading from the stencil buffer and reference value |
-|  [setReference(ref)](doc/markdown/./device.stencilstate.setreference.md) | Sets the reference value for the stencil test |
-|  [setWriteMask(mask)](doc/markdown/./device.stencilstate.setwritemask.md) | Sets the bit mask for writing to the stencil buffer |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.stencilstate.clone.md)
+
+
+</td><td>
+
+Creates a new StencilState by copying this one
+
+
+</td></tr>
+<tr><td>
+
+[enable(b)](doc/markdown/./device.stencilstate.enable.md)
+
+
+</td><td>
+
+Enables or disables the stencil test
+
+
+</td></tr>
+<tr><td>
+
+[setBackCompareFunc(func)](doc/markdown/./device.stencilstate.setbackcomparefunc.md)
+
+
+</td><td>
+
+Sets the compare function for back stencil state
+
+
+</td></tr>
+<tr><td>
+
+[setBackOp(fail, zfail, pass)](doc/markdown/./device.stencilstate.setbackop.md)
+
+
+</td><td>
+
+Sets the stencil operations for back stencil state
+
+
+</td></tr>
+<tr><td>
+
+[setFrontCompareFunc(func)](doc/markdown/./device.stencilstate.setfrontcomparefunc.md)
+
+
+</td><td>
+
+Sets the compare function for front stencil state
+
+
+</td></tr>
+<tr><td>
+
+[setFrontOp(fail, zfail, pass)](doc/markdown/./device.stencilstate.setfrontop.md)
+
+
+</td><td>
+
+Sets the stencil operations for front stencil state
+
+
+</td></tr>
+<tr><td>
+
+[setReadMask(mask)](doc/markdown/./device.stencilstate.setreadmask.md)
+
+
+</td><td>
+
+Sets the bit mask for reading from the stencil buffer and reference value
+
+
+</td></tr>
+<tr><td>
+
+[setReference(ref)](doc/markdown/./device.stencilstate.setreference.md)
+
+
+</td><td>
+
+Sets the reference value for the stencil test
+
+
+</td></tr>
+<tr><td>
+
+[setWriteMask(mask)](doc/markdown/./device.stencilstate.setwritemask.md)
+
+
+</td><td>
+
+Sets the bit mask for writing to the stencil buffer
+
+
+</td></tr>
+</tbody></table>
 

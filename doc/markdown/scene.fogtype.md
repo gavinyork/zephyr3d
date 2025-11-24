@@ -9,5 +9,5 @@ Type of fog
 **Signature:**
 
 ```typescript
-type FogType = 'linear' | 'exp' | 'exp2' | 'scatter' | 'none';
+type FogType = 'height_fog' | 'none';
 ```

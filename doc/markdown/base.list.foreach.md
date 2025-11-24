@@ -14,9 +14,39 @@ forEach(callback: (data: T) => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  callback | (data: T) =&gt; void | The function to be executed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+callback
+
+
+</td><td>
+
+(data: T) =&gt; void
+
+
+</td><td>
+
+The function to be executed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

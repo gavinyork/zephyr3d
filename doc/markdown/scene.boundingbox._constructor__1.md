@@ -14,7 +14,37 @@ constructor(box: AABB);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  box | [AABB](doc/markdown/./base.aabb.md) | The AABB |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+box
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+The AABB
+
+
+</td></tr>
+</tbody></table>
 

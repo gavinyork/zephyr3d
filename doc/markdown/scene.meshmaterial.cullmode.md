@@ -4,7 +4,7 @@
 
 ## MeshMaterial.cullMode property
 
-Cull mode
+Face culling mode: 'none' \| 'front' \| 'back'. - Does not force shader rebuild; affects rasterizer state.
 
 **Signature:**
 

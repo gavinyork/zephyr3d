@@ -4,21 +4,83 @@
 
 ## Material.updateRenderStates() method
 
-Update render states according to draw context and current material pass
+Update render states (depth/stencil, blending, rasterization) for the pass.
+
+Implement in subclasses based on transparency, double-sidedness, depth writes/tests, color mask, stencil ops, etc., and any context flags in `ctx`<!-- -->.
 
 **Signature:**
 
 ```typescript
-protected updateRenderStates(pass: number, renderStates: RenderStateSet, ctx: DrawContext): void;
+protected updateRenderStates(_pass: number, _renderStates: RenderStateSet, _ctx: DrawContext): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number | Current material pass |
-|  renderStates | [RenderStateSet](doc/markdown/./device.renderstateset.md) | Render state set to be updated |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current pass index.
+
+
+</td></tr>
+<tr><td>
+
+\_renderStates
+
+
+</td><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+Render state set to mutate.
+
+
+</td></tr>
+<tr><td>
+
+\_ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

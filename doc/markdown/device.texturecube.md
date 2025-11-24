@@ -15,9 +15,43 @@ interface TextureCube<T = unknown> extends BaseTexture<T>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [createWithMipmapData(data, sRGB, creationFlags)](doc/markdown/./device.texturecube.createwithmipmapdata.md) |  |
-|  [update(data, xOffset, yOffset, width, height, face)](doc/markdown/./device.texturecube.update.md) |  |
-|  [updateFromElement(data, xOffset, yOffset, face, x, y, width, height)](doc/markdown/./device.texturecube.updatefromelement.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createWithMipmapData(data, sRGB, creationFlags)](doc/markdown/./device.texturecube.createwithmipmapdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[update(data, xOffset, yOffset, width, height, face)](doc/markdown/./device.texturecube.update.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[updateFromElement(data, xOffset, yOffset, face, x, y, width, height)](doc/markdown/./device.texturecube.updatefromelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

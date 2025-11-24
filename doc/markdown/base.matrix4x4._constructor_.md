@@ -14,22 +14,277 @@ constructor(m00: number, m10: number, m20: number, m30: number, m01: number, m11
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  m00 | number | element at row 0, column 0 |
-|  m10 | number | element at row 0, column 1 |
-|  m20 | number | element at row 0, column 2 |
-|  m30 | number | element at row 0, column 3 |
-|  m01 | number | element at row 1, column 0 |
-|  m11 | number | element at row 1, column 1 |
-|  m21 | number | element at row 1, column 2 |
-|  m31 | number | element at row 1, column 3 |
-|  m02 | number | element at row 2, column 0 |
-|  m12 | number | element at row 2, column 1 |
-|  m22 | number | element at row 2, column 2 |
-|  m32 | number | element at row 2, column 3 |
-|  m03 | number | element at row 3, column 0 |
-|  m13 | number | element at row 3, column 1 |
-|  m23 | number | element at row 3, column 2 |
-|  m33 | number | element at row 3, column 3 |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+m00
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 0
+
+
+</td></tr>
+<tr><td>
+
+m10
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 1
+
+
+</td></tr>
+<tr><td>
+
+m20
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 2
+
+
+</td></tr>
+<tr><td>
+
+m30
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 3
+
+
+</td></tr>
+<tr><td>
+
+m01
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 0
+
+
+</td></tr>
+<tr><td>
+
+m11
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 1
+
+
+</td></tr>
+<tr><td>
+
+m21
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 2
+
+
+</td></tr>
+<tr><td>
+
+m31
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 3
+
+
+</td></tr>
+<tr><td>
+
+m02
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 0
+
+
+</td></tr>
+<tr><td>
+
+m12
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 1
+
+
+</td></tr>
+<tr><td>
+
+m22
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 2
+
+
+</td></tr>
+<tr><td>
+
+m32
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 3
+
+
+</td></tr>
+<tr><td>
+
+m03
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 3, column 0
+
+
+</td></tr>
+<tr><td>
+
+m13
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 3, column 1
+
+
+</td></tr>
+<tr><td>
+
+m23
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 3, column 2
+
+
+</td></tr>
+<tr><td>
+
+m33
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 3, column 3
+
+
+</td></tr>
+</tbody></table>
 

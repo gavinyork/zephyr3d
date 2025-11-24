@@ -14,9 +14,39 @@ rayIntersectionTest(ray: Ray): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ray | [Ray](doc/markdown/./base.ray.md) | The ray being traced |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ray
+
+
+</td><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+The ray being traced
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

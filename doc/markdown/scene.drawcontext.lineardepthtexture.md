@@ -4,7 +4,7 @@
 
 ## DrawContext.linearDepthTexture property
 
-Linear depth texture
+Linearized depth texture bound for sampling.
 
 **Signature:**
 

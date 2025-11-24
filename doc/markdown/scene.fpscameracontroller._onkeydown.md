@@ -4,24 +4,52 @@
 
 ## FPSCameraController.\_onKeyDown() method
 
-Key down event handler
+Key down handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
 /** @override */
-protected _onKeyDown(evt: KeyboardEvent): boolean;
+protected _onKeyDown(evt: IControllerKeydownEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | KeyboardEvent | Keyboard event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+evt
+
+
+</td><td>
+
+[IControllerKeydownEvent](doc/markdown/./scene.icontrollerkeydownevent.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

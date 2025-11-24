@@ -14,9 +14,83 @@ interface StructTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [layout](doc/markdown/./device.structtypedetail.layout.md) |  | [PBStructLayout](doc/markdown/./device.pbstructlayout.md) | Layout of the struct type |
-|  [structMembers?](doc/markdown/./device.structtypedetail.structmembers.md) |  | { name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; alignment: number; size: number; }\[\] | _(Optional)_ Members of the struct type |
-|  [structName?](doc/markdown/./device.structtypedetail.structname.md) |  | string | _(Optional)_ Name of the struct type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[layout](doc/markdown/./device.structtypedetail.layout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBStructLayout](doc/markdown/./device.pbstructlayout.md)
+
+
+</td><td>
+
+Layout of the struct type
+
+
+</td></tr>
+<tr><td>
+
+[structMembers?](doc/markdown/./device.structtypedetail.structmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; alignment: number; size: number; }\[\]
+
+
+</td><td>
+
+_(Optional)_ Members of the struct type
+
+
+</td></tr>
+<tr><td>
+
+[structName?](doc/markdown/./device.structtypedetail.structname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Name of the struct type
+
+
+</td></tr>
+</tbody></table>
 

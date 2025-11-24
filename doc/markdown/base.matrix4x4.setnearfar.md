@@ -14,10 +14,55 @@ setNearFar(znear: number, zfar: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  znear | number | The near clip plane. |
-|  zfar | number | The far clip plane. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+znear
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The near clip plane.
+
+
+</td></tr>
+<tr><td>
+
+zfar
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The far clip plane.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

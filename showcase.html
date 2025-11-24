@@ -1,38 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>zephyr3d showcase</title>
-  <link rel="icon" href="media/favicon.ico" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <style>
-    body {
-      height: 100vh;
-    }
-    pre, code {
-      background-color: rgba(0,0,0,0);
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-    }
-  </style>
-</head>
-<body>
-  <div class="d-flex flex-column d-fixed" style="position:fixed;left:0;top:0;right:0;bottom:0;">
-    <div class="btn-group">
-      <button type="button" id="show-code" class="btn btn-light">javascript</button>
-      <button type="button" id="show-html" class="btn btn-light">HTML</button>
-      <button type="button" id="live-demo" class="btn btn-light">Live Demo</button>
-    </div>
-    <div class="flex-grow-1" style="position:relative;">
-      <div id="content" style="position:absolute;left:0;top:0;right:0;bottom:0;background-color: rgb(40, 44, 52);overflow:auto;">
+  <head>
+    <meta charset="UTF-8" />
+    <title>zephyr3d showcase</title>
+    <link rel="icon" href="https://cdn.zephyr3d.org/doc/assets/images/favicon.ico" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <style>
+      body {
+        height: 100vh;
+      }
+      pre,
+      code {
+        background-color: rgba(0, 0, 0, 0);
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="d-flex flex-column d-fixed" style="position: fixed; left: 0; top: 0; right: 0; bottom: 0">
+      <div class="btn-group">
+        <button type="button" id="show-code" class="btn btn-light">javascript</button>
+        <button type="button" id="show-html" class="btn btn-light">HTML</button>
+        <button type="button" id="live-demo" class="btn btn-light">Live Demo</button>
+      </div>
+      <div class="flex-grow-1" style="position: relative">
+        <div
+          id="content"
+          style="
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgb(40, 44, 52);
+            overflow: auto;
+          "
+        ></div>
       </div>
     </div>
-  </div>
-  <script src="js/bootstrap.min.js"></script>
-  <script type="module" src="js/showcase.js"></script>
-</body>
+    <script src="js/bootstrap.min.js"></script>
+    <script type="module" src="js/showcase.js"></script>
+  </body>
 </html>

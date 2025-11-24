@@ -7,18 +7,78 @@
 **Signature:**
 
 ```typescript
-getBufferSubData(dstBuffer?: Uint8Array, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array>;
+getBufferSubData(dstBuffer?: Uint8Array<ArrayBuffer>, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array<ArrayBuffer>>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  dstBuffer | Uint8Array | _(Optional)_ |
-|  offsetInBytes | number | _(Optional)_ |
-|  sizeInBytes | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+dstBuffer
+
+
+</td><td>
+
+Uint8Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+offsetInBytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+sizeInBytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-Promise&lt;Uint8Array&gt;
+Promise&lt;Uint8Array&lt;ArrayBuffer&gt;&gt;
 

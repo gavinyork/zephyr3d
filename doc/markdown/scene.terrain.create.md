@@ -14,14 +14,119 @@ create(sizeX: number, sizeZ: number, elevations: Float32Array, scale: Vector3, p
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sizeX | number | Terrain size in X axis |
-|  sizeZ | number | Terrain size in Z axis |
-|  elevations | Float32Array | Elevation data of the terrain |
-|  scale | [Vector3](doc/markdown/./base.vector3.md) | Scale of the terrain |
-|  patchSize | number | Patch size of the terrain |
-|  options | [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sizeX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Terrain size in X axis
+
+
+</td></tr>
+<tr><td>
+
+sizeZ
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Terrain size in Z axis
+
+
+</td></tr>
+<tr><td>
+
+elevations
+
+
+</td><td>
+
+Float32Array
+
+
+</td><td>
+
+Elevation data of the terrain
+
+
+</td></tr>
+<tr><td>
+
+scale
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Scale of the terrain
+
+
+</td></tr>
+<tr><td>
+
+patchSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Patch size of the terrain
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

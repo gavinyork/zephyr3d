@@ -4,7 +4,9 @@
 
 ## Application.run() method
 
-Start running the rendering loop
+Start the application's render loop.
+
+Uses the device's internal scheduling (`device.runLoop`<!-- -->) to repeatedly call `frame()`<!-- -->.
 
 **Signature:**
 

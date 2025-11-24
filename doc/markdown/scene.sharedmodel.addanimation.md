@@ -14,9 +14,39 @@ addAnimation(animation: AssetAnimationData): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  animation | [AssetAnimationData](doc/markdown/./scene.assetanimationdata.md) | The animation to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+animation
+
+
+</td><td>
+
+[AssetAnimationData](doc/markdown/./scene.assetanimationdata.md)
+
+
+</td><td>
+
+The animation to be added
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

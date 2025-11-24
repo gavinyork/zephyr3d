@@ -14,7 +14,25 @@ interface Visitor<T>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [visit(target)](doc/markdown/./scene.visitor.visit.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[visit(target)](doc/markdown/./scene.visitor.visit.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

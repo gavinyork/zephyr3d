@@ -4,15 +4,19 @@
 
 ## PickResult type
 
-Camera pick result
+Result of a camera picking operation.
+
+Used by GPU/CPU picking flows to report what was intersected.
 
 **Signature:**
 
 ```typescript
 type PickResult = {
+    distance: number;
+    intersectedPoint: Vector3;
     drawable: Drawable;
     target: PickTarget;
 };
 ```
-**References:** [Drawable](doc/markdown/./scene.drawable.md)<!-- -->, [PickTarget](doc/markdown/./scene.picktarget.md)
+**References:** [Vector3](doc/markdown/./base.vector3.md)<!-- -->, [Drawable](doc/markdown/./scene.drawable.md)<!-- -->, [PickTarget](doc/markdown/./scene.picktarget.md)
 

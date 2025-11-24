@@ -15,25 +15,264 @@ declare class PerspectiveCamera extends Camera
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, fovY, aspect, near, far)](doc/markdown/./scene.perspectivecamera._constructor_.md) |  | Creates an instance of PerspectiveCamera |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, fovY, near, far, aspect)](doc/markdown/./scene.perspectivecamera._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of PerspectiveCamera
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [aspect](doc/markdown/./scene.perspectivecamera.aspect.md) |  | number | Aspect ratio of the perspective transform |
-|  [far](doc/markdown/./scene.perspectivecamera.far.md) |  | number | The far clip plane |
-|  [fovY](doc/markdown/./scene.perspectivecamera.fovy.md) |  | number | Radian value indicates the field of view in Y axis |
-|  [near](doc/markdown/./scene.perspectivecamera.near.md) |  | number | The near clip plane |
-|  [window](doc/markdown/./scene.perspectivecamera.window.md) |  | number\[\] | Sub-window of the frustum |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[aspect](doc/markdown/./scene.perspectivecamera.aspect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Aspect ratio of the perspective transform
+
+
+</td></tr>
+<tr><td>
+
+[autoAspect](doc/markdown/./scene.perspectivecamera.autoaspect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Automatically calculate aspect ratio before render according to current viewport
+
+
+</td></tr>
+<tr><td>
+
+[far](doc/markdown/./scene.perspectivecamera.far.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The far clip plane
+
+
+</td></tr>
+<tr><td>
+
+[fovY](doc/markdown/./scene.perspectivecamera.fovy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Radian value indicates the field of view in Y axis
+
+
+</td></tr>
+<tr><td>
+
+[near](doc/markdown/./scene.perspectivecamera.near.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The near clip plane
+
+
+</td></tr>
+<tr><td>
+
+[window](doc/markdown/./scene.perspectivecamera.window.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Sub-window of the frustum
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.perspectivecamera.setortho.md) |  | Not valid for PerspectiveCamera |
-|  [setPerspective(fovY, aspect, zNear, zFar)](doc/markdown/./scene.perspectivecamera.setperspective.md) |  | Setup a perspective projection matrix for the camera |
-|  [setProjectionMatrix(matrix)](doc/markdown/./scene.perspectivecamera.setprojectionmatrix.md) |  | Setup a projection matrix for the camera |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[adjustAspectRatio()](doc/markdown/./scene.perspectivecamera.adjustaspectratio.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adjust aspect ratio according to viewport settings of the camera
+
+
+</td></tr>
+<tr><td>
+
+[render(scene)](doc/markdown/./scene.perspectivecamera.render.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Renders a scene
+
+
+</td></tr>
+<tr><td>
+
+[setOrtho(\_left, \_right, \_bottom, \_top, \_near, \_far)](doc/markdown/./scene.perspectivecamera.setortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Not valid for PerspectiveCamera
+
+
+</td></tr>
+<tr><td>
+
+[setPerspective(fovY, aspect, zNear, zFar)](doc/markdown/./scene.perspectivecamera.setperspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a perspective projection matrix for the camera
+
+
+</td></tr>
+<tr><td>
+
+[setProjectionMatrix(matrix)](doc/markdown/./scene.perspectivecamera.setprojectionmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a projection matrix for the camera
+
+
+</td></tr>
+</tbody></table>
 

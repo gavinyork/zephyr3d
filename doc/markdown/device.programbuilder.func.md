@@ -14,11 +14,71 @@ func(name: string, params: PBShaderExp[], body?: (this: PBFunctionScope) => void
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the function |
-|  params | [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->\[\] | Parameters of the function |
-|  body | (this: [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)<!-- -->) =&gt; void | _(Optional)_ The generator function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the function
+
+
+</td></tr>
+<tr><td>
+
+params
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->\[\]
+
+
+</td><td>
+
+Parameters of the function
+
+
+</td></tr>
+<tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+_(Optional)_ The generator function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

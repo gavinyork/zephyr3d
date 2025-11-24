@@ -17,10 +17,55 @@ extends(name: string, members: {
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the new struct type |
-|  members | { name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; }\[\] | additional struct members |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the new struct type
+
+
+</td></tr>
+<tr><td>
+
+members
+
+
+</td><td>
+
+{ name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; }\[\]
+
+
+</td><td>
+
+additional struct members
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

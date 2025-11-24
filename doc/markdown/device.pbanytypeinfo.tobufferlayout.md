@@ -9,14 +9,42 @@ Creates a buffer layout from this type
 **Signature:**
 
 ```typescript
-toBufferLayout(offset: number): UniformBufferLayout;
+toBufferLayout(_offset: number): UniformBufferLayout;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  offset | number | Byte offset of the layout |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_offset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

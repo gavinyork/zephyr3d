@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-primitive: Primitive;
+primitive: DRef<Primitive>;
 ```

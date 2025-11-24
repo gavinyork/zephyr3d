@@ -14,10 +14,55 @@ setWaveLength(cascade: number, length: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cascade | number | The cascade index |
-|  length | number | The new wave length for the specified cascade |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cascade
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The cascade index
+
+
+</td></tr>
+<tr><td>
+
+length
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The new wave length for the specified cascade
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

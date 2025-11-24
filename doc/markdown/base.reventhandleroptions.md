@@ -10,7 +10,7 @@ Options of event handler
 
 ```typescript
 type REventHandlerOptions = {
-    once?: boolean;
-    context?: unknown;
+    once: boolean;
+    context: unknown;
 };
 ```

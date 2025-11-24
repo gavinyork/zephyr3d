@@ -4,7 +4,7 @@
 
 ## DrawContext.depthFormat property
 
-Default depth buffer format
+Default depth buffer format for targets created in this pass.
 
 **Signature:**
 

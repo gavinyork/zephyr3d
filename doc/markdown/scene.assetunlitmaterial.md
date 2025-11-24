@@ -15,8 +15,64 @@ interface AssetUnlitMaterial extends AssetMaterial
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [diffuse?](doc/markdown/./scene.assetunlitmaterial.diffuse.md) |  | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ |
-|  [diffuseMap?](doc/markdown/./scene.assetunlitmaterial.diffusemap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[diffuse?](doc/markdown/./scene.assetunlitmaterial.diffuse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[diffuseMap?](doc/markdown/./scene.assetunlitmaterial.diffusemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,39 @@ begin(ctx: DrawContext): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The draw context. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+The draw context.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

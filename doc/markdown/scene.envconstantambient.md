@@ -15,25 +15,197 @@ declare class EnvConstantAmbient extends EnvironmentLighting
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(ambientColor)](doc/markdown/./scene.envconstantambient._constructor_.md) |  | Creates an instance of EnvConstantAmbient |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(ambientColor)](doc/markdown/./scene.envconstantambient._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of EnvConstantAmbient
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [ambientColor](doc/markdown/./scene.envconstantambient.ambientcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The ambient color |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ambientColor](doc/markdown/./scene.envconstantambient.ambientcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The ambient color
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getIrradiance(scope, normal)](doc/markdown/./scene.envconstantambient.getirradiance.md) |  | Get irradiance for a fragment |
-|  [getRadiance(scope, refl, roughness)](doc/markdown/./scene.envconstantambient.getradiance.md) |  | Get radiance for a fragment |
-|  [getType()](doc/markdown/./scene.envconstantambient.gettype.md) |  | The environment light type |
-|  [hasIrradiance()](doc/markdown/./scene.envconstantambient.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
-|  [hasRadiance()](doc/markdown/./scene.envconstantambient.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
-|  [initShaderBindings(pb)](doc/markdown/./scene.envconstantambient.initshaderbindings.md) |  | Initialize shader bindings |
-|  [updateBindGroup(bg)](doc/markdown/./scene.envconstantambient.updatebindgroup.md) |  | Updates the uniform values |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getIrradiance(scope, \_normal)](doc/markdown/./scene.envconstantambient.getirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get irradiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getRadiance(\_scope, \_refl, \_roughness)](doc/markdown/./scene.envconstantambient.getradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get radiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.envconstantambient.gettype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+The environment light type
+
+
+</td></tr>
+<tr><td>
+
+[hasIrradiance()](doc/markdown/./scene.envconstantambient.hasirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports diffuse light
+
+
+</td></tr>
+<tr><td>
+
+[hasRadiance()](doc/markdown/./scene.envconstantambient.hasradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports reflective light
+
+
+</td></tr>
+<tr><td>
+
+[initShaderBindings(pb)](doc/markdown/./scene.envconstantambient.initshaderbindings.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize shader bindings
+
+
+</td></tr>
+<tr><td>
+
+[updateBindGroup(bg)](doc/markdown/./scene.envconstantambient.updatebindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Updates the uniform values
+
+
+</td></tr>
+</tbody></table>
 

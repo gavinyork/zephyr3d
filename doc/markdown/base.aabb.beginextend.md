@@ -9,9 +9,11 @@ Invalidate the min/max point so that we can start extending the AABB.
 **Signature:**
 
 ```typescript
-beginExtend(): void;
+beginExtend(): this;
 ```
 **Returns:**
 
-void
+this
+
+self
 

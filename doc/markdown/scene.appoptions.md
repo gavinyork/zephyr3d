@@ -4,7 +4,9 @@
 
 ## AppOptions type
 
-The creation options for Application
+Creation options for Application.
+
+Provides the canvas, device backend, and optional runtime and device configuration.
 
 **Signature:**
 
@@ -14,7 +16,13 @@ type AppOptions = {
     backend: DeviceBackend;
     enableMSAA?: boolean;
     pixelRatio?: number;
+    runtimeOptions?: {
+        VFS?: VFS;
+        scriptsRoot?: string;
+        editorMode?: boolean;
+        enabled?: boolean;
+    };
 };
 ```
-**References:** [DeviceBackend](doc/markdown/./device.devicebackend.md)
+**References:** [DeviceBackend](doc/markdown/./device.devicebackend.md)<!-- -->, [VFS](doc/markdown/./base.vfs.md)
 

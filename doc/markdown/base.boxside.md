@@ -14,12 +14,117 @@ declare enum BoxSide
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  BACK | <code>5</code> | Back side (-z) |
-|  BOTTOM | <code>2</code> | Bottom side (-y) |
-|  FRONT | <code>4</code> | Front side (+z) |
-|  LEFT | <code>0</code> | Left side (-x) |
-|  RIGHT | <code>1</code> | Right side (+x) |
-|  TOP | <code>3</code> | Top side (+y) |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+BACK
+
+
+</td><td>
+
+`5`
+
+
+</td><td>
+
+Back side (-z)
+
+
+</td></tr>
+<tr><td>
+
+BOTTOM
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+Bottom side (-y)
+
+
+</td></tr>
+<tr><td>
+
+FRONT
+
+
+</td><td>
+
+`4`
+
+
+</td><td>
+
+Front side (+z)
+
+
+</td></tr>
+<tr><td>
+
+LEFT
+
+
+</td><td>
+
+`0`
+
+
+</td><td>
+
+Left side (-x)
+
+
+</td></tr>
+<tr><td>
+
+RIGHT
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+Right side (+x)
+
+
+</td></tr>
+<tr><td>
+
+TOP
+
+
+</td><td>
+
+`3`
+
+
+</td><td>
+
+Top side (+y)
+
+
+</td></tr>
+</tbody></table>
 

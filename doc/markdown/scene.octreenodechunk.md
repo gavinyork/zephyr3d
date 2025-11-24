@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk class
 
-Octree node chunk
+A grid of octree nodes at a specific level of detail.
 
 **Signature:**
 
@@ -12,33 +12,327 @@ Octree node chunk
 declare class OctreeNodeChunk 
 ```
 
+## Remarks
+
+- Each chunk represents a uniform grid of (d x d x d) nodes, where (d = 2^<!-- -->{<!-- -->level<!-- -->}<!-- -->). - Chunks are linked as a hierarchy from coarse (root) to fine (leaf) via `prev`<!-- -->/`next`<!-- -->. - Nodes are created lazily and indexed by a linear index.
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(octree)](doc/markdown/./scene.octreenodechunk._constructor_.md) |  | Creates an instance of octree chunk |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(octree)](doc/markdown/./scene.octreenodechunk._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a chunk for the given octree.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [clearNodes()](doc/markdown/./scene.octreenodechunk.clearnodes.md) |  | Removes all octree nodes of this chunk |
-|  [empty()](doc/markdown/./scene.octreenodechunk.empty.md) |  | Check if this chunk is empty |
-|  [getChildIndex(index, placement)](doc/markdown/./scene.octreenodechunk.getchildindex.md) |  | Gets the index of a child node at given placement |
-|  [getDimension()](doc/markdown/./scene.octreenodechunk.getdimension.md) |  | Gets the dimension of this chunk |
-|  [getLevel()](doc/markdown/./scene.octreenodechunk.getlevel.md) |  | Gets the level index of this chunk |
-|  [getNext()](doc/markdown/./scene.octreenodechunk.getnext.md) |  | Gets the chunk next to this chunk |
-|  [getNode(index)](doc/markdown/./scene.octreenodechunk.getnode.md) |  | Gets an octree node at a given index |
-|  [getNodeSize()](doc/markdown/./scene.octreenodechunk.getnodesize.md) |  | Gets the size of the node in this chunk |
-|  [getOctree()](doc/markdown/./scene.octreenodechunk.getoctree.md) |  | Gets the octree that the chunk belongs to |
-|  [getOrCreateNode(index)](doc/markdown/./scene.octreenodechunk.getorcreatenode.md) |  | Gets or creates an octree node at a given index |
-|  [getOrCreateNodeChain(index)](doc/markdown/./scene.octreenodechunk.getorcreatenodechain.md) |  | Gets or creates an octree node chain at a given index |
-|  [getParentIndex(index)](doc/markdown/./scene.octreenodechunk.getparentindex.md) |  | Gets the index of the parent node |
-|  [getPrev()](doc/markdown/./scene.octreenodechunk.getprev.md) |  | Gets the chunk previous to this chunk |
-|  [getWorldSize()](doc/markdown/./scene.octreenodechunk.getworldsize.md) |  | Gets the root size of the octree |
-|  [setDimension(dimension)](doc/markdown/./scene.octreenodechunk.setdimension.md) |  | Sets the dimension of this chunk |
-|  [setLevel(level)](doc/markdown/./scene.octreenodechunk.setlevel.md) |  | Sets the level index of this chunk |
-|  [setNext(chunk)](doc/markdown/./scene.octreenodechunk.setnext.md) |  | Sets the next chunk |
-|  [setNodeSize(size)](doc/markdown/./scene.octreenodechunk.setnodesize.md) |  | Sets the size of octree node in this chunk |
-|  [setPrev(chunk)](doc/markdown/./scene.octreenodechunk.setprev.md) |  | Sets the previous chunk |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clearNodes()](doc/markdown/./scene.octreenodechunk.clearnodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove and clear all nodes in this chunk.
+
+
+</td></tr>
+<tr><td>
+
+[empty()](doc/markdown/./scene.octreenodechunk.empty.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this chunk currently has no created nodes.
+
+
+</td></tr>
+<tr><td>
+
+[getChildIndex(index, placement)](doc/markdown/./scene.octreenodechunk.getchildindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Compute the child index in the next chunk for a given parent index and placement.
+
+
+</td></tr>
+<tr><td>
+
+[getDimension()](doc/markdown/./scene.octreenodechunk.getdimension.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Dimension of this chunk (number of cells per axis).
+
+
+</td></tr>
+<tr><td>
+
+[getLevel()](doc/markdown/./scene.octreenodechunk.getlevel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Level index of this chunk (0 = root/coarsest).
+
+
+</td></tr>
+<tr><td>
+
+[getNext()](doc/markdown/./scene.octreenodechunk.getnext.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Next (finer) chunk in the hierarchy, or `null` if this is the finest.
+
+
+</td></tr>
+<tr><td>
+
+[getNode(index)](doc/markdown/./scene.octreenodechunk.getnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get an octree node by linear index.
+
+
+</td></tr>
+<tr><td>
+
+[getNodeSize()](doc/markdown/./scene.octreenodechunk.getnodesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Node size at this chunk level.
+
+
+</td></tr>
+<tr><td>
+
+[getOctree()](doc/markdown/./scene.octreenodechunk.getoctree.md)
+
+
+</td><td>
+
+
+</td><td>
+
+The octree that owns this chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getOrCreateNode(index)](doc/markdown/./scene.octreenodechunk.getorcreatenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get or create an octree node by linear index.
+
+
+</td></tr>
+<tr><td>
+
+[getOrCreateNodeChain(index)](doc/markdown/./scene.octreenodechunk.getorcreatenodechain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Ensure the node chain (this level and all parents) exists for a given index.
+
+
+</td></tr>
+<tr><td>
+
+[getParentIndex(index)](doc/markdown/./scene.octreenodechunk.getparentindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Compute the parent index in the previous chunk for a given child index.
+
+
+</td></tr>
+<tr><td>
+
+[getPrev()](doc/markdown/./scene.octreenodechunk.getprev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Previous (coarser) chunk in the hierarchy, or `null` if this is the root.
+
+
+</td></tr>
+<tr><td>
+
+[getWorldSize()](doc/markdown/./scene.octreenodechunk.getworldsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Root world size of the octree.
+
+
+</td></tr>
+<tr><td>
+
+[setDimension(dimension)](doc/markdown/./scene.octreenodechunk.setdimension.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the dimension (cells per axis).
+
+
+</td></tr>
+<tr><td>
+
+[setLevel(level)](doc/markdown/./scene.octreenodechunk.setlevel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the level index.
+
+
+</td></tr>
+<tr><td>
+
+[setNext(chunk)](doc/markdown/./scene.octreenodechunk.setnext.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Link to the next (finer) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[setNodeSize(size)](doc/markdown/./scene.octreenodechunk.setnodesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the node size at this level.
+
+
+</td></tr>
+<tr><td>
+
+[setPrev(chunk)](doc/markdown/./scene.octreenodechunk.setprev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Link to the previous (coarser) chunk.
+
+
+</td></tr>
+</tbody></table>
 

@@ -9,7 +9,7 @@ The texture restore handler callback function This callback function will be cal
 **Signature:**
 
 ```typescript
-get atlasTextureRestoreHandler(): (tex: BaseTexture) => Promise<void>;
+get atlasTextureRestoreHandler(): (tex: BaseTexture) => void;
 
-set atlasTextureRestoreHandler(f: (tex: BaseTexture) => Promise<void>);
+set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void);
 ```

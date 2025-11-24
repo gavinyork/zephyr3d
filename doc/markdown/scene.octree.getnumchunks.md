@@ -4,7 +4,7 @@
 
 ## Octree.getNumChunks() method
 
-Gets the number of chunks in the octree
+Number of chunks (levels) in the octree hierarchy.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getNumChunks(): number;
 
 number
 
-The number of chunks in the octree
+The total number of chunk levels.
 

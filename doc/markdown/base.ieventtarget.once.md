@@ -14,11 +14,71 @@ once<K extends keyof T>(type: K, listener: EventListener<T, K>, context?: unknow
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | K | The event type to listen for |
-|  listener | [EventListener](doc/markdown/./base.eventlistener_2.md)<!-- -->&lt;T, K&gt; | The callback function |
-|  context | unknown | _(Optional)_ Context object of the listener function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+K
+
+
+</td><td>
+
+The event type to listen for
+
+
+</td></tr>
+<tr><td>
+
+listener
+
+
+</td><td>
+
+[EventListener](doc/markdown/./base.eventlistener_2.md)<!-- -->&lt;T, K&gt;
+
+
+</td><td>
+
+The callback function
+
+
+</td></tr>
+<tr><td>
+
+context
+
+
+</td><td>
+
+unknown
+
+
+</td><td>
+
+_(Optional)_ Context object of the listener function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

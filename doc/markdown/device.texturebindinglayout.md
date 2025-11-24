@@ -14,11 +14,121 @@ interface TextureBindingLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [autoBindSampler](doc/markdown/./device.texturebindinglayout.autobindsampler.md) |  | string | name of the default sampler uniform when using WebGPU device |
-|  [autoBindSamplerComparison](doc/markdown/./device.texturebindinglayout.autobindsamplercomparison.md) |  | string | name of the default comparison sampler uniform when using WebGPU device |
-|  [multisampled](doc/markdown/./device.texturebindinglayout.multisampled.md) |  | boolean | Whether the textur is a multisampled texture |
-|  [sampleType](doc/markdown/./device.texturebindinglayout.sampletype.md) |  | 'float' \| 'unfilterable-float' \| 'depth' \| 'sint' \| 'uint' | Sample type of the texture |
-|  [viewDimension](doc/markdown/./device.texturebindinglayout.viewdimension.md) |  | '1d' \| '2d' \| '2d-array' \| 'cube' \| 'cube-array' \| '3d' | View dimension for the texture |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[autoBindSampler](doc/markdown/./device.texturebindinglayout.autobindsampler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+name of the default sampler uniform when using WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[autoBindSamplerComparison](doc/markdown/./device.texturebindinglayout.autobindsamplercomparison.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+name of the default comparison sampler uniform when using WebGPU device
+
+
+</td></tr>
+<tr><td>
+
+[multisampled](doc/markdown/./device.texturebindinglayout.multisampled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the textur is a multisampled texture
+
+
+</td></tr>
+<tr><td>
+
+[sampleType](doc/markdown/./device.texturebindinglayout.sampletype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'float' \| 'unfilterable-float' \| 'depth' \| 'sint' \| 'uint'
+
+
+</td><td>
+
+Sample type of the texture
+
+
+</td></tr>
+<tr><td>
+
+[viewDimension](doc/markdown/./device.texturebindinglayout.viewdimension.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'1d' \| '2d' \| '2d-array' \| 'cube' \| 'cube-array' \| '3d'
+
+
+</td><td>
+
+View dimension for the texture
+
+
+</td></tr>
+</tbody></table>
 

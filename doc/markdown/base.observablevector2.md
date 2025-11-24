@@ -15,20 +15,187 @@ declare class ObservableVector2 extends Vector2
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [callback](doc/markdown/./base.observablevector2.callback.md) |  | () =&gt; void | The callback function which will be executed when the value changed |
-|  [x](doc/markdown/./base.observablevector2.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.observablevector2.y.md) |  | number | Get the y component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[callback](doc/markdown/./base.observablevector2.callback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+() =&gt; void
+
+
+</td><td>
+
+The callback function which will be executed when the value changed
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.observablevector2.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.observablevector2.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [copyWithin(target, start, end)](doc/markdown/./base.observablevector2.copywithin.md) |  | Inherited from Float32Array.copyWithin |
-|  [fill(value, start, end)](doc/markdown/./base.observablevector2.fill.md) |  | Inherited from Float32Array.fill |
-|  [reverse()](doc/markdown/./base.observablevector2.reverse.md) |  | Inherited from Float32Array.reverse |
-|  [set(array, offset)](doc/markdown/./base.observablevector2.set.md) |  | Inherited from Float32Array.set |
-|  [setXY(x, y)](doc/markdown/./base.observablevector2.setxy.md) |  | Set component values. |
-|  [sort(compareFn)](doc/markdown/./base.observablevector2.sort.md) |  | Inherited from Float32Array.sort |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[copyWithin(target, start, end)](doc/markdown/./base.observablevector2.copywithin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.copyWithin
+
+
+</td></tr>
+<tr><td>
+
+[fill(value, start, end)](doc/markdown/./base.observablevector2.fill.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.fill
+
+
+</td></tr>
+<tr><td>
+
+[reverse()](doc/markdown/./base.observablevector2.reverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.reverse
+
+
+</td></tr>
+<tr><td>
+
+[set(array, offset)](doc/markdown/./base.observablevector2.set.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.set
+
+
+</td></tr>
+<tr><td>
+
+[setXY(x, y)](doc/markdown/./base.observablevector2.setxy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[sort(compareFn)](doc/markdown/./base.observablevector2.sort.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.sort
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,10 +14,55 @@ getCharWidth(char: string, font: Font): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  char | string | The character to be measured |
-|  font | [Font](doc/markdown/./device.font.md) | Font of the character |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+char
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The character to be measured
+
+
+</td></tr>
+<tr><td>
+
+font
+
+
+</td><td>
+
+[Font](doc/markdown/./device.font.md)
+
+
+</td><td>
+
+Font of the character
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

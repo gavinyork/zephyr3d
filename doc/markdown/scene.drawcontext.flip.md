@@ -4,7 +4,7 @@
 
 ## DrawContext.flip property
 
-Wether should flip upside down
+Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions).
 
 **Signature:**
 

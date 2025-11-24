@@ -4,7 +4,9 @@
 
 ## Mesh.isBatchable() method
 
-returns true if the object is batchable
+Returns true if the object supports instanced rendering.
+
+When true, the object should also implement the [BatchDrawable](doc/markdown/./scene.batchdrawable.md) methods.
 
 **Signature:**
 

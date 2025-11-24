@@ -9,15 +9,58 @@ Ends rendering for the given pass.
 **Signature:**
 
 ```typescript
-endPass(ctx: DrawContext, pass: number): void;
+endPass(ctx: DrawContext, _pass: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The draw context. |
-|  pass | number | The pass number. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+The draw context.
+
+
+</td></tr>
+<tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

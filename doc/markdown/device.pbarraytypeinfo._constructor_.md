@@ -14,8 +14,51 @@ constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInf
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  elementType | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) |  |
-|  dimension | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+elementType
+
+
+</td><td>
+
+[PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dimension
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

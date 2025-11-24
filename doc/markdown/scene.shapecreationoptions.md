@@ -14,9 +14,102 @@ interface ShapeCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [needNormal?](doc/markdown/./scene.shapecreationoptions.neednormal.md) |  | boolean | _(Optional)_ true if we need to calculate normals for the shape |
-|  [needTangent?](doc/markdown/./scene.shapecreationoptions.needtangent.md) |  | boolean | _(Optional)_ true if we need to calculate tangents for the shape |
-|  [needUV?](doc/markdown/./scene.shapecreationoptions.needuv.md) |  | boolean | _(Optional)_ true if we need to calculate texture coordinates for the shape |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[needNormal?](doc/markdown/./scene.shapecreationoptions.neednormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ true if we need to calculate normals for the shape
+
+
+</td></tr>
+<tr><td>
+
+[needTangent?](doc/markdown/./scene.shapecreationoptions.needtangent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ true if we need to calculate tangents for the shape
+
+
+</td></tr>
+<tr><td>
+
+[needUV?](doc/markdown/./scene.shapecreationoptions.needuv.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ true if we need to calculate texture coordinates for the shape
+
+
+</td></tr>
+<tr><td>
+
+[transform?](doc/markdown/./scene.shapecreationoptions.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ Transform matrix for the shape
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,13 +14,67 @@ interface IMixinVertexColor
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [vertexColor](doc/markdown/./scene.imixinvertexcolor.vertexcolor.md) |  | boolean |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vertexColor](doc/markdown/./scene.imixinvertexcolor.vertexcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [getVertexColor(scope)](doc/markdown/./scene.imixinvertexcolor.getvertexcolor.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getVertexColor(scope)](doc/markdown/./scene.imixinvertexcolor.getvertexcolor.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -12,15 +12,121 @@ updateFromElement(data: TextureImageElement, destX: number, destY: number, srcX:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TextureImageElement](doc/markdown/./device.textureimageelement.md) |  |
-|  destX | number |  |
-|  destY | number |  |
-|  srcX | number |  |
-|  srcY | number |  |
-|  width | number |  |
-|  height | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+destX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+destY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+srcX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+srcY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

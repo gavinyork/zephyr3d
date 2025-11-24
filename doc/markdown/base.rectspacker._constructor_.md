@@ -14,9 +14,69 @@ constructor(width: number, height: number, maxBins?: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  width | number | width of image bin |
-|  height | number | height of image bin |
-|  maxBins | number | _(Optional)_ max count of image bins |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+width of image bin
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+height of image bin
+
+
+</td></tr>
+<tr><td>
+
+maxBins
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ max count of image bins
+
+
+</td></tr>
+</tbody></table>
 

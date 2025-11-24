@@ -15,8 +15,60 @@ interface AssetTranslationTrack extends AssetAnimationTrack
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [keyFrames](doc/markdown/./scene.assettranslationtrack.keyframes.md) |  | Record&lt;number, [Vector3](doc/markdown/./base.vector3.md)<!-- -->\[\]&gt; |  |
-|  [nodes](doc/markdown/./scene.assettranslationtrack.nodes.md) |  | number\[\] |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[keyFrames](doc/markdown/./scene.assettranslationtrack.keyframes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;number, [Vector3](doc/markdown/./base.vector3.md)<!-- -->\[\]&gt;
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[nodes](doc/markdown/./scene.assettranslationtrack.nodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

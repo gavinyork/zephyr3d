@@ -14,11 +14,121 @@ interface BufferBindingLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [dynamicOffsetIndex](doc/markdown/./device.bufferbindinglayout.dynamicoffsetindex.md) |  | number | dynamic offset index |
-|  [hasDynamicOffset](doc/markdown/./device.bufferbindinglayout.hasdynamicoffset.md) |  | boolean | Whether the buffer should be accessed by a dynamic offset |
-|  [minBindingSize?](doc/markdown/./device.bufferbindinglayout.minbindingsize.md) |  | number | _(Optional)_ minimum binding size of the buffer |
-|  [type?](doc/markdown/./device.bufferbindinglayout.type.md) |  | 'uniform' \| 'storage' \| 'read-only-storage' | _(Optional)_ The bind type |
-|  [uniformLayout](doc/markdown/./device.bufferbindinglayout.uniformlayout.md) |  | [UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md) | layout for the buffer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[dynamicOffsetIndex](doc/markdown/./device.bufferbindinglayout.dynamicoffsetindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+dynamic offset index
+
+
+</td></tr>
+<tr><td>
+
+[hasDynamicOffset](doc/markdown/./device.bufferbindinglayout.hasdynamicoffset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the buffer should be accessed by a dynamic offset
+
+
+</td></tr>
+<tr><td>
+
+[minBindingSize?](doc/markdown/./device.bufferbindinglayout.minbindingsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ minimum binding size of the buffer
+
+
+</td></tr>
+<tr><td>
+
+[type?](doc/markdown/./device.bufferbindinglayout.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'uniform' \| 'storage' \| 'read-only-storage'
+
+
+</td><td>
+
+_(Optional)_ The bind type
+
+
+</td></tr>
+<tr><td>
+
+[uniformLayout](doc/markdown/./device.bufferbindinglayout.uniformlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md)
+
+
+</td><td>
+
+layout for the buffer
+
+
+</td></tr>
+</tbody></table>
 

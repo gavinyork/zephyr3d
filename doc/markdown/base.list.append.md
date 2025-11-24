@@ -14,9 +14,39 @@ append(data: T): ListIterator<T>;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | T | The data associated to the element |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The data associated to the element
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,7 +15,35 @@ declare class PBOutputScope extends PBScope
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.pboutputscope._constructor_.md) |  | Constructs a new instance of the <code>PBOutputScope</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.pboutputscope._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBOutputScope` class
+
+
+</td></tr>
+</tbody></table>
 

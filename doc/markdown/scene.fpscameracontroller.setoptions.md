@@ -14,9 +14,39 @@ setOptions(opt?: FPSCameraControllerOptions): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  opt | [FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md) | _(Optional)_ options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+opt
+
+
+</td><td>
+
+[FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md)
+
+
+</td><td>
+
+_(Optional)_ options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

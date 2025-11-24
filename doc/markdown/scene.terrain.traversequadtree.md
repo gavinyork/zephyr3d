@@ -14,9 +14,39 @@ traverseQuadtree(callback: (node: QuadtreeNode) => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  callback | (node: QuadtreeNode) =&gt; void | the callback function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+callback
+
+
+</td><td>
+
+(node: QuadtreeNode) =&gt; void
+
+
+</td><td>
+
+the callback function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

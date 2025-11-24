@@ -4,7 +4,7 @@
 
 ## DrawContext.queue property
 
-current queue
+Current sub-queue index within the render queue (e.g., opaque, transparent).
 
 **Signature:**
 

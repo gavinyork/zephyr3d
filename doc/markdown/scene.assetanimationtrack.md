@@ -14,10 +14,96 @@ interface AssetAnimationTrack
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [defaultMorphWeights?](doc/markdown/./scene.assetanimationtrack.defaultmorphweights.md) |  | number\[\] | _(Optional)_ |
-|  [interpolator](doc/markdown/./scene.assetanimationtrack.interpolator.md) |  | [Interpolator](doc/markdown/./base.interpolator.md) |  |
-|  [node](doc/markdown/./scene.assetanimationtrack.node.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) |  |
-|  [type](doc/markdown/./scene.assetanimationtrack.type.md) |  | 'translation' \| 'scale' \| 'rotation' \| 'weights' |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[defaultMorphWeights?](doc/markdown/./scene.assetanimationtrack.defaultmorphweights.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[interpolator](doc/markdown/./scene.assetanimationtrack.interpolator.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Interpolator](doc/markdown/./base.interpolator.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[node](doc/markdown/./scene.assetanimationtrack.node.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.assetanimationtrack.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'translation' \| 'scale' \| 'rotation' \| 'weights'
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

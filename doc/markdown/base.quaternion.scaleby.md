@@ -9,18 +9,48 @@ Scale this quaternion by a scalar number.
 **Signature:**
 
 ```typescript
-scaleBy(f: number): Quaternion;
+scaleBy(f: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  f | number | amount to scale this quaternion by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+f
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+amount to scale this quaternion by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Quaternion](doc/markdown/./base.quaternion.md)
+this
 
 self
 

@@ -14,10 +14,55 @@ addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  joint | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | The joint node |
-|  inverseBindMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Inverse binding matrix of the joint |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+joint
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+The joint node
+
+
+</td></tr>
+<tr><td>
+
+inverseBindMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+Inverse binding matrix of the joint
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

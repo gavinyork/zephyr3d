@@ -14,10 +14,55 @@ declare function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShader
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  value | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | The float value to be encode |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+value
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+The float value to be encode
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

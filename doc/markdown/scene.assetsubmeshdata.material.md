@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-material: MeshMaterial;
+material: DRef<MeshMaterial>;
 ```

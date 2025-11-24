@@ -12,14 +12,119 @@ calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: n
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  minX | number | Minimum X position of the clipmap tile. |
-|  maxX | number | Maximum X position of the clipmap tile. |
-|  minZ | number | Minimum Z position of the clipmap tile. |
-|  maxZ | number | Maximum Z position of the clipmap tile. |
-|  y | number | Y position of the water surface. |
-|  outAABB | [AABB](doc/markdown/./base.aabb.md) | Output AABB. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+minX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Minimum X position of the clipmap tile.
+
+
+</td></tr>
+<tr><td>
+
+maxX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum X position of the clipmap tile.
+
+
+</td></tr>
+<tr><td>
+
+minZ
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Minimum Z position of the clipmap tile.
+
+
+</td></tr>
+<tr><td>
+
+maxZ
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum Z position of the clipmap tile.
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Y position of the water surface.
+
+
+</td></tr>
+<tr><td>
+
+outAABB
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+Output AABB.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

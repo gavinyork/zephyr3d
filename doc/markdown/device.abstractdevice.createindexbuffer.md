@@ -9,17 +9,64 @@ Creates an index buffer
 **Signature:**
 
 ```typescript
-createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | Uint16Array \| Uint32Array | Data of the index buffer |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+Uint16Array&lt;ArrayBuffer&gt; \| Uint32Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+Data of the index buffer
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+The created index buffer.
 

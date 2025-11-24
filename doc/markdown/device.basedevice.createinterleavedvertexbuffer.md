@@ -12,11 +12,67 @@ createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedAr
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  attribFormats | [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)<!-- -->\[\] |  |
-|  data | [TypedArray](doc/markdown/./base.typedarray.md) |  |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+attribFormats
+
+
+</td><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

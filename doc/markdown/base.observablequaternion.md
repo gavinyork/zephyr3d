@@ -15,22 +15,225 @@ declare class ObservableQuaternion extends Quaternion
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [callback](doc/markdown/./base.observablequaternion.callback.md) |  | () =&gt; void | The callback function which will be executed when the value changed |
-|  [w](doc/markdown/./base.observablequaternion.w.md) |  | number | Get the w component value. |
-|  [x](doc/markdown/./base.observablequaternion.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.observablequaternion.y.md) |  | number | Get the y component value. |
-|  [z](doc/markdown/./base.observablequaternion.z.md) |  | number | Get the z component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[callback](doc/markdown/./base.observablequaternion.callback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+() =&gt; void
+
+
+</td><td>
+
+The callback function which will be executed when the value changed
+
+
+</td></tr>
+<tr><td>
+
+[w](doc/markdown/./base.observablequaternion.w.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the w component value.
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.observablequaternion.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.observablequaternion.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+<tr><td>
+
+[z](doc/markdown/./base.observablequaternion.z.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the z component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [copyWithin(target, start, end)](doc/markdown/./base.observablequaternion.copywithin.md) |  | Inherited from Float32Array.copyWithin |
-|  [fill(value, start, end)](doc/markdown/./base.observablequaternion.fill.md) |  | Inherited from Float32Array.fill |
-|  [reverse()](doc/markdown/./base.observablequaternion.reverse.md) |  | Inherited from Float32Array.reverse |
-|  [set(array, offset)](doc/markdown/./base.observablequaternion.set.md) |  | Inherited from Float32Array.set |
-|  [setXYZW(x, y, z, w)](doc/markdown/./base.observablequaternion.setxyzw.md) |  | Set component values. |
-|  [sort(compareFn)](doc/markdown/./base.observablequaternion.sort.md) |  | Inherited from Float32Array.sort |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[copyWithin(target, start, end)](doc/markdown/./base.observablequaternion.copywithin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.copyWithin
+
+
+</td></tr>
+<tr><td>
+
+[fill(value, start, end)](doc/markdown/./base.observablequaternion.fill.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.fill
+
+
+</td></tr>
+<tr><td>
+
+[reverse()](doc/markdown/./base.observablequaternion.reverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.reverse
+
+
+</td></tr>
+<tr><td>
+
+[set(array, offset)](doc/markdown/./base.observablequaternion.set.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.set
+
+
+</td></tr>
+<tr><td>
+
+[setXYZW(x, y, z, w)](doc/markdown/./base.observablequaternion.setxyzw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[sort(compareFn)](doc/markdown/./base.observablequaternion.sort.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.sort
+
+
+</td></tr>
+</tbody></table>
 

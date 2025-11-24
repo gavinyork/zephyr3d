@@ -1,22 +1,31 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, DirectionalLight, Compositor, Tonemap, PBRMetallicRoughnessMaterial, BoxShape, Mesh, FPSCameraController } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  DirectionalLight,
+  PBRMetallicRoughnessMaterial,
+  BoxShape,
+  Mesh,
+  FPSCameraController,
+  getInput
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
+myApp.ready().then(async () => {
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 600);
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
   camera.lookAt(new Vector3(0, 8, 30), new Vector3(0, 8, 0), Vector3.axisPY());
   camera.controller = new FPSCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
   // Create sun light
   const sunLight = new DirectionalLight(scene);
@@ -24,15 +33,7 @@ myApp.ready().then(async() => {
   sunLight.castShadow = true;
   sunLight.shadow.numShadowCascades = 4;
 
-  // Set the sky rendering mode to Atmospheric Scattering
-  scene.env.sky.skyType = 'scatter';
-  // Set the fog effect to atmospheric scattering
-  scene.env.sky.fogType = 'scatter';
-  // Sets aerial perspective density
-  scene.env.sky.aerialPerspectiveDensity = 20;
-
   // Create the ground and some boxes
-
   const material = new PBRMetallicRoughnessMaterial();
   material.metallic = 0.1;
   material.roughness = 0.6;
@@ -55,18 +56,14 @@ myApp.ready().then(async() => {
     box2.material = material;
   }
 
-  // Added a Tonemap post-processing effect
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
   // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
   myApp.on('tick', function () {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

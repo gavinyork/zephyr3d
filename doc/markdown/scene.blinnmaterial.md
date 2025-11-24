@@ -9,27 +9,162 @@ Blinn material
 **Signature:**
 
 ```typescript
-declare class BlinnMaterial extends BlinnMaterial_base 
+declare class BlinnMaterial extends BlinnMaterial_base implements Clonable<BlinnMaterial> 
 ```
 **Extends:** BlinnMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[BlinnMaterial](doc/markdown/./scene.blinnmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.blinnmaterial._constructor_.md) |  | Creates an instance of BlinnMaterial class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.blinnmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of BlinnMaterial class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [vertexNormal](doc/markdown/./scene.blinnmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
-|  [vertexTangent](doc/markdown/./scene.blinnmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vertexNormal](doc/markdown/./scene.blinnmaterial.vertexnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+<tr><td>
+
+[vertexTangent](doc/markdown/./scene.blinnmaterial.vertextangent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [fragmentShader(scope)](doc/markdown/./scene.blinnmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope)](doc/markdown/./scene.blinnmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.blinnmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.blinnmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.blinnmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

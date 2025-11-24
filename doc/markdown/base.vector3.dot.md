@@ -14,10 +14,55 @@ static dot(a: Vector3, b: Vector3): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Vector3](doc/markdown/./base.vector3.md) | The first operand. |
-|  b | [Vector3](doc/markdown/./base.vector3.md) | The second operand. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

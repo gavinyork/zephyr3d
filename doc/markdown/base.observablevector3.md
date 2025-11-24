@@ -15,21 +15,206 @@ declare class ObservableVector3 extends Vector3
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [callback](doc/markdown/./base.observablevector3.callback.md) |  | () =&gt; void | The callback function which will be executed when the value changed |
-|  [x](doc/markdown/./base.observablevector3.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.observablevector3.y.md) |  | number | Get the y component value. |
-|  [z](doc/markdown/./base.observablevector3.z.md) |  | number | Get the z component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[callback](doc/markdown/./base.observablevector3.callback.md)
+
+
+</td><td>
+
+
+</td><td>
+
+() =&gt; void
+
+
+</td><td>
+
+The callback function which will be executed when the value changed
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.observablevector3.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.observablevector3.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+<tr><td>
+
+[z](doc/markdown/./base.observablevector3.z.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the z component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [copyWithin(target, start, end)](doc/markdown/./base.observablevector3.copywithin.md) |  | Inherited from Float32Array.copyWithin |
-|  [fill(value, start, end)](doc/markdown/./base.observablevector3.fill.md) |  | Inherited from Float32Array.fill |
-|  [reverse()](doc/markdown/./base.observablevector3.reverse.md) |  | Inherited from Float32Array.reverse |
-|  [set(array, offset)](doc/markdown/./base.observablevector3.set.md) |  | Inherited from Float32Array.set |
-|  [setXYZ(x, y, z)](doc/markdown/./base.observablevector3.setxyz.md) |  | Set component values. |
-|  [sort(compareFn)](doc/markdown/./base.observablevector3.sort.md) |  | Inherited from Float32Array.sort |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[copyWithin(target, start, end)](doc/markdown/./base.observablevector3.copywithin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.copyWithin
+
+
+</td></tr>
+<tr><td>
+
+[fill(value, start, end)](doc/markdown/./base.observablevector3.fill.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.fill
+
+
+</td></tr>
+<tr><td>
+
+[reverse()](doc/markdown/./base.observablevector3.reverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.reverse
+
+
+</td></tr>
+<tr><td>
+
+[set(array, offset)](doc/markdown/./base.observablevector3.set.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.set
+
+
+</td></tr>
+<tr><td>
+
+[setXYZ(x, y, z)](doc/markdown/./base.observablevector3.setxyz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[sort(compareFn)](doc/markdown/./base.observablevector3.sort.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inherited from Float32Array.sort
+
+
+</td></tr>
+</tbody></table>
 

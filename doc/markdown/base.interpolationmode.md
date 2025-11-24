@@ -9,5 +9,5 @@ The interpolation mode
 **Signature:**
 
 ```typescript
-type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline';
+type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
 ```

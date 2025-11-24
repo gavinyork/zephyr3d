@@ -4,7 +4,7 @@
 
 ## Primitive.getVertexBufferInfo() method
 
-Gets the vertex buffer information by a given semantic
+Get vertex buffer information for a given semantic.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  semantic | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The semantic of the vertex buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic to look up.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [VertexBufferInfo](doc/markdown/./device.vertexbufferinfo.md)
 
-The vertex buffer information of the given semantic
+The `VertexBufferInfo`<!-- -->, or `null` if not found.
 

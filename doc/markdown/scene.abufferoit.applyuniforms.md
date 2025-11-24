@@ -16,10 +16,55 @@ applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The draw context. |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+The draw context.
+
+
+</td></tr>
+<tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+The bind group.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

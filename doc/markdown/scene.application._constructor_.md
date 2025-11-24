@@ -4,17 +4,49 @@
 
 ## Application.(constructor)
 
-Creates an instance of Application
+Construct the Application singleton with the provided options.
+
+Throws if an instance already exists.
 
 **Signature:**
 
 ```typescript
-constructor(opt: Partial<AppOptions>);
+constructor(opt: AppOptions);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  opt | Partial&lt;[AppOptions](doc/markdown/./scene.appoptions.md)<!-- -->&gt; | The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+opt
+
+
+</td><td>
+
+[AppOptions](doc/markdown/./scene.appoptions.md)
+
+
+</td><td>
+
+Application creation options (canvas, backend, and optional runtime/device settings).
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,13 +14,95 @@ createGrass(density: number[][], bladeWidth: number, bladeHeight: number, offset
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  density | number\[\]\[\] | The density map |
-|  bladeWidth | number |  |
-|  bladeHeight | number |  |
-|  offset | number |  |
-|  grassTexture | [Texture2D](doc/markdown/./device.texture2d.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+density
+
+
+</td><td>
+
+number\[\]\[\]
+
+
+</td><td>
+
+The density map
+
+
+</td></tr>
+<tr><td>
+
+bladeWidth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+bladeHeight
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+offset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+grassTexture
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

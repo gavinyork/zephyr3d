@@ -12,13 +12,93 @@ abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcO
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sourceBuffer | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) |  |
-|  destBuffer | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) |  |
-|  srcOffset | number |  |
-|  dstOffset | number |  |
-|  bytes | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sourceBuffer
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+destBuffer
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+srcOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dstOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+bytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

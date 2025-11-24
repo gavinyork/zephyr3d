@@ -26,7 +26,7 @@
 // 创建平行光对象
 const light = new DirectionalLight(scene);
 // 平行光方向
-light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
 // 平行光颜色
 light.color = new Vector4(1, 1, 0, 1);
 
@@ -60,7 +60,7 @@ light.color = new Vector4(1, 1, 1, 1);
 // 创建锥形光对象
 const light = new SpotLight(scene);
 // 锥形光方向
-light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
 // 锥形光颜色
 light.color = new Vector4(1, 1, 1, 1);
 // 光锥角度余弦
@@ -96,7 +96,7 @@ IBL是通过对环境贴图在球面空间进行积分而预先计算出场景�
 ```javascript
 
   // 加载全景图
-  assetManager.fetchTexture('assets/images/Wide_Street.hdr').then(tex => {
+  assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/Wide_Street.hdr').then(tex => {
     // 通过全景图生成立方体天空贴图
     const skyMap = myApp.device.createCubeTexture('rgba16f', 512);
     panoramaToCubemap(tex, skyMap);

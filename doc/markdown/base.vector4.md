@@ -15,62 +15,816 @@ declare class Vector4 extends VectorBase
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(x, y, z, w)](doc/markdown/./base.vector4._constructor_.md) |  | Creates a new Vector4 initialized with values. |
-|  [(constructor)(elements)](doc/markdown/./base.vector4._constructor__1.md) |  | Creates a new Vector4 initialized with values in an array. |
-|  [(constructor)(array)](doc/markdown/./base.vector4._constructor__2.md) |  | Creates a new Vector4 initialized with values in a Float32Array. |
-|  [(constructor)(buffer, offset)](doc/markdown/./base.vector4._constructor__3.md) |  | Creates a new Vector4 placed on a given ArrayBuffer object. |
-|  [(constructor)()](doc/markdown/./base.vector4._constructor__4.md) |  | Creates a new Vector4 filled with zero values. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(x, y, z, w)](doc/markdown/./base.vector4._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 initialized with values.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(elements)](doc/markdown/./base.vector4._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 initialized with values in an array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(array)](doc/markdown/./base.vector4._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 initialized with values in a Float32Array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(buffer, offset)](doc/markdown/./base.vector4._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 placed on a given ArrayBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)()](doc/markdown/./base.vector4._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 filled with zero values.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [magnitude](doc/markdown/./base.vector4.magnitude.md) | <code>readonly</code> | number | Get the length of the vector. |
-|  [magnitudeSq](doc/markdown/./base.vector4.magnitudesq.md) | <code>readonly</code> | number | Get the squared length of the vector. |
-|  [w](doc/markdown/./base.vector4.w.md) |  | number | Get the w component value. |
-|  [x](doc/markdown/./base.vector4.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.vector4.y.md) |  | number | Get the y component value. |
-|  [z](doc/markdown/./base.vector4.z.md) |  | number | Get the z component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[magnitude](doc/markdown/./base.vector4.magnitude.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the length of the vector.
+
+
+</td></tr>
+<tr><td>
+
+[magnitudeSq](doc/markdown/./base.vector4.magnitudesq.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the squared length of the vector.
+
+
+</td></tr>
+<tr><td>
+
+[w](doc/markdown/./base.vector4.w.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the w component value.
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.vector4.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.vector4.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+<tr><td>
+
+[z](doc/markdown/./base.vector4.z.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the z component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [abs(a, result)](doc/markdown/./base.vector4.abs.md) | <code>static</code> | Calculates the absolute values of a Vector4. |
-|  [add(a, b, result)](doc/markdown/./base.vector4.add.md) | <code>static</code> | Add two Vector4's. |
-|  [addBy(other)](doc/markdown/./base.vector4.addby.md) |  | Add a vector to this vector. |
-|  [axisNW()](doc/markdown/./base.vector4.axisnw.md) | <code>static</code> | Creates a new Vector4 pointing in the negative direction of the W axis, i.e. vec4(0, 0, 0, -1) |
-|  [axisNX()](doc/markdown/./base.vector4.axisnx.md) | <code>static</code> | Creates a new Vector4 pointing in the negative direction of the X axis, i.e. vec4(-1, 0, 0, 0) |
-|  [axisNY()](doc/markdown/./base.vector4.axisny.md) | <code>static</code> | Creates a new Vector4 pointing in the negative direction of the Y axis, i.e. vec4(0, -1, 0, 0) |
-|  [axisNZ()](doc/markdown/./base.vector4.axisnz.md) | <code>static</code> | Creates a new Vector4 pointing in the negative direction of the Z axis, i.e. vec4(0, 0, -1, 0) |
-|  [axisPW()](doc/markdown/./base.vector4.axispw.md) | <code>static</code> | Creates a new Vector4 pointing in the positive direction of the W axis, i.e. vec4(0, 0, 0, 1) |
-|  [axisPX()](doc/markdown/./base.vector4.axispx.md) | <code>static</code> | Creates a new Vector4 pointing in the positive direction of the X axis, i.e. vec4(1, 0, 0, 0) |
-|  [axisPY()](doc/markdown/./base.vector4.axispy.md) | <code>static</code> | Creates a new Vector4 pointing in the positive direction of the Y axis, i.e. vec4(0, 1, 0, 0) |
-|  [axisPZ()](doc/markdown/./base.vector4.axispz.md) | <code>static</code> | Creates a new Vector4 pointing in the positive direction of the Z axis, i.e. vec4(0, 0, 1, 0) |
-|  [clone()](doc/markdown/./base.vector4.clone.md) |  | Creates a new Vector4 initialized with values from this vector. |
-|  [div(a, b, result)](doc/markdown/./base.vector4.div.md) | <code>static</code> | Divide two Vector4's. |
-|  [divBy(other)](doc/markdown/./base.vector4.divby.md) |  | Divide this vector by a vector. |
-|  [dot(a, b)](doc/markdown/./base.vector4.dot.md) | <code>static</code> | Calculates the dot product of two Vector4's. |
-|  [inplaceInverse()](doc/markdown/./base.vector4.inplaceinverse.md) |  | Inverse this vector inplace. |
-|  [inplaceMax(other)](doc/markdown/./base.vector4.inplacemax.md) |  | Set the component values to the maximum of this vector and another vector. |
-|  [inplaceMin(other)](doc/markdown/./base.vector4.inplacemin.md) |  | Set the component values to the minimum of this vector and another vector. |
-|  [inplaceNormalize()](doc/markdown/./base.vector4.inplacenormalize.md) |  | Normalize this vector inplace. |
-|  [inverse(v, result)](doc/markdown/./base.vector4.inverse.md) | <code>static</code> | Inverse a Vector4 |
-|  [max(a, b, result)](doc/markdown/./base.vector4.max.md) | <code>static</code> | Calculates the maximum of two Vector4's. |
-|  [min(a, b, result)](doc/markdown/./base.vector4.min.md) | <code>static</code> | Calculates the minimum of two Vector4's. |
-|  [mul(a, b, result)](doc/markdown/./base.vector4.mul.md) | <code>static</code> | Multiply two Vector4's. |
-|  [mulBy(other)](doc/markdown/./base.vector4.mulby.md) |  | Multiply this vector by a vector. |
-|  [normalize(v, result)](doc/markdown/./base.vector4.normalize.md) | <code>static</code> | Normalize a Vector4 |
-|  [one()](doc/markdown/./base.vector4.one.md) | <code>static</code> | Creates a new Vector4 initialized with one. |
-|  [scale(a, b, result)](doc/markdown/./base.vector4.scale.md) | <code>static</code> | Scale a Vector4 by a scalar number. |
-|  [scaleBy(f)](doc/markdown/./base.vector4.scaleby.md) |  | Scale this vector by a scalar number. |
-|  [setAndNormalize(x, y, z, w)](doc/markdown/./base.vector4.setandnormalize.md) |  | Set component values and then normalize the vector. |
-|  [setXYZW(x, y, z, w)](doc/markdown/./base.vector4.setxyzw.md) |  | Set component values. |
-|  [sub(a, b, result)](doc/markdown/./base.vector4.sub.md) | <code>static</code> | Subtract two Vector4's. |
-|  [subBy(other)](doc/markdown/./base.vector4.subby.md) |  | Subtract a vector from this vector. |
-|  [xy()](doc/markdown/./base.vector4.xy.md) |  | Creates a new Vector2 initialized with x, y component of this vector. |
-|  [xyz()](doc/markdown/./base.vector4.xyz.md) |  | Creates a new Vector3 initialized with x, y, z component of this vector. |
-|  [zero()](doc/markdown/./base.vector4.zero.md) | <code>static</code> | Creates a new Vector4 initialized with zero values. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[abs(a, result)](doc/markdown/./base.vector4.abs.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the absolute values of a Vector4.
+
+
+</td></tr>
+<tr><td>
+
+[add(a, b, result)](doc/markdown/./base.vector4.add.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Add two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[addBy(other)](doc/markdown/./base.vector4.addby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a vector to this vector.
+
+
+</td></tr>
+<tr><td>
+
+[axisNW()](doc/markdown/./base.vector4.axisnw.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the negative direction of the W axis, i.e. vec4(0, 0, 0, -1)
+
+
+</td></tr>
+<tr><td>
+
+[axisNX()](doc/markdown/./base.vector4.axisnx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the negative direction of the X axis, i.e. vec4(-1, 0, 0, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisNY()](doc/markdown/./base.vector4.axisny.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the negative direction of the Y axis, i.e. vec4(0, -1, 0, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisNZ()](doc/markdown/./base.vector4.axisnz.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the negative direction of the Z axis, i.e. vec4(0, 0, -1, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisPW()](doc/markdown/./base.vector4.axispw.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the positive direction of the W axis, i.e. vec4(0, 0, 0, 1)
+
+
+</td></tr>
+<tr><td>
+
+[axisPX()](doc/markdown/./base.vector4.axispx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the positive direction of the X axis, i.e. vec4(1, 0, 0, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisPY()](doc/markdown/./base.vector4.axispy.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the positive direction of the Y axis, i.e. vec4(0, 1, 0, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisPZ()](doc/markdown/./base.vector4.axispz.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 pointing in the positive direction of the Z axis, i.e. vec4(0, 0, 1, 0)
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./base.vector4.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector4 initialized with values from this vector.
+
+
+</td></tr>
+<tr><td>
+
+[combine(a, b, t0, t1, result)](doc/markdown/./base.vector4.combine.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Combine two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[combineBy(other, t0, t1)](doc/markdown/./base.vector4.combineby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Combine a vector to this vector.
+
+
+</td></tr>
+<tr><td>
+
+[div(a, b, result)](doc/markdown/./base.vector4.div.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Divide two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[divBy(other)](doc/markdown/./base.vector4.divby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Divide this vector by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[dot(a, b)](doc/markdown/./base.vector4.dot.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the dot product of two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceInverse()](doc/markdown/./base.vector4.inplaceinverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inverse this vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceMax(other)](doc/markdown/./base.vector4.inplacemax.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the component values to the maximum of this vector and another vector.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceMin(other)](doc/markdown/./base.vector4.inplacemin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the component values to the minimum of this vector and another vector.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceNormalize()](doc/markdown/./base.vector4.inplacenormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Normalize this vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inverse(v, result)](doc/markdown/./base.vector4.inverse.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Inverse a Vector4
+
+
+</td></tr>
+<tr><td>
+
+[max(a, b, result)](doc/markdown/./base.vector4.max.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the maximum of two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[min(a, b, result)](doc/markdown/./base.vector4.min.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the minimum of two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[mul(a, b, result)](doc/markdown/./base.vector4.mul.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiply two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[mulBy(other)](doc/markdown/./base.vector4.mulby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiply this vector by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[normalize(v, result)](doc/markdown/./base.vector4.normalize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Normalize a Vector4
+
+
+</td></tr>
+<tr><td>
+
+[one()](doc/markdown/./base.vector4.one.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 initialized with one.
+
+
+</td></tr>
+<tr><td>
+
+[scale(a, b, result)](doc/markdown/./base.vector4.scale.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Scale a Vector4 by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(f)](doc/markdown/./base.vector4.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scale this vector by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[setAndNormalize(x, y, z, w)](doc/markdown/./base.vector4.setandnormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values and then normalize the vector.
+
+
+</td></tr>
+<tr><td>
+
+[setXYZW(x, y, z, w)](doc/markdown/./base.vector4.setxyzw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[sub(a, b, result)](doc/markdown/./base.vector4.sub.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Subtract two Vector4's.
+
+
+</td></tr>
+<tr><td>
+
+[subBy(other)](doc/markdown/./base.vector4.subby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Subtract a vector from this vector.
+
+
+</td></tr>
+<tr><td>
+
+[xy()](doc/markdown/./base.vector4.xy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 initialized with x, y component of this vector.
+
+
+</td></tr>
+<tr><td>
+
+[xyz()](doc/markdown/./base.vector4.xyz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector3 initialized with x, y, z component of this vector.
+
+
+</td></tr>
+<tr><td>
+
+[zero()](doc/markdown/./base.vector4.zero.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector4 initialized with zero values.
+
+
+</td></tr>
+</tbody></table>
 

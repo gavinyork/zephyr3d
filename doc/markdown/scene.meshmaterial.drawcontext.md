@@ -4,7 +4,7 @@
 
 ## MeshMaterial.drawContext property
 
-Draw context for shader creation
+Draw context captured during program creation, available inside shader hooks.
 
 **Signature:**
 

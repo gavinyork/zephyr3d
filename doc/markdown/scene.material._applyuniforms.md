@@ -4,21 +4,83 @@
 
 ## Material.\_applyUniforms() method
 
-Applies uniform values
+Upload uniforms and bind resources to the per-material bind group (index 2).
+
+Implement in subclasses to: - Write uniform buffers/textures/samplers to the `bindGroup`<!-- -->. - Respect the current `pass` and `ctx`<!-- -->.
 
 **Signature:**
 
 ```typescript
-protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+protected _applyUniforms(_bindGroup: BindGroup, _ctx: DrawContext, _pass: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The drawing context |
-|  pass | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+The bind group to populate.
+
+
+</td></tr>
+<tr><td>
+
+\_ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context.
+
+
+</td></tr>
+<tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pass number.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

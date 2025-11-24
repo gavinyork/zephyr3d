@@ -4,7 +4,11 @@
 
 ## DrawContext interface
 
-The context for drawing objects
+Context object passed to draw calls and render helpers.
+
+It aggregates all per-frame, per-pass, and per-draw state derived from the engine and renderer, including device handles, textures, passes, flags, and post-processing links.
+
+Notes: - Not all textures/fields are present for every pass; check for undefined when optional. - Values like `HiZ`<!-- -->, `TAA`<!-- -->, `SSR` signal features the renderer has activated for the current pass.
 
 **Signature:**
 
@@ -14,42 +18,824 @@ interface DrawContext
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [applyFog](doc/markdown/./scene.drawcontext.applyfog.md) |  | [FogType](doc/markdown/./scene.fogtype.md) | Whether should apply fog to fragment |
-|  [camera](doc/markdown/./scene.drawcontext.camera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera for current drawing task |
-|  [clusteredLight?](doc/markdown/./scene.drawcontext.clusteredlight.md) |  | ClusteredLight | _(Optional)_ clustered light index |
-|  [compositor?](doc/markdown/./scene.drawcontext.compositor.md) |  | [Compositor](doc/markdown/./scene.compositor.md) | _(Optional)_ The compositor used to apply postprocessing effects |
-|  [compositorContex?](doc/markdown/./scene.drawcontext.compositorcontex.md) |  | [CompositorContext](doc/markdown/./scene.compositorcontext.md) | _(Optional)_ The posteffect rendering context |
-|  [defaultViewport?](doc/markdown/./scene.drawcontext.defaultviewport.md) |  | boolean | _(Optional)_ whether render to default viewport |
-|  [depthFormat?](doc/markdown/./scene.drawcontext.depthformat.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | _(Optional)_ Default depth buffer format |
-|  [depthTexture?](doc/markdown/./scene.drawcontext.depthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Depth texture |
-|  [device](doc/markdown/./scene.drawcontext.device.md) |  | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | Render device |
-|  [drawEnvLight](doc/markdown/./scene.drawcontext.drawenvlight.md) |  | boolean | Whether current render pass is base light pass |
-|  [env](doc/markdown/./scene.drawcontext.env.md) |  | [Environment](doc/markdown/./scene.environment.md) | The scene environment |
-|  [flip](doc/markdown/./scene.drawcontext.flip.md) |  | boolean | Wether should flip upside down |
-|  [forceColorState?](doc/markdown/./scene.drawcontext.forcecolorstate.md) |  | [ColorState](doc/markdown/./device.colorstate.md) | _(Optional)_ Force color mask state |
-|  [forceCullMode?](doc/markdown/./scene.drawcontext.forcecullmode.md) |  | [FaceMode](doc/markdown/./device.facemode.md) | _(Optional)_ Force cull mode |
-|  [globalBindGroupAllocator](doc/markdown/./scene.drawcontext.globalbindgroupallocator.md) |  | GlobalBindGroupAllocator | Global bind group allocator |
-|  [HiZ](doc/markdown/./scene.drawcontext.hiz.md) |  | boolean | hierarchical depth |
-|  [HiZTexture](doc/markdown/./scene.drawcontext.hiztexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | hierarchical depth buffer |
-|  [instanceData?](doc/markdown/./scene.drawcontext.instancedata.md) |  | [InstanceData](doc/markdown/./scene.instancedata.md) | _(Optional)_ Instance data for current drawing task |
-|  [lightBlending](doc/markdown/./scene.drawcontext.lightblending.md) |  | boolean | whether is blending light |
-|  [linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Linear depth texture |
-|  [materialFlags](doc/markdown/./scene.drawcontext.materialflags.md) |  | number | Material varying flags |
-|  [oit](doc/markdown/./scene.drawcontext.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
-|  [picking](doc/markdown/./scene.drawcontext.picking.md) |  | boolean | whether GPU picking is enabled |
-|  [primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
-|  [queue](doc/markdown/./scene.drawcontext.queue.md) |  | number | current queue |
-|  [renderPass](doc/markdown/./scene.drawcontext.renderpass.md) |  | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the current drawing task belongs |
-|  [renderPassHash](doc/markdown/./scene.drawcontext.renderpasshash.md) |  | string | Hash value for the drawing task |
-|  [renderQueue?](doc/markdown/./scene.drawcontext.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | _(Optional)_ The render queue which is currently being rendered |
-|  [scene](doc/markdown/./scene.drawcontext.scene.md) |  | [Scene](doc/markdown/./scene.scene.md) | The scene that is currently been drawing |
-|  [sceneColorTexture?](doc/markdown/./scene.drawcontext.scenecolortexture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ Scene color texture |
-|  [sunLight?](doc/markdown/./scene.drawcontext.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | _(Optional)_ the sun light |
-|  [timestamp](doc/markdown/./scene.drawcontext.timestamp.md) |  | number | Timestamp |
-|  [viewportHeight?](doc/markdown/./scene.drawcontext.viewportheight.md) |  | number | _(Optional)_ viewport height |
-|  [viewportWidth?](doc/markdown/./scene.drawcontext.viewportwidth.md) |  | number | _(Optional)_ viewport width |
-|  [viewportX?](doc/markdown/./scene.drawcontext.viewportx.md) |  | number | _(Optional)_ viewport X |
-|  [viewportY?](doc/markdown/./scene.drawcontext.viewporty.md) |  | number | _(Optional)_ viewport Y |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[camera](doc/markdown/./scene.drawcontext.camera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera associated with the current drawing task (may differ from primaryCamera).
+
+
+</td></tr>
+<tr><td>
+
+[clusteredLight?](doc/markdown/./scene.drawcontext.clusteredlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+ClusteredLight
+
+
+</td><td>
+
+_(Optional)_ Clustered light index/structure for lighting in forward+, clustered shading, etc.
+
+
+</td></tr>
+<tr><td>
+
+[colorFormat?](doc/markdown/./scene.drawcontext.colorformat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+_(Optional)_ Default color buffer format for targets created in this pass.
+
+
+</td></tr>
+<tr><td>
+
+[compositor?](doc/markdown/./scene.drawcontext.compositor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Compositor](doc/markdown/./scene.compositor.md)
+
+
+</td><td>
+
+_(Optional)_ Compositor used to apply post-processing effects at the end of the frame/pass.
+
+
+</td></tr>
+<tr><td>
+
+[depthFormat?](doc/markdown/./scene.drawcontext.depthformat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+_(Optional)_ Default depth buffer format for targets created in this pass.
+
+
+</td></tr>
+<tr><td>
+
+[depthTexture?](doc/markdown/./scene.drawcontext.depthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+_(Optional)_ Scene (non-linear) depth texture bound for sampling.
+
+
+</td></tr>
+<tr><td>
+
+[device](doc/markdown/./scene.drawcontext.device.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+Render device used for issuing GPU commands.
+
+
+</td></tr>
+<tr><td>
+
+[drawEnvLight](doc/markdown/./scene.drawcontext.drawenvlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this is the base lighting pass that draws environment lighting.
+
+
+</td></tr>
+<tr><td>
+
+[env](doc/markdown/./scene.drawcontext.env.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Environment](doc/markdown/./scene.environment.md)
+
+
+</td><td>
+
+Scene environment (sky, IBL, exposure, etc.) used for shading.
+
+
+</td></tr>
+<tr><td>
+
+[finalFramebuffer](doc/markdown/./scene.drawcontext.finalframebuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Final framebuffer target where the last stage renders.
+
+
+</td></tr>
+<tr><td>
+
+[flip](doc/markdown/./scene.drawcontext.flip.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions).
+
+
+</td></tr>
+<tr><td>
+
+[fogFlags](doc/markdown/./scene.drawcontext.fogflags.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Fog application flags for transparent objects (bitmask).
+
+
+</td></tr>
+<tr><td>
+
+[forceColorState?](doc/markdown/./scene.drawcontext.forcecolorstate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ColorState](doc/markdown/./device.colorstate.md)
+
+
+</td><td>
+
+_(Optional)_ Force color mask state override for special passes (optional).
+
+
+</td></tr>
+<tr><td>
+
+[forceCullMode?](doc/markdown/./scene.drawcontext.forcecullmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FaceMode](doc/markdown/./device.facemode.md)
+
+
+</td><td>
+
+_(Optional)_ Force cull mode override for special passes (optional).
+
+
+</td></tr>
+<tr><td>
+
+[globalBindGroupAllocator](doc/markdown/./scene.drawcontext.globalbindgroupallocator.md)
+
+
+</td><td>
+
+
+</td><td>
+
+GlobalBindGroupAllocator
+
+
+</td><td>
+
+Allocator for global (frame/pass) bind groups and descriptor resources.
+
+
+</td></tr>
+<tr><td>
+
+[HiZ](doc/markdown/./scene.drawcontext.hiz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether hierarchical depth (Hi-Z) is enabled for the current pass.
+
+
+</td></tr>
+<tr><td>
+
+[HiZTexture](doc/markdown/./scene.drawcontext.hiztexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Hi-Z (hierarchical Z) depth texture, when generated.
+
+
+</td></tr>
+<tr><td>
+
+[instanceData?](doc/markdown/./scene.drawcontext.instancedata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[InstanceData](doc/markdown/./scene.instancedata.md)
+
+
+</td><td>
+
+_(Optional)_ Instance data buffer/metadata for the current drawing task (instanced rendering).
+
+
+</td></tr>
+<tr><td>
+
+[intermediateFramebuffer](doc/markdown/./scene.drawcontext.intermediateframebuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Intermediate framebuffer used by the compositor or multi-pass pipelines.
+
+
+</td></tr>
+<tr><td>
+
+[lightBlending](doc/markdown/./scene.drawcontext.lightblending.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the current lighting pass is blending light accumulations.
+
+
+</td></tr>
+<tr><td>
+
+[linearDepthTexture?](doc/markdown/./scene.drawcontext.lineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+_(Optional)_ Linearized depth texture bound for sampling.
+
+
+</td></tr>
+<tr><td>
+
+[materialFlags](doc/markdown/./scene.drawcontext.materialflags.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Material varying bit flags that influence shader selection.
+
+
+</td></tr>
+<tr><td>
+
+[motionVectors](doc/markdown/./scene.drawcontext.motionvectors.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether motion vectors are being written this pass (used by TAA/MotionBlur).
+
+
+</td></tr>
+<tr><td>
+
+[motionVectorTexture?](doc/markdown/./scene.drawcontext.motionvectortexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+_(Optional)_ Motion vector texture target when motion vectors are active.
+
+
+</td></tr>
+<tr><td>
+
+[oit](doc/markdown/./scene.drawcontext.oit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[OIT](doc/markdown/./scene.oit.md)
+
+
+</td><td>
+
+Order-Independent Transparency interface for transparent passes.
+
+
+</td></tr>
+<tr><td>
+
+[picking](doc/markdown/./scene.drawcontext.picking.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether GPU-based picking is currently enabled.
+
+
+</td></tr>
+<tr><td>
+
+[primaryCamera](doc/markdown/./scene.drawcontext.primarycamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera position/view used by the primary render pass of this frame.
+
+
+</td></tr>
+<tr><td>
+
+[queue](doc/markdown/./scene.drawcontext.queue.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current sub-queue index within the render queue (e.g., opaque, transparent).
+
+
+</td></tr>
+<tr><td>
+
+[renderHeight](doc/markdown/./scene.drawcontext.renderheight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Framebuffer height for rendering (in pixels).
+
+
+</td></tr>
+<tr><td>
+
+[renderPass](doc/markdown/./scene.drawcontext.renderpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+The render pass to which this drawing task belongs.
+
+
+</td></tr>
+<tr><td>
+
+[renderPassHash](doc/markdown/./scene.drawcontext.renderpasshash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Stable hash for the current pass/draw state, for render bundle or pipeline cache.
+
+
+</td></tr>
+<tr><td>
+
+[renderQueue?](doc/markdown/./scene.drawcontext.renderqueue.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+_(Optional)_ The render queue which is currently being rendered (if applicable).
+
+
+</td></tr>
+<tr><td>
+
+[renderWidth](doc/markdown/./scene.drawcontext.renderwidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Framebuffer width for rendering (in pixels).
+
+
+</td></tr>
+<tr><td>
+
+[scene](doc/markdown/./scene.drawcontext.scene.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene currently being drawn.
+
+
+</td></tr>
+<tr><td>
+
+[sceneColorTexture?](doc/markdown/./scene.drawcontext.scenecolortexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+_(Optional)_ Scene color texture bound for sampling (previous pass or resolved color).
+
+
+</td></tr>
+<tr><td>
+
+[SSR](doc/markdown/./scene.drawcontext.ssr.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Screen-space reflections are active this frame/pass.
+
+
+</td></tr>
+<tr><td>
+
+[SSRCalcThickness](doc/markdown/./scene.drawcontext.ssrcalcthickness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether SSR thickness should be computed dynamically in this pass.
+
+
+</td></tr>
+<tr><td>
+
+[SSRNormalTexture](doc/markdown/./scene.drawcontext.ssrnormaltexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+SSR normal input texture (usually view-space or world-space normals).
+
+
+</td></tr>
+<tr><td>
+
+[SSRRoughnessTexture](doc/markdown/./scene.drawcontext.ssrroughnesstexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+SSR roughness input texture.
+
+
+</td></tr>
+<tr><td>
+
+[sunLight?](doc/markdown/./scene.drawcontext.sunlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[DirectionalLight](doc/markdown/./scene.directionallight.md)
+
+
+</td><td>
+
+_(Optional)_ Sun/directional light reference for passes that need it.
+
+
+</td></tr>
+<tr><td>
+
+[TAA](doc/markdown/./scene.drawcontext.taa.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Temporal anti-aliasing is active this frame/pass.
+
+
+</td></tr>
+<tr><td>
+
+[timestamp](doc/markdown/./scene.drawcontext.timestamp.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Timestamp for the current draw (engine-defined time units).
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,7 +4,7 @@
 
 ## ExtractMixinReturnType type
 
-Extract mixin return type
+Extracts the return type of a mixin function.
 
 **Signature:**
 

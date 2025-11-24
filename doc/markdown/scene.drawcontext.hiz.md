@@ -4,7 +4,7 @@
 
 ## DrawContext.HiZ property
 
-hierarchical depth
+Whether hierarchical depth (Hi-Z) is enabled for the current pass.
 
 **Signature:**
 

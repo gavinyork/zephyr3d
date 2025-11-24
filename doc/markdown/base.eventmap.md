@@ -9,5 +9,5 @@ Mapping table of event types and their constructors
 **Signature:**
 
 ```typescript
-type EventMap = Record<string, any>;
+type EventMap = Record<string, any[]>;
 ```

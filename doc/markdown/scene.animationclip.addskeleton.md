@@ -4,19 +4,49 @@
 
 ## AnimationClip.addSkeleton() method
 
-Adds a skeleton to the animation
+Add a skeleton used by this clip.
 
 **Signature:**
 
 ```typescript
-addSkeleton(skeleton: Skeleton): void;
+addSkeleton(skeletonId: string): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  skeleton | [Skeleton](doc/markdown/./scene.skeleton.md) | The skeleton to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+skeletonId
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Persistent ID of Skeleton to register for this clip.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

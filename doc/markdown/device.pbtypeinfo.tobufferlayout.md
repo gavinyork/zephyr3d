@@ -14,10 +14,55 @@ abstract toBufferLayout(offset: number, layout: PBStructLayout): UniformBufferLa
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  offset | number | Byte offset of the layout |
-|  layout | [PBStructLayout](doc/markdown/./device.pbstructlayout.md) | Type of the layout |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+offset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Byte offset of the layout
+
+
+</td></tr>
+<tr><td>
+
+layout
+
+
+</td><td>
+
+[PBStructLayout](doc/markdown/./device.pbstructlayout.md)
+
+
+</td><td>
+
+Type of the layout
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

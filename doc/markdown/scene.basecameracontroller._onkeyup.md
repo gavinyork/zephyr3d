@@ -4,23 +4,53 @@
 
 ## BaseCameraController.\_onKeyUp() method
 
-Key up event handler
+Key up handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
-protected _onKeyUp(evt: KeyboardEvent): boolean;
+protected _onKeyUp(_evt: IControllerKeyupEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | KeyboardEvent | Keyboard event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_evt
+
+
+</td><td>
+
+[IControllerKeyupEvent](doc/markdown/./scene.icontrollerkeyupevent.md)
+
+
+</td><td>
+
+Keyboard event.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

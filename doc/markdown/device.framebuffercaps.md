@@ -14,12 +14,159 @@ interface FramebufferCaps
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [maxColorAttachmentBytesPerSample](doc/markdown/./device.framebuffercaps.maxcolorattachmentbytespersample.md) |  | number | Maximum color attachment bytes per sample |
-|  [maxDrawBuffers](doc/markdown/./device.framebuffercaps.maxdrawbuffers.md) |  | number | The maximum number of framebuffer color attachment points |
-|  [supportDepth32float](doc/markdown/./device.framebuffercaps.supportdepth32float.md) |  | boolean | True if device supports 32bits float depth buffer |
-|  [supportDepth32floatStencil8](doc/markdown/./device.framebuffercaps.supportdepth32floatstencil8.md) |  | boolean | True if device supports 32bits float depth buffer with 8bits stencil |
-|  [supportFloatBlending](doc/markdown/./device.framebuffercaps.supportfloatblending.md) |  | boolean | True if device supports blending on float point frame buffer |
-|  [supportMultisampledFramebuffer](doc/markdown/./device.framebuffercaps.supportmultisampledframebuffer.md) |  | boolean | True if device supports multisampled frame buffer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[maxColorAttachmentBytesPerSample](doc/markdown/./device.framebuffercaps.maxcolorattachmentbytespersample.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum color attachment bytes per sample
+
+
+</td></tr>
+<tr><td>
+
+[maxDrawBuffers](doc/markdown/./device.framebuffercaps.maxdrawbuffers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum number of framebuffer color attachment points
+
+
+</td></tr>
+<tr><td>
+
+[supportDepth32float](doc/markdown/./device.framebuffercaps.supportdepth32float.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports 32bits float depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportDepth32floatStencil8](doc/markdown/./device.framebuffercaps.supportdepth32floatstencil8.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports 32bits float depth buffer with 8bits stencil
+
+
+</td></tr>
+<tr><td>
+
+[supportFloatBlending](doc/markdown/./device.framebuffercaps.supportfloatblending.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports blending on float point frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportMultisampledFramebuffer](doc/markdown/./device.framebuffercaps.supportmultisampledframebuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports multisampled frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportRenderMipmap](doc/markdown/./device.framebuffercaps.supportrendermipmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports rendering to mipmap
+
+
+</td></tr>
+</tbody></table>
 

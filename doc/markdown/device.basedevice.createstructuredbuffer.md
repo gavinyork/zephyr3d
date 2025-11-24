@@ -12,11 +12,67 @@ abstract createStructuredBuffer(structureType: PBStructTypeInfo, options: Buffer
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  structureType | [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) |  |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) |  |
-|  data | [TypedArray](doc/markdown/./base.typedarray.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+structureType
+
+
+</td><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

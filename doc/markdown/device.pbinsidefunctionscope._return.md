@@ -14,9 +14,39 @@ $return(retval?: ExpValueType): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  retval | [ExpValueType](doc/markdown/./device.expvaluetype.md) | _(Optional)_ The return value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+retval
+
+
+</td><td>
+
+[ExpValueType](doc/markdown/./device.expvaluetype.md)
+
+
+</td><td>
+
+_(Optional)_ The return value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## DrawContext.lightBlending property
 
-whether is blending light
+Whether the current lighting pass is blending light accumulations.
 
 **Signature:**
 

@@ -4,6 +4,10 @@
 
 ## Material.getQueueType() method
 
+Return the queue type to which this material belongs.
+
+Override this in transparent or special materials (e.g., post-process).
+
 **Signature:**
 
 ```typescript

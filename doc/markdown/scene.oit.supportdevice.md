@@ -9,14 +9,44 @@ Checks whether the renderer supports the given device type.
 **Signature:**
 
 ```typescript
-abstract supportDevice(deviceType: string): boolean;
+supportDevice(deviceType: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  deviceType | string | The device type. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+deviceType
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The device type.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

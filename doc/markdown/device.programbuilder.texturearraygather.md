@@ -14,12 +14,79 @@ textureArrayGather(tex: PBShaderExp, sampler: PBShaderExp, coords: PBShaderExp, 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  tex | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
-|  sampler | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
-|  coords | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
-|  arrayIndex | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+tex
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+coords
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+arrayIndex
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

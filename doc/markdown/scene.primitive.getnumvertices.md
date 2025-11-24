@@ -4,7 +4,7 @@
 
 ## Primitive.getNumVertices() method
 
-Query total vertex count
+Query total vertex count from the position buffer, if present.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getNumVertices(): number;
 
 number
 
-Total vertex count, 0 if no position vertex buffer set
+Total vertex count; 0 if no position buffer is set.
 

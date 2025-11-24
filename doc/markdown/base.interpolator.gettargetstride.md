@@ -14,9 +14,39 @@ static getTargetStride(target: InterpolationTarget): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  target | [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | The interpolation target |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+[InterpolationTarget](doc/markdown/./base.interpolationtarget.md)
+
+
+</td><td>
+
+The interpolation target
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

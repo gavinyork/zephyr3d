@@ -4,7 +4,9 @@
 
 ## BatchDrawable interface
 
-interface for any objects that support instancing
+Interface for drawables that support hardware instancing.
+
+Instanced drawables supply instance-specific uniforms, offsets, and strides to allow a single draw call to render many instances efficiently.
 
 **Signature:**
 
@@ -12,13 +14,4 @@ interface for any objects that support instancing
 interface BatchDrawable extends Drawable 
 ```
 **Extends:** [Drawable](doc/markdown/./scene.drawable.md)
-
-## Methods
-
-|  Method | Description |
-|  --- | --- |
-|  [applyInstanceOffsetAndStride(renderQueue, stride, offset)](doc/markdown/./scene.batchdrawable.applyinstanceoffsetandstride.md) |  |
-|  [applyMaterialUniforms(instanceInfo)](doc/markdown/./scene.batchdrawable.applymaterialuniforms.md) |  |
-|  [getInstanceId(renderPass)](doc/markdown/./scene.batchdrawable.getinstanceid.md) | Gets the instance id of the object |
-|  [getInstanceUniforms()](doc/markdown/./scene.batchdrawable.getinstanceuniforms.md) | Gets the instance uniforms |
 

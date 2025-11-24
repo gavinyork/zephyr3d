@@ -14,9 +14,69 @@ constructor(p0: Vector3, p1: Vector3, p2: Vector3);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  p0 | [Vector3](doc/markdown/./base.vector3.md) | The first point. |
-|  p1 | [Vector3](doc/markdown/./base.vector3.md) | The second point. |
-|  p2 | [Vector3](doc/markdown/./base.vector3.md) | The third point. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+p0
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The first point.
+
+
+</td></tr>
+<tr><td>
+
+p1
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The second point.
+
+
+</td></tr>
+<tr><td>
+
+p2
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The third point.
+
+
+</td></tr>
+</tbody></table>
 

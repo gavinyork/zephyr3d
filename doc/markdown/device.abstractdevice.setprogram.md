@@ -14,9 +14,39 @@ setProgram(program: GPUProgram): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  program | [GPUProgram](doc/markdown/./device.gpuprogram.md) | The GPU program to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+program
+
+
+</td><td>
+
+[GPUProgram](doc/markdown/./device.gpuprogram.md)
+
+
+</td><td>
+
+The GPU program to be set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

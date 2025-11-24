@@ -4,7 +4,7 @@
 
 ## OctreeNode.getOrCreateParent() method
 
-Gets or creates the parent node
+Get or create the parent node from the previous (coarser) chunk.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getOrCreateParent(): OctreeNode;
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-The parent node
+The existing or newly created parent `OctreeNode`<!-- -->, or `null` if creation is not possible.
+
+## Remarks
+
+Returns `null` if the previous chunk does not exist.
 

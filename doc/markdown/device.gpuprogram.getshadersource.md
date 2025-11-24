@@ -12,9 +12,37 @@ getShaderSource(kind: ShaderKind): string;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  kind | [ShaderKind](doc/markdown/./device.shaderkind.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+kind
+
+
+</td><td>
+
+[ShaderKind](doc/markdown/./device.shaderkind.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

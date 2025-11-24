@@ -4,7 +4,7 @@
 
 ## DrawContext.oit property
 
-OIT
+Order-Independent Transparency interface for transparent passes.
 
 **Signature:**
 

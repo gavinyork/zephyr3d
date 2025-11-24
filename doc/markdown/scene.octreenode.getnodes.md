@@ -4,7 +4,7 @@
 
 ## OctreeNode.getNodes() method
 
-Get all the scene nodes that this octree node contains
+Get all scene nodes contained in this octree node.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getNodes(): GraphNode[];
 
 [GraphNode](doc/markdown/./scene.graphnode.md)<!-- -->\[\]
 
-An array of the scene nodes
+An array of scene nodes currently held by this octree node.
+
+## Remarks
+
+The returned array is owned by the node and may be mutated internally.
 

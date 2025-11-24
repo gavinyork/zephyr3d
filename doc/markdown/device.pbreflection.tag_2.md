@@ -14,9 +14,39 @@ tag(values: Record<string, PBReflectionTagGetter>): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  values | Record&lt;string, [PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md)<!-- -->&gt; | The object that contains the tag names and the getter functions |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+values
+
+
+</td><td>
+
+Record&lt;string, [PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md)<!-- -->&gt;
+
+
+</td><td>
+
+The object that contains the tag names and the getter functions
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -9,17 +9,92 @@ Calculate vertex position and normal.
 **Signature:**
 
 ```typescript
-abstract calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
+calcVertexPositionAndNormal(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp, outNormal: PBShaderExp): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Global scope of the shader program. |
-|  inPos | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Input position. |
-|  outPos | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Output position. |
-|  outNormal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Output normal. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Global scope of the shader program.
+
+
+</td></tr>
+<tr><td>
+
+inPos
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Input position.
+
+
+</td></tr>
+<tr><td>
+
+outPos
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Output position.
+
+
+</td></tr>
+<tr><td>
+
+outNormal
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Output normal.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

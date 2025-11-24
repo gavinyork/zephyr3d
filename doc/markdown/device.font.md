@@ -14,29 +14,318 @@ declare class Font
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name, scale)](doc/markdown/./device.font._constructor_.md) |  | Creates a instance of font class from font name and the scale value |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name, scale)](doc/markdown/./device.font._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a instance of font class from font name and the scale value
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bottom](doc/markdown/./device.font.bottom.md) | <code>readonly</code> | number | Gets the bottom position of the font |
-|  [bottomScaled](doc/markdown/./device.font.bottomscaled.md) | <code>readonly</code> | number | Gets the scaled bottom position of the font |
-|  [family](doc/markdown/./device.font.family.md) | <code>readonly</code> | string | Gets the font family |
-|  [fontName](doc/markdown/./device.font.fontname.md) |  | string | Gets the font name |
-|  [fontNameScaled](doc/markdown/./device.font.fontnamescaled.md) | <code>readonly</code> | string | Gets the scaled font name |
-|  [maxHeight](doc/markdown/./device.font.maxheight.md) | <code>readonly</code> | number | Gets the maximum height of the font |
-|  [maxHeightScaled](doc/markdown/./device.font.maxheightscaled.md) | <code>readonly</code> | number | Gets the scaled maximum height of the font |
-|  [size](doc/markdown/./device.font.size.md) | <code>readonly</code> | number | Gets the font size |
-|  [top](doc/markdown/./device.font.top.md) | <code>readonly</code> | number | Gets top position of the font |
-|  [topScaled](doc/markdown/./device.font.topscaled.md) | <code>readonly</code> | number | Gets the scaled top position of the font |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bottom](doc/markdown/./device.font.bottom.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the bottom position of the font
+
+
+</td></tr>
+<tr><td>
+
+[bottomScaled](doc/markdown/./device.font.bottomscaled.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the scaled bottom position of the font
+
+
+</td></tr>
+<tr><td>
+
+[family](doc/markdown/./device.font.family.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Gets the font family
+
+
+</td></tr>
+<tr><td>
+
+[fontName](doc/markdown/./device.font.fontname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Gets the font name
+
+
+</td></tr>
+<tr><td>
+
+[fontNameScaled](doc/markdown/./device.font.fontnamescaled.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Gets the scaled font name
+
+
+</td></tr>
+<tr><td>
+
+[maxHeight](doc/markdown/./device.font.maxheight.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the maximum height of the font
+
+
+</td></tr>
+<tr><td>
+
+[maxHeightScaled](doc/markdown/./device.font.maxheightscaled.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the scaled maximum height of the font
+
+
+</td></tr>
+<tr><td>
+
+[size](doc/markdown/./device.font.size.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the font size
+
+
+</td></tr>
+<tr><td>
+
+[top](doc/markdown/./device.font.top.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets top position of the font
+
+
+</td></tr>
+<tr><td>
+
+[topScaled](doc/markdown/./device.font.topscaled.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the scaled top position of the font
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [equalTo(other)](doc/markdown/./device.font.equalto.md) |  | Tests if two fonts are the same |
-|  [fetchFont(name, scale)](doc/markdown/./device.font.fetchfont.md) | <code>static</code> | Fetch a font from cache |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[equalTo(other)](doc/markdown/./device.font.equalto.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Tests if two fonts are the same
+
+
+</td></tr>
+<tr><td>
+
+[fetchFont(name, scale)](doc/markdown/./device.font.fetchfont.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Fetch a font from cache
+
+
+</td></tr>
+</tbody></table>
 

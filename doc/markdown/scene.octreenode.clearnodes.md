@@ -4,7 +4,7 @@
 
 ## OctreeNode.clearNodes() method
 
-Removes all the scene nodes that this octree node contains
+Remove all scene nodes from this octree node.
 
 **Signature:**
 

@@ -1,52 +1,57 @@
-import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, DirectionalLight, AssetManager, Bloom } from '@zephyr3d/scene';
+import { HttpFS, Vector3 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
   backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-14')
+  }
 });
 
 myApp.ready().then(function () {
   // Create scene and light
   const scene = new Scene();
   const light = new DirectionalLight(scene);
+  light.intensity = 20;
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const assetManager = new AssetManager();
   // Loads a model
-  assetManager.fetchModel(scene, 'assets/models/DamagedHelmet.glb').then(info => {
-    info.group.position.setXYZ(0, -0.5, 0);
-  });
+  getEngine().resourceManager.instantiatePrefab(scene.rootNode, '/assets/DamagedHelmet.zprefab');
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
-  const bloom = new Bloom();
-  bloom.threshold = 0.87;
-  bloom.intensity = 1.2;
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getEngine().setRenderable(scene, 0, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      // The lower half of the screen uses Bloom
+      scene.mainCamera.viewport = [0, 0, width, height >> 1];
+      scene.mainCamera.bloom = true;
+    }
+  });
 
-  myApp.on('tick', function () {
-    camera.updateController();
-    const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-    const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
-    // The lower half of the screen uses Bloom
-    compositor.appendPostEffect(bloom);
-    camera.viewport = [0, 0, width, height >> 1];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
-    camera.render(scene, compositor);
-    // No Bloom on the upper half of the screen 
-    compositor.removePostEffect(bloom);
-    camera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    camera.aspect = camera.viewport[2]/camera.viewport[3];
-    camera.render(scene, compositor);
+  getEngine().setRenderable(scene, 1, {
+    beforeRender(scene) {
+      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
+      scene.mainCamera.bloom = false;
+    }
   });
 
   myApp.run();

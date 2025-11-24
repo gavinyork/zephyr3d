@@ -9,5 +9,5 @@ Index buffer
 **Signature:**
 
 ```typescript
-get indexBuffer(): IndexBuffer<unknown>;
+get indexBuffer(): IndexBuffer;
 ```

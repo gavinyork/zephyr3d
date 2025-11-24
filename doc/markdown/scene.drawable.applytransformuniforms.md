@@ -4,7 +4,7 @@
 
 ## Drawable.applyTransformUniforms() method
 
-Apply transform uniforms
+Applies transform-related uniforms to the active bind group or pipeline.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ applyTransformUniforms(renderQueue: RenderQueue): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  renderQueue | [RenderQueue](doc/markdown/./scene.renderqueue.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+renderQueue
+
+
+</td><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+The current render queue issuing this draw.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

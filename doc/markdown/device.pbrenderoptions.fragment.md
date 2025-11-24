@@ -14,10 +14,55 @@ fragment(this: PBGlobalScope, pb: ProgramBuilder): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  this | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | Global scope object of the fragment shader |
-|  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder instance |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+this
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+Global scope object of the fragment shader
+
+
+</td></tr>
+<tr><td>
+
+pb
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+The program builder instance
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

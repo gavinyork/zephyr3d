@@ -14,9 +14,39 @@ setBoneMatrices(matrices: Texture2D): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrices | [Texture2D](doc/markdown/./device.texture2d.md) | The texture that contains the bone matrices |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrices
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The texture that contains the bone matrices
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

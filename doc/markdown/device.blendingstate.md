@@ -14,26 +14,270 @@ interface BlendingState
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [alphaEquation](doc/markdown/./device.blendingstate.alphaequation.md) |  | [BlendEquation](doc/markdown/./device.blendequation.md) | The blending equation for alpha channel |
-|  [alphaToCoverageEnabled](doc/markdown/./device.blendingstate.alphatocoverageenabled.md) |  | boolean | true if alpha to coverage is enabled |
-|  [dstBlendAlpha](doc/markdown/./device.blendingstate.dstblendalpha.md) |  | [BlendFunc](doc/markdown/./device.blendfunc.md) | The destination blending factor for alpha channel |
-|  [dstBlendRGB](doc/markdown/./device.blendingstate.dstblendrgb.md) |  | [BlendFunc](doc/markdown/./device.blendfunc.md) | The destination blending factor for RGB channels |
-|  [enabled](doc/markdown/./device.blendingstate.enabled.md) |  | boolean | true if alpha blending is enabled |
-|  [rgbEquation](doc/markdown/./device.blendingstate.rgbequation.md) |  | [BlendEquation](doc/markdown/./device.blendequation.md) | The blending equation for RGB channels |
-|  [srcBlendAlpha](doc/markdown/./device.blendingstate.srcblendalpha.md) |  | [BlendFunc](doc/markdown/./device.blendfunc.md) | The source blending factor for alpha channel |
-|  [srcBlendRGB](doc/markdown/./device.blendingstate.srcblendrgb.md) |  | [BlendFunc](doc/markdown/./device.blendfunc.md) | The source blending factor for RGB channels |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[alphaEquation](doc/markdown/./device.blendingstate.alphaequation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendEquation](doc/markdown/./device.blendequation.md)
+
+
+</td><td>
+
+The blending equation for alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[alphaToCoverageEnabled](doc/markdown/./device.blendingstate.alphatocoverageenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if alpha to coverage is enabled
+
+
+</td></tr>
+<tr><td>
+
+[dstBlendAlpha](doc/markdown/./device.blendingstate.dstblendalpha.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The destination blending factor for alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[dstBlendRGB](doc/markdown/./device.blendingstate.dstblendrgb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The destination blending factor for RGB channels
+
+
+</td></tr>
+<tr><td>
+
+[enabled](doc/markdown/./device.blendingstate.enabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if alpha blending is enabled
+
+
+</td></tr>
+<tr><td>
+
+[rgbEquation](doc/markdown/./device.blendingstate.rgbequation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendEquation](doc/markdown/./device.blendequation.md)
+
+
+</td><td>
+
+The blending equation for RGB channels
+
+
+</td></tr>
+<tr><td>
+
+[srcBlendAlpha](doc/markdown/./device.blendingstate.srcblendalpha.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The source blending factor for alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[srcBlendRGB](doc/markdown/./device.blendingstate.srcblendrgb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+The source blending factor for RGB channels
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [clone()](doc/markdown/./device.blendingstate.clone.md) | Creates a new BlendingState by copying this one |
-|  [enable(b)](doc/markdown/./device.blendingstate.enable.md) | Enable or disable alpha blending |
-|  [enableAlphaToCoverage(b)](doc/markdown/./device.blendingstate.enablealphatocoverage.md) | Enable or disable alpha to coverage |
-|  [setBlendEquation(rgb, alpha)](doc/markdown/./device.blendingstate.setblendequation.md) | Sets the blending equations for RGB channels and the alpha channel |
-|  [setBlendFunc(src, dest)](doc/markdown/./device.blendingstate.setblendfunc.md) | Sets the blending function for both RGB channels and the alpha channel |
-|  [setBlendFuncAlpha(src, dest)](doc/markdown/./device.blendingstate.setblendfuncalpha.md) | Sets the blending function for the alpha channel |
-|  [setBlendFuncRGB(src, dest)](doc/markdown/./device.blendingstate.setblendfuncrgb.md) | Sets the blending function for RGB channels |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.blendingstate.clone.md)
+
+
+</td><td>
+
+Creates a new BlendingState by copying this one
+
+
+</td></tr>
+<tr><td>
+
+[enable(b)](doc/markdown/./device.blendingstate.enable.md)
+
+
+</td><td>
+
+Enable or disable alpha blending
+
+
+</td></tr>
+<tr><td>
+
+[enableAlphaToCoverage(b)](doc/markdown/./device.blendingstate.enablealphatocoverage.md)
+
+
+</td><td>
+
+Enable or disable alpha to coverage
+
+
+</td></tr>
+<tr><td>
+
+[setBlendEquation(rgb, alpha)](doc/markdown/./device.blendingstate.setblendequation.md)
+
+
+</td><td>
+
+Sets the blending equations for RGB channels and the alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[setBlendFunc(src, dest)](doc/markdown/./device.blendingstate.setblendfunc.md)
+
+
+</td><td>
+
+Sets the blending function for both RGB channels and the alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[setBlendFuncAlpha(src, dest)](doc/markdown/./device.blendingstate.setblendfuncalpha.md)
+
+
+</td><td>
+
+Sets the blending function for the alpha channel
+
+
+</td></tr>
+<tr><td>
+
+[setBlendFuncRGB(src, dest)](doc/markdown/./device.blendingstate.setblendfuncrgb.md)
+
+
+</td><td>
+
+Sets the blending function for RGB channels
+
+
+</td></tr>
+</tbody></table>
 

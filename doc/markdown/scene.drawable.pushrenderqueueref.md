@@ -4,7 +4,9 @@
 
 ## Drawable.pushRenderQueueRef() method
 
-Set render queue reference
+Pushes a reference to the current render queue for cleanup or back-references.
+
+Useful for batching or deferred state application.
 
 **Signature:**
 
@@ -14,9 +16,37 @@ pushRenderQueueRef(ref: RenderQueueRef): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ref | RenderQueueRef |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ref
+
+
+</td><td>
+
+RenderQueueRef
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

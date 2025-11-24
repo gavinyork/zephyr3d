@@ -14,28 +14,267 @@ declare class VertexData
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.vertexdata._constructor_.md) |  | Constructs a new instance of the <code>VertexData</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.vertexdata._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `VertexData` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [indexBuffer](doc/markdown/./device.vertexdata.indexbuffer.md) | <code>readonly</code> | [IndexBuffer](doc/markdown/./device.indexbuffer.md)<!-- -->&lt;unknown&gt; | Index buffer |
-|  [vertexBuffers](doc/markdown/./device.vertexdata.vertexbuffers.md) | <code>readonly</code> | [VertexBufferInfo](doc/markdown/./device.vertexbufferinfo.md)<!-- -->\[\] | Vertex buffer information list |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[indexBuffer](doc/markdown/./device.vertexdata.indexbuffer.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+
+</td><td>
+
+Index buffer
+
+
+</td></tr>
+<tr><td>
+
+[numVertices](doc/markdown/./device.vertexdata.numvertices.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of vertices
+
+
+</td></tr>
+<tr><td>
+
+[vertexBuffers](doc/markdown/./device.vertexdata.vertexbuffers.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[VertexBufferInfo](doc/markdown/./device.vertexbufferinfo.md)<!-- -->\[\]
+
+
+</td><td>
+
+Vertex buffer information list
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [clone()](doc/markdown/./device.vertexdata.clone.md) |  | Creates a new instance of VertexData by copying from this object |
-|  [getDrawOffset()](doc/markdown/./device.vertexdata.getdrawoffset.md) |  | Draw offset |
-|  [getIndexBuffer()](doc/markdown/./device.vertexdata.getindexbuffer.md) |  | Gets the index buffer |
-|  [getVertexBuffer(semantic)](doc/markdown/./device.vertexdata.getvertexbuffer.md) |  | Gets the vertex buffer by specific vertex semantic |
-|  [getVertexBufferInfo(semantic)](doc/markdown/./device.vertexdata.getvertexbufferinfo.md) |  | Gets the vertex buffer information by specific vertex semantic |
-|  [removeVertexBuffer(buffer)](doc/markdown/./device.vertexdata.removevertexbuffer.md) |  | Removes a vertex buffer |
-|  [setDrawOffset(offset)](doc/markdown/./device.vertexdata.setdrawoffset.md) |  |  |
-|  [setIndexBuffer(buffer)](doc/markdown/./device.vertexdata.setindexbuffer.md) |  | Sets the index buffer |
-|  [setVertexBuffer(buffer, stepMode)](doc/markdown/./device.vertexdata.setvertexbuffer.md) |  | Sets a vertex buffer |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.vertexdata.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new instance of VertexData by copying from this object
+
+
+</td></tr>
+<tr><td>
+
+[getDrawOffset()](doc/markdown/./device.vertexdata.getdrawoffset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Draw offset
+
+
+</td></tr>
+<tr><td>
+
+[getIndexBuffer()](doc/markdown/./device.vertexdata.getindexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the index buffer
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBuffer(semantic)](doc/markdown/./device.vertexdata.getvertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the vertex buffer by specific vertex semantic
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferInfo(semantic)](doc/markdown/./device.vertexdata.getvertexbufferinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the vertex buffer information by specific vertex semantic
+
+
+</td></tr>
+<tr><td>
+
+[removeVertexBuffer(buffer)](doc/markdown/./device.vertexdata.removevertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes a vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[setDrawOffset(offset)](doc/markdown/./device.vertexdata.setdrawoffset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setIndexBuffer(buffer)](doc/markdown/./device.vertexdata.setindexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the index buffer
+
+
+</td></tr>
+<tr><td>
+
+[setVertexBuffer(buffer, stepMode)](doc/markdown/./device.vertexdata.setvertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets a vertex buffer
+
+
+</td></tr>
+</tbody></table>
 

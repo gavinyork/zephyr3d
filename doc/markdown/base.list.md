@@ -14,31 +14,283 @@ declare class List<T = unknown>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./base.list._constructor_.md) |  | Constructs a new instance of the <code>List</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./base.list._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `List` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [length](doc/markdown/./base.list.length.md) | <code>readonly</code> | number | Get the number of elements in the linked list |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[length](doc/markdown/./base.list.length.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the number of elements in the linked list
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [append(data)](doc/markdown/./base.list.append.md) |  | Append an element to the end of the linked list |
-|  [back()](doc/markdown/./base.list.back.md) |  | Gets the data associated to the last element in the linked list |
-|  [begin()](doc/markdown/./base.list.begin.md) |  | Returns an iterator pointing to the first element in the list. |
-|  [clear()](doc/markdown/./base.list.clear.md) |  | Remove all elements in the linked list |
-|  [end()](doc/markdown/./base.list.end.md) |  | Returns an iterator referring to the past-the-end element in the list. |
-|  [forEach(callback)](doc/markdown/./base.list.foreach.md) |  | Execute the callback function sequentially for each element of the linked list |
-|  [forEachReverse(callback)](doc/markdown/./base.list.foreachreverse.md) |  | Execute the callback function sequentially for each element of the linked list in the reversed order |
-|  [front()](doc/markdown/./base.list.front.md) |  | Gets the data associated to the first element in the linked list |
-|  [insert(data, at)](doc/markdown/./base.list.insert.md) |  | Inserts an element into the linked list |
-|  [prepend(data)](doc/markdown/./base.list.prepend.md) |  | Add a new element to the linked list header |
-|  [rbegin()](doc/markdown/./base.list.rbegin.md) |  | Returns a reverse iterator pointing to the last element in the list (i.e., its reverse beginning). |
-|  [remove(it)](doc/markdown/./base.list.remove.md) |  | Deletes an element from the linked list |
-|  [rend()](doc/markdown/./base.list.rend.md) |  | Returns a reverse iterator pointing to the theoretical element preceding the first element in the list (which is considered its reverse end). |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[append(data)](doc/markdown/./base.list.append.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Append an element to the end of the linked list
+
+
+</td></tr>
+<tr><td>
+
+[back()](doc/markdown/./base.list.back.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the data associated to the last element in the linked list
+
+
+</td></tr>
+<tr><td>
+
+[begin()](doc/markdown/./base.list.begin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns an iterator pointing to the first element in the list.
+
+
+</td></tr>
+<tr><td>
+
+[clear()](doc/markdown/./base.list.clear.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove all elements in the linked list
+
+
+</td></tr>
+<tr><td>
+
+[end()](doc/markdown/./base.list.end.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns an iterator referring to the past-the-end element in the list.
+
+
+</td></tr>
+<tr><td>
+
+[forEach(callback)](doc/markdown/./base.list.foreach.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Execute the callback function sequentially for each element of the linked list
+
+
+</td></tr>
+<tr><td>
+
+[forEachReverse(callback)](doc/markdown/./base.list.foreachreverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Execute the callback function sequentially for each element of the linked list in the reversed order
+
+
+</td></tr>
+<tr><td>
+
+[front()](doc/markdown/./base.list.front.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the data associated to the first element in the linked list
+
+
+</td></tr>
+<tr><td>
+
+[insert(data, at)](doc/markdown/./base.list.insert.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inserts an element into the linked list
+
+
+</td></tr>
+<tr><td>
+
+[prepend(data)](doc/markdown/./base.list.prepend.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a new element to the linked list header
+
+
+</td></tr>
+<tr><td>
+
+[rbegin()](doc/markdown/./base.list.rbegin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns a reverse iterator pointing to the last element in the list (i.e., its reverse beginning).
+
+
+</td></tr>
+<tr><td>
+
+[remove(it)](doc/markdown/./base.list.remove.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Deletes an element from the linked list
+
+
+</td></tr>
+<tr><td>
+
+[rend()](doc/markdown/./base.list.rend.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns a reverse iterator pointing to the theoretical element preceding the first element in the list (which is considered its reverse end).
+
+
+</td></tr>
+</tbody></table>
 

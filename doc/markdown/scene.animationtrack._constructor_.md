@@ -4,17 +4,47 @@
 
 ## AnimationTrack.(constructor)
 
-Creates a new animation track
+Construct a new animation track.
 
 **Signature:**
 
 ```typescript
-constructor(interpolator: Interpolator);
+constructor(embedded?: boolean);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  interpolator | [Interpolator](doc/markdown/./base.interpolator.md) | Interpolator for the track |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+embedded
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether this track is embedded/owned inline by its container. Default false.
+
+
+</td></tr>
+</tbody></table>
 

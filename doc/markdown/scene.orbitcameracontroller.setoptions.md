@@ -14,9 +14,39 @@ setOptions(opt?: OrbitCameraControllerOptions): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  opt | [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | _(Optional)_ options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+opt
+
+
+</td><td>
+
+[OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md)
+
+
+</td><td>
+
+_(Optional)_ options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

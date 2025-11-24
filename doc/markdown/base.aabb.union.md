@@ -14,9 +14,39 @@ union(other: AABB): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [AABB](doc/markdown/./base.aabb.md) | The AABB to be merged with. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+The AABB to be merged with.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

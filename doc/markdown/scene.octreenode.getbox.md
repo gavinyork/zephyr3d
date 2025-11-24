@@ -4,7 +4,7 @@
 
 ## OctreeNode.getBox() method
 
-Get the bounding box of the octree node
+Get the tight AABB of this node, computed from its existing children.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getBox(): AABB;
 
 [AABB](doc/markdown/./base.aabb.md)
 
-The bounding box of the octree node
+The tight `AABB` of this node, or `null` if unavailable.
+
+## Remarks
+
+- Computed lazily by merging all child boxes from the next chunk level. - Returns `null` if no child contributes a valid box.
 

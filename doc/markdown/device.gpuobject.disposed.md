@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-disposed: null;
+readonly disposed: boolean;
 ```

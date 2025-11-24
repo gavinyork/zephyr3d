@@ -14,10 +14,55 @@ equalsTo(other: AABB, epsl?: number): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [AABB](doc/markdown/./base.aabb.md) | The AABB to be compared with. |
-|  epsl | number | _(Optional)_ The epsilon for comparison. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+The AABB to be compared with.
+
+
+</td></tr>
+<tr><td>
+
+epsl
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The epsilon for comparison.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

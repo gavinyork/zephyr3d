@@ -4,7 +4,7 @@
 
 ## Primitive.getVertexBuffer() method
 
-Gets the vertex buffer by a given semantic
+Get the vertex buffer that matches a given semantic.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  semantic | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The semantic of the vertex buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic to look up.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
 
-The vertex buffer which semantic matches the given value
+The matching vertex buffer, or `null` if not found.
 

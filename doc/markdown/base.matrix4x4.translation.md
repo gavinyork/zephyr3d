@@ -14,10 +14,55 @@ static translation(t: Vector3, result?: Matrix4x4): Matrix4x4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  t | [Vector3](doc/markdown/./base.vector3.md) | The translate vector. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix. if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+t
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The translate vector.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix. if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

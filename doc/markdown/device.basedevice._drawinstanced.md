@@ -12,12 +12,79 @@ protected abstract _drawInstanced(primitiveType: PrimitiveType, first: number, c
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  primitiveType | [PrimitiveType](doc/markdown/./device.primitivetype.md) |  |
-|  first | number |  |
-|  count | number |  |
-|  numInstances | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+primitiveType
+
+
+</td><td>
+
+[PrimitiveType](doc/markdown/./device.primitivetype.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+first
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+count
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+numInstances
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

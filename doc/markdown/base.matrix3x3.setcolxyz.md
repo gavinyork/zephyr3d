@@ -14,12 +14,87 @@ setColXYZ(col: number, x: number, y: number, z: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  col | number | The column index. |
-|  x | number | The first value of the column to be set. |
-|  y | number | The second value of the column to be set. |
-|  z | number | The third value of the column to be set. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+col
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The column index.
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The first value of the column to be set.
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The second value of the column to be set.
+
+
+</td></tr>
+<tr><td>
+
+z
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The third value of the column to be set.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

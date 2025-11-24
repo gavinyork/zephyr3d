@@ -4,7 +4,7 @@
 
 ## Primitive.raycast() method
 
-Ray intersection test
+Test intersection against the current axis-aligned bounding box (AABB).
 
 **Signature:**
 
@@ -14,13 +14,43 @@ raycast(ray: Ray): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ray | [Ray](doc/markdown/./base.ray.md) | Ray object used to do intersection test with this object |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ray
+
+
+</td><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+Ray to test against the primitive's AABB (derived from its bounding volume).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 number
 
-The distance from ray origin to the intersection point if ray intersects with this object, otherwise null
+The distance from ray origin to the intersection, or `null` if no hit or no AABB.
 

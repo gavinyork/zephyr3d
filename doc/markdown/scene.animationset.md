@@ -6,36 +6,309 @@
 
 Animation set
 
+Manages a collection of named animation clips for a model and orchestrates: - Playback state (time, loops, speed, weights, fade-in/out). - Blending across multiple tracks targeting the same property via weighted averages. - Skeleton usage and application for clips that drive skeletal animation. - Active track registration and cleanup as clips start/stop.
+
+Usage: - Create or retrieve `AnimationClip`<!-- -->s by name. - Start playback with `playAnimation(name, options)`<!-- -->. - Advance animation with `update(deltaSeconds)`<!-- -->. - Optionally adjust weight while playing with `setAnimationWeight(name, weight)`<!-- -->.
+
+Lifetime: - Disposing the set releases references to the model, clips, and clears active state.
+
 **Signature:**
 
 ```typescript
-declare class AnimationSet 
+declare class AnimationSet extends Disposable implements IDisposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [IDisposable](doc/markdown/./base.idisposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, model)](doc/markdown/./scene.animationset._constructor_.md) |  | Creates an instance of AnimationSet |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(model)](doc/markdown/./scene.animationset._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create an AnimationSet controlling the provided model.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [numAnimations](doc/markdown/./scene.animationset.numanimations.md) | <code>readonly</code> | number | How many animations in this set |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[model](doc/markdown/./scene.animationset.model.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+The model (SceneNode) controlled by this animation set.
+
+
+</td></tr>
+<tr><td>
+
+[numAnimations](doc/markdown/./scene.animationset.numanimations.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of animation clips registered in this set.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [add(animation)](doc/markdown/./scene.animationset.add.md) |  | Adds an animation |
-|  [dispose()](doc/markdown/./scene.animationset.dispose.md) |  |  |
-|  [get(name)](doc/markdown/./scene.animationset.get.md) |  | Gets an animation clip by name |
-|  [getAnimationNames()](doc/markdown/./scene.animationset.getanimationnames.md) |  | Gets names of all the animations of the model |
-|  [getAnimationWeight(name)](doc/markdown/./scene.animationset.getanimationweight.md) |  | Gets the weight of specific animation which is currently playing |
-|  [isPlayingAnimation(name)](doc/markdown/./scene.animationset.isplayinganimation.md) |  | Checks whether an animation is playing |
-|  [playAnimation(name, options)](doc/markdown/./scene.animationset.playanimation.md) |  | Starts playing an animation of the model |
-|  [setAnimationWeight(name, weight)](doc/markdown/./scene.animationset.setanimationweight.md) |  | Sets the weight of specific animation which is currently playing |
-|  [stopAnimation(name, options)](doc/markdown/./scene.animationset.stopanimation.md) |  | Stops playing an animation of the model |
-|  [update()](doc/markdown/./scene.animationset.update.md) |  | Updates all animations of the model |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createAnimation(name, embedded)](doc/markdown/./scene.animationset.createanimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create and register a new animation clip.
+
+
+</td></tr>
+<tr><td>
+
+[deleteAnimation(name)](doc/markdown/./scene.animationset.deleteanimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Delete and dispose an animation clip by name.
+
+- If the animation is currently playing, it is first stopped (immediately).
+
+
+</td></tr>
+<tr><td>
+
+[get(name)](doc/markdown/./scene.animationset.get.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Retrieve an animation clip by name.
+
+
+</td></tr>
+<tr><td>
+
+[getAnimationClip(name)](doc/markdown/./scene.animationset.getanimationclip.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get an animation clip by name.
+
+Alias of `get(name)` returning a nullable type.
+
+
+</td></tr>
+<tr><td>
+
+[getAnimationNames()](doc/markdown/./scene.animationset.getanimationnames.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the list of all registered animation names.
+
+
+</td></tr>
+<tr><td>
+
+[isPlayingAnimation(name)](doc/markdown/./scene.animationset.isplayinganimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check whether an animation is currently playing.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.animationset.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Dispose the animation set and release owned resources.
+
+- Disposes the weak reference to the model. - Disposes all registered animation clips. - Clears active animations, tracks, and skeleton references.
+
+
+</td></tr>
+<tr><td>
+
+[playAnimation(name, options)](doc/markdown/./scene.animationset.playanimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Start (or update) playback of an animation clip.
+
+Behavior: - If the clip is already playing, updates its fade-in (resets fade-out). - Otherwise initializes playback state (repeat counter, speed, weight, initial time). - Registers clip tracks and skeletons into the active sets for blending and application.
+
+
+</td></tr>
+<tr><td>
+
+[setAnimationWeight(name, weight)](doc/markdown/./scene.animationset.setanimationweight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the runtime blend weight for a currently playing animation.
+
+Has no effect if the clip is not active.
+
+
+</td></tr>
+<tr><td>
+
+[stopAnimation(name, options)](doc/markdown/./scene.animationset.stopanimation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Stop playback of an animation clip.
+
+Behavior: - If `options.fadeOut > 0`<!-- -->, marks the clip for fade-out; actual removal occurs after fade completes. - If `fadeOut` is 0 or omitted, immediately: - Removes the clip from active animations. - Unregisters its tracks from active track maps. - Decrements skeleton reference counts; resets and removes skeletons when refcount reaches 0.
+
+
+</td></tr>
+<tr><td>
+
+[update(deltaInSeconds)](doc/markdown/./scene.animationset.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Advance and apply active animations.
+
+Responsibilities per call: - Update time cursor for each active clip (respecting speedRatio and looping). - Enforce repeat limits and apply fade-out termination if configured. - For each animated target, blend active tracks (weighted by clip weight × fade-in × fade-out) and apply the resulting state to the target. - Apply all active skeletons to update skinning transforms.
+
+
+</td></tr>
+</tbody></table>
 

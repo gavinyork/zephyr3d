@@ -14,10 +14,55 @@ getCol(col: number, result?: Vector3): Vector3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  col | number | The column index |
-|  result | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output vector, if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+col
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The column index
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector, if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## SceneNode.isGraphNode() method
 
-true if this is a graph node, false otherwise
+Type guard: true if this node is a graph node.
 
 **Signature:**
 

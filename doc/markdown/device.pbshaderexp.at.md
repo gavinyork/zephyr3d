@@ -14,9 +14,39 @@ at(index: number | PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | index of the element |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+index of the element
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

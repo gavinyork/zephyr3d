@@ -15,30 +15,299 @@ declare class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(type)](doc/markdown/./device.pbprimitivetypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBPrimitiveTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(type)](doc/markdown/./device.pbprimitivetypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBPrimitiveTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [cols](doc/markdown/./device.pbprimitivetypeinfo.cols.md) | <code>readonly</code> | number | Get number of columns |
-|  [normalized](doc/markdown/./device.pbprimitivetypeinfo.normalized.md) | <code>readonly</code> | boolean | Get if this is a normalized primitive type |
-|  [primitiveType](doc/markdown/./device.pbprimitivetypeinfo.primitivetype.md) | <code>readonly</code> | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | Get the primitive type |
-|  [rows](doc/markdown/./device.pbprimitivetypeinfo.rows.md) | <code>readonly</code> | number | Get number of rows |
-|  [scalarType](doc/markdown/./device.pbprimitivetypeinfo.scalartype.md) | <code>readonly</code> | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | Get the scalar type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[cols](doc/markdown/./device.pbprimitivetypeinfo.cols.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get number of columns
+
+
+</td></tr>
+<tr><td>
+
+[normalized](doc/markdown/./device.pbprimitivetypeinfo.normalized.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Get if this is a normalized primitive type
+
+
+</td></tr>
+<tr><td>
+
+[primitiveType](doc/markdown/./device.pbprimitivetypeinfo.primitivetype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+Get the primitive type
+
+
+</td></tr>
+<tr><td>
+
+[rows](doc/markdown/./device.pbprimitivetypeinfo.rows.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get number of rows
+
+
+</td></tr>
+<tr><td>
+
+[scalarType](doc/markdown/./device.pbprimitivetypeinfo.scalartype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+Get the scalar type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getCachedTypeInfo(primitiveType)](doc/markdown/./device.pbprimitivetypeinfo.getcachedtypeinfo.md) | <code>static</code> | Get or create a PBPrimitiveTypeInfo instance for a given prmitive type |
-|  [isInteger()](doc/markdown/./device.pbprimitivetypeinfo.isinteger.md) |  | Whether the type is signed or unsigned integer scalar or vector |
-|  [isMatrixType()](doc/markdown/./device.pbprimitivetypeinfo.ismatrixtype.md) |  | Returns true if this is a matrix type |
-|  [isPrimitiveType()](doc/markdown/./device.pbprimitivetypeinfo.isprimitivetype.md) |  | returns true if this is a primitive type |
-|  [isScalarType()](doc/markdown/./device.pbprimitivetypeinfo.isscalartype.md) |  | Returns true if this is a scalar type |
-|  [isVectorType()](doc/markdown/./device.pbprimitivetypeinfo.isvectortype.md) |  | Returns true if this is a vector type |
-|  [resizeType(rows, cols)](doc/markdown/./device.pbprimitivetypeinfo.resizetype.md) |  | Creates a new primitive type info by changing row and column of this type |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbprimitivetypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getCachedTypeInfo(primitiveType)](doc/markdown/./device.pbprimitivetypeinfo.getcachedtypeinfo.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Get or create a PBPrimitiveTypeInfo instance for a given prmitive type
+
+
+</td></tr>
+<tr><td>
+
+[isInteger()](doc/markdown/./device.pbprimitivetypeinfo.isinteger.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the type is signed or unsigned integer scalar or vector
+
+
+</td></tr>
+<tr><td>
+
+[isMatrixType()](doc/markdown/./device.pbprimitivetypeinfo.ismatrixtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a matrix type
+
+
+</td></tr>
+<tr><td>
+
+[isPrimitiveType()](doc/markdown/./device.pbprimitivetypeinfo.isprimitivetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a primitive type
+
+
+</td></tr>
+<tr><td>
+
+[isScalarType()](doc/markdown/./device.pbprimitivetypeinfo.isscalartype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a scalar type
+
+
+</td></tr>
+<tr><td>
+
+[isVectorType()](doc/markdown/./device.pbprimitivetypeinfo.isvectortype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a vector type
+
+
+</td></tr>
+<tr><td>
+
+[resizeType(rows, cols)](doc/markdown/./device.pbprimitivetypeinfo.resizetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new primitive type info by changing row and column of this type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbprimitivetypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

@@ -15,11 +15,121 @@ interface TorusCreationOptions extends ShapeCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [innerRadius?](doc/markdown/./scene.toruscreationoptions.innerradius.md) |  | number | _(Optional)_ Inner radius, default is 3 |
-|  [numSegments?](doc/markdown/./scene.toruscreationoptions.numsegments.md) |  | number | _(Optional)_ Segment count, default is 16 |
-|  [numSlices?](doc/markdown/./scene.toruscreationoptions.numslices.md) |  | number | _(Optional)_ Slice count, default is 40 \* |
-|  [outerRadius?](doc/markdown/./scene.toruscreationoptions.outerradius.md) |  | number | _(Optional)_ Outer radius, default is 10 |
-|  [radialDetail?](doc/markdown/./scene.toruscreationoptions.radialdetail.md) |  | number | _(Optional)_ Radial detail, default is 20 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[innerRadius?](doc/markdown/./scene.toruscreationoptions.innerradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Inner radius, default is 3
+
+
+</td></tr>
+<tr><td>
+
+[numSegments?](doc/markdown/./scene.toruscreationoptions.numsegments.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Segment count, default is 16
+
+
+</td></tr>
+<tr><td>
+
+[numSlices?](doc/markdown/./scene.toruscreationoptions.numslices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Slice count, default is 40 \*
+
+
+</td></tr>
+<tr><td>
+
+[outerRadius?](doc/markdown/./scene.toruscreationoptions.outerradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Outer radius, default is 10
+
+
+</td></tr>
+<tr><td>
+
+[radialDetail?](doc/markdown/./scene.toruscreationoptions.radialdetail.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Radial detail, default is 20
+
+
+</td></tr>
+</tbody></table>
 

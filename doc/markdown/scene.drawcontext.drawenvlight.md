@@ -4,7 +4,7 @@
 
 ## DrawContext.drawEnvLight property
 
-Whether current render pass is base light pass
+Whether this is the base lighting pass that draws environment lighting.
 
 **Signature:**
 

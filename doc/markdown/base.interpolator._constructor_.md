@@ -9,15 +9,90 @@ Creates a interpolator instance
 **Signature:**
 
 ```typescript
-constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: TypedArray, outputs: TypedArray);
+constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: InterpolateData, outputs: InterpolateData);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  mode | [InterpolationMode](doc/markdown/./base.interpolationmode.md) | The interpolation mode |
-|  target | [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | The interpolation target |
-|  inputs | [TypedArray](doc/markdown/./base.typedarray.md) | Linear time in seconds |
-|  outputs | [TypedArray](doc/markdown/./base.typedarray.md) | Vector or scalars representing the properties to be interpolated |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+mode
+
+
+</td><td>
+
+[InterpolationMode](doc/markdown/./base.interpolationmode.md)
+
+
+</td><td>
+
+The interpolation mode
+
+
+</td></tr>
+<tr><td>
+
+target
+
+
+</td><td>
+
+[InterpolationTarget](doc/markdown/./base.interpolationtarget.md)
+
+
+</td><td>
+
+The interpolation target
+
+
+</td></tr>
+<tr><td>
+
+inputs
+
+
+</td><td>
+
+[InterpolateData](doc/markdown/./base.interpolatedata.md)
+
+
+</td><td>
+
+Linear time in seconds
+
+
+</td></tr>
+<tr><td>
+
+outputs
+
+
+</td><td>
+
+[InterpolateData](doc/markdown/./base.interpolatedata.md)
+
+
+</td><td>
+
+Vector or scalars representing the properties to be interpolated
+
+
+</td></tr>
+</tbody></table>
 

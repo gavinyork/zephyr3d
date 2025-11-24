@@ -14,10 +14,55 @@ static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  normal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ Vertex normal input, must be type of vec3, null if no vertex normal input |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+normal
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+_(Optional)_ Vertex normal input, must be type of vec3, null if no vertex normal input
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

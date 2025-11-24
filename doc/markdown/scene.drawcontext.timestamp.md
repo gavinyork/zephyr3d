@@ -4,7 +4,7 @@
 
 ## DrawContext.timestamp property
 
-Timestamp
+Timestamp for the current draw (engine-defined time units).
 
 **Signature:**
 

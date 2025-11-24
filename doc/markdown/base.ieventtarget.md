@@ -14,10 +14,60 @@ interface IEventTarget<T extends EventMap = any>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [dispatchEvent(evt, type)](doc/markdown/./base.ieventtarget.dispatchevent.md) | Synchronously invoke the affected event listeners with an event object |
-|  [off(type, listener)](doc/markdown/./base.ieventtarget.off.md) | Removes an event listener function previously registered. |
-|  [on(type, listener, context)](doc/markdown/./base.ieventtarget.on.md) | Sets up a function that will be called whenever the specified event is delivered to the target |
-|  [once(type, listener, context)](doc/markdown/./base.ieventtarget.once.md) | Sets up a function that will be called only once when the specified event is delivered to the target |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[dispatchEvent(type, args)](doc/markdown/./base.ieventtarget.dispatchevent.md)
+
+
+</td><td>
+
+Synchronously invoke the affected event listeners with an event object
+
+
+</td></tr>
+<tr><td>
+
+[off(type, listener, context)](doc/markdown/./base.ieventtarget.off.md)
+
+
+</td><td>
+
+Removes an event listener function previously registered.
+
+
+</td></tr>
+<tr><td>
+
+[on(type, listener, context)](doc/markdown/./base.ieventtarget.on.md)
+
+
+</td><td>
+
+Sets up a function that will be called whenever the specified event is delivered to the target
+
+
+</td></tr>
+<tr><td>
+
+[once(type, listener, context)](doc/markdown/./base.ieventtarget.once.md)
+
+
+</td><td>
+
+Sets up a function that will be called only once when the specified event is delivered to the target
+
+
+</td></tr>
+</tbody></table>
 

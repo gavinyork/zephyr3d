@@ -15,26 +15,270 @@ declare class EnvShIBL extends EnvironmentLighting
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(radianceMap, irradianceSH)](doc/markdown/./scene.envshibl._constructor_.md) |  | Creates an instance of EnvIBL |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(radianceMap, irradianceSH, irradianceSHFB)](doc/markdown/./scene.envshibl._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of EnvIBL
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [irradianceSH](doc/markdown/./scene.envshibl.irradiancesh.md) |  | Float32Array | The irradiance sh coeffecients |
-|  [radianceMap](doc/markdown/./scene.envshibl.radiancemap.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | The radiance map |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[irradianceSH](doc/markdown/./scene.envshibl.irradiancesh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+The irradiance sh coeffecients
+
+
+</td></tr>
+<tr><td>
+
+[irradianceSHFB](doc/markdown/./scene.envshibl.irradianceshfb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+The irradiance sh coeffecients
+
+
+</td></tr>
+<tr><td>
+
+[irradianceWindow](doc/markdown/./scene.envshibl.irradiancewindow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The irradiance sh window
+
+
+</td></tr>
+<tr><td>
+
+[radianceMap](doc/markdown/./scene.envshibl.radiancemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+The radiance map
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getIrradiance(scope, normal)](doc/markdown/./scene.envshibl.getirradiance.md) |  | Get irradiance for a fragment |
-|  [getRadiance(scope, refl, roughness)](doc/markdown/./scene.envshibl.getradiance.md) |  | Get radiance for a fragment |
-|  [getType()](doc/markdown/./scene.envshibl.gettype.md) |  | The environment light type |
-|  [hasIrradiance()](doc/markdown/./scene.envshibl.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
-|  [hasRadiance()](doc/markdown/./scene.envshibl.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
-|  [initShaderBindings(pb)](doc/markdown/./scene.envshibl.initshaderbindings.md) |  | Initialize shader bindings |
-|  [updateBindGroup(bg)](doc/markdown/./scene.envshibl.updatebindgroup.md) |  | Updates the uniform values |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getIrradiance(scope, normal)](doc/markdown/./scene.envshibl.getirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get irradiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getRadiance(scope, refl, roughness)](doc/markdown/./scene.envshibl.getradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get radiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.envshibl.gettype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+The environment light type
+
+
+</td></tr>
+<tr><td>
+
+[hasIrradiance()](doc/markdown/./scene.envshibl.hasirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports diffuse light
+
+
+</td></tr>
+<tr><td>
+
+[hasRadiance()](doc/markdown/./scene.envshibl.hasradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports reflective light
+
+
+</td></tr>
+<tr><td>
+
+[initShaderBindings(pb)](doc/markdown/./scene.envshibl.initshaderbindings.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize shader bindings
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.envshibl.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the object and releases all GPU resources
+
+
+</td></tr>
+<tr><td>
+
+[updateBindGroup(bg)](doc/markdown/./scene.envshibl.updatebindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Updates the uniform values
+
+
+</td></tr>
+</tbody></table>
 

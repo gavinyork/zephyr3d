@@ -9,17 +9,90 @@ Apply the post effect
 **Signature:**
 
 ```typescript
-abstract apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) |  |
-|  inputColorTexture | [Texture2D](doc/markdown/./device.texture2d.md) | The previous scene color texture |
-|  sceneDepthTexture | [Texture2D](doc/markdown/./device.texture2d.md) | The linear scene depth texture |
-|  srgbOutput | boolean | Whether the result should be gamma corrected |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+inputColorTexture
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The previous scene color texture
+
+
+</td></tr>
+<tr><td>
+
+sceneDepthTexture
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The linear scene depth texture
+
+
+</td></tr>
+<tr><td>
+
+srgbOutput
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the result should be gamma corrected
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

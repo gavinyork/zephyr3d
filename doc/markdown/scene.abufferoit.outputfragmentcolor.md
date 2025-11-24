@@ -14,10 +14,55 @@ outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The global shader scope. |
-|  color | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The calculated fragment color. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The global shader scope.
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The calculated fragment color.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

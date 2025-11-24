@@ -14,12 +14,59 @@ createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sizeInBytes | number | Size of the buffer in bytes |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sizeInBytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Size of the buffer in bytes
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+The created buffer.
 

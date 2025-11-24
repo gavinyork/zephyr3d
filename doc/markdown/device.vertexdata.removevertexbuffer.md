@@ -14,9 +14,39 @@ removeVertexBuffer(buffer: StructuredBuffer): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) | Vertex buffer to be removed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
+
+
+</td><td>
+
+Vertex buffer to be removed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

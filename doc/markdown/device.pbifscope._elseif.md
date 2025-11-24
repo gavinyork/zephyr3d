@@ -14,10 +14,55 @@ $elseif(condition: ExpValueNonArrayType, body: (this: PBIfScope) => void): PBIfS
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  condition | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | Condition expression for the else if branch |
-|  body | (this: [PBIfScope](doc/markdown/./device.pbifscope.md)<!-- -->) =&gt; void | Generator function for the scope that insides the else if statement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+condition
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+Condition expression for the else if branch
+
+
+</td></tr>
+<tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBIfScope](doc/markdown/./device.pbifscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Generator function for the scope that insides the else if statement
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

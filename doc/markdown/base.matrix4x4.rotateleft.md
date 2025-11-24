@@ -14,11 +14,71 @@ static rotateLeft(m: Matrix4x4, r: Matrix3x3 | Matrix4x4 | Quaternion, result?: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  m | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The matrix that will be translated. |
-|  r | [Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md) \| [Quaternion](doc/markdown/./base.quaternion.md) | The rotate matrix or quaternion. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix (can be the same as m), if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+m
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The matrix that will be translated.
+
+
+</td></tr>
+<tr><td>
+
+r
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md) \| [Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The rotate matrix or quaternion.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix (can be the same as m), if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

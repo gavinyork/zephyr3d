@@ -14,11 +14,71 @@ declare function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: P
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | current shader scope |
-|  p | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | noise coordinate |
-|  freq | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | frequency |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+current shader scope
+
+
+</td></tr>
+<tr><td>
+
+p
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+noise coordinate
+
+
+</td></tr>
+<tr><td>
+
+freq
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+frequency
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

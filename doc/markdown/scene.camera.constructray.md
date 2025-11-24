@@ -14,10 +14,55 @@ constructRay(x: number, y: number): Ray;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  x | number | The x-component of the screen coordinates, relative to the top-left corner of the viewport. |
-|  y | number | The y-component of the screen coordinates, relative to the top-left corner of the viewport. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The x-component of the screen coordinates, relative to the top-left corner of the viewport.
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The y-component of the screen coordinates, relative to the top-left corner of the viewport.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

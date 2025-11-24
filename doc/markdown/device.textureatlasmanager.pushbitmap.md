@@ -14,10 +14,55 @@ pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  key | string | Key of the atlas |
-|  bitmap | ImageData \| ImageBitmap | The bitmap object |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+key
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Key of the atlas
+
+
+</td></tr>
+<tr><td>
+
+bitmap
+
+
+</td><td>
+
+ImageData \| ImageBitmap
+
+
+</td><td>
+
+The bitmap object
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

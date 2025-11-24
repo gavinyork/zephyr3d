@@ -14,10 +14,85 @@ declare enum ClipState
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  A\_INSIDE\_B | <code>1</code> | A is inside B |
-|  B\_INSIDE\_A | <code>2</code> | B is inside A |
-|  CLIPPED | <code>2</code> | A and B partially overlap |
-|  NOT\_CLIPPED | <code>0</code> | A does not intersect with B |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+A\_INSIDE\_B
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+A is inside B
+
+
+</td></tr>
+<tr><td>
+
+B\_INSIDE\_A
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+B is inside A
+
+
+</td></tr>
+<tr><td>
+
+CLIPPED
+
+
+</td><td>
+
+`3`
+
+
+</td><td>
+
+A and B partially overlap
+
+
+</td></tr>
+<tr><td>
+
+NOT\_CLIPPED
+
+
+</td><td>
+
+`0`
+
+
+</td><td>
+
+A does not intersect with B
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,7 +14,37 @@ constructor(params?: OceanFieldBuildParams);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  params | OceanFieldBuildParams | _(Optional)_ Ocean field build parameters. If not provided, default parameters will be used. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+params
+
+
+</td><td>
+
+OceanFieldBuildParams
+
+
+</td><td>
+
+_(Optional)_ Ocean field build parameters. If not provided, default parameters will be used.
+
+
+</td></tr>
+</tbody></table>
 

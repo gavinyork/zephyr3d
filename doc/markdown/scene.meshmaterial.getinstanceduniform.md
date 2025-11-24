@@ -4,6 +4,10 @@
 
 ## MeshMaterial.getInstancedUniform() method
 
+Read an encoded per-instance uniform in shader code.
+
+Encoded index packs: vector index, component offset, and component count.
+
 **Signature:**
 
 ```typescript
@@ -12,12 +16,59 @@ getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShade
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) |  |
-|  uniformIndex | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Inside-function shader scope.
+
+
+</td></tr>
+<tr><td>
+
+uniformIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Encoded index from `defineInstanceUniform`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+The shader expression reading the selected components.
 

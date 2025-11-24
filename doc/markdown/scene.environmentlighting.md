@@ -9,18 +9,139 @@ Base class for any kind of environment light
 **Signature:**
 
 ```typescript
-declare abstract class EnvironmentLighting 
+declare abstract class EnvironmentLighting extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getIrradiance(scope, normal)](doc/markdown/./scene.environmentlighting.getirradiance.md) | <code>abstract</code> | Get irradiance for a fragment |
-|  [getRadiance(scope, refl, roughness)](doc/markdown/./scene.environmentlighting.getradiance.md) | <code>abstract</code> | Get radiance for a fragment |
-|  [getType()](doc/markdown/./scene.environmentlighting.gettype.md) | <code>abstract</code> | The environment light type |
-|  [hasIrradiance()](doc/markdown/./scene.environmentlighting.hasirradiance.md) | <code>abstract</code> | Returns whether this environment lighting supports diffuse light |
-|  [hasRadiance()](doc/markdown/./scene.environmentlighting.hasradiance.md) | <code>abstract</code> | Returns whether this environment lighting supports reflective light |
-|  [initShaderBindings(pb)](doc/markdown/./scene.environmentlighting.initshaderbindings.md) | <code>abstract</code> | Initialize shader bindings |
-|  [updateBindGroup(bg)](doc/markdown/./scene.environmentlighting.updatebindgroup.md) | <code>abstract</code> | Updates the uniform values |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getIrradiance(scope, normal)](doc/markdown/./scene.environmentlighting.getirradiance.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Get irradiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getRadiance(scope, refl, roughness)](doc/markdown/./scene.environmentlighting.getradiance.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Get radiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.environmentlighting.gettype.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+The environment light type
+
+
+</td></tr>
+<tr><td>
+
+[hasIrradiance()](doc/markdown/./scene.environmentlighting.hasirradiance.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Returns whether this environment lighting supports diffuse light
+
+
+</td></tr>
+<tr><td>
+
+[hasRadiance()](doc/markdown/./scene.environmentlighting.hasradiance.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Returns whether this environment lighting supports reflective light
+
+
+</td></tr>
+<tr><td>
+
+[initShaderBindings(pb)](doc/markdown/./scene.environmentlighting.initshaderbindings.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Initialize shader bindings
+
+
+</td></tr>
+<tr><td>
+
+[updateBindGroup(bg)](doc/markdown/./scene.environmentlighting.updatebindgroup.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Updates the uniform values
+
+
+</td></tr>
+</tbody></table>
 

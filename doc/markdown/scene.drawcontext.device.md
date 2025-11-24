@@ -4,7 +4,7 @@
 
 ## DrawContext.device property
 
-Render device
+Render device used for issuing GPU commands.
 
 **Signature:**
 

@@ -15,20 +15,127 @@ declare class PointLight extends PunctualLight
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.pointlight._constructor_.md) |  | Creates an instance of point light |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.pointlight._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of point light
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [range](doc/markdown/./scene.pointlight.range.md) |  | number | The range of the light |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[range](doc/markdown/./scene.pointlight.range.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The range of the light
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isPointLight()](doc/markdown/./scene.pointlight.ispointlight.md) |  | returns true if this is a point light |
-|  [setRange(val)](doc/markdown/./scene.pointlight.setrange.md) |  | Sets the range of the light |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isPointLight()](doc/markdown/./scene.pointlight.ispointlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a point light
+
+
+</td></tr>
+<tr><td>
+
+[setRange(val)](doc/markdown/./scene.pointlight.setrange.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the range of the light
+
+
+</td></tr>
+</tbody></table>
 

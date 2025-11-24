@@ -14,7 +14,37 @@ constructor(options?: BoxCreationOptions);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 

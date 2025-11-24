@@ -4,30 +4,138 @@
 
 ## Skeleton class
 
-Skeleton for skinned animation
+Skeleton for skinned animation.
+
+Responsibilities: - Maintains joint transforms: inverse bind, bind pose, and current skinning matrices. - Provides a texture containing joint matrices for GPU skinning. - Applies skinning state to associated meshes each frame. - Computes animated axis-aligned bounding boxes using representative skinned vertices.
+
+Joint matrix texture layout: - Texture format: `rgba32f`<!-- -->. - Stored as a 2-layered ring buffer: current and previous joint transforms to support temporal addressing if needed. Offsets are tracked in `_jointOffsets[0]` (current) and `_jointOffsets[1]` (previous).
+
+Usage: - Construct with joints, bind data, meshes and submesh bounding info. - Call `apply()` each frame to update joint texture, bind to meshes, and update bounds. - Call `reset()` to clear skinning on meshes.
 
 **Signature:**
 
 ```typescript
-declare class Skeleton 
+declare class Skeleton extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(joints, inverseBindMatrices, bindPoseMatrices, meshes, bounding)](doc/markdown/./scene.skeleton._constructor_.md) |  | Creates an instance of skeleton |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(joints, inverseBindMatrices, bindPoseMatrices, jointTransforms)](doc/markdown/./scene.skeleton._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a skeleton instance.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [jointMatrices](doc/markdown/./scene.skeleton.jointmatrices.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | The joint transform matrices |
-|  [jointTexture](doc/markdown/./scene.skeleton.jointtexture.md) | <code>readonly</code> | [Texture2D](doc/markdown/./device.texture2d.md) | The texture that contains the transform matrices of all the joints |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[jointTexture](doc/markdown/./scene.skeleton.jointtexture.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Texture containing joint matrices for GPU skinning.
+
+Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [dispose()](doc/markdown/./scene.skeleton.dispose.md) |  | Disposes self |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[onDispose()](doc/markdown/./scene.skeleton.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Dispose GPU resources and references held by the skeleton.
+
+- Disposes the joint texture. - Clears matrix arrays and joint references.
+
+
+</td></tr>
+</tbody></table>
 

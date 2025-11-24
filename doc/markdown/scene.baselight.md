@@ -15,30 +15,288 @@ declare abstract class BaseLight extends GraphNode
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, type)](doc/markdown/./scene.baselight._constructor_.md) |  | Creates a light node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, type)](doc/markdown/./scene.baselight._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a light node
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [diffuseAndIntensity](doc/markdown/./scene.baselight.diffuseandintensity.md) | <code>readonly</code> | [Vector4](doc/markdown/./base.vector4.md) | Color and intensity of the light |
-|  [directionAndCutoff](doc/markdown/./scene.baselight.directionandcutoff.md) | <code>readonly</code> | [Vector4](doc/markdown/./base.vector4.md) | Direction and cutoff of the light |
-|  [intensity](doc/markdown/./scene.baselight.intensity.md) |  | number | Intensity of the light |
-|  [lightType](doc/markdown/./scene.baselight.lighttype.md) | <code>readonly</code> | number | Gets the light type |
-|  [positionAndRange](doc/markdown/./scene.baselight.positionandrange.md) | <code>readonly</code> | [Vector4](doc/markdown/./base.vector4.md) | Position and range of the light |
-|  [viewMatrix](doc/markdown/./scene.baselight.viewmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View matrix of the light |
-|  [viewProjMatrix](doc/markdown/./scene.baselight.viewprojmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View-projection matrix of the light |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[diffuseAndIntensity](doc/markdown/./scene.baselight.diffuseandintensity.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Color and intensity of the light
+
+
+</td></tr>
+<tr><td>
+
+[directionAndCutoff](doc/markdown/./scene.baselight.directionandcutoff.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Direction and cutoff of the light
+
+
+</td></tr>
+<tr><td>
+
+[intensity](doc/markdown/./scene.baselight.intensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Intensity of the light
+
+
+</td></tr>
+<tr><td>
+
+[lightType](doc/markdown/./scene.baselight.lighttype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the light type
+
+
+</td></tr>
+<tr><td>
+
+[positionAndRange](doc/markdown/./scene.baselight.positionandrange.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Position and range of the light
+
+
+</td></tr>
+<tr><td>
+
+[viewMatrix](doc/markdown/./scene.baselight.viewmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+View matrix of the light
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isDirectionLight()](doc/markdown/./scene.baselight.isdirectionlight.md) |  | returns true if this is a directional light |
-|  [isLight()](doc/markdown/./scene.baselight.islight.md) |  | true if this is a light node, false otherwise |
-|  [isPointLight()](doc/markdown/./scene.baselight.ispointlight.md) |  | returns true if this is a point light |
-|  [isPunctualLight()](doc/markdown/./scene.baselight.ispunctuallight.md) |  | true if this is a punctual light node, false otherwise |
-|  [isSpotLight()](doc/markdown/./scene.baselight.isspotlight.md) |  | returns true if this is a spot light |
-|  [setIntensity(val)](doc/markdown/./scene.baselight.setintensity.md) |  | Sets the intensity of the light |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isDirectionLight()](doc/markdown/./scene.baselight.isdirectionlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a directional light
+
+
+</td></tr>
+<tr><td>
+
+[isLight()](doc/markdown/./scene.baselight.islight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a light.
+
+
+</td></tr>
+<tr><td>
+
+[isPointLight()](doc/markdown/./scene.baselight.ispointlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a point light
+
+
+</td></tr>
+<tr><td>
+
+[isPunctualLight()](doc/markdown/./scene.baselight.ispunctuallight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+true if this is a punctual light node, false otherwise
+
+
+</td></tr>
+<tr><td>
+
+[isSpotLight()](doc/markdown/./scene.baselight.isspotlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a spot light
+
+
+</td></tr>
+<tr><td>
+
+[setIntensity(val)](doc/markdown/./scene.baselight.setintensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the intensity of the light
+
+
+</td></tr>
+</tbody></table>
 

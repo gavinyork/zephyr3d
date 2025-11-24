@@ -14,9 +14,39 @@ apply(force?: boolean): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  force | boolean | _(Optional)_ Force applying all render statements |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+force
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Force applying all render statements
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

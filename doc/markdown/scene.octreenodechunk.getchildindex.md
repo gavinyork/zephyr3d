@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getChildIndex() method
 
-Gets the index of a child node at given placement
+Compute the child index in the next chunk for a given parent index and placement.
 
 **Signature:**
 
@@ -14,14 +14,59 @@ getChildIndex(index: number, placement: OctreePlacement): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index of the parent node |
-|  placement | [OctreePlacement](doc/markdown/./scene.octreeplacement.md) | The placement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Parent node index in this chunk.
+
+
+</td></tr>
+<tr><td>
+
+placement
+
+
+</td><td>
+
+[OctreePlacement](doc/markdown/./scene.octreeplacement.md)
+
+
+</td><td>
+
+Child octant placement.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 number
 
-Index of the child
+The linear index of the child in the next chunk.
 

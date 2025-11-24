@@ -4,7 +4,9 @@
 
 ## AnimationTrack.getBlendId() method
 
-Get the blend ID
+Get the blend identifier for this track.
+
+Tracks with the same blend ID are considered compatible for blending on the same target channel/property.
 
 **Signature:**
 
@@ -15,9 +17,5 @@ abstract getBlendId(): unknown;
 
 unknown
 
-Blend ID
-
-## Remarks
-
-Two tracks which have same blend ID can be blended together
+An identifier used to group compatible tracks for blending.
 

@@ -14,24 +14,228 @@ declare class Ray
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(origin, directionNormalized)](doc/markdown/./base.ray._constructor_.md) |  | Construct a ray from origin and normalized direction vector. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(origin, directionNormalized)](doc/markdown/./base.ray._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a ray from origin and normalized direction vector.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bboxIntersectionTest](doc/markdown/./base.ray.bboxintersectiontest.md) |  | (bbox: [AABB](doc/markdown/./base.aabb.md)<!-- -->) =&gt; boolean | Do a intersection test with an AABB. |
-|  [bboxIntersectionTestEx](doc/markdown/./base.ray.bboxintersectiontestex.md) |  | (bbox: [AABB](doc/markdown/./base.aabb.md)<!-- -->) =&gt; number \| null | Do a intersection test with an AABB. |
-|  [direction](doc/markdown/./base.ray.direction.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Get the ray direction vector |
-|  [origin](doc/markdown/./base.ray.origin.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Get the ray origin point |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bboxIntersectionTest](doc/markdown/./base.ray.bboxintersectiontest.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(bbox: [AABB](doc/markdown/./base.aabb.md)<!-- -->) =&gt; boolean
+
+
+</td><td>
+
+Do a intersection test with an AABB.
+
+
+</td></tr>
+<tr><td>
+
+[bboxIntersectionTestEx](doc/markdown/./base.ray.bboxintersectiontestex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(bbox: [AABB](doc/markdown/./base.aabb.md)<!-- -->) =&gt; number \| null
+
+
+</td><td>
+
+Do a intersection test with an AABB.
+
+
+</td></tr>
+<tr><td>
+
+[direction](doc/markdown/./base.ray.direction.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get the ray direction vector
+
+
+</td></tr>
+<tr><td>
+
+[origin](doc/markdown/./base.ray.origin.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get the ray origin point
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [intersectionTestTriangle(v1, v2, v3, cull)](doc/markdown/./base.ray.intersectiontesttriangle.md) |  | Do a ray triangle intersection test. |
-|  [set(origin, directionNormalized)](doc/markdown/./base.ray.set.md) |  | Set the ray origin and normalized direction vector. |
-|  [transform(matrix, other)](doc/markdown/./base.ray.transform.md) |  | Transform the ray. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[intersectionTestCircle(center, normal, radius, epsl)](doc/markdown/./base.ray.intersectiontestcircle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[intersectionTestSphere(center, radius)](doc/markdown/./base.ray.intersectiontestsphere.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a ray sphere intersection test
+
+
+</td></tr>
+<tr><td>
+
+[intersectionTestTriangle(v1, v2, v3, cull)](doc/markdown/./base.ray.intersectiontesttriangle.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a ray triangle intersection test.
+
+
+</td></tr>
+<tr><td>
+
+[set(origin, directionNormalized)](doc/markdown/./base.ray.set.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the ray origin and normalized direction vector.
+
+
+</td></tr>
+<tr><td>
+
+[transform(matrix, other)](doc/markdown/./base.ray.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform the ray.
+
+
+</td></tr>
+</tbody></table>
 

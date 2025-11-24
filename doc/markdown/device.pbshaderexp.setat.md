@@ -14,10 +14,55 @@ setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | index of the element |
-|  val | number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | value to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+index of the element
+
+
+</td></tr>
+<tr><td>
+
+val
+
+
+</td><td>
+
+number \| boolean \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+value to set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

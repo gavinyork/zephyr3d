@@ -9,15 +9,8 @@ Get the shader hash of the wave generator.
 **Signature:**
 
 ```typescript
-getHash(device: AbstractDevice): string;
+getHash(): string;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | Rendering device. |
-
 **Returns:**
 
 string

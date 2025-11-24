@@ -17,14 +17,111 @@ declare class DepthPass extends RenderPass
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.depthpass._constructor_.md) |  | Creates an instance of DepthRenderPass |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.depthpass._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of DepthRenderPass
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [encodeDepth](doc/markdown/./scene.depthpass.encodedepth.md) |  | boolean |  |
-|  [renderBackface](doc/markdown/./scene.depthpass.renderbackface.md) |  | boolean |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[encodeDepth](doc/markdown/./scene.depthpass.encodedepth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[renderBackface](doc/markdown/./scene.depthpass.renderbackface.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[transmission](doc/markdown/./scene.depthpass.transmission.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

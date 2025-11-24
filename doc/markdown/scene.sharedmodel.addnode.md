@@ -14,11 +14,71 @@ addNode(parent: AssetHierarchyNode, index: number, name: string): AssetHierarchy
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  parent | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | Under which node the node should be added |
-|  index | number | Index of the node |
-|  name | string | Name of the node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+parent
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+Under which node the node should be added
+
+
+</td></tr>
+<tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the node
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the node
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

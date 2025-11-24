@@ -14,9 +14,39 @@ uniform(group: number): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  group | number | The bind group index |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+group
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The bind group index
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,9 @@
 
 ## ModelFetchOptions type
 
-Options for model fetching
+Options for model fetching.
+
+Provides decoding and instancing hints used by supported model loaders.
 
 **Signature:**
 

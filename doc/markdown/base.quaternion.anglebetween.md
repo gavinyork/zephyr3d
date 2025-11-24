@@ -14,10 +14,55 @@ static angleBetween(a: Quaternion, b: Quaternion): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Quaternion](doc/markdown/./base.quaternion.md) | The origin quaternion |
-|  b | [Quaternion](doc/markdown/./base.quaternion.md) | The destination quaternion |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The origin quaternion
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The destination quaternion
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## AnimationTrack.animation property
 
-Animation this track belongs to
+The `AnimationClip` that owns this track.
 
 **Signature:**
 

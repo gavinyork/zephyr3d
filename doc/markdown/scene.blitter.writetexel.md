@@ -14,12 +14,87 @@ writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  type | [BlitType](doc/markdown/./scene.blittype.md) | The blit type |
-|  uv | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texture coordinate to where the texel will be written |
-|  texel | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texel to be written |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+The blit type
+
+
+</td></tr>
+<tr><td>
+
+uv
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The texture coordinate to where the texel will be written
+
+
+</td></tr>
+<tr><td>
+
+texel
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The texel to be written
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

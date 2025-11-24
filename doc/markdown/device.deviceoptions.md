@@ -14,8 +14,64 @@ interface DeviceOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [dpr?](doc/markdown/./device.deviceoptions.dpr.md) |  | number | _(Optional)_ The device pixel ratio |
-|  [msaa?](doc/markdown/./device.deviceoptions.msaa.md) |  | boolean | _(Optional)_ True if the device must have a MSAA back buffer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[dpr?](doc/markdown/./device.deviceoptions.dpr.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The device pixel ratio
+
+
+</td></tr>
+<tr><td>
+
+[msaa?](doc/markdown/./device.deviceoptions.msaa.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ True if the device must have a MSAA back buffer
+
+
+</td></tr>
+</tbody></table>
 

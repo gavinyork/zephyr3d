@@ -4,20 +4,65 @@
 
 ## AnimationTrack.applyState() method
 
-Applys animation state to node
+Apply a previously computed animation state to the target.
 
 **Signature:**
 
 ```typescript
-abstract applyState(node: SceneNode, state: StateType): any;
+abstract applyState(target: object, state: StateType): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [SceneNode](doc/markdown/./scene.scenenode.md) | The scene node to which the state will be applied |
-|  state | StateType | The animation state |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+object
+
+
+</td><td>
+
+The animated object to modify.
+
+
+</td></tr>
+<tr><td>
+
+state
+
+
+</td><td>
+
+StateType
+
+
+</td><td>
+
+The state to apply.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

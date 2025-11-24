@@ -9,12 +9,42 @@ Creates an instance of OrbitCameraController
 **Signature:**
 
 ```typescript
-constructor(options?: OrbitCameraControllerOptions);
+constructor(options?: Partial<OrbitCameraControllerOptions>);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+Partial&lt;[OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md)<!-- -->&gt;
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 

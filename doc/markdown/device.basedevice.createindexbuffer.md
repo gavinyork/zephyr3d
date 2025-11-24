@@ -7,15 +7,58 @@
 **Signature:**
 
 ```typescript
-abstract createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+abstract createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | Uint16Array \| Uint32Array |  |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+Uint16Array&lt;ArrayBuffer&gt; \| Uint32Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

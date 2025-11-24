@@ -9,14 +9,44 @@ Adds a posteffect
 **Signature:**
 
 ```typescript
-appendPostEffect(postEffect: AbstractPostEffect<any>): void;
+appendPostEffect(postEffect: AbstractPostEffect): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  postEffect | [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;any&gt; | The post effect to add |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+postEffect
+
+
+</td><td>
+
+[AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+
+
+</td><td>
+
+The post effect to add
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

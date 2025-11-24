@@ -9,18 +9,48 @@ Subtract a matrix from this matrix component-wise.
 **Signature:**
 
 ```typescript
-subBy(other: Matrix4x4): Matrix4x4;
+subBy(other: Matrix4x4): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The matrix that will be subtract. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The matrix that will be subtract.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+this
 
 self
 

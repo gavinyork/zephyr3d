@@ -9,31 +9,187 @@ Base class for any kind of puncual light
 **Signature:**
 
 ```typescript
-declare abstract class PunctualLight extends BaseLight 
+declare class PunctualLight extends BaseLight 
 ```
 **Extends:** [BaseLight](doc/markdown/./scene.baselight.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, type)](doc/markdown/./scene.punctuallight._constructor_.md) |  | Creates an instance of punctual light |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, type)](doc/markdown/./scene.punctuallight._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of punctual light
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [castShadow](doc/markdown/./scene.punctuallight.castshadow.md) |  | boolean | Whether this light casts shadows |
-|  [color](doc/markdown/./scene.punctuallight.color.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Color of the light |
-|  [shadow](doc/markdown/./scene.punctuallight.shadow.md) | <code>readonly</code> | [ShadowMapper](doc/markdown/./scene.shadowmapper.md) | The shadow mapper for this light |
-|  [viewProjMatrix](doc/markdown/./scene.punctuallight.viewprojmatrix.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View-projection matrix of the light |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[castShadow](doc/markdown/./scene.punctuallight.castshadow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this light casts shadows
+
+
+</td></tr>
+<tr><td>
+
+[color](doc/markdown/./scene.punctuallight.color.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Color of the light
+
+
+</td></tr>
+<tr><td>
+
+[shadow](doc/markdown/./scene.punctuallight.shadow.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[ShadowMapper](doc/markdown/./scene.shadowmapper.md)
+
+
+</td><td>
+
+The shadow mapper for this light
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isPunctualLight()](doc/markdown/./scene.punctuallight.ispunctuallight.md) |  | true if this is a punctual light node, false otherwise |
-|  [setCastShadow(b)](doc/markdown/./scene.punctuallight.setcastshadow.md) |  | Sets whether this light casts shadows |
-|  [setColor(color)](doc/markdown/./scene.punctuallight.setcolor.md) |  | Sets color of the light |
-|  [setLightViewProjectionMatrix(mat)](doc/markdown/./scene.punctuallight.setlightviewprojectionmatrix.md) |  | Sets the view projection matrix for this light |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isPunctualLight()](doc/markdown/./scene.punctuallight.ispunctuallight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+true if this is a punctual light node, false otherwise
+
+
+</td></tr>
+<tr><td>
+
+[setCastShadow(b)](doc/markdown/./scene.punctuallight.setcastshadow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets whether this light casts shadows
+
+
+</td></tr>
+<tr><td>
+
+[setColor(color)](doc/markdown/./scene.punctuallight.setcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets color of the light
+
+
+</td></tr>
+</tbody></table>
 

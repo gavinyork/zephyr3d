@@ -14,9 +14,83 @@ interface BindGroupLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [entries](doc/markdown/./device.bindgrouplayout.entries.md) |  | [BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md)<!-- -->\[\] | A list of [BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md) |
-|  [label?](doc/markdown/./device.bindgrouplayout.label.md) |  | string | _(Optional)_ Label of the layout |
-|  [nameMap?](doc/markdown/./device.bindgrouplayout.namemap.md) |  | Record&lt;string, string&gt; | _(Optional)_ The name map |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[entries](doc/markdown/./device.bindgrouplayout.entries.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md)<!-- -->\[\]
+
+
+</td><td>
+
+A list of [BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md)
+
+
+</td></tr>
+<tr><td>
+
+[label?](doc/markdown/./device.bindgrouplayout.label.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Label of the layout
+
+
+</td></tr>
+<tr><td>
+
+[nameMap?](doc/markdown/./device.bindgrouplayout.namemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;string, string&gt;
+
+
+</td><td>
+
+_(Optional)_ The name map
+
+
+</td></tr>
+</tbody></table>
 

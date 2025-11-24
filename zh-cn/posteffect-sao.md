@@ -1,25 +1,20 @@
-# 环境光遮挡 (SSAO)
+# SSAO（屏幕空间环境光遮蔽）
 
-环境光遮挡是一种屏幕空间的AO算法，旨在提供间接光的阴影近似，提高渲染的真实感，位于Opacity组
+**用途**：模拟光线遮挡，在物体缝隙、接触区域生成阴影，增强深度层次。
 
+**属性接口**：
+
+- `camera.SSAO`:	`boolean` -	启用 SSAO
+- `camera.SSAOScale`:	`number` -	采样比例（半径倍数）
+- `camera.SSAOBias`:	`number` -	偏移，减少自遮挡伪影
+- `camera.SSAORadius`:	`number` -	采样半径
+- `camera.SSAOIntensity`:	`number` -	阴影强度
+- `camera.SSAOBlurDepthCutoff`:	`number` -	模糊深度截止值
+
+**示例**：
 ```javascript
-
-// 创建Compositor实例
-const compositor = new Compositor();
-// 创建SAO后处理
-const ssao = new SAO();
-// radius属性为深度检测范围，默认值为100
-ssao.radius = 80;
-// intensity属性为强度，值越大阴影越强烈，默认值为0.05
-ssao.intensity = 0.04;
-// blurKernelRadius属性为模糊半径，默认值为8
-ssao.blurKernelRadius = 10;
-// 添加该效果到compositor
-compositor.appendPostEffect(ssao);
-// ...
-// 渲染场景并应用效果
-camera.render(scene, compositor);
-
+camera.SSAO = true;
+camera.SSAOIntensity = 0.05;
 ```
 
 <div class="showcase" case="tut-29" style="width:600px;height:800px;"></div>

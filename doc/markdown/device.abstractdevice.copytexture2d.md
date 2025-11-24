@@ -14,12 +14,87 @@ copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  src | [Texture2D](doc/markdown/./device.texture2d.md) | Texture that will be copied from. |
-|  srcLevel | number | Which mipmap level to be copied from. |
-|  dst | [Texture2D](doc/markdown/./device.texture2d.md) | Texture that will be copied to. |
-|  dstLevel | number | Which mipmap level to be copied to. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+src
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Texture that will be copied from.
+
+
+</td></tr>
+<tr><td>
+
+srcLevel
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Which mipmap level to be copied from.
+
+
+</td></tr>
+<tr><td>
+
+dst
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Texture that will be copied to.
+
+
+</td></tr>
+<tr><td>
+
+dstLevel
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Which mipmap level to be copied to.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

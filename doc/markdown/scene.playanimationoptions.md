@@ -4,7 +4,9 @@
 
 ## PlayAnimationOptions type
 
-Options for playing animation
+Options for playing an animation.
+
+Controls looping, playback speed (including reverse), and fade-in blending.
 
 **Signature:**
 
@@ -12,7 +14,7 @@ Options for playing animation
 type PlayAnimationOptions = {
     repeat?: number;
     speedRatio?: number;
-    weight?: number;
     fadeIn?: number;
+    weight?: number;
 };
 ```

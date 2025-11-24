@@ -14,9 +14,39 @@ main(body?: (this: PBFunctionScope) => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  body | (this: [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)<!-- -->) =&gt; void | _(Optional)_ The shader generator function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+_(Optional)_ The shader generator function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

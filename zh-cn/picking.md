@@ -1,102 +1,104 @@
 # 场景拾取
 
-场景拾取是指在虚拟场景中,通过鼠标或其他输入设备选择场景中物体的技术，对于实现场景交互非常重要。引擎提供了射线检测和颜色检测两种拾取方案。
+## 概述
+
+**场景拾取（Scene Picking）** 是指在虚拟场景中，通过鼠标、触摸或其他输入设备，选择或识别场景中物体的一项关键技术。  
+它为交互系统提供基础支持，使用户能够与三维空间中的对象进行选择、操作或交互。
+
+引擎提供了以下两种拾取方式：
+
+1. **射线检测（Ray‑based Picking）** — 基于 CPU 的几何射线求交算法  
+2. **颜色拾取（Color‑based Picking）** — 基于 GPU 的像素级拾取方案  
+
+---
 
 ## 射线检测
 
-射线检测是一种CPU上执行的拾取算法，原理是根据鼠标或其他输入设备的位置在世界坐标系(或摄像机坐标系)生成一条射线，然后将射线与场景中的物体求交来得到被拾取的物体。
+**射线检测** 是一种在 CPU 上执行的拾取算法。  
+其原理是：根据鼠标或其他输入设备在屏幕上的坐标位置，从摄像机位置向该坐标方向发出一条射线，  
+并计算这条射线与场景中物体的几何体（包围盒）是否相交，从而确定被拾取的对象。
 
-以下代码演示了如何使用射线检测拾取场景中的物体。
+以下示例展示了如何使用射线检测实现场景拾取：
 
-```javascript
+```javascript  
+// 假设 x 和 y 是相对于视口左上角的屏幕坐标  
+// 构造一条从摄像机原点穿过该屏幕坐标的射线  
+const ray = camera.constructRay(x, y);  
 
-// 假设x, y是相对于视口左上角的屏幕坐标，拾取该位置的物体
+// 对场景执行射线检测  
+const pickResult = scene.raycast(ray);  
 
-// 构造一条从摄像机原点穿过该屏幕坐标的射线
-const ray = camera.constructRay(x, y);
-// 对场景进行射线检测
-const pickResult = scene.raycast(ray);
-// 返回拾取到的场景节点以及相交距离和交点，否则返回null
-if (pickResult) {
-  console.log(`节点: ${pickResult.target.node}`);
-  console.log(`距离: ${pickResult.dist}`);
-  console.log(`交点: ${pickResult.point}`);
-}
-
+// 若拾取到物体，则 pickResult 包含拾取结果信息  
+if (pickResult) {  
+  console.log(`节点: ${pickResult.target.node}`);  
+  console.log(`距离: ${pickResult.dist}`);  
+  console.log(`交点: ${pickResult.point}`);  
+}  
 ```
 
-射线检测是通过与物体的包围盒求交来进行拾取，它是不精确的，尤其对于不规则形状物体，
-透明物体以及动画变形的物体，可能无法拾取到正确的物体，这种情况下，可以采用颜色拾取
-的方法。
+> 射线检测通过与物体的**包围盒（Bounding Box）**求交来计算命中结果，  
+> 因此精度有限 —— 对于不规则网格、透明物体或具有骨骼变形的物体，可能无法精确拾取。  
+> 若需像素级精度或拾取透明/复杂对象，建议使用 **颜色拾取**。
 
 <div class="showcase" case="tut-47"></div>
 
+---
+
 ## 颜色拾取
 
-颜色拾取是利用GPU进行像素级拾取的方案。原理是通过使用不同的颜色渲染物体到1x1纹理，
-然后回读该纹理根据颜色判断拾取到了哪个物体。WebGL，WebGL2和WebGPU设备均支持颜
-色拾取，但是对于WebGL，回读纹理是一个阻塞的操作，可能导致卡顿，因此我们推荐在
-WebGL2或WebGPU设备上使用颜色拾取。在我们的实现中，进行颜色拾取必须进行一次场景
-渲染。
+**颜色拾取** 是一种基于 GPU 的拾取方法，可实现像素级精确拾取。  
+其原理是：将场景中每个可选择物体以**唯一的编码颜色**渲染到一张极小的离屏纹理（通常为 1×1），  
+再异步读取该像素的颜色值以确定被拾取的对象。
 
-以下代码演示了如何使用颜色拾取。
+以下示例展示如何使用颜色拾取获取鼠标下的物体：
 
-```javascript
+```javascript  
+let lastPickResult;
 
-// 告诉摄像机在渲染的同时执行拾取
-camera.enablePicking = true;
-
+let x = 0;
+let y = 0;
 // 鼠标移动时更新拾取位置
-app.device.canvas.addEventListener('pointermove', (ev) => {
-  camera.pickPosX = ev.offsetX;
-  camera.pickPosY = ev.offsetY;
+myApp.on('pointermove', (ev) => {
+  x = ev.offsetX;
+  y = ev.offsetY;
 });
-
-// 渲染之后可以获取拾取结果
-// 注意，对于WebGL2和WebGPU设备，拾取是一个异步过程，因此本次获取的实际上是上一帧的拾取结果
-app.on('tick', () => {
-  // 首先渲染场景
-  camera.render(scene);
-  // 然后获取拾取结果，如果未拾取到任何物体则返回null.
-  const pickResult = camera.pickResult;
-  if (pickResult) {
-    // drawable是拾取到的渲染对象
-    console.log(pickResult.drawable);
-    // node是拾取到的节点
-    console.log(pickResult.target.node);
-  }
-});
-
+// 异步拾取方法
+function picking() {
+  scene.mainCamera.pickAsync(x, y).then((pickResult) => {
+    if (lastPickResult !== pickResult?.target.node) {
+      if (lastPickResult) {
+        lastPickResult.material.emissiveColor = Vector3.zero();
+        lastPickResult = null;
+      }
+      if (pickResult) {
+        lastPickResult = pickResult.target.node;
+        lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);
+      }
+    }
+  });
+}
+// 每帧执行异步拾取
+myApp.on('tick', picking);
 ```
 
 <div class="showcase" case="tut-48"></div>
 
-使用上述方法，每次获取的是上一帧的拾取结果，因此只适用于每帧进行拾取的场景，不适用于单次拾取，
-例如每次点击鼠标时进行一次拾取。在这种情况下，可以异步获取拾取结果。下面是一个示例：
+---
 
-```javascript
+## 方法对比与建议
 
-// 告诉摄像机在渲染的同时执行拾取
-camera.enablePicking = true;
+| 拾取方式 | 执行位置 | 精度 | 适用场景 | 优点 | 缺点 |
+|-----------|-----------|-------|------------|-------|------|
+| **射线检测** | CPU | 基于包围盒（近似） | 简单模型、低精度选取 | 性能高，不依赖 GPU | 对复杂模型不准确 |
+| **颜色拾取** | GPU | 像素级精确 | 编辑器、高精度交互 | 精度高，支持复杂形状 | WebGL 模式下可能卡顿 |
 
-// 鼠标移动时更新拾取位置
-app.device.canvas.addEventListener('pointermove', (ev) => {
-  camera.pickPosX = ev.offsetX;
-  camera.pickPosY = ev.offsetY;
-});
+---
 
-app.on('tick', () => {
-  // 首先渲染场景
-  camera.render(scene);
-  // 异步获取本次拾取结果，如果未拾取到任何物体则返回null.
-  camera.pickResultAsync.then((pickResult) => {
-    if (pickResult) {
-      // drawable是拾取到的渲染对象
-      console.log(pickResult.drawable);
-      // node是拾取到的节点
-      console.log(pickResult.target.node);
-    }
-  });
-});
+## 总结
 
-```
+场景拾取是实现 3D 交互系统的基础功能。  
+Zephyr3D 同时提供 **射线检测**与**颜色拾取**两种方案，可根据精度与性能需求灵活选择：
+
+- 若场景简单或交互频繁，可选择 **射线检测**（快速但近似）；  
+- 若需要高精度拾取或编辑器类功能，可选择 **颜色拾取**（准确但开销较大）；  
+

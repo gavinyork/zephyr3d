@@ -19,18 +19,141 @@ Graph node is the base class of any kind of scene node that will be placed into 
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.graphnode._constructor_.md) |  | Creates a graph node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.graphnode._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a graph node
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getBoneMatrices()](doc/markdown/./scene.graphnode.getbonematrices.md) |  | Gets the texture that contains the bone matrices of the object |
-|  [getName()](doc/markdown/./scene.graphnode.getname.md) |  | Gets the name |
-|  [getSortDistance(camera)](doc/markdown/./scene.graphnode.getsortdistance.md) |  | Gets the distance for object sorting |
-|  [getXForm()](doc/markdown/./scene.graphnode.getxform.md) |  | Gets the XForm of the object |
-|  [isBatchable()](doc/markdown/./scene.graphnode.isbatchable.md) |  | returns true if the object is batchable |
-|  [isGraphNode()](doc/markdown/./scene.graphnode.isgraphnode.md) |  | true if this is a graph node, false otherwise |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getBoneMatrices()](doc/markdown/./scene.graphnode.getbonematrices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the texture containing bone matrices for skinned meshes.
+
+
+</td></tr>
+<tr><td>
+
+[getName()](doc/markdown/./scene.graphnode.getname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the name
+
+
+</td></tr>
+<tr><td>
+
+[getNode()](doc/markdown/./scene.graphnode.getnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the owning scene node (transform and hierarchy).
+
+
+</td></tr>
+<tr><td>
+
+[getSortDistance(camera)](doc/markdown/./scene.graphnode.getsortdistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Computes the distance used for sorting (e.g., transparent draw order).
+
+
+</td></tr>
+<tr><td>
+
+[isBatchable()](doc/markdown/./scene.graphnode.isbatchable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the object supports instanced rendering.
+
+When true, the object should also implement the [BatchDrawable](doc/markdown/./scene.batchdrawable.md) methods.
+
+
+</td></tr>
+<tr><td>
+
+[isGraphNode()](doc/markdown/./scene.graphnode.isgraphnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a graph node.
+
+
+</td></tr>
+</tbody></table>
 

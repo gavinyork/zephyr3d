@@ -12,9 +12,37 @@ abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,10 +14,55 @@ set(origin: Vector3, directionNormalized: Vector3): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  origin | [Vector3](doc/markdown/./base.vector3.md) | The ray origin point. |
-|  directionNormalized | [Vector3](doc/markdown/./base.vector3.md) | The normalized direction vector. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+origin
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The ray origin point.
+
+
+</td></tr>
+<tr><td>
+
+directionNormalized
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The normalized direction vector.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

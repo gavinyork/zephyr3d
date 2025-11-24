@@ -9,15 +9,70 @@ multiply a couple of values togeter
 **Signature:**
 
 ```typescript
-mul(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
+mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  x | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
-|  rest | (number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->)\[\] |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+x
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+rest
+
+
+</td><td>
+
+(number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->)\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

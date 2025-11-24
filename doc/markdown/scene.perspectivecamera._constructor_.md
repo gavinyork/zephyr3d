@@ -9,16 +9,106 @@ Creates an instance of PerspectiveCamera
 **Signature:**
 
 ```typescript
-constructor(scene: Scene, fovY: number, aspect: number, near: number, far: number);
+constructor(scene: Scene, fovY?: number, near?: number, far?: number, aspect?: number);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene that the camera belongs to. |
-|  fovY | number | A radian value indicates the field of view in Y axis |
-|  aspect | number | Aspect ratio of the perspective transform |
-|  near | number | The near clip plane |
-|  far | number | The far clip plane |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene that the camera belongs to.
+
+
+</td></tr>
+<tr><td>
+
+fovY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ A radian value indicates the field of view in Y axis
+
+
+</td></tr>
+<tr><td>
+
+near
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The near clip plane
+
+
+</td></tr>
+<tr><td>
+
+far
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ The far clip plane
+
+
+</td></tr>
+<tr><td>
+
+aspect
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Aspect ratio of the perspective transform
+
+
+</td></tr>
+</tbody></table>
 

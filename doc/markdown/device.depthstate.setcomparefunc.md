@@ -14,9 +14,39 @@ setCompareFunc(func: CompareFunc): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  func | [CompareFunc](doc/markdown/./device.comparefunc.md) | The comparison function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+func
+
+
+</td><td>
+
+[CompareFunc](doc/markdown/./device.comparefunc.md)
+
+
+</td><td>
+
+The comparison function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

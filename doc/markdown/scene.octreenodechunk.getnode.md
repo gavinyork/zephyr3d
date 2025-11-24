@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getNode() method
 
-Gets an octree node at a given index
+Get an octree node by linear index.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getNode(index: number): OctreeNode;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index of the node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Linear index within this chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-The octree node
+The `OctreeNode` at the index, or `null` if absent.
 

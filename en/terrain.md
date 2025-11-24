@@ -35,19 +35,19 @@ for (let i = 0; i < TERRAIN_WIDTH * TERRAIN_HEIGHT; i++) {
   heightmap = heightsInt16[i] / 65535;
 }
 // Load SplatMap
-const splatMap = await assetManager.fetchTexture('assets/maps/map1/splatmap.tga', { linearColorSpace: true });
+const splatMap = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/splatmap.tga', { linearColorSpace: true });
 // Detail Texture 1
-const detailAlbedo0 = await assetManager.fetchTexture('assets/maps/map1/detail1.jpg', { linearColorSpace: false });
-const detailNormal0 = await assetManager.fetchTexture('assets/maps/map1/detail1_norm.jpg', { linearColorSpace: true });
+const detailAlbedo0 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1.jpg', { linearColorSpace: false });
+const detailNormal0 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail1_norm.jpg', { linearColorSpace: true });
 // Detail Texture 2
-const detailAlbedo1 = await assetManager.fetchTexture('assets/maps/map1/detail2.jpg', { linearColorSpace: false });
-const detailNormal1 = await assetManager.fetchTexture('assets/maps/map1/detail2_norm.jpg', { linearColorSpace: true });
+const detailAlbedo1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2.jpg', { linearColorSpace: false });
+const detailNormal1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail2_norm.jpg', { linearColorSpace: true });
 // Detail Texture 3
-const detailAlbedo2 = await assetManager.fetchTexture('assets/maps/map1/detail3.jpg', { linearColorSpace: false });
-const detailNormal2 = await assetManager.fetchTexture('assets/maps/map1/detail3_norm.jpg', { linearColorSpace: true });
+const detailAlbedo2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3.jpg', { linearColorSpace: false });
+const detailNormal2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/maps/map1/detail3_norm.jpg', { linearColorSpace: true });
 // Grass blade textures
-const grass1 = await assetManager.fetchTexture('assets/images/grass1.dds');
-const grass2 = await assetManager.fetchTexture('assets/images/grass2.dds');
+const grass1 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/grass1.dds');
+const grass2 = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/grass2.dds');
 
 // Create the terrain
 const terrain = new Terrain(scene);

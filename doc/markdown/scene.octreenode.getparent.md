@@ -4,7 +4,7 @@
 
 ## OctreeNode.getParent() method
 
-Gets parent of the node
+Get the parent node from the previous (coarser) chunk.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getParent(): OctreeNode;
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-Parent of the node
+The parent `OctreeNode`<!-- -->, or `null` if not present.
+
+## Remarks
+
+Returns `null` if the previous chunk does not exist or the parent is absent.
 

@@ -15,8 +15,51 @@ declare class CopyBlitter extends Blitter
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [calcHash()](doc/markdown/./scene.copyblitter.calchash.md) | <code>protected</code> | Calculates the hash code |
-|  [filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.copyblitter.filter.md) |  | Calculates the destination texel by the source texel |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[calcHash()](doc/markdown/./scene.copyblitter.calchash.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Calculates the hash code
+
+
+</td></tr>
+<tr><td>
+
+[filter(scope, type, srcTex, srcUV, srcLayer, sampleType)](doc/markdown/./scene.copyblitter.filter.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the destination texel by the source texel
+
+
+</td></tr>
+</tbody></table>
 

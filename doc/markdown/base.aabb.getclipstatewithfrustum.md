@@ -14,9 +14,39 @@ getClipStateWithFrustum(frustum: Frustum): ClipState;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  frustum | [Frustum](doc/markdown/./base.frustum.md) | The frustum object. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+frustum
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+The frustum object.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

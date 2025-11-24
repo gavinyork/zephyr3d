@@ -14,7 +14,37 @@ constructor(options?: T);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | T | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 

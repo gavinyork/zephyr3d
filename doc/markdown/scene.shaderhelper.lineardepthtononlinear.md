@@ -14,11 +14,71 @@ static linearDepthToNonLinear(scope: PBInsideFunctionScope, depth: PBShaderExp, 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  depth | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The linear depth |
-|  nearFar | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | _(Optional)_ A vector that contains the near clip plane in x component and the far clip plane in y component |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+depth
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The linear depth
+
+
+</td></tr>
+<tr><td>
+
+nearFar
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+_(Optional)_ A vector that contains the near clip plane in x component and the far clip plane in y component
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

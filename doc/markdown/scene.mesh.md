@@ -17,43 +17,512 @@ declare class Mesh extends Mesh_base implements BatchDrawable
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, primitive, material)](doc/markdown/./scene.mesh._constructor_.md) |  | Creates an instance of mesh node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, primitive, material)](doc/markdown/./scene.mesh._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of mesh node
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [castShadow](doc/markdown/./scene.mesh.castshadow.md) |  | boolean | Wether the mesh node casts shadows |
-|  [drawBoundingBox](doc/markdown/./scene.mesh.drawboundingbox.md) |  | boolean | Wether to draw the bounding box of the mesh node |
-|  [material](doc/markdown/./scene.mesh.material.md) |  | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | Material of the mesh |
-|  [primitive](doc/markdown/./scene.mesh.primitive.md) |  | [Primitive](doc/markdown/./scene.primitive.md) | Primitive of the mesh |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[castShadow](doc/markdown/./scene.mesh.castshadow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Wether the mesh node casts shadows
+
+
+</td></tr>
+<tr><td>
+
+[material](doc/markdown/./scene.mesh.material.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MeshMaterial](doc/markdown/./scene.meshmaterial.md)
+
+
+</td><td>
+
+Material of the mesh
+
+
+</td></tr>
+<tr><td>
+
+[primitive](doc/markdown/./scene.mesh.primitive.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Primitive](doc/markdown/./scene.primitive.md)
+
+
+</td><td>
+
+Primitive of the mesh
+
+
+</td></tr>
+<tr><td>
+
+[skeletonName](doc/markdown/./scene.mesh.skeletonname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [dispose()](doc/markdown/./scene.mesh.dispose.md) |  | Disposes the mesh node |
-|  [draw(ctx)](doc/markdown/./scene.mesh.draw.md) |  | Draw the object |
-|  [getBoneMatrices()](doc/markdown/./scene.mesh.getbonematrices.md) |  | Gets the texture that contains the bone matrices of the object |
-|  [getInstanceColor()](doc/markdown/./scene.mesh.getinstancecolor.md) |  | Gets the instance color |
-|  [getInstanceId(renderPass)](doc/markdown/./scene.mesh.getinstanceid.md) |  | Gets the instance id of the object |
-|  [getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md) |  | Gets the instance uniforms |
-|  [getMaterial()](doc/markdown/./scene.mesh.getmaterial.md) |  | Gets the associated material |
-|  [getMorphData()](doc/markdown/./scene.mesh.getmorphdata.md) |  | Gets the morph texture |
-|  [getMorphInfo()](doc/markdown/./scene.mesh.getmorphinfo.md) |  | Gets the morph information buffer |
-|  [getName()](doc/markdown/./scene.mesh.getname.md) |  | Gets name of the drawable object |
-|  [getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md) |  | If set, the pick target will be returned as the pick result |
-|  [getQueueType()](doc/markdown/./scene.mesh.getqueuetype.md) |  | Gets the type of render queue |
-|  [getXForm()](doc/markdown/./scene.mesh.getxform.md) |  | Gets the XForm of the object |
-|  [isBatchable()](doc/markdown/./scene.mesh.isbatchable.md) |  | returns true if the object is batchable |
-|  [isMesh()](doc/markdown/./scene.mesh.ismesh.md) |  | true if this is a mesh node, false otherwise |
-|  [isUnlit()](doc/markdown/./scene.mesh.isunlit.md) |  | true if the shading of this object is independent of lighting |
-|  [needSceneColor()](doc/markdown/./scene.mesh.needscenecolor.md) |  | Need scene color |
-|  [setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md) |  | Sets the bounding box for animation |
-|  [setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md) |  | Sets the texture that contains the bone matrices for skeletal animation |
-|  [setMorphData(data)](doc/markdown/./scene.mesh.setmorphdata.md) |  | Sets the texture that contains the morph target data |
-|  [setMorphInfo(info)](doc/markdown/./scene.mesh.setmorphinfo.md) |  | Sets the buffer that contains the morph target information |
-|  [setPickTarget(node, label)](doc/markdown/./scene.mesh.setpicktarget.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[draw(ctx, hash)](doc/markdown/./scene.mesh.draw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Issues draw commands for this object.
+
+
+</td></tr>
+<tr><td>
+
+[getAnimatedBoundingBox()](doc/markdown/./scene.mesh.getanimatedboundingbox.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the bounding box for animation
+
+
+</td></tr>
+<tr><td>
+
+[getBoneMatrices()](doc/markdown/./scene.mesh.getbonematrices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the texture containing bone matrices for skinned meshes.
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceId(\_renderPass)](doc/markdown/./scene.mesh.getinstanceid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns a stable instance ID string for use with the given render pass.
+
+Used to group compatible instances into batches within a pass.
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceUniforms()](doc/markdown/./scene.mesh.getinstanceuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns a tightly-packed float array of instance uniforms for GPU upload.
+
+The returned memory should be compatible with ArrayBuffer views used by the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[getMaterial()](doc/markdown/./scene.mesh.getmaterial.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the bound material driving shading for this drawable.
+
+
+</td></tr>
+<tr><td>
+
+[getMorphData()](doc/markdown/./scene.mesh.getmorphdata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the morph target data texture (if morphing is used).
+
+
+</td></tr>
+<tr><td>
+
+[getMorphInfo()](doc/markdown/./scene.mesh.getmorphinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the morph information buffer (weights, ranges, etc.).
+
+
+</td></tr>
+<tr><td>
+
+[getName()](doc/markdown/./scene.mesh.getname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the display name of the drawable object (for debugging/UI).
+
+
+</td></tr>
+<tr><td>
+
+[getNode()](doc/markdown/./scene.mesh.getnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the owning scene node (transform and hierarchy).
+
+
+</td></tr>
+<tr><td>
+
+[getPickTarget()](doc/markdown/./scene.mesh.getpicktarget.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the pick target override to be reported when this object is picked.
+
+If not set, a default target derived from the node/material may be used.
+
+
+</td></tr>
+<tr><td>
+
+[getPrimitive()](doc/markdown/./scene.mesh.getprimitive.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the geometry primitive to be drawn.
+
+
+</td></tr>
+<tr><td>
+
+[getQueueType()](doc/markdown/./scene.mesh.getqueuetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the type/category of render queue this object belongs to.
+
+
+</td></tr>
+<tr><td>
+
+[isBatchable()](doc/markdown/./scene.mesh.isbatchable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the object supports instanced rendering.
+
+When true, the object should also implement the [BatchDrawable](doc/markdown/./scene.batchdrawable.md) methods.
+
+
+</td></tr>
+<tr><td>
+
+[isMesh()](doc/markdown/./scene.mesh.ismesh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a mesh.
+
+
+</td></tr>
+<tr><td>
+
+[isUnlit()](doc/markdown/./scene.mesh.isunlit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+True if shading is unlit (does not depend on scene lighting).
+
+
+</td></tr>
+<tr><td>
+
+[needSceneColor()](doc/markdown/./scene.mesh.needscenecolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the object requires access to the scene color buffer.
+
+
+</td></tr>
+<tr><td>
+
+[needSceneDepth()](doc/markdown/./scene.mesh.needscenedepth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the object requires access to the scene depth (linear or non-linear).
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.mesh.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the mesh node
+
+
+</td></tr>
+<tr><td>
+
+[setAnimatedBoundingBox(bbox)](doc/markdown/./scene.mesh.setanimatedboundingbox.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the bounding box for animation
+
+
+</td></tr>
+<tr><td>
+
+[setBoneMatrices(matrices)](doc/markdown/./scene.mesh.setbonematrices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the texture that contains the bone matrices for skeletal animation
+
+
+</td></tr>
+<tr><td>
+
+[setMorphData(data)](doc/markdown/./scene.mesh.setmorphdata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the texture that contains the morph target data
+
+
+</td></tr>
+<tr><td>
+
+[setMorphInfo(info)](doc/markdown/./scene.mesh.setmorphinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the buffer that contains the morph target information
+
+
+</td></tr>
+<tr><td>
+
+[setPickTarget(node, label)](doc/markdown/./scene.mesh.setpicktarget.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[update(frameId, elapsedInSeconds, deltaInSeconds)](doc/markdown/./scene.mesh.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update node state once per-frame
+
+
+</td></tr>
+</tbody></table>
 

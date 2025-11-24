@@ -15,24 +15,197 @@ declare class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name, layout, members)](doc/markdown/./device.pbstructtypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBStructTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name, layout, members)](doc/markdown/./device.pbstructtypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBStructTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [layout](doc/markdown/./device.pbstructtypeinfo.layout.md) | <code>readonly</code> | [PBStructLayout](doc/markdown/./device.pbstructlayout.md) | Get the layout type |
-|  [structMembers](doc/markdown/./device.pbstructtypeinfo.structmembers.md) | <code>readonly</code> | { name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md)<!-- -->; alignment: number; size: number; defaultAlignment: number; defaultSize: number; }\[\] | Get member types of the struct type |
-|  [structName](doc/markdown/./device.pbstructtypeinfo.structname.md) |  | string | Get name of the struct type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[layout](doc/markdown/./device.pbstructtypeinfo.layout.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBStructLayout](doc/markdown/./device.pbstructlayout.md)
+
+
+</td><td>
+
+Get the layout type
+
+
+</td></tr>
+<tr><td>
+
+[structMembers](doc/markdown/./device.pbstructtypeinfo.structmembers.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+{ name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; alignment: number; size: number; defaultAlignment: number; defaultSize: number; }\[\]
+
+
+</td><td>
+
+Get member types of the struct type
+
+
+</td></tr>
+<tr><td>
+
+[structName](doc/markdown/./device.pbstructtypeinfo.structname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get name of the struct type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [extends(name, members)](doc/markdown/./device.pbstructtypeinfo.extends.md) |  | Creates a new struct type by extending this type |
-|  [haveAtomicMembers()](doc/markdown/./device.pbstructtypeinfo.haveatomicmembers.md) |  | Whether this struct has atomic members |
-|  [isStructType()](doc/markdown/./device.pbstructtypeinfo.isstructtype.md) |  | returns true if this is a struct type |
-|  [toBufferLayout(offset, layout)](doc/markdown/./device.pbstructtypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[extends(name, members)](doc/markdown/./device.pbstructtypeinfo.extends.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new struct type by extending this type
+
+
+</td></tr>
+<tr><td>
+
+[haveAtomicMembers()](doc/markdown/./device.pbstructtypeinfo.haveatomicmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this struct has atomic members
+
+
+</td></tr>
+<tr><td>
+
+[isStructType()](doc/markdown/./device.pbstructtypeinfo.isstructtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a struct type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(offset, layout)](doc/markdown/./device.pbstructtypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

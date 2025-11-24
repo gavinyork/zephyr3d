@@ -4,7 +4,7 @@
 
 ## Mesh.isUnlit() method
 
-true if the shading of this object is independent of lighting
+True if shading is unlit (does not depend on scene lighting).
 
 **Signature:**
 

@@ -14,7 +14,35 @@ constructor(scope: PBScope);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBScope](doc/markdown/./device.pbscope.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBScope](doc/markdown/./device.pbscope.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,28 +4,103 @@
 
 ## AssetManager.fetchBinaryData() method
 
-Fetches a binary resource from a given URL
+Fetch a binary resource via VFS.
+
+- Cached per resolved URL. Post-process is applied only on first load for a given key.
 
 **Signature:**
 
 ```typescript
-fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer>;
+fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<ArrayBuffer>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  url | string | The URL from where to fetch the resource |
-|  postProcess | (data: ArrayBuffer) =&gt; ArrayBuffer | _(Optional)_ A function that will be involved when the binary data was loaded. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+url
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Resource URL or VFS path.
+
+
+</td></tr>
+<tr><td>
+
+postProcess
+
+
+</td><td>
+
+(data: ArrayBuffer) =&gt; ArrayBuffer
+
+
+</td><td>
+
+_(Optional)_ Optional transformation applied to the loaded ArrayBuffer.
+
+
+</td></tr>
+<tr><td>
+
+httpRequest
+
+
+</td><td>
+
+[HttpRequest](doc/markdown/./base.httprequest.md)
+
+
+</td><td>
+
+_(Optional)_ Optional HttpRequest for custom URL resolution/headers.
+
+
+</td></tr>
+<tr><td>
+
+VFSs
+
+
+</td><td>
+
+[VFS](doc/markdown/./base.vfs.md)<!-- -->\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 Promise&lt;ArrayBuffer&gt;
 
-Binary data as ArrayBuffer
-
-## Remarks
-
-If a binary data has already been loaded, the function will ignore the postProcess parameter and directly return the data loaded previously. To load the same data with different postProcess parameters, use different AssetManager instances separately.
+A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
 

@@ -4,7 +4,9 @@
 
 ## Primitive.setBoundingVolume() method
 
-Sets the bounding volume of the primitive
+Set or replace the bounding volume of this primitive.
+
+Triggers registered bounding-volume change callbacks.
 
 **Signature:**
 
@@ -14,11 +16,43 @@ setBoundingVolume(bv: BoundingVolume): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bv | [BoundingVolume](doc/markdown/./scene.boundingvolume.md) | The bounding volume to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bv
+
+
+</td><td>
+
+[BoundingVolume](doc/markdown/./scene.boundingvolume.md)
+
+
+</td><td>
+
+The bounding volume to set.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

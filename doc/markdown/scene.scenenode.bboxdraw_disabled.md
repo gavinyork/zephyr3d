@@ -4,6 +4,8 @@
 
 ## SceneNode.BBOXDRAW\_DISABLED property
 
+Disable bounding-box visualization.
+
 **Signature:**
 
 ```typescript

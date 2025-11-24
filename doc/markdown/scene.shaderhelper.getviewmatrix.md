@@ -4,7 +4,7 @@
 
 ## ShaderHelper.getViewMatrix() method
 
-Gets the uniform variable of type mat4 which holds the view matrix of current camera
+Gets the uniform variable of type mat4 which holds the view matrix of current camera (world space to camera space)
 
 **Signature:**
 
@@ -14,9 +14,39 @@ static getViewMatrix(scope: PBInsideFunctionScope): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

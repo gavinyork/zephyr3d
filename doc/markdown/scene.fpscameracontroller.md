@@ -15,20 +15,183 @@ declare class FPSCameraController extends BaseCameraController
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.fpscameracontroller._constructor_.md) |  | Creates an instance of FPSCameraController |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.fpscameracontroller._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of FPSCameraController
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [\_onKeyDown(evt)](doc/markdown/./scene.fpscameracontroller._onkeydown.md) | <code>protected</code> | Key down event handler |
-|  [\_onKeyUp(evt)](doc/markdown/./scene.fpscameracontroller._onkeyup.md) | <code>protected</code> | Key up event handler |
-|  [\_onMouseDown(evt)](doc/markdown/./scene.fpscameracontroller._onmousedown.md) | <code>protected</code> | Mouse down event handler |
-|  [\_onMouseMove(evt)](doc/markdown/./scene.fpscameracontroller._onmousemove.md) | <code>protected</code> | Mouse move event handler |
-|  [\_onMouseUp(evt)](doc/markdown/./scene.fpscameracontroller._onmouseup.md) | <code>protected</code> | Mouse up event handler |
-|  [reset()](doc/markdown/./scene.fpscameracontroller.reset.md) |  | Resets state |
-|  [setOptions(opt)](doc/markdown/./scene.fpscameracontroller.setoptions.md) |  | Set options |
-|  [update()](doc/markdown/./scene.fpscameracontroller.update.md) |  | Updates state |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_onKeyDown(evt)](doc/markdown/./scene.fpscameracontroller._onkeydown.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Key down handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onKeyUp(evt)](doc/markdown/./scene.fpscameracontroller._onkeyup.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Key up handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseDown(evt)](doc/markdown/./scene.fpscameracontroller._onmousedown.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Mouse down event handler
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseMove(evt)](doc/markdown/./scene.fpscameracontroller._onmousemove.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer move handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseUp(evt)](doc/markdown/./scene.fpscameracontroller._onmouseup.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer up handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[reset()](doc/markdown/./scene.fpscameracontroller.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Reset the controller's internal state.
+
+Called automatically when a camera is attached via `_setCamera`<!-- -->. Subclasses should override this to reset accumulators, velocities, targets, etc.
+
+
+</td></tr>
+<tr><td>
+
+[setOptions(opt)](doc/markdown/./scene.fpscameracontroller.setoptions.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set options
+
+
+</td></tr>
+<tr><td>
+
+[update()](doc/markdown/./scene.fpscameracontroller.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Per-frame update.
+
+Subclasses should override this to: - Integrate velocities/accelerations and apply damping. - Smoothly interpolate camera transforms. - Clamp angles/distances/FOV, etc.
+
+Called once per frame by the owning system.
+
+
+</td></tr>
+</tbody></table>
 

@@ -12,10 +12,53 @@ createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractD
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cvs | HTMLCanvasElement |  |
-|  options | [DeviceOptions](doc/markdown/./device.deviceoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cvs
+
+
+</td><td>
+
+HTMLCanvasElement
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[DeviceOptions](doc/markdown/./device.deviceoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

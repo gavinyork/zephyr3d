@@ -4,7 +4,9 @@
 
 ## PickTarget type
 
-Pick target
+Picking result target container.
+
+Use to override/annotate which scene node (and optional label) a drawable should report when GPU picking or raycast returns a hit.
 
 **Signature:**
 

@@ -9,15 +9,60 @@ Check if all data is close enough to another
 **Signature:**
 
 ```typescript
-equalsTo(other: Float32Array, epsl?: number): boolean;
+equalsTo(other: Float32Array<ArrayBuffer>, epsl?: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | Float32Array | The data to be compared with. |
-|  epsl | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+Float32Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+The data to be compared with.
+
+
+</td></tr>
+<tr><td>
+
+epsl
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,7 +14,35 @@ constructor(rhs: AABBTree);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rhs | [AABBTree](doc/markdown/./scene.aabbtree.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rhs
+
+
+</td><td>
+
+[AABBTree](doc/markdown/./scene.aabbtree.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

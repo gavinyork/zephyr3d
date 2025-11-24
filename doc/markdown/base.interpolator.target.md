@@ -10,4 +10,6 @@ Gets the interpolation target
 
 ```typescript
 get target(): InterpolationTarget;
+
+set target(val: InterpolationTarget);
 ```

@@ -14,10 +14,102 @@ interface TextureTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [readable](doc/markdown/./device.texturetypedetail.readable.md) |  | boolean | true if this is a readable storage texture type |
-|  [storageTexelFormat](doc/markdown/./device.texturetypedetail.storagetexelformat.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | texture format if this is a storage texture |
-|  [textureType](doc/markdown/./device.texturetypedetail.texturetype.md) |  | [PBTextureType](doc/markdown/./device.pbtexturetype.md) | type of the texture |
-|  [writable](doc/markdown/./device.texturetypedetail.writable.md) |  | boolean | true if this is a writable storage texture type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[readable](doc/markdown/./device.texturetypedetail.readable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if this is a readable storage texture type
+
+
+</td></tr>
+<tr><td>
+
+[storageTexelFormat](doc/markdown/./device.texturetypedetail.storagetexelformat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+texture format if this is a storage texture
+
+
+</td></tr>
+<tr><td>
+
+[textureType](doc/markdown/./device.texturetypedetail.texturetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBTextureType](doc/markdown/./device.pbtexturetype.md)
+
+
+</td><td>
+
+type of the texture
+
+
+</td></tr>
+<tr><td>
+
+[writable](doc/markdown/./device.texturetypedetail.writable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if this is a writable storage texture type
+
+
+</td></tr>
+</tbody></table>
 

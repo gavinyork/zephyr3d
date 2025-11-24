@@ -4,23 +4,71 @@
 
 ## AnimationTrack.calculateState() method
 
-Calculates current animation state
+Compute the animation state at the specified time.
+
+Implementations should be pure with respect to inputs: given the same `target` and `currentTime`<!-- -->, return the same `StateType`<!-- -->.
 
 **Signature:**
 
 ```typescript
-abstract calculateState(currentTime: number): StateType;
+abstract calculateState(target: object, currentTime: number): StateType;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  currentTime | number | At which time the animation state should be calculated. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+object
+
+
+</td><td>
+
+The animated object (used to resolve current baseline if needed).
+
+
+</td></tr>
+<tr><td>
+
+currentTime
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Time cursor in seconds within the track's timeline.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 StateType
 
-State object
+The computed state at `currentTime`<!-- -->.
 

@@ -14,6 +14,7 @@ type IMixinLight = {
     normalMapMode: 'tangent-space' | 'object-space';
     doubleSidedLighting: boolean;
     needCalculateEnvLight(): boolean;
+    getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp;
     getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
     getEnvLightRadiance(scope: PBInsideFunctionScope, reflectVec: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
     calculateViewVector(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp;

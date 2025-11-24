@@ -14,11 +14,71 @@ static scaleLeft(m: Matrix4x4, s: Vector3, result?: Matrix4x4): Matrix4x4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  m | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The matrix that will be translated. |
-|  s | [Vector3](doc/markdown/./base.vector3.md) | The scale vector. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix (can be the same as m), if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+m
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The matrix that will be translated.
+
+
+</td></tr>
+<tr><td>
+
+s
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The scale vector.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix (can be the same as m), if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

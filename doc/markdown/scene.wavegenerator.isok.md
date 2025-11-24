@@ -9,14 +9,44 @@ Check if the wave generator is ok.
 **Signature:**
 
 ```typescript
-abstract isOk(device: AbstractDevice): boolean;
+isOk(device: AbstractDevice): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | Rendering device. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+Rendering device.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

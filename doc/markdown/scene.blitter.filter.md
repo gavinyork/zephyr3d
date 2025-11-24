@@ -14,14 +14,117 @@ abstract filter(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderEx
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  type | [BlitType](doc/markdown/./scene.blittype.md) | The blit type |
-|  srcTex | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The source texel |
-|  srcUV | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texture coordinate of the source texel |
-|  srcLayer | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The layer of the source texture |
-|  sampeType | 'float' \| 'int' \| 'uint' \| 'depth' |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+The blit type
+
+
+</td></tr>
+<tr><td>
+
+srcTex
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The source texel
+
+
+</td></tr>
+<tr><td>
+
+srcUV
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The texture coordinate of the source texel
+
+
+</td></tr>
+<tr><td>
+
+srcLayer
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The layer of the source texture
+
+
+</td></tr>
+<tr><td>
+
+sampeType
+
+
+</td><td>
+
+'float' \| 'int' \| 'uint' \| 'depth'
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

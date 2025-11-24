@@ -4,7 +4,9 @@
 
 ## Material.(constructor)
 
-Creates an instance of material
+Create a new material instance.
+
+- Initializes one pass by default. - Prepares per-pass hash storage and change tracking. - Registers a persistent ID in the global registry.
 
 **Signature:**
 

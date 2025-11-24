@@ -14,11 +14,71 @@ declare function packFloat3(a: number, b: number, c: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | number | first of the three floats |
-|  b | number | second of the three floats |
-|  c | number | third of the tree floats |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+first of the three floats
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+second of the three floats
+
+
+</td></tr>
+<tr><td>
+
+c
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+third of the tree floats
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,9 @@
 
 ## Material.\_createHash() method
 
-Calculates the hash code of the shader program
+Compute the material-specific portion of the shader hash for the current options.
+
+Subclasses should override to include macro/define sets that influence program compilation. Example return: `"USE_NORMALMAP=1;ALPHA_MODE=BLEND;RECEIVE_SHADOWS=1"`<!-- -->.
 
 **Signature:**
 
@@ -15,5 +17,5 @@ protected _createHash(): string;
 
 string
 
-The hash code
+Hash fragment string (no context/pass info).
 

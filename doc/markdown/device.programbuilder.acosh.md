@@ -14,9 +14,37 @@ acosh(val: number | PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

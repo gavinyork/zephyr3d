@@ -14,10 +14,94 @@ interface ColorRGBA
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [a](doc/markdown/./base.colorrgba.a.md) |  | number |  |
-|  [b](doc/markdown/./base.colorrgba.b.md) |  | number |  |
-|  [g](doc/markdown/./base.colorrgba.g.md) |  | number |  |
-|  [r](doc/markdown/./base.colorrgba.r.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[a](doc/markdown/./base.colorrgba.a.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[b](doc/markdown/./base.colorrgba.b.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[g](doc/markdown/./base.colorrgba.g.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[r](doc/markdown/./base.colorrgba.r.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

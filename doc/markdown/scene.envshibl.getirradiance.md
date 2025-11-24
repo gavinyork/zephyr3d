@@ -15,10 +15,55 @@ getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  normal | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | surface normal |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+normal
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+surface normal
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

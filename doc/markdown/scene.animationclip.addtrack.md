@@ -4,24 +4,73 @@
 
 ## AnimationClip.addTrack() method
 
-Adds an animation track to the animation
+Add a track to this clip for a specific target object.
+
+Constraints: - The track must not already belong to another clip. - Only one track with the same blendId may exist per target in a single clip.
+
+Side effects: - Assigns this clip to `track.animation`<!-- -->. - Extends `timeDuration` to cover the track duration if longer. - Calls `track.reset(target)` to initialize the target state if needed.
 
 **Signature:**
 
 ```typescript
-addTrack(node: SceneNode, track: AnimationTrack): this;
+addTrack(target: object, track: AnimationTrack): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [SceneNode](doc/markdown/./scene.scenenode.md) | The node that will be controlled by the track |
-|  track | [AnimationTrack](doc/markdown/./scene.animationtrack.md) | The track to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+object
+
+
+</td><td>
+
+Target object controlled by the track.
+
+
+</td></tr>
+<tr><td>
+
+track
+
+
+</td><td>
+
+[AnimationTrack](doc/markdown/./scene.animationtrack.md)
+
+
+</td><td>
+
+Track to add.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 this
 
-self
+This clip (for chaining).
 

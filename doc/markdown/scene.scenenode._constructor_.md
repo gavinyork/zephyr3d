@@ -4,7 +4,7 @@
 
 ## SceneNode.(constructor)
 
-Creates a new scene node
+Construct a scene node.
 
 **Signature:**
 
@@ -14,7 +14,41 @@ constructor(scene: Scene);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | Which scene the node belongs to |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+Scene that will own this node.
+
+
+</td></tr>
+</tbody></table>
+
+## Remarks
+
+If a `scene` is provided and this is not the root node, the node is reparented under the scene's root immediately.
 

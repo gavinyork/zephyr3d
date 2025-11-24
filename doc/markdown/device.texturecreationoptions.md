@@ -15,9 +15,102 @@ interface TextureCreationOptions extends BaseCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [samplerOptions?](doc/markdown/./device.texturecreationoptions.sampleroptions.md) |  | [SamplerOptions](doc/markdown/./device.sampleroptions.md) | _(Optional)_ |
-|  [texture?](doc/markdown/./device.texturecreationoptions.texture.md) |  | [BaseTexture](doc/markdown/./device.basetexture.md) | _(Optional)_ |
-|  [writable?](doc/markdown/./device.texturecreationoptions.writable.md) |  | boolean | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[mipmapping?](doc/markdown/./device.texturecreationoptions.mipmapping.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[samplerOptions?](doc/markdown/./device.texturecreationoptions.sampleroptions.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SamplerOptions](doc/markdown/./device.sampleroptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[texture?](doc/markdown/./device.texturecreationoptions.texture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[writable?](doc/markdown/./device.texturecreationoptions.writable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

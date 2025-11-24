@@ -14,11 +14,43 @@ createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  params | [GPUProgramConstructParams](doc/markdown/./device.gpuprogramconstructparams.md) | The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+params
+
+
+</td><td>
+
+[GPUProgramConstructParams](doc/markdown/./device.gpuprogramconstructparams.md)
+
+
+</td><td>
+
+The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [GPUProgram](doc/markdown/./device.gpuprogram.md)
+
+The created program.
 

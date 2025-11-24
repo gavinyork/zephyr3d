@@ -9,25 +9,191 @@ Sphere shape
 **Signature:**
 
 ```typescript
-declare class SphereShape extends Shape<SphereCreationOptions> 
+declare class SphereShape extends Shape<SphereCreationOptions> implements Clonable<SphereShape> 
 ```
 **Extends:** [Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;[SphereCreationOptions](doc/markdown/./scene.spherecreationoptions.md)<!-- -->&gt;
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[SphereShape](doc/markdown/./scene.sphereshape.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.sphereshape._constructor_.md) |  | Creates an instance of sphere shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.sphereshape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of sphere shape
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [radius](doc/markdown/./scene.sphereshape.radius.md) | <code>readonly</code> | number | Sphere radius |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.sphereshape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ radius: number; verticalDetail: number; horizonalDetail: number; needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[radius](doc/markdown/./scene.sphereshape.radius.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Sphere radius
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.sphereshape.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+type of the shape
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [raycast(ray)](doc/markdown/./scene.sphereshape.raycast.md) |  | Ray intersection test |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.sphereshape.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateData(options, vertices, normals, tangents, uvs, indices, bbox, indexOffset, vertexCallback)](doc/markdown/./scene.sphereshape.generatedata.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Generates the data for the sphere shape
+
+
+</td></tr>
+<tr><td>
+
+[raycast(ray)](doc/markdown/./scene.sphereshape.raycast.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Test intersection against the current axis-aligned bounding box (AABB).
+
+
+</td></tr>
+</tbody></table>
 

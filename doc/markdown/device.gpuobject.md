@@ -9,42 +9,326 @@ Base class for a GPU object
 **Signature:**
 
 ```typescript
-interface GPUObject<T = unknown> extends IEventTarget<{
-    disposed: null;
-}> 
+interface GPUObject<T = unknown> extends IDisposable 
 ```
-**Extends:** [IEventTarget](doc/markdown/./base.ieventtarget.md)<!-- -->&lt;{ disposed: null; }&gt;
+**Extends:** [IDisposable](doc/markdown/./base.idisposable.md)
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [cid](doc/markdown/./device.gpuobject.cid.md) | <code>readonly</code> | number |  |
-|  [device](doc/markdown/./device.gpuobject.device.md) | <code>readonly</code> | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The object was created by which device |
-|  [disposed](doc/markdown/./device.gpuobject.disposed.md) |  | null |  |
-|  [name](doc/markdown/./device.gpuobject.name.md) |  | string |  |
-|  [object](doc/markdown/./device.gpuobject.object.md) | <code>readonly</code> | T | The internal GPU object |
-|  [restoreHandler](doc/markdown/./device.gpuobject.restorehandler.md) |  | (tex: [GPUObject](doc/markdown/./device.gpuobject.md)<!-- -->) =&gt; Promise&lt;void&gt; |  |
-|  [uid](doc/markdown/./device.gpuobject.uid.md) | <code>readonly</code> | number | unique id |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[cid](doc/markdown/./device.gpuobject.cid.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[device](doc/markdown/./device.gpuobject.device.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The object was created by which device
+
+
+</td></tr>
+<tr><td>
+
+[disposed](doc/markdown/./device.gpuobject.disposed.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./device.gpuobject.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[object](doc/markdown/./device.gpuobject.object.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The internal GPU object
+
+
+</td></tr>
+<tr><td>
+
+[restoreHandler](doc/markdown/./device.gpuobject.restorehandler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(tex: [GPUObject](doc/markdown/./device.gpuobject.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[uid](doc/markdown/./device.gpuobject.uid.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+unique id
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [destroy()](doc/markdown/./device.gpuobject.destroy.md) |  |
-|  [dispose()](doc/markdown/./device.gpuobject.dispose.md) |  |
-|  [isBindGroup()](doc/markdown/./device.gpuobject.isbindgroup.md) |  |
-|  [isBuffer()](doc/markdown/./device.gpuobject.isbuffer.md) |  |
-|  [isFramebuffer()](doc/markdown/./device.gpuobject.isframebuffer.md) |  |
-|  [isProgram()](doc/markdown/./device.gpuobject.isprogram.md) |  |
-|  [isSampler()](doc/markdown/./device.gpuobject.issampler.md) |  |
-|  [isTexture()](doc/markdown/./device.gpuobject.istexture.md) |  |
-|  [isTexture2D()](doc/markdown/./device.gpuobject.istexture2d.md) |  |
-|  [isTexture2DArray()](doc/markdown/./device.gpuobject.istexture2darray.md) |  |
-|  [isTexture3D()](doc/markdown/./device.gpuobject.istexture3d.md) |  |
-|  [isTextureCube()](doc/markdown/./device.gpuobject.istexturecube.md) |  |
-|  [isTextureVideo()](doc/markdown/./device.gpuobject.istexturevideo.md) |  |
-|  [isVertexLayout()](doc/markdown/./device.gpuobject.isvertexlayout.md) |  |
-|  [reload()](doc/markdown/./device.gpuobject.reload.md) |  |
-|  [restore()](doc/markdown/./device.gpuobject.restore.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[destroy()](doc/markdown/./device.gpuobject.destroy.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[dispose()](doc/markdown/./device.gpuobject.dispose.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isBindGroup()](doc/markdown/./device.gpuobject.isbindgroup.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isBuffer()](doc/markdown/./device.gpuobject.isbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isFramebuffer()](doc/markdown/./device.gpuobject.isframebuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isProgram()](doc/markdown/./device.gpuobject.isprogram.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isSampler()](doc/markdown/./device.gpuobject.issampler.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTexture()](doc/markdown/./device.gpuobject.istexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTexture2D()](doc/markdown/./device.gpuobject.istexture2d.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTexture2DArray()](doc/markdown/./device.gpuobject.istexture2darray.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTexture3D()](doc/markdown/./device.gpuobject.istexture3d.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTextureCube()](doc/markdown/./device.gpuobject.istexturecube.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTextureVideo()](doc/markdown/./device.gpuobject.istexturevideo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isVertexLayout()](doc/markdown/./device.gpuobject.isvertexlayout.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[reload()](doc/markdown/./device.gpuobject.reload.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[restore()](doc/markdown/./device.gpuobject.restore.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

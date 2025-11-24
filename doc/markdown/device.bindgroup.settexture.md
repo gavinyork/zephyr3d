@@ -12,11 +12,67 @@ setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
-|  texture | [BaseTexture](doc/markdown/./device.basetexture.md) |  |
-|  sampler | [TextureSampler](doc/markdown/./device.texturesampler.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+texture
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## LogMode type
 
-Log mode
+Log severity levels.
 
 **Signature:**
 

@@ -9,14 +9,60 @@ Setup uniforms for the shader program.
 **Signature:**
 
 ```typescript
-setupUniforms(scope: PBGlobalScope): void;
+setupUniforms(scope: PBGlobalScope, uniformGroup: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | Global scope of the shader program. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+Global scope of the shader program.
+
+
+</td></tr>
+<tr><td>
+
+uniformGroup
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bind group index for uniform values
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

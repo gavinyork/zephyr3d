@@ -6,81 +6,1533 @@
 
 ## Classes
 
-|  Class | Description |
-|  --- | --- |
-|  [AABB](doc/markdown/./base.aabb.md) | Axis aligned bounding box |
-|  [Frustum](doc/markdown/./base.frustum.md) | The frustum class |
-|  [HttpRequest](doc/markdown/./base.httprequest.md) | Wrapper of a http get request |
-|  [Interpolator](doc/markdown/./base.interpolator.md) | The interpolator class |
-|  [List](doc/markdown/./base.list.md) | The double list class |
-|  [ListIterator](doc/markdown/./base.listiterator.md) | The list iterator class |
-|  [Matrix3x3](doc/markdown/./base.matrix3x3.md) | 3x3 Matrix |
-|  [Matrix4x4](doc/markdown/./base.matrix4x4.md) | 4x4 Matrix |
-|  [ObservableQuaternion](doc/markdown/./base.observablequaternion.md) | Observable 4 dimentional vector |
-|  [ObservableVector2](doc/markdown/./base.observablevector2.md) | Observable 2 dimentional vector |
-|  [ObservableVector3](doc/markdown/./base.observablevector3.md) | Observable 3 dimentional vector |
-|  [ObservableVector4](doc/markdown/./base.observablevector4.md) | Observable 4 dimentional vector |
-|  [Plane](doc/markdown/./base.plane.md) | The plane class |
-|  [PRNG](doc/markdown/./base.prng.md) | Pseudorandom number generator |
-|  [Quaternion](doc/markdown/./base.quaternion.md) | Quaternion |
-|  [Ray](doc/markdown/./base.ray.md) | The ray class |
-|  [RectsPacker](doc/markdown/./base.rectspacker.md) | The rectangle packer class |
-|  [SH](doc/markdown/./base.sh.md) | Spherical harmonics utilities |
-|  [Vector2](doc/markdown/./base.vector2.md) | 2 dimentional vector |
-|  [Vector3](doc/markdown/./base.vector3.md) | 3 dimentional vector |
-|  [Vector4](doc/markdown/./base.vector4.md) | 4 dimentional vector |
-|  [VectorBase](doc/markdown/./base.vectorbase.md) | Base class for vector and matrix types. |
+<table><thead><tr><th>
+
+Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+Axis aligned bounding box
+
+
+</td></tr>
+<tr><td>
+
+[DataTransferVFS](doc/markdown/./base.datatransfervfs.md)
+
+
+</td><td>
+
+DataTransfer-based virtual file system for handling dropped files and directories.
+
+Read-only VFS populated from a `DataTransfer` (drag-and-drop) or a `FileList` (e.g., from `<input type="file" webkitdirectory>`<!-- -->).
+
+Notes: - This VFS is read-only; mutating operations throw `VFSError` with code `"EROFS"`<!-- -->. - For directory support via drag-and-drop, relies on non-standard WebKit APIs (`webkitGetAsEntry`<!-- -->, `FileSystemDirectoryEntry`<!-- -->, etc.) where available.
+
+
+</td></tr>
+<tr><td>
+
+[Disposable](doc/markdown/./base.disposable.md)
+
+
+</td><td>
+
+Base class for any Disposable class
+
+
+</td></tr>
+<tr><td>
+
+[DRef](doc/markdown/./base.dref.md)
+
+
+</td><td>
+
+A reference-counting wrapper for disposable objects.
+
+
+</td></tr>
+<tr><td>
+
+[DWeakRef](doc/markdown/./base.dweakref.md)
+
+
+</td><td>
+
+A weak-reference-counting wrapper for disposable objects.
+
+
+</td></tr>
+<tr><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+The frustum class
+
+
+</td></tr>
+<tr><td>
+
+[GenericHtmlDirectoryReader](doc/markdown/./base.generichtmldirectoryreader.md)
+
+
+</td><td>
+
+A generic HTML directory reader that parses index-style HTML pages to list directory entries (files and subdirectories).
+
+
+</td></tr>
+<tr><td>
+
+[GlobMatcher](doc/markdown/./base.globmatcher.md)
+
+
+</td><td>
+
+A matcher for glob patterns that converts wildcard patterns to regular expressions.
+
+
+</td></tr>
+<tr><td>
+
+[HeightField](doc/markdown/./base.heightfield.md)
+
+
+</td><td>
+
+Height field class for height sampling and ray intersection
+
+
+</td></tr>
+<tr><td>
+
+[HttpFS](doc/markdown/./base.httpfs.md)
+
+
+</td><td>
+
+HTTP-backed virtual file system.
+
+Provides a read-only VFS implementation that resolves files via HTTP(S). Supports: - File reads via `GET` - Existence/stat probing via `HEAD` - Optional directory listing via pluggable [HttpDirectoryReader](doc/markdown/./base.httpdirectoryreader.md)<!-- -->s
+
+Limitations: - This FS is read-only; mutating operations throw `VFSError` with code `"EROFS"`<!-- -->. - Partial reads (HTTP range) are not implemented yet.
+
+
+</td></tr>
+<tr><td>
+
+[HttpRequest](doc/markdown/./base.httprequest.md)
+
+
+</td><td>
+
+Wrapper of a http get request
+
+
+</td></tr>
+<tr><td>
+
+[IndexedDBFS](doc/markdown/./base.indexeddbfs.md)
+
+
+</td><td>
+
+IndexedDB-based file system implementation.
+
+Provides a virtual file system interface using IndexedDB as the underlying storage. Supports standard file operations like create, read, write, delete, and directory listing.
+
+
+</td></tr>
+<tr><td>
+
+[Interpolator](doc/markdown/./base.interpolator.md)
+
+
+</td><td>
+
+The interpolator class
+
+
+</td></tr>
+<tr><td>
+
+[List](doc/markdown/./base.list.md)
+
+
+</td><td>
+
+The double list class
+
+
+</td></tr>
+<tr><td>
+
+[ListIterator](doc/markdown/./base.listiterator.md)
+
+
+</td><td>
+
+The list iterator class
+
+
+</td></tr>
+<tr><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+3x3 Matrix
+
+
+</td></tr>
+<tr><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+4x4 Matrix
+
+
+</td></tr>
+<tr><td>
+
+[MemoryFS](doc/markdown/./base.memoryfs.md)
+
+
+</td><td>
+
+Memory file system.
+
+
+</td></tr>
+<tr><td>
+
+[NullVFS](doc/markdown/./base.nullvfs.md)
+
+
+</td><td>
+
+Null file system.
+
+
+</td></tr>
+<tr><td>
+
+[Observable](doc/markdown/./base.observable.md)
+
+
+</td><td>
+
+Observable event emitter implementation.
+
+Provides subscription, one-time subscription, unsubscription, and synchronous dispatch for events defined by an [EventMap](doc/markdown/./base.eventmap.md)<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[ObservableQuaternion](doc/markdown/./base.observablequaternion.md)
+
+
+</td><td>
+
+Observable 4 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[ObservableVector2](doc/markdown/./base.observablevector2.md)
+
+
+</td><td>
+
+Observable 2 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[ObservableVector3](doc/markdown/./base.observablevector3.md)
+
+
+</td><td>
+
+Observable 3 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[ObservableVector4](doc/markdown/./base.observablevector4.md)
+
+
+</td><td>
+
+Observable 4 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[PathUtils](doc/markdown/./base.pathutils.md)
+
+
+</td><td>
+
+Path utilities.
+
+Provides POSIX-like path manipulation helpers (pure string operations), including normalization, joining, dirname/basename/extname extraction, absolute-path detection, and relative path computation.
+
+Notes: - Uses "/" as the separator (web/URL or POSIX-like paths). - All methods are pure and do not touch a real filesystem. - `normalize` collapses ".", "..", and redundant slashes.
+
+
+</td></tr>
+<tr><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+The plane class
+
+
+</td></tr>
+<tr><td>
+
+[PRNG](doc/markdown/./base.prng.md)
+
+
+</td><td>
+
+Pseudorandom number generator
+
+
+</td></tr>
+<tr><td>
+
+[PythonHttpServerReader](doc/markdown/./base.pythonhttpserverreader.md)
+
+
+</td><td>
+
+Directory reader for Python's built-in `http.server` (and similar) HTML directory listings.
+
+
+</td></tr>
+<tr><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+Quaternion
+
+
+</td></tr>
+<tr><td>
+
+[Ray](doc/markdown/./base.ray.md)
+
+
+</td><td>
+
+The ray class
+
+
+</td></tr>
+<tr><td>
+
+[RectsPacker](doc/markdown/./base.rectspacker.md)
+
+
+</td><td>
+
+The rectangle packer class
+
+
+</td></tr>
+<tr><td>
+
+[SH](doc/markdown/./base.sh.md)
+
+
+</td><td>
+
+Spherical harmonics utilities
+
+
+</td></tr>
+<tr><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+2 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+3 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+4 dimentional vector
+
+
+</td></tr>
+<tr><td>
+
+[VectorBase](doc/markdown/./base.vectorbase.md)
+
+
+</td><td>
+
+Base class for vector and matrix types.
+
+
+</td></tr>
+<tr><td>
+
+[VFSError](doc/markdown/./base.vfserror.md)
+
+
+</td><td>
+
+Represents an error that occurred during a VFS operation.
+
+
+</td></tr>
+<tr><td>
+
+[ZipFS](doc/markdown/./base.zipfs.md)
+
+
+</td><td>
+
+ZIP file system implementation using zip.js.
+
+Supports reading, writing, and manipulating ZIP archives as a virtual file system. Can be mounted onto other file systems and used in combination with other VFS implementations.
+
+
+</td></tr>
+</tbody></table>
+
+## Abstract Classes
+
+<table><thead><tr><th>
+
+Abstract Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[VFS](doc/markdown/./base.vfs.md)
+
+
+</td><td>
+
+Abstract base class for virtual file systems.
+
+Provides a standardized interface for file system operations and supports mounting other VFS instances at specific paths for composition.
+
+
+</td></tr>
+</tbody></table>
 
 ## Enumerations
 
-|  Enumeration | Description |
-|  --- | --- |
-|  [BoxSide](doc/markdown/./base.boxside.md) | Enumerator used to refer to a box side |
-|  [ClipState](doc/markdown/./base.clipstate.md) | The intersection test result of two object A and B |
-|  [CubeFace](doc/markdown/./base.cubeface.md) | Enumerator used to refer to the cube face |
+<table><thead><tr><th>
+
+Enumeration
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[BoxSide](doc/markdown/./base.boxside.md)
+
+
+</td><td>
+
+Enumerator used to refer to a box side
+
+
+</td></tr>
+<tr><td>
+
+[ClipState](doc/markdown/./base.clipstate.md)
+
+
+</td><td>
+
+The intersection test result of two object A and B
+
+
+</td></tr>
+<tr><td>
+
+[CubeFace](doc/markdown/./base.cubeface.md)
+
+
+</td><td>
+
+Enumerator used to refer to the cube face
+
+
+</td></tr>
+</tbody></table>
 
 ## Functions
 
-|  Function | Description |
-|  --- | --- |
-|  [applyMixins(target, mixins)](doc/markdown/./base.applymixins.md) | Applies mixins to a constructor function. |
-|  [floatToHalf(val)](doc/markdown/./base.floattohalf.md) | Converts float value to half float |
-|  [halfToFloat(val)](doc/markdown/./base.halftofloat.md) | Converts half float value to float |
-|  [isPowerOf2(value)](doc/markdown/./base.ispowerof2.md) | Check if a number is a power of 2. |
-|  [makeEventTarget(cls)](doc/markdown/./base.makeeventtarget.md) | This mixin make a class an event target |
-|  [nextPowerOf2(value)](doc/markdown/./base.nextpowerof2.md) | Given a number, find the next number power of 2. |
-|  [packFloat3(a, b, c)](doc/markdown/./base.packfloat3.md) | Compresses three floats to R11F\_G11F\_B10F format |
-|  [parseColor(input)](doc/markdown/./base.parsecolor.md) | parse a css color value to RGBA color type. |
-|  [toFloat(val)](doc/markdown/./base.tofloat.md) | Convert a number to 32 bit float value |
-|  [unpackFloat3(pk, result)](doc/markdown/./base.unpackfloat3.md) | Decompresses the three floats that was compressed to R11F\_G11F\_B10F format |
-|  [weightedAverage(weights, values, funcLerp)](doc/markdown/./base.weightedaverage.md) | Calculates the weighted average of a set of values. |
+<table><thead><tr><th>
+
+Function
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyMixins(target, mixins)](doc/markdown/./base.applymixins.md)
+
+
+</td><td>
+
+Applies mixins to a constructor function.
+
+
+</td></tr>
+<tr><td>
+
+[applyPatch(base, patch)](doc/markdown/./base.applypatch.md)
+
+
+</td><td>
+
+Apply a [DiffPatch](doc/markdown/./base.diffpatch.md) to a given `base` value to produce a new value.
+
+Behavior: - `set`<!-- -->: sets/replaces the value at path (deep-cloned). - `del`<!-- -->: deletes the value at path; deleting the root yields `undefined`<!-- -->. - `arr`<!-- -->: applies array element `set`<!-- -->s first, then `ins`<!-- -->, then `del` (descending indices), minimizing index-shift side-effects during mutation.
+
+Structural handling: - Intermediate containers are created as needed: arrays for numeric next keys, objects otherwise. - If an `arr` operation targets a non-array location, the array result is reconstructed by replaying the sub-ops against an empty array and then placed at the path.
+
+Immutability: - The function starts by deep-cloning `base` to avoid mutating the input.
+
+
+</td></tr>
+<tr><td>
+
+[ASSERT(condition, message)](doc/markdown/./base.assert.md)
+
+
+</td><td>
+
+Simple assertion which throws an error if the !!condition is false.
+
+
+</td></tr>
+<tr><td>
+
+[base64ToText(base64)](doc/markdown/./base.base64totext.md)
+
+
+</td><td>
+
+Converts a base64 string to text (Supports emoji character)
+
+
+</td></tr>
+<tr><td>
+
+[base64ToUint8Array(base64)](doc/markdown/./base.base64touint8array.md)
+
+
+</td><td>
+
+Converts a base64 string to Uint8Array (Supports emoji character)
+
+
+</td></tr>
+<tr><td>
+
+[degree2radian(degree)](doc/markdown/./base.degree2radian.md)
+
+
+</td><td>
+
+Convert a degree value to radian value.
+
+
+</td></tr>
+<tr><td>
+
+[diff(base, target)](doc/markdown/./base.diff.md)
+
+
+</td><td>
+
+Compute a patch that transforms `base` into `target`<!-- -->.
+
+This function emits a sequence of operations needed to convert the input value `base` into `target`<!-- -->. The resulting [DiffPatch](doc/markdown/./base.diffpatch.md) can be applied with [applyPatch()](doc/markdown/./base.applypatch.md)<!-- -->.
+
+Semantics: - Primitives: emits a single `set` if values differ. - Objects: recurses into keys; emits `set` for additions/updates and `del` for removals. - Arrays: emits an `arr` operation containing element-wise `set`<!-- -->, `ins`<!-- -->, and `del`<!-- -->.
+
+Notes: - Comparison for primitives uses strict equality (`===`<!-- -->) via `shallowEqual`<!-- -->. - Complex nested changes within arrays are represented either as: - element-wise `set` when types differ or primitives differ, or - nested operations pushed to the top-level with extended paths when elements are arrays/objects. - This is not a minimum-edit-distance diff; it's a straightforward positional diff.
+
+
+</td></tr>
+<tr><td>
+
+[float2half(f32)](doc/markdown/./base.float2half.md)
+
+
+</td><td>
+
+Convert float32 to float16
+
+
+</td></tr>
+<tr><td>
+
+[floatToHalf(val)](doc/markdown/./base.floattohalf.md)
+
+
+</td><td>
+
+Converts float value to half float
+
+
+</td></tr>
+<tr><td>
+
+[flushPendingDisposals()](doc/markdown/./base.flushpendingdisposals.md)
+
+
+</td><td>
+
+Processes all pending disposals from the previous frame. This should be called at the beginning of each frame
+
+
+</td></tr>
+<tr><td>
+
+[formatString(format, args)](doc/markdown/./base.formatstring.md)
+
+
+</td><td>
+
+Simple sprintf implementation:
+
+
+</td></tr>
+<tr><td>
+
+[guessMimeType(path)](doc/markdown/./base.guessmimetype.md)
+
+
+</td><td>
+
+Guesses the MIME type based on a file path or file name.
+
+Behavior: - Uses `PathUtils.extname` to extract the extension (case-insensitive). - Falls back to `application/octet-stream` if unknown.
+
+Notes: - The mapping is intentionally minimal and web-oriented. - Extend the `mimeTypes` table if you need additional types.
+
+Examples: - guessMimeType('image.png') -<!-- -->&gt; 'image/png' - guessMimeType('/a/b/model.glb') -<!-- -->&gt; 'model/gltf-binary' - guessMimeType('unknown.ext') -<!-- -->&gt; 'application/octet-stream'
+
+
+</td></tr>
+<tr><td>
+
+[half2float(f16)](doc/markdown/./base.half2float.md)
+
+
+</td><td>
+
+Convert float16 to float32
+
+
+</td></tr>
+<tr><td>
+
+[halfToFloat(val)](doc/markdown/./base.halftofloat.md)
+
+
+</td><td>
+
+Converts half float value to float
+
+
+</td></tr>
+<tr><td>
+
+[halton23(length)](doc/markdown/./base.halton23.md)
+
+
+</td><td>
+
+Generates an array of jitters using the Halton sequence.
+
+
+</td></tr>
+<tr><td>
+
+[IS\_INSTANCE\_OF(value, constructor)](doc/markdown/./base.is_instance_of.md)
+
+
+</td><td>
+
+Check if a value is an instance of a specific constructor.
+
+
+</td></tr>
+<tr><td>
+
+[isPowerOf2(value)](doc/markdown/./base.ispowerof2.md)
+
+
+</td><td>
+
+Check if a number is a power of 2.
+
+
+</td></tr>
+<tr><td>
+
+[makeObservable(cls)](doc/markdown/./base.makeobservable.md)
+
+
+</td><td>
+
+Mixin that augments a class with [IEventTarget](doc/markdown/./base.ieventtarget.md) capabilities.
+
+It returns a higher-order factory that, when instantiated with an event map `X`<!-- -->, produces a subclass adding `on/once/off/dispatchEvent` and the internal listener management.
+
+Usage:
+
+```ts
+class Base {}
+const Eventful = makeObservable(Base)<{ 'ready': []; 'data': [number] }>();
+const obj = new Eventful();
+obj.on('data', (n) => console.log(n));
+obj.dispatchEvent('data', 42);
+```
+
+
+</td></tr>
+<tr><td>
+
+[nextPowerOf2(value)](doc/markdown/./base.nextpowerof2.md)
+
+
+</td><td>
+
+Given a number, find the next number power of 2.
+
+
+</td></tr>
+<tr><td>
+
+[packFloat3(a, b, c)](doc/markdown/./base.packfloat3.md)
+
+
+</td><td>
+
+Compresses three floats to R11F\_G11F\_B10F format
+
+
+</td></tr>
+<tr><td>
+
+[parseColor(input)](doc/markdown/./base.parsecolor.md)
+
+
+</td><td>
+
+parse a css color value to RGBA color type.
+
+
+</td></tr>
+<tr><td>
+
+[radian2degree(radian)](doc/markdown/./base.radian2degree.md)
+
+
+</td><td>
+
+Convert a radian value to degree value.
+
+
+</td></tr>
+<tr><td>
+
+[randomUUID()](doc/markdown/./base.randomuuid.md)
+
+
+</td><td>
+
+Generate 128bit random UUID
+
+
+</td></tr>
+<tr><td>
+
+[releaseObject(obj)](doc/markdown/./base.releaseobject.md)
+
+
+</td><td>
+
+Releases a disposable object
+
+
+</td></tr>
+<tr><td>
+
+[retainObject(obj)](doc/markdown/./base.retainobject.md)
+
+
+</td><td>
+
+Retains a disposable object
+
+
+</td></tr>
+<tr><td>
+
+[textToBase64(text)](doc/markdown/./base.texttobase64.md)
+
+
+</td><td>
+
+Converts a string to Base64 (Supports emoji character)
+
+
+</td></tr>
+<tr><td>
+
+[toFloat(val)](doc/markdown/./base.tofloat.md)
+
+
+</td><td>
+
+Convert a number to 32 bit float value
+
+
+</td></tr>
+<tr><td>
+
+[uint8ArrayToBase64(array)](doc/markdown/./base.uint8arraytobase64.md)
+
+
+</td><td>
+
+Converts a Uint8Array to Base64 (Supports emoji character)
+
+
+</td></tr>
+<tr><td>
+
+[unpackFloat3(pk, result)](doc/markdown/./base.unpackfloat3.md)
+
+
+</td><td>
+
+Decompresses the three floats that was compressed to R11F\_G11F\_B10F format
+
+
+</td></tr>
+<tr><td>
+
+[weightedAverage(weights, values, funcLerp)](doc/markdown/./base.weightedaverage.md)
+
+
+</td><td>
+
+Calculates the weighted average of a set of values.
+
+
+</td></tr>
+</tbody></table>
 
 ## Interfaces
 
-|  Interface | Description |
-|  --- | --- |
-|  [ColorRGBA](doc/markdown/./base.colorrgba.md) | RGBA color type |
-|  [IEventTarget](doc/markdown/./base.ieventtarget.md) | The event target interface |
-|  [Tuple2](doc/markdown/./base.tuple2.md) | two elements tuple type |
-|  [Tuple3](doc/markdown/./base.tuple3.md) | three elements tuple type |
-|  [Tuple4](doc/markdown/./base.tuple4.md) | four elements tuple type |
+<table><thead><tr><th>
+
+Interface
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[Clonable](doc/markdown/./base.clonable.md)
+
+
+</td><td>
+
+Clonable interface
+
+
+</td></tr>
+<tr><td>
+
+[ColorRGBA](doc/markdown/./base.colorrgba.md)
+
+
+</td><td>
+
+RGBA color type
+
+
+</td></tr>
+<tr><td>
+
+[DataTransferFileEntry](doc/markdown/./base.datatransferfileentry.md)
+
+
+</td><td>
+
+File entry descriptor used by the DataTransfer-based VFS.
+
+Represents files captured from `DataTransfer` or `FileList`<!-- -->, along with minimal metadata required by the virtual file system.
+
+
+</td></tr>
+<tr><td>
+
+[FileMetadata](doc/markdown/./base.filemetadata.md)
+
+
+</td><td>
+
+Represents metadata information for a file or directory.
+
+
+</td></tr>
+<tr><td>
+
+[FileStat](doc/markdown/./base.filestat.md)
+
+
+</td><td>
+
+Represents statistical information about a file or directory.
+
+
+</td></tr>
+<tr><td>
+
+[GlobOptions](doc/markdown/./base.globoptions.md)
+
+
+</td><td>
+
+Options for glob pattern matching.
+
+
+</td></tr>
+<tr><td>
+
+[GlobResult](doc/markdown/./base.globresult.md)
+
+
+</td><td>
+
+Represents a file or directory that matches a glob pattern.
+
+
+</td></tr>
+<tr><td>
+
+[HttpDirectoryReader](doc/markdown/./base.httpdirectoryreader.md)
+
+
+</td><td>
+
+Interface for an HTTP directory reader.
+
+Implementations encapsulate the logic to enumerate entries under an HTTP-served directory. This may involve parsing HTML indexes, JSON manifests, or custom APIs.
+
+Notes: - A host VFS may register multiple readers and select one via [HttpDirectoryReader.canHandle()](doc/markdown/./base.httpdirectoryreader.canhandle.md)<!-- -->. - Readers should return a flat list of entries for the provided `dirPath` only (non-recursive). Recursion is orchestrated by the VFS if needed.
+
+
+</td></tr>
+<tr><td>
+
+[HttpDirectoryReaderContext](doc/markdown/./base.httpdirectoryreadercontext.md)
+
+
+</td><td>
+
+Context utilities provided to an [HttpDirectoryReader](doc/markdown/./base.httpdirectoryreader.md)<!-- -->.
+
+A reader implementation uses these helpers to fetch remote resources, resolve/normalize paths, and infer MIME types without depending on the VFS internals.
+
+
+</td></tr>
+<tr><td>
+
+[HttpFSOptions](doc/markdown/./base.httpfsoptions.md)
+
+
+</td><td>
+
+Options for [HttpFS](doc/markdown/./base.httpfs.md)<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[IDisposable](doc/markdown/./base.idisposable.md)
+
+
+</td><td>
+
+Represents an object that can be disposed
+
+
+</td></tr>
+<tr><td>
+
+[IEventTarget](doc/markdown/./base.ieventtarget.md)
+
+
+</td><td>
+
+The event target interface
+
+
+</td></tr>
+<tr><td>
+
+[ListOptions](doc/markdown/./base.listoptions.md)
+
+
+</td><td>
+
+Options for listing directory contents.
+
+
+</td></tr>
+<tr><td>
+
+[MoveOptions](doc/markdown/./base.moveoptions.md)
+
+
+</td><td>
+
+Options for move operations.
+
+
+</td></tr>
+<tr><td>
+
+[ReadOptions](doc/markdown/./base.readoptions.md)
+
+
+</td><td>
+
+Options for reading files.
+
+
+</td></tr>
+<tr><td>
+
+[Tuple2](doc/markdown/./base.tuple2.md)
+
+
+</td><td>
+
+two elements tuple type
+
+
+</td></tr>
+<tr><td>
+
+[Tuple3](doc/markdown/./base.tuple3.md)
+
+
+</td><td>
+
+three elements tuple type
+
+
+</td></tr>
+<tr><td>
+
+[Tuple4](doc/markdown/./base.tuple4.md)
+
+
+</td><td>
+
+four elements tuple type
+
+
+</td></tr>
+<tr><td>
+
+[WriteOptions](doc/markdown/./base.writeoptions.md)
+
+
+</td><td>
+
+Options for writing files.
+
+
+</td></tr>
+<tr><td>
+
+[ZipEntry](doc/markdown/./base.zipentry.md)
+
+
+</td><td>
+
+ZIP entry type
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSDependencies](doc/markdown/./base.zipjsdependencies.md)
+
+
+</td><td>
+
+ZipJS dependencies
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSEntry](doc/markdown/./base.zipjsentry.md)
+
+
+</td><td>
+
+ZipJSEntry interface of zip.js
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSReader](doc/markdown/./base.zipjsreader.md)
+
+
+</td><td>
+
+ZipJSReader interface of zip.js
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSReaderConstructor](doc/markdown/./base.zipjsreaderconstructor.md)
+
+
+</td><td>
+
+ZipJSReader constructor interface of zip.js
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSWriter](doc/markdown/./base.zipjswriter.md)
+
+
+</td><td>
+
+ZipJSWriter interface of zip.js
+
+
+</td></tr>
+<tr><td>
+
+[ZipJSWriterConstructor](doc/markdown/./base.zipjswriterconstructor.md)
+
+
+</td><td>
+
+ZipJSWriter constructor interface of zip.js
+
+
+</td></tr>
+</tbody></table>
 
 ## Type Aliases
 
-|  Type Alias | Description |
-|  --- | --- |
-|  [EventListener\_2](doc/markdown/./base.eventlistener_2.md) | Event handler type |
-|  [EventMap](doc/markdown/./base.eventmap.md) | Mapping table of event types and their constructors |
-|  [EventType](doc/markdown/./base.eventtype.md) | Get the constructor type bye event type |
-|  [ExtractMixinReturnType](doc/markdown/./base.extractmixinreturntype.md) | Extract mixin return type |
-|  [ExtractMixinType](doc/markdown/./base.extractmixintype.md) | Extract mixin type |
-|  [GenericConstructor](doc/markdown/./base.genericconstructor.md) | A generic constructor type |
-|  [InterpolationMode](doc/markdown/./base.interpolationmode.md) | The interpolation mode |
-|  [InterpolationTarget](doc/markdown/./base.interpolationtarget.md) | Target of interpolation |
-|  [MaybeArray](doc/markdown/./base.maybearray.md) |  |
-|  [PackRect](doc/markdown/./base.packrect.md) | The type of packed result. |
-|  [REventHandlerOptions](doc/markdown/./base.reventhandleroptions.md) | Options of event handler |
-|  [TypedArray](doc/markdown/./base.typedarray.md) | Typed array |
-|  [TypedArrayConstructor](doc/markdown/./base.typedarrayconstructor.md) | Type of a typed array constructor |
-|  [UnionToIntersection](doc/markdown/./base.uniontointersection.md) | Convert union type to intersection |
+<table><thead><tr><th>
+
+Type Alias
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[DiffArray](doc/markdown/./base.diffarray.md)
+
+
+</td><td>
+
+A JSON-like array with [DiffValue](doc/markdown/./base.diffvalue.md) elements.
+
+
+</td></tr>
+<tr><td>
+
+[DiffArrDel](doc/markdown/./base.diffarrdel.md)
+
+
+</td><td>
+
+An array patch operation that deletes the element at `index`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[DiffArrIns](doc/markdown/./base.diffarrins.md)
+
+
+</td><td>
+
+An array patch operation that inserts `value` at `index`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[DiffArrSet](doc/markdown/./base.diffarrset.md)
+
+
+</td><td>
+
+An array patch operation that sets the element at `index` to `value`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[DiffObject](doc/markdown/./base.diffobject.md)
+
+
+</td><td>
+
+A JSON-like object with string keys and [DiffValue](doc/markdown/./base.diffvalue.md) values.
+
+
+</td></tr>
+<tr><td>
+
+[DiffOpArr](doc/markdown/./base.diffoparr.md)
+
+
+</td><td>
+
+A patch operation that applies a list of array mutations (`ops`<!-- -->) at `path`<!-- -->.
+
+- The `ops` list can include insert (`ins`<!-- -->), delete (`del`<!-- -->), and set (`set`<!-- -->) operations.
+
+
+</td></tr>
+<tr><td>
+
+[DiffOpDel](doc/markdown/./base.diffopdel.md)
+
+
+</td><td>
+
+A patch operation that deletes the value at `path`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[DiffOpSet](doc/markdown/./base.diffopset.md)
+
+
+</td><td>
+
+A patch operation that sets the value at `path` to `value`<!-- -->.
+
+- Represents add/replace semantics.
+
+
+</td></tr>
+<tr><td>
+
+[DiffPatch](doc/markdown/./base.diffpatch.md)
+
+
+</td><td>
+
+A patch is a list of operations that can transform one [DiffValue](doc/markdown/./base.diffvalue.md) into another.
+
+
+</td></tr>
+<tr><td>
+
+[DiffPath](doc/markdown/./base.diffpath.md)
+
+
+</td><td>
+
+A path describing a location within a JSON-like structure.
+
+Each segment is either a string (object key) or a number (array index).
+
+Example: `["users", 0, "name"]`
+
+
+</td></tr>
+<tr><td>
+
+[DiffValue](doc/markdown/./base.diffvalue.md)
+
+
+</td><td>
+
+A JSON-like value that can be diffed/patched.
+
+Includes primitives (`null`<!-- -->, `boolean`<!-- -->, `number`<!-- -->, `string`<!-- -->), objects, and arrays.
+
+
+</td></tr>
+<tr><td>
+
+[EulerAngleOrder](doc/markdown/./base.eulerangleorder.md)
+
+
+</td><td>
+
+Euler angle order type
+
+
+</td></tr>
+<tr><td>
+
+[EventListener\_2](doc/markdown/./base.eventlistener_2.md)
+
+
+</td><td>
+
+Event handler type
+
+
+</td></tr>
+<tr><td>
+
+[EventMap](doc/markdown/./base.eventmap.md)
+
+
+</td><td>
+
+Mapping table of event types and their constructors
+
+
+</td></tr>
+<tr><td>
+
+[ExtractMixinReturnType](doc/markdown/./base.extractmixinreturntype.md)
+
+
+</td><td>
+
+Extract mixin return type
+
+
+</td></tr>
+<tr><td>
+
+[ExtractMixinType](doc/markdown/./base.extractmixintype.md)
+
+
+</td><td>
+
+Extract mixin type
+
+
+</td></tr>
+<tr><td>
+
+[GenericConstructor](doc/markdown/./base.genericconstructor.md)
+
+
+</td><td>
+
+A generic constructor type
+
+
+</td></tr>
+<tr><td>
+
+[InterpolateData](doc/markdown/./base.interpolatedata.md)
+
+
+</td><td>
+
+Type of input/output values
+
+
+</td></tr>
+<tr><td>
+
+[InterpolationMode](doc/markdown/./base.interpolationmode.md)
+
+
+</td><td>
+
+The interpolation mode
+
+
+</td></tr>
+<tr><td>
+
+[InterpolationTarget](doc/markdown/./base.interpolationtarget.md)
+
+
+</td><td>
+
+Target of interpolation
+
+
+</td></tr>
+<tr><td>
+
+[MaybeArray](doc/markdown/./base.maybearray.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[PackRect](doc/markdown/./base.packrect.md)
+
+
+</td><td>
+
+The type of packed result.
+
+
+</td></tr>
+<tr><td>
+
+[REventHandlerOptions](doc/markdown/./base.reventhandleroptions.md)
+
+
+</td><td>
+
+Options of event handler
+
+
+</td></tr>
+<tr><td>
+
+[Truthy](doc/markdown/./base.truthy.md)
+
+
+</td><td>
+
+Generic Truthy type
+
+
+</td></tr>
+<tr><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+Typed array
+
+
+</td></tr>
+<tr><td>
+
+[TypedArrayConstructor](doc/markdown/./base.typedarrayconstructor.md)
+
+
+</td><td>
+
+Type of a typed array constructor
+
+
+</td></tr>
+<tr><td>
+
+[UnionToIntersection](doc/markdown/./base.uniontointersection.md)
+
+
+</td><td>
+
+Convert union type to intersection
+
+
+</td></tr>
+</tbody></table>
 

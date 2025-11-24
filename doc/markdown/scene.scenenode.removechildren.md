@@ -4,7 +4,7 @@
 
 ## SceneNode.removeChildren() method
 
-Removes all children from this node
+Remove all children from this node.
 
 **Signature:**
 

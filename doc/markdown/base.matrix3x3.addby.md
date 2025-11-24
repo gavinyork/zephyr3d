@@ -9,18 +9,48 @@ Add a matrix to this matrix component-wise.
 **Signature:**
 
 ```typescript
-addBy(other: Matrix3x3): Matrix3x3;
+addBy(other: Matrix3x3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | The matrix that will be added. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+The matrix that will be added.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+this
 
 self
 

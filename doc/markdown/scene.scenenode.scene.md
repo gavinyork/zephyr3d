@@ -4,7 +4,7 @@
 
 ## SceneNode.scene property
 
-The scene to which the node belongs
+The owning scene.
 
 **Signature:**
 

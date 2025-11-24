@@ -4,7 +4,7 @@
 
 ## Terrain.getName() method
 
-Gets name of the drawable object
+Gets the display name of the drawable object (for debugging/UI).
 
 **Signature:**
 

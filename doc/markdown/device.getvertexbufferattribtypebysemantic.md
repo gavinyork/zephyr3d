@@ -14,10 +14,55 @@ declare function getVertexBufferAttribTypeBySemantic(vertexBufferType: PBStructT
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vertexBufferType | [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) | The structure type of the vertex buffer |
-|  semantic | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The vertex semantic |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vertexBufferType
+
+
+</td><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+The structure type of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

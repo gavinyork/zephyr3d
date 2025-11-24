@@ -14,10 +14,55 @@ transformPoint(point: Vector3, result?: Vector4): Vector4;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  point | [Vector3](doc/markdown/./base.vector3.md) | The point to be transformed. |
-|  result | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ The output vector, if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+point
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point to be transformed.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector, if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

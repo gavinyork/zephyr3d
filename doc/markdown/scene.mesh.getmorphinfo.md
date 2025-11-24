@@ -4,14 +4,14 @@
 
 ## Mesh.getMorphInfo() method
 
-Gets the morph information buffer
+Returns the morph information buffer (weights, ranges, etc.).
 
 **Signature:**
 
 ```typescript
-getMorphInfo(): GPUDataBuffer<unknown>;
+getMorphInfo(): MorphInfo;
 ```
 **Returns:**
 
-[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)<!-- -->&lt;unknown&gt;
+[MorphInfo](doc/markdown/./scene.morphinfo.md)
 

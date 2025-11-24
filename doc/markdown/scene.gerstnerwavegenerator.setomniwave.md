@@ -14,10 +14,55 @@ setOmniWave(waveIndex: number, isOmni: boolean): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  waveIndex | number | index of the wave to set. |
-|  isOmni | boolean | true if the wave is an omni-directional wave, false otherwise. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+waveIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the wave to set.
+
+
+</td></tr>
+<tr><td>
+
+isOmni
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the wave is an omni-directional wave, false otherwise.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

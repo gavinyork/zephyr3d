@@ -9,18 +9,48 @@ Set the component values to the minimum of this vector and another vector.
 **Signature:**
 
 ```typescript
-inplaceMin(other: Vector3): Vector3;
+inplaceMin(other: Vector3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Vector3](doc/markdown/./base.vector3.md) | The vector that to be compared with. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The vector that to be compared with.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector3](doc/markdown/./base.vector3.md)
+this
 
 self
 

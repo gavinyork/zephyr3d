@@ -9,20 +9,80 @@ Set component values and then normalize the vector.
 **Signature:**
 
 ```typescript
-setAndNormalize(x: number, y: number, z: number): Vector3;
+setAndNormalize(x: number, y: number, z: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  x | number | The x component value. |
-|  y | number | The y component value. |
-|  z | number | The z component value. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The x component value.
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The y component value.
+
+
+</td></tr>
+<tr><td>
+
+z
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The z component value.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector3](doc/markdown/./base.vector3.md)
+this
 
 self
 

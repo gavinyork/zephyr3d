@@ -14,10 +14,94 @@ interface MaterialTextureInfo
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [sampler](doc/markdown/./scene.materialtextureinfo.sampler.md) |  | [TextureSampler](doc/markdown/./device.texturesampler.md) |  |
-|  [texCoord](doc/markdown/./scene.materialtextureinfo.texcoord.md) |  | number |  |
-|  [texture](doc/markdown/./scene.materialtextureinfo.texture.md) |  | [Texture2D](doc/markdown/./device.texture2d.md) |  |
-|  [transform](doc/markdown/./scene.materialtextureinfo.transform.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[sampler](doc/markdown/./scene.materialtextureinfo.sampler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[texCoord](doc/markdown/./scene.materialtextureinfo.texcoord.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[texture](doc/markdown/./scene.materialtextureinfo.texture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[transform](doc/markdown/./scene.materialtextureinfo.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

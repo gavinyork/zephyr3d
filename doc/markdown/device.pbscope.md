@@ -15,19 +15,200 @@ declare class PBScope extends Proxiable<PBScope>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [$builder](doc/markdown/./device.pbscope._builder.md) | <code>readonly</code> | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | Get the program builder |
-|  [$builtins](doc/markdown/./device.pbscope._builtins.md) | <code>readonly</code> | [PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md) | Returns the scope of the builtin variables |
-|  [$g](doc/markdown/./device.pbscope._g.md) | <code>readonly</code> | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | Get the global scope |
-|  [$inputs](doc/markdown/./device.pbscope._inputs.md) | <code>readonly</code> | [PBInputScope](doc/markdown/./device.pbinputscope.md) | Returns the scope of the input variables |
-|  [$l](doc/markdown/./device.pbscope._l.md) | <code>readonly</code> | [PBLocalScope](doc/markdown/./device.pblocalscope.md) | Get the current local scope |
-|  [$outputs](doc/markdown/./device.pbscope._outputs.md) | <code>readonly</code> | [PBOutputScope](doc/markdown/./device.pboutputscope.md) | Returns the scope of the output variables |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$builder](doc/markdown/./device.pbscope._builder.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+Get the program builder
+
+
+</td></tr>
+<tr><td>
+
+[$builtins](doc/markdown/./device.pbscope._builtins.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md)
+
+
+</td><td>
+
+Returns the scope of the builtin variables
+
+
+</td></tr>
+<tr><td>
+
+[$g](doc/markdown/./device.pbscope._g.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+Get the global scope
+
+
+</td></tr>
+<tr><td>
+
+[$inputs](doc/markdown/./device.pbscope._inputs.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBInputScope](doc/markdown/./device.pbinputscope.md)
+
+
+</td><td>
+
+Returns the scope of the input variables
+
+
+</td></tr>
+<tr><td>
+
+[$l](doc/markdown/./device.pbscope._l.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBLocalScope](doc/markdown/./device.pblocalscope.md)
+
+
+</td><td>
+
+Get the current local scope
+
+
+</td></tr>
+<tr><td>
+
+[$outputs](doc/markdown/./device.pbscope._outputs.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBOutputScope](doc/markdown/./device.pboutputscope.md)
+
+
+</td><td>
+
+Returns the scope of the output variables
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [$getVertexAttrib(semantic)](doc/markdown/./device.pbscope._getvertexattrib.md) |  | Get the input vertex attribute by specified semantic |
-|  [$query(name)](doc/markdown/./device.pbscope._query.md) |  | Query the global variable by the name |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$getVertexAttrib(semantic)](doc/markdown/./device.pbscope._getvertexattrib.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the input vertex attribute by specified semantic
+
+
+</td></tr>
+<tr><td>
+
+[$query(name)](doc/markdown/./device.pbscope._query.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Query the global variable by the name
+
+
+</td></tr>
+</tbody></table>
 

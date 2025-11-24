@@ -4,7 +4,7 @@
 
 ## OctreeNode.getLevel() method
 
-Gets the level index of the octree node
+Get the hierarchical level index of this node.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getLevel(): number;
 
 number
 
-The level index
+The level index of this octree node.
+
+## Remarks
+
+Level 0 is the root chunk; higher levels are finer subdivisions.
 

@@ -14,11 +14,71 @@ declare function getVertexAttribFormat(semantic: VertexSemantic, type: DataType,
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  semantic | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The vertex semantic |
-|  type | [DataType](doc/markdown/./device.datatype.md) | Data type of vertex component |
-|  count | number | The count of vertex components |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+[DataType](doc/markdown/./device.datatype.md)
+
+
+</td><td>
+
+Data type of vertex component
+
+
+</td></tr>
+<tr><td>
+
+count
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The count of vertex components
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

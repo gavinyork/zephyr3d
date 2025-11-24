@@ -9,13 +9,74 @@ Creates an instance of EnvIBL
 **Signature:**
 
 ```typescript
-constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array);
+constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer, irradianceSHFB?: FrameBuffer);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  radianceMap | [TextureCube](doc/markdown/./device.texturecube.md) | _(Optional)_ The radiance map |
-|  irradianceSH | ([Vector4](doc/markdown/./base.vector4.md) \| [Vector3](doc/markdown/./base.vector3.md)<!-- -->)\[\] \| Float32Array | _(Optional)_ The irradiance SH |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+radianceMap
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+_(Optional)_ The radiance map
+
+
+</td></tr>
+<tr><td>
+
+irradianceSH
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+_(Optional)_ The irradiance SH
+
+
+</td></tr>
+<tr><td>
+
+irradianceSHFB
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

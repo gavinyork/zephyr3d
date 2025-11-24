@@ -14,12 +14,105 @@ declare enum PBAddressSpace
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  FUNCTION | <code>&quot;function&quot;</code> |  |
-|  PRIVATE | <code>&quot;private&quot;</code> |  |
-|  STORAGE | <code>&quot;storage&quot;</code> |  |
-|  UNIFORM | <code>&quot;uniform&quot;</code> |  |
-|  UNKNOWN | <code>&quot;unknown&quot;</code> |  |
-|  WORKGROUP | <code>&quot;workgroup&quot;</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+FUNCTION
+
+
+</td><td>
+
+`"function"`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PRIVATE
+
+
+</td><td>
+
+`"private"`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+STORAGE
+
+
+</td><td>
+
+`"storage"`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+UNIFORM
+
+
+</td><td>
+
+`"uniform"`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+UNKNOWN
+
+
+</td><td>
+
+`"unknown"`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+WORKGROUP
+
+
+</td><td>
+
+`"workgroup"`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

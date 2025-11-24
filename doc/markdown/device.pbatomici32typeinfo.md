@@ -15,14 +15,83 @@ declare class PBAtomicI32TypeInfo extends PBTypeInfo<null>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.pbatomici32typeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBAtomicI32TypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.pbatomici32typeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBAtomicI32TypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [haveAtomicMembers()](doc/markdown/./device.pbatomici32typeinfo.haveatomicmembers.md) |  | returns true if this is a pointer type |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbatomici32typeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[haveAtomicMembers()](doc/markdown/./device.pbatomici32typeinfo.haveatomicmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a pointer type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbatomici32typeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

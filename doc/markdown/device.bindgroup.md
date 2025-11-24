@@ -15,17 +15,115 @@ interface BindGroup extends GPUObject<unknown>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [getBuffer(name)](doc/markdown/./device.bindgroup.getbuffer.md) |  |
-|  [getDynamicOffsets()](doc/markdown/./device.bindgroup.getdynamicoffsets.md) |  |
-|  [getGPUId()](doc/markdown/./device.bindgroup.getgpuid.md) |  |
-|  [getLayout()](doc/markdown/./device.bindgroup.getlayout.md) |  |
-|  [getTexture(name)](doc/markdown/./device.bindgroup.gettexture.md) |  |
-|  [setBuffer(name, buffer, offset, bindOffset, bindSize)](doc/markdown/./device.bindgroup.setbuffer.md) |  |
-|  [setRawData(name, byteOffset, data, srcPos, srcLength)](doc/markdown/./device.bindgroup.setrawdata.md) |  |
-|  [setSampler(name, sampler)](doc/markdown/./device.bindgroup.setsampler.md) |  |
-|  [setTexture(name, texture, sampler)](doc/markdown/./device.bindgroup.settexture.md) |  |
-|  [setTextureView(name, value, level, face, mipCount, sampler)](doc/markdown/./device.bindgroup.settextureview.md) |  |
-|  [setValue(name, value)](doc/markdown/./device.bindgroup.setvalue.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getBuffer(name, nocreate)](doc/markdown/./device.bindgroup.getbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getDynamicOffsets()](doc/markdown/./device.bindgroup.getdynamicoffsets.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getGPUId()](doc/markdown/./device.bindgroup.getgpuid.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getLayout()](doc/markdown/./device.bindgroup.getlayout.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getTexture(name)](doc/markdown/./device.bindgroup.gettexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setBuffer(name, buffer, offset, bindOffset, bindSize)](doc/markdown/./device.bindgroup.setbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setRawData(name, byteOffset, data, srcPos, srcLength)](doc/markdown/./device.bindgroup.setrawdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setSampler(name, sampler)](doc/markdown/./device.bindgroup.setsampler.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setTexture(name, texture, sampler)](doc/markdown/./device.bindgroup.settexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setTextureView(name, value, level, face, mipCount, sampler)](doc/markdown/./device.bindgroup.settextureview.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setValue(name, value)](doc/markdown/./device.bindgroup.setvalue.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

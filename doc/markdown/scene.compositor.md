@@ -14,16 +14,97 @@ declare class Compositor
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.compositor._constructor_.md) |  | Creates an instance of Compositor |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.compositor._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of Compositor
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [appendPostEffect(postEffect)](doc/markdown/./scene.compositor.appendposteffect.md) |  | Adds a posteffect |
-|  [clear()](doc/markdown/./scene.compositor.clear.md) |  | Removes all post effects |
-|  [getPostEffects()](doc/markdown/./scene.compositor.getposteffects.md) |  | Gets all post effects |
-|  [removePostEffect(postEffect)](doc/markdown/./scene.compositor.removeposteffect.md) |  | Removes a posteffect that was previously added |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[appendPostEffect(postEffect)](doc/markdown/./scene.compositor.appendposteffect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds a posteffect
+
+
+</td></tr>
+<tr><td>
+
+[clear()](doc/markdown/./scene.compositor.clear.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes all post effects
+
+
+</td></tr>
+<tr><td>
+
+[removePostEffect(postEffect)](doc/markdown/./scene.compositor.removeposteffect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes a posteffect that was previously added
+
+
+</td></tr>
+</tbody></table>
 

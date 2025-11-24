@@ -1,87 +1,97 @@
-import { Interpolator, Matrix4x4, Vector3 } from '@zephyr3d/base';
+import { HttpFS, Interpolator, Matrix4x4, Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   OrbitCameraController,
   Application,
   PerspectiveCamera,
-  AnimationSet,
-  AnimationClip,
-  AssetManager,
-  AnimationTrack
+  AnimationTrack,
+  getInput,
+  getEngine,
+  DirectionalLight
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
+// Custom animation track for UV animation
 class MyAnimationTrack extends AnimationTrack {
+  // Track state, a Float32Array of length 1 storing the UV offset
   _state;
+  // Interpolator used for keyframe interpolation
+  _interpolator;
   constructor(interpolator) {
-    super(interpolator);
-    this._state = new Float32Array(2);
+    super();
+    this._interpolator = interpolator;
+    this._state = new Float32Array(1);
   }
-  calculateState(currentTime) {
+  // Calculate the track state at the given time
+  calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }
+  // If more than one track affects the same node, mix their states
   mixState(a, b, t) {
-    const result = new Float32Array(2);
+    const result = new Float32Array(1);
     result[0] = a[0] + (b[0] - a[0]) * t;
-    result[1] = a[1] + (b[1] - a[1]) * t;
     return result;
   }
-  applyState(node, state) {
-    node.iterate((node) => {
+  // Apply the track state to the target node
+  applyState(target, state) {
+    target.iterate((node) => {
       if (node.isMesh()) {
         const material = /** @type {import('@zephyr3d/scene').PBRMetallicRoughnessMaterial} */ (
           node.material
         );
         material.albedoTexCoordMatrix = Matrix4x4.translation(new Vector3(state[0], 0, 0));
-        material.opacity = state[1];
       }
     });
   }
+  // BlendId for this track type, tracks with the same BlendId can be blended together
   getBlendId() {
-    return 'uv_and_opacity';
+    return 'uv_animation';
+  }
+  // Duration of the animation track
+  getDuration() {
+    return this._interpolator.maxTime;
   }
 }
 
 const myApp = new Application({
   backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-26')
+  }
 });
 
 myApp.ready().then(async () => {
   const scene = new Scene();
-  const assetManager = new AssetManager();
-  const model = await assetManager.fetchModel(scene, 'assets/models/BoxTextured.glb');
-  const animationSet = new AnimationSet(scene, model.group);
-  const animation = new AnimationClip('UserTrackTest');
-  const interpolator = new Interpolator(
-    'linear',
-    null,
-    new Float32Array([0, 1, 2]),
-    new Float32Array([0, 0.9, 0.5, 0, 1, 0.9])
+
+  // Create directional light
+  const light = new DirectionalLight(scene);
+  light.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
+
+  // Load model
+  const model = await getEngine().resourceManager.instantiatePrefab(
+    scene.rootNode,
+    '/assets/BoxTextured.zprefab'
   );
+  // Create an animation
+  const animation = model.animationSet.createAnimation('UserTrackTest');
+  // Create an interpolator storing keyframes for the custom animation
+  const interpolator = new Interpolator('linear', null, new Float32Array([0, 2]), new Float32Array([0, 1]));
+  // Create custom track using the keyframe data and add it to the animation
   const track = new MyAnimationTrack(interpolator);
-  animation.addTrack(model.group, track);
-  animationSet.add(animation);
-  animationSet.playAnimation('UserTrackTest');
+  animation.addTrack(model, track);
+  // Start playing the animation
+  model.animationSet.playAnimation('UserTrackTest');
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
-  camera.lookAt(new Vector3(0, 3, 8), Vector3.zero(), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
+  scene.mainCamera.lookAt(new Vector3(0, 1, 2), Vector3.zero(), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('tick', () => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

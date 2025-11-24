@@ -4,19 +4,49 @@
 
 ## Material.isTransparentPass() method
 
-Returns true if given pass is transparent
+Whether the given pass is transparent.
+
+Used to place draw calls into appropriate render queues and set blending states.
 
 **Signature:**
 
 ```typescript
-isTransparentPass(pass: number): boolean;
+isTransparentPass(_pass: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

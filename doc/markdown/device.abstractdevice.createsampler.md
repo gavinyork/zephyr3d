@@ -14,11 +14,43 @@ createSampler(options: SamplerOptions): TextureSampler;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [SamplerOptions](doc/markdown/./device.sampleroptions.md) | The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[SamplerOptions](doc/markdown/./device.sampleroptions.md)
+
+
+</td><td>
+
+The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [TextureSampler](doc/markdown/./device.texturesampler.md)
+
+The created texture sampler
 

@@ -6,8 +6,38 @@
 
 ## Variables
 
-|  Variable | Description |
-|  --- | --- |
-|  [backendWebGL1](doc/markdown/./backend-webgl.backendwebgl1.md) | The WebGL1 backend |
-|  [backendWebGL2](doc/markdown/./backend-webgl.backendwebgl2.md) | The WebGL2 backend |
+<table><thead><tr><th>
+
+Variable
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[backendWebGL1](doc/markdown/./backend-webgl.backendwebgl1.md)
+
+
+</td><td>
+
+The WebGL1 backend
+
+
+</td></tr>
+<tr><td>
+
+[backendWebGL2](doc/markdown/./backend-webgl.backendwebgl2.md)
+
+
+</td><td>
+
+The WebGL2 backend
+
+
+</td></tr>
+</tbody></table>
 

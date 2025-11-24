@@ -12,10 +12,53 @@ setPickTarget(node: SceneNode, label?: string): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [SceneNode](doc/markdown/./scene.scenenode.md) |  |
-|  label | string | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+node
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+label
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,24 +4,52 @@
 
 ## OrbitCameraController.\_onMouseUp() method
 
-Mouse up event handler
+Pointer up handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
 /** @override */
-protected _onMouseUp(evt: PointerEvent): boolean;
+protected _onMouseUp(evt: IControllerPointerUpEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | PointerEvent | Mouse event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+evt
+
+
+</td><td>
+
+[IControllerPointerUpEvent](doc/markdown/./scene.icontrollerpointerupevent.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

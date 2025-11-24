@@ -14,8 +14,53 @@ constructor(layout: UniformBufferLayout, buffer?: StructuredBuffer | ArrayBuffer
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  layout | [UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md) | Layout of the structure |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) \| ArrayBuffer | _(Optional)_ Buffer that holds the data |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+layout
+
+
+</td><td>
+
+[UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md)
+
+
+</td><td>
+
+Layout of the structure
+
+
+</td></tr>
+<tr><td>
+
+buffer
+
+
+</td><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md) \| ArrayBuffer
+
+
+</td><td>
+
+_(Optional)_ Buffer that holds the data
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,7 +14,37 @@ constructor(options?: FPSCameraControllerOptions);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 

@@ -12,16 +12,135 @@ updateFromElement(data: TextureImageElement, xOffset: number, yOffset: number, l
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TextureImageElement](doc/markdown/./device.textureimageelement.md) |  |
-|  xOffset | number |  |
-|  yOffset | number |  |
-|  layerIndex | number |  |
-|  x | number |  |
-|  y | number |  |
-|  width | number |  |
-|  height | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+xOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+yOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+layerIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

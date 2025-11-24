@@ -14,11 +14,71 @@ static scale(a: Vector3, b: number, result?: Vector3): Vector3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Vector3](doc/markdown/./base.vector3.md) | The vector to be scaled. |
-|  b | number | The scalar number. |
-|  result | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output vector (can be the same vector as a). if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The vector to be scaled.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The scalar number.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector (can be the same vector as a). if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

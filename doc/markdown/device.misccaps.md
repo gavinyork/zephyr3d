@@ -14,11 +14,121 @@ interface MiscCaps
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [maxBindGroups](doc/markdown/./device.misccaps.maxbindgroups.md) |  | number | The maximum number of [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->'s in a shader program |
-|  [maxTexCoordIndex](doc/markdown/./device.misccaps.maxtexcoordindex.md) |  | number | The maximum number of texture coordinate index |
-|  [support32BitIndex](doc/markdown/./device.misccaps.support32bitindex.md) |  | boolean | True if the device supports 32-bits index buffer |
-|  [supportBlendMinMax](doc/markdown/./device.misccaps.supportblendminmax.md) |  | boolean | True if the device supports minimum and maximum blending equations |
-|  [supportOversizedViewport](doc/markdown/./device.misccaps.supportoversizedviewport.md) |  | boolean | True if the device supports oversized viewport |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[maxBindGroups](doc/markdown/./device.misccaps.maxbindgroups.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum number of [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->'s in a shader program
+
+
+</td></tr>
+<tr><td>
+
+[maxTexCoordIndex](doc/markdown/./device.misccaps.maxtexcoordindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum number of texture coordinate index
+
+
+</td></tr>
+<tr><td>
+
+[support32BitIndex](doc/markdown/./device.misccaps.support32bitindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the device supports 32-bits index buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportBlendMinMax](doc/markdown/./device.misccaps.supportblendminmax.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the device supports minimum and maximum blending equations
+
+
+</td></tr>
+<tr><td>
+
+[supportOversizedViewport](doc/markdown/./device.misccaps.supportoversizedviewport.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the device supports oversized viewport
+
+
+</td></tr>
+</tbody></table>
 

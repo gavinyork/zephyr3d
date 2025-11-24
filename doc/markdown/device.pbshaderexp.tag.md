@@ -14,9 +14,39 @@ tag(...args: ShaderExpTagValue[]): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  args | [ShaderExpTagValue](doc/markdown/./device.shaderexptagvalue.md)<!-- -->\[\] | tags |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+args
+
+
+</td><td>
+
+[ShaderExpTagValue](doc/markdown/./device.shaderexptagvalue.md)<!-- -->\[\]
+
+
+</td><td>
+
+tags
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

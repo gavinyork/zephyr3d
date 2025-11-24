@@ -14,11 +14,71 @@ static fromAxisAngle(axis: Vector3, angle: number, result?: Quaternion): Quatern
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  axis | [Vector3](doc/markdown/./base.vector3.md) | The rotation axis. |
-|  angle | number | The rotate angle. |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion, if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+axis
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The rotation axis.
+
+
+</td></tr>
+<tr><td>
+
+angle
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The rotate angle.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion, if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

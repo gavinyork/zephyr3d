@@ -15,7 +15,45 @@ interface AssetPBRMaterialCommon extends AssetUnlitMaterial
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [ior?](doc/markdown/./scene.assetpbrmaterialcommon.ior.md) |  | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ior?](doc/markdown/./scene.assetpbrmaterialcommon.ior.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

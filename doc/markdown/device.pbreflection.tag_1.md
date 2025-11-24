@@ -14,10 +14,55 @@ tag(name: string, getter: PBReflectionTagGetter): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | The tag name |
-|  getter | [PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md) | The getter function |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The tag name
+
+
+</td></tr>
+<tr><td>
+
+getter
+
+
+</td><td>
+
+[PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md)
+
+
+</td><td>
+
+The getter function
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

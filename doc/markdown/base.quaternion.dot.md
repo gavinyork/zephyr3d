@@ -14,10 +14,55 @@ static dot(a: Quaternion, b: Quaternion): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Quaternion](doc/markdown/./base.quaternion.md) | The first operand. |
-|  b | [Quaternion](doc/markdown/./base.quaternion.md) | The second operand. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

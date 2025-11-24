@@ -14,9 +14,39 @@ $do(body: (this: PBDoWhileScope) => void): PBDoWhileScope;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  body | (this: [PBDoWhileScope](doc/markdown/./device.pbdowhilescope.md)<!-- -->) =&gt; void | Generator function for the scope that inside the do..while statment |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBDoWhileScope](doc/markdown/./device.pbdowhilescope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Generator function for the scope that inside the do..while statment
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

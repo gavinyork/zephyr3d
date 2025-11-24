@@ -9,18 +9,48 @@ Creates a new bounding volume by tranforming this bounding volume by a matrix
 **Signature:**
 
 ```typescript
-transform(matrix: Matrix4x4): BoundingVolume;
+transform(matrix: Matrix4x4): BoundingBox;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The transform matrix
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[BoundingVolume](doc/markdown/./scene.boundingvolume.md)
+[BoundingBox](doc/markdown/./scene.boundingbox.md)
 
 The created bounding volume
 

@@ -4,7 +4,7 @@
 
 ## DrawContext.depthTexture property
 
-Depth texture
+Scene (non-linear) depth texture bound for sampling.
 
 **Signature:**
 

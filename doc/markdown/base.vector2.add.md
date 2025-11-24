@@ -14,11 +14,71 @@ static add(a: Vector2, b: Vector2, result?: Vector2): Vector2;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Vector2](doc/markdown/./base.vector2.md) | The first operand. |
-|  b | [Vector2](doc/markdown/./base.vector2.md) | The second operand. |
-|  result | [Vector2](doc/markdown/./base.vector2.md) | _(Optional)_ The output vector (can be the same vector as a or b). if not specified, a new vector will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+_(Optional)_ The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

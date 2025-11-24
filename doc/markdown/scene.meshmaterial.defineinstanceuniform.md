@@ -4,22 +4,91 @@
 
 ## MeshMaterial.defineInstanceUniform() method
 
-Define instance uniform index
+Define a per-instance uniform for this class.
+
+Returns a compact index encoding the vector index and component offset, which can be used in shader code via `getInstancedUniform(...)`<!-- -->.
 
 **Signature:**
 
 ```typescript
-static defineInstanceUniform(prop: string, type: InstanceUniformType): number;
+static defineInstanceUniform(prop: string, type: InstanceUniformType, name?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  prop | string |  |
-|  type | InstanceUniformType |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+prop
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Property name exposed on instances.
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+InstanceUniformType
+
+
+</td><td>
+
+Uniform data type.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 number
+
+Encoded index for use in `getInstancedUniform`<!-- -->.
+
+## Exceptions
+
+If the property is already defined or type is invalid.
 

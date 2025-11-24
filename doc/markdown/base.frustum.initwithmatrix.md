@@ -14,9 +14,39 @@ initWithMatrix(transform: Matrix4x4): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  transform | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | Model-view matrix used to initialize the frustum |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+transform
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+Model-view matrix used to initialize the frustum
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

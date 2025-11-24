@@ -4,7 +4,7 @@
 
 ## Mesh.isMesh() method
 
-true if this is a mesh node, false otherwise
+Type guard: true if this node is a mesh.
 
 **Signature:**
 

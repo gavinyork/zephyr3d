@@ -14,7 +14,37 @@ constructor(array: Float32Array);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  array | Float32Array | Float32Array object that contains the values. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+array
+
+
+</td><td>
+
+Float32Array
+
+
+</td><td>
+
+Float32Array object that contains the values.
+
+
+</td></tr>
+</tbody></table>
 

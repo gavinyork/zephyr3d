@@ -14,9 +14,39 @@ addSkeleton(skeleton: AssetSkeleton): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  skeleton | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | The skeleton to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+skeleton
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)
+
+
+</td><td>
+
+The skeleton to be added
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

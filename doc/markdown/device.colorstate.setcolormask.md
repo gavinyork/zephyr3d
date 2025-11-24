@@ -14,12 +14,87 @@ setColorMask(r: boolean, g: boolean, b: boolean, a: boolean): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  r | boolean | true if writing to the red channel is allowed |
-|  g | boolean | true if writing to the green channel is allowed |
-|  b | boolean | true if writing to the blue channel is allowed |
-|  a | boolean | true if writing to the alpha channel is allowed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+r
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if writing to the red channel is allowed
+
+
+</td></tr>
+<tr><td>
+
+g
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if writing to the green channel is allowed
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if writing to the blue channel is allowed
+
+
+</td></tr>
+<tr><td>
+
+a
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if writing to the alpha channel is allowed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

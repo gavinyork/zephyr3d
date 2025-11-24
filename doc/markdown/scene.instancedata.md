@@ -14,10 +14,94 @@ interface InstanceData
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindGroup](doc/markdown/./scene.instancedata.bindgroup.md) |  | CachedBindGroup |  |
-|  [numInstances](doc/markdown/./scene.instancedata.numinstances.md) |  | number |  |
-|  [offset](doc/markdown/./scene.instancedata.offset.md) |  | number |  |
-|  [stride](doc/markdown/./scene.instancedata.stride.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindGroup](doc/markdown/./scene.instancedata.bindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+CachedBindGroup
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[numInstances](doc/markdown/./scene.instancedata.numinstances.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[offset](doc/markdown/./scene.instancedata.offset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[stride](doc/markdown/./scene.instancedata.stride.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

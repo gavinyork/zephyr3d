@@ -4,7 +4,7 @@
 
 ## DrawContext.renderPass property
 
-The render pass to which the current drawing task belongs
+The render pass to which this drawing task belongs.
 
 **Signature:**
 

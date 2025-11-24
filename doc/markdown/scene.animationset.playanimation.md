@@ -4,7 +4,9 @@
 
 ## AnimationSet.playAnimation() method
 
-Starts playing an animation of the model
+Start (or update) playback of an animation clip.
+
+Behavior: - If the clip is already playing, updates its fade-in (resets fade-out). - Otherwise initializes playback state (repeat counter, speed, weight, initial time). - Registers clip tracks and skeletons into the active sets for blending and application.
 
 **Signature:**
 
@@ -14,10 +16,55 @@ playAnimation(name: string, options?: PlayAnimationOptions): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the animation to play |
-|  options | [PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md) | _(Optional)_ Playing options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the animation to play.
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Playback options (repeat, speedRatio, fadeIn).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

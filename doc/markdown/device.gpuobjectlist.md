@@ -14,13 +14,159 @@ interface GPUObjectList
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindGroups](doc/markdown/./device.gpuobjectlist.bindgroups.md) |  | [BindGroup](doc/markdown/./device.bindgroup.md)<!-- -->\[\] | list of bind groups |
-|  [buffers](doc/markdown/./device.gpuobjectlist.buffers.md) |  | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)<!-- -->\[\] | list of buffers |
-|  [framebuffers](doc/markdown/./device.gpuobjectlist.framebuffers.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->\[\] | list of frame buffers |
-|  [programs](doc/markdown/./device.gpuobjectlist.programs.md) |  | [GPUProgram](doc/markdown/./device.gpuprogram.md)<!-- -->\[\] | list of programs |
-|  [samplers](doc/markdown/./device.gpuobjectlist.samplers.md) |  | [TextureSampler](doc/markdown/./device.texturesampler.md)<!-- -->\[\] | list of samplers |
-|  [textures](doc/markdown/./device.gpuobjectlist.textures.md) |  | [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->\[\] | list of textures |
-|  [vertexArrayObjects](doc/markdown/./device.gpuobjectlist.vertexarrayobjects.md) |  | [VertexLayout](doc/markdown/./device.vertexlayout.md)<!-- -->\[\] | list of vertex layouts |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindGroups](doc/markdown/./device.gpuobjectlist.bindgroups.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of bind groups
+
+
+</td></tr>
+<tr><td>
+
+[buffers](doc/markdown/./device.gpuobjectlist.buffers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of buffers
+
+
+</td></tr>
+<tr><td>
+
+[framebuffers](doc/markdown/./device.gpuobjectlist.framebuffers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of frame buffers
+
+
+</td></tr>
+<tr><td>
+
+[programs](doc/markdown/./device.gpuobjectlist.programs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[GPUProgram](doc/markdown/./device.gpuprogram.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of programs
+
+
+</td></tr>
+<tr><td>
+
+[samplers](doc/markdown/./device.gpuobjectlist.samplers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of samplers
+
+
+</td></tr>
+<tr><td>
+
+[textures](doc/markdown/./device.gpuobjectlist.textures.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of textures
+
+
+</td></tr>
+<tr><td>
+
+[vertexArrayObjects](doc/markdown/./device.gpuobjectlist.vertexarrayobjects.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[VertexLayout](doc/markdown/./device.vertexlayout.md)<!-- -->\[\]
+
+
+</td><td>
+
+list of vertex layouts
+
+
+</td></tr>
+</tbody></table>
 

@@ -15,10 +15,77 @@ declare class VectorBase extends Float32Array
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [equalsTo(other, epsl)](doc/markdown/./base.vectorbase.equalsto.md) |  | Check if all data is close enough to another |
-|  [isNaN()](doc/markdown/./base.vectorbase.isnan.md) |  | Check the data for the presence of NaN. |
-|  [setRandom(minValue, maxValue)](doc/markdown/./base.vectorbase.setrandom.md) |  | Generate random vector |
-|  [toString()](doc/markdown/./base.vectorbase.tostring.md) |  | Convert this to string object. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[equalsTo(other, epsl)](doc/markdown/./base.vectorbase.equalsto.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if all data is close enough to another
+
+
+</td></tr>
+<tr><td>
+
+[isNaN()](doc/markdown/./base.vectorbase.isnan.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check the data for the presence of NaN.
+
+
+</td></tr>
+<tr><td>
+
+[setRandom(minValue, maxValue)](doc/markdown/./base.vectorbase.setrandom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Generate random vector
+
+
+</td></tr>
+<tr><td>
+
+[toString()](doc/markdown/./base.vectorbase.tostring.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convert this to string object.
+
+
+</td></tr>
+</tbody></table>
 

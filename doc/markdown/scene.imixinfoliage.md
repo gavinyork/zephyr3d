@@ -14,7 +14,25 @@ interface IMixinFoliage
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [calculateFoliageAlbedo(scope, albedoColor, texelCoord)](doc/markdown/./scene.imixinfoliage.calculatefoliagealbedo.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[calculateFoliageAlbedo(scope, albedoColor, texelCoord)](doc/markdown/./scene.imixinfoliage.calculatefoliagealbedo.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

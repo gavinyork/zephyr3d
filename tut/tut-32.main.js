@@ -1,43 +1,42 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, AssetManager, Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d/scene';
+import {
+  Scene,
+  AssetManager,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
-  const device = myApp.device;
-
+myApp.ready().then(async () => {
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   // Load skybox texture
   const assetManager = new AssetManager();
   /** @type {import('@zephyr3d/device').TextureCube} */
-  const skyboxTexture = await assetManager.fetchTexture('assets/images/sky.dds');
+  const skyboxTexture = await assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/sky.dds');
 
   // Set the sky rendering mode to Skybox
   scene.env.sky.skyType = 'skybox';
   // Set skybox texture
   scene.env.sky.skyboxTexture = skyboxTexture;
+  // Disable height fog
+  scene.env.sky.fogType = 'none';
 
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

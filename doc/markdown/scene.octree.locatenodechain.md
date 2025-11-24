@@ -4,7 +4,7 @@
 
 ## Octree.locateNodeChain() method
 
-Locates a node chain in the octree by a sphere
+Locate the best-fit node chain for a sphere.
 
 **Signature:**
 
@@ -14,15 +14,79 @@ locateNodeChain(candidate: OctreeNode, center: Vector3, radius: number): OctreeN
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  candidate | [OctreeNode](doc/markdown/./scene.octreenode.md) | The candidate node |
-|  center | [Vector3](doc/markdown/./base.vector3.md) | center of the sphere |
-|  radius | number | radius of the sphere |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+candidate
+
+
+</td><td>
+
+[OctreeNode](doc/markdown/./scene.octreenode.md)
+
+
+</td><td>
+
+Optional current node containing the object (hint for reuse).
+
+
+</td></tr>
+<tr><td>
+
+center
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Sphere center in world coordinates.
+
+
+</td></tr>
+<tr><td>
+
+radius
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Sphere radius in world units.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-Head node of the located node chain
+The head `OctreeNode` of the located chain, or `null` if out of bounds.
+
+## Remarks
+
+- Chooses the finest level where node size is at least (4 \\<!-- -->times) radius. - Returns `null` if the sphere lies outside the current octree bounds. - If `candidate` already matches, it is returned directly.
 

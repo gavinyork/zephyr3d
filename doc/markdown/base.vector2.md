@@ -15,57 +15,734 @@ declare class Vector2 extends VectorBase
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(x, y)](doc/markdown/./base.vector2._constructor_.md) |  | Creates a new Vector2 initialized with values. |
-|  [(constructor)(elements)](doc/markdown/./base.vector2._constructor__1.md) |  | Creates a new Vector2 initialized with values in an array. |
-|  [(constructor)(array)](doc/markdown/./base.vector2._constructor__2.md) |  | Creates a new Vector2 initialized with values in a Float32Array. |
-|  [(constructor)(buffer, offset)](doc/markdown/./base.vector2._constructor__3.md) |  | Creates a new Vector2 placed on a given ArrayBuffer object. |
-|  [(constructor)()](doc/markdown/./base.vector2._constructor__4.md) |  | Creates a new Vector2 filled with zero values. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(x, y)](doc/markdown/./base.vector2._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 initialized with values.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(elements)](doc/markdown/./base.vector2._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 initialized with values in an array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(array)](doc/markdown/./base.vector2._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 initialized with values in a Float32Array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(buffer, offset)](doc/markdown/./base.vector2._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 placed on a given ArrayBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)()](doc/markdown/./base.vector2._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 filled with zero values.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [magnitude](doc/markdown/./base.vector2.magnitude.md) | <code>readonly</code> | number | Get the length of the vector. |
-|  [magnitudeSq](doc/markdown/./base.vector2.magnitudesq.md) | <code>readonly</code> | number | Get the squared length of the vector. |
-|  [x](doc/markdown/./base.vector2.x.md) |  | number | Get the x component value. |
-|  [y](doc/markdown/./base.vector2.y.md) |  | number | Get the y component value. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[magnitude](doc/markdown/./base.vector2.magnitude.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the length of the vector.
+
+
+</td></tr>
+<tr><td>
+
+[magnitudeSq](doc/markdown/./base.vector2.magnitudesq.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the squared length of the vector.
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.vector2.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the x component value.
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.vector2.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the y component value.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [abs(a, result)](doc/markdown/./base.vector2.abs.md) | <code>static</code> | Calculates the absolute values of a Vector2. |
-|  [add(a, b, result)](doc/markdown/./base.vector2.add.md) | <code>static</code> | Add two Vector2's. |
-|  [addBy(other)](doc/markdown/./base.vector2.addby.md) |  | Add a vector to this vector. |
-|  [axisNX()](doc/markdown/./base.vector2.axisnx.md) | <code>static</code> | Creates a new Vector2 pointing in the negative direction of the X axis, i.e. vec2(-1, 0) |
-|  [axisNY()](doc/markdown/./base.vector2.axisny.md) | <code>static</code> | Creates a new Vector2 pointing in the negative direction of the Y axis, i.e. vec2(0, -1) |
-|  [axisPX()](doc/markdown/./base.vector2.axispx.md) | <code>static</code> | Creates a new Vector2 pointing in the positive direction of the X axis, i.e. vec2(1, 0) |
-|  [axisPY()](doc/markdown/./base.vector2.axispy.md) | <code>static</code> | Creates a new Vector2 pointing in the positive direction of the Y axis, i.e. vec2(0, 1) |
-|  [clone()](doc/markdown/./base.vector2.clone.md) |  | Creates a new Vector2 initialized with values from this vector. |
-|  [cross(a, b)](doc/markdown/./base.vector2.cross.md) | <code>static</code> | Calculates the cross product of two Vector2's. |
-|  [distance(v1, v2)](doc/markdown/./base.vector2.distance.md) | <code>static</code> | Calculates the distance between two Vector2's. |
-|  [distanceSq(v1, v2)](doc/markdown/./base.vector2.distancesq.md) | <code>static</code> | Calculates the squared distance between two Vector2's. |
-|  [div(a, b, result)](doc/markdown/./base.vector2.div.md) | <code>static</code> | Divide two Vector2's. |
-|  [divBy(other)](doc/markdown/./base.vector2.divby.md) |  | Divide this vector by a vector. |
-|  [dot(a, b)](doc/markdown/./base.vector2.dot.md) | <code>static</code> | Calculates the dot product of two Vector2's. |
-|  [inplaceInverse()](doc/markdown/./base.vector2.inplaceinverse.md) |  | Inverse this vector inplace. |
-|  [inplaceMax(other)](doc/markdown/./base.vector2.inplacemax.md) |  | Set the component values to the maximum of this vector and another vector. |
-|  [inplaceMin(other)](doc/markdown/./base.vector2.inplacemin.md) |  | Set the component values to the minimum of this vector and another vector. |
-|  [inplaceNormalize()](doc/markdown/./base.vector2.inplacenormalize.md) |  | Normalize this vector inplace. |
-|  [inverse(v, result)](doc/markdown/./base.vector2.inverse.md) | <code>static</code> | Inverse a Vector2 |
-|  [max(a, b, result)](doc/markdown/./base.vector2.max.md) | <code>static</code> | Calculates the maximum of two Vector2's. |
-|  [min(a, b, result)](doc/markdown/./base.vector2.min.md) | <code>static</code> | Calculates the minimum of two Vector2's. |
-|  [mul(a, b, result)](doc/markdown/./base.vector2.mul.md) | <code>static</code> | Multiply two Vector2's. |
-|  [mulBy(other)](doc/markdown/./base.vector2.mulby.md) |  | Multiply this vector by a vector. |
-|  [normalize(v, result)](doc/markdown/./base.vector2.normalize.md) | <code>static</code> | Normalize a Vector2 |
-|  [one()](doc/markdown/./base.vector2.one.md) | <code>static</code> | Creates a new Vector2 initialized with one. |
-|  [scale(a, b, result)](doc/markdown/./base.vector2.scale.md) | <code>static</code> | Scale a Vector2 by a scalar number. |
-|  [scaleBy(f)](doc/markdown/./base.vector2.scaleby.md) |  | Scale this vector by a scalar number. |
-|  [setAndNormalize(x, y)](doc/markdown/./base.vector2.setandnormalize.md) |  | Set component values and then normalize the vector. |
-|  [setXY(x, y)](doc/markdown/./base.vector2.setxy.md) |  | Set component values. |
-|  [sub(a, b, result)](doc/markdown/./base.vector2.sub.md) | <code>static</code> | Subtract two Vector2's. |
-|  [subBy(other)](doc/markdown/./base.vector2.subby.md) |  | Subtract a vector from this vector. |
-|  [zero()](doc/markdown/./base.vector2.zero.md) | <code>static</code> | Creates a new Vector2 initialized with zero values. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[abs(a, result)](doc/markdown/./base.vector2.abs.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the absolute values of a Vector2.
+
+
+</td></tr>
+<tr><td>
+
+[add(a, b, result)](doc/markdown/./base.vector2.add.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Add two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[addBy(other)](doc/markdown/./base.vector2.addby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a vector to this vector.
+
+
+</td></tr>
+<tr><td>
+
+[axisNX()](doc/markdown/./base.vector2.axisnx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 pointing in the negative direction of the X axis, i.e. vec2(-1, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisNY()](doc/markdown/./base.vector2.axisny.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 pointing in the negative direction of the Y axis, i.e. vec2(0, -1)
+
+
+</td></tr>
+<tr><td>
+
+[axisPX()](doc/markdown/./base.vector2.axispx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 pointing in the positive direction of the X axis, i.e. vec2(1, 0)
+
+
+</td></tr>
+<tr><td>
+
+[axisPY()](doc/markdown/./base.vector2.axispy.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 pointing in the positive direction of the Y axis, i.e. vec2(0, 1)
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./base.vector2.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Vector2 initialized with values from this vector.
+
+
+</td></tr>
+<tr><td>
+
+[combine(a, b, t0, t1, result)](doc/markdown/./base.vector2.combine.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Combine two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[combineBy(other, t0, t1)](doc/markdown/./base.vector2.combineby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Combine a vector to this vector.
+
+
+</td></tr>
+<tr><td>
+
+[cross(a, b)](doc/markdown/./base.vector2.cross.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the cross product of two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[distance(v1, v2)](doc/markdown/./base.vector2.distance.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the distance between two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[distanceSq(v1, v2)](doc/markdown/./base.vector2.distancesq.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the squared distance between two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[div(a, b, result)](doc/markdown/./base.vector2.div.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Divide two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[divBy(other)](doc/markdown/./base.vector2.divby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Divide this vector by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[dot(a, b)](doc/markdown/./base.vector2.dot.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the dot product of two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceInverse()](doc/markdown/./base.vector2.inplaceinverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inverse this vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceMax(other)](doc/markdown/./base.vector2.inplacemax.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the component values to the maximum of this vector and another vector.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceMin(other)](doc/markdown/./base.vector2.inplacemin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the component values to the minimum of this vector and another vector.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceNormalize()](doc/markdown/./base.vector2.inplacenormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Normalize this vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inverse(v, result)](doc/markdown/./base.vector2.inverse.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Inverse a Vector2
+
+
+</td></tr>
+<tr><td>
+
+[max(a, b, result)](doc/markdown/./base.vector2.max.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the maximum of two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[min(a, b, result)](doc/markdown/./base.vector2.min.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the minimum of two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[mul(a, b, result)](doc/markdown/./base.vector2.mul.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiply two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[mulBy(other)](doc/markdown/./base.vector2.mulby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiply this vector by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[normalize(v, result)](doc/markdown/./base.vector2.normalize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Normalize a Vector2
+
+
+</td></tr>
+<tr><td>
+
+[one()](doc/markdown/./base.vector2.one.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 initialized with one.
+
+
+</td></tr>
+<tr><td>
+
+[scale(a, b, result)](doc/markdown/./base.vector2.scale.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Scale a Vector2 by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(f)](doc/markdown/./base.vector2.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scale this vector by a scalar number.
+
+
+</td></tr>
+<tr><td>
+
+[setAndNormalize(x, y)](doc/markdown/./base.vector2.setandnormalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values and then normalize the vector.
+
+
+</td></tr>
+<tr><td>
+
+[setXY(x, y)](doc/markdown/./base.vector2.setxy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set component values.
+
+
+</td></tr>
+<tr><td>
+
+[sub(a, b, result)](doc/markdown/./base.vector2.sub.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Subtract two Vector2's.
+
+
+</td></tr>
+<tr><td>
+
+[subBy(other)](doc/markdown/./base.vector2.subby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Subtract a vector from this vector.
+
+
+</td></tr>
+<tr><td>
+
+[zero()](doc/markdown/./base.vector2.zero.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a new Vector2 initialized with zero values.
+
+
+</td></tr>
+</tbody></table>
 

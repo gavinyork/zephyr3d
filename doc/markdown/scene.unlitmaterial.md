@@ -9,26 +9,145 @@ Unlit material
 **Signature:**
 
 ```typescript
-declare class UnlitMaterial extends UnlitMaterial_base 
+declare class UnlitMaterial extends UnlitMaterial_base implements Clonable<UnlitMaterial> 
 ```
 **Extends:** UnlitMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[UnlitMaterial](doc/markdown/./scene.unlitmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.unlitmaterial._constructor_.md) |  | Constructs a new instance of the <code>UnlitMaterial</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.unlitmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `UnlitMaterial` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [FEATURE\_VERTEX\_COLOR](doc/markdown/./scene.unlitmaterial.feature_vertex_color.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[FEATURE\_VERTEX\_COLOR](doc/markdown/./scene.unlitmaterial.feature_vertex_color.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [fragmentShader(scope)](doc/markdown/./scene.unlitmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope)](doc/markdown/./scene.unlitmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.unlitmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.unlitmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.unlitmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

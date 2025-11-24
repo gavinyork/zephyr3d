@@ -25,7 +25,6 @@ type IMixinPBRCommon = {
     clearcoat: boolean;
     clearcoatIntensity: number;
     clearcoatRoughnessFactor: number;
-    clearcoatNormalScale: number;
     iridescence: boolean;
     iridescenceFactor: number;
     iridescenceIor: number;
@@ -33,9 +32,6 @@ type IMixinPBRCommon = {
     iridescenceThicknessMax: number;
     getCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
-    fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp): PBShaderExp;
-    distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
-    visGGX(scope: PBInsideFunctionScope, NdotV: PBShaderExp, NdotL: PBShaderExp, alphaRoughness: PBShaderExp): PBShaderExp;
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
     getF0(scope: PBInsideFunctionScope): PBShaderExp;
@@ -53,7 +49,7 @@ type IMixinPBRCommon = {
     'thickness',
     'iridescence',
     'iridescenceThickness'
-]>;
+]> & IMixinPBRBRDF;
 ```
 **References:** [Vector3](doc/markdown/./base.vector3.md)<!-- -->, [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)<!-- -->, [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)
 

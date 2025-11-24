@@ -8,7 +8,9 @@ import {
   Mesh,
   DirectionalLight,
   TorusShape,
-  PBRMetallicRoughnessMaterial
+  PBRMetallicRoughnessMaterial,
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -17,8 +19,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -30,41 +30,36 @@ myApp.ready().then(async () => {
     const material = new PBRMetallicRoughnessMaterial();
     material.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const mesh = new Mesh(scene, torusShape, material);
-    mesh.position.setRandom(-50, 50);
+    mesh.position.setRandom(-10, 10);
     mesh.rotation.fromEulerAngle(
       Math.random() * Math.PI * 2,
       Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-      'ZYX'
+      Math.random() * Math.PI * 2
     );
     mesh.pickable = true;
+    mesh.gpuPickable = true;
   }
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
-  camera.lookAt(new Vector3(0, 0, 100), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  camera.enablePicking = true;
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 20), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
 
   /** @type {*} */
   let lastPickResult;
 
-  myApp.device.canvas.addEventListener('pointermove', (ev) => {
-    camera.pickPosX = ev.offsetX;
-    camera.pickPosY = ev.offsetY;
+  let x = 0;
+  let y = 0;
+  myApp.on('pointermove', (ev) => {
+    x = ev.offsetX;
+    y = ev.offsetY;
   });
 
-  myApp.on('tick', (ev) => {
-    camera.updateController();
-    camera.render(scene);
-    camera.pickResultAsync.then((pickResult) => {
+  function picking() {
+    scene.mainCamera.pickAsync(x, y).then((pickResult) => {
       if (lastPickResult !== pickResult?.target.node) {
         if (lastPickResult) {
           lastPickResult.material.emissiveColor = Vector3.zero();
@@ -76,7 +71,9 @@ myApp.ready().then(async () => {
         }
       }
     });
-  });
+  }
+
+  myApp.on('tick', picking);
 
   myApp.run();
 });

@@ -4,7 +4,7 @@
 
 ## DrawContext.compositor property
 
-The compositor used to apply postprocessing effects
+Compositor used to apply post-processing effects at the end of the frame/pass.
 
 **Signature:**
 

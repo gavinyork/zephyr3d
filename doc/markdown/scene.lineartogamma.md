@@ -14,10 +14,55 @@ declare function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp)
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  color | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The vec3 color to be converted |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The vec3 color to be converted
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

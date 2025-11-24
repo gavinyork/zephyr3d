@@ -4,7 +4,9 @@
 
 ## Camera.clipPlane property
 
-Clip plane in camera space
+Clip plane in camera space.
+
+Setting this invalidates derived data. Shaders should respect `clipMask` and plane.
 
 **Signature:**
 

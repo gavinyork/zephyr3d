@@ -15,10 +15,178 @@ interface BoxCreationOptions extends ShapeCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [size?](doc/markdown/./scene.boxcreationoptions.size.md) |  | number | _(Optional)_ Size of all axises, default 1 |
-|  [sizeX?](doc/markdown/./scene.boxcreationoptions.sizex.md) |  | number | _(Optional)_ Size of axis x, default 1 |
-|  [sizeY?](doc/markdown/./scene.boxcreationoptions.sizey.md) |  | number | _(Optional)_ Size of axis y, default 1 |
-|  [sizeZ?](doc/markdown/./scene.boxcreationoptions.sizez.md) |  | number | _(Optional)_ Size of axis z, default 1 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[anchor?](doc/markdown/./scene.boxcreationoptions.anchor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Anchor
+
+
+</td></tr>
+<tr><td>
+
+[anchorX?](doc/markdown/./scene.boxcreationoptions.anchorx.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Anchor X
+
+
+</td></tr>
+<tr><td>
+
+[anchorY?](doc/markdown/./scene.boxcreationoptions.anchory.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Anchor Y
+
+
+</td></tr>
+<tr><td>
+
+[anchorZ?](doc/markdown/./scene.boxcreationoptions.anchorz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Anchor Z
+
+
+</td></tr>
+<tr><td>
+
+[size?](doc/markdown/./scene.boxcreationoptions.size.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Size of all axises, default 1
+
+
+</td></tr>
+<tr><td>
+
+[sizeX?](doc/markdown/./scene.boxcreationoptions.sizex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Size of axis x, default 1
+
+
+</td></tr>
+<tr><td>
+
+[sizeY?](doc/markdown/./scene.boxcreationoptions.sizey.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Size of axis y, default 1
+
+
+</td></tr>
+<tr><td>
+
+[sizeZ?](doc/markdown/./scene.boxcreationoptions.sizez.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Size of axis z, default 1
+
+
+</td></tr>
+</tbody></table>
 

@@ -10,11 +10,11 @@ Interface for PBRSpecularGlossiness mixin
 
 ```typescript
 type IMixinPBRSpecularGlossiness = {
-    specularFactor: Vector4;
+    specularFactor: Vector3;
     glossinessFactor: number;
     PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN: PBShaderExp, outRoughness?: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
 } & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['specular']>;
 ```
-**References:** [Vector4](doc/markdown/./base.vector4.md)<!-- -->, [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md)<!-- -->, [IMixinLight](doc/markdown/./scene.imixinlight.md)<!-- -->, [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)
+**References:** [Vector3](doc/markdown/./base.vector3.md)<!-- -->, [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)<!-- -->, [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->, [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md)<!-- -->, [IMixinLight](doc/markdown/./scene.imixinlight.md)<!-- -->, [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)
 

@@ -15,33 +15,353 @@ declare class PBShaderExp extends Proxiable<PBShaderExp>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [$group](doc/markdown/./device.pbshaderexp._group.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$group](doc/markdown/./device.pbshaderexp._group.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [at(index)](doc/markdown/./device.pbshaderexp.at.md) |  | Get element in the array by index |
-|  [attrib(attr)](doc/markdown/./device.pbshaderexp.attrib.md) |  | Point out that the variable is a input vertex attribute |
-|  [getTypeName()](doc/markdown/./device.pbshaderexp.gettypename.md) |  | Get type name of this variable |
-|  [highp()](doc/markdown/./device.pbshaderexp.highp.md) |  | Point out that the variable should be in high precision |
-|  [inout()](doc/markdown/./device.pbshaderexp.inout.md) |  |  |
-|  [isConstructor()](doc/markdown/./device.pbshaderexp.isconstructor.md) |  | Whether this is a constructor |
-|  [isVector()](doc/markdown/./device.pbshaderexp.isvector.md) |  | Determine if this variable is of vector type |
-|  [lowp()](doc/markdown/./device.pbshaderexp.lowp.md) |  | Points out that the variable should be in low precision |
-|  [mediump()](doc/markdown/./device.pbshaderexp.mediump.md) |  | Points out that the variable should be in medium precision |
-|  [numComponents()](doc/markdown/./device.pbshaderexp.numcomponents.md) |  | Get vector component count of the variable if this variable is of vector type |
-|  [out()](doc/markdown/./device.pbshaderexp.out.md) |  |  |
-|  [sampleType(type)](doc/markdown/./device.pbshaderexp.sampletype.md) |  | Set sample type for the variable if the variable is of type texture |
-|  [setAt(index, val)](doc/markdown/./device.pbshaderexp.setat.md) |  | Set element in the array by index |
-|  [storage(group)](doc/markdown/./device.pbshaderexp.storage.md) |  | Point out that the variable should be in storage address space |
-|  [storageBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebuffer.md) |  | Point out that the variable should be a storage buffer |
-|  [storageBufferReadonly(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebufferreadonly.md) |  | Point out that the variable is read-only and should be a storage buffer |
-|  [storageReadonly(group)](doc/markdown/./device.pbshaderexp.storagereadonly.md) |  | Point out that the variable is read-only and should be in storage address space |
-|  [tag(args)](doc/markdown/./device.pbshaderexp.tag.md) |  | Create tags for the variable |
-|  [uniform(group)](doc/markdown/./device.pbshaderexp.uniform.md) |  | Point out that the variable should be in uniform address space |
-|  [uniformBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.uniformbuffer.md) |  | Point out that the variable should be an uniform buffer |
-|  [workgroup()](doc/markdown/./device.pbshaderexp.workgroup.md) |  | Point out that the variable should be in workgroup address space |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[at(index)](doc/markdown/./device.pbshaderexp.at.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get element in the array by index
+
+
+</td></tr>
+<tr><td>
+
+[attrib(attr)](doc/markdown/./device.pbshaderexp.attrib.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable is a input vertex attribute
+
+
+</td></tr>
+<tr><td>
+
+[getTypeName()](doc/markdown/./device.pbshaderexp.gettypename.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get type name of this variable
+
+
+</td></tr>
+<tr><td>
+
+[highp()](doc/markdown/./device.pbshaderexp.highp.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be in high precision
+
+
+</td></tr>
+<tr><td>
+
+[inout()](doc/markdown/./device.pbshaderexp.inout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isConstructor()](doc/markdown/./device.pbshaderexp.isconstructor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this is a constructor
+
+
+</td></tr>
+<tr><td>
+
+[isVector()](doc/markdown/./device.pbshaderexp.isvector.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Determine if this variable is of vector type
+
+
+</td></tr>
+<tr><td>
+
+[lowp()](doc/markdown/./device.pbshaderexp.lowp.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Points out that the variable should be in low precision
+
+
+</td></tr>
+<tr><td>
+
+[mediump()](doc/markdown/./device.pbshaderexp.mediump.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Points out that the variable should be in medium precision
+
+
+</td></tr>
+<tr><td>
+
+[numComponents()](doc/markdown/./device.pbshaderexp.numcomponents.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get vector component count of the variable if this variable is of vector type
+
+
+</td></tr>
+<tr><td>
+
+[out()](doc/markdown/./device.pbshaderexp.out.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[sampleType(type)](doc/markdown/./device.pbshaderexp.sampletype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set sample type for the variable if the variable is of type texture
+
+
+</td></tr>
+<tr><td>
+
+[setAt(index, val)](doc/markdown/./device.pbshaderexp.setat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set element in the array by index
+
+
+</td></tr>
+<tr><td>
+
+[storage(group)](doc/markdown/./device.pbshaderexp.storage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be in storage address space
+
+
+</td></tr>
+<tr><td>
+
+[storageBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be a storage buffer
+
+
+</td></tr>
+<tr><td>
+
+[storageBufferReadonly(group, bindingSize)](doc/markdown/./device.pbshaderexp.storagebufferreadonly.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable is read-only and should be a storage buffer
+
+
+</td></tr>
+<tr><td>
+
+[storageReadonly(group)](doc/markdown/./device.pbshaderexp.storagereadonly.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable is read-only and should be in storage address space
+
+
+</td></tr>
+<tr><td>
+
+[tag(args)](doc/markdown/./device.pbshaderexp.tag.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create tags for the variable
+
+
+</td></tr>
+<tr><td>
+
+[uniform(group)](doc/markdown/./device.pbshaderexp.uniform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be in uniform address space
+
+
+</td></tr>
+<tr><td>
+
+[uniformBuffer(group, bindingSize)](doc/markdown/./device.pbshaderexp.uniformbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be an uniform buffer
+
+
+</td></tr>
+<tr><td>
+
+[workgroup()](doc/markdown/./device.pbshaderexp.workgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Point out that the variable should be in workgroup address space
+
+
+</td></tr>
+</tbody></table>
 

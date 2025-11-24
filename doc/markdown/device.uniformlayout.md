@@ -14,12 +14,140 @@ interface UniformLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [arraySize](doc/markdown/./device.uniformlayout.arraysize.md) |  | number | The array length if the uniform is array type |
-|  [byteSize](doc/markdown/./device.uniformlayout.bytesize.md) |  | number | Byte size of the uniform |
-|  [name](doc/markdown/./device.uniformlayout.name.md) |  | string | Name of the uniform |
-|  [offset](doc/markdown/./device.uniformlayout.offset.md) |  | number | Byte offset of the uniform buffer |
-|  [subLayout](doc/markdown/./device.uniformlayout.sublayout.md) |  | [UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md) | Layout of the members if the uniform is struct type |
-|  [type](doc/markdown/./device.uniformlayout.type.md) |  | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | The primitive type of the uniform |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[arraySize](doc/markdown/./device.uniformlayout.arraysize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The array length if the uniform is array type
+
+
+</td></tr>
+<tr><td>
+
+[byteSize](doc/markdown/./device.uniformlayout.bytesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Byte size of the uniform
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./device.uniformlayout.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the uniform
+
+
+</td></tr>
+<tr><td>
+
+[offset](doc/markdown/./device.uniformlayout.offset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Byte offset of the uniform buffer
+
+
+</td></tr>
+<tr><td>
+
+[subLayout](doc/markdown/./device.uniformlayout.sublayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md)
+
+
+</td><td>
+
+Layout of the members if the uniform is struct type
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./device.uniformlayout.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+The primitive type of the uniform
+
+
+</td></tr>
+</tbody></table>
 

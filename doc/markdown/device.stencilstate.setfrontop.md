@@ -14,11 +14,71 @@ setFrontOp(fail: StencilOp, zfail: StencilOp, pass: StencilOp): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  fail | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use when the stencil test fails |
-|  zfail | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use when the stencil test passes bug depth test fails |
-|  pass | [StencilOp](doc/markdown/./device.stencilop.md) | The function to use when both the stencil test and the depth test pass |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+fail
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use when the stencil test fails
+
+
+</td></tr>
+<tr><td>
+
+zfail
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use when the stencil test passes bug depth test fails
+
+
+</td></tr>
+<tr><td>
+
+pass
+
+
+</td><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+The function to use when both the stencil test and the depth test pass
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

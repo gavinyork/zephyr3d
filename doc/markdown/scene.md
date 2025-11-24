@@ -6,245 +6,4533 @@
 
 ## Classes
 
-|  Class | Description |
-|  --- | --- |
-|  [AABBTree](doc/markdown/./scene.aabbtree.md) | Axis-Aligned Bounding Box Tree |
-|  [ABufferOIT](doc/markdown/./scene.abufferoit.md) | per-pixel linked list OIT renderer using ABuffer. |
-|  [AnimationClip](doc/markdown/./scene.animationclip.md) | Animation that contains multiple tracks |
-|  [AnimationSet](doc/markdown/./scene.animationset.md) | Animation set |
-|  [Application](doc/markdown/./scene.application.md) | Application class |
-|  [AppResizeEvent](doc/markdown/./scene.appresizeevent.md) | This event will be fired whenever the device size changes |
-|  [AppTickEvent](doc/markdown/./scene.apptickevent.md) | Event that will be fired every frame |
-|  [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | Heirarchical node interface for model loading |
-|  [AssetManager](doc/markdown/./scene.assetmanager.md) | The asset manager |
-|  [AssetScene](doc/markdown/./scene.assetscene.md) | Scene for model loading |
-|  [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | Skeleton information for model loading |
-|  [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | Base class for any kind of camera controllers |
-|  [BatchGroup](doc/markdown/./scene.batchgroup.md) | Batch group node |
-|  [BlinnMaterial](doc/markdown/./scene.blinnmaterial.md) | Blinn material |
-|  [Bloom](doc/markdown/./scene.bloom.md) | The bloom post effect |
-|  [BoundingBox](doc/markdown/./scene.boundingbox.md) | The bounding box class |
-|  [BoxFilterBlitter](doc/markdown/./scene.boxfilterblitter.md) | Box-filter blitter |
-|  [BoxFrameShape](doc/markdown/./scene.boxframeshape.md) | Wireframe box shape |
-|  [BoxShape](doc/markdown/./scene.boxshape.md) | Box shape |
-|  [Camera](doc/markdown/./scene.camera.md) | The camera node class |
-|  [Compositor](doc/markdown/./scene.compositor.md) | Post processing compositor |
-|  [CopyBlitter](doc/markdown/./scene.copyblitter.md) | Copy blitter |
-|  [CullVisitor](doc/markdown/./scene.cullvisitor.md) | Node visitor for culling |
-|  [CylinderShape](doc/markdown/./scene.cylindershape.md) | Box shape |
-|  [DepthPass](doc/markdown/./scene.depthpass.md) | <p>Depth render pass</p><p>Scene depth render pass</p> |
-|  [DirectionalLight](doc/markdown/./scene.directionallight.md) | Directional light |
-|  [EnvConstantAmbient](doc/markdown/./scene.envconstantambient.md) | Constant ambient light |
-|  [EnvHemisphericAmbient](doc/markdown/./scene.envhemisphericambient.md) | Hemispheric ambient light |
-|  [EnvIBL](doc/markdown/./scene.envibl.md) | IBL based environment lighting |
-|  [Environment](doc/markdown/./scene.environment.md) | Environment of scene |
-|  [EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md) | Wrapper for environmant lighting |
-|  [EnvShIBL](doc/markdown/./scene.envshibl.md) | IBL with SH based environment lighting |
-|  [EulerRotationTrack](doc/markdown/./scene.eulerrotationtrack.md) | Euler angle rotation animation track |
-|  [FFTWaveGenerator](doc/markdown/./scene.fftwavegenerator.md) | This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm. |
-|  [FPSCameraController](doc/markdown/./scene.fpscameracontroller.md) | FPS camera controller |
-|  [FXAA](doc/markdown/./scene.fxaa.md) | FXAA post effect |
-|  [GaussianBlurBlitter](doc/markdown/./scene.gaussianblurblitter.md) | Gaussian blur blitter |
-|  [GerstnerWaveGenerator](doc/markdown/./scene.gerstnerwavegenerator.md) | Gerstner wave generator. |
-|  [GraphNode](doc/markdown/./scene.graphnode.md) | Graph scene node |
-|  [GrassMaterial](doc/markdown/./scene.grassmaterial.md) | Terrain grass material |
-|  [Grayscale](doc/markdown/./scene.grayscale.md) | Grayscale post effect |
-|  [LambertMaterial](doc/markdown/./scene.lambertmaterial.md) | Lambert material |
-|  [Material](doc/markdown/./scene.material.md) | Base class for any kind of materials |
-|  [Mesh](doc/markdown/./scene.mesh.md) | Mesh node |
-|  [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | Base class for any kind of mesh materials |
-|  [NamedObject](doc/markdown/./scene.namedobject.md) | Named object interface for model loading |
-|  [Octree](doc/markdown/./scene.octree.md) | Octree class |
-|  [OctreeNode](doc/markdown/./scene.octreenode.md) | Octree node |
-|  [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | Octree node chunk |
-|  [OrbitCameraController](doc/markdown/./scene.orbitcameracontroller.md) | Orbit camera controller |
-|  [OrthoCamera](doc/markdown/./scene.orthocamera.md) | Orthogonal camera class |
-|  [PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md) | PBRMetallicRoughnessMaterial class |
-|  [PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md) | PBRSpecularGlossinessMaterial class |
-|  [PerspectiveCamera](doc/markdown/./scene.perspectivecamera.md) | Perspective camera class |
-|  [PlaneShape](doc/markdown/./scene.planeshape.md) | The plane shape |
-|  [PointLight](doc/markdown/./scene.pointlight.md) | Point light |
-|  [PostWater](doc/markdown/./scene.postwater.md) | The post water effect |
-|  [Primitive](doc/markdown/./scene.primitive.md) | Primitive contains only the vertex and index data of a mesh |
-|  [RenderQueue](doc/markdown/./scene.renderqueue.md) | A queue that contains the items to be rendered |
-|  [RotationTrack](doc/markdown/./scene.rotationtrack.md) | Rotation animation track |
-|  [SAO](doc/markdown/./scene.sao.md) | The Scalable Ambient Obscurance (SAO) post effect |
-|  [ScaleTrack](doc/markdown/./scene.scaletrack.md) | Scale animation track |
-|  [Scene](doc/markdown/./scene.scene.md) | Presents a world that manages a couple of objects that will be rendered |
-|  [SceneNode](doc/markdown/./scene.scenenode.md) | The base class for any kind of scene objects |
-|  [SceneUpdateEvent](doc/markdown/./scene.sceneupdateevent.md) | Event that will be fired when the scene needs to be updated |
-|  [ShaderHelper](doc/markdown/./scene.shaderhelper.md) | Helper shader functions for the builtin material system |
-|  [ShadowMapPass](doc/markdown/./scene.shadowmappass.md) | Shadow map render pass |
-|  [ShadowMapper](doc/markdown/./scene.shadowmapper.md) | The shadow map generator |
-|  [SharedModel](doc/markdown/./scene.sharedmodel.md) | Model information that can be shared by multiple model nodes |
-|  [Skeleton](doc/markdown/./scene.skeleton.md) | Skeleton for skinned animation |
-|  [SkyRenderer](doc/markdown/./scene.skyrenderer.md) | The sky renderer |
-|  [SphereShape](doc/markdown/./scene.sphereshape.md) | Sphere shape |
-|  [SpotLight](doc/markdown/./scene.spotlight.md) | Spot light |
-|  [Terrain](doc/markdown/./scene.terrain.md) | Terrain node |
-|  [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) | Terrain material class |
-|  [Tonemap](doc/markdown/./scene.tonemap.md) | The tonemap post effect |
-|  [TorusShape](doc/markdown/./scene.torusshape.md) | Torus shape |
-|  [TranslationTrack](doc/markdown/./scene.translationtrack.md) | Translate animation track |
-|  [UnlitMaterial](doc/markdown/./scene.unlitmaterial.md) | Unlit material |
-|  [WeightedBlendedOIT](doc/markdown/./scene.weightedblendedoit.md) | Weighted-blended OIT renderer. |
-|  [XForm](doc/markdown/./scene.xform.md) | Presents a transformation from one space to another |
+<table><thead><tr><th>
+
+Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AABBTree](doc/markdown/./scene.aabbtree.md)
+
+
+</td><td>
+
+Axis-Aligned Bounding Box Tree
+
+
+</td></tr>
+<tr><td>
+
+[AbsNode](doc/markdown/./scene.absnode.md)
+
+
+</td><td>
+
+Computes the absolute value
+
+
+</td></tr>
+<tr><td>
+
+[AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
+
+
+</td><td>
+
+Base class for any type of post effect
+
+
+</td></tr>
+<tr><td>
+
+[ABufferOIT](doc/markdown/./scene.abufferoit.md)
+
+
+</td><td>
+
+per-pixel linked list OIT renderer using ABuffer.
+
+
+</td></tr>
+<tr><td>
+
+[AnimationClip](doc/markdown/./scene.animationclip.md)
+
+
+</td><td>
+
+Animation clip
+
+Represents a named animation composed of multiple tracks targeting various objects/properties, with an overall duration, weight, and optional auto-play behavior. Tracks may target different objects and are grouped by a per-target array. Skeletons used by this clip are tracked for lifecycle and application during playback.
+
+Typical workflow: - Create a clip via `AnimationSet.createAnimation(name)`<!-- -->. - Add one or more `AnimationTrack`<!-- -->s via `addTrack(target, track)`<!-- -->. - Optionally register skeletons via `addSkeleton(...)`<!-- -->. - Start playback through the owning `AnimationSet.playAnimation(name, options)`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[AnimationSet](doc/markdown/./scene.animationset.md)
+
+
+</td><td>
+
+Animation set
+
+Manages a collection of named animation clips for a model and orchestrates: - Playback state (time, loops, speed, weights, fade-in/out). - Blending across multiple tracks targeting the same property via weighted averages. - Skeleton usage and application for clips that drive skeletal animation. - Active track registration and cleanup as clips start/stop.
+
+Usage: - Create or retrieve `AnimationClip`<!-- -->s by name. - Start playback with `playAnimation(name, options)`<!-- -->. - Advance animation with `update(deltaSeconds)`<!-- -->. - Optionally adjust weight while playing with `setAnimationWeight(name, weight)`<!-- -->.
+
+Lifetime: - Disposing the set releases references to the model, clips, and clears active state.
+
+
+</td></tr>
+<tr><td>
+
+[Application](doc/markdown/./scene.application.md)
+
+
+</td><td>
+
+Application
+
+Entry-point and lifecycle coordinator for the engine. Responsible for: - Creating and owning the rendering device from a chosen backend. - Managing the per-frame loop, including timing and viewport setup. - Forwarding device/DOM input events via an observable event map. - Hosting the runtime scripting system and input manager.
+
+Singleton: - Only one instance may exist at a time. Access via `{@link getApp}`<!-- -->.
+
+Events: - See `appEventMap` for all emitted events (resize, tick, pointer/keyboard/drag).
+
+Usage: - Construct with `AppOptions`<!-- -->, await `ready()`<!-- -->, then call `run()` to start the loop.
+
+
+</td></tr>
+<tr><td>
+
+[ArccosineHNode](doc/markdown/./scene.arccosinehnode.md)
+
+
+</td><td>
+
+Computes the inverse hyperbolic cosine function
+
+
+</td></tr>
+<tr><td>
+
+[ArcCosNode](doc/markdown/./scene.arccosnode.md)
+
+
+</td><td>
+
+Computes the arccosine (inverse cosine) function
+
+
+</td></tr>
+<tr><td>
+
+[ArcsineHNode](doc/markdown/./scene.arcsinehnode.md)
+
+
+</td><td>
+
+Computes the inverse hyperbolic sine function
+
+
+</td></tr>
+<tr><td>
+
+[ArcSinNode](doc/markdown/./scene.arcsinnode.md)
+
+
+</td><td>
+
+Computes the arcsine (inverse sine) function
+
+
+</td></tr>
+<tr><td>
+
+[ArcTan2Node](doc/markdown/./scene.arctan2node.md)
+
+
+</td><td>
+
+Computes the two-argument arctangent function
+
+
+</td></tr>
+<tr><td>
+
+[ArctangentHNode](doc/markdown/./scene.arctangenthnode.md)
+
+
+</td><td>
+
+Computes the inverse hyperbolic tangent function
+
+
+</td></tr>
+<tr><td>
+
+[ArcTanNode](doc/markdown/./scene.arctannode.md)
+
+
+</td><td>
+
+Computes the arctangent (inverse tangent) function
+
+
+</td></tr>
+<tr><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+Heirarchical node interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetManager](doc/markdown/./scene.assetmanager.md)
+
+
+</td><td>
+
+Centralized asset manager for loading and caching resources.
+
+Responsibilities: - Abstracts resource loading via VFS (text/json/binary). - Dispatches texture/model loading to registered loaders by MIME type. - Caches results and uses weak references to allow GPU resources to be GC'd when unused. - Harmonizes cross-backend constraints (e.g., WebGL non-power-of-two rules and sRGB handling). - Provides access to built-in textures with device-restore handlers.
+
+Threading/async model: - All I/O is async; repeated calls are coalesced via internal promise caches keyed by URL or hash.
+
+
+</td></tr>
+<tr><td>
+
+[AssetScene](doc/markdown/./scene.assetscene.md)
+
+
+</td><td>
+
+Scene for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)
+
+
+</td><td>
+
+Skeleton information for model loading
+
+
+</td></tr>
+<tr><td>
+
+[BaseCameraController](doc/markdown/./scene.basecameracontroller.md)
+
+
+</td><td>
+
+Base class for camera controllers.
+
+Provides a common lifecycle and event-handling surface for concrete camera controllers (e.g., orbit, fly, FPS). Subclasses implement protected handler methods to react to mouse/keyboard input, and update camera transforms in `update()`<!-- -->.
+
+Responsibilities: - Holds a reference to a `Camera` and resets internal state when the camera changes. - Offers a `lookAt(from, to, up)` helper that delegates to the camera. - Exposes public event entry points (`onMouseDown`<!-- -->, `onMouseUp`<!-- -->, `onMouseMove`<!-- -->, `onMouseWheel`<!-- -->, `onKeyDown`<!-- -->, `onKeyUp`<!-- -->) that forward to protected handlers which subclasses can override. - Defines `reset()` and `update()` lifecycle methods for state initialization and per-frame updates.
+
+Event handling contract: - Each public `onXxx` method returns a boolean that indicates whether the event was handled by the controller. Returning `true` allows upstream dispatchers to stop propagation if desired.
+
+Subclassing guidelines: - Override the protected `_onXxx` handlers rather than the public `onXxx` methods. - Override `reset()` to reinitialize controller state when a new camera is attached. - Override `update()` to advance state each frame (e.g., apply accumulated deltas with damping).
+
+Lifecycle: 1. A camera is attached via internal `_setCamera(camera)`<!-- -->, which calls `reset()`<!-- -->. 2. Input events are passed in through the public `onXxx` methods. 3. Per-frame, `update()` is called to apply state changes to the camera.
+
+Thread-safety/assumptions: - Designed for use on the main thread in a browser environment. - Pointer events are used for mouse input; keyboard events for key input.
+
+
+</td></tr>
+<tr><td>
+
+[BatchGroup](doc/markdown/./scene.batchgroup.md)
+
+
+</td><td>
+
+Batch group node
+
+
+</td></tr>
+<tr><td>
+
+[BillboardMatrixNode](doc/markdown/./scene.billboardmatrixnode.md)
+
+
+</td><td>
+
+Billboard matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[BlinnMaterial](doc/markdown/./scene.blinnmaterial.md)
+
+
+</td><td>
+
+Blinn material
+
+
+</td></tr>
+<tr><td>
+
+[Bloom](doc/markdown/./scene.bloom.md)
+
+
+</td><td>
+
+The bloom post effect
+
+
+</td></tr>
+<tr><td>
+
+[BoundingBox](doc/markdown/./scene.boundingbox.md)
+
+
+</td><td>
+
+The bounding box class
+
+
+</td></tr>
+<tr><td>
+
+[BoxFilterBlitter](doc/markdown/./scene.boxfilterblitter.md)
+
+
+</td><td>
+
+Box-filter blitter
+
+
+</td></tr>
+<tr><td>
+
+[BoxFrameShape](doc/markdown/./scene.boxframeshape.md)
+
+
+</td><td>
+
+Wireframe box shape
+
+
+</td></tr>
+<tr><td>
+
+[BoxShape](doc/markdown/./scene.boxshape.md)
+
+
+</td><td>
+
+Box shape
+
+
+</td></tr>
+<tr><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+A renderable camera node that manages view/projection math, frusta, input control, picking, and a post-processing chain via a compositor.
+
+Key features: - Maintains projection, view, VP, and inverse VP matrices and lazily recomputes them when invalidated. - Provides world- and view-space frusta for culling and clipping. - Supports perspective and orthographic projections. - Integrates with post effects (Tonemap, FXAA, TAA, Bloom, SSR, SSAO, Motion Blur) through an internal `Compositor`<!-- -->. - Handles temporal jitter and history state when TAA or motion blur are enabled. - Emits picking rays from screen coordinates and supports async GPU picking. - Optional controller integration for user input handling.
+
+Performance notes: - Matrices/frusta are computed on demand and cached until invalidation. - Temporal jitter and history are set up only when required by enabled features and device support.
+
+
+</td></tr>
+<tr><td>
+
+[CameraNearFarNode](doc/markdown/./scene.cameranearfarnode.md)
+
+
+</td><td>
+
+Camera near/far plane input node
+
+
+</td></tr>
+<tr><td>
+
+[CameraPositionNode](doc/markdown/./scene.camerapositionnode.md)
+
+
+</td><td>
+
+Camera position input node
+
+
+</td></tr>
+<tr><td>
+
+[CeilNode](doc/markdown/./scene.ceilnode.md)
+
+
+</td><td>
+
+Rounds up to the nearest integer
+
+
+</td></tr>
+<tr><td>
+
+[ClampNode](doc/markdown/./scene.clampnode.md)
+
+
+</td><td>
+
+Clamps a value to a specified range
+
+
+</td></tr>
+<tr><td>
+
+[ClipmapTerrain](doc/markdown/./scene.clipmapterrain.md)
+
+
+</td><td>
+
+ClipmapTerrain implements an efficient terrain rendering system using clipmaps.
+
+Clipmaps provide level-of-detail (LOD) rendering for large terrains by using multiple nested grids at different resolutions. The terrain automatically adjusts detail levels based on camera distance, providing high detail near the camera and lower detail in the distance.
+
+Key features: - Automatic LOD management based on camera position - Support for height maps, splat maps, and detail textures - Integrated grass rendering system
+
+
+</td></tr>
+<tr><td>
+
+[ClipmapTerrainMaterial](doc/markdown/./scene.clipmapterrainmaterial.md)
+
+
+</td><td>
+
+Default material type of clipmap terrain
+
+
+</td></tr>
+<tr><td>
+
+[CompAddNode](doc/markdown/./scene.compaddnode.md)
+
+
+</td><td>
+
+Component-wise addition
+
+
+</td></tr>
+<tr><td>
+
+[CompDivNode](doc/markdown/./scene.compdivnode.md)
+
+
+</td><td>
+
+Component-wise division
+
+
+</td></tr>
+<tr><td>
+
+[CompMulNode](doc/markdown/./scene.compmulnode.md)
+
+
+</td><td>
+
+Component-wise multiplication with scalar support
+
+
+</td></tr>
+<tr><td>
+
+[Compositor](doc/markdown/./scene.compositor.md)
+
+
+</td><td>
+
+Post processing compositor
+
+
+</td></tr>
+<tr><td>
+
+[CompSubNode](doc/markdown/./scene.compsubnode.md)
+
+
+</td><td>
+
+Component-wise subtraction
+
+
+</td></tr>
+<tr><td>
+
+[ConstantScalarNode](doc/markdown/./scene.constantscalarnode.md)
+
+
+</td><td>
+
+Constant scalar (float) value node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantTexture2DArrayNode](doc/markdown/./scene.constanttexture2darraynode.md)
+
+
+</td><td>
+
+2D texture array constant node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantTexture2DNode](doc/markdown/./scene.constanttexture2dnode.md)
+
+
+</td><td>
+
+2D texture constant node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantTextureCubeNode](doc/markdown/./scene.constanttexturecubenode.md)
+
+
+</td><td>
+
+Cubemap texture constant node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantVec2Node](doc/markdown/./scene.constantvec2node.md)
+
+
+</td><td>
+
+Constant 2D vector (vec2) value node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantVec3Node](doc/markdown/./scene.constantvec3node.md)
+
+
+</td><td>
+
+Constant 3D vector (vec3) value node
+
+
+</td></tr>
+<tr><td>
+
+[ConstantVec4Node](doc/markdown/./scene.constantvec4node.md)
+
+
+</td><td>
+
+Constant 4D vector (vec4) value node
+
+
+</td></tr>
+<tr><td>
+
+[CopyBlitter](doc/markdown/./scene.copyblitter.md)
+
+
+</td><td>
+
+Copy blitter
+
+
+</td></tr>
+<tr><td>
+
+[CosHNode](doc/markdown/./scene.coshnode.md)
+
+
+</td><td>
+
+Computes the hyperbolic cosine function
+
+
+</td></tr>
+<tr><td>
+
+[CosNode](doc/markdown/./scene.cosnode.md)
+
+
+</td><td>
+
+Computes the cosine function
+
+
+</td></tr>
+<tr><td>
+
+[CrossProductNode](doc/markdown/./scene.crossproductnode.md)
+
+
+</td><td>
+
+Calculates the cross product of two 3D vectors
+
+
+</td></tr>
+<tr><td>
+
+[CubemapSHProjector](doc/markdown/./scene.cubemapshprojector.md)
+
+
+</td><td>
+
+CubemapSHProjector is responsible for projecting a cubemap texture into spherical harmonics (SH) coefficients. This is commonly used for efficient environment lighting approximation in real-time rendering.
+
+The class uses Monte Carlo sampling to compute the first 9 spherical harmonics coefficients (up to order 2) from a cubemap texture, which can then be used for ambient lighting calculations.
+
+
+</td></tr>
+<tr><td>
+
+[CullVisitor](doc/markdown/./scene.cullvisitor.md)
+
+
+</td><td>
+
+Node visitor for culling
+
+
+</td></tr>
+<tr><td>
+
+[CylinderShape](doc/markdown/./scene.cylindershape.md)
+
+
+</td><td>
+
+Box shape
+
+
+</td></tr>
+<tr><td>
+
+[DDXNode](doc/markdown/./scene.ddxnode.md)
+
+
+</td><td>
+
+Computes the partial derivative with respect to screen-space X
+
+
+</td></tr>
+<tr><td>
+
+[DDYNode](doc/markdown/./scene.ddynode.md)
+
+
+</td><td>
+
+Computes the partial derivative with respect to screen-space Y
+
+
+</td></tr>
+<tr><td>
+
+[Degrees2RadiansNode](doc/markdown/./scene.degrees2radiansnode.md)
+
+
+</td><td>
+
+Converts degrees to radians
+
+
+</td></tr>
+<tr><td>
+
+[DepthPass](doc/markdown/./scene.depthpass.md)
+
+
+</td><td>
+
+Depth render pass
+
+Scene depth render pass
+
+
+</td></tr>
+<tr><td>
+
+[DirectionalLight](doc/markdown/./scene.directionallight.md)
+
+
+</td><td>
+
+Directional light
+
+
+</td></tr>
+<tr><td>
+
+[DistanceNode](doc/markdown/./scene.distancenode.md)
+
+
+</td><td>
+
+Calculates the distance between two points
+
+
+</td></tr>
+<tr><td>
+
+[DotProductNode](doc/markdown/./scene.dotproductnode.md)
+
+
+</td><td>
+
+Calculates the dot product of two vectors
+
+
+</td></tr>
+<tr><td>
+
+[DracoMeshDecoder](doc/markdown/./scene.dracomeshdecoder.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[ElapsedTimeNode](doc/markdown/./scene.elapsedtimenode.md)
+
+
+</td><td>
+
+Elapsed time input node
+
+
+</td></tr>
+<tr><td>
+
+[Engine](doc/markdown/./scene.engine.md)
+
+
+</td><td>
+
+Core engine class managing scripting, serialization, and rendering.
+
+Responsibilities: - Manages a [ScriptingSystem](doc/markdown/./scene.scriptingsystem.md) for dynamic script attachment and lifecycle. - Manages a [ResourceManager](doc/markdown/./scene.resourcemanager.md) for loading scenes and assets. - Maintains a list of active renderable objects to be rendered each frame. - Provides methods to attach/detach scripts, update scripts, load scenes, and read files. - Supports enabling/disabling of runtime operations.
+
+
+</td></tr>
+<tr><td>
+
+[EnvConstantAmbient](doc/markdown/./scene.envconstantambient.md)
+
+
+</td><td>
+
+Constant ambient light
+
+
+</td></tr>
+<tr><td>
+
+[EnvHemisphericAmbient](doc/markdown/./scene.envhemisphericambient.md)
+
+
+</td><td>
+
+Hemispheric ambient light
+
+
+</td></tr>
+<tr><td>
+
+[Environment](doc/markdown/./scene.environment.md)
+
+
+</td><td>
+
+Environment of scene
+
+
+</td></tr>
+<tr><td>
+
+[EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md)
+
+
+</td><td>
+
+Wrapper for environmant lighting
+
+
+</td></tr>
+<tr><td>
+
+[EnvShIBL](doc/markdown/./scene.envshibl.md)
+
+
+</td><td>
+
+IBL with SH based environment lighting
+
+
+</td></tr>
+<tr><td>
+
+[Exp2Node](doc/markdown/./scene.exp2node.md)
+
+
+</td><td>
+
+Computes the base-2 exponential function
+
+
+</td></tr>
+<tr><td>
+
+[ExpNode](doc/markdown/./scene.expnode.md)
+
+
+</td><td>
+
+Computes the natural exponential function
+
+
+</td></tr>
+<tr><td>
+
+[FaceForwardNode](doc/markdown/./scene.faceforwardnode.md)
+
+
+</td><td>
+
+Flips a vector to face forward
+
+
+</td></tr>
+<tr><td>
+
+[FBMWaveGenerator](doc/markdown/./scene.fbmwavegenerator.md)
+
+
+</td><td>
+
+FBM wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[FFTWaveGenerator](doc/markdown/./scene.fftwavegenerator.md)
+
+
+</td><td>
+
+This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
+
+
+</td></tr>
+<tr><td>
+
+[FloorNode](doc/markdown/./scene.floornode.md)
+
+
+</td><td>
+
+Rounds down to the nearest integer
+
+
+</td></tr>
+<tr><td>
+
+[FmaNode](doc/markdown/./scene.fmanode.md)
+
+
+</td><td>
+
+Fused multiply-add operation
+
+
+</td></tr>
+<tr><td>
+
+[FPSCameraController](doc/markdown/./scene.fpscameracontroller.md)
+
+
+</td><td>
+
+FPS camera controller
+
+
+</td></tr>
+<tr><td>
+
+[FractNode](doc/markdown/./scene.fractnode.md)
+
+
+</td><td>
+
+Computes the fractional part
+
+
+</td></tr>
+<tr><td>
+
+[FunctionCallNode](doc/markdown/./scene.functioncallnode.md)
+
+
+</td><td>
+
+Function call node for material blueprint functions
+
+
+</td></tr>
+<tr><td>
+
+[FunctionInputNode](doc/markdown/./scene.functioninputnode.md)
+
+
+</td><td>
+
+Function input parameter node
+
+
+</td></tr>
+<tr><td>
+
+[FunctionOutputNode](doc/markdown/./scene.functionoutputnode.md)
+
+
+</td><td>
+
+Function output value node
+
+
+</td></tr>
+<tr><td>
+
+[FWidthNode](doc/markdown/./scene.fwidthnode.md)
+
+
+</td><td>
+
+Computes the sum of absolute derivatives
+
+
+</td></tr>
+<tr><td>
+
+[FXAA](doc/markdown/./scene.fxaa.md)
+
+
+</td><td>
+
+FXAA post effect
+
+
+</td></tr>
+<tr><td>
+
+[GaussianBlurBlitter](doc/markdown/./scene.gaussianblurblitter.md)
+
+
+</td><td>
+
+Gaussian blur blitter
+
+
+</td></tr>
+<tr><td>
+
+[GerstnerWaveGenerator](doc/markdown/./scene.gerstnerwavegenerator.md)
+
+
+</td><td>
+
+Gerstner wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[GraphNode](doc/markdown/./scene.graphnode.md)
+
+
+</td><td>
+
+Graph scene node
+
+
+</td></tr>
+<tr><td>
+
+[GrassLayer](doc/markdown/./scene.grasslayer.md)
+
+
+</td><td>
+
+Grass layer class
+
+
+</td></tr>
+<tr><td>
+
+[GrassMaterial](doc/markdown/./scene.grassmaterial.md)
+
+
+</td><td>
+
+Terrain grass material
+
+
+</td></tr>
+<tr><td>
+
+[GrassRenderer](doc/markdown/./scene.grassrenderer.md)
+
+
+</td><td>
+
+Grass renderer for clipmap terrain
+
+
+</td></tr>
+<tr><td>
+
+[Grayscale](doc/markdown/./scene.grayscale.md)
+
+
+</td><td>
+
+Grayscale post effect
+
+
+</td></tr>
+<tr><td>
+
+[Hash1Node](doc/markdown/./scene.hash1node.md)
+
+
+</td><td>
+
+Calculates float hash by input scalar value or vector value
+
+
+</td></tr>
+<tr><td>
+
+[Hash2Node](doc/markdown/./scene.hash2node.md)
+
+
+</td><td>
+
+Calculates vec2 hash by input scalar value or vector value
+
+
+</td></tr>
+<tr><td>
+
+[Hash3Node](doc/markdown/./scene.hash3node.md)
+
+
+</td><td>
+
+Calculates vec3 hash by input scalar value or vector value
+
+
+</td></tr>
+<tr><td>
+
+[InputManager](doc/markdown/./scene.inputmanager.md)
+
+
+</td><td>
+
+Input manager
+
+Centralizes DOM input event handling for the engine: - Subscribes to pointer/keyboard/drag/wheel/composition events on the target canvas element. - Normalizes click and double-click detection using distance/time tolerances. - Supports a middleware chain (`use`<!-- -->) to intercept and optionally consume events before they are dispatched to the Application's observable event map. - Manages pointer capture for mouse interactions to ensure consistent up/move delivery.
+
+Lifecycle: - Call `start()` to attach all event listeners; `stop()` to remove them.
+
+
+</td></tr>
+<tr><td>
+
+[InvProjMatrixNode](doc/markdown/./scene.invprojmatrixnode.md)
+
+
+</td><td>
+
+Inverse projection matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[InvSqrtNode](doc/markdown/./scene.invsqrtnode.md)
+
+
+</td><td>
+
+Computes the inverse square root
+
+
+</td></tr>
+<tr><td>
+
+[InvViewProjMatrixNode](doc/markdown/./scene.invviewprojmatrixnode.md)
+
+
+</td><td>
+
+Inverse view-projection matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[LambertMaterial](doc/markdown/./scene.lambertmaterial.md)
+
+
+</td><td>
+
+Lambert material
+
+
+</td></tr>
+<tr><td>
+
+[LengthNode](doc/markdown/./scene.lengthnode.md)
+
+
+</td><td>
+
+Calculates the length of a vector
+
+
+</td></tr>
+<tr><td>
+
+[Log2Node](doc/markdown/./scene.log2node.md)
+
+
+</td><td>
+
+Computes the base-2 logarithm
+
+
+</td></tr>
+<tr><td>
+
+[LogNode](doc/markdown/./scene.lognode.md)
+
+
+</td><td>
+
+Computes the natural logarithm
+
+
+</td></tr>
+<tr><td>
+
+[MakeVectorNode](doc/markdown/./scene.makevectornode.md)
+
+
+</td><td>
+
+Vector constructor node
+
+
+</td></tr>
+<tr><td>
+
+[Material](doc/markdown/./scene.material.md)
+
+
+</td><td>
+
+Base class for all materials.
+
+Responsibilities: - Defines a multi-pass rendering interface (`numPasses`<!-- -->, `apply`<!-- -->, `bind`<!-- -->, `draw`<!-- -->, `drawPrimitive`<!-- -->). - Builds and caches GPU shader programs per pass and per-render-context hash. - Manages a per-material bind group (typically at index 2) for uniforms and resources. - Updates render states per pass (`updateRenderStates`<!-- -->) and uploads uniforms (`_applyUniforms`<!-- -->). - Tracks "option" changes that affect shader variant hashing and render bundles.
+
+Caching and hashing: - `createHash(pass)` produces a stable hash representing shader variant options for a pass. Override `_createHash()` in subclasses to encode feature toggles (defines, keywords, macros). - The global hash used to key `MaterialState` also includes `ctx.materialFlags` and `ctx.renderPassHash`<!-- -->, allowing context-sensitive variants (e.g., MSAA, MRT layout). - GPU programs are additionally memoized in a global static `_programCache` across materials by `constructor.name` + hash, to avoid recompilation of identical variants.
+
+Bind groups and uniforms: - If a program declares a bind group layout at index 2 (i.e., `bindGroupLayouts.length > 2`<!-- -->), `apply()` will allocate the group and keep it in the state. Subclasses should fill it in `_applyUniforms()`<!-- -->. - `applyUniforms()` only calls `_applyUniforms()` when `needUpdate` is true, based on `_optionTag` changes (see `optionChanged()`<!-- -->).
+
+Lifecycle: - Constructed materials register a persistent ID into a global registry for serialization. - `apply(ctx)` prepares all passes: creates/gets state, programs, bind groups, render states, and uploads uniforms as needed. - `bind(device, pass)` binds the program, bind group (index 2), and render states. - `draw(primitive, ctx, numInstances)` runs all passes, calling `bind()` and `drawPrimitive()`<!-- -->. - `onDispose()` releases bind groups and registry entries.
+
+Extending: - Override `_createProgram(pb, ctx, pass)` to build a shader. - Override `_applyUniforms(bindGroup, ctx, pass)` to upload uniforms and resources. - Override `updateRenderStates(pass, renderStates, ctx)` to set depth, blend, cull, etc. - Override `_createHash()` to encode options that affect program compilation. - Override `supportLighting`<!-- -->, `supportInstancing`<!-- -->, `isTransparentPass`<!-- -->, `getQueueType`<!-- -->, etc.
+
+Thread-safety: - Intended for main-thread use in a renderer driving WebGPU/WebGL-like devices.
+
+
+</td></tr>
+<tr><td>
+
+[MaterialBlueprintIR](doc/markdown/./scene.materialblueprintir.md)
+
+
+</td><td>
+
+Material Blueprint Intermediate Representation
+
+
+</td></tr>
+<tr><td>
+
+[MaxNode](doc/markdown/./scene.maxnode.md)
+
+
+</td><td>
+
+Returns the maximum of two values
+
+
+</td></tr>
+<tr><td>
+
+[Mesh](doc/markdown/./scene.mesh.md)
+
+
+</td><td>
+
+Mesh node
+
+
+</td></tr>
+<tr><td>
+
+[MeshMaterial](doc/markdown/./scene.meshmaterial.md)
+
+
+</td><td>
+
+Base class for mesh materials.
+
+Key responsibilities: - Defines feature-based shader variants (alpha test, blending, alpha-to-coverage, TAA toggle, etc.). - Provides a material instancing mechanism (per-instance uniforms via a shared core material). - Implements the base shader scaffolding for multiple render passes (LIGHT, DEPTH, OBJECT\_COLOR, SHADOWMAP). - Updates render states depending on pass and features (blending, depth, culling). - Submits material uniforms and cooperates with OIT/TAA/SSR/motion vectors.
+
+Variant system: - Features are stored in `_featureStates` and hashed into `_createHash()`<!-- -->. - Changing features calls `useFeature(...)` which triggers `optionChanged(true)` to rebuild programs.
+
+Instancing: - `defineInstanceUniform` registers per-instance fields with packed layout. - `createInstance()` returns a lightweight instance that shares the core’s GPU programs and updates instance uniform buffer only. This improves batching/instancing support.
+
+Shader hooks: - `vertexShader(scope)` and `fragmentShader(scope)` provide per-pass hook points to implement the material’s vertex/fragment logic. The base class wires up common I/O (skin, morph, instancing). - `outputFragmentColor(...)` centralizes final color output across passes, handling OIT and alpha ops.
+
+Render states and queues: - `updateRenderStates(...)` sets depth/blend/cull states based on blending, alpha-to-coverage, depth equality optimizations, pass type, and optional OIT overrides. - `getQueueType()` chooses between opaque and transparent queues.
+
+Extending: - Override `vertexShader`<!-- -->, `fragmentShader`<!-- -->, and optionally `outputFragmentColor`<!-- -->. - Override `supportLighting`<!-- -->, `isTransparentPass`<!-- -->, `needFragmentColor`<!-- -->, etc., as needed. - Use `uniformChanged()` when changing uniform-only values that do not alter shader variants. - Use `useFeature()` when toggling options that affect shader variants.
+
+
+</td></tr>
+<tr><td>
+
+[MinNode](doc/markdown/./scene.minnode.md)
+
+
+</td><td>
+
+Returns the minimum of two values
+
+
+</td></tr>
+<tr><td>
+
+[MixNode](doc/markdown/./scene.mixnode.md)
+
+
+</td><td>
+
+Linear interpolation between two values
+
+
+</td></tr>
+<tr><td>
+
+[ModNode](doc/markdown/./scene.modnode.md)
+
+
+</td><td>
+
+Modulo operation
+
+
+</td></tr>
+<tr><td>
+
+[MorphTargetTrack](doc/markdown/./scene.morphtargettrack.md)
+
+
+</td><td>
+
+Morph target track
+
+
+</td></tr>
+<tr><td>
+
+[NamedObject](doc/markdown/./scene.namedobject.md)
+
+
+</td><td>
+
+Named object interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[NodeEulerRotationTrack](doc/markdown/./scene.nodeeulerrotationtrack.md)
+
+
+</td><td>
+
+Euler angle rotation animation track
+
+
+</td></tr>
+<tr><td>
+
+[NodeRotationTrack](doc/markdown/./scene.noderotationtrack.md)
+
+
+</td><td>
+
+Rotation animation track
+
+
+</td></tr>
+<tr><td>
+
+[NodeScaleTrack](doc/markdown/./scene.nodescaletrack.md)
+
+
+</td><td>
+
+Scale animation track
+
+
+</td></tr>
+<tr><td>
+
+[NodeTranslationTrack](doc/markdown/./scene.nodetranslationtrack.md)
+
+
+</td><td>
+
+Translate animation track
+
+
+</td></tr>
+<tr><td>
+
+[NormalizeNode](doc/markdown/./scene.normalizenode.md)
+
+
+</td><td>
+
+Normalizes a vector to unit length
+
+
+</td></tr>
+<tr><td>
+
+[Octree](doc/markdown/./scene.octree.md)
+
+
+</td><td>
+
+Spatial acceleration structure for scene graph nodes using an octree hierarchy.
+
+
+</td></tr>
+<tr><td>
+
+[OctreeNode](doc/markdown/./scene.octreenode.md)
+
+
+</td><td>
+
+A single node (cell) within the octree hierarchy.
+
+
+</td></tr>
+<tr><td>
+
+[OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
+
+
+</td><td>
+
+A grid of octree nodes at a specific level of detail.
+
+
+</td></tr>
+<tr><td>
+
+[OrbitCameraController](doc/markdown/./scene.orbitcameracontroller.md)
+
+
+</td><td>
+
+Orbit camera controller
+
+
+</td></tr>
+<tr><td>
+
+[OrthoCamera](doc/markdown/./scene.orthocamera.md)
+
+
+</td><td>
+
+Orthogonal camera class
+
+
+</td></tr>
+<tr><td>
+
+[ParticleMaterial](doc/markdown/./scene.particlematerial.md)
+
+
+</td><td>
+
+Particle material.
+
+- Specializes `MeshMaterial` for billboard/sprite-style particles. - Provides optional alpha map (coverage/shape) and ramp map (color/alpha over lifetime or scalar). - Uses blended transparency by default and disables face culling. - Supports per-particle attributes via vertex inputs (position, params, velocity).
+
+Features: - `FEATURE_ALPHA_MAP`<!-- -->: enables sampling an alpha coverage texture. - `FEATURE_RAMP_MAP`<!-- -->: enables sampling a ramp/gradient texture.
+
+Default states: - `cullMode = 'none'` - `blendMode = 'blend'`
+
+
+</td></tr>
+<tr><td>
+
+[ParticleSystem](doc/markdown/./scene.particlesystem.md)
+
+
+</td><td>
+
+Particle system class
+
+
+</td></tr>
+<tr><td>
+
+[PBRBlockNode](doc/markdown/./scene.pbrblocknode.md)
+
+
+</td><td>
+
+PBR (Physically Based Rendering) material output node
+
+
+</td></tr>
+<tr><td>
+
+[PBRBluePrintMaterial](doc/markdown/./scene.pbrblueprintmaterial.md)
+
+
+</td><td>
+
+PBRBluePrintMaterial class
+
+
+</td></tr>
+<tr><td>
+
+[PBRMetallicRoughnessMaterial](doc/markdown/./scene.pbrmetallicroughnessmaterial.md)
+
+
+</td><td>
+
+PBRMetallicRoughnessMaterial class
+
+
+</td></tr>
+<tr><td>
+
+[PBRSpecularGlossinessMaterial](doc/markdown/./scene.pbrspecularglossinessmaterial.md)
+
+
+</td><td>
+
+PBRSpecularGlossinessMaterial class
+
+
+</td></tr>
+<tr><td>
+
+[PerlinNoise2DNode](doc/markdown/./scene.perlinnoise2dnode.md)
+
+
+</td><td>
+
+Calculates a perlin noise by input UV and scale value
+
+
+</td></tr>
+<tr><td>
+
+[PerspectiveCamera](doc/markdown/./scene.perspectivecamera.md)
+
+
+</td><td>
+
+Perspective camera class
+
+
+</td></tr>
+<tr><td>
+
+[PlaneShape](doc/markdown/./scene.planeshape.md)
+
+
+</td><td>
+
+The plane shape
+
+
+</td></tr>
+<tr><td>
+
+[PointLight](doc/markdown/./scene.pointlight.md)
+
+
+</td><td>
+
+Point light
+
+
+</td></tr>
+<tr><td>
+
+[PowNode](doc/markdown/./scene.pownode.md)
+
+
+</td><td>
+
+Raises a value to a power
+
+
+</td></tr>
+<tr><td>
+
+[Primitive](doc/markdown/./scene.primitive.md)
+
+
+</td><td>
+
+Holds vertex/index data and draw parameters for a mesh geometry.
+
+Responsibilities: - Owns one or more vertex buffers and an optional index buffer. - Defines primitive topology, draw range (start/count), and vertex layout. - Provides utilities to create/set/remove buffers and query vertex/face counts. - Tracks changes via a change tag and notifies render-bundle caching. - Optionally stores a bounding volume and supports ray intersection tests.
+
+Ownership and lifecycle: - When adding buffers (`setVertexBuffer`<!-- -->, `setIndexBuffer`<!-- -->), the primitive retains them. - When removing/overwriting buffers, the primitive releases the previous buffers. - Disposing the primitive also disposes the internal `VertexLayout` and releases retained buffers.
+
+
+</td></tr>
+<tr><td>
+
+[ProjectionMatrixNode](doc/markdown/./scene.projectionmatrixnode.md)
+
+
+</td><td>
+
+Projection matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[PropertyTrack](doc/markdown/./scene.propertytrack.md)
+
+
+</td><td>
+
+Property animation track
+
+Animates a single property (scalar, vector, or color) on a target object using time-based interpolation. Supports: - float, vec2, vec3/rgb, vec4, rgba property types - Separate interpolation for RGB and Alpha in RGBA mode - Linear and cubic spline (natural) interpolation presets
+
+The track reads a `PropertyAccessor` which encapsulates how to get/set the property on the target object. Internally, the current state is represented as a numeric array.
+
+Notes: - `calculateState` samples interpolators into an internal reusable state instance for performance; consumers should treat returned states as ephemeral. - `mixState` performs component-wise linear interpolation for blending.
+
+
+</td></tr>
+<tr><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)
+
+
+</td><td>
+
+Base class for any kind of puncual light
+
+
+</td></tr>
+<tr><td>
+
+[Radians2DegreesNode](doc/markdown/./scene.radians2degreesnode.md)
+
+
+</td><td>
+
+Converts radians to degrees
+
+
+</td></tr>
+<tr><td>
+
+[ReflectNode](doc/markdown/./scene.reflectnode.md)
+
+
+</td><td>
+
+Calculates the reflection direction
+
+
+</td></tr>
+<tr><td>
+
+[RefractNode](doc/markdown/./scene.refractnode.md)
+
+
+</td><td>
+
+Calculates the refraction direction
+
+
+</td></tr>
+<tr><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+A queue that contains the items to be rendered
+
+
+</td></tr>
+<tr><td>
+
+[ResolveVertexNormalNode](doc/markdown/./scene.resolvevertexnormalnode.md)
+
+
+</td><td>
+
+Vertex normal resolver node
+
+
+</td></tr>
+<tr><td>
+
+[ResolveVertexPositionNode](doc/markdown/./scene.resolvevertexpositionnode.md)
+
+
+</td><td>
+
+Vertex position resolver node
+
+
+</td></tr>
+<tr><td>
+
+[ResolveVertexTangentNode](doc/markdown/./scene.resolvevertextangentnode.md)
+
+
+</td><td>
+
+Vertex tangent resolver node
+
+
+</td></tr>
+<tr><td>
+
+[ResourceManager](doc/markdown/./scene.resourcemanager.md)
+
+
+</td><td>
+
+Manages serialization and deserialization of engine objects to/from JSON, including asset resolution via a virtual file system (VFS) and asset manager.
+
+
+</td></tr>
+<tr><td>
+
+[RuntimeScript](doc/markdown/./scene.runtimescript.md)
+
+
+</td><td>
+
+Base class for runtime scripts that can be attached to a host object.
+
+Lifecycle overview: - onCreated(): Called once per script instance right after construction, before any host is attached. - onAttached(host): Called each time this instance is attached to a host. - onUpdate(deltaTime, elapsedTime): Called every frame/tick while attached. - onDetached(host): Called when detached from a host. - onDestroy(): Called when the instance is no longer attached to any host and is about to be discarded.
+
+Notes: - Hooks may return a Promise to perform asynchronous work (e.g., asset loading). - The generic host type `T` can be `IDisposable` or `null`<!-- -->. If `null`<!-- -->, the script may operate without a concrete host.
+
+
+</td></tr>
+<tr><td>
+
+[SAO](doc/markdown/./scene.sao.md)
+
+
+</td><td>
+
+The Scalable Ambient Obscurance (SAO) post effect
+
+
+</td></tr>
+<tr><td>
+
+[SaturateNode](doc/markdown/./scene.saturatenode.md)
+
+
+</td><td>
+
+Clamps a value to the range \[0, 1\]
+
+
+</td></tr>
+<tr><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+Represents a renderable world that manages scene graph, spatial indexing, and environment.
+
+Core responsibilities: - Owns the root [SceneNode](doc/markdown/./scene.scenenode.md) and maintains a spatial [Octree](doc/markdown/./scene.octree.md) for culling/raycasting. - Manages environment/lighting via [Environment](doc/markdown/./scene.environment.md)<!-- -->. - Provides per-frame update queues (global and per-camera) for scene nodes. - Offers utilities like ray construction and raycasting. - Emits observable events: `update`<!-- -->, `startrender`<!-- -->, `endrender`<!-- -->.
+
+Performance notes: - Octree placement is lazily synchronized on demand before reads (e.g., `octree`<!-- -->, `boundingBox`<!-- -->) and during per-frame updates. - Update queues use weak references to avoid retaining disposed nodes.
+
+
+</td></tr>
+<tr><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+The base class of all scene graph objects.
+
+
+</td></tr>
+<tr><td>
+
+[ScriptingSystem](doc/markdown/./scene.scriptingsystem.md)
+
+
+</td><td>
+
+Script system that resolves, loads, and manages lifecycle of runtime scripts.
+
+Responsibilities: - Resolves module IDs to URLs via [ScriptRegistry](doc/markdown/./scene.scriptregistry.md) - Dynamically imports modules and instantiates a `RuntimeScript` (default export) - Tracks attachments between hosts and script instances - Bridges script lifecycle hooks: `onCreated`<!-- -->, `onAttached`<!-- -->, `onDetached`<!-- -->, `onDestroy`<!-- -->, `onUpdate` - Auto-detaches scripts when a host is disposed
+
+Notes: - Multiple hosts can reference the same `RuntimeScript` instance; destruction occurs when the last host detaches. - Errors during load/attach/update are caught and logged; an optional `onLoadError` callback can be provided.
+
+
+</td></tr>
+<tr><td>
+
+[ScriptRegistry](doc/markdown/./scene.scriptregistry.md)
+
+
+</td><td>
+
+Resolves, builds, and serves runtime modules using a VFS.
+
+Responsibilities: - Resolve logical module IDs to physical paths or URLs. - In editor mode, rewrite import specifiers and serve modules as data URLs after transpile. - Transpile TypeScript to JavaScript on the fly (requires `window.ts` TypeScript runtime). - Gather static and dynamic import dependencies for tooling.
+
+Modes: - Editor mode (`editorMode === true`<!-- -->): modules are rewritten to data URLs after transpile/build. - Runtime mode (`editorMode === false`<!-- -->): returns .js URLs directly (with .ts -<!-- -->&gt; .js mapping).
+
+Caching: - Built modules are memoized in `_built` map keyed by logical ID.
+
+
+</td></tr>
+<tr><td>
+
+[ShaderHelper](doc/markdown/./scene.shaderhelper.md)
+
+
+</td><td>
+
+Helper shader functions for the builtin material system
+
+
+</td></tr>
+<tr><td>
+
+[ShadowMapPass](doc/markdown/./scene.shadowmappass.md)
+
+
+</td><td>
+
+Shadow map render pass
+
+
+</td></tr>
+<tr><td>
+
+[ShadowMapper](doc/markdown/./scene.shadowmapper.md)
+
+
+</td><td>
+
+The shadow map generator
+
+
+</td></tr>
+<tr><td>
+
+[SharedModel](doc/markdown/./scene.sharedmodel.md)
+
+
+</td><td>
+
+Model information that can be shared by multiple model nodes
+
+
+</td></tr>
+<tr><td>
+
+[SignNode](doc/markdown/./scene.signnode.md)
+
+
+</td><td>
+
+Extracts the sign of a value
+
+
+</td></tr>
+<tr><td>
+
+[SimplexNoise2DNode](doc/markdown/./scene.simplexnoise2dnode.md)
+
+
+</td><td>
+
+Calculates a simplex noise by input UV and scale value
+
+
+</td></tr>
+<tr><td>
+
+[SinHNode](doc/markdown/./scene.sinhnode.md)
+
+
+</td><td>
+
+Computes the hyperbolic sine function
+
+
+</td></tr>
+<tr><td>
+
+[SinNode](doc/markdown/./scene.sinnode.md)
+
+
+</td><td>
+
+Computes the sine function
+
+
+</td></tr>
+<tr><td>
+
+[Skeleton](doc/markdown/./scene.skeleton.md)
+
+
+</td><td>
+
+Skeleton for skinned animation.
+
+Responsibilities: - Maintains joint transforms: inverse bind, bind pose, and current skinning matrices. - Provides a texture containing joint matrices for GPU skinning. - Applies skinning state to associated meshes each frame. - Computes animated axis-aligned bounding boxes using representative skinned vertices.
+
+Joint matrix texture layout: - Texture format: `rgba32f`<!-- -->. - Stored as a 2-layered ring buffer: current and previous joint transforms to support temporal addressing if needed. Offsets are tracked in `_jointOffsets[0]` (current) and `_jointOffsets[1]` (previous).
+
+Usage: - Construct with joints, bind data, meshes and submesh bounding info. - Call `apply()` each frame to update joint texture, bind to meshes, and update bounds. - Call `reset()` to clear skinning on meshes.
+
+
+</td></tr>
+<tr><td>
+
+[SkyEnvTextureNode](doc/markdown/./scene.skyenvtexturenode.md)
+
+
+</td><td>
+
+Sky environment texture input node
+
+
+</td></tr>
+<tr><td>
+
+[SkyRenderer](doc/markdown/./scene.skyrenderer.md)
+
+
+</td><td>
+
+The sky renderer
+
+
+</td></tr>
+<tr><td>
+
+[SphereShape](doc/markdown/./scene.sphereshape.md)
+
+
+</td><td>
+
+Sphere shape
+
+
+</td></tr>
+<tr><td>
+
+[SpotLight](doc/markdown/./scene.spotlight.md)
+
+
+</td><td>
+
+Spot light
+
+
+</td></tr>
+<tr><td>
+
+[SqrtNode](doc/markdown/./scene.sqrtnode.md)
+
+
+</td><td>
+
+Computes the square root
+
+
+</td></tr>
+<tr><td>
+
+[StepNode](doc/markdown/./scene.stepnode.md)
+
+
+</td><td>
+
+Step function (Heaviside step)
+
+
+</td></tr>
+<tr><td>
+
+[SwizzleNode](doc/markdown/./scene.swizzlenode.md)
+
+
+</td><td>
+
+Vector swizzle node
+
+
+</td></tr>
+<tr><td>
+
+[TanHNode](doc/markdown/./scene.tanhnode.md)
+
+
+</td><td>
+
+Computes the hyperbolic tangent function
+
+
+</td></tr>
+<tr><td>
+
+[TanNode](doc/markdown/./scene.tannode.md)
+
+
+</td><td>
+
+Computes the tangent function
+
+
+</td></tr>
+<tr><td>
+
+[Terrain](doc/markdown/./scene.terrain.md)
+
+
+</td><td>
+
+Terrain node
+
+
+</td></tr>
+<tr><td>
+
+[TerrainMaterial](doc/markdown/./scene.terrainmaterial.md)
+
+
+</td><td>
+
+Terrain material class
+
+
+</td></tr>
+<tr><td>
+
+[TetrahedronFrameShape](doc/markdown/./scene.tetrahedronframeshape.md)
+
+
+</td><td>
+
+Tetrahedron shape
+
+
+</td></tr>
+<tr><td>
+
+[TetrahedronShape](doc/markdown/./scene.tetrahedronshape.md)
+
+
+</td><td>
+
+Tetrahedron shape
+
+
+</td></tr>
+<tr><td>
+
+[TextureSampleGrad](doc/markdown/./scene.texturesamplegrad.md)
+
+
+</td><td>
+
+Texture sampling with explicit gradients node
+
+
+</td></tr>
+<tr><td>
+
+[TextureSampleNode](doc/markdown/./scene.texturesamplenode.md)
+
+
+</td><td>
+
+Texture sampling node
+
+
+</td></tr>
+<tr><td>
+
+[Tonemap](doc/markdown/./scene.tonemap.md)
+
+
+</td><td>
+
+The tonemap post effect
+
+
+</td></tr>
+<tr><td>
+
+[TorusShape](doc/markdown/./scene.torusshape.md)
+
+
+</td><td>
+
+Torus shape
+
+
+</td></tr>
+<tr><td>
+
+[TransformNode](doc/markdown/./scene.transformnode.md)
+
+
+</td><td>
+
+Matrix-vector transformation node
+
+
+</td></tr>
+<tr><td>
+
+[UnlitMaterial](doc/markdown/./scene.unlitmaterial.md)
+
+
+</td><td>
+
+Unlit material
+
+
+</td></tr>
+<tr><td>
+
+[VertexBinormalNode](doc/markdown/./scene.vertexbinormalnode.md)
+
+
+</td><td>
+
+Vertex binormal (bitangent) input node
+
+
+</td></tr>
+<tr><td>
+
+[VertexBlockNode](doc/markdown/./scene.vertexblocknode.md)
+
+
+</td><td>
+
+Vertex output node
+
+
+</td></tr>
+<tr><td>
+
+[VertexColorNode](doc/markdown/./scene.vertexcolornode.md)
+
+
+</td><td>
+
+Vertex color input node
+
+
+</td></tr>
+<tr><td>
+
+[VertexNormalNode](doc/markdown/./scene.vertexnormalnode.md)
+
+
+</td><td>
+
+Vertex normal input node
+
+
+</td></tr>
+<tr><td>
+
+[VertexPositionNode](doc/markdown/./scene.vertexpositionnode.md)
+
+
+</td><td>
+
+Vertex world position input node
+
+
+</td></tr>
+<tr><td>
+
+[VertexTangentNode](doc/markdown/./scene.vertextangentnode.md)
+
+
+</td><td>
+
+Vertex tangent input node
+
+
+</td></tr>
+<tr><td>
+
+[VertexUVNode](doc/markdown/./scene.vertexuvnode.md)
+
+
+</td><td>
+
+Vertex UV coordinate input node
+
+
+</td></tr>
+<tr><td>
+
+[ViewMatrixNode](doc/markdown/./scene.viewmatrixnode.md)
+
+
+</td><td>
+
+View matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[ViewProjMatrixNode](doc/markdown/./scene.viewprojmatrixnode.md)
+
+
+</td><td>
+
+View-projection matrix input node
+
+
+</td></tr>
+<tr><td>
+
+[Water](doc/markdown/./scene.water.md)
+
+
+</td><td>
+
+Water scene node
+
+
+</td></tr>
+<tr><td>
+
+[WeightedBlendedOIT](doc/markdown/./scene.weightedblendedoit.md)
+
+
+</td><td>
+
+Weighted-blended OIT renderer.
+
+
+</td></tr>
+</tbody></table>
 
 ## Abstract Classes
 
-|  Abstract Class | Description |
-|  --- | --- |
-|  [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md) | Base class for any type of post effect |
-|  [AnimationTrack](doc/markdown/./scene.animationtrack.md) | Base class for any kind of animation track |
-|  [BaseLight](doc/markdown/./scene.baselight.md) | Base class for any kind of light node |
-|  [Blitter](doc/markdown/./scene.blitter.md) | Base class for any kind of blitters |
-|  [EnvironmentLighting](doc/markdown/./scene.environmentlighting.md) | Base class for any kind of environment light |
-|  [OIT](doc/markdown/./scene.oit.md) | <p>Abstract class for order-independent transparency renderers.</p><p>Order-independent transparency (OIT) renderers allow for rendering of transparent objects in any order, regardless of their depth.</p><p>This abstract class defines the common interface for all OIT renderers. Specific implementations of OIT renderers should extend this class and provide concrete implementations for the abstract methods.</p> |
-|  [PunctualLight](doc/markdown/./scene.punctuallight.md) | Base class for any kind of puncual light |
-|  [RenderPass](doc/markdown/./scene.renderpass.md) | Base class for any kind of render passes |
-|  [Shape](doc/markdown/./scene.shape.md) | Abstract base class for any kind of shapes |
-|  [WaveGenerator](doc/markdown/./scene.wavegenerator.md) | Abstract class for wave generators. |
+<table><thead><tr><th>
+
+Abstract Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AnimationTrack](doc/markdown/./scene.animationtrack.md)
+
+
+</td><td>
+
+Base class for animation tracks.
+
+A track produces time-varying state for a specific target and defines how to: - Compute state at a given time (`calculateState`<!-- -->) - Apply that state to a target (`applyState`<!-- -->) - Blend between two states (`mixState`<!-- -->) - Report its blend compatibility (`getBlendId`<!-- -->) - Report its intrinsic duration (`getDuration`<!-- -->)
+
+Generic: - `StateType` is the shape of the computed/applied state (e.g., number, vector, pose).
+
+
+</td></tr>
+<tr><td>
+
+[BaseGraphNode](doc/markdown/./scene.basegraphnode.md)
+
+
+</td><td>
+
+Abstract base class for graph nodes
+
+
+</td></tr>
+<tr><td>
+
+[BaseLight](doc/markdown/./scene.baselight.md)
+
+
+</td><td>
+
+Base class for any kind of light node
+
+
+</td></tr>
+<tr><td>
+
+[BaseTextureNode](doc/markdown/./scene.basetexturenode.md)
+
+
+</td><td>
+
+Abstract base class for texture nodes
+
+
+</td></tr>
+<tr><td>
+
+[Blitter](doc/markdown/./scene.blitter.md)
+
+
+</td><td>
+
+Base class for any kind of blitters
+
+
+</td></tr>
+<tr><td>
+
+[EnvironmentLighting](doc/markdown/./scene.environmentlighting.md)
+
+
+</td><td>
+
+Base class for any kind of environment light
+
+
+</td></tr>
+<tr><td>
+
+[GenericMathNode](doc/markdown/./scene.genericmathnode.md)
+
+
+</td><td>
+
+Abstract base class for generic mathematical function nodes
+
+
+</td></tr>
+<tr><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+Base class for any kind of render passes
+
+
+</td></tr>
+<tr><td>
+
+[Shape](doc/markdown/./scene.shape.md)
+
+
+</td><td>
+
+Abstract base class for any kind of shapes
+
+
+</td></tr>
+</tbody></table>
 
 ## Enumerations
 
-|  Enumeration | Description |
-|  --- | --- |
-|  [MaterialVaryingFlags](doc/markdown/./scene.materialvaryingflags.md) | Material varying flags |
-|  [OctreePlacement](doc/markdown/./scene.octreeplacement.md) | Octree placement |
+<table><thead><tr><th>
+
+Enumeration
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[MaterialVaryingFlags](doc/markdown/./scene.materialvaryingflags.md)
+
+
+</td><td>
+
+Material varying flags
+
+
+</td></tr>
+<tr><td>
+
+[OctreePlacement](doc/markdown/./scene.octreeplacement.md)
+
+
+</td><td>
+
+Child placement within an octree node.
+
+
+</td></tr>
+<tr><td>
+
+[PostEffectLayer](doc/markdown/./scene.posteffectlayer.md)
+
+
+</td><td>
+
+Rendering layer of post processing effects
+
+
+</td></tr>
+</tbody></table>
 
 ## Functions
 
-|  Function | Description |
-|  --- | --- |
-|  [applyMaterialMixins(target, mixins)](doc/markdown/./scene.applymaterialmixins.md) | Apply material mixins to specific material class |
-|  [decode2HalfFromRGBA(scope, value)](doc/markdown/./scene.decode2halffromrgba.md) | Decodes two half floats that was encoded into a rgba8unorm |
-|  [decodeFloatFromRGBA(scope, value)](doc/markdown/./scene.decodefloatfromrgba.md) | Decodes a float that was encoded into a rgba8unorm |
-|  [decodeNormalizedFloatFromRGBA(scope, value)](doc/markdown/./scene.decodenormalizedfloatfromrgba.md) | Decodes a float that was encoded into a rgba8unorm |
-|  [decodeRGBM(scope, rgbm, maxRange)](doc/markdown/./scene.decodergbm.md) | Decodes color value that was encoded into RGBM format |
-|  [encode2HalfToRGBA(scope, a, b)](doc/markdown/./scene.encode2halftorgba.md) | Encodes two half floats into a rgba8unorm |
-|  [encodeFloatToRGBA(scope, value)](doc/markdown/./scene.encodefloattorgba.md) | Encodes a float into a rgba8unorm |
-|  [encodeNormalizedFloatToRGBA(scope, value)](doc/markdown/./scene.encodenormalizedfloattorgba.md) | Encodes a float into a rgba8unorm |
-|  [encodeRGBM(scope, rgb, maxRange)](doc/markdown/./scene.encodergbm.md) | Encodes a color value into RGBM format |
-|  [gammaToLinear(scope, color)](doc/markdown/./scene.gammatolinear.md) | Converts a vec3 color from gamma space to linear space |
-|  [gradient(scope, p, t)](doc/markdown/./scene.gradient.md) | Generate random float value from a vec2 |
-|  [hash(scope, p)](doc/markdown/./scene.hash.md) | Generate random float value from a vec2 |
-|  [interleavedGradientNoise(scope, c)](doc/markdown/./scene.interleavedgradientnoise.md) | Calculate interleaved gradient noise |
-|  [linearToGamma(scope, color)](doc/markdown/./scene.lineartogamma.md) | Converts a vec3 color from linear space to gamma space |
-|  [mixinAlbedoColor(BaseCls)](doc/markdown/./scene.mixinalbedocolor.md) | Albedo color mixin |
-|  [mixinBlinnPhong(BaseCls)](doc/markdown/./scene.mixinblinnphong.md) | Blinn-phong lighting model mixin |
-|  [mixinFoliage(BaseCls)](doc/markdown/./scene.mixinfoliage.md) | Foliage mixin |
-|  [mixinLambert(BaseCls)](doc/markdown/./scene.mixinlambert.md) | Lambert lighting model mixin |
-|  [mixinLight(BaseCls)](doc/markdown/./scene.mixinlight.md) | Light mixin |
-|  [mixinPBRCommon(BaseCls)](doc/markdown/./scene.mixinpbrcommon.md) | PBR common stuff mixin |
-|  [mixinPBRMetallicRoughness(BaseCls)](doc/markdown/./scene.mixinpbrmetallicroughness.md) | PBRMetallicRoughness lighting model mixin |
-|  [mixinPBRSpecularGlossness(BaseCls)](doc/markdown/./scene.mixinpbrspecularglossness.md) | PBRSpecularGlossiness mixin |
-|  [mixinTextureProps(name)](doc/markdown/./scene.mixintextureprops.md) | Texture property mixin |
-|  [mixinVertexColor(BaseCls)](doc/markdown/./scene.mixinvertexcolor.md) | Vertex color mixin |
-|  [noise3D(scope, p)](doc/markdown/./scene.noise3d.md) | Calculate 3d noise by a 3d position |
-|  [panoramaToCubemap(tex, outputCubeMap)](doc/markdown/./scene.panoramatocubemap.md) | Converts an equirectangular image to cubemap |
-|  [perlinNoise2D(scope, p)](doc/markdown/./scene.perlinnoise2d.md) | Generate a float perlin noise value from a vec2 |
-|  [perlinNoise3D(scope, p)](doc/markdown/./scene.perlinnoise3d.md) | Generate a float perlin noise value from a vec3 |
-|  [prefilterCubemap(tex, type, destTex, numSamples)](doc/markdown/./scene.prefiltercubemap.md) | Prefilters an environment cubemap |
-|  [projectCubemap(tex)](doc/markdown/./scene.projectcubemap.md) | Projects a function represented in a cubemap into spherical harmonics using GPU |
-|  [projectCubemapCPU(input)](doc/markdown/./scene.projectcubemapcpu.md) | Projects a function represented in a cubemap into spherical harmonics using CPU |
-|  [smoothNoise3D(scope, p)](doc/markdown/./scene.smoothnoise3d.md) | Calculate smooth 3d noise by a 3d position |
-|  [worleyFBM(scope, p, freq)](doc/markdown/./scene.worleyfbm.md) | Calculate worley FBM |
-|  [worleyNoise(scope, uv, freq)](doc/markdown/./scene.worleynoise.md) | worley 3d noise |
+<table><thead><tr><th>
+
+Function
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyMaterialMixins(target, mixins)](doc/markdown/./scene.applymaterialmixins.md)
+
+
+</td><td>
+
+Apply material mixins to a target material class.
+
+Useful for composing optional capabilities (e.g., base color, normal map, PBR terms).
+
+
+</td></tr>
+<tr><td>
+
+[decode2HalfFromRGBA(scope, value)](doc/markdown/./scene.decode2halffromrgba.md)
+
+
+</td><td>
+
+Decodes two half floats that was encoded into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[decodeFloatFromRGBA(scope, value)](doc/markdown/./scene.decodefloatfromrgba.md)
+
+
+</td><td>
+
+Decodes a float that was encoded into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[decodeNormalizedFloatFromRGBA(scope, value)](doc/markdown/./scene.decodenormalizedfloatfromrgba.md)
+
+
+</td><td>
+
+Decodes a float that was encoded into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[decodeRGBM(scope, rgbm, maxRange)](doc/markdown/./scene.decodergbm.md)
+
+
+</td><td>
+
+Decodes color value that was encoded into RGBM format
+
+
+</td></tr>
+<tr><td>
+
+[encode2HalfToRGBA(scope, a, b)](doc/markdown/./scene.encode2halftorgba.md)
+
+
+</td><td>
+
+Encodes two half floats into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[encodeFloatToRGBA(scope, value)](doc/markdown/./scene.encodefloattorgba.md)
+
+
+</td><td>
+
+Encodes a float into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[encodeNormalizedFloatToRGBA(scope, value)](doc/markdown/./scene.encodenormalizedfloattorgba.md)
+
+
+</td><td>
+
+Encodes a float into a rgba8unorm
+
+
+</td></tr>
+<tr><td>
+
+[encodeRGBM(scope, rgb, maxRange)](doc/markdown/./scene.encodergbm.md)
+
+
+</td><td>
+
+Encodes a color value into RGBM format
+
+
+</td></tr>
+<tr><td>
+
+[fetchSampler(type)](doc/markdown/./scene.fetchsampler.md)
+
+
+</td><td>
+
+Fetch a sampler by type
+
+
+</td></tr>
+<tr><td>
+
+[gammaToLinear(scope, color)](doc/markdown/./scene.gammatolinear.md)
+
+
+</td><td>
+
+Converts a vec3 color from gamma space to linear space
+
+
+</td></tr>
+<tr><td>
+
+[getApp()](doc/markdown/./scene.getapp.md)
+
+
+</td><td>
+
+Singleton accessor for the current Application instance.
+
+
+</td></tr>
+<tr><td>
+
+[getDevice()](doc/markdown/./scene.getdevice.md)
+
+
+</td><td>
+
+Singleton accessor for the device instance.
+
+
+</td></tr>
+<tr><td>
+
+[getEngine()](doc/markdown/./scene.getengine.md)
+
+
+</td><td>
+
+Singleton accessor for the current engine instance.
+
+
+</td></tr>
+<tr><td>
+
+[getInput()](doc/markdown/./scene.getinput.md)
+
+
+</td><td>
+
+Singleton accessor for the input manager instance.
+
+
+</td></tr>
+<tr><td>
+
+[gradient(scope, p, t)](doc/markdown/./scene.gradient.md)
+
+
+</td><td>
+
+Generate random float value from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[hash11(scope, p)](doc/markdown/./scene.hash11.md)
+
+
+</td><td>
+
+Generate random float value from a float
+
+
+</td></tr>
+<tr><td>
+
+[hash12(scope, p)](doc/markdown/./scene.hash12.md)
+
+
+</td><td>
+
+Generate random vec2 value from a float
+
+
+</td></tr>
+<tr><td>
+
+[hash13(scope, p)](doc/markdown/./scene.hash13.md)
+
+
+</td><td>
+
+Generate random vec3 value from a float
+
+
+</td></tr>
+<tr><td>
+
+[hash21(scope, p)](doc/markdown/./scene.hash21.md)
+
+
+</td><td>
+
+Generate random float value from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[hash22(scope, p)](doc/markdown/./scene.hash22.md)
+
+
+</td><td>
+
+Generate random vec2 value from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[hash23(scope, p)](doc/markdown/./scene.hash23.md)
+
+
+</td><td>
+
+Generate random vec3 value from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[hash31(scope, p)](doc/markdown/./scene.hash31.md)
+
+
+</td><td>
+
+Generate random float value from a vec3
+
+
+</td></tr>
+<tr><td>
+
+[hash32(scope, p)](doc/markdown/./scene.hash32.md)
+
+
+</td><td>
+
+Generate random vec2 value from a vec3
+
+
+</td></tr>
+<tr><td>
+
+[hash33(scope, p)](doc/markdown/./scene.hash33.md)
+
+
+</td><td>
+
+Generate random vec3 value from a vec3
+
+
+</td></tr>
+<tr><td>
+
+[interleavedGradientNoise(scope, c)](doc/markdown/./scene.interleavedgradientnoise.md)
+
+
+</td><td>
+
+Calculate interleaved gradient noise
+
+
+</td></tr>
+<tr><td>
+
+[linearToGamma(scope, color)](doc/markdown/./scene.lineartogamma.md)
+
+
+</td><td>
+
+Converts a vec3 color from linear space to gamma space
+
+
+</td></tr>
+<tr><td>
+
+[mixinAlbedoColor(BaseCls)](doc/markdown/./scene.mixinalbedocolor.md)
+
+
+</td><td>
+
+Albedo color mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinBlinnPhong(BaseCls)](doc/markdown/./scene.mixinblinnphong.md)
+
+
+</td><td>
+
+Blinn-phong lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinFoliage(BaseCls)](doc/markdown/./scene.mixinfoliage.md)
+
+
+</td><td>
+
+Foliage mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinLambert(BaseCls)](doc/markdown/./scene.mixinlambert.md)
+
+
+</td><td>
+
+Lambert lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinLight(BaseCls)](doc/markdown/./scene.mixinlight.md)
+
+
+</td><td>
+
+Light mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinPBRCommon(BaseCls)](doc/markdown/./scene.mixinpbrcommon.md)
+
+
+</td><td>
+
+PBR common stuff mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinPBRMetallicRoughness(BaseCls)](doc/markdown/./scene.mixinpbrmetallicroughness.md)
+
+
+</td><td>
+
+PBRMetallicRoughness lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinPBRSpecularGlossness(BaseCls)](doc/markdown/./scene.mixinpbrspecularglossness.md)
+
+
+</td><td>
+
+PBRSpecularGlossiness mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinTextureProps(name)](doc/markdown/./scene.mixintextureprops.md)
+
+
+</td><td>
+
+Texture property mixin
+
+
+</td></tr>
+<tr><td>
+
+[mixinVertexColor(BaseCls)](doc/markdown/./scene.mixinvertexcolor.md)
+
+
+</td><td>
+
+Vertex color mixin
+
+
+</td></tr>
+<tr><td>
+
+[noise3D(scope, p)](doc/markdown/./scene.noise3d.md)
+
+
+</td><td>
+
+Calculate 3d noise by a 3d position
+
+
+</td></tr>
+<tr><td>
+
+[panoramaToCubemap(tex, outputCubeMap)](doc/markdown/./scene.panoramatocubemap.md)
+
+
+</td><td>
+
+Converts an equirectangular image to cubemap
+
+
+</td></tr>
+<tr><td>
+
+[perlinNoise2D(scope, p)](doc/markdown/./scene.perlinnoise2d.md)
+
+
+</td><td>
+
+Generate a float perlin noise value from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[perlinNoise3D(scope, p)](doc/markdown/./scene.perlinnoise3d.md)
+
+
+</td><td>
+
+Generate a float perlin noise value from a vec3
+
+
+</td></tr>
+<tr><td>
+
+[prefilterCubemap(tex, type, destTexture, numSamples, radianceSource)](doc/markdown/./scene.prefiltercubemap.md)
+
+
+</td><td>
+
+Prefilters an environment cubemap
+
+
+</td></tr>
+<tr><td>
+
+[smoothNoise3D(scope, p)](doc/markdown/./scene.smoothnoise3d.md)
+
+
+</td><td>
+
+Calculate smooth 3d noise by a 3d position
+
+
+</td></tr>
+<tr><td>
+
+[temporalResolve(scope, currentColorTex, historyColorTex, currentDepthTex, motionVectorTex, prevMotionVectorTex, uv, workSize, debug)](doc/markdown/./scene.temporalresolve.md)
+
+
+</td><td>
+
+Temporal resolve implementation
+
+
+</td></tr>
+<tr><td>
+
+[valueNoise(scope, p)](doc/markdown/./scene.valuenoise.md)
+
+
+</td><td>
+
+Generate value noise from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[whiteNoise(scope, p)](doc/markdown/./scene.whitenoise.md)
+
+
+</td><td>
+
+Generate uniform distributed white noise from a vec2
+
+
+</td></tr>
+<tr><td>
+
+[worleyFBM(scope, p, freq)](doc/markdown/./scene.worleyfbm.md)
+
+
+</td><td>
+
+Calculate worley FBM
+
+
+</td></tr>
+<tr><td>
+
+[worleyNoise(scope, uv, freq)](doc/markdown/./scene.worleynoise.md)
+
+
+</td><td>
+
+worley 3d noise
+
+
+</td></tr>
+</tbody></table>
 
 ## Interfaces
 
-|  Interface | Description |
-|  --- | --- |
-|  [AssetAnimationData](doc/markdown/./scene.assetanimationdata.md) | Animation data interface for model loading |
-|  [AssetAnimationTrack](doc/markdown/./scene.assetanimationtrack.md) | Animation track interface for model loading |
-|  [AssetMaterial](doc/markdown/./scene.assetmaterial.md) | Base material properties for model loading |
-|  [AssetMaterialClearcoat](doc/markdown/./scene.assetmaterialclearcoat.md) | Clearcoat related material properties for model loading |
-|  [AssetMaterialCommon](doc/markdown/./scene.assetmaterialcommon.md) | Common properties of material for model loading |
-|  [AssetMaterialIridescence](doc/markdown/./scene.assetmaterialiridescence.md) | Iridescence related material properties for model loading |
-|  [AssetMaterialSheen](doc/markdown/./scene.assetmaterialsheen.md) | Sheen related material properties for model loading |
-|  [AssetMaterialTransmission](doc/markdown/./scene.assetmaterialtransmission.md) | Transmission related material properties for model loading |
-|  [AssetMeshData](doc/markdown/./scene.assetmeshdata.md) | Mesh data interface for model loading |
-|  [AssetPBRMaterialCommon](doc/markdown/./scene.assetpbrmaterialcommon.md) | PBR related material properties for model loading |
-|  [AssetPBRMaterialMR](doc/markdown/./scene.assetpbrmaterialmr.md) | PBR of Metallic-Roughness workflow related material properties for model loading |
-|  [AssetPBRMaterialSG](doc/markdown/./scene.assetpbrmaterialsg.md) | PBR of Specular-Glossness workfow related material properties for model loading |
-|  [AssetRotationTrack](doc/markdown/./scene.assetrotationtrack.md) | Rotation track of key frame animation interface for model loading |
-|  [AssetScaleTrack](doc/markdown/./scene.assetscaletrack.md) | Scale track of key frame animation interface for model loading |
-|  [AssetSkeletalAnimationTrack](doc/markdown/./scene.assetskeletalanimationtrack.md) | Skeletal animation track interface for model loading |
-|  [AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md) | Sub mesh data interface for model loading |
-|  [AssetTranslationTrack](doc/markdown/./scene.assettranslationtrack.md) | Translation track of key frame animation interface for model loading |
-|  [AssetUnlitMaterial](doc/markdown/./scene.assetunlitmaterial.md) | Unlit related material properties for model loading |
-|  [BatchDrawable](doc/markdown/./scene.batchdrawable.md) | interface for any objects that support instancing |
-|  [BoundingVolume](doc/markdown/./scene.boundingvolume.md) | Base interface for any kind of bounding volumes |
-|  [BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md) | Creation options for box shape |
-|  [CompositorContext](doc/markdown/./scene.compositorcontext.md) | Posteffect rendering context |
-|  [CylinderCreationOptions](doc/markdown/./scene.cylindercreationoptions.md) | Creation options for cylinder shape |
-|  [Drawable](doc/markdown/./scene.drawable.md) | Base interface for a drawble object |
-|  [DrawContext](doc/markdown/./scene.drawcontext.md) | The context for drawing objects |
-|  [FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md) | Creation options for FPSCameraController |
-|  [IMixinFoliage](doc/markdown/./scene.imixinfoliage.md) | Interface for foliage mixin |
-|  [IMixinVertexColor](doc/markdown/./scene.imixinvertexcolor.md) | Interface for vertex color mixin |
-|  [InstanceData](doc/markdown/./scene.instancedata.md) | Instance data |
-|  [Logger](doc/markdown/./scene.logger.md) | Logger interface |
-|  [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | Texture information for model loading |
-|  [OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md) | Creation options for OrbitCameraController |
-|  [PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md) | Creation options for plane shapes |
-|  [ShapeCreationOptions](doc/markdown/./scene.shapecreationoptions.md) | Base class for creation options of any kind of shapes |
-|  [SphereCreationOptions](doc/markdown/./scene.spherecreationoptions.md) | Creation options for sphere shape |
-|  [TorusCreationOptions](doc/markdown/./scene.toruscreationoptions.md) | Creation options for torus shape |
-|  [Visitor](doc/markdown/./scene.visitor.md) | Visior |
+<table><thead><tr><th>
+
+Interface
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AssetAnimationData](doc/markdown/./scene.assetanimationdata.md)
+
+
+</td><td>
+
+Animation data interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetAnimationTrack](doc/markdown/./scene.assetanimationtrack.md)
+
+
+</td><td>
+
+Animation track interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterial](doc/markdown/./scene.assetmaterial.md)
+
+
+</td><td>
+
+Base material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterialClearcoat](doc/markdown/./scene.assetmaterialclearcoat.md)
+
+
+</td><td>
+
+Clearcoat related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterialCommon](doc/markdown/./scene.assetmaterialcommon.md)
+
+
+</td><td>
+
+Common properties of material for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterialIridescence](doc/markdown/./scene.assetmaterialiridescence.md)
+
+
+</td><td>
+
+Iridescence related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterialSheen](doc/markdown/./scene.assetmaterialsheen.md)
+
+
+</td><td>
+
+Sheen related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMaterialTransmission](doc/markdown/./scene.assetmaterialtransmission.md)
+
+
+</td><td>
+
+Transmission related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetMeshData](doc/markdown/./scene.assetmeshdata.md)
+
+
+</td><td>
+
+Mesh data interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetPBRMaterialCommon](doc/markdown/./scene.assetpbrmaterialcommon.md)
+
+
+</td><td>
+
+PBR related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetPBRMaterialMR](doc/markdown/./scene.assetpbrmaterialmr.md)
+
+
+</td><td>
+
+PBR of Metallic-Roughness workflow related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetPBRMaterialSG](doc/markdown/./scene.assetpbrmaterialsg.md)
+
+
+</td><td>
+
+PBR of Specular-Glossness workfow related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetRotationTrack](doc/markdown/./scene.assetrotationtrack.md)
+
+
+</td><td>
+
+Rotation track of key frame animation interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetScaleTrack](doc/markdown/./scene.assetscaletrack.md)
+
+
+</td><td>
+
+Scale track of key frame animation interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetSkeletalAnimationTrack](doc/markdown/./scene.assetskeletalanimationtrack.md)
+
+
+</td><td>
+
+Skeletal animation track interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md)
+
+
+</td><td>
+
+Sub mesh data interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetTranslationTrack](doc/markdown/./scene.assettranslationtrack.md)
+
+
+</td><td>
+
+Translation track of key frame animation interface for model loading
+
+
+</td></tr>
+<tr><td>
+
+[AssetUnlitMaterial](doc/markdown/./scene.assetunlitmaterial.md)
+
+
+</td><td>
+
+Unlit related material properties for model loading
+
+
+</td></tr>
+<tr><td>
+
+[BatchDrawable](doc/markdown/./scene.batchdrawable.md)
+
+
+</td><td>
+
+Interface for drawables that support hardware instancing.
+
+Instanced drawables supply instance-specific uniforms, offsets, and strides to allow a single draw call to render many instances efficiently.
+
+
+</td></tr>
+<tr><td>
+
+[BlueprintDAG](doc/markdown/./scene.blueprintdag.md)
+
+
+</td><td>
+
+Complete representation of a Blueprint Directed Acyclic Graph (DAG)
+
+
+</td></tr>
+<tr><td>
+
+[BluePrintUniformTexture](doc/markdown/./scene.blueprintuniformtexture.md)
+
+
+</td><td>
+
+Represents a uniform texture and its sampler in the blueprint intermediate representation
+
+
+</td></tr>
+<tr><td>
+
+[BluePrintUniformValue](doc/markdown/./scene.blueprintuniformvalue.md)
+
+
+</td><td>
+
+Represents a uniform scalar or vector value in the blueprint intermediate representation
+
+
+</td></tr>
+<tr><td>
+
+[BoundingVolume](doc/markdown/./scene.boundingvolume.md)
+
+
+</td><td>
+
+Base interface for any kind of bounding volumes
+
+
+</td></tr>
+<tr><td>
+
+[BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md)
+
+
+</td><td>
+
+Creation options for box shape
+
+
+</td></tr>
+<tr><td>
+
+[CompositorContext](doc/markdown/./scene.compositorcontext.md)
+
+
+</td><td>
+
+Posteffect rendering context
+
+
+</td></tr>
+<tr><td>
+
+[CylinderCreationOptions](doc/markdown/./scene.cylindercreationoptions.md)
+
+
+</td><td>
+
+Creation options for cylinder shape
+
+
+</td></tr>
+<tr><td>
+
+[Drawable](doc/markdown/./scene.drawable.md)
+
+
+</td><td>
+
+Base interface for a drawable (renderable) object.
+
+A drawable encapsulates geometry, material, and GPU-resident data required to be rendered. Implementations integrate with render queues, batching, and instancing.
+
+
+</td></tr>
+<tr><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Context object passed to draw calls and render helpers.
+
+It aggregates all per-frame, per-pass, and per-draw state derived from the engine and renderer, including device handles, textures, passes, flags, and post-processing links.
+
+Notes: - Not all textures/fields are present for every pass; check for undefined when optional. - Values like `HiZ`<!-- -->, `TAA`<!-- -->, `SSR` signal features the renderer has activated for the current pass.
+
+
+</td></tr>
+<tr><td>
+
+[FPSCameraControllerOptions](doc/markdown/./scene.fpscameracontrolleroptions.md)
+
+
+</td><td>
+
+Creation options for FPSCameraController
+
+
+</td></tr>
+<tr><td>
+
+[GraphStructure](doc/markdown/./scene.graphstructure.md)
+
+
+</td><td>
+
+Adjacency list representation of the graph structure
+
+
+</td></tr>
+<tr><td>
+
+[IAttachedScript](doc/markdown/./scene.iattachedscript.md)
+
+
+</td><td>
+
+Information about a script attached to a host.
+
+
+</td></tr>
+<tr><td>
+
+[IBaseEvent](doc/markdown/./scene.ibaseevent.md)
+
+
+</td><td>
+
+Base structure for all controller events.
+
+Represents a typed event emitted or handled by a camera controller.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerKeyboardEvent](doc/markdown/./scene.icontrollerkeyboardevent.md)
+
+
+</td><td>
+
+Base interface for all controller keyboard events.
+
+Provides key identification along with standard modifier flags.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerKeydownEvent](doc/markdown/./scene.icontrollerkeydownevent.md)
+
+
+</td><td>
+
+Key down event for camera controllers.
+
+Triggered when a keyboard key is pressed down.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerKeypressEvent](doc/markdown/./scene.icontrollerkeypressevent.md)
+
+
+</td><td>
+
+Key press event for camera controllers.
+
+Triggered when a key is pressed and generates a character value (legacy usage).
+
+
+</td></tr>
+<tr><td>
+
+[IControllerKeyupEvent](doc/markdown/./scene.icontrollerkeyupevent.md)
+
+
+</td><td>
+
+Key up event for camera controllers.
+
+Triggered when a keyboard key is released.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerMouseEvent](doc/markdown/./scene.icontrollermouseevent.md)
+
+
+</td><td>
+
+Base interface for all controller mouse and pointer events.
+
+Extends the base event with positional and button information, as well as modifier keys.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerPointerCancelEvent](doc/markdown/./scene.icontrollerpointercancelevent.md)
+
+
+</td><td>
+
+Pointer cancel event for camera controllers.
+
+Triggered when the pointer operation is canceled (e.g., touch canceled, system interruption).
+
+
+</td></tr>
+<tr><td>
+
+[IControllerPointerDownEvent](doc/markdown/./scene.icontrollerpointerdownevent.md)
+
+
+</td><td>
+
+Pointer down event for camera controllers.
+
+Triggered when a mouse, pen, or touch pointer is pressed down.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerPointerMoveEvent](doc/markdown/./scene.icontrollerpointermoveevent.md)
+
+
+</td><td>
+
+Pointer move event for camera controllers.
+
+Triggered when the pointer (mouse, pen, or touch) moves across the viewport.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerPointerUpEvent](doc/markdown/./scene.icontrollerpointerupevent.md)
+
+
+</td><td>
+
+Pointer up event for camera controllers.
+
+Triggered when a mouse, pen, or touch pointer is released.
+
+
+</td></tr>
+<tr><td>
+
+[IControllerWheelEvent](doc/markdown/./scene.icontrollerwheelevent.md)
+
+
+</td><td>
+
+Wheel (scroll) event for camera controllers.
+
+Extends a mouse event with wheel delta values for scroll-based input (e.g., zoom).
+
+
+</td></tr>
+<tr><td>
+
+[IGraphNode](doc/markdown/./scene.igraphnode.md)
+
+
+</td><td>
+
+Interface for a graph node in the material blueprint system
+
+
+</td></tr>
+<tr><td>
+
+[IMixinFoliage](doc/markdown/./scene.imixinfoliage.md)
+
+
+</td><td>
+
+Interface for foliage mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinVertexColor](doc/markdown/./scene.imixinvertexcolor.md)
+
+
+</td><td>
+
+Interface for vertex color mixin
+
+
+</td></tr>
+<tr><td>
+
+[IModKey](doc/markdown/./scene.imodkey.md)
+
+
+</td><td>
+
+Standard modifier key set for mouse/keyboard events.
+
+Encapsulates common modifier keys such as Ctrl, Alt, Shift, and Meta.
+
+
+</td></tr>
+<tr><td>
+
+[InstanceData](doc/markdown/./scene.instancedata.md)
+
+
+</td><td>
+
+Instance data
+
+
+</td></tr>
+<tr><td>
+
+[IRenderable](doc/markdown/./scene.irenderable.md)
+
+
+</td><td>
+
+Interface for objects that can be rendered.
+
+
+</td></tr>
+<tr><td>
+
+[IRenderHook](doc/markdown/./scene.irenderhook.md)
+
+
+</td><td>
+
+Interface for render hooks to customize rendering behavior.
+
+
+</td></tr>
+<tr><td>
+
+[IRUniformTexture](doc/markdown/./scene.iruniformtexture.md)
+
+
+</td><td>
+
+Represents a uniform texture and its sampler in the intermediate representation
+
+
+</td></tr>
+<tr><td>
+
+[IRUniformValue](doc/markdown/./scene.iruniformvalue.md)
+
+
+</td><td>
+
+Represents a uniform scalar or vector value in the intermediate representation
+
+
+</td></tr>
+<tr><td>
+
+[MaterialBlueprintIRBehaviors](doc/markdown/./scene.materialblueprintirbehaviors.md)
+
+
+</td><td>
+
+Material blueprint behavior flags
+
+
+</td></tr>
+<tr><td>
+
+[MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md)
+
+
+</td><td>
+
+Texture information for model loading
+
+
+</td></tr>
+<tr><td>
+
+[Metadata](doc/markdown/./scene.metadata.md)
+
+
+</td><td>
+
+Metadata interface for storing additional information
+
+
+</td></tr>
+<tr><td>
+
+[NodeConnection](doc/markdown/./scene.nodeconnection.md)
+
+
+</td><td>
+
+Represents a connection between two nodes
+
+
+</td></tr>
+<tr><td>
+
+[OIT](doc/markdown/./scene.oit.md)
+
+
+</td><td>
+
+Abstract class for order-independent transparency renderers.
+
+Order-independent transparency (OIT) renderers allow for rendering of transparent objects in any order, regardless of their depth.
+
+This abstract class defines the common interface for all OIT renderers. Specific implementations of OIT renderers should extend this class and provide concrete implementations for the abstract methods.
+
+
+</td></tr>
+<tr><td>
+
+[OrbitCameraControllerOptions](doc/markdown/./scene.orbitcameracontrolleroptions.md)
+
+
+</td><td>
+
+Creation options for OrbitCameraController
+
+
+</td></tr>
+<tr><td>
+
+[PlaneCreationOptions](doc/markdown/./scene.planecreationoptions.md)
+
+
+</td><td>
+
+Creation options for plane shapes
+
+
+</td></tr>
+<tr><td>
+
+[ShapeCreationOptions](doc/markdown/./scene.shapecreationoptions.md)
+
+
+</td><td>
+
+Base class for creation options of any kind of shapes
+
+
+</td></tr>
+<tr><td>
+
+[SphereCreationOptions](doc/markdown/./scene.spherecreationoptions.md)
+
+
+</td><td>
+
+Creation options for sphere shape
+
+
+</td></tr>
+<tr><td>
+
+[TetrahedronCreationOptions](doc/markdown/./scene.tetrahedroncreationoptions.md)
+
+
+</td><td>
+
+Creation options for tetrahedron shape
+
+
+</td></tr>
+<tr><td>
+
+[TorusCreationOptions](doc/markdown/./scene.toruscreationoptions.md)
+
+
+</td><td>
+
+Creation options for torus shape
+
+
+</td></tr>
+<tr><td>
+
+[Visitor](doc/markdown/./scene.visitor.md)
+
+
+</td><td>
+
+Visior
+
+
+</td></tr>
+<tr><td>
+
+[WaveGenerator](doc/markdown/./scene.wavegenerator.md)
+
+
+</td><td>
+
+Abstract class for wave generators.
+
+
+</td></tr>
+</tbody></table>
 
 ## Variables
 
-|  Variable | Description |
-|  --- | --- |
-|  [BUILTIN\_ASSET\_TEST\_CUBEMAP](doc/markdown/./scene.builtin_asset_test_cubemap.md) | Builtin cube texture for test |
-|  [BUILTIN\_ASSET\_TEXTURE\_SHEEN\_LUT](doc/markdown/./scene.builtin_asset_texture_sheen_lut.md) | Builtin texture name for sheen LUT |
-|  [LIGHT\_TYPE\_DIRECTIONAL](doc/markdown/./scene.light_type_directional.md) | Directional light type |
-|  [LIGHT\_TYPE\_NONE](doc/markdown/./scene.light_type_none.md) | No light |
-|  [LIGHT\_TYPE\_POINT](doc/markdown/./scene.light_type_point.md) | Point light type |
-|  [LIGHT\_TYPE\_SPOT](doc/markdown/./scene.light_type_spot.md) | Spot light type |
-|  [MAX\_CLUSTERED\_LIGHTS](doc/markdown/./scene.max_clustered_lights.md) | Max light size for clustered lighting |
-|  [QUEUE\_OPAQUE](doc/markdown/./scene.queue_opaque.md) | Opaque render queue type |
-|  [QUEUE\_TRANSPARENT](doc/markdown/./scene.queue_transparent.md) | Transparent render queue type |
-|  [RENDER\_PASS\_TYPE\_DEPTH](doc/markdown/./scene.render_pass_type_depth.md) | Depth only render pass type |
-|  [RENDER\_PASS\_TYPE\_LIGHT](doc/markdown/./scene.render_pass_type_light.md) | Forward render pass type |
-|  [RENDER\_PASS\_TYPE\_OBJECT\_COLOR](doc/markdown/./scene.render_pass_type_object_color.md) | Object color render pass type |
-|  [RENDER\_PASS\_TYPE\_SHADOWMAP](doc/markdown/./scene.render_pass_type_shadowmap.md) | Shadow map render pass type |
+<table><thead><tr><th>
+
+Variable
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ATMOSPHERIC\_FOG\_BIT](doc/markdown/./scene.atmospheric_fog_bit.md)
+
+
+</td><td>
+
+Atmospheric Fog flag
+
+
+</td></tr>
+<tr><td>
+
+[BUILTIN\_ASSET\_TEST\_CUBEMAP](doc/markdown/./scene.builtin_asset_test_cubemap.md)
+
+
+</td><td>
+
+Builtin cube texture for test
+
+
+</td></tr>
+<tr><td>
+
+[BUILTIN\_ASSET\_TEXTURE\_SHEEN\_LUT](doc/markdown/./scene.builtin_asset_texture_sheen_lut.md)
+
+
+</td><td>
+
+Builtin texture name for sheen LUT
+
+
+</td></tr>
+<tr><td>
+
+[HEIGHT\_FOG\_BIT](doc/markdown/./scene.height_fog_bit.md)
+
+
+</td><td>
+
+Exponential Fog flag
+
+
+</td></tr>
+<tr><td>
+
+[LIGHT\_TYPE\_DIRECTIONAL](doc/markdown/./scene.light_type_directional.md)
+
+
+</td><td>
+
+Directional light type
+
+
+</td></tr>
+<tr><td>
+
+[LIGHT\_TYPE\_NONE](doc/markdown/./scene.light_type_none.md)
+
+
+</td><td>
+
+No light
+
+
+</td></tr>
+<tr><td>
+
+[LIGHT\_TYPE\_POINT](doc/markdown/./scene.light_type_point.md)
+
+
+</td><td>
+
+Point light type
+
+
+</td></tr>
+<tr><td>
+
+[LIGHT\_TYPE\_SPOT](doc/markdown/./scene.light_type_spot.md)
+
+
+</td><td>
+
+Spot light type
+
+
+</td></tr>
+<tr><td>
+
+[MAX\_CLUSTERED\_LIGHTS](doc/markdown/./scene.max_clustered_lights.md)
+
+
+</td><td>
+
+Max light size for clustered lighting
+
+
+</td></tr>
+<tr><td>
+
+[QUEUE\_OPAQUE](doc/markdown/./scene.queue_opaque.md)
+
+
+</td><td>
+
+Opaque render queue type
+
+
+</td></tr>
+<tr><td>
+
+[QUEUE\_TRANSPARENT](doc/markdown/./scene.queue_transparent.md)
+
+
+</td><td>
+
+Transparent render queue type
+
+
+</td></tr>
+<tr><td>
+
+[RENDER\_PASS\_TYPE\_DEPTH](doc/markdown/./scene.render_pass_type_depth.md)
+
+
+</td><td>
+
+Depth only render pass type
+
+
+</td></tr>
+<tr><td>
+
+[RENDER\_PASS\_TYPE\_LIGHT](doc/markdown/./scene.render_pass_type_light.md)
+
+
+</td><td>
+
+Forward render pass type
+
+
+</td></tr>
+<tr><td>
+
+[RENDER\_PASS\_TYPE\_OBJECT\_COLOR](doc/markdown/./scene.render_pass_type_object_color.md)
+
+
+</td><td>
+
+Object color render pass type
+
+
+</td></tr>
+<tr><td>
+
+[RENDER\_PASS\_TYPE\_SHADOWMAP](doc/markdown/./scene.render_pass_type_shadowmap.md)
+
+
+</td><td>
+
+Shadow map render pass type
+
+
+</td></tr>
+</tbody></table>
 
 ## Type Aliases
 
-|  Type Alias | Description |
-|  --- | --- |
-|  [AppOptions](doc/markdown/./scene.appoptions.md) | The creation options for Application |
-|  [BlendMode](doc/markdown/./scene.blendmode.md) | Blending mode for mesh material |
-|  [BlitType](doc/markdown/./scene.blittype.md) | Blit type |
-|  [EnvLightType](doc/markdown/./scene.envlighttype.md) | Environment light type |
-|  [ExtractMixinReturnType](doc/markdown/./scene.extractmixinreturntype.md) | Extract mixin return type |
-|  [ExtractMixinType](doc/markdown/./scene.extractmixintype.md) | Extract mixin type |
-|  [FogType](doc/markdown/./scene.fogtype.md) | Type of fog |
-|  [IMixinAlbedoColor](doc/markdown/./scene.imixinalbedocolor.md) | Interface for albedo color mixin |
-|  [IMixinBlinnPhong](doc/markdown/./scene.imixinblinnphong.md) | Interface for blinn-phong lighting model mixin |
-|  [IMixinLambert](doc/markdown/./scene.imixinlambert.md) | Interface of lambert lighting model mixin |
-|  [IMixinLight](doc/markdown/./scene.imixinlight.md) | Interface for light mixin |
-|  [IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md) | Interface for common PBR mixin |
-|  [IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md) | Interface for PBRMetallicRoughness lighting model mixin |
-|  [IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md) | Interface for PBRSpecularGlossiness mixin |
-|  [LogMode](doc/markdown/./scene.logmode.md) | Log mode |
-|  [ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md) | Options for model fetching |
-|  [ModelInfo](doc/markdown/./scene.modelinfo.md) | Data structure returned by AssetManager.fetchModel() |
-|  [PickResult](doc/markdown/./scene.pickresult.md) | Camera pick result |
-|  [PickTarget](doc/markdown/./scene.picktarget.md) | Pick target |
-|  [PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md) | Options for playing animation |
-|  [SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md) | Scene node visible state |
-|  [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow mapping mode |
-|  [SkyType](doc/markdown/./scene.skytype.md) | Type of sky |
-|  [StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md) | Options for stop playing animation |
-|  [TerrainDetailMapInfo](doc/markdown/./scene.terraindetailmapinfo.md) | Terrain detail map information |
-|  [TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md) | Terrain material options |
-|  [TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md) | Options for texture fetching |
-|  [TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md) | TextureMixinInstanceTypes |
-|  [TextureMixinTypes](doc/markdown/./scene.texturemixintypes.md) | TextureMixinTypes |
-|  [TextureProp](doc/markdown/./scene.textureprop.md) | TextureProp |
-|  [TexturePropUniforms](doc/markdown/./scene.texturepropuniforms.md) | TexturePropUniforms |
-|  [ToMixedTextureType](doc/markdown/./scene.tomixedtexturetype.md) | ToMixedTextureType |
+<table><thead><tr><th>
+
+Type Alias
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AppOptions](doc/markdown/./scene.appoptions.md)
+
+
+</td><td>
+
+Creation options for Application.
+
+Provides the canvas, device backend, and optional runtime and device configuration.
+
+
+</td></tr>
+<tr><td>
+
+[BlendMode](doc/markdown/./scene.blendmode.md)
+
+
+</td><td>
+
+Blending mode for mesh materials.
+
+- `none`<!-- -->: No blending (opaque). - `blend`<!-- -->: Standard alpha blending (srcAlpha, 1 - srcAlpha). - `additive`<!-- -->: Additive blending (1, 1), commonly for glow/FX.
+
+May be combined with alpha-to-coverage and alpha test.
+
+
+</td></tr>
+<tr><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+Blit type
+
+
+</td></tr>
+<tr><td>
+
+[CameraHistoryData](doc/markdown/./scene.camerahistorydata.md)
+
+
+</td><td>
+
+Temporal history resources used by reprojection (TAA, motion blur).
+
+
+</td></tr>
+<tr><td>
+
+[EmitterBehavior](doc/markdown/./scene.emitterbehavior.md)
+
+
+</td><td>
+
+Particle emitter behavior
+
+
+</td></tr>
+<tr><td>
+
+[EmitterShape](doc/markdown/./scene.emittershape.md)
+
+
+</td><td>
+
+Particle emitter shape
+
+
+</td></tr>
+<tr><td>
+
+[EnvLightType](doc/markdown/./scene.envlighttype.md)
+
+
+</td><td>
+
+Environment light type
+
+
+</td></tr>
+<tr><td>
+
+[ExtractMixinReturnType](doc/markdown/./scene.extractmixinreturntype.md)
+
+
+</td><td>
+
+Extracts the return type of a mixin function.
+
+
+</td></tr>
+<tr><td>
+
+[ExtractMixinType](doc/markdown/./scene.extractmixintype.md)
+
+
+</td><td>
+
+Produces the intersection type of multiple mixins’ return types.
+
+
+</td></tr>
+<tr><td>
+
+[FogType](doc/markdown/./scene.fogtype.md)
+
+
+</td><td>
+
+Type of fog
+
+
+</td></tr>
+<tr><td>
+
+[GraphNodeInput](doc/markdown/./scene.graphnodeinput.md)
+
+
+</td><td>
+
+Input slot definition for a graph node
+
+
+</td></tr>
+<tr><td>
+
+[GraphNodeOutput](doc/markdown/./scene.graphnodeoutput.md)
+
+
+</td><td>
+
+Output slot definition for a graph node
+
+
+</td></tr>
+<tr><td>
+
+[GrassInstanceInfo](doc/markdown/./scene.grassinstanceinfo.md)
+
+
+</td><td>
+
+Grass blade instance information
+
+
+</td></tr>
+<tr><td>
+
+[Host](doc/markdown/./scene.host.md)
+
+
+</td><td>
+
+A host object that supports disposal.
+
+Hosts are objects to which scripts can be attached. They are expected to emit a `'dispose'` event compatible with `IDisposable` so that scripts can be automatically detached when the host is destroyed.
+
+
+</td></tr>
+<tr><td>
+
+[IMixinAlbedoColor](doc/markdown/./scene.imixinalbedocolor.md)
+
+
+</td><td>
+
+Interface for albedo color mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinBlinnPhong](doc/markdown/./scene.imixinblinnphong.md)
+
+
+</td><td>
+
+Interface for blinn-phong lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinLambert](doc/markdown/./scene.imixinlambert.md)
+
+
+</td><td>
+
+Interface of lambert lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinLight](doc/markdown/./scene.imixinlight.md)
+
+
+</td><td>
+
+Interface for light mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinPBRCommon](doc/markdown/./scene.imixinpbrcommon.md)
+
+
+</td><td>
+
+Interface for common PBR mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinPBRMetallicRoughness](doc/markdown/./scene.imixinpbrmetallicroughness.md)
+
+
+</td><td>
+
+Interface for PBRMetallicRoughness lighting model mixin
+
+
+</td></tr>
+<tr><td>
+
+[IMixinPBRSpecularGlossiness](doc/markdown/./scene.imixinpbrspecularglossiness.md)
+
+
+</td><td>
+
+Interface for PBRSpecularGlossiness mixin
+
+
+</td></tr>
+<tr><td>
+
+[InputEventHandler](doc/markdown/./scene.inputeventhandler.md)
+
+
+</td><td>
+
+Input handler middleware type.
+
+Return true to indicate the event has been handled and should not be forwarded to the Application's observable event system.
+
+
+</td></tr>
+<tr><td>
+
+[LogMode](doc/markdown/./scene.logmode.md)
+
+
+</td><td>
+
+Log severity levels.
+
+
+</td></tr>
+<tr><td>
+
+[ModelFetchOptions](doc/markdown/./scene.modelfetchoptions.md)
+
+
+</td><td>
+
+Options for model fetching.
+
+Provides decoding and instancing hints used by supported model loaders.
+
+
+</td></tr>
+<tr><td>
+
+[ModelInfo](doc/markdown/./scene.modelinfo.md)
+
+
+</td><td>
+
+Data structure returned by AssetManager.fetchModel().
+
+Bundles the created scene node group and an optional animation set if present in the asset.
+
+
+</td></tr>
+<tr><td>
+
+[MorphData](doc/markdown/./scene.morphdata.md)
+
+
+</td><td>
+
+Morph Data
+
+
+</td></tr>
+<tr><td>
+
+[MorphInfo](doc/markdown/./scene.morphinfo.md)
+
+
+</td><td>
+
+Morph information
+
+
+</td></tr>
+<tr><td>
+
+[MorphState](doc/markdown/./scene.morphstate.md)
+
+
+</td><td>
+
+Morph animation state
+
+
+</td></tr>
+<tr><td>
+
+[NodeIterateFunc](doc/markdown/./scene.nodeiteratefunc.md)
+
+
+</td><td>
+
+Iteration callback used by traversal helpers.
+
+Return true to stop traversal early.
+
+
+</td></tr>
+<tr><td>
+
+[PickResult](doc/markdown/./scene.pickresult.md)
+
+
+</td><td>
+
+Result of a camera picking operation.
+
+Used by GPU/CPU picking flows to report what was intersected.
+
+
+</td></tr>
+<tr><td>
+
+[PickTarget](doc/markdown/./scene.picktarget.md)
+
+
+</td><td>
+
+Picking result target container.
+
+Use to override/annotate which scene node (and optional label) a drawable should report when GPU picking or raycast returns a hit.
+
+
+</td></tr>
+<tr><td>
+
+[PlayAnimationOptions](doc/markdown/./scene.playanimationoptions.md)
+
+
+</td><td>
+
+Options for playing an animation.
+
+Controls looping, playback speed (including reverse), and fade-in blending.
+
+
+</td></tr>
+<tr><td>
+
+[PropEdit](doc/markdown/./scene.propedit.md)
+
+
+</td><td>
+
+Editor-oriented edit types that augment how a property is presented/edited.
+
+This is orthogonal to [PropertyType](doc/markdown/./scene.propertytype.md) and is purely an editor hint.
+
+
+</td></tr>
+<tr><td>
+
+[PropertyAccessor](doc/markdown/./scene.propertyaccessor.md)
+
+
+</td><td>
+
+Descriptor for a serializable property of a class/type.
+
+This binds together: - Metadata: `type`<!-- -->, `name`<!-- -->, `default`<!-- -->, `readonly`<!-- -->, `persistent`<!-- -->, `options` - Accessors: `get`<!-- -->, `set`<!-- -->, `add`<!-- -->, `delete`<!-- -->, `create` for manipulating the underlying object state - Predicates: `isValid`<!-- -->, `isNullable`<!-- -->, `isHidden` to control UI and validation - Commands: `command` for action-style properties (`type: 'command'`<!-- -->) - Utilities: `getDefaultValue` to compute defaults dynamically
+
+The accessors are invoked with `this` bound to the owning object instance.
+
+
+</td></tr>
+<tr><td>
+
+[PropertyAccessorOptions](doc/markdown/./scene.propertyaccessoroptions.md)
+
+
+</td><td>
+
+Additional options controlling how a property is displayed, constrained, and edited.
+
+These options are consumed primarily by an editor/inspector UI, but may also influence validation and tooling behavior.
+
+
+</td></tr>
+<tr><td>
+
+[PropertyType](doc/markdown/./scene.propertytype.md)
+
+
+</td><td>
+
+Enumerates supported data types for serializable properties.
+
+This type informs serializers/editors how to interpret and encode values.
+
+
+</td></tr>
+<tr><td>
+
+[PropertyValue](doc/markdown/./scene.propertyvalue.md)
+
+
+</td><td>
+
+Container for a serializable property's value.
+
+Values are carried in typed arrays (even for single values) to support both scalar and array-like properties in a unified shape.
+
+Conventions: - `num` carries numeric data for types like `int`<!-- -->, `float`<!-- -->, `vec*`<!-- -->, `int*`<!-- -->, `rgb`<!-- -->, `rgba` - `str` carries string data for `string` - `bool` carries boolean data for `bool` - `object` carries references/instances for `object`<!-- -->, `object_array`<!-- -->, `embedded`
+
+Only the relevant field(s) for the property's [PropertyType](doc/markdown/./scene.propertytype.md) will be populated.
+
+
+</td></tr>
+<tr><td>
+
+[SamplerType](doc/markdown/./scene.samplertype.md)
+
+
+</td><td>
+
+Sampler types
+
+
+</td></tr>
+<tr><td>
+
+[SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md)
+
+
+</td><td>
+
+Visibility state of a node.
+
+- 'visible': force visible - 'hidden': force hidden - 'inherit': inherits from the closest ancestor that is not 'inherit'
+
+
+</td></tr>
+<tr><td>
+
+[ScriptingSystemOptions](doc/markdown/./scene.scriptingsystemoptions.md)
+
+
+</td><td>
+
+Options for configuring a `ScriptingSystem`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[SerializableClass](doc/markdown/./scene.serializableclass.md)
+
+
+</td><td>
+
+Descriptor for a serializable class/type.
+
+This defines how a class is identified, constructed, and inspected for properties. Editors and serializers can use this metadata to instantiate objects, load initial parameters, and enumerate property accessors.
+
+
+</td></tr>
+<tr><td>
+
+[ShadowMode](doc/markdown/./scene.shadowmode.md)
+
+
+</td><td>
+
+Shadow mapping mode
+
+
+</td></tr>
+<tr><td>
+
+[ShapeOptionType](doc/markdown/./scene.shapeoptiontype.md)
+
+
+</td><td>
+
+Shape option types
+
+
+</td></tr>
+<tr><td>
+
+[ShapeType](doc/markdown/./scene.shapetype.md)
+
+
+</td><td>
+
+Shape types
+
+
+</td></tr>
+<tr><td>
+
+[SkyType](doc/markdown/./scene.skytype.md)
+
+
+</td><td>
+
+Type of sky
+
+
+</td></tr>
+<tr><td>
+
+[StopAnimationOptions](doc/markdown/./scene.stopanimationoptions.md)
+
+
+</td><td>
+
+Options for stopping an animation.
+
+Allows a graceful fade-out instead of abrupt stop.
+
+
+</td></tr>
+<tr><td>
+
+[TerrainDebugMode](doc/markdown/./scene.terraindebugmode.md)
+
+
+</td><td>
+
+Terrain debug rendering mode
+
+
+</td></tr>
+<tr><td>
+
+[TerrainDetailMapInfo](doc/markdown/./scene.terraindetailmapinfo.md)
+
+
+</td><td>
+
+Terrain detail map information
+
+
+</td></tr>
+<tr><td>
+
+[TerrainMaterialOptions](doc/markdown/./scene.terrainmaterialoptions.md)
+
+
+</td><td>
+
+Terrain material options
+
+
+</td></tr>
+<tr><td>
+
+[TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md)
+
+
+</td><td>
+
+Options for texture fetching.
+
+Controls how a texture is loaded, converted, and optionally uploaded into an existing texture object.
+
+
+</td></tr>
+<tr><td>
+
+[TextureMixinInstanceTypes](doc/markdown/./scene.texturemixininstancetypes.md)
+
+
+</td><td>
+
+TextureMixinInstanceTypes
+
+
+</td></tr>
+<tr><td>
+
+[TextureMixinTypes](doc/markdown/./scene.texturemixintypes.md)
+
+
+</td><td>
+
+TextureMixinTypes
+
+
+</td></tr>
+<tr><td>
+
+[TextureProp](doc/markdown/./scene.textureprop.md)
+
+
+</td><td>
+
+TextureProp
+
+
+</td></tr>
+<tr><td>
+
+[TexturePropUniforms](doc/markdown/./scene.texturepropuniforms.md)
+
+
+</td><td>
+
+TexturePropUniforms
+
+
+</td></tr>
+<tr><td>
+
+[ToMixedTextureType](doc/markdown/./scene.tomixedtexturetype.md)
+
+
+</td><td>
+
+ToMixedTextureType
+
+
+</td></tr>
+</tbody></table>
 

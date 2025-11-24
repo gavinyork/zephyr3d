@@ -14,10 +14,55 @@ push(camera: Camera, drawable: Drawable): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  camera | [Camera](doc/markdown/./scene.camera.md) | The camera for drawing the item |
-|  drawable | [Drawable](doc/markdown/./scene.drawable.md) | The object to be drawn |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+camera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera for drawing the item
+
+
+</td></tr>
+<tr><td>
+
+drawable
+
+
+</td><td>
+
+[Drawable](doc/markdown/./scene.drawable.md)
+
+
+</td><td>
+
+The object to be drawn
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

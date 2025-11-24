@@ -14,10 +14,55 @@ static rotationZ(angle: number, result?: Matrix3x3): Matrix3x3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  angle | number | The rotate angle in radians. |
-|  result | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+angle
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The rotate angle in radians.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

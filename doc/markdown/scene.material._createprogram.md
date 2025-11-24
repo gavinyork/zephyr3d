@@ -4,25 +4,83 @@
 
 ## Material.\_createProgram() method
 
-Creates the shader program
+Create and compile the shader program for this material/pass.
+
+Implement in subclasses: - Define shader stages, entry points, macros/defines, and resource layouts. - Return a compiled `GPUProgram`<!-- -->.
 
 **Signature:**
 
 ```typescript
-protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram;
+protected _createProgram(_pb: ProgramBuilder, _ctx: DrawContext, _pass: number): GPUProgram;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The drawing context |
-|  pass | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_pb
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+\_ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pass number.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [GPUProgram](doc/markdown/./device.gpuprogram.md)
 
-The created shader program
+The created program, or `null` on failure.
 

@@ -14,11 +14,140 @@ interface OrbitCameraControllerOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [center](doc/markdown/./scene.orbitcameracontrolleroptions.center.md) |  | [Vector3](doc/markdown/./base.vector3.md) | target position |
-|  [damping?](doc/markdown/./scene.orbitcameracontrolleroptions.damping.md) |  | number | _(Optional)_ damping value |
-|  [distance?](doc/markdown/./scene.orbitcameracontrolleroptions.distance.md) |  | number | _(Optional)_ initial distance between the camera and the target |
-|  [rotateSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.rotatespeed.md) |  | number | _(Optional)_ Rotating speed |
-|  [zoomSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.zoomspeed.md) |  | number | _(Optional)_ Zooming speed |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[center](doc/markdown/./scene.orbitcameracontrolleroptions.center.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+target position
+
+
+</td></tr>
+<tr><td>
+
+[controls?](doc/markdown/./scene.orbitcameracontrolleroptions.controls.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ rotate?: { button: number; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; }; pan?: { button: number; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; }; zoom?: { button: number; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; }; zoomWheel?: boolean; }
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[damping?](doc/markdown/./scene.orbitcameracontrolleroptions.damping.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ damping value
+
+
+</td></tr>
+<tr><td>
+
+[panSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.panspeed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Panning speed
+
+
+</td></tr>
+<tr><td>
+
+[rotateSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.rotatespeed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Rotating speed
+
+
+</td></tr>
+<tr><td>
+
+[zoomSpeed?](doc/markdown/./scene.orbitcameracontrolleroptions.zoomspeed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Zooming speed
+
+
+</td></tr>
+</tbody></table>
 

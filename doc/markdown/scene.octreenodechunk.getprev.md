@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getPrev() method
 
-Gets the chunk previous to this chunk
+Previous (coarser) chunk in the hierarchy, or `null` if this is the root.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getPrev(): OctreeNodeChunk;
 
 [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
 
-The previous chunk
+The previous `OctreeNodeChunk`<!-- -->, or `null` if none.
 

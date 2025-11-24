@@ -4,53 +4,564 @@
 
 ## MeshMaterial class
 
-Base class for any kind of mesh materials
+Base class for mesh materials.
+
+Key responsibilities: - Defines feature-based shader variants (alpha test, blending, alpha-to-coverage, TAA toggle, etc.). - Provides a material instancing mechanism (per-instance uniforms via a shared core material). - Implements the base shader scaffolding for multiple render passes (LIGHT, DEPTH, OBJECT\_COLOR, SHADOWMAP). - Updates render states depending on pass and features (blending, depth, culling). - Submits material uniforms and cooperates with OIT/TAA/SSR/motion vectors.
+
+Variant system: - Features are stored in `_featureStates` and hashed into `_createHash()`<!-- -->. - Changing features calls `useFeature(...)` which triggers `optionChanged(true)` to rebuild programs.
+
+Instancing: - `defineInstanceUniform` registers per-instance fields with packed layout. - `createInstance()` returns a lightweight instance that shares the core’s GPU programs and updates instance uniform buffer only. This improves batching/instancing support.
+
+Shader hooks: - `vertexShader(scope)` and `fragmentShader(scope)` provide per-pass hook points to implement the material’s vertex/fragment logic. The base class wires up common I/O (skin, morph, instancing). - `outputFragmentColor(...)` centralizes final color output across passes, handling OIT and alpha ops.
+
+Render states and queues: - `updateRenderStates(...)` sets depth/blend/cull states based on blending, alpha-to-coverage, depth equality optimizations, pass type, and optional OIT overrides. - `getQueueType()` chooses between opaque and transparent queues.
+
+Extending: - Override `vertexShader`<!-- -->, `fragmentShader`<!-- -->, and optionally `outputFragmentColor`<!-- -->. - Override `supportLighting`<!-- -->, `isTransparentPass`<!-- -->, `needFragmentColor`<!-- -->, etc., as needed. - Use `uniformChanged()` when changing uniform-only values that do not alter shader variants. - Use `useFeature()` when toggling options that affect shader variants.
 
 **Signature:**
 
 ```typescript
-declare class MeshMaterial extends Material 
+declare class MeshMaterial extends Material implements Clonable<MeshMaterial> 
 ```
 **Extends:** [Material](doc/markdown/./scene.material.md)
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[MeshMaterial](doc/markdown/./scene.meshmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(args)](doc/markdown/./scene.meshmaterial._constructor_.md) |  | Creates an instance of MeshMaterial class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.meshmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a MeshMaterial with default opaque settings.
+
+Defaults: - `blendMode = 'none'` - `cullMode = 'back'` - `opacity = 1` - `alphaCutoff = 0` - `taaStrength = 1 - 1/16`
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [alphaCutoff](doc/markdown/./scene.meshmaterial.alphacutoff.md) |  | number | A value between 0 and 1, presents the cutoff for alpha testing |
-|  [alphaToCoverage](doc/markdown/./scene.meshmaterial.alphatocoverage.md) |  | boolean |  |
-|  [blendMode](doc/markdown/./scene.meshmaterial.blendmode.md) |  | [BlendMode](doc/markdown/./scene.blendmode.md) | Blending mode |
-|  [cullMode](doc/markdown/./scene.meshmaterial.cullmode.md) |  | [FaceMode](doc/markdown/./device.facemode.md) | Cull mode |
-|  [drawContext](doc/markdown/./scene.meshmaterial.drawcontext.md) | <code>readonly</code> | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context for shader creation |
-|  [objectColor](doc/markdown/./scene.meshmaterial.objectcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Object color used for GPU picking |
-|  [opacity](doc/markdown/./scene.meshmaterial.opacity.md) |  | number | A value between 0 and 1, presents the opacity |
-|  [pass](doc/markdown/./scene.meshmaterial.pass.md) | <code>readonly</code> | number | Current material pass |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[alphaCutoff](doc/markdown/./scene.meshmaterial.alphacutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Alpha test cutoff in \[0, 1\]. - 0 disables alpha testing. - &gt; 0 discards fragments with alpha &lt; cutoff. Changing this marks uniforms dirty (no shader rebuild).
+
+
+</td></tr>
+<tr><td>
+
+[alphaToCoverage](doc/markdown/./scene.meshmaterial.alphatocoverage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Alpha-to-coverage toggle. - Useful to approximate transparency for MSAA targets. - Managed as a shader feature; toggling rebuilds variants.
+
+
+</td></tr>
+<tr><td>
+
+[blendMode](doc/markdown/./scene.meshmaterial.blendmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BlendMode](doc/markdown/./scene.blendmode.md)
+
+
+</td><td>
+
+Blending mode of this material. - 'none' for opaque, 'blend' for standard alpha, 'additive' for emissive FX. - Changing the mode toggles an internal feature and rebuilds variants.
+
+
+</td></tr>
+<tr><td>
+
+[cullMode](doc/markdown/./scene.meshmaterial.cullmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FaceMode](doc/markdown/./device.facemode.md)
+
+
+</td><td>
+
+Face culling mode: 'none' \| 'front' \| 'back'. - Does not force shader rebuild; affects rasterizer state.
+
+
+</td></tr>
+<tr><td>
+
+[drawContext](doc/markdown/./scene.meshmaterial.drawcontext.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context captured during program creation, available inside shader hooks.
+
+
+</td></tr>
+<tr><td>
+
+[objectColor](doc/markdown/./scene.meshmaterial.objectcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Per-object color used for GPU picking/object-ID pass. - Changing marks uniforms dirty only.
+
+
+</td></tr>
+<tr><td>
+
+[opacity](doc/markdown/./scene.meshmaterial.opacity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Material opacity in \[0, 1\]. - Used in transparent passes. Changing marks uniforms dirty only.
+
+
+</td></tr>
+<tr><td>
+
+[TAADisabled](doc/markdown/./scene.meshmaterial.taadisabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether TAA is disabled for this material. - When true, motion vectors encode a large sentinel to skip TAA accumulation. - Managed via an internal feature toggle.
+
+
+</td></tr>
+<tr><td>
+
+[TAAStrength](doc/markdown/./scene.meshmaterial.taastrength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+TAA strength in \[0, 1\]. - Higher values generally imply stronger accumulation. - The value is mapped when writing motion-vector outputs during depth pass.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.meshmaterial.applyuniformvalues.md) |  | Submit Uniform values before rendering with this material. |
-|  [createInstance()](doc/markdown/./scene.meshmaterial.createinstance.md) |  | Create material instance |
-|  [defineFeature()](doc/markdown/./scene.meshmaterial.definefeature.md) | <code>static</code> | Define feature index |
-|  [defineInstanceUniform(prop, type)](doc/markdown/./scene.meshmaterial.defineinstanceuniform.md) | <code>static</code> | Define instance uniform index |
-|  [doAlphaTest(scope, color)](doc/markdown/./scene.meshmaterial.doalphatest.md) |  |  |
-|  [featureUsed(feature)](doc/markdown/./scene.meshmaterial.featureused.md) |  | Check if a feature is in use for given render pass type. |
-|  [fragmentShader(scope)](doc/markdown/./scene.meshmaterial.fragmentshader.md) |  | Fragment shader implementation of this material |
-|  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.meshmaterial.getinstanceduniform.md) |  |  |
-|  [getQueueType()](doc/markdown/./scene.meshmaterial.getqueuetype.md) |  | Determine which queue should be used to render this material. |
-|  [isTransparentPass(pass)](doc/markdown/./scene.meshmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
-|  [needFragmentColor(ctx)](doc/markdown/./scene.meshmaterial.needfragmentcolor.md) |  | Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use. |
-|  [outputFragmentColor(scope, worldPos, color, ssrRoughness, ssrNormal)](doc/markdown/./scene.meshmaterial.outputfragmentcolor.md) |  | Calculate final fragment color for output. |
-|  [supportLighting()](doc/markdown/./scene.meshmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
-|  [uniformChanged()](doc/markdown/./scene.meshmaterial.uniformchanged.md) |  | Indicate that the uniform has changed and needs to be resubmitted. |
-|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.meshmaterial.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |
-|  [useFeature(feature, use)](doc/markdown/./scene.meshmaterial.usefeature.md) |  | Use or unuse a feature of the material, this will cause the shader to be rebuild. |
-|  [vertexShader(scope)](doc/markdown/./scene.meshmaterial.vertexshader.md) |  | Vertex shader implementation of this material |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.meshmaterial.applyuniformvalues.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Submit material uniforms/resources to the material bind group (set 2). Handles alpha cutoff, opacity (non-instanced transparent), OIT, object color, and TAA strength.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.meshmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a shallow clone of this material. Subclasses should override to copy custom fields.
+
+
+</td></tr>
+<tr><td>
+
+[copyFrom(other)](doc/markdown/./scene.meshmaterial.copyfrom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Copy common MeshMaterial properties from another material. Call `super.copyFrom(other)` first when overriding in subclasses.
+
+
+</td></tr>
+<tr><td>
+
+[createInstance()](doc/markdown/./scene.meshmaterial.createinstance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a material instance (preferred for GPU instancing).
+
+- On WebGL1 (or when instancing unsupported), falls back to cloning. - Otherwise, returns a proxy instance that shares GPU programs and stores per-instance uniforms in a compact Float32Array.
+
+The returned instance: - Exposes properties defined by `defineInstanceUniform` with getter/setter that read/write the packed buffer and notify `RenderBundleWrapper`<!-- -->. - Delegates methods to the core material via prototype chain.
+
+
+</td></tr>
+<tr><td>
+
+[defineFeature()](doc/markdown/./scene.meshmaterial.definefeature.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Define a new feature bit/index for shader variants. Subclasses may use this to add their own switches.
+
+
+</td></tr>
+<tr><td>
+
+[defineInstanceUniform(prop, type, name)](doc/markdown/./scene.meshmaterial.defineinstanceuniform.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Define a per-instance uniform for this class.
+
+Returns a compact index encoding the vector index and component offset, which can be used in shader code via `getInstancedUniform(...)`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[featureUsed(feature)](doc/markdown/./scene.meshmaterial.featureused.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Query a feature flag’s current value.
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.meshmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Fragment shader hook. Declares pass-dependent uniforms (e.g., opacity, objectColor, alphaCutoff). Override to implement per-fragment logic, and call `outputFragmentColor` to finalize writes.
+
+
+</td></tr>
+<tr><td>
+
+[getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.meshmaterial.getinstanceduniform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Read an encoded per-instance uniform in shader code.
+
+Encoded index packs: vector index, component offset, and component count.
+
+
+</td></tr>
+<tr><td>
+
+[getInstancedUniforms()](doc/markdown/./scene.meshmaterial.getinstanceduniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the list of per-instance uniforms for this material class.
+
+
+</td></tr>
+<tr><td>
+
+[getQueueType()](doc/markdown/./scene.meshmaterial.getqueuetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Determine the render queue for this material. Transparent materials are queued as `QUEUE_TRANSPARENT`<!-- -->, otherwise `QUEUE_OPAQUE`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[isTransparentPass(\_pass)](doc/markdown/./scene.meshmaterial.istransparentpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the given pass is transparent. Default returns true when `blendMode !== 'none'`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[needFragmentColor(ctx)](doc/markdown/./scene.meshmaterial.needfragmentcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the fragment shader needs to compute color. Returns true for LIGHT pass, or when alpha test or alpha-to-coverage is enabled. Override if the material writes color in other passes.
+
+
+</td></tr>
+<tr><td>
+
+[outputFragmentColor(scope, worldPos, color, ssrRoughness, ssrNormal)](doc/markdown/./scene.meshmaterial.outputfragmentcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Centralized final color write and per-pass output composition.
+
+Behavior by pass: - LIGHT: clipping, alpha handling, optional OIT integration, fog application, color output encoding. - DEPTH: encoded depth; optional motion vectors (TAA enabled/disabled handling). - OBJECT\_COLOR: object color and distance output (linear depth or world-pos + distance). - SHADOWMAP: writes shadow depth via light’s shadow implementation.
+
+Also writes SSR roughness/normal buffers when requested via material flags.
+
+
+</td></tr>
+<tr><td>
+
+[supportLighting()](doc/markdown/./scene.meshmaterial.supportlighting.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material responds to scene lighting. Override to return false for unlit materials.
+
+
+</td></tr>
+<tr><td>
+
+[uniformChanged()](doc/markdown/./scene.meshmaterial.uniformchanged.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Mark uniform-only changes so uniforms are re-uploaded on next apply, without rebuilding shader programs.
+
+
+</td></tr>
+<tr><td>
+
+[updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.meshmaterial.updaterenderstates.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Update render states per pass and draw context. Sets blending, alpha-to-coverage, depth test/write, cull mode, color mask, and cooperates with OIT.
+
+
+</td></tr>
+<tr><td>
+
+[useFeature(feature, use)](doc/markdown/./scene.meshmaterial.usefeature.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Enable or disable a feature and trigger variant rebuild when changed. Calls `optionChanged(true)` internally on change.
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.meshmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Vertex shader hook. Prepares common inputs (skin/morph/instancing), varyings, and pass-dependent outputs. Override to implement per-vertex logic; use `ShaderHelper` as needed.
+
+
+</td></tr>
+</tbody></table>
 

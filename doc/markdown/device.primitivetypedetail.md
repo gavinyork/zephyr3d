@@ -14,7 +14,45 @@ interface PrimitiveTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [primitiveType?](doc/markdown/./device.primitivetypedetail.primitivetype.md) |  | [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[primitiveType?](doc/markdown/./device.primitivetypedetail.primitivetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

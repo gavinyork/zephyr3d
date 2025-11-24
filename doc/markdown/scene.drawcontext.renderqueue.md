@@ -4,7 +4,7 @@
 
 ## DrawContext.renderQueue property
 
-The render queue which is currently being rendered
+The render queue which is currently being rendered (if applicable).
 
 **Signature:**
 

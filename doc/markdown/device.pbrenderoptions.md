@@ -14,14 +14,82 @@ interface PBRenderOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [label?](doc/markdown/./device.pbrenderoptions.label.md) |  | string | _(Optional)_ program label for debugging |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[label?](doc/markdown/./device.pbrenderoptions.label.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ program label for debugging
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [fragment(this, pb)](doc/markdown/./device.pbrenderoptions.fragment.md) | Fragment shader generator. |
-|  [vertex(this, pb)](doc/markdown/./device.pbrenderoptions.vertex.md) | Vertex shader generator. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[fragment(this, pb)](doc/markdown/./device.pbrenderoptions.fragment.md)
+
+
+</td><td>
+
+Fragment shader generator.
+
+
+</td></tr>
+<tr><td>
+
+[vertex(this, pb)](doc/markdown/./device.pbrenderoptions.vertex.md)
+
+
+</td><td>
+
+Vertex shader generator.
+
+
+</td></tr>
+</tbody></table>
 

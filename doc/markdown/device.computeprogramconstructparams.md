@@ -14,8 +14,64 @@ interface ComputeProgramConstructParams
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindGroupLayouts](doc/markdown/./device.computeprogramconstructparams.bindgrouplayouts.md) |  | [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\] | Bind group layouts for the program |
-|  [source](doc/markdown/./device.computeprogramconstructparams.source.md) |  | string | The shader source |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindGroupLayouts](doc/markdown/./device.computeprogramconstructparams.bindgrouplayouts.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\]
+
+
+</td><td>
+
+Bind group layouts for the program
+
+
+</td></tr>
+<tr><td>
+
+[source](doc/markdown/./device.computeprogramconstructparams.source.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The shader source
+
+
+</td></tr>
+</tbody></table>
 

@@ -15,32 +15,314 @@ declare class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(textureType, texelFormat, readable, writable)](doc/markdown/./device.pbtexturetypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBTextureTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(textureType, texelFormat, readable, writable)](doc/markdown/./device.pbtexturetypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBTextureTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [readable](doc/markdown/./device.pbtexturetypeinfo.readable.md) |  | boolean | Returns true if this is a readable storage texture type |
-|  [storageTexelFormat](doc/markdown/./device.pbtexturetypeinfo.storagetexelformat.md) | <code>readonly</code> | [TextureFormat](doc/markdown/./device.textureformat.md) | Get texture format if this is a storage texture |
-|  [textureType](doc/markdown/./device.pbtexturetypeinfo.texturetype.md) | <code>readonly</code> | [PBTextureType](doc/markdown/./device.pbtexturetype.md) | Get the texture type |
-|  [writable](doc/markdown/./device.pbtexturetypeinfo.writable.md) |  | boolean | Returns true if this is a writable storage texture type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[readable](doc/markdown/./device.pbtexturetypeinfo.readable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Returns true if this is a readable storage texture type
+
+
+</td></tr>
+<tr><td>
+
+[storageTexelFormat](doc/markdown/./device.pbtexturetypeinfo.storagetexelformat.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+Get texture format if this is a storage texture
+
+
+</td></tr>
+<tr><td>
+
+[textureType](doc/markdown/./device.pbtexturetypeinfo.texturetype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBTextureType](doc/markdown/./device.pbtexturetype.md)
+
+
+</td><td>
+
+Get the texture type
+
+
+</td></tr>
+<tr><td>
+
+[writable](doc/markdown/./device.pbtexturetypeinfo.writable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Returns true if this is a writable storage texture type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [is2DTexture()](doc/markdown/./device.pbtexturetypeinfo.is2dtexture.md) |  | Returns true if this is a 2D texture type |
-|  [is3DTexture()](doc/markdown/./device.pbtexturetypeinfo.is3dtexture.md) |  | Returns true if this is a 3D texture type |
-|  [isArrayTexture()](doc/markdown/./device.pbtexturetypeinfo.isarraytexture.md) |  | Returns true if this is an array texture type |
-|  [isCubeTexture()](doc/markdown/./device.pbtexturetypeinfo.iscubetexture.md) |  | Returns true if this is a cube texture type |
-|  [isDepthTexture()](doc/markdown/./device.pbtexturetypeinfo.isdepthtexture.md) |  | Return s true if this is a depth texture type |
-|  [isExternalTexture()](doc/markdown/./device.pbtexturetypeinfo.isexternaltexture.md) |  | Returns true if this is an external texture type |
-|  [isIntTexture()](doc/markdown/./device.pbtexturetypeinfo.isinttexture.md) |  | Returns true if the texture format is of type integer |
-|  [isMultisampledTexture()](doc/markdown/./device.pbtexturetypeinfo.ismultisampledtexture.md) |  | Returns true if this is a multisampled texture type |
-|  [isStorageTexture()](doc/markdown/./device.pbtexturetypeinfo.isstoragetexture.md) |  | Returns true if this is a storage texture type |
-|  [isUIntTexture()](doc/markdown/./device.pbtexturetypeinfo.isuinttexture.md) |  | Returns true if the texture format is of type unsigned integer |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbtexturetypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[is2DTexture()](doc/markdown/./device.pbtexturetypeinfo.is2dtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a 2D texture type
+
+
+</td></tr>
+<tr><td>
+
+[is3DTexture()](doc/markdown/./device.pbtexturetypeinfo.is3dtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a 3D texture type
+
+
+</td></tr>
+<tr><td>
+
+[isArrayTexture()](doc/markdown/./device.pbtexturetypeinfo.isarraytexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is an array texture type
+
+
+</td></tr>
+<tr><td>
+
+[isCubeTexture()](doc/markdown/./device.pbtexturetypeinfo.iscubetexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a cube texture type
+
+
+</td></tr>
+<tr><td>
+
+[isDepthTexture()](doc/markdown/./device.pbtexturetypeinfo.isdepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Return s true if this is a depth texture type
+
+
+</td></tr>
+<tr><td>
+
+[isExternalTexture()](doc/markdown/./device.pbtexturetypeinfo.isexternaltexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is an external texture type
+
+
+</td></tr>
+<tr><td>
+
+[isIntTexture()](doc/markdown/./device.pbtexturetypeinfo.isinttexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the texture format is of type integer
+
+
+</td></tr>
+<tr><td>
+
+[isMultisampledTexture()](doc/markdown/./device.pbtexturetypeinfo.ismultisampledtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a multisampled texture type
+
+
+</td></tr>
+<tr><td>
+
+[isStorageTexture()](doc/markdown/./device.pbtexturetypeinfo.isstoragetexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a storage texture type
+
+
+</td></tr>
+<tr><td>
+
+[isUIntTexture()](doc/markdown/./device.pbtexturetypeinfo.isuinttexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the texture format is of type unsigned integer
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbtexturetypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

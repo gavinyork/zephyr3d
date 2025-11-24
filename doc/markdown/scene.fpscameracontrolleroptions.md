@@ -14,9 +14,83 @@ interface FPSCameraControllerOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [controlKeys?](doc/markdown/./scene.fpscameracontrolleroptions.controlkeys.md) |  | { up: string; down: string; forward: string; backward: string; left: string; right: string; } | _(Optional)_ The control keys |
-|  [moveSpeed?](doc/markdown/./scene.fpscameracontrolleroptions.movespeed.md) |  | number | _(Optional)_ Moving speed |
-|  [rotateSpeed?](doc/markdown/./scene.fpscameracontrolleroptions.rotatespeed.md) |  | number | _(Optional)_ Rotating speed |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[controlKeys?](doc/markdown/./scene.fpscameracontrolleroptions.controlkeys.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ up: string; down: string; forward: string; backward: string; left: string; right: string; }
+
+
+</td><td>
+
+_(Optional)_ The control keys
+
+
+</td></tr>
+<tr><td>
+
+[moveSpeed?](doc/markdown/./scene.fpscameracontrolleroptions.movespeed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Moving speed
+
+
+</td></tr>
+<tr><td>
+
+[rotateSpeed?](doc/markdown/./scene.fpscameracontrolleroptions.rotatespeed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Rotating speed
+
+
+</td></tr>
+</tbody></table>
 

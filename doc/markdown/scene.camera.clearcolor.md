@@ -4,12 +4,12 @@
 
 ## Camera.clearColor property
 
-Color value used to clear color buffer before rendering, if null, color buffer will not be cleared
+Framebuffer clear color, or `null` to disable.
 
 **Signature:**
 
 ```typescript
 get clearColor(): Vector4;
 
-set clearColor(val: Vector4);
+set clearColor(v: Vector4);
 ```

@@ -4,20 +4,49 @@
 
 ## SceneNode.traverse() method
 
-Traverse the entire subtree of this node by a visitor
+Depth-first traversal of this node's subtree (pre-order).
 
 **Signature:**
 
 ```typescript
-traverse(v: Visitor<SceneNode>, inverse?: boolean): void;
+traverse(v: Visitor<SceneNode>): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v | [Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt; | The visitor that will travel the subtree of this node |
-|  inverse | boolean | _(Optional)_ true if traversing from bottom to top, otherwise top to bottom |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v
+
+
+</td><td>
+
+[Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt;
+
+
+</td><td>
+
+Visitor invoked on each node.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

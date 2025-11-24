@@ -4,21 +4,55 @@
 
 ## Primitive.removeVertexBuffer() method
 
-Removes a vertex buffer from the primitive
+Remove all vertex buffers that match a given semantic.
+
+This releases retained buffers, marks the layout dirty, and invalidates bundles.
 
 **Signature:**
 
 ```typescript
-removeVertexBuffer(buffer: StructuredBuffer): void;
+removeVertexBuffer(semantic: VertexSemantic): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) | The vertex buffer to be removed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+semantic
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic to remove (e.g., 'position', 'normal').
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

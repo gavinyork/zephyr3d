@@ -4,7 +4,7 @@
 
 ## Octree.initialize() method
 
-Initialize the octree with specified root size and leaf size
+Initialize the octree with specified root and leaf sizes.
 
 **Signature:**
 
@@ -14,12 +14,61 @@ initialize(rootSize: number, leafSize: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rootSize | number | Root size of the octree |
-|  leafSize | number | Leaf size of the octree |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rootSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Root world size (edge length).
+
+
+</td></tr>
+<tr><td>
+
+leafSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Leaf cell size (edge length).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
+
+## Remarks
+
+- Clears any existing data. - Builds chunk hierarchy from coarse to fine granularity.
 

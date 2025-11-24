@@ -14,10 +14,102 @@ interface AssetMaterialSheen
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [sheenColorFactor?](doc/markdown/./scene.assetmaterialsheen.sheencolorfactor.md) |  | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ |
-|  [sheenColorMap?](doc/markdown/./scene.assetmaterialsheen.sheencolormap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
-|  [sheenRoughnessFactor?](doc/markdown/./scene.assetmaterialsheen.sheenroughnessfactor.md) |  | number | _(Optional)_ |
-|  [sheenRoughnessMap?](doc/markdown/./scene.assetmaterialsheen.sheenroughnessmap.md) |  | [MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[sheenColorFactor?](doc/markdown/./scene.assetmaterialsheen.sheencolorfactor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[sheenColorMap?](doc/markdown/./scene.assetmaterialsheen.sheencolormap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[sheenRoughnessFactor?](doc/markdown/./scene.assetmaterialsheen.sheenroughnessfactor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[sheenRoughnessMap?](doc/markdown/./scene.assetmaterialsheen.sheenroughnessmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MaterialTextureInfo](doc/markdown/./scene.materialtextureinfo.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

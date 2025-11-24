@@ -4,24 +4,69 @@
 
 ## Primitive.createAndSetIndexBuffer() method
 
-Creates an index buffer from the given options and then adds it to the prmitive
+Create an index buffer from data and set it on the primitive.
 
 **Signature:**
 
 ```typescript
-createAndSetIndexBuffer(data: Uint16Array | Uint32Array, dynamic?: boolean): IndexBuffer;
+createAndSetIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, dynamic?: boolean): IndexBuffer;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | Uint16Array \| Uint32Array | Contents of the index buffer |
-|  dynamic | boolean | _(Optional)_ true if the index buffer is dynamic |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+Uint16Array&lt;ArrayBuffer&gt; \| Uint32Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+Index data as Uint16Array or Uint32Array.
+
+
+</td></tr>
+<tr><td>
+
+dynamic
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether the index buffer is dynamic (unmanaged).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [IndexBuffer](doc/markdown/./device.indexbuffer.md)
 
-The created index buffer
+The created `IndexBuffer`<!-- -->.
 

@@ -9,11 +9,11 @@ Invert this matrix inplace, assuming this matrix presents an affine transformati
 **Signature:**
 
 ```typescript
-inplaceInvertAffine(): Matrix4x4;
+inplaceInvertAffine(): this;
 ```
 **Returns:**
 
-[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+this
 
 self
 

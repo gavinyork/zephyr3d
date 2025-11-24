@@ -14,10 +14,55 @@ static prepareVertexShader(pb: ProgramBuilder, ctx: DrawContext): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The drawing context |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pb
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+The program builder
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+The drawing context
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

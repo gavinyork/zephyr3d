@@ -14,9 +14,39 @@ setupFragmentOutput(scope: PBGlobalScope): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | The global shader scope. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+The global shader scope.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

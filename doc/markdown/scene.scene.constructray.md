@@ -4,7 +4,7 @@
 
 ## Scene.constructRay() method
 
-Constructs a ray by a given camera and the position on screen
+Constructs a world-space ray from a camera and a screen position.
 
 **Signature:**
 
@@ -14,18 +14,127 @@ constructRay(camera: Camera, viewportWidth: number, viewportHeight: number, scre
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  camera | [Camera](doc/markdown/./scene.camera.md) | The camera used to compute the ray |
-|  viewportWidth | number | Width of the viewport |
-|  viewportHeight | number | Height of the viewport |
-|  screenX | number | The x position on screen |
-|  screenY | number | The y position on screen |
-|  invModelMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ A matrix used to transform the ray |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+camera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+Camera whose projection/view defines the ray.
+
+
+</td></tr>
+<tr><td>
+
+viewportWidth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current viewport width in pixels.
+
+
+</td></tr>
+<tr><td>
+
+viewportHeight
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current viewport height in pixels.
+
+
+</td></tr>
+<tr><td>
+
+screenX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Screen-space x (pixels).
+
+
+</td></tr>
+<tr><td>
+
+screenY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Screen-space y (pixels).
+
+
+</td></tr>
+<tr><td>
+
+invModelMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ Optional inverse model matrix to transform the ray into local space.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [Ray](doc/markdown/./base.ray.md)
 
-The constructed ray
+The constructed Ray.
+
+## Remarks
+
+Computes NDC from screen coordinates, unprojects using `invViewProjectionMatrix`<!-- -->, then forms a ray from the camera world position to the unprojected point. If `invModelMatrix` is provided, both origin and direction are transformed.
 

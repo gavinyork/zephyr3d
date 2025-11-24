@@ -4,7 +4,7 @@
 
 ## DrawContext.primaryCamera property
 
-The camera position of the primary render pass
+The camera position/view used by the primary render pass of this frame.
 
 **Signature:**
 

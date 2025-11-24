@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.setNext() method
 
-Sets the next chunk
+Link to the next (finer) chunk.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setNext(chunk: OctreeNodeChunk): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  chunk | [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | The chunk to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+chunk
+
+
+</td><td>
+
+[OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
+
+
+</td><td>
+
+The next chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

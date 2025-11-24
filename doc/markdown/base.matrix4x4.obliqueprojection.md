@@ -12,10 +12,51 @@ static obliqueProjection(projectionMatrix: Matrix4x4, clipPlane: Plane): Matrix4
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  projectionMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) |  |
-|  clipPlane | [Plane](doc/markdown/./base.plane.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+projectionMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+clipPlane
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

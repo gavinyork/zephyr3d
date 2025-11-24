@@ -9,12 +9,42 @@ Creates a new Vector2 initialized with values in a Float32Array.
 **Signature:**
 
 ```typescript
-constructor(array: Float32Array);
+constructor(array: Float32Array<ArrayBuffer>);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  array | Float32Array | Float32Array object that contains the x, y values. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+array
+
+
+</td><td>
+
+Float32Array&lt;ArrayBuffer&gt;
+
+
+</td><td>
+
+Float32Array object that contains the x, y values.
+
+
+</td></tr>
+</tbody></table>
 

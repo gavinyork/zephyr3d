@@ -9,17 +9,106 @@ Prefilters an environment cubemap
 **Signature:**
 
 ```typescript
-declare function prefilterCubemap(tex: TextureCube, type: DistributionType, destTex: TextureCube, numSamples?: number): void;
+declare function prefilterCubemap(tex: TextureCube, type: DistributionType, destTexture: TextureCube | FrameBuffer, numSamples?: number, radianceSource?: boolean): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  tex | [TextureCube](doc/markdown/./device.texturecube.md) | The environment cubemap |
-|  type | DistributionType | The prefilter type |
-|  destTex | [TextureCube](doc/markdown/./device.texturecube.md) | The output cubemap |
-|  numSamples | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+tex
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+The environment cubemap
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+DistributionType
+
+
+</td><td>
+
+The prefilter type
+
+
+</td></tr>
+<tr><td>
+
+destTexture
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md) \| [FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+numSamples
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+radianceSource
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

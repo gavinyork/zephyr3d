@@ -14,15 +14,135 @@ static ortho(left: number, right: number, bottom: number, top: number, near: num
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  left | number | Left bound of the frustum. |
-|  right | number | Right bound of the frustum. |
-|  bottom | number | Bottom bound of the frustum. |
-|  top | number | Top bound of the frustum. |
-|  near | number | Near bound of the frustum. |
-|  far | number | Far bound of the frustum. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+left
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Left bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+right
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Right bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+bottom
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bottom bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+top
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Top bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+near
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Near bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+far
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Far bound of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

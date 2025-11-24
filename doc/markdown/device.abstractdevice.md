@@ -15,104 +15,1136 @@ interface AbstractDevice extends IEventTarget<DeviceEventMap>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [canvas](doc/markdown/./device.abstractdevice.canvas.md) |  | HTMLCanvasElement | Get the canvas element for this device |
-|  [frameInfo](doc/markdown/./device.abstractdevice.frameinfo.md) |  | [FrameInfo](doc/markdown/./device.frameinfo.md) | Get the current frame information |
-|  [isRendering](doc/markdown/./device.abstractdevice.isrendering.md) |  | boolean | Check if the device is running a rendering loop by calling [AbstractDevice.runLoop()](doc/markdown/./device.abstractdevice.runloop.md) |
-|  [pool](doc/markdown/./device.abstractdevice.pool.md) |  | Pool | Get pool object |
-|  [programBuilder](doc/markdown/./device.abstractdevice.programbuilder.md) |  | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | Get the program builder |
-|  [runLoopFunction](doc/markdown/./device.abstractdevice.runloopfunction.md) |  | (device: [AbstractDevice](doc/markdown/./device.abstractdevice.md)<!-- -->) =&gt; void | Get the run loop callback function |
-|  [type](doc/markdown/./device.abstractdevice.type.md) |  | string | Get the device type |
-|  [videoMemoryUsage](doc/markdown/./device.abstractdevice.videomemoryusage.md) |  | number | Get the video memory usage in bytes |
-|  [vSync](doc/markdown/./device.abstractdevice.vsync.md) |  | boolean | vSync |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[canvas](doc/markdown/./device.abstractdevice.canvas.md)
+
+
+</td><td>
+
+
+</td><td>
+
+HTMLCanvasElement
+
+
+</td><td>
+
+Get the canvas element for this device
+
+
+</td></tr>
+<tr><td>
+
+[frameInfo](doc/markdown/./device.abstractdevice.frameinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameInfo](doc/markdown/./device.frameinfo.md)
+
+
+</td><td>
+
+Get the current frame information
+
+
+</td></tr>
+<tr><td>
+
+[isRendering](doc/markdown/./device.abstractdevice.isrendering.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Check if the device is running a rendering loop by calling [AbstractDevice.runLoop()](doc/markdown/./device.abstractdevice.runloop.md)
+
+
+</td></tr>
+<tr><td>
+
+[pool](doc/markdown/./device.abstractdevice.pool.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Pool](doc/markdown/./device.pool.md)
+
+
+</td><td>
+
+Get pool object
+
+
+</td></tr>
+<tr><td>
+
+[programBuilder](doc/markdown/./device.abstractdevice.programbuilder.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+Get the program builder
+
+
+</td></tr>
+<tr><td>
+
+[runLoopFunction](doc/markdown/./device.abstractdevice.runloopfunction.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(device: [AbstractDevice](doc/markdown/./device.abstractdevice.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Get the run loop callback function
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./device.abstractdevice.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get the device type
+
+
+</td></tr>
+<tr><td>
+
+[videoMemoryUsage](doc/markdown/./device.abstractdevice.videomemoryusage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the video memory usage in bytes
+
+
+</td></tr>
+<tr><td>
+
+[vSync](doc/markdown/./device.abstractdevice.vsync.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+vSync
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [beginCapture()](doc/markdown/./device.abstractdevice.begincapture.md) | Begin capture draw commands |
-|  [beginFrame()](doc/markdown/./device.abstractdevice.beginframe.md) | Begins a frame for rendering |
-|  [buildComputeProgram(options)](doc/markdown/./device.abstractdevice.buildcomputeprogram.md) | Builds compute program |
-|  [buildRenderProgram(options)](doc/markdown/./device.abstractdevice.buildrenderprogram.md) | Builds render program |
-|  [cancelNextFrame(handle)](doc/markdown/./device.abstractdevice.cancelnextframe.md) | Cancel schedule next frame |
-|  [clearFrameBuffer(clearColor, clearDepth, clearStencil)](doc/markdown/./device.abstractdevice.clearframebuffer.md) | Clears the current frame buffer |
-|  [compute(workgroupCountX, workgroupCountY, workgroupCountZ)](doc/markdown/./device.abstractdevice.compute.md) | Dispatches a compute task to the GPU |
-|  [copyBuffer(sourceBuffer, destBuffer, srcOffset, dstOffset, bytes)](doc/markdown/./device.abstractdevice.copybuffer.md) | Copies a buffer to another buffer |
-|  [copyFramebufferToTexture2D(src, index, dst, level)](doc/markdown/./device.abstractdevice.copyframebuffertotexture2d.md) | Copies a color attachment of a framebuffer to a mipmap level of a texture. |
-|  [copyTexture2D(src, srcLevel, dst, dstLevel)](doc/markdown/./device.abstractdevice.copytexture2d.md) | Copies a 2d texture to another texture. |
-|  [createBindGroup(layout)](doc/markdown/./device.abstractdevice.createbindgroup.md) | Creates a bind group |
-|  [createBlendingState()](doc/markdown/./device.abstractdevice.createblendingstate.md) | Creates a blending state object |
-|  [createBuffer(sizeInBytes, options)](doc/markdown/./device.abstractdevice.createbuffer.md) | Creates a gpu buffer |
-|  [createColorState()](doc/markdown/./device.abstractdevice.createcolorstate.md) | Creates a color state object |
-|  [createCubeTexture(format, size, options)](doc/markdown/./device.abstractdevice.createcubetexture.md) | Creates a cube texture |
-|  [createCubeTextureFromMipmapData(data, sRGB, options)](doc/markdown/./device.abstractdevice.createcubetexturefrommipmapdata.md) | Creates a cube texture from given mipmap data |
-|  [createDepthState()](doc/markdown/./device.abstractdevice.createdepthstate.md) | Creates a depth state object |
-|  [createFrameBuffer(colorAttachments, depthAttachment, options)](doc/markdown/./device.abstractdevice.createframebuffer.md) | Creates a frame buffer |
-|  [createGPUProgram(params)](doc/markdown/./device.abstractdevice.creategpuprogram.md) | Creates a gpu program |
-|  [createIndexBuffer(data, options)](doc/markdown/./device.abstractdevice.createindexbuffer.md) | Creates an index buffer |
-|  [createInterleavedVertexBuffer(attribFormats, data, options)](doc/markdown/./device.abstractdevice.createinterleavedvertexbuffer.md) | Creates an interleaved vertex buffer |
-|  [createRasterizerState()](doc/markdown/./device.abstractdevice.createrasterizerstate.md) | Creates a rasterizer state object |
-|  [createRenderStateSet()](doc/markdown/./device.abstractdevice.createrenderstateset.md) | Creates a render state set object |
-|  [createSampler(options)](doc/markdown/./device.abstractdevice.createsampler.md) | Creates a texture sampler object |
-|  [createStencilState()](doc/markdown/./device.abstractdevice.createstencilstate.md) | Creates a stencil state object |
-|  [createStructuredBuffer(structureType, options, data)](doc/markdown/./device.abstractdevice.createstructuredbuffer.md) | Creates a structured buffer |
-|  [createTexture2D(format, width, height, options)](doc/markdown/./device.abstractdevice.createtexture2d.md) | Creates a 2d texture |
-|  [createTexture2DArray(format, width, height, depth, options)](doc/markdown/./device.abstractdevice.createtexture2darray.md) | Creates a 2d array texture |
-|  [createTexture2DArrayFromImages(elements, sRGB, options)](doc/markdown/./device.abstractdevice.createtexture2darrayfromimages.md) | Creates a 2d array texture from a seris of image elements |
-|  [createTexture2DArrayFromMipmapData(data, options)](doc/markdown/./device.abstractdevice.createtexture2darrayfrommipmapdata.md) | Creates a 2d array texture from mipmap data |
-|  [createTexture2DFromImage(element, sRGB, options)](doc/markdown/./device.abstractdevice.createtexture2dfromimage.md) | Creates a 2d texture from a image element |
-|  [createTexture2DFromMipmapData(data, sRGB, options)](doc/markdown/./device.abstractdevice.createtexture2dfrommipmapdata.md) | Creates a 2d texture from given mipmap data |
-|  [createTexture3D(format, width, height, depth, options)](doc/markdown/./device.abstractdevice.createtexture3d.md) | Creates a 3d texture |
-|  [createTextureFromMipmapData(data, sRGB, options)](doc/markdown/./device.abstractdevice.createtexturefrommipmapdata.md) | Creates a texture from given mipmap data |
-|  [createTextureVideo(el, samplerOptions)](doc/markdown/./device.abstractdevice.createtexturevideo.md) | Creates a video texture from a video element |
-|  [createVertexBuffer(attribFormat, data, options)](doc/markdown/./device.abstractdevice.createvertexbuffer.md) | Creates a non-interleaved vertex buffer |
-|  [createVertexLayout(options)](doc/markdown/./device.abstractdevice.createvertexlayout.md) | Creates a vertex layout |
-|  [deviceToScreen(val)](doc/markdown/./device.abstractdevice.devicetoscreen.md) | Calculates the screen position from position of current frame buffer. |
-|  [draw(primitiveType, first, count)](doc/markdown/./device.abstractdevice.draw.md) | Draw primitives |
-|  [drawInstanced(primitiveType, first, count, numInstances)](doc/markdown/./device.abstractdevice.drawinstanced.md) | Draw multiple instances of primitives |
-|  [drawText(text, x, y, color)](doc/markdown/./device.abstractdevice.drawtext.md) | Draw a string |
-|  [endCapture()](doc/markdown/./device.abstractdevice.endcapture.md) | End capture draw commands |
-|  [endFrame()](doc/markdown/./device.abstractdevice.endframe.md) | Ends a frame for rendering |
-|  [executeRenderBundle(renderBundle)](doc/markdown/./device.abstractdevice.executerenderbundle.md) | Executes render bundle |
-|  [exitLoop()](doc/markdown/./device.abstractdevice.exitloop.md) | Exits from current rendering loop |
-|  [flush()](doc/markdown/./device.abstractdevice.flush.md) | Flush the gpu command buffer |
-|  [getAdapterInfo()](doc/markdown/./device.abstractdevice.getadapterinfo.md) | Get adapter information |
-|  [getBackBufferHeight()](doc/markdown/./device.abstractdevice.getbackbufferheight.md) | Get the height of back buffer |
-|  [getBackBufferWidth()](doc/markdown/./device.abstractdevice.getbackbufferwidth.md) | Get the width of back buffer |
-|  [getBindGroup(index)](doc/markdown/./device.abstractdevice.getbindgroup.md) | Get current bind group |
-|  [getDeviceCaps()](doc/markdown/./device.abstractdevice.getdevicecaps.md) | Get the device capabilities |
-|  [getDrawingBufferHeight()](doc/markdown/./device.abstractdevice.getdrawingbufferheight.md) | Get the height of current frame buffer |
-|  [getDrawingBufferWidth()](doc/markdown/./device.abstractdevice.getdrawingbufferwidth.md) | Get the width of current frame buffer |
-|  [getFramebuffer()](doc/markdown/./device.abstractdevice.getframebuffer.md) | Get current frame buffer |
-|  [getFrameBufferSampleCount()](doc/markdown/./device.abstractdevice.getframebuffersamplecount.md) | Get sample count of current frame buffer |
-|  [getGPUObjectById(uid)](doc/markdown/./device.abstractdevice.getgpuobjectbyid.md) | Get GPU object by id |
-|  [getGPUObjects()](doc/markdown/./device.abstractdevice.getgpuobjects.md) | Get all GPU objects |
-|  [getProgram()](doc/markdown/./device.abstractdevice.getprogram.md) | Get current GPU program |
-|  [getRenderStates()](doc/markdown/./device.abstractdevice.getrenderstates.md) | Get current render states |
-|  [getScale()](doc/markdown/./device.abstractdevice.getscale.md) | Get the value of device pixel ratio |
-|  [getScissor()](doc/markdown/./device.abstractdevice.getscissor.md) | Get current scissor rectangle |
-|  [getVertexAttribFormat(semantic, dataType, componentCount)](doc/markdown/./device.abstractdevice.getvertexattribformat.md) | Get the vertex attribute format from vertex semantic and data type |
-|  [getVertexLayout()](doc/markdown/./device.abstractdevice.getvertexlayout.md) | Get current vertex layout |
-|  [getViewport()](doc/markdown/./device.abstractdevice.getviewport.md) | Get current viewport as \[x, y, width, height\] |
-|  [isContextLost()](doc/markdown/./device.abstractdevice.iscontextlost.md) | Returns true if device context is lost. |
-|  [isWindingOrderReversed()](doc/markdown/./device.abstractdevice.iswindingorderreversed.md) | Check if the current winding order is reversed. |
-|  [nextFrame(callback)](doc/markdown/./device.abstractdevice.nextframe.md) | Schedule next frame |
-|  [popDeviceStates()](doc/markdown/./device.abstractdevice.popdevicestates.md) | Pops last FrameBuffer state |
-|  [pushDeviceStates()](doc/markdown/./device.abstractdevice.pushdevicestates.md) | Pushes current FrameBuffer state |
-|  [readPixels(index, x, y, w, h, buffer)](doc/markdown/./device.abstractdevice.readpixels.md) | Read pixel values from current frame buffer |
-|  [readPixelsToBuffer(index, x, y, w, h, buffer)](doc/markdown/./device.abstractdevice.readpixelstobuffer.md) | Read pixel values from current frame buffer to a GPU buffer |
-|  [reverseVertexWindingOrder(reverse)](doc/markdown/./device.abstractdevice.reversevertexwindingorder.md) | Set wether to reverse the winding order |
-|  [runLoop(func)](doc/markdown/./device.abstractdevice.runloop.md) | Begins a rendering loop |
-|  [runNextFrame(f)](doc/markdown/./device.abstractdevice.runnextframe.md) | Schedules a function to be executed at the beginning of the next frame |
-|  [screenToDevice(val)](doc/markdown/./device.abstractdevice.screentodevice.md) | Calculates the actual position of current frame buffer from screen position. |
-|  [setBindGroup(index, bindGroup, dynamicOffsets)](doc/markdown/./device.abstractdevice.setbindgroup.md) | Set current bind group |
-|  [setFont(fontName)](doc/markdown/./device.abstractdevice.setfont.md) | Set font for drawText function |
-|  [setFramebuffer(rt)](doc/markdown/./device.abstractdevice.setframebuffer.md) | Sets the current framebuffer to the specified FrameBuffer object. |
-|  [setFramebuffer(color, depth, miplevel, face, sampleCount)](doc/markdown/./device.abstractdevice.setframebuffer_1.md) | Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count. |
-|  [setProgram(program)](doc/markdown/./device.abstractdevice.setprogram.md) | Set current GPU program |
-|  [setRenderStates(renderStates)](doc/markdown/./device.abstractdevice.setrenderstates.md) | Set current render states |
-|  [setScissor(scissor)](doc/markdown/./device.abstractdevice.setscissor.md) | Set scissor rectangle from an array that contains the position and size |
-|  [setVertexLayout(vertexData)](doc/markdown/./device.abstractdevice.setvertexlayout.md) | Set current vertex layout |
-|  [setViewport(vp)](doc/markdown/./device.abstractdevice.setviewport.md) | Set viewport from an array that contains the position and size |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[beginCapture()](doc/markdown/./device.abstractdevice.begincapture.md)
+
+
+</td><td>
+
+Begin capture draw commands
+
+
+</td></tr>
+<tr><td>
+
+[beginFrame()](doc/markdown/./device.abstractdevice.beginframe.md)
+
+
+</td><td>
+
+Begins a frame for rendering
+
+
+</td></tr>
+<tr><td>
+
+[buildComputeProgram(options)](doc/markdown/./device.abstractdevice.buildcomputeprogram.md)
+
+
+</td><td>
+
+Builds compute program
+
+
+</td></tr>
+<tr><td>
+
+[buildRenderProgram(options)](doc/markdown/./device.abstractdevice.buildrenderprogram.md)
+
+
+</td><td>
+
+Builds render program
+
+
+</td></tr>
+<tr><td>
+
+[cancelNextFrame(handle)](doc/markdown/./device.abstractdevice.cancelnextframe.md)
+
+
+</td><td>
+
+Cancel schedule next frame
+
+
+</td></tr>
+<tr><td>
+
+[clearFrameBuffer(clearColor, clearDepth, clearStencil)](doc/markdown/./device.abstractdevice.clearframebuffer.md)
+
+
+</td><td>
+
+Clears the current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[compute(workgroupCountX, workgroupCountY, workgroupCountZ)](doc/markdown/./device.abstractdevice.compute.md)
+
+
+</td><td>
+
+Dispatches a compute task to the GPU
+
+
+</td></tr>
+<tr><td>
+
+[copyBuffer(sourceBuffer, destBuffer, srcOffset, dstOffset, bytes)](doc/markdown/./device.abstractdevice.copybuffer.md)
+
+
+</td><td>
+
+Copies a buffer to another buffer
+
+
+</td></tr>
+<tr><td>
+
+[copyFramebufferToTexture2D(src, index, dst, level)](doc/markdown/./device.abstractdevice.copyframebuffertotexture2d.md)
+
+
+</td><td>
+
+Copies a color attachment of a framebuffer to a mipmap level of a texture.
+
+
+</td></tr>
+<tr><td>
+
+[copyTexture2D(src, srcLevel, dst, dstLevel)](doc/markdown/./device.abstractdevice.copytexture2d.md)
+
+
+</td><td>
+
+Copies a 2d texture to another texture.
+
+
+</td></tr>
+<tr><td>
+
+[createBindGroup(layout)](doc/markdown/./device.abstractdevice.createbindgroup.md)
+
+
+</td><td>
+
+Creates a bind group
+
+
+</td></tr>
+<tr><td>
+
+[createBlendingState()](doc/markdown/./device.abstractdevice.createblendingstate.md)
+
+
+</td><td>
+
+Creates a blending state object
+
+
+</td></tr>
+<tr><td>
+
+[createBuffer(sizeInBytes, options)](doc/markdown/./device.abstractdevice.createbuffer.md)
+
+
+</td><td>
+
+Creates a gpu buffer
+
+
+</td></tr>
+<tr><td>
+
+[createColorState()](doc/markdown/./device.abstractdevice.createcolorstate.md)
+
+
+</td><td>
+
+Creates a color state object
+
+
+</td></tr>
+<tr><td>
+
+[createCubeTexture(format, size, options)](doc/markdown/./device.abstractdevice.createcubetexture.md)
+
+
+</td><td>
+
+Creates a cube texture
+
+
+</td></tr>
+<tr><td>
+
+[createDepthState()](doc/markdown/./device.abstractdevice.createdepthstate.md)
+
+
+</td><td>
+
+Creates a depth state object
+
+
+</td></tr>
+<tr><td>
+
+[createFrameBuffer(colorAttachments, depthAttachment, options)](doc/markdown/./device.abstractdevice.createframebuffer.md)
+
+
+</td><td>
+
+Creates a frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[createGPUProgram(params)](doc/markdown/./device.abstractdevice.creategpuprogram.md)
+
+
+</td><td>
+
+Creates a gpu program
+
+
+</td></tr>
+<tr><td>
+
+[createIndexBuffer(data, options)](doc/markdown/./device.abstractdevice.createindexbuffer.md)
+
+
+</td><td>
+
+Creates an index buffer
+
+
+</td></tr>
+<tr><td>
+
+[createInterleavedVertexBuffer(attribFormats, data, options)](doc/markdown/./device.abstractdevice.createinterleavedvertexbuffer.md)
+
+
+</td><td>
+
+Creates an interleaved vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[createRasterizerState()](doc/markdown/./device.abstractdevice.createrasterizerstate.md)
+
+
+</td><td>
+
+Creates a rasterizer state object
+
+
+</td></tr>
+<tr><td>
+
+[createRenderStateSet()](doc/markdown/./device.abstractdevice.createrenderstateset.md)
+
+
+</td><td>
+
+Creates a render state set object
+
+
+</td></tr>
+<tr><td>
+
+[createSampler(options)](doc/markdown/./device.abstractdevice.createsampler.md)
+
+
+</td><td>
+
+Creates a texture sampler object
+
+
+</td></tr>
+<tr><td>
+
+[createStencilState()](doc/markdown/./device.abstractdevice.createstencilstate.md)
+
+
+</td><td>
+
+Creates a stencil state object
+
+
+</td></tr>
+<tr><td>
+
+[createStructuredBuffer(structureType, options, data)](doc/markdown/./device.abstractdevice.createstructuredbuffer.md)
+
+
+</td><td>
+
+Creates a structured buffer
+
+
+</td></tr>
+<tr><td>
+
+[createTexture2D(format, width, height, options)](doc/markdown/./device.abstractdevice.createtexture2d.md)
+
+
+</td><td>
+
+Creates a 2d texture
+
+
+</td></tr>
+<tr><td>
+
+[createTexture2DArray(format, width, height, depth, options)](doc/markdown/./device.abstractdevice.createtexture2darray.md)
+
+
+</td><td>
+
+Creates a 2d array texture
+
+
+</td></tr>
+<tr><td>
+
+[createTexture2DArrayFromImages(elements, sRGB, options)](doc/markdown/./device.abstractdevice.createtexture2darrayfromimages.md)
+
+
+</td><td>
+
+Creates a 2d array texture from a seris of image elements
+
+
+</td></tr>
+<tr><td>
+
+[createTexture2DFromImage(element, sRGB, options)](doc/markdown/./device.abstractdevice.createtexture2dfromimage.md)
+
+
+</td><td>
+
+Creates a 2d texture from a image element
+
+
+</td></tr>
+<tr><td>
+
+[createTexture3D(format, width, height, depth, options)](doc/markdown/./device.abstractdevice.createtexture3d.md)
+
+
+</td><td>
+
+Creates a 3D texture
+
+
+</td></tr>
+<tr><td>
+
+[createTextureFromMipmapData(data, sRGB, options)](doc/markdown/./device.abstractdevice.createtexturefrommipmapdata.md)
+
+
+</td><td>
+
+Creates a texture from given mipmap data
+
+
+</td></tr>
+<tr><td>
+
+[createTextureVideo(el, samplerOptions)](doc/markdown/./device.abstractdevice.createtexturevideo.md)
+
+
+</td><td>
+
+Creates a video texture from a video element
+
+
+</td></tr>
+<tr><td>
+
+[createVertexBuffer(attribFormat, data, options)](doc/markdown/./device.abstractdevice.createvertexbuffer.md)
+
+
+</td><td>
+
+Creates a non-interleaved vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[createVertexLayout(options)](doc/markdown/./device.abstractdevice.createvertexlayout.md)
+
+
+</td><td>
+
+Creates a vertex layout object.
+
+
+</td></tr>
+<tr><td>
+
+[deviceToScreen(val)](doc/markdown/./device.abstractdevice.devicetoscreen.md)
+
+
+</td><td>
+
+Calculates the screen position from position of current frame buffer.
+
+
+</td></tr>
+<tr><td>
+
+[draw(primitiveType, first, count)](doc/markdown/./device.abstractdevice.draw.md)
+
+
+</td><td>
+
+Draw primitives
+
+
+</td></tr>
+<tr><td>
+
+[drawInstanced(primitiveType, first, count, numInstances)](doc/markdown/./device.abstractdevice.drawinstanced.md)
+
+
+</td><td>
+
+Draw multiple instances of primitives
+
+
+</td></tr>
+<tr><td>
+
+[drawText(text, x, y, color)](doc/markdown/./device.abstractdevice.drawtext.md)
+
+
+</td><td>
+
+Draw a string
+
+
+</td></tr>
+<tr><td>
+
+[endCapture()](doc/markdown/./device.abstractdevice.endcapture.md)
+
+
+</td><td>
+
+End capture draw commands
+
+
+</td></tr>
+<tr><td>
+
+[endFrame()](doc/markdown/./device.abstractdevice.endframe.md)
+
+
+</td><td>
+
+Ends a frame for rendering
+
+
+</td></tr>
+<tr><td>
+
+[executeRenderBundle(renderBundle)](doc/markdown/./device.abstractdevice.executerenderbundle.md)
+
+
+</td><td>
+
+Executes render bundle
+
+
+</td></tr>
+<tr><td>
+
+[exitLoop()](doc/markdown/./device.abstractdevice.exitloop.md)
+
+
+</td><td>
+
+Exits from current rendering loop
+
+
+</td></tr>
+<tr><td>
+
+[flush()](doc/markdown/./device.abstractdevice.flush.md)
+
+
+</td><td>
+
+Flush the gpu command buffer
+
+
+</td></tr>
+<tr><td>
+
+[getAdapterInfo()](doc/markdown/./device.abstractdevice.getadapterinfo.md)
+
+
+</td><td>
+
+Get adapter information
+
+
+</td></tr>
+<tr><td>
+
+[getBackBufferHeight()](doc/markdown/./device.abstractdevice.getbackbufferheight.md)
+
+
+</td><td>
+
+Get the height of back buffer
+
+
+</td></tr>
+<tr><td>
+
+[getBackBufferWidth()](doc/markdown/./device.abstractdevice.getbackbufferwidth.md)
+
+
+</td><td>
+
+Get the width of back buffer
+
+
+</td></tr>
+<tr><td>
+
+[getBindGroup(index)](doc/markdown/./device.abstractdevice.getbindgroup.md)
+
+
+</td><td>
+
+Get current bind group
+
+
+</td></tr>
+<tr><td>
+
+[getDeviceCaps()](doc/markdown/./device.abstractdevice.getdevicecaps.md)
+
+
+</td><td>
+
+Get the device capabilities
+
+
+</td></tr>
+<tr><td>
+
+[getDrawingBufferHeight()](doc/markdown/./device.abstractdevice.getdrawingbufferheight.md)
+
+
+</td><td>
+
+Get the height of current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[getDrawingBufferWidth()](doc/markdown/./device.abstractdevice.getdrawingbufferwidth.md)
+
+
+</td><td>
+
+Get the width of current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[getFramebuffer()](doc/markdown/./device.abstractdevice.getframebuffer.md)
+
+
+</td><td>
+
+Get current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[getFrameBufferSampleCount()](doc/markdown/./device.abstractdevice.getframebuffersamplecount.md)
+
+
+</td><td>
+
+Get sample count of current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[getGPUObjectById(uid)](doc/markdown/./device.abstractdevice.getgpuobjectbyid.md)
+
+
+</td><td>
+
+Get GPU object by id
+
+
+</td></tr>
+<tr><td>
+
+[getGPUObjects()](doc/markdown/./device.abstractdevice.getgpuobjects.md)
+
+
+</td><td>
+
+Get all GPU objects
+
+
+</td></tr>
+<tr><td>
+
+[getPool(key)](doc/markdown/./device.abstractdevice.getpool.md)
+
+
+</td><td>
+
+Get the pool with given key, or create a new one if not exists
+
+
+</td></tr>
+<tr><td>
+
+[getProgram()](doc/markdown/./device.abstractdevice.getprogram.md)
+
+
+</td><td>
+
+Get current GPU program
+
+
+</td></tr>
+<tr><td>
+
+[getRenderStates()](doc/markdown/./device.abstractdevice.getrenderstates.md)
+
+
+</td><td>
+
+Get current render states
+
+
+</td></tr>
+<tr><td>
+
+[getScale()](doc/markdown/./device.abstractdevice.getscale.md)
+
+
+</td><td>
+
+Get the value of device pixel ratio
+
+
+</td></tr>
+<tr><td>
+
+[getScissor()](doc/markdown/./device.abstractdevice.getscissor.md)
+
+
+</td><td>
+
+Get current scissor rectangle
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttribFormat(semantic, dataType, componentCount)](doc/markdown/./device.abstractdevice.getvertexattribformat.md)
+
+
+</td><td>
+
+Get the vertex attribute format from vertex semantic and data type
+
+
+</td></tr>
+<tr><td>
+
+[getVertexLayout()](doc/markdown/./device.abstractdevice.getvertexlayout.md)
+
+
+</td><td>
+
+Get current vertex layout
+
+
+</td></tr>
+<tr><td>
+
+[getViewport()](doc/markdown/./device.abstractdevice.getviewport.md)
+
+
+</td><td>
+
+Get current viewport as \[x, y, width, height\]
+
+
+</td></tr>
+<tr><td>
+
+[isContextLost()](doc/markdown/./device.abstractdevice.iscontextlost.md)
+
+
+</td><td>
+
+Returns true if device context is lost.
+
+
+</td></tr>
+<tr><td>
+
+[isWindingOrderReversed()](doc/markdown/./device.abstractdevice.iswindingorderreversed.md)
+
+
+</td><td>
+
+Check if the current winding order is reversed.
+
+
+</td></tr>
+<tr><td>
+
+[nextFrame(callback)](doc/markdown/./device.abstractdevice.nextframe.md)
+
+
+</td><td>
+
+Schedule next frame
+
+
+</td></tr>
+<tr><td>
+
+[poolExists(key)](doc/markdown/./device.abstractdevice.poolexists.md)
+
+
+</td><td>
+
+Check if a pool with given key exists
+
+
+</td></tr>
+<tr><td>
+
+[popDeviceStates()](doc/markdown/./device.abstractdevice.popdevicestates.md)
+
+
+</td><td>
+
+Pops last FrameBuffer state
+
+
+</td></tr>
+<tr><td>
+
+[pushDeviceStates()](doc/markdown/./device.abstractdevice.pushdevicestates.md)
+
+
+</td><td>
+
+Pushes current FrameBuffer state
+
+
+</td></tr>
+<tr><td>
+
+[readPixels(index, x, y, w, h, buffer)](doc/markdown/./device.abstractdevice.readpixels.md)
+
+
+</td><td>
+
+Read pixel values from current frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[readPixelsToBuffer(index, x, y, w, h, buffer)](doc/markdown/./device.abstractdevice.readpixelstobuffer.md)
+
+
+</td><td>
+
+Read pixel values from current frame buffer to a GPU buffer
+
+
+</td></tr>
+<tr><td>
+
+[reverseVertexWindingOrder(reverse)](doc/markdown/./device.abstractdevice.reversevertexwindingorder.md)
+
+
+</td><td>
+
+Set wether to reverse the winding order
+
+
+</td></tr>
+<tr><td>
+
+[runLoop(func)](doc/markdown/./device.abstractdevice.runloop.md)
+
+
+</td><td>
+
+Begins a rendering loop
+
+
+</td></tr>
+<tr><td>
+
+[runNextFrame(f)](doc/markdown/./device.abstractdevice.runnextframe.md)
+
+
+</td><td>
+
+Schedules a function to be executed at the beginning of the next frame
+
+
+</td></tr>
+<tr><td>
+
+[runNextFrameAsync(f)](doc/markdown/./device.abstractdevice.runnextframeasync.md)
+
+
+</td><td>
+
+Asyncronized version of scheduling a function to be executed at the beginning of the next frame
+
+
+</td></tr>
+<tr><td>
+
+[screenToDevice(val)](doc/markdown/./device.abstractdevice.screentodevice.md)
+
+
+</td><td>
+
+Calculates the actual position of current frame buffer from screen position.
+
+
+</td></tr>
+<tr><td>
+
+[setBindGroup(index, bindGroup, dynamicOffsets)](doc/markdown/./device.abstractdevice.setbindgroup.md)
+
+
+</td><td>
+
+Set current bind group
+
+
+</td></tr>
+<tr><td>
+
+[setFont(fontName)](doc/markdown/./device.abstractdevice.setfont.md)
+
+
+</td><td>
+
+Set font for drawText function
+
+
+</td></tr>
+<tr><td>
+
+[setFramebuffer(rt)](doc/markdown/./device.abstractdevice.setframebuffer.md)
+
+
+</td><td>
+
+Sets the current framebuffer to the specified FrameBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[setFramebuffer(color, depth, miplevel, face, sampleCount)](doc/markdown/./device.abstractdevice.setframebuffer_1.md)
+
+
+</td><td>
+
+Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
+
+
+</td></tr>
+<tr><td>
+
+[setProgram(program)](doc/markdown/./device.abstractdevice.setprogram.md)
+
+
+</td><td>
+
+Set current GPU program
+
+
+</td></tr>
+<tr><td>
+
+[setRenderStates(renderStates)](doc/markdown/./device.abstractdevice.setrenderstates.md)
+
+
+</td><td>
+
+Set current render states
+
+
+</td></tr>
+<tr><td>
+
+[setScissor(scissor)](doc/markdown/./device.abstractdevice.setscissor.md)
+
+
+</td><td>
+
+Set scissor rectangle from an array that contains the position and size
+
+
+</td></tr>
+<tr><td>
+
+[setVertexLayout(vertexData)](doc/markdown/./device.abstractdevice.setvertexlayout.md)
+
+
+</td><td>
+
+Set current vertex layout
+
+
+</td></tr>
+<tr><td>
+
+[setViewport(vp)](doc/markdown/./device.abstractdevice.setviewport.md)
+
+
+</td><td>
+
+Set viewport from an array that contains the position and size
+
+
+</td></tr>
+</tbody></table>
 

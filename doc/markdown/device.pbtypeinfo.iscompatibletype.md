@@ -14,9 +14,39 @@ isCompatibleType(other: PBTypeInfo): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | The type to be checked |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+The type to be checked
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,9 +14,39 @@ declare function genDefaultName(obj: GPUObject): "unknown" | "sampler" | "textur
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  obj | [GPUObject](doc/markdown/./device.gpuobject.md) | The gpu object |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+obj
+
+
+</td><td>
+
+[GPUObject](doc/markdown/./device.gpuobject.md)
+
+
+</td><td>
+
+The gpu object
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## MeshMaterial.getQueueType() method
 
-Determine which queue should be used to render this material.
+Determine the render queue for this material. Transparent materials are queued as `QUEUE_TRANSPARENT`<!-- -->, otherwise `QUEUE_OPAQUE`<!-- -->.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getQueueType(): number;
 
 number
 
-QUEUE\_TRANSPARENT or QUEUE\_OPAQUE
+The queue type constant.
 

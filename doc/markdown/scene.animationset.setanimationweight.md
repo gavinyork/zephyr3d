@@ -4,7 +4,9 @@
 
 ## AnimationSet.setAnimationWeight() method
 
-Sets the weight of specific animation which is currently playing
+Set the runtime blend weight for a currently playing animation.
+
+Has no effect if the clip is not active.
 
 **Signature:**
 
@@ -14,10 +16,55 @@ setAnimationWeight(name: string, weight: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the animation |
-|  weight | number | New weight value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the playing animation.
+
+
+</td></tr>
+<tr><td>
+
+weight
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+New weight value used during blending.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

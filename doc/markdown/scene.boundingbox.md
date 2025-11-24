@@ -17,19 +17,153 @@ declare class BoundingBox extends AABB implements BoundingVolume
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.boundingbox._constructor_.md) |  | Creates an empty bounding box |
-|  [(constructor)(box)](doc/markdown/./scene.boundingbox._constructor__1.md) |  | Creates a bounding box from an AABB |
-|  [(constructor)(minPoint, maxPoint)](doc/markdown/./scene.boundingbox._constructor__2.md) |  | Creates a bounding box from the min point and the max point |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.boundingbox._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an empty bounding box
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(box)](doc/markdown/./scene.boundingbox._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a bounding box from an AABB
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(minPoint, maxPoint)](doc/markdown/./scene.boundingbox._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a bounding box from the min point and the max point
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [behindPlane(plane)](doc/markdown/./scene.boundingbox.behindplane.md) |  | Check if this bounding volume is behind a plane |
-|  [clone()](doc/markdown/./scene.boundingbox.clone.md) |  | Creates a new bounding volume by copying from this bounding volume |
-|  [outsideFrustum(frustum)](doc/markdown/./scene.boundingbox.outsidefrustum.md) |  | Check if this bounding volume is outside a frustum |
-|  [toAABB()](doc/markdown/./scene.boundingbox.toaabb.md) |  | Gets the minimum AABB that contains the bounding volume |
-|  [transform(matrix)](doc/markdown/./scene.boundingbox.transform.md) |  | Creates a new bounding volume by tranforming this bounding volume by a matrix |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[behindPlane(plane)](doc/markdown/./scene.boundingbox.behindplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if this bounding volume is behind a plane
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.boundingbox.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new bounding volume by copying from this bounding volume
+
+
+</td></tr>
+<tr><td>
+
+[outsideFrustum(frustum)](doc/markdown/./scene.boundingbox.outsidefrustum.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if this bounding volume is outside a frustum
+
+
+</td></tr>
+<tr><td>
+
+[toAABB()](doc/markdown/./scene.boundingbox.toaabb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the minimum AABB that contains the bounding volume
+
+
+</td></tr>
+<tr><td>
+
+[transform(matrix)](doc/markdown/./scene.boundingbox.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new bounding volume by tranforming this bounding volume by a matrix
+
+
+</td></tr>
+</tbody></table>
 

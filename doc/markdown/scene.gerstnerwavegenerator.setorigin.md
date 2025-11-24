@@ -14,11 +14,71 @@ setOrigin(waveIndex: number, x: number, z: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  waveIndex | number | index of the wave to set. |
-|  x | number | X coordinate of the wave origin |
-|  z | number | Z coordinate of the wave origin |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+waveIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the wave to set.
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+X coordinate of the wave origin
+
+
+</td></tr>
+<tr><td>
+
+z
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Z coordinate of the wave origin
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

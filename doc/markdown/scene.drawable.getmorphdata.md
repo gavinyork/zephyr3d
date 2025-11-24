@@ -4,14 +4,14 @@
 
 ## Drawable.getMorphData() method
 
-Gets the morph texture
+Returns the morph target data texture (if morphing is used).
 
 **Signature:**
 
 ```typescript
-getMorphData(): Texture2D;
+getMorphData(): MorphData;
 ```
 **Returns:**
 
-[Texture2D](doc/markdown/./device.texture2d.md)
+[MorphData](doc/markdown/./scene.morphdata.md)
 

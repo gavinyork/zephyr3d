@@ -15,16 +15,111 @@ declare class GlyphManager extends TextureAtlasManager
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(device, binWidth, binHeight, border)](doc/markdown/./device.glyphmanager._constructor_.md) |  | Creates a new glyph manager instance |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(device, binWidth, binHeight, border)](doc/markdown/./device.glyphmanager._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new glyph manager instance
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [clipStringToWidth(str, width, charMargin, start, font)](doc/markdown/./device.glyphmanager.clipstringtowidth.md) |  | Clips a string so that it's width is not larger than the given value |
-|  [getCharWidth(char, font)](doc/markdown/./device.glyphmanager.getcharwidth.md) |  | Measuring width of a character |
-|  [getGlyphInfo(char, font)](doc/markdown/./device.glyphmanager.getglyphinfo.md) |  | Gets the atlas information for given character |
-|  [measureStringWidth(str, charMargin, font)](doc/markdown/./device.glyphmanager.measurestringwidth.md) |  | Measuring the width of a string |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clipStringToWidth(str, width, charMargin, start, font)](doc/markdown/./device.glyphmanager.clipstringtowidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clips a string so that it's width is not larger than the given value
+
+
+</td></tr>
+<tr><td>
+
+[getCharWidth(char, font)](doc/markdown/./device.glyphmanager.getcharwidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Measuring width of a character
+
+
+</td></tr>
+<tr><td>
+
+[getGlyphInfo(char, font)](doc/markdown/./device.glyphmanager.getglyphinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the atlas information for given character
+
+
+</td></tr>
+<tr><td>
+
+[measureStringWidth(str, charMargin, font)](doc/markdown/./device.glyphmanager.measurestringwidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Measuring the width of a string
+
+
+</td></tr>
+</tbody></table>
 

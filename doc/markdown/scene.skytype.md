@@ -9,7 +9,7 @@ Type of sky
 **Signature:**
 
 ```typescript
-type SkyType = 'color' | 'skybox' | 'scatter' | 'scatter-nocloud' | 'none';
+type SkyType = 'image' | 'skybox' | 'scatter' | 'none';
 ```
 
 ## Remarks

@@ -14,11 +14,71 @@ compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: numbe
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  workgroupCountX | number | X dimension of the grid of workgroups to be dispatch |
-|  workgroupCountY | number | Y dimension of the grid of workgroups to be dispatch |
-|  workgroupCountZ | number | Z dimension of the grid of workgroups to be dispatch |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+workgroupCountX
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+X dimension of the grid of workgroups to be dispatch
+
+
+</td></tr>
+<tr><td>
+
+workgroupCountY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Y dimension of the grid of workgroups to be dispatch
+
+
+</td></tr>
+<tr><td>
+
+workgroupCountZ
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Z dimension of the grid of workgroups to be dispatch
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

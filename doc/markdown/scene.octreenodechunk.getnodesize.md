@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getNodeSize() method
 
-Gets the size of the node in this chunk
+Node size at this chunk level.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getNodeSize(): number;
 
 number
 
-The size of the node in this chunk
+The world-space edge length per cell in this chunk.
+
+## Remarks
+
+Represents the world-space edge length for a cell at this level.
 

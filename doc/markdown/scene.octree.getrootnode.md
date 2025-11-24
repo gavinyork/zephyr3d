@@ -4,7 +4,7 @@
 
 ## Octree.getRootNode() method
 
-Gets the root node of the octree
+Get the root node (level 0, index 0), creating it if necessary.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getRootNode(): OctreeNode;
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-Root node of the octree
+The root `OctreeNode`<!-- -->.
 

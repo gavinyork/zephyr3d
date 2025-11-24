@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.clearNodes() method
 
-Removes all octree nodes of this chunk
+Remove and clear all nodes in this chunk.
 
 **Signature:**
 
@@ -14,4 +14,8 @@ clearNodes(): void;
 **Returns:**
 
 void
+
+## Remarks
+
+Also detaches all scene nodes held by each `OctreeNode`<!-- -->.
 

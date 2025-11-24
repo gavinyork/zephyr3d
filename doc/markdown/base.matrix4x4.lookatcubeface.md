@@ -14,11 +14,69 @@ static lookAtCubeFace(face: CubeFace, pos: Vector3, result?: Matrix4x4): Matrix4
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  face | [CubeFace](doc/markdown/./base.cubeface.md) | The cube face to be looked at. |
-|  pos | [Vector3](doc/markdown/./base.vector3.md) |  |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+face
+
+
+</td><td>
+
+[CubeFace](doc/markdown/./base.cubeface.md)
+
+
+</td><td>
+
+The cube face to be looked at.
+
+
+</td></tr>
+<tr><td>
+
+pos
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

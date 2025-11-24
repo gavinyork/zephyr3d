@@ -1,4 +1,4 @@
-import { Application, Compositor, OrbitCameraController, PerspectiveCamera, Tonemap } from '@zephyr3d/scene';
+import { Application, getEngine, getInput, OrbitCameraController, PerspectiveCamera } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Scene } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
@@ -17,20 +17,13 @@ myApp.ready().then(function () {
   // Create scene
   const scene = new Scene();
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
   // Set camera controller
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   // Input handler middleware for camera controll
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
-  // Frame event handler
-  myApp.on('tick', function () {
-    // Update camera controller state
-    camera.updateController();
-    // Render scene
-    camera.render(scene, compositor);
-  });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+  // Set scene as active renderable object at layer 0
+  getEngine().setRenderable(scene, 0);
+  // Start application
   myApp.run();
 });

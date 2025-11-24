@@ -4,7 +4,7 @@
 
 ## SceneNode.hasChild() method
 
-Check if given node is a direct child of the node
+Whether the given node is a direct child of this node.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ hasChild(child: SceneNode): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  child | [SceneNode](doc/markdown/./scene.scenenode.md) | The node to be checked |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+child
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+The node to be checked
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

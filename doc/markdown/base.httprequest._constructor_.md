@@ -9,5 +9,42 @@ Constructs a new instance of the `HttpRequest` class
 **Signature:**
 
 ```typescript
-constructor();
+constructor(urlResolver?: (url: string) => string);
 ```
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+urlResolver
+
+
+</td><td>
+
+(url: string) =&gt; string
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
+

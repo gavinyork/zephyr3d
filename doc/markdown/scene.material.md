@@ -4,43 +4,490 @@
 
 ## Material class
 
-Base class for any kind of materials
+Base class for all materials.
+
+Responsibilities: - Defines a multi-pass rendering interface (`numPasses`<!-- -->, `apply`<!-- -->, `bind`<!-- -->, `draw`<!-- -->, `drawPrimitive`<!-- -->). - Builds and caches GPU shader programs per pass and per-render-context hash. - Manages a per-material bind group (typically at index 2) for uniforms and resources. - Updates render states per pass (`updateRenderStates`<!-- -->) and uploads uniforms (`_applyUniforms`<!-- -->). - Tracks "option" changes that affect shader variant hashing and render bundles.
+
+Caching and hashing: - `createHash(pass)` produces a stable hash representing shader variant options for a pass. Override `_createHash()` in subclasses to encode feature toggles (defines, keywords, macros). - The global hash used to key `MaterialState` also includes `ctx.materialFlags` and `ctx.renderPassHash`<!-- -->, allowing context-sensitive variants (e.g., MSAA, MRT layout). - GPU programs are additionally memoized in a global static `_programCache` across materials by `constructor.name` + hash, to avoid recompilation of identical variants.
+
+Bind groups and uniforms: - If a program declares a bind group layout at index 2 (i.e., `bindGroupLayouts.length > 2`<!-- -->), `apply()` will allocate the group and keep it in the state. Subclasses should fill it in `_applyUniforms()`<!-- -->. - `applyUniforms()` only calls `_applyUniforms()` when `needUpdate` is true, based on `_optionTag` changes (see `optionChanged()`<!-- -->).
+
+Lifecycle: - Constructed materials register a persistent ID into a global registry for serialization. - `apply(ctx)` prepares all passes: creates/gets state, programs, bind groups, render states, and uploads uniforms as needed. - `bind(device, pass)` binds the program, bind group (index 2), and render states. - `draw(primitive, ctx, numInstances)` runs all passes, calling `bind()` and `drawPrimitive()`<!-- -->. - `onDispose()` releases bind groups and registry entries.
+
+Extending: - Override `_createProgram(pb, ctx, pass)` to build a shader. - Override `_applyUniforms(bindGroup, ctx, pass)` to upload uniforms and resources. - Override `updateRenderStates(pass, renderStates, ctx)` to set depth, blend, cull, etc. - Override `_createHash()` to encode options that affect program compilation. - Override `supportLighting`<!-- -->, `supportInstancing`<!-- -->, `isTransparentPass`<!-- -->, `getQueueType`<!-- -->, etc.
+
+Thread-safety: - Intended for main-thread use in a renderer driving WebGPU/WebGL-like devices.
 
 **Signature:**
 
 ```typescript
-declare class Material 
+declare class Material extends Disposable implements Clonable<Material>, IDisposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[Material](doc/markdown/./scene.material.md)<!-- -->&gt;, [IDisposable](doc/markdown/./base.idisposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.material._constructor_.md) |  | Creates an instance of material |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.material._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a new material instance.
+
+- Initializes one pass by default. - Prepares per-pass hash storage and change tracking. - Registers a persistent ID in the global registry.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [instanceId](doc/markdown/./scene.material.instanceid.md) | <code>readonly</code> | number | Unique identifier of the material |
-|  [numPasses](doc/markdown/./scene.material.numpasses.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[changeTag](doc/markdown/./scene.material.changetag.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Incremented when the material’s GPU-relevant state changes and render bundles may need to be rebuilt.
+
+
+</td></tr>
+<tr><td>
+
+[instanceId](doc/markdown/./scene.material.instanceid.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Runtime-unique numeric identifier for the material instance.
+
+
+</td></tr>
+<tr><td>
+
+[numPasses](doc/markdown/./scene.material.numpasses.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of rendering passes this material uses.
+
+Increasing this will expand the per-pass hash cache; make sure to implement `createHash(pass)`<!-- -->, `_createProgram(pb, ctx, pass)`<!-- -->, and `updateRenderStates(pass, ...)` accordingly for each pass.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [\_applyUniforms(bindGroup, ctx, pass)](doc/markdown/./scene.material._applyuniforms.md) | <code>protected</code> | Applies uniform values |
-|  [\_createHash()](doc/markdown/./scene.material._createhash.md) | <code>protected</code> | Calculates the hash code of the shader program |
-|  [\_createProgram(pb, ctx, pass)](doc/markdown/./scene.material._createprogram.md) | <code>protected</code> | Creates the shader program |
-|  [apply(ctx)](doc/markdown/./scene.material.apply.md) |  | Apply material |
-|  [applyUniforms(bindGroup, ctx, needUpdate, pass)](doc/markdown/./scene.material.applyuniforms.md) |  | Sets all uniform values to the bind group of the material if needed |
-|  [drawPrimitive(pass, primitive, ctx, numInstances)](doc/markdown/./scene.material.drawprimitive.md) |  | Draw primitve |
-|  [getQueueType()](doc/markdown/./scene.material.getqueuetype.md) |  |  |
-|  [isBatchable()](doc/markdown/./scene.material.isbatchable.md) |  | Returns true if this material supports geometry instancing |
-|  [isTransparentPass(pass)](doc/markdown/./scene.material.istransparentpass.md) |  | Returns true if given pass is transparent |
-|  [needSceneColor()](doc/markdown/./scene.material.needscenecolor.md) |  | Return true if this material requires the scene color texture |
-|  [passToHash(pass)](doc/markdown/./scene.material.passtohash.md) |  | Convert pass to hash |
-|  [supportInstancing()](doc/markdown/./scene.material.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
-|  [supportLighting()](doc/markdown/./scene.material.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
-|  [updateRenderStates(pass, renderStates, ctx)](doc/markdown/./scene.material.updaterenderstates.md) | <code>protected</code> | Update render states according to draw context and current material pass |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_applyUniforms(\_bindGroup, \_ctx, \_pass)](doc/markdown/./scene.material._applyuniforms.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Upload uniforms and bind resources to the per-material bind group (index 2).
+
+Implement in subclasses to: - Write uniform buffers/textures/samplers to the `bindGroup`<!-- -->. - Respect the current `pass` and `ctx`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[\_createHash()](doc/markdown/./scene.material._createhash.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Compute the material-specific portion of the shader hash for the current options.
+
+Subclasses should override to include macro/define sets that influence program compilation. Example return: `"USE_NORMALMAP=1;ALPHA_MODE=BLEND;RECEIVE_SHADOWS=1"`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[\_createProgram(\_pb, \_ctx, \_pass)](doc/markdown/./scene.material._createprogram.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Create and compile the shader program for this material/pass.
+
+Implement in subclasses: - Define shader stages, entry points, macros/defines, and resource layouts. - Return a compiled `GPUProgram`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[apply(ctx)](doc/markdown/./scene.material.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Prepare the material for drawing across all passes for the given draw context.
+
+Steps per pass: - Compute global hash (material variant + context). - Retrieve or build the GPU program, cache in `_programCache`<!-- -->. - Create per-material bind group (index 2) if the program exposes it. - Update uniforms if `_optionTag` indicates changes since last apply. - Update and cache render states for the pass. - Detect bind group GPU ID changes to bump `changeTag` and notify `RenderBundleWrapper`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[applyUniforms(bindGroup, ctx, needUpdate, pass)](doc/markdown/./scene.material.applyuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Conditionally update uniforms/resources into the material bind group.
+
+Delegates to `_applyUniforms()` when `needUpdate` is true (based on `_optionTag` check).
+
+
+</td></tr>
+<tr><td>
+
+[clearCache()](doc/markdown/./scene.material.clearcache.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.material.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a shallow clone of this material.
+
+Note: The base implementation returns a base `Material`<!-- -->. Subclasses should override to return their own type and copy custom fields.
+
+
+</td></tr>
+<tr><td>
+
+[copyFrom(other)](doc/markdown/./scene.material.copyfrom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Copy basic properties from another material.
+
+Disposes existing bind groups/states, copies `numPasses`<!-- -->. Subclasses should extend this to copy their own fields and call `optionChanged(true)` if shader-affecting options differ.
+
+
+</td></tr>
+<tr><td>
+
+[createInstance()](doc/markdown/./scene.material.createinstance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a material instance (instance-uniform-driven variant).
+
+Base returns `null`<!-- -->. Subclasses that support instancing can return a lightweight instance.
+
+
+</td></tr>
+<tr><td>
+
+[drawPrimitive(pass, primitive, ctx, numInstances)](doc/markdown/./scene.material.drawprimitive.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Issue the actual draw call for a pass.
+
+Override for custom per-pass draw behavior if necessary. The default implementation: - Draws instanced if `numInstances > 0`<!-- -->. - Else uses `ctx.instanceData.numInstances` if available. - Else issues a non-instanced draw.
+
+
+</td></tr>
+<tr><td>
+
+[getQueueType()](doc/markdown/./scene.material.getqueuetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Return the queue type to which this material belongs.
+
+Override this in transparent or special materials (e.g., post-process).
+
+
+</td></tr>
+<tr><td>
+
+[isBatchable()](doc/markdown/./scene.material.isbatchable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if this is a instance of material
+
+
+</td></tr>
+<tr><td>
+
+[isTransparentPass(\_pass)](doc/markdown/./scene.material.istransparentpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the given pass is transparent.
+
+Used to place draw calls into appropriate render queues and set blending states.
+
+
+</td></tr>
+<tr><td>
+
+[needSceneColor()](doc/markdown/./scene.material.needscenecolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material requires the scene color texture (e.g., for refraction).
+
+
+</td></tr>
+<tr><td>
+
+[needSceneDepth()](doc/markdown/./scene.material.needscenedepth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material requires the linear scene depth texture (e.g., for depth-aware effects).
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.material.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Dispose the material and release GPU-side resource references.
+
+- Unregisters from the global registry. - Disposes the per-material bind groups kept in `_states`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[passToHash(pass)](doc/markdown/./scene.material.passtohash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convert a pass index to a hash seed string.
+
+Subclasses may override to encode per-pass role (e.g., "depth", "forward", "shadow").
+
+
+</td></tr>
+<tr><td>
+
+[supportInstancing()](doc/markdown/./scene.material.supportinstancing.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material supports hardware instancing.
+
+Override and return `false` if per-instance data is not supported in the shader.
+
+
+</td></tr>
+<tr><td>
+
+[supportLighting()](doc/markdown/./scene.material.supportlighting.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material's shading is affected by scene lights.
+
+Override and return `false` for unlit materials.
+
+
+</td></tr>
+<tr><td>
+
+[updateRenderStates(\_pass, \_renderStates, \_ctx)](doc/markdown/./scene.material.updaterenderstates.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Update render states (depth/stencil, blending, rasterization) for the pass.
+
+Implement in subclasses based on transparency, double-sidedness, depth writes/tests, color mask, stencil ops, etc., and any context flags in `ctx`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 

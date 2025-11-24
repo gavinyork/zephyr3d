@@ -14,9 +14,140 @@ interface TextureFormatInfo
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [compressed](doc/markdown/./device.textureformatinfo.compressed.md) |  | boolean | True if the texture format is a compressed format |
-|  [filterable](doc/markdown/./device.textureformatinfo.filterable.md) |  | boolean | True if the texture format supports linear filtering |
-|  [renderable](doc/markdown/./device.textureformatinfo.renderable.md) |  | boolean | True if the texture format can be used as a render target |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[blockHeight](doc/markdown/./device.textureformatinfo.blockheight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Block height
+
+
+</td></tr>
+<tr><td>
+
+[blockWidth](doc/markdown/./device.textureformatinfo.blockwidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Block width
+
+
+</td></tr>
+<tr><td>
+
+[compressed](doc/markdown/./device.textureformatinfo.compressed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the texture format is a compressed format
+
+
+</td></tr>
+<tr><td>
+
+[filterable](doc/markdown/./device.textureformatinfo.filterable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the texture format supports linear filtering
+
+
+</td></tr>
+<tr><td>
+
+[renderable](doc/markdown/./device.textureformatinfo.renderable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if the texture format can be used as a render target
+
+
+</td></tr>
+<tr><td>
+
+[size](doc/markdown/./device.textureformatinfo.size.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of bytes per-block
+
+
+</td></tr>
+</tbody></table>
 

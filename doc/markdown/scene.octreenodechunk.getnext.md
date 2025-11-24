@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getNext() method
 
-Gets the chunk next to this chunk
+Next (finer) chunk in the hierarchy, or `null` if this is the finest.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getNext(): OctreeNodeChunk;
 
 [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
 
-The next chunk
+The next `OctreeNodeChunk`<!-- -->, or `null` if none.
 

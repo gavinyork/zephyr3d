@@ -12,11 +12,65 @@ abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  clearColor | [Vector4](doc/markdown/./base.vector4.md) |  |
-|  clearDepth | number |  |
-|  clearStencil | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+clearColor
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+clearDepth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+clearStencil
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,7 @@
 
 ## SceneNode.pickable property
 
-Computed value of pick mode
+Whether this node is enabled for CPU picking
 
 **Signature:**
 

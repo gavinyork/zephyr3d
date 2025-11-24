@@ -4,7 +4,7 @@
 
 ## Application.ready() method
 
-Wait until the application is ready.
+Initialize the rendering device and start input processing.
 
 **Signature:**
 
@@ -14,4 +14,8 @@ ready(): Promise<void>;
 **Returns:**
 
 Promise&lt;void&gt;
+
+## Exceptions
+
+If device creation fails.
 

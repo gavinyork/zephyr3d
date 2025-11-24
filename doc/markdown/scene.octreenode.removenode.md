@@ -4,7 +4,7 @@
 
 ## OctreeNode.removeNode() method
 
-Removes a scene node from this node
+Remove a scene node from this octree node.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ removeNode(node: GraphNode): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [GraphNode](doc/markdown/./scene.graphnode.md) | The scene node to be removed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+node
+
+
+</td><td>
+
+[GraphNode](doc/markdown/./scene.graphnode.md)
+
+
+</td><td>
+
+Scene node to remove.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

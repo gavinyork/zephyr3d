@@ -4,7 +4,9 @@
 
 ## Material.applyUniforms() method
 
-Sets all uniform values to the bind group of the material if needed
+Conditionally update uniforms/resources into the material bind group.
+
+Delegates to `_applyUniforms()` when `needUpdate` is true (based on `_optionTag` check).
 
 **Signature:**
 
@@ -14,12 +16,87 @@ applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group of the material |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The context of current drawing task |
-|  needUpdate | boolean | true if the uniform values needs to update |
-|  pass | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+Material bind group at index 2 (may be `null` if program has no layout).
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Draw context.
+
+
+</td></tr>
+<tr><td>
+
+needUpdate
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether uniforms need to be refreshed.
+
+
+</td></tr>
+<tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Pass index.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

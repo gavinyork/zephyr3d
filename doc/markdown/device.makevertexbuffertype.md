@@ -14,10 +14,55 @@ declare function makeVertexBufferType(length: number, ...attributes: VertexAttri
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  length | number | The length of the vertex buffer |
-|  attributes | [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)<!-- -->\[\] | The vertex attributes |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+length
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The length of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+attributes
+
+
+</td><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)<!-- -->\[\]
+
+
+</td><td>
+
+The vertex attributes
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

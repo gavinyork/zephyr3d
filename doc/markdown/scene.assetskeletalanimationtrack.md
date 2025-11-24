@@ -15,8 +15,60 @@ interface AssetSkeletalAnimationTrack extends AssetAnimationTrack
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [keyFrames](doc/markdown/./scene.assetskeletalanimationtrack.keyframes.md) |  | Record&lt;number, { translation: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; rotation: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; scale: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }\[\]&gt; |  |
-|  [skeleton](doc/markdown/./scene.assetskeletalanimationtrack.skeleton.md) |  | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[keyFrames](doc/markdown/./scene.assetskeletalanimationtrack.keyframes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;number, { translation: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; rotation: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; scale: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }\[\]&gt;
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[skeleton](doc/markdown/./scene.assetskeletalanimationtrack.skeleton.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -9,14 +9,44 @@ Update the wave generator.
 **Signature:**
 
 ```typescript
-abstract update(timeInSeconds: number): void;
+update(timeInSeconds: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  timeInSeconds | number | Time in seconds. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+timeInSeconds
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Time in seconds.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

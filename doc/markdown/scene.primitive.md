@@ -4,47 +4,451 @@
 
 ## Primitive class
 
-Primitive contains only the vertex and index data of a mesh
+Holds vertex/index data and draw parameters for a mesh geometry.
+
+Responsibilities: - Owns one or more vertex buffers and an optional index buffer. - Defines primitive topology, draw range (start/count), and vertex layout. - Provides utilities to create/set/remove buffers and query vertex/face counts. - Tracks changes via a change tag and notifies render-bundle caching. - Optionally stores a bounding volume and supports ray intersection tests.
+
+Ownership and lifecycle: - When adding buffers (`setVertexBuffer`<!-- -->, `setIndexBuffer`<!-- -->), the primitive retains them. - When removing/overwriting buffers, the primitive releases the previous buffers. - Disposing the primitive also disposes the internal `VertexLayout` and releases retained buffers.
 
 **Signature:**
 
 ```typescript
-declare class Primitive 
+declare class Primitive extends Primitive_base implements Clonable<Primitive> 
 ```
+**Extends:** Primitive\_base
+
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[Primitive](doc/markdown/./scene.primitive.md)<!-- -->&gt;
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.primitive._constructor_.md) |  | Creates an instance of a primitive |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.primitive._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create an empty primitive.
+
+Defaults: - Primitive type: 'triangle-list' - `indexStart = 0`<!-- -->, `indexCount = null` (auto-computed) - No vertex/index buffers attached - No bounding volume
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [indexCount](doc/markdown/./scene.primitive.indexcount.md) |  | number | The number of the indices or vertices to be drawn |
-|  [indexStart](doc/markdown/./scene.primitive.indexstart.md) |  | number | Start index for drawing |
-|  [primitiveType](doc/markdown/./scene.primitive.primitivetype.md) |  | [PrimitiveType](doc/markdown/./device.primitivetype.md) | Primitive type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[changeTag](doc/markdown/./scene.primitive.changetag.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Change tag that increments whenever draw-affecting state changes. Useful for invalidating cached render bundles.
+
+
+</td></tr>
+<tr><td>
+
+[indexCount](doc/markdown/./scene.primitive.indexcount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of indices/vertices to draw.
+
+
+</td></tr>
+<tr><td>
+
+[indexStart](doc/markdown/./scene.primitive.indexstart.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Starting index/vertex for drawing.
+
+
+</td></tr>
+<tr><td>
+
+[primitiveType](doc/markdown/./scene.primitive.primitivetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PrimitiveType](doc/markdown/./device.primitivetype.md)
+
+
+</td><td>
+
+Primitive topology.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [createAndSetIndexBuffer(data, dynamic)](doc/markdown/./scene.primitive.createandsetindexbuffer.md) |  | Creates an index buffer from the given options and then adds it to the prmitive |
-|  [createAndSetVertexBuffer(format, data, stepMode)](doc/markdown/./scene.primitive.createandsetvertexbuffer.md) |  | Creates a vertex buffer from the given options and then adds it to the primitive |
-|  [dispose()](doc/markdown/./scene.primitive.dispose.md) |  | Disposes the primitive |
-|  [draw()](doc/markdown/./scene.primitive.draw.md) |  | Draw the prmitive |
-|  [drawInstanced(numInstances)](doc/markdown/./scene.primitive.drawinstanced.md) |  | Draw multiple instances of the primitive |
-|  [getBoundingVolume()](doc/markdown/./scene.primitive.getboundingvolume.md) |  | Gets the bounding volume of the primitive |
-|  [getIndexBuffer()](doc/markdown/./scene.primitive.getindexbuffer.md) |  | Gets the index buffer of the primitive |
-|  [getNumFaces()](doc/markdown/./scene.primitive.getnumfaces.md) |  | Query total face count |
-|  [getNumVertices()](doc/markdown/./scene.primitive.getnumvertices.md) |  | Query total vertex count |
-|  [getVertexBuffer(semantic)](doc/markdown/./scene.primitive.getvertexbuffer.md) |  | Gets the vertex buffer by a given semantic |
-|  [getVertexBufferInfo(semantic)](doc/markdown/./scene.primitive.getvertexbufferinfo.md) |  | Gets the vertex buffer information by a given semantic |
-|  [raycast(ray)](doc/markdown/./scene.primitive.raycast.md) |  | Ray intersection test |
-|  [removeBoundingboxChangeCallback(cb)](doc/markdown/./scene.primitive.removeboundingboxchangecallback.md) |  | Removes a callback function for bounding box changing |
-|  [removeVertexBuffer(buffer)](doc/markdown/./scene.primitive.removevertexbuffer.md) |  | Removes a vertex buffer from the primitive |
-|  [setBoundingVolume(bv)](doc/markdown/./scene.primitive.setboundingvolume.md) |  | Sets the bounding volume of the primitive |
-|  [setIndexBuffer(buffer)](doc/markdown/./scene.primitive.setindexbuffer.md) |  | Adds an index buffer to the primitive |
-|  [setVertexBuffer(buffer, stepMode)](doc/markdown/./scene.primitive.setvertexbuffer.md) |  | Adds a vertex buffer to the primitive |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.primitive.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a shallow clone: copies topology, draw range, and buffers.
+
+Note: Buffers are re-retained on the new primitive.
+
+
+</td></tr>
+<tr><td>
+
+[copyFrom(other)](doc/markdown/./scene.primitive.copyfrom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Copy from another primitive.
+
+Copies: - All vertex buffers and the index buffer - Primitive type, index start, index count
+
+
+</td></tr>
+<tr><td>
+
+[createAndSetIndexBuffer(data, dynamic)](doc/markdown/./scene.primitive.createandsetindexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create an index buffer from data and set it on the primitive.
+
+
+</td></tr>
+<tr><td>
+
+[createAndSetVertexBuffer(format, data, stepMode)](doc/markdown/./scene.primitive.createandsetvertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a vertex buffer from data and add it to the primitive.
+
+- For interleaved layouts, pass an array of `VertexAttribFormat`<!-- -->. - For a single attribute, pass a single `VertexAttribFormat`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[draw()](doc/markdown/./scene.primitive.draw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Issue a non-instanced draw for the current topology and range.
+
+Preconditions: A valid vertex layout and `indexCount > 0`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[drawInstanced(numInstances)](doc/markdown/./scene.primitive.drawinstanced.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Issue an instanced draw for the current topology and range.
+
+Preconditions: A valid vertex layout and `indexCount > 0`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[getBoundingVolume()](doc/markdown/./scene.primitive.getboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the bounding volume associated with this primitive.
+
+
+</td></tr>
+<tr><td>
+
+[getIndexBuffer()](doc/markdown/./scene.primitive.getindexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the current index buffer.
+
+
+</td></tr>
+<tr><td>
+
+[getNumFaces()](doc/markdown/./scene.primitive.getnumfaces.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Query total face/segment count based on topology and buffer size.
+
+- For indexed geometry: derived from index buffer. - For non-indexed: derived from position vertex count.
+
+
+</td></tr>
+<tr><td>
+
+[getNumVertices()](doc/markdown/./scene.primitive.getnumvertices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Query total vertex count from the position buffer, if present.
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBuffer(semantic)](doc/markdown/./scene.primitive.getvertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the vertex buffer that matches a given semantic.
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferInfo(semantic)](doc/markdown/./scene.primitive.getvertexbufferinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get vertex buffer information for a given semantic.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.primitive.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Dispose this primitive and release associated GPU resources.
+
+
+</td></tr>
+<tr><td>
+
+[raycast(ray)](doc/markdown/./scene.primitive.raycast.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Test intersection against the current axis-aligned bounding box (AABB).
+
+
+</td></tr>
+<tr><td>
+
+[removeVertexBuffer(semantic)](doc/markdown/./scene.primitive.removevertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove all vertex buffers that match a given semantic.
+
+This releases retained buffers, marks the layout dirty, and invalidates bundles.
+
+
+</td></tr>
+<tr><td>
+
+[setBoundingVolume(bv)](doc/markdown/./scene.primitive.setboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set or replace the bounding volume of this primitive.
+
+Triggers registered bounding-volume change callbacks.
+
+
+</td></tr>
+<tr><td>
+
+[setIndexBuffer(buffer)](doc/markdown/./scene.primitive.setindexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set or replace the index buffer.
+
+Ownership note: The primitive retains the buffer; previous buffer is released. Marks the vertex layout dirty and invalidates bundles.
+
+
+</td></tr>
+<tr><td>
+
+[setVertexBuffer(buffer, stepMode)](doc/markdown/./scene.primitive.setvertexbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add an existing vertex buffer to the primitive.
+
+Ownership note: The primitive retains the buffer; it will be released or disposed when replaced or on dispose.
+
+
+</td></tr>
+</tbody></table>
 

@@ -7,21 +7,74 @@
 **Signature:**
 
 ```typescript
-setFramebuffer(color: (BaseTexture | {
-        texture: BaseTexture;
-        miplevel?: number;
-        face?: number;
-        layer?: number;
-    })[], depth?: BaseTexture, sampleCount?: number): any;
+setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  color | ([BaseTexture](doc/markdown/./device.basetexture.md) \| { texture: [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->; miplevel?: number; face?: number; layer?: number; })\[\] |  |
-|  depth | [BaseTexture](doc/markdown/./device.basetexture.md) | _(Optional)_ |
-|  sampleCount | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+color
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+depth
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+sampleCount
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,10 +15,52 @@ interface Texture2D<T = unknown> extends BaseTexture<T>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [createWithMipmapData(data, sRGB, creationFlags)](doc/markdown/./device.texture2d.createwithmipmapdata.md) |  |
-|  [loadFromElement(element, sRGB, creationFlags)](doc/markdown/./device.texture2d.loadfromelement.md) |  |
-|  [update(data, xOffset, yOffset, width, height)](doc/markdown/./device.texture2d.update.md) |  |
-|  [updateFromElement(data, destX, destY, srcX, srcY, width, height)](doc/markdown/./device.texture2d.updatefromelement.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createWithMipmapData(data, sRGB, creationFlags)](doc/markdown/./device.texture2d.createwithmipmapdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[loadFromElement(element, sRGB, creationFlags)](doc/markdown/./device.texture2d.loadfromelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[update(data, xOffset, yOffset, width, height)](doc/markdown/./device.texture2d.update.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[updateFromElement(data, destX, destY, srcX, srcY, width, height)](doc/markdown/./device.texture2d.updatefromelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

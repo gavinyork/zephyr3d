@@ -4,7 +4,11 @@
 
 ## Camera class
 
-The camera node class
+A renderable camera node that manages view/projection math, frusta, input control, picking, and a post-processing chain via a compositor.
+
+Key features: - Maintains projection, view, VP, and inverse VP matrices and lazily recomputes them when invalidated. - Provides world- and view-space frusta for culling and clipping. - Supports perspective and orthographic projections. - Integrates with post effects (Tonemap, FXAA, TAA, Bloom, SSR, SSAO, Motion Blur) through an internal `Compositor`<!-- -->. - Handles temporal jitter and history state when TAA or motion blur are enabled. - Emits picking rays from screen coordinates and supports async GPU picking. - Optional controller integration for user input handling.
+
+Performance notes: - Matrices/frusta are computed on demand and cached until invalidation. - Temporal jitter and history are set up only when required by enabled features and device support.
 
 **Signature:**
 
@@ -15,69 +19,1413 @@ declare class Camera extends SceneNode
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, projectionMatrix)](doc/markdown/./scene.camera._constructor_.md) |  | Creates a new camera node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, projectionMatrix)](doc/markdown/./scene.camera._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new camera node.
+
+Initializes projection/view matrices, temporal fields, controller linkage, and builds the default post-processing pipeline on the internal compositor.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [clearColor](doc/markdown/./scene.camera.clearcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | Color value used to clear color buffer before rendering, if null, color buffer will not be cleared |
-|  [clipMask](doc/markdown/./scene.camera.clipmask.md) |  | number | Clip plane mask |
-|  [clipPlane](doc/markdown/./scene.camera.clipplane.md) |  | [Plane](doc/markdown/./base.plane.md) | Clip plane in camera space |
-|  [commandBufferReuse](doc/markdown/./scene.camera.commandbufferreuse.md) |  | boolean | Whether to allow command buffer reuse optimization |
-|  [controller](doc/markdown/./scene.camera.controller.md) |  | [BaseCameraController](doc/markdown/./scene.basecameracontroller.md) | The camera controller |
-|  [depthPrePass](doc/markdown/./scene.camera.depthprepass.md) |  | boolean | Whether to perform a depth pass |
-|  [enablePicking](doc/markdown/./scene.camera.enablepicking.md) |  | boolean | Whether GPU picking is enabled for this camera |
-|  [framebuffer](doc/markdown/./scene.camera.framebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | Framebuffer object into which the scene will be rendered |
-|  [frustum](doc/markdown/./scene.camera.frustum.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) | Gets the frustum of the camera |
-|  [frustumViewSpace](doc/markdown/./scene.camera.frustumviewspace.md) | <code>readonly</code> | [Frustum](doc/markdown/./base.frustum.md) |  |
-|  [HiZ](doc/markdown/./scene.camera.hiz.md) |  | boolean | Gets whether Hi-Z acceleration is enabled. When enabled, it can significantly improve SSR performance with minimal quality impact. |
-|  [invViewProjectionMatrix](doc/markdown/./scene.camera.invviewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The inverse-view-projection matrix of the camera |
-|  [oit](doc/markdown/./scene.camera.oit.md) |  | [OIT](doc/markdown/./scene.oit.md) | OIT |
-|  [pickPosX](doc/markdown/./scene.camera.pickposx.md) |  | number | X coordinate for picking related to viewport |
-|  [pickPosY](doc/markdown/./scene.camera.pickposy.md) |  | number | Y coordinate for picking related to viewport |
-|  [pickResult](doc/markdown/./scene.camera.pickresult.md) |  | [PickResult](doc/markdown/./scene.pickresult.md) | Pick result |
-|  [sampleCount](doc/markdown/./scene.camera.samplecount.md) |  | number | Sample count for MSAA |
-|  [scissor](doc/markdown/./scene.camera.scissor.md) |  | number\[\] | Scissor rectangle used for rendering, if null, use viewport value |
-|  [SSR](doc/markdown/./scene.camera.ssr.md) |  | boolean | Gets whether Screen Space Reflections (SSR) is enabled. |
-|  [ssrBlurDepthCutoff](doc/markdown/./scene.camera.ssrblurdepthcutoff.md) |  | number | Gets the depth cutoff value for SSR blur. Determines at what depth difference the blur effect should be reduced or eliminated. |
-|  [ssrBlurKernelSize](doc/markdown/./scene.camera.ssrblurkernelsize.md) |  | number | Gets the kernel size for the SSR blur effect. Defines the size of the blur kernel. Larger values create softer, more spread-out blur. |
-|  [ssrBlurScale](doc/markdown/./scene.camera.ssrblurscale.md) |  | number | Gets the blur scale factor for SSR. Controls the overall intensity of the blur effect applied to reflections. |
-|  [ssrBlurStdDev](doc/markdown/./scene.camera.ssrblurstddev.md) |  | number | Gets the standard deviation for the SSR Gaussian blur. Controls the distribution of the blur effect. Higher values create more pronounced blur. |
-|  [ssrCalcThickness](doc/markdown/./scene.camera.ssrcalcthickness.md) |  | boolean | Gets whether SSR should calculate thickness automatically. When enabled, the system will dynamically compute surface thickness for reflections. |
-|  [ssrIterations](doc/markdown/./scene.camera.ssriterations.md) |  | number | Gets the number of iterations for SSR ray marching. Higher values provide more accurate reflections but impact performance. |
-|  [ssrMaxDistance](doc/markdown/./scene.camera.ssrmaxdistance.md) |  | number | Gets the maximum distance for SSR ray marching. Defines how far rays will travel when searching for reflection intersections. |
-|  [ssrMaxRoughness](doc/markdown/./scene.camera.ssrmaxroughness.md) |  | number | Gets the maximum roughness value for screen space reflections. Controls the cutoff point where surfaces are considered too rough for SSR. |
-|  [ssrRoughnessFactor](doc/markdown/./scene.camera.ssrroughnessfactor.md) |  | number | Gets the roughness factor for SSR calculations. Affects how surface roughness influences reflection clarity. |
-|  [ssrStride](doc/markdown/./scene.camera.ssrstride.md) |  | number | Gets the stride value for SSR ray marching. Controls the step size during ray marching. Larger values improve performance but may miss details. |
-|  [ssrThickness](doc/markdown/./scene.camera.ssrthickness.md) |  | number | Gets the thickness value for SSR calculations. Determines the thickness threshold for surfaces when calculating reflections. |
-|  [viewMatrix](doc/markdown/./scene.camera.viewmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | View matrix of the camera |
-|  [viewport](doc/markdown/./scene.camera.viewport.md) |  | number\[\] | Viewport used for rendering, if null, use full framebuffer size |
-|  [viewProjectionMatrix](doc/markdown/./scene.camera.viewprojectionmatrix.md) | <code>readonly</code> | [Matrix4x4](doc/markdown/./base.matrix4x4.md) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bloom](doc/markdown/./scene.camera.bloom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether Bloom is enabled.
+
+
+</td></tr>
+<tr><td>
+
+[bloomDownsampleLimit](doc/markdown/./scene.camera.bloomdownsamplelimit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom downsample limit
+
+
+</td></tr>
+<tr><td>
+
+[bloomIntensity](doc/markdown/./scene.camera.bloomintensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom intensity
+
+
+</td></tr>
+<tr><td>
+
+[bloomMaxDownsampleLevels](doc/markdown/./scene.camera.bloommaxdownsamplelevels.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum bloom downsample levels
+
+
+</td></tr>
+<tr><td>
+
+[bloomThreshold](doc/markdown/./scene.camera.bloomthreshold.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom threshold
+
+
+</td></tr>
+<tr><td>
+
+[bloomThresholdKnee](doc/markdown/./scene.camera.bloomthresholdknee.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom threshold knee
+
+
+</td></tr>
+<tr><td>
+
+[clearColor](doc/markdown/./scene.camera.clearcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+Framebuffer clear color, or `null` to disable.
+
+
+</td></tr>
+<tr><td>
+
+[clearDepth](doc/markdown/./scene.camera.cleardepth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Framebuffer stencil clear value, disabled when null. Default is 0.
+
+
+</td></tr>
+<tr><td>
+
+[clearStencil](doc/markdown/./scene.camera.clearstencil.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Framebuffer stencil clear value, disabled when null. Default is 0.
+
+
+</td></tr>
+<tr><td>
+
+[clipMask](doc/markdown/./scene.camera.clipmask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip plane mask
+
+
+</td></tr>
+<tr><td>
+
+[clipPlane](doc/markdown/./scene.camera.clipplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+Clip plane in camera space.
+
+Setting this invalidates derived data. Shaders should respect `clipMask` and plane.
+
+
+</td></tr>
+<tr><td>
+
+[commandBufferReuse](doc/markdown/./scene.camera.commandbufferreuse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether to allow command buffer reuse optimization
+
+
+</td></tr>
+<tr><td>
+
+[compositor](doc/markdown/./scene.camera.compositor.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Compositor](doc/markdown/./scene.compositor.md)
+
+
+</td><td>
+
+The compositor that owns and runs the camera's post-processing chain.
+
+
+</td></tr>
+<tr><td>
+
+[controller](doc/markdown/./scene.camera.controller.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BaseCameraController](doc/markdown/./scene.basecameracontroller.md)
+
+
+</td><td>
+
+The camera controller
+
+
+</td></tr>
+<tr><td>
+
+[depthPrePass](doc/markdown/./scene.camera.depthprepass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether to perform a depth pass
+
+
+</td></tr>
+<tr><td>
+
+[frustum](doc/markdown/./scene.camera.frustum.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+Gets the frustum of the camera
+
+
+</td></tr>
+<tr><td>
+
+[frustumViewSpace](doc/markdown/./scene.camera.frustumviewspace.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[FXAA](doc/markdown/./scene.camera.fxaa.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether FXAA is enabled.
+
+
+</td></tr>
+<tr><td>
+
+[HDR](doc/markdown/./scene.camera.hdr.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether HDR backbuffer is enabled.
+
+Tonemap should be disabled when not using HDR backbuffer.
+
+
+</td></tr>
+<tr><td>
+
+[HiZ](doc/markdown/./scene.camera.hiz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether Hi-Z acceleration is enabled.
+
+Often improves SSR performance with little quality impact when supported.
+
+
+</td></tr>
+<tr><td>
+
+[interactionRect](doc/markdown/./scene.camera.interactionrect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+\[left: number, top: number, width: number, height: number\]
+
+
+</td><td>
+
+Pointer interaction rectangle in css pixels (relative to canvas)
+
+
+</td></tr>
+<tr><td>
+
+[invViewProjectionMatrix](doc/markdown/./scene.camera.invviewprojectionmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The inverse-view-projection matrix of the camera
+
+
+</td></tr>
+<tr><td>
+
+[motionBlur](doc/markdown/./scene.camera.motionblur.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether motion blur is enabled via the post effect.
+
+
+</td></tr>
+<tr><td>
+
+[motionBlurStrength](doc/markdown/./scene.camera.motionblurstrength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Motion blur strength
+
+
+</td></tr>
+<tr><td>
+
+[oit](doc/markdown/./scene.camera.oit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[OIT](doc/markdown/./scene.oit.md)
+
+
+</td><td>
+
+OIT
+
+
+</td></tr>
+<tr><td>
+
+[scissor](doc/markdown/./scene.camera.scissor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Scissor rectangle used for rendering, if null, use viewport value
+
+
+</td></tr>
+<tr><td>
+
+[SSAO](doc/markdown/./scene.camera.ssao.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether SSAO is enabled.
+
+
+</td></tr>
+<tr><td>
+
+[SSAOBias](doc/markdown/./scene.camera.ssaobias.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SSAO bias
+
+
+</td></tr>
+<tr><td>
+
+[SSAOBlurDepthCutoff](doc/markdown/./scene.camera.ssaoblurdepthcutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SSAO depth cutoff
+
+
+</td></tr>
+<tr><td>
+
+[SSAOIntensity](doc/markdown/./scene.camera.ssaointensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SSAO intensity
+
+
+</td></tr>
+<tr><td>
+
+[SSAORadius](doc/markdown/./scene.camera.ssaoradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SSAO radius
+
+
+</td></tr>
+<tr><td>
+
+[SSAOScale](doc/markdown/./scene.camera.ssaoscale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SSAO scale
+
+
+</td></tr>
+<tr><td>
+
+[SSR](doc/markdown/./scene.camera.ssr.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether Screen Space Reflections (SSR) is enabled.
+
+
+</td></tr>
+<tr><td>
+
+[ssrBlurDepthCutoff](doc/markdown/./scene.camera.ssrblurdepthcutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the depth cutoff value for SSR blur. Determines at what depth difference the blur effect should be reduced or eliminated.
+
+
+</td></tr>
+<tr><td>
+
+[ssrBlurKernelSize](doc/markdown/./scene.camera.ssrblurkernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the kernel size for the SSR blur effect. Defines the size of the blur kernel. Larger values create softer, more spread-out blur.
+
+
+</td></tr>
+<tr><td>
+
+[ssrBlurScale](doc/markdown/./scene.camera.ssrblurscale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the blur scale factor for SSR. Controls the overall intensity of the blur effect applied to reflections.
+
+
+</td></tr>
+<tr><td>
+
+[ssrBlurStdDev](doc/markdown/./scene.camera.ssrblurstddev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the standard deviation for the SSR Gaussian blur. Controls the distribution of the blur effect. Higher values create more pronounced blur.
+
+
+</td></tr>
+<tr><td>
+
+[ssrCalcThickness](doc/markdown/./scene.camera.ssrcalcthickness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether SSR should calculate thickness automatically. When enabled, the system will dynamically compute surface thickness for reflections.
+
+
+</td></tr>
+<tr><td>
+
+[ssrIterations](doc/markdown/./scene.camera.ssriterations.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the number of iterations for SSR ray marching. Higher values provide more accurate reflections but impact performance.
+
+
+</td></tr>
+<tr><td>
+
+[ssrMaxDistance](doc/markdown/./scene.camera.ssrmaxdistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the maximum distance for SSR ray marching. Defines how far rays will travel when searching for reflection intersections.
+
+
+</td></tr>
+<tr><td>
+
+[ssrMaxRoughness](doc/markdown/./scene.camera.ssrmaxroughness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the maximum roughness value for screen space reflections. Controls the cutoff point where surfaces are considered too rough for SSR.
+
+
+</td></tr>
+<tr><td>
+
+[ssrRoughnessFactor](doc/markdown/./scene.camera.ssrroughnessfactor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the roughness factor for SSR calculations. Affects how surface roughness influences reflection clarity.
+
+
+</td></tr>
+<tr><td>
+
+[ssrStride](doc/markdown/./scene.camera.ssrstride.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the stride value for SSR ray marching. Controls the step size during ray marching. Larger values improve performance but may miss details.
+
+
+</td></tr>
+<tr><td>
+
+[ssrThickness](doc/markdown/./scene.camera.ssrthickness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the thickness value for SSR calculations. Determines the thickness threshold for surfaces when calculating reflections.
+
+
+</td></tr>
+<tr><td>
+
+[TAA](doc/markdown/./scene.camera.taa.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Gets whether TAA is enabled.
+
+
+</td></tr>
+<tr><td>
+
+[TAADebug](doc/markdown/./scene.camera.taadebug.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the debug flag for TAA
+
+
+</td></tr>
+<tr><td>
+
+[toneMap](doc/markdown/./scene.camera.tonemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether tonemapping is enabled via the post effect.
+
+
+</td></tr>
+<tr><td>
+
+[toneMapExposure](doc/markdown/./scene.camera.tonemapexposure.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Tonemap exposure
+
+
+</td></tr>
+<tr><td>
+
+[viewMatrix](doc/markdown/./scene.camera.viewmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+View matrix of the camera
+
+
+</td></tr>
+<tr><td>
+
+[viewport](doc/markdown/./scene.camera.viewport.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Viewport used for rendering, if null, use full framebuffer size
+
+
+</td></tr>
+<tr><td>
+
+[viewProjectionMatrix](doc/markdown/./scene.camera.viewprojectionmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [constructRay(x, y)](doc/markdown/./scene.camera.constructray.md) |  | Constructs a ray based on the given screen coordinates. |
-|  [dispose()](doc/markdown/./scene.camera.dispose.md) |  | Disposes the node |
-|  [getAspect()](doc/markdown/./scene.camera.getaspect.md) |  | Gets the aspect ratio |
-|  [getFarPlane()](doc/markdown/./scene.camera.getfarplane.md) |  | Gets the far clip plane of the camera |
-|  [getFOV()](doc/markdown/./scene.camera.getfov.md) |  | Gets the vertical field of view of the camera |
-|  [getNearPlane()](doc/markdown/./scene.camera.getnearplane.md) |  | Gets the near clip plane of the camera |
-|  [getProjectionMatrix()](doc/markdown/./scene.camera.getprojectionmatrix.md) |  | Gets the projection matrix of the camera |
-|  [getRotationMatrix()](doc/markdown/./scene.camera.getrotationmatrix.md) |  |  |
-|  [getTanHalfFovy()](doc/markdown/./scene.camera.gettanhalffovy.md) |  | Gets the tangent of half of the vertical field of view |
-|  [handleEvent(ev, type)](doc/markdown/./scene.camera.handleevent.md) |  | Handle input events |
-|  [isCamera()](doc/markdown/./scene.camera.iscamera.md) |  | true if this is a camera node, false otherwise |
-|  [lookAt(eye, target, up)](doc/markdown/./scene.camera.lookat.md) |  | Place the camera by specifying the camera position and the target point |
-|  [lookAtCubeFace(face, position)](doc/markdown/./scene.camera.lookatcubeface.md) |  | Place the camera to look at a given cube face at a given camera position |
-|  [render(scene, compositor)](doc/markdown/./scene.camera.render.md) |  | Renders a scene |
-|  [resetController()](doc/markdown/./scene.camera.resetcontroller.md) |  | Reset the controller |
-|  [setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.camera.setortho.md) |  | Setup a orthogonal projection matrix for the camera |
-|  [setPerspective(fovY, aspect, zNear, zFar)](doc/markdown/./scene.camera.setperspective.md) |  | Setup a perspective projection matrix for the camera |
-|  [setProjectionMatrix(matrix)](doc/markdown/./scene.camera.setprojectionmatrix.md) |  | Setup a projection matrix for the camera |
-|  [updateController()](doc/markdown/./scene.camera.updatecontroller.md) |  | Updates the controller state |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clearHistoryData()](doc/markdown/./scene.camera.clearhistorydata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clears the camera history data which is used in temporal reprojection
+
+
+</td></tr>
+<tr><td>
+
+[constructRay(x, y)](doc/markdown/./scene.camera.constructray.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a ray based on the given screen coordinates.
+
+
+</td></tr>
+<tr><td>
+
+[getAspect()](doc/markdown/./scene.camera.getaspect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the aspect ratio
+
+
+</td></tr>
+<tr><td>
+
+[getFarPlane()](doc/markdown/./scene.camera.getfarplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the far clip plane of the camera
+
+
+</td></tr>
+<tr><td>
+
+[getFOV()](doc/markdown/./scene.camera.getfov.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the vertical field of view of the camera
+
+
+</td></tr>
+<tr><td>
+
+[getHistoryData()](doc/markdown/./scene.camera.gethistorydata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the camera history data which is used in temporal reprojection
+
+
+</td></tr>
+<tr><td>
+
+[getInvProjectionMatrix()](doc/markdown/./scene.camera.getinvprojectionmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the inverse projection matrix of the camera
+
+
+</td></tr>
+<tr><td>
+
+[getNearPlane()](doc/markdown/./scene.camera.getnearplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the near clip plane of the camera
+
+
+</td></tr>
+<tr><td>
+
+[getProjectionMatrix()](doc/markdown/./scene.camera.getprojectionmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the projection matrix of the camera
+
+
+</td></tr>
+<tr><td>
+
+[getRotationMatrix()](doc/markdown/./scene.camera.getrotationmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getTanHalfFovy()](doc/markdown/./scene.camera.gettanhalffovy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the tangent of half of the vertical field of view
+
+
+</td></tr>
+<tr><td>
+
+[handleEvent(ev, type)](doc/markdown/./scene.camera.handleevent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle input events
+
+
+</td></tr>
+<tr><td>
+
+[isCamera()](doc/markdown/./scene.camera.iscamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+true if this is a camera node, false otherwise
+
+
+</td></tr>
+<tr><td>
+
+[isOrtho()](doc/markdown/./scene.camera.isortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the camera is orthographic
+
+
+</td></tr>
+<tr><td>
+
+[isPerspective()](doc/markdown/./scene.camera.isperspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns true if the camera is perspective
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(eye, target, up)](doc/markdown/./scene.camera.lookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Place the camera by specifying the camera position and the target point
+
+
+</td></tr>
+<tr><td>
+
+[lookAtCubeFace(face, position)](doc/markdown/./scene.camera.lookatcubeface.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Place the camera to look at a given cube face at a given camera position
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.camera.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the node
+
+
+</td></tr>
+<tr><td>
+
+[pickAsync(posX, posY)](doc/markdown/./scene.camera.pickasync.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[render(scene)](doc/markdown/./scene.camera.render.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Renders a scene
+
+
+</td></tr>
+<tr><td>
+
+[resetController()](doc/markdown/./scene.camera.resetcontroller.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Reset the controller
+
+
+</td></tr>
+<tr><td>
+
+[setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.camera.setortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a orthogonal projection matrix for the camera
+
+
+</td></tr>
+<tr><td>
+
+[setPerspective(fovY, aspect, zNear, zFar)](doc/markdown/./scene.camera.setperspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a perspective projection matrix for the camera
+
+
+</td></tr>
+<tr><td>
+
+[setProjectionMatrix(matrix)](doc/markdown/./scene.camera.setprojectionmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a projection matrix for the camera
+
+
+</td></tr>
+<tr><td>
+
+[updateController()](doc/markdown/./scene.camera.updatecontroller.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Updates the controller state
+
+
+</td></tr>
+</tbody></table>
 

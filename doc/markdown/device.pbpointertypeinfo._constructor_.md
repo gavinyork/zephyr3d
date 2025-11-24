@@ -14,8 +14,49 @@ constructor(pointerType: PBTypeInfo, addressSpace: PBAddressSpace);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pointerType | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) |  |
-|  addressSpace | [PBAddressSpace](doc/markdown/./device.pbaddressspace.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pointerType
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+addressSpace
+
+
+</td><td>
+
+[PBAddressSpace](doc/markdown/./device.pbaddressspace.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,10 +14,55 @@ getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  frustum | [Frustum](doc/markdown/./base.frustum.md) | The frustum object. |
-|  mask | number | The frustum planes that needs to be tested. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+frustum
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+The frustum object.
+
+
+</td></tr>
+<tr><td>
+
+mask
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The frustum planes that needs to be tested.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

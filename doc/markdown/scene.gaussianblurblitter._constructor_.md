@@ -14,10 +14,85 @@ constructor(phase: 'horizonal' | 'vertical', kernalSize: number, sigma: number, 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  phase | 'horizonal' \| 'vertical' | Blitter phase |
-|  kernalSize | number | kernel size |
-|  sigma | number | Gaussian standard deviation |
-|  blurSize | number | Blur radius |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+phase
+
+
+</td><td>
+
+'horizonal' \| 'vertical'
+
+
+</td><td>
+
+Blitter phase
+
+
+</td></tr>
+<tr><td>
+
+kernalSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+kernel size
+
+
+</td></tr>
+<tr><td>
+
+sigma
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gaussian standard deviation
+
+
+</td></tr>
+<tr><td>
+
+blurSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blur radius
+
+
+</td></tr>
+</tbody></table>
 

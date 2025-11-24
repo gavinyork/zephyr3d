@@ -15,9 +15,39 @@ initShaderBindings(pb: ProgramBuilder): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pb
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+The program builder
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,11 +15,71 @@ getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShader
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  refl | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Reflection vector |
-|  roughness | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Surface roughness |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+refl
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Reflection vector
+
+
+</td></tr>
+<tr><td>
+
+roughness
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Surface roughness
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

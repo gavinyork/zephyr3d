@@ -4,7 +4,9 @@
 
 ## Scene.octree property
 
-Gets the octree
+Gets the octree used for spatial organization and queries.
+
+Ensures pending node placements are synchronized before returning.
 
 **Signature:**
 

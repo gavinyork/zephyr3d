@@ -4,7 +4,9 @@
 
 ## Camera.(constructor)
 
-Creates a new camera node
+Creates a new camera node.
+
+Initializes projection/view matrices, temporal fields, controller linkage, and builds the default post-processing pipeline on the internal compositor.
 
 **Signature:**
 
@@ -14,8 +16,53 @@ constructor(scene: Scene, projectionMatrix?: Matrix4x4);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene that the camera belongs to |
-|  projectionMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ Projection matrix for this camera |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene that owns this camera.
+
+
+</td></tr>
+<tr><td>
+
+projectionMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ Optional projection matrix to initialize with.
+
+
+</td></tr>
+</tbody></table>
 

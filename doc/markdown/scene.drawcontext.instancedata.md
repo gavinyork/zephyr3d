@@ -4,7 +4,7 @@
 
 ## DrawContext.instanceData property
 
-Instance data for current drawing task
+Instance data buffer/metadata for the current drawing task (instanced rendering).
 
 **Signature:**
 

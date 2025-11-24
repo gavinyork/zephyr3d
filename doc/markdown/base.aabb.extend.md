@@ -9,16 +9,48 @@ Extend the AABB so that it can contain specified point.
 **Signature:**
 
 ```typescript
-extend(v: Vector3): void;
+extend(v: Vector3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v | [Vector3](doc/markdown/./base.vector3.md) | The point used to extend the AABB. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point used to extend the AABB.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-void
+this
+
+self
 

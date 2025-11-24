@@ -15,22 +15,162 @@ declare class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(pointerType, addressSpace)](doc/markdown/./device.pbpointertypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBPointerTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(pointerType, addressSpace)](doc/markdown/./device.pbpointertypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBPointerTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [addressSpace](doc/markdown/./device.pbpointertypeinfo.addressspace.md) |  | [PBAddressSpace](doc/markdown/./device.pbaddressspace.md) | Get address space of the pointer |
-|  [pointerType](doc/markdown/./device.pbpointertypeinfo.pointertype.md) | <code>readonly</code> | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Get type of the pointer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addressSpace](doc/markdown/./device.pbpointertypeinfo.addressspace.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBAddressSpace](doc/markdown/./device.pbaddressspace.md)
+
+
+</td><td>
+
+Get address space of the pointer
+
+
+</td></tr>
+<tr><td>
+
+[pointerType](doc/markdown/./device.pbpointertypeinfo.pointertype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Get type of the pointer
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [haveAtomicMembers()](doc/markdown/./device.pbpointertypeinfo.haveatomicmembers.md) |  | Wether this type have atomic members |
-|  [isPointerType()](doc/markdown/./device.pbpointertypeinfo.ispointertype.md) |  | returns true if this is a pointer type |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbpointertypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[haveAtomicMembers()](doc/markdown/./device.pbpointertypeinfo.haveatomicmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Wether this type have atomic members
+
+
+</td></tr>
+<tr><td>
+
+[isPointerType()](doc/markdown/./device.pbpointertypeinfo.ispointertype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a pointer type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbpointertypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

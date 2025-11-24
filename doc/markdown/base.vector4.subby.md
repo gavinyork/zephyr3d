@@ -9,18 +9,48 @@ Subtract a vector from this vector.
 **Signature:**
 
 ```typescript
-subBy(other: Vector4): Vector4;
+subBy(other: Vector4): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Vector4](doc/markdown/./base.vector4.md) | The vector that will be subtract. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The vector that will be subtract.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector4](doc/markdown/./base.vector4.md)
+this
 
 self
 

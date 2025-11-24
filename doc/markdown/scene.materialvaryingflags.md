@@ -14,10 +14,91 @@ declare const enum MaterialVaryingFlags
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  INSTANCING | <code>4</code> |  |
-|  MORPH\_ANIMATION | <code>1</code> |  |
-|  SKIN\_ANIMATION | <code>2</code> |  |
-|  SSR\_STORE\_ROUGHNESS | <code>8</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+APPLY\_FOG
+
+
+</td><td>
+
+`16`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+INSTANCING
+
+
+</td><td>
+
+`4`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+MORPH\_ANIMATION
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+SKIN\_ANIMATION
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+SSR\_STORE\_ROUGHNESS
+
+
+</td><td>
+
+`8`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -15,22 +15,170 @@ declare class AssetSkeleton extends NamedObject
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name)](doc/markdown/./scene.assetskeleton._constructor_.md) |  | Creates an instance of AssetSkeleton |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name)](doc/markdown/./scene.assetskeleton._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of AssetSkeleton
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindPoseMatrices](doc/markdown/./scene.assetskeleton.bindposematrices.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | Binding pose matrices of the joints |
-|  [inverseBindMatrices](doc/markdown/./scene.assetskeleton.inversebindmatrices.md) |  | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | Inverse of the binding matrices of the joints |
-|  [joints](doc/markdown/./scene.assetskeleton.joints.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] | Joints of the skeleton |
-|  [pivot](doc/markdown/./scene.assetskeleton.pivot.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | The pivot node |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindPoseMatrices](doc/markdown/./scene.assetskeleton.bindposematrices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\]
+
+
+</td><td>
+
+Binding pose matrices of the joints
+
+
+</td></tr>
+<tr><td>
+
+[inverseBindMatrices](doc/markdown/./scene.assetskeleton.inversebindmatrices.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\]
+
+
+</td><td>
+
+Inverse of the binding matrices of the joints
+
+
+</td></tr>
+<tr><td>
+
+[joints](doc/markdown/./scene.assetskeleton.joints.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\]
+
+
+</td><td>
+
+Joints of the skeleton
+
+
+</td></tr>
+<tr><td>
+
+[pivot](doc/markdown/./scene.assetskeleton.pivot.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+The pivot node
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addJoint(joint, inverseBindMatrix)](doc/markdown/./scene.assetskeleton.addjoint.md) |  | Adds a joint to the skeleton |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addJoint(joint, inverseBindMatrix)](doc/markdown/./scene.assetskeleton.addjoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Adds a joint to the skeleton
+
+
+</td></tr>
+</tbody></table>
 

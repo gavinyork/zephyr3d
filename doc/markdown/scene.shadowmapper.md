@@ -14,32 +14,474 @@ declare class ShadowMapper
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(light)](doc/markdown/./scene.shadowmapper._constructor_.md) |  | Creates an instance of ShadowMapper |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(light)](doc/markdown/./scene.shadowmapper._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of ShadowMapper
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [depthBias](doc/markdown/./scene.shadowmapper.depthbias.md) |  | number | Depth bias for the shadow map |
-|  [esmBlur](doc/markdown/./scene.shadowmapper.esmblur.md) |  | boolean | Whether to enable ESM blur |
-|  [esmBlurKernelSize](doc/markdown/./scene.shadowmapper.esmblurkernelsize.md) |  | number | Kernel size for ESM |
-|  [esmBlurRadius](doc/markdown/./scene.shadowmapper.esmblurradius.md) |  | number | Blur radius for ESM |
-|  [esmDepthScale](doc/markdown/./scene.shadowmapper.esmdepthscale.md) |  | number | Depth scale for ESM |
-|  [light](doc/markdown/./scene.shadowmapper.light.md) | <code>readonly</code> | [PunctualLight](doc/markdown/./scene.punctuallight.md) | The light that is used to generate shadow map |
-|  [mode](doc/markdown/./scene.shadowmapper.mode.md) |  | [ShadowMode](doc/markdown/./scene.shadowmode.md) | Shadow map mode |
-|  [nearClip](doc/markdown/./scene.shadowmapper.nearclip.md) |  | number | Near clip plane |
-|  [normalBias](doc/markdown/./scene.shadowmapper.normalbias.md) |  | number | Normal bias for the shadow map |
-|  [numShadowCascades](doc/markdown/./scene.shadowmapper.numshadowcascades.md) |  | number | Count of the cascades, The maximum value is 4 |
-|  [pcfKernelSize](doc/markdown/./scene.shadowmapper.pcfkernelsize.md) |  | number | Kernel size for optimized PCF |
-|  [pdSampleCount](doc/markdown/./scene.shadowmapper.pdsamplecount.md) |  | number | Sample count for poisson disc PCF |
-|  [pdSampleRadius](doc/markdown/./scene.shadowmapper.pdsampleradius.md) |  | number | Radius for poisson disc PCF |
-|  [shadowDistance](doc/markdown/./scene.shadowmapper.shadowdistance.md) |  | number | Maximum distance from the camera, shadow will not be rendered beyond this range |
-|  [shadowMapSize](doc/markdown/./scene.shadowmapper.shadowmapsize.md) |  | number | Size of the shadow map |
-|  [shadowRegion](doc/markdown/./scene.shadowmapper.shadowregion.md) |  | [AABB](doc/markdown/./base.aabb.md) | Shadow region for directional light |
-|  [splitLambda](doc/markdown/./scene.shadowmapper.splitlambda.md) |  | number | The split lambda for cascaded shadow mapping |
-|  [vsmBlurKernelSize](doc/markdown/./scene.shadowmapper.vsmblurkernelsize.md) |  | number | Kernel size of VSM |
-|  [vsmBlurRadius](doc/markdown/./scene.shadowmapper.vsmblurradius.md) |  | number | Blur radius for VSM |
-|  [vsmDarkness](doc/markdown/./scene.shadowmapper.vsmdarkness.md) |  | number | Darkness for VSM |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[depthBias](doc/markdown/./scene.shadowmapper.depthbias.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Depth bias for the shadow map
+
+
+</td></tr>
+<tr><td>
+
+[esmBlur](doc/markdown/./scene.shadowmapper.esmblur.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether to enable ESM blur
+
+
+</td></tr>
+<tr><td>
+
+[esmBlurKernelSize](doc/markdown/./scene.shadowmapper.esmblurkernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Kernel size for ESM
+
+
+</td></tr>
+<tr><td>
+
+[esmBlurRadius](doc/markdown/./scene.shadowmapper.esmblurradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blur radius for ESM
+
+
+</td></tr>
+<tr><td>
+
+[esmDepthScale](doc/markdown/./scene.shadowmapper.esmdepthscale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Depth scale for ESM
+
+
+</td></tr>
+<tr><td>
+
+[light](doc/markdown/./scene.shadowmapper.light.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)
+
+
+</td><td>
+
+The light that is used to generate shadow map
+
+
+</td></tr>
+<tr><td>
+
+[mode](doc/markdown/./scene.shadowmapper.mode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ShadowMode](doc/markdown/./scene.shadowmode.md)
+
+
+</td><td>
+
+Shadow map mode
+
+
+</td></tr>
+<tr><td>
+
+[nearClip](doc/markdown/./scene.shadowmapper.nearclip.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Near clip plane
+
+
+</td></tr>
+<tr><td>
+
+[normalBias](doc/markdown/./scene.shadowmapper.normalbias.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Normal bias for the shadow map
+
+
+</td></tr>
+<tr><td>
+
+[numShadowCascades](doc/markdown/./scene.shadowmapper.numshadowcascades.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Count of the cascades, The maximum value is 4
+
+
+</td></tr>
+<tr><td>
+
+[pcfKernelSize](doc/markdown/./scene.shadowmapper.pcfkernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Kernel size for optimized PCF
+
+
+</td></tr>
+<tr><td>
+
+[pdSampleCount](doc/markdown/./scene.shadowmapper.pdsamplecount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Sample count for poisson disc PCF
+
+
+</td></tr>
+<tr><td>
+
+[pdSampleRadius](doc/markdown/./scene.shadowmapper.pdsampleradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Radius for poisson disc PCF
+
+
+</td></tr>
+<tr><td>
+
+[shadowDistance](doc/markdown/./scene.shadowmapper.shadowdistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum distance from the camera, shadow will not be rendered beyond this range
+
+
+</td></tr>
+<tr><td>
+
+[shadowMapSize](doc/markdown/./scene.shadowmapper.shadowmapsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Size of the shadow map
+
+
+</td></tr>
+<tr><td>
+
+[shadowRegion](doc/markdown/./scene.shadowmapper.shadowregion.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+Shadow region for directional light
+
+
+</td></tr>
+<tr><td>
+
+[splitLambda](doc/markdown/./scene.shadowmapper.splitlambda.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The split lambda for cascaded shadow mapping
+
+
+</td></tr>
+<tr><td>
+
+[vsmBlurKernelSize](doc/markdown/./scene.shadowmapper.vsmblurkernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Kernel size of VSM
+
+
+</td></tr>
+<tr><td>
+
+[vsmBlurRadius](doc/markdown/./scene.shadowmapper.vsmblurradius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blur radius for VSM
+
+
+</td></tr>
+<tr><td>
+
+[vsmDarkness](doc/markdown/./scene.shadowmapper.vsmdarkness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Darkness for VSM
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[copyFrom(other)](doc/markdown/./scene.shadowmapper.copyfrom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

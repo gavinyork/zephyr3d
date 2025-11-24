@@ -14,9 +14,39 @@ needFlip(device: AbstractDevice): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The device object |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The device object
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

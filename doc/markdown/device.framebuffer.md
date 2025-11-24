@@ -15,26 +15,205 @@ interface FrameBuffer<T = unknown> extends GPUObject<T>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [bind()](doc/markdown/./device.framebuffer.bind.md) |  |
-|  [getColorAttachmentCubeFace(index)](doc/markdown/./device.framebuffer.getcolorattachmentcubeface.md) |  |
-|  [getColorAttachmentGenerateMipmaps(index)](doc/markdown/./device.framebuffer.getcolorattachmentgeneratemipmaps.md) |  |
-|  [getColorAttachmentLayer(index)](doc/markdown/./device.framebuffer.getcolorattachmentlayer.md) |  |
-|  [getColorAttachmentMipLevel(index)](doc/markdown/./device.framebuffer.getcolorattachmentmiplevel.md) |  |
-|  [getColorAttachments()](doc/markdown/./device.framebuffer.getcolorattachments.md) |  |
-|  [getDepthAttachment()](doc/markdown/./device.framebuffer.getdepthattachment.md) |  |
-|  [getDepthAttachmentCubeFace()](doc/markdown/./device.framebuffer.getdepthattachmentcubeface.md) |  |
-|  [getDepthAttachmentLayer()](doc/markdown/./device.framebuffer.getdepthattachmentlayer.md) |  |
-|  [getHash()](doc/markdown/./device.framebuffer.gethash.md) |  |
-|  [getHeight()](doc/markdown/./device.framebuffer.getheight.md) |  |
-|  [getSampleCount()](doc/markdown/./device.framebuffer.getsamplecount.md) |  |
-|  [getWidth()](doc/markdown/./device.framebuffer.getwidth.md) |  |
-|  [setColorAttachmentCubeFace(index, face)](doc/markdown/./device.framebuffer.setcolorattachmentcubeface.md) |  |
-|  [setColorAttachmentGenerateMipmaps(index, generateMipmaps)](doc/markdown/./device.framebuffer.setcolorattachmentgeneratemipmaps.md) |  |
-|  [setColorAttachmentLayer(index, layer)](doc/markdown/./device.framebuffer.setcolorattachmentlayer.md) |  |
-|  [setColorAttachmentMipLevel(index, level)](doc/markdown/./device.framebuffer.setcolorattachmentmiplevel.md) |  |
-|  [setDepthAttachmentCubeFace(face)](doc/markdown/./device.framebuffer.setdepthattachmentcubeface.md) |  |
-|  [setDepthAttachmentLayer(layer)](doc/markdown/./device.framebuffer.setdepthattachmentlayer.md) |  |
-|  [unbind()](doc/markdown/./device.framebuffer.unbind.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bind()](doc/markdown/./device.framebuffer.bind.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachment(index)](doc/markdown/./device.framebuffer.getcolorattachment.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachmentCubeFace(index)](doc/markdown/./device.framebuffer.getcolorattachmentcubeface.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachmentGenerateMipmaps(index)](doc/markdown/./device.framebuffer.getcolorattachmentgeneratemipmaps.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachmentLayer(index)](doc/markdown/./device.framebuffer.getcolorattachmentlayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachmentMipLevel(index)](doc/markdown/./device.framebuffer.getcolorattachmentmiplevel.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getColorAttachments()](doc/markdown/./device.framebuffer.getcolorattachments.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getDepthAttachment()](doc/markdown/./device.framebuffer.getdepthattachment.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getDepthAttachmentCubeFace()](doc/markdown/./device.framebuffer.getdepthattachmentcubeface.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getDepthAttachmentLayer()](doc/markdown/./device.framebuffer.getdepthattachmentlayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getHash()](doc/markdown/./device.framebuffer.gethash.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getHeight()](doc/markdown/./device.framebuffer.getheight.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getSampleCount()](doc/markdown/./device.framebuffer.getsamplecount.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getWidth()](doc/markdown/./device.framebuffer.getwidth.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setColorAttachmentCubeFace(index, face)](doc/markdown/./device.framebuffer.setcolorattachmentcubeface.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setColorAttachmentGenerateMipmaps(index, generateMipmaps)](doc/markdown/./device.framebuffer.setcolorattachmentgeneratemipmaps.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setColorAttachmentLayer(index, layer)](doc/markdown/./device.framebuffer.setcolorattachmentlayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setColorAttachmentMipLevel(index, level)](doc/markdown/./device.framebuffer.setcolorattachmentmiplevel.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setDepthAttachmentCubeFace(face)](doc/markdown/./device.framebuffer.setdepthattachmentcubeface.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setDepthAttachmentLayer(layer)](doc/markdown/./device.framebuffer.setdepthattachmentlayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[unbind()](doc/markdown/./device.framebuffer.unbind.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

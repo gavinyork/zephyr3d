@@ -14,11 +14,71 @@ declare function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The device object |
-|  fontFamily | string | _(Optional)_ Font family, default to arial |
-|  fontSize | number | _(Optional)_ Default font size, default to 16 |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The device object
+
+
+</td></tr>
+<tr><td>
+
+fontFamily
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Font family, default to arial
+
+
+</td></tr>
+<tr><td>
+
+fontSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Default font size, default to 16
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

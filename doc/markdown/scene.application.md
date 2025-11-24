@@ -4,45 +4,288 @@
 
 ## Application class
 
-Application class
+Application
+
+Entry-point and lifecycle coordinator for the engine. Responsible for: - Creating and owning the rendering device from a chosen backend. - Managing the per-frame loop, including timing and viewport setup. - Forwarding device/DOM input events via an observable event map. - Hosting the runtime scripting system and input manager.
+
+Singleton: - Only one instance may exist at a time. Access via `{@link getApp}`<!-- -->.
+
+Events: - See `appEventMap` for all emitted events (resize, tick, pointer/keyboard/drag).
+
+Usage: - Construct with `AppOptions`<!-- -->, await `ready()`<!-- -->, then call `run()` to start the loop.
 
 **Signature:**
 
 ```typescript
-declare class Application extends Application_base 
+declare class Application extends Observable<appEventMap> 
 ```
-**Extends:** Application\_base
-
-## Remarks
-
-This is the entry point of your application. The Application is responsible for initializing the rendering device and doing the rendering loop. The Application can not be created more than once. You can get the instance by calling the 'Application.instance' static method.
+**Extends:** [Observable](doc/markdown/./base.observable.md)<!-- -->&lt;appEventMap&gt;
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(opt)](doc/markdown/./scene.application._constructor_.md) |  | Creates an instance of Application |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(opt)](doc/markdown/./scene.application._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct the Application singleton with the provided options.
+
+Throws if an instance already exists.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [device](doc/markdown/./scene.application.device.md) | <code>readonly</code> | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The rendering device that was initialized by the application |
-|  [deviceType](doc/markdown/./scene.application.devicetype.md) | <code>readonly</code> | string | Gets the device type |
-|  [inputManager](doc/markdown/./scene.application.inputmanager.md) | <code>readonly</code> | InputManager | The input manager instance |
-|  [instance](doc/markdown/./scene.application.instance.md) | <p><code>static</code></p><p><code>readonly</code></p> | [Application](doc/markdown/./scene.application.md) | Gets the singleton instance of the application |
-|  [logger](doc/markdown/./scene.application.logger.md) |  | [Logger](doc/markdown/./scene.logger.md) | The logger object |
-|  [options](doc/markdown/./scene.application.options.md) | <code>readonly</code> | [AppOptions](doc/markdown/./scene.appoptions.md) | The options that was used to create the application |
-|  [timeElapsedInSeconds](doc/markdown/./scene.application.timeelapsedinseconds.md) | <code>readonly</code> | number | Query time elapsed since last frame in seconds |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[device](doc/markdown/./scene.application.device.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The initialized rendering device.
+
+Available after `await ready()`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[deviceType](doc/markdown/./scene.application.devicetype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Convenience accessor for the device type name provided by the backend.
+
+
+</td></tr>
+<tr><td>
+
+[engine](doc/markdown/./scene.application.engine.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Engine](doc/markdown/./scene.engine.md)
+
+
+</td><td>
+
+Get the instanceof [Engine](doc/markdown/./scene.engine.md)<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[inputManager](doc/markdown/./scene.application.inputmanager.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[InputManager](doc/markdown/./scene.inputmanager.md)
+
+
+</td><td>
+
+The input manager instance handling pointer/keyboard event routing.
+
+
+</td></tr>
+<tr><td>
+
+[options](doc/markdown/./scene.application.options.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AppOptions](doc/markdown/./scene.appoptions.md)
+
+
+</td><td>
+
+The (sanitized) options used to create this application.
+
+Note: Defaults are applied for `enableMSAA` and `pixelRatio` if omitted.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [focus()](doc/markdown/./scene.application.focus.md) |  | Set focus |
-|  [frame()](doc/markdown/./scene.application.frame.md) |  | Render one frame |
-|  [log(text, mode)](doc/markdown/./scene.application.log.md) |  | Message log |
-|  [ready()](doc/markdown/./scene.application.ready.md) |  | Wait until the application is ready. |
-|  [run()](doc/markdown/./scene.application.run.md) |  | Start running the rendering loop |
-|  [stop()](doc/markdown/./scene.application.stop.md) |  | Stop running the rendering loop |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[focus()](doc/markdown/./scene.application.focus.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set keyboard focus to the device's canvas element.
+
+
+</td></tr>
+<tr><td>
+
+[frame()](doc/markdown/./scene.application.frame.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Render a single frame.
+
+Steps: - Flushes pending disposals from the previous frame. - Clears device state (framebuffer, viewport, scissor). - Queries frame timing from the device (`elapsedFrame`<!-- -->, `elapsedOverall`<!-- -->). - Updates the runtime manager (scripting/behaviors). - Emits `tick` with delta/elapsed times.
+
+Safe to call manually; also used by the run loop.
+
+
+</td></tr>
+<tr><td>
+
+[ready()](doc/markdown/./scene.application.ready.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize the rendering device and start input processing.
+
+
+</td></tr>
+<tr><td>
+
+[run()](doc/markdown/./scene.application.run.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Start the application's render loop.
+
+Uses the device's internal scheduling (`device.runLoop`<!-- -->) to repeatedly call `frame()`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[stop()](doc/markdown/./scene.application.stop.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Stop the application's render loop.
+
+Uses `device.exitLoop()` to end the scheduling started by `run()`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 

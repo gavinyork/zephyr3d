@@ -4,7 +4,9 @@
 
 ## Drawable interface
 
-Base interface for a drawble object
+Base interface for a drawable (renderable) object.
+
+A drawable encapsulates geometry, material, and GPU-resident data required to be rendered. Implementations integrate with render queues, batching, and instancing.
 
 **Signature:**
 
@@ -14,24 +16,242 @@ interface Drawable
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [applyTransformUniforms(renderQueue)](doc/markdown/./scene.drawable.applytransformuniforms.md) | Apply transform uniforms |
-|  [draw(ctx)](doc/markdown/./scene.drawable.draw.md) | Draw the object |
-|  [getBoneMatrices()](doc/markdown/./scene.drawable.getbonematrices.md) | Gets the texture that contains the bone matrices of the object |
-|  [getId()](doc/markdown/./scene.drawable.getid.md) | Gets unique id of the drawable object |
-|  [getInstanceColor()](doc/markdown/./scene.drawable.getinstancecolor.md) | Gets the instance color |
-|  [getMaterial()](doc/markdown/./scene.drawable.getmaterial.md) | Gets the associated material |
-|  [getMorphData()](doc/markdown/./scene.drawable.getmorphdata.md) | Gets the morph texture |
-|  [getMorphInfo()](doc/markdown/./scene.drawable.getmorphinfo.md) | Gets the morph information buffer |
-|  [getName()](doc/markdown/./scene.drawable.getname.md) | Gets name of the drawable object |
-|  [getObjectColor()](doc/markdown/./scene.drawable.getobjectcolor.md) | Gets the object color used for GPU picking |
-|  [getPickTarget()](doc/markdown/./scene.drawable.getpicktarget.md) | If set, the pick target will be returned as the pick result |
-|  [getQueueType()](doc/markdown/./scene.drawable.getqueuetype.md) | Gets the type of render queue |
-|  [getSortDistance(camera)](doc/markdown/./scene.drawable.getsortdistance.md) | Gets the distance for object sorting |
-|  [getXForm()](doc/markdown/./scene.drawable.getxform.md) | Gets the XForm of the object |
-|  [isBatchable()](doc/markdown/./scene.drawable.isbatchable.md) | returns true if the object is batchable |
-|  [isUnlit()](doc/markdown/./scene.drawable.isunlit.md) | true if the shading of this object is independent of lighting |
-|  [needSceneColor()](doc/markdown/./scene.drawable.needscenecolor.md) | Need scene color |
-|  [pushRenderQueueRef(ref)](doc/markdown/./scene.drawable.pushrenderqueueref.md) | Set render queue reference |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyTransformUniforms(renderQueue)](doc/markdown/./scene.drawable.applytransformuniforms.md)
+
+
+</td><td>
+
+Applies transform-related uniforms to the active bind group or pipeline.
+
+
+</td></tr>
+<tr><td>
+
+[dispose()](doc/markdown/./scene.drawable.dispose.md)
+
+
+</td><td>
+
+Releases all GPU resources and detaches from the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[draw(ctx, hash)](doc/markdown/./scene.drawable.draw.md)
+
+
+</td><td>
+
+Issues draw commands for this object.
+
+
+</td></tr>
+<tr><td>
+
+[getBoneMatrices()](doc/markdown/./scene.drawable.getbonematrices.md)
+
+
+</td><td>
+
+Returns the texture containing bone matrices for skinned meshes.
+
+
+</td></tr>
+<tr><td>
+
+[getDrawableId()](doc/markdown/./scene.drawable.getdrawableid.md)
+
+
+</td><td>
+
+Unique, stable identifier for the drawable, used in caches and picking.
+
+
+</td></tr>
+<tr><td>
+
+[getMaterial()](doc/markdown/./scene.drawable.getmaterial.md)
+
+
+</td><td>
+
+Returns the bound material driving shading for this drawable.
+
+
+</td></tr>
+<tr><td>
+
+[getMorphData()](doc/markdown/./scene.drawable.getmorphdata.md)
+
+
+</td><td>
+
+Returns the morph target data texture (if morphing is used).
+
+
+</td></tr>
+<tr><td>
+
+[getMorphInfo()](doc/markdown/./scene.drawable.getmorphinfo.md)
+
+
+</td><td>
+
+Returns the morph information buffer (weights, ranges, etc.).
+
+
+</td></tr>
+<tr><td>
+
+[getName()](doc/markdown/./scene.drawable.getname.md)
+
+
+</td><td>
+
+Gets the display name of the drawable object (for debugging/UI).
+
+
+</td></tr>
+<tr><td>
+
+[getNode()](doc/markdown/./scene.drawable.getnode.md)
+
+
+</td><td>
+
+Returns the owning scene node (transform and hierarchy).
+
+
+</td></tr>
+<tr><td>
+
+[getObjectColor()](doc/markdown/./scene.drawable.getobjectcolor.md)
+
+
+</td><td>
+
+Returns the unique color used for GPU picking (object ID in color).
+
+
+</td></tr>
+<tr><td>
+
+[getPickTarget()](doc/markdown/./scene.drawable.getpicktarget.md)
+
+
+</td><td>
+
+Returns the pick target override to be reported when this object is picked.
+
+If not set, a default target derived from the node/material may be used.
+
+
+</td></tr>
+<tr><td>
+
+[getPrimitive()](doc/markdown/./scene.drawable.getprimitive.md)
+
+
+</td><td>
+
+Returns the geometry primitive to be drawn.
+
+
+</td></tr>
+<tr><td>
+
+[getQueueType()](doc/markdown/./scene.drawable.getqueuetype.md)
+
+
+</td><td>
+
+Returns the type/category of render queue this object belongs to.
+
+
+</td></tr>
+<tr><td>
+
+[getSortDistance(camera)](doc/markdown/./scene.drawable.getsortdistance.md)
+
+
+</td><td>
+
+Computes the distance used for sorting (e.g., transparent draw order).
+
+
+</td></tr>
+<tr><td>
+
+[isBatchable()](doc/markdown/./scene.drawable.isbatchable.md)
+
+
+</td><td>
+
+Returns true if the object supports instanced rendering.
+
+When true, the object should also implement the [BatchDrawable](doc/markdown/./scene.batchdrawable.md) methods.
+
+
+</td></tr>
+<tr><td>
+
+[isUnlit()](doc/markdown/./scene.drawable.isunlit.md)
+
+
+</td><td>
+
+True if shading is unlit (does not depend on scene lighting).
+
+
+</td></tr>
+<tr><td>
+
+[needSceneColor()](doc/markdown/./scene.drawable.needscenecolor.md)
+
+
+</td><td>
+
+Whether the object requires access to the scene color buffer.
+
+
+</td></tr>
+<tr><td>
+
+[needSceneDepth()](doc/markdown/./scene.drawable.needscenedepth.md)
+
+
+</td><td>
+
+Whether the object requires access to the scene depth (linear or non-linear).
+
+
+</td></tr>
+<tr><td>
+
+[pushRenderQueueRef(ref)](doc/markdown/./scene.drawable.pushrenderqueueref.md)
+
+
+</td><td>
+
+Pushes a reference to the current render queue for cleanup or back-references.
+
+Useful for batching or deferred state application.
+
+
+</td></tr>
+</tbody></table>
 

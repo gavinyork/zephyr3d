@@ -9,13 +9,156 @@ Torus shape
 **Signature:**
 
 ```typescript
-declare class TorusShape extends Shape<TorusCreationOptions> 
+declare class TorusShape extends Shape<TorusCreationOptions> implements Clonable<TorusShape> 
 ```
 **Extends:** [Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;[TorusCreationOptions](doc/markdown/./scene.toruscreationoptions.md)<!-- -->&gt;
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[TorusShape](doc/markdown/./scene.torusshape.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.torusshape._constructor_.md) |  | Creates an instance of torus shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.torusshape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of torus shape
+
+
+</td></tr>
+</tbody></table>
+
+## Properties
+
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.torusshape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ numSlices: number; numSegments: number; outerRadius: number; innerRadius: number; radialDetail: number; needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.torusshape.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+type of the shape
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.torusshape.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateData(options, vertices, normals, tangents, uvs, indices, bbox, indexOffset, vertexCallback)](doc/markdown/./scene.torusshape.generatedata.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Generates the data for the torus shape
+
+
+</td></tr>
+</tbody></table>
 

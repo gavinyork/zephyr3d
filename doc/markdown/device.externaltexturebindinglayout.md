@@ -14,7 +14,45 @@ interface ExternalTextureBindingLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [autoBindSampler](doc/markdown/./device.externaltexturebindinglayout.autobindsampler.md) |  | string | name of the default sampler uniform when using WebGPU device |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[autoBindSampler](doc/markdown/./device.externaltexturebindinglayout.autobindsampler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+name of the default sampler uniform when using WebGPU device
+
+
+</td></tr>
+</tbody></table>
 

@@ -1,5 +1,17 @@
 import { Quaternion, Vector3 } from '@zephyr3d/base';
-import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, SphereShape, BlinnMaterial, DirectionalLight, AssetManager, Quadtree } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  SphereShape,
+  BlinnMaterial,
+  DirectionalLight,
+  AssetManager,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -18,14 +30,16 @@ myApp.ready().then(function () {
   material.shininess = 256;
   // Load albedo map and normal map
   const assetManager = new AssetManager();
-  assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
+  assetManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg').then((texture) => {
     material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
   });
-  assetManager.fetchTexture('assets/images/earthnormal.png', {
-    linearColorSpace: true
-  }).then(texture => {
-    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
-  });
+  assetManager
+    .fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
+      linearColorSpace: true
+    })
+    .then((texture) => {
+      material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
+    });
   // All sphere meshes share the same vertex data and materials, allowing for rendering with geometry instances on WebGL2 and WebGPU devices
   const spherePrimitive = new SphereShape();
   // Create a sphere mesh as the parent node
@@ -40,15 +54,13 @@ myApp.ready().then(function () {
   sphere3.position.y = 4;
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 20), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 20), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getEngine().setRenderable(scene, 0);
 
   let x = 0;
   myApp.on('tick', function () {
@@ -57,8 +69,6 @@ myApp.ready().then(function () {
     // Sphere2 rotates about the x-axis
     sphere2.rotation = Quaternion.fromAxisAngle(new Vector3(1, 0, 0), x * 8);
     x += 0.01;
-    camera.updateController();
-    camera.render(scene, compositor);
   });
 
   myApp.run();

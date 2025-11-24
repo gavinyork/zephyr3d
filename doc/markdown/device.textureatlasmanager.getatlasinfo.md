@@ -14,9 +14,39 @@ getAtlasInfo(key: string): AtlasInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  key | string | Key of the atlas |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+key
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Key of the atlas
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

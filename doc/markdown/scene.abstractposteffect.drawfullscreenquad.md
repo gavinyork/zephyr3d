@@ -14,9 +14,39 @@ protected drawFullscreenQuad(renderStateSet?: RenderStateSet): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  renderStateSet | [RenderStateSet](doc/markdown/./device.renderstateset.md) | _(Optional)_ Render states that will be used when drawing the fullscreen quad. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+renderStateSet
+
+
+</td><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+_(Optional)_ Render states that will be used when drawing the fullscreen quad.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -19,130 +19,1844 @@ The matrix is column-major: \| m00, m10, m20, m30 \| \| m01, m11, m21, m31 \| \|
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23, m33)](doc/markdown/./base.matrix4x4._constructor_.md) |  | Creates a Matrix4x4 initialized with values. |
-|  [(constructor)(elements)](doc/markdown/./base.matrix4x4._constructor__1.md) |  | Creates a Matrix4x4 initialized with values in an array. |
-|  [(constructor)(array)](doc/markdown/./base.matrix4x4._constructor__2.md) |  | Cerates a Matrix4x4 initialized with values in a Float32Array. |
-|  [(constructor)(buffer, offset)](doc/markdown/./base.matrix4x4._constructor__3.md) |  | Creates a new Matrix4x4 placed on a given ArrayBuffer object. |
-|  [(constructor)()](doc/markdown/./base.matrix4x4._constructor__4.md) |  | Creates a new identity Matrix4x4. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23, m33)](doc/markdown/./base.matrix4x4._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a Matrix4x4 initialized with values.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(elements)](doc/markdown/./base.matrix4x4._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a Matrix4x4 initialized with values in an array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(array)](doc/markdown/./base.matrix4x4._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Cerates a Matrix4x4 initialized with values in a Float32Array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(buffer, offset)](doc/markdown/./base.matrix4x4._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Matrix4x4 placed on a given ArrayBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)()](doc/markdown/./base.matrix4x4._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new identity Matrix4x4.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [m00](doc/markdown/./base.matrix4x4.m00.md) |  | number | Get the element at row 0, column 0 |
-|  [m01](doc/markdown/./base.matrix4x4.m01.md) |  | number | Get the element at row 1, column 0 |
-|  [m02](doc/markdown/./base.matrix4x4.m02.md) |  | number | Get the element at row 2, column 0 |
-|  [m03](doc/markdown/./base.matrix4x4.m03.md) |  | number | Get the element at row 3, column 0 |
-|  [m10](doc/markdown/./base.matrix4x4.m10.md) |  | number | Get the element at row 0, column 1 |
-|  [m11](doc/markdown/./base.matrix4x4.m11.md) |  | number | Get the element at row 1, column 1 |
-|  [m12](doc/markdown/./base.matrix4x4.m12.md) |  | number | Get the element at row 2, column 1 |
-|  [m13](doc/markdown/./base.matrix4x4.m13.md) |  | number | Get the element at row 3, column 1 |
-|  [m20](doc/markdown/./base.matrix4x4.m20.md) |  | number | Get the element at row 0, column 2 |
-|  [m21](doc/markdown/./base.matrix4x4.m21.md) |  | number | Get the element at row 1, column 2 |
-|  [m22](doc/markdown/./base.matrix4x4.m22.md) |  | number | Get the element at row 2, column 2 |
-|  [m23](doc/markdown/./base.matrix4x4.m23.md) |  | number | Get the element at row 3, column 2 |
-|  [m30](doc/markdown/./base.matrix4x4.m30.md) |  | number | Get the element at row 0, column 3 |
-|  [m31](doc/markdown/./base.matrix4x4.m31.md) |  | number | Get the element at row 1, column 3 |
-|  [m32](doc/markdown/./base.matrix4x4.m32.md) |  | number | Get the element at row 2, column 3 |
-|  [m33](doc/markdown/./base.matrix4x4.m33.md) |  | number | Get the element at row 3, column 3 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[m00](doc/markdown/./base.matrix4x4.m00.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m01](doc/markdown/./base.matrix4x4.m01.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m02](doc/markdown/./base.matrix4x4.m02.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m03](doc/markdown/./base.matrix4x4.m03.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 3, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m10](doc/markdown/./base.matrix4x4.m10.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m11](doc/markdown/./base.matrix4x4.m11.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m12](doc/markdown/./base.matrix4x4.m12.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m13](doc/markdown/./base.matrix4x4.m13.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 3, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m20](doc/markdown/./base.matrix4x4.m20.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m21](doc/markdown/./base.matrix4x4.m21.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m22](doc/markdown/./base.matrix4x4.m22.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m23](doc/markdown/./base.matrix4x4.m23.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 3, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m30](doc/markdown/./base.matrix4x4.m30.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 3
+
+
+</td></tr>
+<tr><td>
+
+[m31](doc/markdown/./base.matrix4x4.m31.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 3
+
+
+</td></tr>
+<tr><td>
+
+[m32](doc/markdown/./base.matrix4x4.m32.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 3
+
+
+</td></tr>
+<tr><td>
+
+[m33](doc/markdown/./base.matrix4x4.m33.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 3, column 3
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [add(a, b, result)](doc/markdown/./base.matrix4x4.add.md) | <code>static</code> | Adds two Matrix4x4's component-wise. |
-|  [addBy(other)](doc/markdown/./base.matrix4x4.addby.md) |  | Add a matrix to this matrix component-wise. |
-|  [clone()](doc/markdown/./base.matrix4x4.clone.md) |  | Creates a new Matrix4x4 initialized with values from this matrix. |
-|  [decompose(scale, rotation, translation)](doc/markdown/./base.matrix4x4.decompose.md) |  | Decompose this matrix into its rotation, translation and scale components. |
-|  [decomposeLookAt(eye, target, up)](doc/markdown/./base.matrix4x4.decomposelookat.md) |  | Decompose this matrix into a look-at form. |
-|  [det()](doc/markdown/./base.matrix4x4.det.md) |  | Calculates the determinant of this matrix. |
-|  [div(a, b, result)](doc/markdown/./base.matrix4x4.div.md) | <code>static</code> | Divides two Matrix4x4's component-wise. |
-|  [divBy(other)](doc/markdown/./base.matrix4x4.divby.md) |  | Divide this matrix by a matrix component-wise. |
-|  [frustum(left, right, bottom, top, znear, zfar)](doc/markdown/./base.matrix4x4.frustum.md) |  | Calculates a perspective projection matrix from a frustum inplace. |
-|  [frustum(left, right, bottom, top, znear, zfar, result)](doc/markdown/./base.matrix4x4.frustum.md) | <code>static</code> | Creates a perspective projection matrix from a frustum. |
-|  [getAspect()](doc/markdown/./base.matrix4x4.getaspect.md) |  | Get the aspect ratio. |
-|  [getBottomPlane()](doc/markdown/./base.matrix4x4.getbottomplane.md) |  | Get the bottom clip plane. |
-|  [getCol(col, result)](doc/markdown/./base.matrix4x4.getcol.md) |  | Get the values in a column as a Vector4 |
-|  [getFarPlane()](doc/markdown/./base.matrix4x4.getfarplane.md) |  | Get far clip plane. |
-|  [getFarPlaneHeight()](doc/markdown/./base.matrix4x4.getfarplaneheight.md) |  | Get height of the far clip plane. |
-|  [getFarPlaneWidth()](doc/markdown/./base.matrix4x4.getfarplanewidth.md) |  | Get width of the far clip plane. |
-|  [getFov()](doc/markdown/./base.matrix4x4.getfov.md) |  | Get the vertical field of view in radians. |
-|  [getLeftPlane()](doc/markdown/./base.matrix4x4.getleftplane.md) |  | Get the left clip plane. |
-|  [getNearPlane()](doc/markdown/./base.matrix4x4.getnearplane.md) |  | Get near clip plane. |
-|  [getNearPlaneHeight()](doc/markdown/./base.matrix4x4.getnearplaneheight.md) |  | Get height of the near clip plane. |
-|  [getNearPlaneWidth()](doc/markdown/./base.matrix4x4.getnearplanewidth.md) |  | Get width of the near clip plane. |
-|  [getRightPlane()](doc/markdown/./base.matrix4x4.getrightplane.md) |  | Get the right clip plane. |
-|  [getRow(row, result)](doc/markdown/./base.matrix4x4.getrow.md) |  | Get the values in a row as a Vector4 |
-|  [getTanHalfFov()](doc/markdown/./base.matrix4x4.gettanhalffov.md) |  | Get tangent value of half of the vertical field of view. |
-|  [getTopPlane()](doc/markdown/./base.matrix4x4.gettopplane.md) |  | Get the top clip plane. |
-|  [identity()](doc/markdown/./base.matrix4x4.identity.md) |  | Make this matrix identity. |
-|  [identity(result)](doc/markdown/./base.matrix4x4.identity.md) | <code>static</code> | Creates an identity Matrix4x4. |
-|  [inplaceInvert()](doc/markdown/./base.matrix4x4.inplaceinvert.md) |  | Invert this matrix inplace. |
-|  [inplaceInvertAffine()](doc/markdown/./base.matrix4x4.inplaceinvertaffine.md) |  | Invert this matrix inplace, assuming this matrix presents an affine transformation. |
-|  [invert(matrix, result)](doc/markdown/./base.matrix4x4.invert.md) | <code>static</code> | Inverts a Matrix4x4 |
-|  [invertAffine(matrix, result)](doc/markdown/./base.matrix4x4.invertaffine.md) | <code>static</code> | Inverts a Matrix4x4 which presents an affine transformation. |
-|  [isOrtho()](doc/markdown/./base.matrix4x4.isortho.md) |  | Check if this matrix is orthogonal projection matrix. |
-|  [isPerspective()](doc/markdown/./base.matrix4x4.isperspective.md) |  | Check if this matrix is perspective projection matrix. |
-|  [lookAt(eye, target, up)](doc/markdown/./base.matrix4x4.lookat.md) |  | Calculates a look-at matrix inplace. |
-|  [lookAt(eye, target, up, result)](doc/markdown/./base.matrix4x4.lookat.md) | <code>static</code> | Creates a look-at matrix. |
-|  [lookAtCubeFace(face, pos, result)](doc/markdown/./base.matrix4x4.lookatcubeface.md) | <code>static</code> | Creates a matrix, which presents a transform of looking at given cube face. |
-|  [mul(a, b, result)](doc/markdown/./base.matrix4x4.mul.md) | <code>static</code> | Multiplys two Matrix4x4's component-wise. |
-|  [mulBy(other)](doc/markdown/./base.matrix4x4.mulby.md) |  | Multiplies this matrix by a matrix component-wise. |
-|  [multiply(m1, m2, result)](doc/markdown/./base.matrix4x4.multiply.md) | <code>static</code> | Multiplies two Matrix4x4's |
-|  [multiplyAffine(m1, m2, result)](doc/markdown/./base.matrix4x4.multiplyaffine.md) | <code>static</code> | Multiplies two Matrix4x4's which present affine transformations. |
-|  [multiplyLeft(other)](doc/markdown/./base.matrix4x4.multiplyleft.md) |  | Pre-multiply by a matrix inplace. |
-|  [multiplyLeftAffine(other)](doc/markdown/./base.matrix4x4.multiplyleftaffine.md) |  | Pre-multiply by a matrix inplace, assuming both matrices present affine transformations. |
-|  [multiplyRight(other)](doc/markdown/./base.matrix4x4.multiplyright.md) |  | Post-multiply by a matrix inplace. |
-|  [multiplyRightAffine(other)](doc/markdown/./base.matrix4x4.multiplyrightaffine.md) |  | Post-multiply by a matrix inplace, assuming both matrices present affine transformations. |
-|  [obliquePerspective(perspectiveMatrix, nearPlane)](doc/markdown/./base.matrix4x4.obliqueperspective.md) | <code>static</code> |  |
-|  [obliqueProjection(projectionMatrix, clipPlane)](doc/markdown/./base.matrix4x4.obliqueprojection.md) | <code>static</code> |  |
-|  [ortho(left, right, bottom, top, near, far)](doc/markdown/./base.matrix4x4.ortho.md) |  | Calculates an orthogonal projection matrix inplace. |
-|  [ortho(left, right, bottom, top, near, far, result)](doc/markdown/./base.matrix4x4.ortho.md) | <code>static</code> | Creates an orthogonal projection matrix from a given frustum. |
-|  [perspective(fovY, aspect, znear, zfar)](doc/markdown/./base.matrix4x4.perspective.md) |  | Calculates a right-handed perspective projection matrix inplace. |
-|  [perspective(fovY, aspect, znear, zfar, result)](doc/markdown/./base.matrix4x4.perspective.md) | <code>static</code> | Creates a right-handed perspective projection matrix. |
-|  [reflection(nx, ny, nz, d, result)](doc/markdown/./base.matrix4x4.reflection.md) | <code>static</code> | Creates a reflection matrix from a plane. |
-|  [rotateLeft(r)](doc/markdown/./base.matrix4x4.rotateleft.md) |  | Pre-rotate by a rotation matrix or quaternion inplace. |
-|  [rotateLeft(m, r, result)](doc/markdown/./base.matrix4x4.rotateleft.md) | <code>static</code> | Pre-rotate a Matrix4x4 by a rotation matrix or quaternion. |
-|  [rotateRight(r)](doc/markdown/./base.matrix4x4.rotateright.md) |  | Post-rotate by a rotation matrix or quaternion inplace. |
-|  [rotateRight(m, r, result)](doc/markdown/./base.matrix4x4.rotateright.md) | <code>static</code> | Post-rotate a Matrix4x4 by a rotation matrix or quaternion. |
-|  [rotation(axis, angle)](doc/markdown/./base.matrix4x4.rotation.md) |  | Calculates a rotation around a given axis inplace. |
-|  [rotation(axis, angle, result)](doc/markdown/./base.matrix4x4.rotation.md) | <code>static</code> | Creates a Matrix4x4 which presents a rotation around a given axis. |
-|  [rotationX(angle)](doc/markdown/./base.matrix4x4.rotationx.md) |  | Calculates a rotation around x axis inplace. |
-|  [rotationX(angle, result)](doc/markdown/./base.matrix4x4.rotationx.md) | <code>static</code> | Creates a Matrix4x4 which presents a rotation around the x axis. |
-|  [rotationY(angle)](doc/markdown/./base.matrix4x4.rotationy.md) |  | Calculates a rotation around y axis inplace. |
-|  [rotationY(angle, result)](doc/markdown/./base.matrix4x4.rotationy.md) | <code>static</code> | Creates a Matrix4x4 which presents a rotation around the y axis. |
-|  [rotationZ(angle)](doc/markdown/./base.matrix4x4.rotationz.md) |  | Calculates a rotation around z axis inplace. |
-|  [rotationZ(angle, result)](doc/markdown/./base.matrix4x4.rotationz.md) | <code>static</code> | Creates a Matrix4x4 which presents a rotation around the z axis. |
-|  [scale(a, f, result)](doc/markdown/./base.matrix4x4.scale.md) | <code>static</code> | Scales a Matrix4x4 by a scalar number component-wise. |
-|  [scaleBy(f)](doc/markdown/./base.matrix4x4.scaleby.md) |  | Scale this matrix by a scalar number component-wise. |
-|  [scaleLeft(s)](doc/markdown/./base.matrix4x4.scaleleft.md) |  | Pre-scale by a vector inplace. |
-|  [scaleLeft(m, s, result)](doc/markdown/./base.matrix4x4.scaleleft.md) | <code>static</code> | Pre-scale a Matrix4x4 by a vector. |
-|  [scaleRight(s)](doc/markdown/./base.matrix4x4.scaleright.md) |  | Post-scale by a vector inplace. |
-|  [scaleRight(m, s, result)](doc/markdown/./base.matrix4x4.scaleright.md) | <code>static</code> | Post-scale a Matrix4x4 by a vector. |
-|  [scaling(s)](doc/markdown/./base.matrix4x4.scaling.md) |  | Calculates a scale matrix inplace. |
-|  [scaling(s, result)](doc/markdown/./base.matrix4x4.scaling.md) | <code>static</code> | Creates a Matrix4x4 which presents a scaling. |
-|  [setCol(col, v)](doc/markdown/./base.matrix4x4.setcol.md) |  | Set values to a column in the matrix. |
-|  [setColXYZW(col, x, y, z, w)](doc/markdown/./base.matrix4x4.setcolxyzw.md) |  | Set values to a column in the matrix. |
-|  [setNearFar(znear, zfar)](doc/markdown/./base.matrix4x4.setnearfar.md) |  | Set the near clip plane and far clip plane. |
-|  [setRow(row, v)](doc/markdown/./base.matrix4x4.setrow.md) |  | Set values to a row in the matrix. |
-|  [setRowXYZW(row, x, y, z, w)](doc/markdown/./base.matrix4x4.setrowxyzw.md) |  | Set values to a row in the matrix. |
-|  [sub(a, b, result)](doc/markdown/./base.matrix4x4.sub.md) | <code>static</code> | Subtracts two Matrix4x4's component-wise. |
-|  [subBy(other)](doc/markdown/./base.matrix4x4.subby.md) |  | Subtract a matrix from this matrix component-wise. |
-|  [transform(vec, result)](doc/markdown/./base.matrix4x4.transform.md) |  | Transform a vector by this matrix. |
-|  [transformAffine(vec, result)](doc/markdown/./base.matrix4x4.transformaffine.md) |  | Transform a vector by this matrix, assuming this matrix presents an affine transformation. |
-|  [transformPoint(point, result)](doc/markdown/./base.matrix4x4.transformpoint.md) |  | Transform a point by this matrix. |
-|  [transformPointAffine(point, result)](doc/markdown/./base.matrix4x4.transformpointaffine.md) |  | Transform a point by this matrix, assuming this matrix presents an affine transformation. |
-|  [transformPointP(point, result)](doc/markdown/./base.matrix4x4.transformpointp.md) |  | Transform a point by this matrix and then do a perspective divide. |
-|  [transformVector(vec, result)](doc/markdown/./base.matrix4x4.transformvector.md) |  | Transform a vector by this matrix. |
-|  [transformVectorAffine(vec, result)](doc/markdown/./base.matrix4x4.transformvectoraffine.md) |  | Transform a vector by this matrix assuming this matrix presents an affine transformation. |
-|  [translateLeft(t)](doc/markdown/./base.matrix4x4.translateleft.md) |  | Pre-translate by a vector inplace. |
-|  [translateLeft(m, t, result)](doc/markdown/./base.matrix4x4.translateleft.md) | <code>static</code> | Pre-translate a Matrix4x4 by a vector. |
-|  [translateRight(t)](doc/markdown/./base.matrix4x4.translateright.md) |  | Post-translate by a vector inplace. |
-|  [translateRight(m, t, result)](doc/markdown/./base.matrix4x4.translateright.md) | <code>static</code> | Post-translate a Matrix4x4 by a vector. |
-|  [translation(t)](doc/markdown/./base.matrix4x4.translation.md) |  | Calculate a translation matrix inplace. |
-|  [translation(t, result)](doc/markdown/./base.matrix4x4.translation.md) | <code>static</code> | Creates a Matrix4x4 which presents a translation. |
-|  [transpose()](doc/markdown/./base.matrix4x4.transpose.md) |  | Calculates the transpose of this matrix inplace. |
-|  [transpose(matrix, result)](doc/markdown/./base.matrix4x4.transpose.md) | <code>static</code> | Transpose a Matrix4x4. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[add(a, b, result)](doc/markdown/./base.matrix4x4.add.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Adds two Matrix4x4's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[addBy(other)](doc/markdown/./base.matrix4x4.addby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a matrix to this matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./base.matrix4x4.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Matrix4x4 initialized with values from this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[compose(scale, rotation, translation)](doc/markdown/./base.matrix4x4.compose.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Compose matrix from rotation, translation and scale components.
+
+
+</td></tr>
+<tr><td>
+
+[compose(scale, rotation, translation, result)](doc/markdown/./base.matrix4x4.compose.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Compose matrix from rotation, translation and scale components.
+
+
+</td></tr>
+<tr><td>
+
+[decompose(scale, rotation, translation)](doc/markdown/./base.matrix4x4.decompose.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Decompose this matrix into its rotation, translation and scale components.
+
+
+</td></tr>
+<tr><td>
+
+[decomposeLookAt(eye, target, up)](doc/markdown/./base.matrix4x4.decomposelookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Decompose this matrix into a look-at form.
+
+
+</td></tr>
+<tr><td>
+
+[det()](doc/markdown/./base.matrix4x4.det.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the determinant of this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[div(a, b, result)](doc/markdown/./base.matrix4x4.div.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Divides two Matrix4x4's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[divBy(other)](doc/markdown/./base.matrix4x4.divby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Divide this matrix by a matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[frustum(left, right, bottom, top, znear, zfar)](doc/markdown/./base.matrix4x4.frustum.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a perspective projection matrix from a frustum inplace.
+
+
+</td></tr>
+<tr><td>
+
+[frustum(left, right, bottom, top, znear, zfar, result)](doc/markdown/./base.matrix4x4.frustum.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a perspective projection matrix from a frustum.
+
+
+</td></tr>
+<tr><td>
+
+[getAspect()](doc/markdown/./base.matrix4x4.getaspect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the aspect ratio.
+
+
+</td></tr>
+<tr><td>
+
+[getBottomPlane()](doc/markdown/./base.matrix4x4.getbottomplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the bottom clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getCol(col, result)](doc/markdown/./base.matrix4x4.getcol.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the values in a column as a Vector4
+
+
+</td></tr>
+<tr><td>
+
+[getFarPlane()](doc/markdown/./base.matrix4x4.getfarplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get far clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getFarPlaneHeight()](doc/markdown/./base.matrix4x4.getfarplaneheight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get height of the far clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getFarPlaneWidth()](doc/markdown/./base.matrix4x4.getfarplanewidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get width of the far clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getFov()](doc/markdown/./base.matrix4x4.getfov.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the vertical field of view in radians.
+
+
+</td></tr>
+<tr><td>
+
+[getLeftPlane()](doc/markdown/./base.matrix4x4.getleftplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the left clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getNearPlane()](doc/markdown/./base.matrix4x4.getnearplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get near clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getNearPlaneHeight()](doc/markdown/./base.matrix4x4.getnearplaneheight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get height of the near clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getNearPlaneWidth()](doc/markdown/./base.matrix4x4.getnearplanewidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get width of the near clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getRightPlane()](doc/markdown/./base.matrix4x4.getrightplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the right clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[getRow(row, result)](doc/markdown/./base.matrix4x4.getrow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the values in a row as a Vector4
+
+
+</td></tr>
+<tr><td>
+
+[getTanHalfFov()](doc/markdown/./base.matrix4x4.gettanhalffov.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get tangent value of half of the vertical field of view.
+
+
+</td></tr>
+<tr><td>
+
+[getTopPlane()](doc/markdown/./base.matrix4x4.gettopplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the top clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[identity()](doc/markdown/./base.matrix4x4.identity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Make this matrix identity.
+
+
+</td></tr>
+<tr><td>
+
+[identity(result)](doc/markdown/./base.matrix4x4.identity.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates an identity Matrix4x4.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceInvert()](doc/markdown/./base.matrix4x4.inplaceinvert.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Invert this matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceInvertAffine()](doc/markdown/./base.matrix4x4.inplaceinvertaffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Invert this matrix inplace, assuming this matrix presents an affine transformation.
+
+
+</td></tr>
+<tr><td>
+
+[invert(matrix, result)](doc/markdown/./base.matrix4x4.invert.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Inverts a Matrix4x4
+
+
+</td></tr>
+<tr><td>
+
+[invertAffine(matrix, result)](doc/markdown/./base.matrix4x4.invertaffine.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Inverts a Matrix4x4 which presents an affine transformation.
+
+
+</td></tr>
+<tr><td>
+
+[isOrtho()](doc/markdown/./base.matrix4x4.isortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if this matrix is orthogonal projection matrix.
+
+
+</td></tr>
+<tr><td>
+
+[isPerspective()](doc/markdown/./base.matrix4x4.isperspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if this matrix is perspective projection matrix.
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(eye, target, up)](doc/markdown/./base.matrix4x4.lookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a look-at matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(eye, target, up, result)](doc/markdown/./base.matrix4x4.lookat.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a look-at matrix.
+
+
+</td></tr>
+<tr><td>
+
+[lookAtCubeFace(face, pos, result)](doc/markdown/./base.matrix4x4.lookatcubeface.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a matrix, which presents a transform of looking at given cube face.
+
+
+</td></tr>
+<tr><td>
+
+[mul(a, b, result)](doc/markdown/./base.matrix4x4.mul.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiplys two Matrix4x4's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[mulBy(other)](doc/markdown/./base.matrix4x4.mulby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiplies this matrix by a matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[multiply(m1, m2, result)](doc/markdown/./base.matrix4x4.multiply.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiplies two Matrix4x4's
+
+
+</td></tr>
+<tr><td>
+
+[multiplyAffine(m1, m2, result)](doc/markdown/./base.matrix4x4.multiplyaffine.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiplies two Matrix4x4's which present affine transformations.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyLeft(other)](doc/markdown/./base.matrix4x4.multiplyleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-multiply by a matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyLeftAffine(other)](doc/markdown/./base.matrix4x4.multiplyleftaffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-multiply by a matrix inplace, assuming both matrices present affine transformations.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyRight(other)](doc/markdown/./base.matrix4x4.multiplyright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-multiply by a matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyRightAffine(other)](doc/markdown/./base.matrix4x4.multiplyrightaffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-multiply by a matrix inplace, assuming both matrices present affine transformations.
+
+
+</td></tr>
+<tr><td>
+
+[obliquePerspective(perspectiveMatrix, nearPlane)](doc/markdown/./base.matrix4x4.obliqueperspective.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[obliqueProjection(projectionMatrix, clipPlane)](doc/markdown/./base.matrix4x4.obliqueprojection.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[ortho(left, right, bottom, top, near, far)](doc/markdown/./base.matrix4x4.ortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates an orthogonal projection matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[ortho(left, right, bottom, top, near, far, result)](doc/markdown/./base.matrix4x4.ortho.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates an orthogonal projection matrix from a given frustum.
+
+
+</td></tr>
+<tr><td>
+
+[perspective(fovY, aspect, znear, zfar)](doc/markdown/./base.matrix4x4.perspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a right-handed perspective projection matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[perspective(fovY, aspect, znear, zfar, result)](doc/markdown/./base.matrix4x4.perspective.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a right-handed perspective projection matrix.
+
+
+</td></tr>
+<tr><td>
+
+[reflection(nx, ny, nz, d, result)](doc/markdown/./base.matrix4x4.reflection.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a reflection matrix from a plane.
+
+
+</td></tr>
+<tr><td>
+
+[rotateLeft(r)](doc/markdown/./base.matrix4x4.rotateleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-rotate by a rotation matrix or quaternion inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotateLeft(m, r, result)](doc/markdown/./base.matrix4x4.rotateleft.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Pre-rotate a Matrix4x4 by a rotation matrix or quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[rotateRight(r)](doc/markdown/./base.matrix4x4.rotateright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-rotate by a rotation matrix or quaternion inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotateRight(m, r, result)](doc/markdown/./base.matrix4x4.rotateright.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Post-rotate a Matrix4x4 by a rotation matrix or quaternion.
+
+
+</td></tr>
+<tr><td>
+
+[rotation(axis, angle)](doc/markdown/./base.matrix4x4.rotation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around a given axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotation(axis, angle, result)](doc/markdown/./base.matrix4x4.rotation.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a rotation around a given axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationX(angle)](doc/markdown/./base.matrix4x4.rotationx.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around x axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationX(angle, result)](doc/markdown/./base.matrix4x4.rotationx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a rotation around the x axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationY(angle)](doc/markdown/./base.matrix4x4.rotationy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around y axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationY(angle, result)](doc/markdown/./base.matrix4x4.rotationy.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a rotation around the y axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationZ(angle)](doc/markdown/./base.matrix4x4.rotationz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around z axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationZ(angle, result)](doc/markdown/./base.matrix4x4.rotationz.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a rotation around the z axis.
+
+
+</td></tr>
+<tr><td>
+
+[scale(a, f, result)](doc/markdown/./base.matrix4x4.scale.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Scales a Matrix4x4 by a scalar number component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(f)](doc/markdown/./base.matrix4x4.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scale this matrix by a scalar number component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[scaleLeft(s)](doc/markdown/./base.matrix4x4.scaleleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-scale by a vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[scaleLeft(m, s, result)](doc/markdown/./base.matrix4x4.scaleleft.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Pre-scale a Matrix4x4 by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[scaleRight(s)](doc/markdown/./base.matrix4x4.scaleright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-scale by a vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[scaleRight(m, s, result)](doc/markdown/./base.matrix4x4.scaleright.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Post-scale a Matrix4x4 by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[scaling(s)](doc/markdown/./base.matrix4x4.scaling.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a scale matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[scaling(s, result)](doc/markdown/./base.matrix4x4.scaling.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a scaling.
+
+
+</td></tr>
+<tr><td>
+
+[setCol(col, v)](doc/markdown/./base.matrix4x4.setcol.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a column in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setColXYZW(col, x, y, z, w)](doc/markdown/./base.matrix4x4.setcolxyzw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a column in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setNearFar(znear, zfar)](doc/markdown/./base.matrix4x4.setnearfar.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the near clip plane and far clip plane.
+
+
+</td></tr>
+<tr><td>
+
+[setRow(row, v)](doc/markdown/./base.matrix4x4.setrow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a row in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setRowXYZW(row, x, y, z, w)](doc/markdown/./base.matrix4x4.setrowxyzw.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a row in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[sub(a, b, result)](doc/markdown/./base.matrix4x4.sub.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Subtracts two Matrix4x4's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[subBy(other)](doc/markdown/./base.matrix4x4.subby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Subtract a matrix from this matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[transform(vec, result)](doc/markdown/./base.matrix4x4.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transformAffine(vec, result)](doc/markdown/./base.matrix4x4.transformaffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix, assuming this matrix presents an affine transformation.
+
+
+</td></tr>
+<tr><td>
+
+[transformPoint(point, result)](doc/markdown/./base.matrix4x4.transformpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a point by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transformPointAffine(point, result)](doc/markdown/./base.matrix4x4.transformpointaffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a point by this matrix, assuming this matrix presents an affine transformation.
+
+
+</td></tr>
+<tr><td>
+
+[transformPointH(point, result)](doc/markdown/./base.matrix4x4.transformpointh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a point by this matrix to homogeneous space.
+
+
+</td></tr>
+<tr><td>
+
+[transformPointP(point, result)](doc/markdown/./base.matrix4x4.transformpointp.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a point by this matrix and then do a perspective divide.
+
+
+</td></tr>
+<tr><td>
+
+[transformVector(vec, result)](doc/markdown/./base.matrix4x4.transformvector.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transformVectorAffine(vec, result)](doc/markdown/./base.matrix4x4.transformvectoraffine.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix assuming this matrix presents an affine transformation.
+
+
+</td></tr>
+<tr><td>
+
+[translateLeft(t)](doc/markdown/./base.matrix4x4.translateleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-translate by a vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[translateLeft(m, t, result)](doc/markdown/./base.matrix4x4.translateleft.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Pre-translate a Matrix4x4 by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[translateRight(t)](doc/markdown/./base.matrix4x4.translateright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-translate by a vector inplace.
+
+
+</td></tr>
+<tr><td>
+
+[translateRight(m, t, result)](doc/markdown/./base.matrix4x4.translateright.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Post-translate a Matrix4x4 by a vector.
+
+
+</td></tr>
+<tr><td>
+
+[translation(t)](doc/markdown/./base.matrix4x4.translation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate a translation matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[translation(t, result)](doc/markdown/./base.matrix4x4.translation.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix4x4 which presents a translation.
+
+
+</td></tr>
+<tr><td>
+
+[transpose()](doc/markdown/./base.matrix4x4.transpose.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the transpose of this matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[transpose(matrix, result)](doc/markdown/./base.matrix4x4.transpose.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Transpose a Matrix4x4.
+
+
+</td></tr>
+</tbody></table>
 

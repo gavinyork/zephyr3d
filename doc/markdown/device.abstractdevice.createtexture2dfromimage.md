@@ -14,13 +14,73 @@ createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  element | [TextureImageElement](doc/markdown/./device.textureimageelement.md) | The image element |
-|  sRGB | boolean |  |
-|  options | [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+element
+
+
+</td><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)
+
+
+</td><td>
+
+The image element
+
+
+</td></tr>
+<tr><td>
+
+sRGB
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [Texture2D](doc/markdown/./device.texture2d.md)
+
+The created 2D texture.
 

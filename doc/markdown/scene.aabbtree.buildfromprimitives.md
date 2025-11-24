@@ -14,11 +14,71 @@ buildFromPrimitives(vertices: number[] | TypedArray, indices: number[] | TypedAr
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vertices | number\[\] \| [TypedArray](doc/markdown/./base.typedarray.md) | Vertices of the polygon soup |
-|  indices | number\[\] \| [TypedArray](doc/markdown/./base.typedarray.md) | indices of the polygon soup |
-|  primitiveType | [PrimitiveType](doc/markdown/./device.primitivetype.md) | Prmitive type of the polygon soup |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vertices
+
+
+</td><td>
+
+number\[\] \| [TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+Vertices of the polygon soup
+
+
+</td></tr>
+<tr><td>
+
+indices
+
+
+</td><td>
+
+number\[\] \| [TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+indices of the polygon soup
+
+
+</td></tr>
+<tr><td>
+
+primitiveType
+
+
+</td><td>
+
+[PrimitiveType](doc/markdown/./device.primitivetype.md)
+
+
+</td><td>
+
+Prmitive type of the polygon soup
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

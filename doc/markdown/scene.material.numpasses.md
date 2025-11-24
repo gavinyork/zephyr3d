@@ -4,6 +4,10 @@
 
 ## Material.numPasses property
 
+Number of rendering passes this material uses.
+
+Increasing this will expand the per-pass hash cache; make sure to implement `createHash(pass)`<!-- -->, `_createProgram(pb, ctx, pass)`<!-- -->, and `updateRenderStates(pass, ...)` accordingly for each pass.
+
 **Signature:**
 
 ```typescript

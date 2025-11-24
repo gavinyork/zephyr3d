@@ -14,9 +14,39 @@ pushLight(light: PunctualLight): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  light | [PunctualLight](doc/markdown/./scene.punctuallight.md) | The light to be pushed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+light
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)
+
+
+</td><td>
+
+The light to be pushed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

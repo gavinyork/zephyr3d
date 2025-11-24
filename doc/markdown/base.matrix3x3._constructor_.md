@@ -14,15 +14,165 @@ constructor(m00: number, m10: number, m20: number, m01: number, m11: number, m21
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  m00 | number | element at row 0, column 0 |
-|  m10 | number | element at row 0, column 1 |
-|  m20 | number | element at row 0, column 2 |
-|  m01 | number | element at row 1, column 0 |
-|  m11 | number | element at row 1, column 1 |
-|  m21 | number | element at row 1, column 2 |
-|  m02 | number | element at row 2, column 0 |
-|  m12 | number | element at row 2, column 1 |
-|  m22 | number | element at row 2, column 2 |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+m00
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 0
+
+
+</td></tr>
+<tr><td>
+
+m10
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 1
+
+
+</td></tr>
+<tr><td>
+
+m20
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 0, column 2
+
+
+</td></tr>
+<tr><td>
+
+m01
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 0
+
+
+</td></tr>
+<tr><td>
+
+m11
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 1
+
+
+</td></tr>
+<tr><td>
+
+m21
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 1, column 2
+
+
+</td></tr>
+<tr><td>
+
+m02
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 0
+
+
+</td></tr>
+<tr><td>
+
+m12
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 1
+
+
+</td></tr>
+<tr><td>
+
+m22
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+element at row 2, column 2
+
+
+</td></tr>
+</tbody></table>
 

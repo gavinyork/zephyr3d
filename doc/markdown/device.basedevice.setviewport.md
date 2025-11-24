@@ -12,9 +12,39 @@ abstract setViewport(vp?: number[] | DeviceViewport): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vp | number\[\] \| [DeviceViewport](doc/markdown/./device.deviceviewport.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vp
+
+
+</td><td>
+
+number\[\] \| [DeviceViewport](doc/markdown/./device.deviceviewport.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

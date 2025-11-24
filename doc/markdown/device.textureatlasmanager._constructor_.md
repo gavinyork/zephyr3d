@@ -14,11 +14,101 @@ constructor(device: AbstractDevice, binWidth: number, binHeight: number, rectBor
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The render device |
-|  binWidth | number | Width of an atlas bin |
-|  binHeight | number | Height of an atlas bin |
-|  rectBorderWidth | number | Border width of an atlas |
-|  linearSpace | boolean | _(Optional)_ true if the texture space is linear |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The render device
+
+
+</td></tr>
+<tr><td>
+
+binWidth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Width of an atlas bin
+
+
+</td></tr>
+<tr><td>
+
+binHeight
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height of an atlas bin
+
+
+</td></tr>
+<tr><td>
+
+rectBorderWidth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Border width of an atlas
+
+
+</td></tr>
+<tr><td>
+
+linearSpace
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ true if the texture space is linear
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,7 +4,7 @@
 
 ## DrawContext.renderPassHash property
 
-Hash value for the drawing task
+Stable hash for the current pass/draw state, for render bundle or pipeline cache.
 
 **Signature:**
 

@@ -4,25 +4,53 @@
 
 ## AssetManager.addModelLoader() method
 
-Adds a model loader to the asset manager
+Register a model loader (highest priority first).
+
+Note: This is a static registry shared by all AssetManager instances.
 
 **Signature:**
 
 ```typescript
-addModelLoader(loader: AbstractModelLoader): void;
+static addModelLoader(loader: AbstractModelLoader): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  loader | AbstractModelLoader | The model loader to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+loader
+
+
+</td><td>
+
+AbstractModelLoader
+
+
+</td><td>
+
+A concrete model loader implementation.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
-
-## Remarks
-
-TODO: this should be a static method
 

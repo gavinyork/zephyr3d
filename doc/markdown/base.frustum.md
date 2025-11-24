@@ -14,31 +14,346 @@ declare class Frustum
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(transform)](doc/markdown/./base.frustum._constructor_.md) |  | Creates a frustum from the tranform matrix. |
-|  [(constructor)(other)](doc/markdown/./base.frustum._constructor__1.md) |  | Creates a frustum initialized with an existing frustum. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(transform)](doc/markdown/./base.frustum._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a frustum from the tranform matrix.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(other)](doc/markdown/./base.frustum._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a frustum initialized with an existing frustum.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [CORNER\_LEFT\_BOTTOM\_FAR](doc/markdown/./base.frustum.corner_left_bottom_far.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_LEFT\_BOTTOM\_NEAR](doc/markdown/./base.frustum.corner_left_bottom_near.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_LEFT\_TOP\_FAR](doc/markdown/./base.frustum.corner_left_top_far.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_LEFT\_TOP\_NEAR](doc/markdown/./base.frustum.corner_left_top_near.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_RIGHT\_BOTTOM\_FAR](doc/markdown/./base.frustum.corner_right_bottom_far.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_RIGHT\_BOTTOM\_NEAR](doc/markdown/./base.frustum.corner_right_bottom_near.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_RIGHT\_TOP\_FAR](doc/markdown/./base.frustum.corner_right_top_far.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [CORNER\_RIGHT\_TOP\_NEAR](doc/markdown/./base.frustum.corner_right_top_near.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [corners](doc/markdown/./base.frustum.corners.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md)<!-- -->\[\] | Get the corner points. |
-|  [planes](doc/markdown/./base.frustum.planes.md) | <code>readonly</code> | [Plane](doc/markdown/./base.plane.md)<!-- -->\[\] | Get the frustum planes. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[CORNER\_LEFT\_BOTTOM\_FAR](doc/markdown/./base.frustum.corner_left_bottom_far.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_LEFT\_BOTTOM\_NEAR](doc/markdown/./base.frustum.corner_left_bottom_near.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_LEFT\_TOP\_FAR](doc/markdown/./base.frustum.corner_left_top_far.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_LEFT\_TOP\_NEAR](doc/markdown/./base.frustum.corner_left_top_near.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_RIGHT\_BOTTOM\_FAR](doc/markdown/./base.frustum.corner_right_bottom_far.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_RIGHT\_BOTTOM\_NEAR](doc/markdown/./base.frustum.corner_right_bottom_near.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_RIGHT\_TOP\_FAR](doc/markdown/./base.frustum.corner_right_top_far.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[CORNER\_RIGHT\_TOP\_NEAR](doc/markdown/./base.frustum.corner_right_top_near.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[corners](doc/markdown/./base.frustum.corners.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)<!-- -->\[\]
+
+
+</td><td>
+
+Get the corner points.
+
+
+</td></tr>
+<tr><td>
+
+[planes](doc/markdown/./base.frustum.planes.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)<!-- -->\[\]
+
+
+</td><td>
+
+Get the frustum planes.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [containsPoint(pt, epsl)](doc/markdown/./base.frustum.containspoint.md) |  | Tests if a point is inside the frustum. |
-|  [getCorner(pos)](doc/markdown/./base.frustum.getcorner.md) |  | Get the point of a given corner. |
-|  [initWithMatrix(transform)](doc/markdown/./base.frustum.initwithmatrix.md) |  | Initialize the frustum by given model-view matrix |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[containsPoint(pt, epsl)](doc/markdown/./base.frustum.containspoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Tests if a point is inside the frustum.
+
+
+</td></tr>
+<tr><td>
+
+[getCorner(pos)](doc/markdown/./base.frustum.getcorner.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the point of a given corner.
+
+
+</td></tr>
+<tr><td>
+
+[initWithMatrix(transform)](doc/markdown/./base.frustum.initwithmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize the frustum by given model-view matrix
+
+
+</td></tr>
+</tbody></table>
 

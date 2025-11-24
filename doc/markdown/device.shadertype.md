@@ -14,9 +14,63 @@ declare enum ShaderType
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  Compute | <code>4</code> |  |
-|  Fragment | <code>2</code> |  |
-|  Vertex | <code>1</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+Compute
+
+
+</td><td>
+
+`4`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+Fragment
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+Vertex
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

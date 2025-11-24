@@ -4,7 +4,7 @@
 
 ## GraphNode.getBoneMatrices() method
 
-Gets the texture that contains the bone matrices of the object
+Returns the texture containing bone matrices for skinned meshes.
 
 **Signature:**
 

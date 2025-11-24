@@ -14,9 +14,83 @@ interface GPUProgramConstructParams
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [label?](doc/markdown/./device.gpuprogramconstructparams.label.md) |  | string | _(Optional)_ Label of the program |
-|  [params](doc/markdown/./device.gpuprogramconstructparams.params.md) |  | [RenderProgramConstructParams](doc/markdown/./device.renderprogramconstructparams.md) \| [ComputeProgramConstructParams](doc/markdown/./device.computeprogramconstructparams.md) | The creation options |
-|  [type](doc/markdown/./device.gpuprogramconstructparams.type.md) |  | 'render' \| 'compute' | Type of the program to be created |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[label?](doc/markdown/./device.gpuprogramconstructparams.label.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Label of the program
+
+
+</td></tr>
+<tr><td>
+
+[params](doc/markdown/./device.gpuprogramconstructparams.params.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[RenderProgramConstructParams](doc/markdown/./device.renderprogramconstructparams.md) \| [ComputeProgramConstructParams](doc/markdown/./device.computeprogramconstructparams.md)
+
+
+</td><td>
+
+The creation options
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./device.gpuprogramconstructparams.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'render' \| 'compute'
+
+
+</td><td>
+
+Type of the program to be created
+
+
+</td></tr>
+</tbody></table>
 

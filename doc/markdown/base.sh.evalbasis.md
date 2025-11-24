@@ -14,10 +14,55 @@ static evalBasis(direction: Vector3, order: number): number[];
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  direction | [Vector3](doc/markdown/./base.vector3.md) | Direction to evaluate, must be normalized |
-|  order | number | SH order |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+direction
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Direction to evaluate, must be normalized
+
+
+</td></tr>
+<tr><td>
+
+order
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SH order
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

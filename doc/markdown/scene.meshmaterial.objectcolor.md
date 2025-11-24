@@ -4,7 +4,7 @@
 
 ## MeshMaterial.objectColor property
 
-Object color used for GPU picking
+Per-object color used for GPU picking/object-ID pass. - Changing marks uniforms dirty only.
 
 **Signature:**
 

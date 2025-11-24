@@ -4,7 +4,7 @@
 
 ## AbstractDevice.createVertexLayout() method
 
-Creates a vertex layout
+Creates a vertex layout object.
 
 **Signature:**
 
@@ -14,11 +14,43 @@ createVertexLayout(options: VertexLayoutOptions): VertexLayout;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md) | The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md)
+
+
+</td><td>
+
+The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [VertexLayout](doc/markdown/./device.vertexlayout.md)
+
+The created vertex layout object.
 

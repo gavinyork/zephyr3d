@@ -14,7 +14,37 @@ constructor(transform: Matrix4x4);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  transform | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+transform
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The transform matrix
+
+
+</td></tr>
+</tbody></table>
 

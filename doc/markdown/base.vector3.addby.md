@@ -9,18 +9,48 @@ Add a vector to this vector.
 **Signature:**
 
 ```typescript
-addBy(other: Vector3): Vector3;
+addBy(other: Vector3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Vector3](doc/markdown/./base.vector3.md) | The vector that will be added. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The vector that will be added.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector3](doc/markdown/./base.vector3.md)
+this
 
 self
 

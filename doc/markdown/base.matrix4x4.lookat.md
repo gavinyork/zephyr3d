@@ -14,12 +14,87 @@ static lookAt(eye: Vector3, target: Vector3, up: Vector3, result?: Matrix4x4): M
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  eye | [Vector3](doc/markdown/./base.vector3.md) | Position of the eye. |
-|  target | [Vector3](doc/markdown/./base.vector3.md) | The point that the eye is looking at. |
-|  up | [Vector3](doc/markdown/./base.vector3.md) | The up vector. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+eye
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Position of the eye.
+
+
+</td></tr>
+<tr><td>
+
+target
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point that the eye is looking at.
+
+
+</td></tr>
+<tr><td>
+
+up
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The up vector.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

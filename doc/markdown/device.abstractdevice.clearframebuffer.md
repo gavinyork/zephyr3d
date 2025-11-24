@@ -14,11 +14,71 @@ clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number):
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  clearColor | [Vector4](doc/markdown/./base.vector4.md) | If not null, the color buffer will be cleared to this value. |
-|  clearDepth | number | If not null, the depth buffer will be cleared to this value. |
-|  clearStencil | number | If not null, the stencil buffer will be cleared to this value. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+clearColor
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+If not null, the color buffer will be cleared to this value.
+
+
+</td></tr>
+<tr><td>
+
+clearDepth
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+If not null, the depth buffer will be cleared to this value.
+
+
+</td></tr>
+<tr><td>
+
+clearStencil
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+If not null, the stencil buffer will be cleared to this value.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

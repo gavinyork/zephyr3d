@@ -14,10 +14,81 @@ constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue, pr
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  renderPass | [RenderPass](doc/markdown/./scene.renderpass.md) | Render pass for the culling task |
-|  camera | [Camera](doc/markdown/./scene.camera.md) | Camera that will be used for culling |
-|  renderQueue | [RenderQueue](doc/markdown/./scene.renderqueue.md) |  |
-|  primaryCamera | [Camera](doc/markdown/./scene.camera.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+renderPass
+
+
+</td><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+Render pass for the culling task
+
+
+</td></tr>
+<tr><td>
+
+camera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+Camera that will be used for culling
+
+
+</td></tr>
+<tr><td>
+
+renderQueue
+
+
+</td><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+primaryCamera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

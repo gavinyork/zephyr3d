@@ -4,7 +4,7 @@
 
 ## AnimationTrack.mixState() method
 
-Mixes two animation state according to specific weight value
+Blend two states into a new state using a weight.
 
 **Signature:**
 
@@ -14,15 +14,75 @@ abstract mixState(a: StateType, b: StateType, t: number): StateType;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | StateType | The first state object |
-|  b | StateType | The second state object |
-|  t | number | The weight value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+StateType
+
+
+</td><td>
+
+First state.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+StateType
+
+
+</td><td>
+
+Second state.
+
+
+</td></tr>
+<tr><td>
+
+t
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blend weight in \[0, 1<!-- -->\]<!-- -->, where 0 yields `a` and 1 yields `b`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 StateType
 
-The mixed state object
+The blended state.
 

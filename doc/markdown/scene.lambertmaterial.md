@@ -9,27 +9,162 @@ Lambert material
 **Signature:**
 
 ```typescript
-declare class LambertMaterial extends LambertMaterial_base 
+declare class LambertMaterial extends LambertMaterial_base implements Clonable<LambertMaterial> 
 ```
 **Extends:** LambertMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[LambertMaterial](doc/markdown/./scene.lambertmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.lambertmaterial._constructor_.md) |  | Constructs a new instance of the <code>LambertMaterial</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.lambertmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `LambertMaterial` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [vertexNormal](doc/markdown/./scene.lambertmaterial.vertexnormal.md) |  | boolean | true if vertex normal attribute presents |
-|  [vertexTangent](doc/markdown/./scene.lambertmaterial.vertextangent.md) |  | boolean | true if vertex normal attribute presents |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vertexNormal](doc/markdown/./scene.lambertmaterial.vertexnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+<tr><td>
+
+[vertexTangent](doc/markdown/./scene.lambertmaterial.vertextangent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if vertex normal attribute presents
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [fragmentShader(scope)](doc/markdown/./scene.lambertmaterial.fragmentshader.md) |  |  |
-|  [vertexShader(scope)](doc/markdown/./scene.lambertmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.lambertmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.lambertmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.lambertmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

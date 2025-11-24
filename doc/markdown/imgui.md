@@ -6,16 +6,150 @@
 
 ## Functions
 
-|  Function | Description |
-|  --- | --- |
-|  [imGuiEndFrame()](doc/markdown/./imgui.imguiendframe.md) | Ends current frame |
-|  [imGuiInit(device, fontFamily, fontSize)](doc/markdown/./imgui.imguiinit.md) | Initialize the ImGUI bindings |
-|  [imGuiInjectEvent(ev, type)](doc/markdown/./imgui.imguiinjectevent.md) | Injects a browser event into the GUI system |
-|  [imGuiNewFrame()](doc/markdown/./imgui.imguinewframe.md) | Starts a new frame |
+<table><thead><tr><th>
+
+Function
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[imGuiCalcTextSize(text, out)](doc/markdown/./imgui.imguicalctextsize.md)
+
+
+</td><td>
+
+Calculate text size
+
+
+</td></tr>
+<tr><td>
+
+[imGuiEndFrame()](doc/markdown/./imgui.imguiendframe.md)
+
+
+</td><td>
+
+Ends current frame
+
+
+</td></tr>
+<tr><td>
+
+[imGuiGetCharCodeMap()](doc/markdown/./imgui.imguigetcharcodemap.md)
+
+
+</td><td>
+
+Get char code map, for emoji conversion
+
+
+</td></tr>
+<tr><td>
+
+[imGuiInFrame()](doc/markdown/./imgui.imguiinframe.md)
+
+
+</td><td>
+
+Whether a frame is currently rendering
+
+
+</td></tr>
+<tr><td>
+
+[imGuiInit(device, fontFamily, fontSize)](doc/markdown/./imgui.imguiinit.md)
+
+
+</td><td>
+
+Initialize the ImGUI bindings
+
+
+</td></tr>
+<tr><td>
+
+[imGuiInjectEvent(ev, type)](doc/markdown/./imgui.imguiinjectevent.md)
+
+
+</td><td>
+
+Injects a browser event into the GUI system
+
+
+</td></tr>
+<tr><td>
+
+[imGuiNewFrame()](doc/markdown/./imgui.imguinewframe.md)
+
+
+</td><td>
+
+Starts a new frame
+
+
+</td></tr>
+<tr><td>
+
+[imGuiSetCharCodeMap(map)](doc/markdown/./imgui.imguisetcharcodemap.md)
+
+
+</td><td>
+
+Sets char code map, for emoji conversion
+
+
+</td></tr>
+<tr><td>
+
+[imGuiSetFontGlyph(charCode, font)](doc/markdown/./imgui.imguisetfontglyph.md)
+
+
+</td><td>
+
+Set special text glyph font
+
+
+</td></tr>
+<tr><td>
+
+[imGuiWantCaptureKeyboard(capture)](doc/markdown/./imgui.imguiwantcapturekeyboard.md)
+
+
+</td><td>
+
+Manual set keyboard capture
+
+
+</td></tr>
+</tbody></table>
 
 ## Namespaces
 
-|  Namespace | Description |
-|  --- | --- |
-|  [ImGui](doc/markdown/./imgui.imgui.md) |  |
+<table><thead><tr><th>
+
+Namespace
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ImGui](doc/markdown/./imgui.imgui.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

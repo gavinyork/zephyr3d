@@ -4,7 +4,7 @@
 
 ## Material.isBatchable() method
 
-Returns true if this material supports geometry instancing
+Returns true if this is a instance of material
 
 **Signature:**
 

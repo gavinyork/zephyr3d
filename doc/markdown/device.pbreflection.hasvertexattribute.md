@@ -14,9 +14,39 @@ hasVertexAttribute(attrib: number): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  attrib | number | The vertex attribute to check |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+attrib
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The vertex attribute to check
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

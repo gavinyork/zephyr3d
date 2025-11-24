@@ -9,15 +9,56 @@ Synchronously invoke the affected event listeners with an event object
 **Signature:**
 
 ```typescript
-dispatchEvent(evt: T[keyof T], type?: string & keyof T): void;
+dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | T\[keyof T\] | The event object to be dispatch. |
-|  type | string &amp; keyof T | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+K
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+T\[K\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

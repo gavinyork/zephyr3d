@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.setPrev() method
 
-Sets the previous chunk
+Link to the previous (coarser) chunk.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setPrev(chunk: OctreeNodeChunk): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  chunk | [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | The chunk to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+chunk
+
+
+</td><td>
+
+[OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
+
+
+</td><td>
+
+The previous chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

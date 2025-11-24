@@ -4,19 +4,65 @@
 
 ## Drawable.draw() method
 
-Draw the object
+Issues draw commands for this object.
 
 **Signature:**
 
 ```typescript
-draw(ctx: DrawContext): any;
+draw(ctx: DrawContext, hash?: string): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Context of the drawing task |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Full draw context for the current pass.
+
+
+</td></tr>
+<tr><td>
+
+hash
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Optional hash key for render bundle or pipeline caching.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,11 +14,71 @@ declare function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  weights | number\[\] | An array of weights for each value. |
-|  values | T\[\] | An array of values to be averaged. |
-|  funcLerp | (a: T, b: T, w: number) =&gt; T | A function that performs linear interpolation between two values of type T. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+weights
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+An array of weights for each value.
+
+
+</td></tr>
+<tr><td>
+
+values
+
+
+</td><td>
+
+T\[\]
+
+
+</td><td>
+
+An array of values to be averaged.
+
+
+</td></tr>
+<tr><td>
+
+funcLerp
+
+
+</td><td>
+
+(a: T, b: T, w: number) =&gt; T
+
+
+</td><td>
+
+A function that performs linear interpolation between two values of type T.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

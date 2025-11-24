@@ -12,10 +12,51 @@ static obliquePerspective(perspectiveMatrix: Matrix4x4, nearPlane: Vector4): Mat
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  perspectiveMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) |  |
-|  nearPlane | [Vector4](doc/markdown/./base.vector4.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+perspectiveMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+nearPlane
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

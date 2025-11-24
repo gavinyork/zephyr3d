@@ -14,18 +14,139 @@ declare class AABBTree
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.aabbtree._constructor_.md) |  | Creates an empty AABB tree |
-|  [(constructor)(rhs)](doc/markdown/./scene.aabbtree._constructor__1.md) |  | Creates an AABB tree by copying from another AABB tree |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.aabbtree._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an empty AABB tree
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(rhs)](doc/markdown/./scene.aabbtree._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an AABB tree by copying from another AABB tree
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [buildFromPrimitives(vertices, indices, primitiveType)](doc/markdown/./scene.aabbtree.buildfromprimitives.md) |  | Build the AABB tree from a polygon soup |
-|  [getTopLevelAABB()](doc/markdown/./scene.aabbtree.gettoplevelaabb.md) |  | Gets the top level bounding box of the tree |
-|  [rayIntersectionDistance(ray)](doc/markdown/./scene.aabbtree.rayintersectiondistance.md) |  | Checks for intersection between a ray and the AABB tree |
-|  [rayIntersectionTest(ray)](doc/markdown/./scene.aabbtree.rayintersectiontest.md) |  | Checks for intersection between a ray and the AABB tree without calculating the intersection point |
-|  [transform(matrix)](doc/markdown/./scene.aabbtree.transform.md) |  | Transform the tree by a matrix |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[buildFromPrimitives(vertices, indices, primitiveType)](doc/markdown/./scene.aabbtree.buildfromprimitives.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Build the AABB tree from a polygon soup
+
+
+</td></tr>
+<tr><td>
+
+[getTopLevelAABB()](doc/markdown/./scene.aabbtree.gettoplevelaabb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the top level bounding box of the tree
+
+
+</td></tr>
+<tr><td>
+
+[rayIntersectionDistance(ray)](doc/markdown/./scene.aabbtree.rayintersectiondistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks for intersection between a ray and the AABB tree
+
+
+</td></tr>
+<tr><td>
+
+[rayIntersectionTest(ray)](doc/markdown/./scene.aabbtree.rayintersectiontest.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks for intersection between a ray and the AABB tree without calculating the intersection point
+
+
+</td></tr>
+<tr><td>
+
+[transform(matrix)](doc/markdown/./scene.aabbtree.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform the tree by a matrix
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,7 +14,37 @@ constructor(ambientColor?: Vector4);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ambientColor | [Vector4](doc/markdown/./base.vector4.md) | _(Optional)_ The ambient color |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ambientColor
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+_(Optional)_ The ambient color
+
+
+</td></tr>
+</tbody></table>
 

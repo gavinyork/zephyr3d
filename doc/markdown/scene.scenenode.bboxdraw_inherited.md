@@ -4,6 +4,8 @@
 
 ## SceneNode.BBOXDRAW\_INHERITED property
 
+Bounding-box draw mode inherited from nearest graph ancestor.
+
 **Signature:**
 
 ```typescript

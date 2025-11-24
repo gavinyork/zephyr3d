@@ -10,14 +10,44 @@ Mouse down event handler
 
 ```typescript
 /** @override */
-protected _onMouseDown(evt: PointerEvent): boolean;
+protected _onMouseDown(evt: IControllerPointerDownEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | PointerEvent | Mouse event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+evt
+
+
+</td><td>
+
+[IControllerPointerDownEvent](doc/markdown/./scene.icontrollerpointerdownevent.md)
+
+
+</td><td>
+
+Mouse event
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

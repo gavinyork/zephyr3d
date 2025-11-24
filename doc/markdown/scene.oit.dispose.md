@@ -9,7 +9,7 @@ Disposes the renderer.
 **Signature:**
 
 ```typescript
-abstract dispose(): void;
+dispose(): void;
 ```
 **Returns:**
 

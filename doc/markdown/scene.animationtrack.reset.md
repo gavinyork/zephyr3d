@@ -4,19 +4,51 @@
 
 ## AnimationTrack.reset() method
 
-Stops playing the track and rewind to the first frame
+Reset the track to its initial state for the given target.
+
+Intended to stop playback and rewind the target to the first frame or default state.
 
 **Signature:**
 
 ```typescript
-reset(node: SceneNode): void;
+reset(_target: object): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [SceneNode](doc/markdown/./scene.scenenode.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_target
+
+
+</td><td>
+
+object
+
+
+</td><td>
+
+The animated object to reset.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

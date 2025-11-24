@@ -14,10 +14,102 @@ interface DeviceCaps
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [framebufferCaps](doc/markdown/./device.devicecaps.framebuffercaps.md) |  | [FramebufferCaps](doc/markdown/./device.framebuffercaps.md) | Frame buffer related capabilities |
-|  [miscCaps](doc/markdown/./device.devicecaps.misccaps.md) |  | [MiscCaps](doc/markdown/./device.misccaps.md) | Miscellaneous capabilities |
-|  [shaderCaps](doc/markdown/./device.devicecaps.shadercaps.md) |  | [ShaderCaps](doc/markdown/./device.shadercaps.md) | Shader related capabilities |
-|  [textureCaps](doc/markdown/./device.devicecaps.texturecaps.md) |  | [TextureCaps](doc/markdown/./device.texturecaps.md) | Texture related capabilities |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[framebufferCaps](doc/markdown/./device.devicecaps.framebuffercaps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FramebufferCaps](doc/markdown/./device.framebuffercaps.md)
+
+
+</td><td>
+
+Frame buffer related capabilities
+
+
+</td></tr>
+<tr><td>
+
+[miscCaps](doc/markdown/./device.devicecaps.misccaps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[MiscCaps](doc/markdown/./device.misccaps.md)
+
+
+</td><td>
+
+Miscellaneous capabilities
+
+
+</td></tr>
+<tr><td>
+
+[shaderCaps](doc/markdown/./device.devicecaps.shadercaps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ShaderCaps](doc/markdown/./device.shadercaps.md)
+
+
+</td><td>
+
+Shader related capabilities
+
+
+</td></tr>
+<tr><td>
+
+[textureCaps](doc/markdown/./device.devicecaps.texturecaps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureCaps](doc/markdown/./device.texturecaps.md)
+
+
+</td><td>
+
+Texture related capabilities
+
+
+</td></tr>
+</tbody></table>
 

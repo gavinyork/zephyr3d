@@ -4,25 +4,53 @@
 
 ## AssetManager.addTextureLoader() method
 
-Adds a texture loader to the asset manager
+Register a texture loader (highest priority first).
+
+Note: This is a static registry shared by all AssetManager instances.
 
 **Signature:**
 
 ```typescript
-addTextureLoader(loader: AbstractTextureLoader): void;
+static addTextureLoader(loader: AbstractTextureLoader): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  loader | AbstractTextureLoader | The texture loader to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+loader
+
+
+</td><td>
+
+AbstractTextureLoader
+
+
+</td><td>
+
+A concrete texture loader implementation.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
-
-## Remarks
-
-TODO: this should be a static method
 

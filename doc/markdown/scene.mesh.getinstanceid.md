@@ -4,19 +4,49 @@
 
 ## Mesh.getInstanceId() method
 
-Gets the instance id of the object
+Returns a stable instance ID string for use with the given render pass.
+
+Used to group compatible instances into batches within a pass.
 
 **Signature:**
 
 ```typescript
-getInstanceId(renderPass: RenderPass): string;
+getInstanceId(_renderPass: RenderPass): string;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  renderPass | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which current drawing task belongs |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_renderPass
+
+
+</td><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,9 +14,39 @@ reverseVertexWindingOrder(reverse: boolean): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  reverse | boolean | true if the winding order should be reversed. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+reverse
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the winding order should be reversed.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

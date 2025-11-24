@@ -12,11 +12,67 @@ createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  attribFormat | [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md) |  |
-|  data | [TypedArray](doc/markdown/./base.typedarray.md) |  |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+attribFormat
+
+
+</td><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

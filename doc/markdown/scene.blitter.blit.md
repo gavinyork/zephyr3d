@@ -4,21 +4,81 @@
 
 ## Blitter.blit() method
 
-Blits a 2D texture to 2D texture or frame buffer
+Blits a 2D texture to a frame buffer
 
 **Signature:**
 
 ```typescript
-blit(source: Texture2D, dest: Texture2D | FrameBuffer, sampler?: TextureSampler): void;
+blit(source: Texture2D, dest: FrameBuffer, sampler?: TextureSampler): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  source | [Texture2D](doc/markdown/./device.texture2d.md) | The source texture |
-|  dest | [Texture2D](doc/markdown/./device.texture2d.md) \| [FrameBuffer](doc/markdown/./device.framebuffer.md) | The destination texture or frame buffer |
-|  sampler | [TextureSampler](doc/markdown/./device.texturesampler.md) | _(Optional)_ Sampler for source texture |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+source
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The source texture
+
+
+</td></tr>
+<tr><td>
+
+dest
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+The frame buffer to blit onto
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+_(Optional)_ Sampler for source texture
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

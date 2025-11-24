@@ -14,13 +14,103 @@ static reflection(nx: number, ny: number, nz: number, d: number, result?: Matrix
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  nx | number | The x component of the plane normal. |
-|  ny | number | The y component of the plane normal. |
-|  nz | number | The z component of the plane normal. |
-|  d | number | The plane distance. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+nx
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The x component of the plane normal.
+
+
+</td></tr>
+<tr><td>
+
+ny
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The y component of the plane normal.
+
+
+</td></tr>
+<tr><td>
+
+nz
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The z component of the plane normal.
+
+
+</td></tr>
+<tr><td>
+
+d
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The plane distance.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

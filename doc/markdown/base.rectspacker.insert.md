@@ -14,10 +14,55 @@ insert(width: number, height: number): PackRect;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  width | number | Width of the rectangle. |
-|  height | number | Height of the rectangle. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Width of the rectangle.
+
+
+</td></tr>
+<tr><td>
+
+height
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height of the rectangle.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

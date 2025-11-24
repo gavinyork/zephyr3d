@@ -12,10 +12,51 @@ setDrawOffset(buffer: StructuredBuffer, byteOffset: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) |  |
-|  byteOffset | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+byteOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

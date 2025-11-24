@@ -14,10 +14,55 @@ setWaveLength(waveIndex: number, val: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  waveIndex | number | index of the wave to set. |
-|  val | number | Length of the wave. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+waveIndex
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the wave to set.
+
+
+</td></tr>
+<tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Length of the wave.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

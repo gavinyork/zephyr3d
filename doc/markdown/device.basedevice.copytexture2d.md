@@ -12,12 +12,79 @@ abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLeve
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  src | [Texture2D](doc/markdown/./device.texture2d.md) |  |
-|  srcLevel | number |  |
-|  dst | [Texture2D](doc/markdown/./device.texture2d.md) |  |
-|  dstLevel | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+src
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+srcLevel
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dst
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dstLevel
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

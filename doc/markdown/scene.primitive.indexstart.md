@@ -4,7 +4,7 @@
 
 ## Primitive.indexStart property
 
-Start index for drawing
+Starting index/vertex for drawing.
 
 **Signature:**
 

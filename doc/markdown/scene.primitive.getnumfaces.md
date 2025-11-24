@@ -4,7 +4,9 @@
 
 ## Primitive.getNumFaces() method
 
-Query total face count
+Query total face/segment count based on topology and buffer size.
+
+- For indexed geometry: derived from index buffer. - For non-indexed: derived from position vertex count.
 
 **Signature:**
 
@@ -15,5 +17,5 @@ getNumFaces(): number;
 
 number
 
-Total face count
+Total primitive count for the current topology.
 

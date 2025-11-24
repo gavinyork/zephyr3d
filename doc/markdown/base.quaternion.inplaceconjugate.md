@@ -9,11 +9,11 @@ Calculates the conjugate of this quaternion inplace.
 **Signature:**
 
 ```typescript
-inplaceConjugate(): Quaternion;
+inplaceConjugate(): this;
 ```
 **Returns:**
 
-[Quaternion](doc/markdown/./base.quaternion.md)
+this
 
 self
 

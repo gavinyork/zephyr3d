@@ -9,7 +9,7 @@ Returns the type of the renderer.
 **Signature:**
 
 ```typescript
-abstract getType(): string;
+getType(): string;
 ```
 **Returns:**
 

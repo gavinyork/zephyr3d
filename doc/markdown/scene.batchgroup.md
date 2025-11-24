@@ -15,15 +15,97 @@ declare class BatchGroup extends GraphNode
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.batchgroup._constructor_.md) |  | Creates an instance of mesh node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.batchgroup._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of mesh node
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getName()](doc/markdown/./scene.batchgroup.getname.md) |  | Gets name of the drawable object |
-|  [invalidate()](doc/markdown/./scene.batchgroup.invalidate.md) |  | Force the batch state to be rebuilt |
-|  [isBatchGroup()](doc/markdown/./scene.batchgroup.isbatchgroup.md) |  | true if this is a batch group, false otherwise |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getName()](doc/markdown/./scene.batchgroup.getname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the display name of the drawable object (for debugging/UI).
+
+
+</td></tr>
+<tr><td>
+
+[invalidate()](doc/markdown/./scene.batchgroup.invalidate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Force the batch state to be rebuilt
+
+
+</td></tr>
+<tr><td>
+
+[isBatchGroup()](doc/markdown/./scene.batchgroup.isbatchgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a batch group.
+
+
+</td></tr>
+</tbody></table>
 

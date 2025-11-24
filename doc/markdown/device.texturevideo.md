@@ -15,13 +15,69 @@ interface TextureVideo<T = unknown> extends BaseTexture<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [source](doc/markdown/./device.texturevideo.source.md) | <code>readonly</code> | HTMLVideoElement |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[source](doc/markdown/./device.texturevideo.source.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+HTMLVideoElement
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [updateVideoFrame()](doc/markdown/./device.texturevideo.updatevideoframe.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[updateVideoFrame()](doc/markdown/./device.texturevideo.updatevideoframe.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

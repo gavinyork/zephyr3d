@@ -4,7 +4,9 @@
 
 ## Application.device property
 
-The rendering device that was initialized by the application
+The initialized rendering device.
+
+Available after `await ready()`<!-- -->.
 
 **Signature:**
 

@@ -14,9 +14,39 @@ behindPlane(plane: Plane): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  plane | [Plane](doc/markdown/./base.plane.md) | The plane to check |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+plane
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+The plane to check
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

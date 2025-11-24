@@ -14,9 +14,39 @@ visit(target: SceneNode | OctreeNode): unknown;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  target | [SceneNode](doc/markdown/./scene.scenenode.md) \| [OctreeNode](doc/markdown/./scene.octreenode.md) | The node to be visit |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md) \| [OctreeNode](doc/markdown/./scene.octreenode.md)
+
+
+</td><td>
+
+The node to be visit
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

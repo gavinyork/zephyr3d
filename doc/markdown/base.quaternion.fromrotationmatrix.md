@@ -14,10 +14,55 @@ static fromRotationMatrix(matrix: Matrix3x3 | Matrix4x4, result?: Quaternion): Q
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrix | [Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The rotation matrix. |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion, if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The rotation matrix.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion, if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

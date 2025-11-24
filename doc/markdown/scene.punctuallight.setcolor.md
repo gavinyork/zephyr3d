@@ -9,14 +9,44 @@ Sets color of the light
 **Signature:**
 
 ```typescript
-setColor(color: Vector4): this;
+setColor(color: Vector4 | Vector3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  color | [Vector4](doc/markdown/./base.vector4.md) | The color to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+color
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md) \| [Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The color to set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

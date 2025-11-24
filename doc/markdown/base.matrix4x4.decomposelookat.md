@@ -14,11 +14,71 @@ decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  eye | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output eye vector. |
-|  target | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output target vector. |
-|  up | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The output up vector. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+eye
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output eye vector.
+
+
+</td></tr>
+<tr><td>
+
+target
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output target vector.
+
+
+</td></tr>
+<tr><td>
+
+up
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The output up vector.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

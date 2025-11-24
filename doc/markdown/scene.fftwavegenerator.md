@@ -9,43 +9,429 @@ This class generates a 2D ocean field using the Fast Fourier Transform (FFT) alg
 **Signature:**
 
 ```typescript
-declare class FFTWaveGenerator extends WaveGenerator 
+declare class FFTWaveGenerator extends Disposable implements WaveGenerator 
 ```
-**Extends:** [WaveGenerator](doc/markdown/./scene.wavegenerator.md)
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [WaveGenerator](doc/markdown/./scene.wavegenerator.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(params)](doc/markdown/./scene.fftwavegenerator._constructor_.md) |  | Create a new instance of the FFTWaveGenerator class. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(params)](doc/markdown/./scene.fftwavegenerator._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a new instance of the FFTWaveGenerator class.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [alignment](doc/markdown/./scene.fftwavegenerator.alignment.md) |  | number | Gets the wave alighment |
-|  [foamContrast](doc/markdown/./scene.fftwavegenerator.foamcontrast.md) |  | number | Gets the foam contrast |
-|  [foamWidth](doc/markdown/./scene.fftwavegenerator.foamwidth.md) |  | number | Gets the foam width |
-|  [wind](doc/markdown/./scene.fftwavegenerator.wind.md) |  | [Vector2](doc/markdown/./base.vector2.md) | Gets the wind vector |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[alignment](doc/markdown/./scene.fftwavegenerator.alignment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the wave alighment
+
+
+</td></tr>
+<tr><td>
+
+[foamContrast](doc/markdown/./scene.fftwavegenerator.foamcontrast.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the foam contrast
+
+
+</td></tr>
+<tr><td>
+
+[foamWidth](doc/markdown/./scene.fftwavegenerator.foamwidth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the foam width
+
+
+</td></tr>
+<tr><td>
+
+[version](doc/markdown/./scene.fftwavegenerator.version.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[wind](doc/markdown/./scene.fftwavegenerator.wind.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+Gets the wind vector
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyWaterBindGroup(bindGroup)](doc/markdown/./scene.fftwavegenerator.applywaterbindgroup.md) |  | Apply water bind group. |
-|  [calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.fftwavegenerator.calcclipmaptileaabb.md) |  |  |
-|  [calcFragmentNormal(scope, xz, vertexNormal)](doc/markdown/./scene.fftwavegenerator.calcfragmentnormal.md) |  |  |
-|  [calcFragmentNormalAndFoam(scope, xz)](doc/markdown/./scene.fftwavegenerator.calcfragmentnormalandfoam.md) |  | Calculate fragment normal and foam. |
-|  [calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.fftwavegenerator.calcvertexpositionandnormal.md) |  | Calculate vertex position and normal. |
-|  [dispose()](doc/markdown/./scene.fftwavegenerator.dispose.md) |  | Dispose the wave generator. |
-|  [getHash()](doc/markdown/./scene.fftwavegenerator.gethash.md) |  | Get the shader hash of the wave generator. |
-|  [getWaveCroppiness(cascade)](doc/markdown/./scene.fftwavegenerator.getwavecroppiness.md) |  | Gets the wave croppiness for the specified cascade |
-|  [getWaveLength(cascade)](doc/markdown/./scene.fftwavegenerator.getwavelength.md) |  | Gets the wave length for the specified cascade |
-|  [getWaveStrength(cascade)](doc/markdown/./scene.fftwavegenerator.getwavestrength.md) |  | Gets the wave strength for the specified cascade |
-|  [isOk()](doc/markdown/./scene.fftwavegenerator.isok.md) |  | Check if the wave generator is ok. |
-|  [setupUniforms(scope)](doc/markdown/./scene.fftwavegenerator.setupuniforms.md) |  | Setup uniforms for the shader program. |
-|  [setWaveCroppiness(cascade, croppiness)](doc/markdown/./scene.fftwavegenerator.setwavecroppiness.md) |  | Sets the wave croppiness for the specified cascade |
-|  [setWaveLength(cascade, length)](doc/markdown/./scene.fftwavegenerator.setwavelength.md) |  | Sets the wave length for the specified cascade |
-|  [setWaveStrength(cascade, strength)](doc/markdown/./scene.fftwavegenerator.setwavestrength.md) |  | Sets the wave strength for the specified cascade |
-|  [update(time)](doc/markdown/./scene.fftwavegenerator.update.md) |  | Update the wave generator. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyWaterBindGroup(bindGroup)](doc/markdown/./scene.fftwavegenerator.applywaterbindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply water bind group.
+
+
+</td></tr>
+<tr><td>
+
+[calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.fftwavegenerator.calcclipmaptileaabb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormal(scope, xz, \_vertexNormal)](doc/markdown/./scene.fftwavegenerator.calcfragmentnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormalAndFoam(scope, xz)](doc/markdown/./scene.fftwavegenerator.calcfragmentnormalandfoam.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate fragment normal and foam.
+
+
+</td></tr>
+<tr><td>
+
+[calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.fftwavegenerator.calcvertexpositionandnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate vertex position and normal.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.fftwavegenerator.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getHash()](doc/markdown/./scene.fftwavegenerator.gethash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the shader hash of the wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[getWaveCroppiness(cascade)](doc/markdown/./scene.fftwavegenerator.getwavecroppiness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the wave croppiness for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[getWaveLength(cascade)](doc/markdown/./scene.fftwavegenerator.getwavelength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the wave length for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[getWaveStrength(cascade)](doc/markdown/./scene.fftwavegenerator.getwavestrength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the wave strength for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[isOk()](doc/markdown/./scene.fftwavegenerator.isok.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the wave generator is ok.
+
+
+</td></tr>
+<tr><td>
+
+[needUpdate()](doc/markdown/./scene.fftwavegenerator.needupdate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Wether this wave generator's update() method should be called this frame
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.fftwavegenerator.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setupUniforms(scope, uniformGroup)](doc/markdown/./scene.fftwavegenerator.setupuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup uniforms for the shader program.
+
+
+</td></tr>
+<tr><td>
+
+[setWaveCroppiness(cascade, croppiness)](doc/markdown/./scene.fftwavegenerator.setwavecroppiness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the wave croppiness for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[setWaveLength(cascade, length)](doc/markdown/./scene.fftwavegenerator.setwavelength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the wave length for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[setWaveStrength(cascade, strength)](doc/markdown/./scene.fftwavegenerator.setwavestrength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the wave strength for the specified cascade
+
+
+</td></tr>
+<tr><td>
+
+[update(time)](doc/markdown/./scene.fftwavegenerator.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update the wave generator.
+
+
+</td></tr>
+</tbody></table>
 

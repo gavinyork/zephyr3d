@@ -1,6 +1,18 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, OrbitCameraController, Mesh, DirectionalLight, BoxShape, LambertMaterial, BatchGroup } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  Mesh,
+  DirectionalLight,
+  BoxShape,
+  LambertMaterial,
+  BatchGroup,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -8,8 +20,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -21,8 +31,8 @@ myApp.ready().then(async () => {
   // Create box shape
   const boxShape = new BoxShape();
   const material = new LambertMaterial();
-  for (let i = -40; i <= 40; i+=4) {
-    for (let j = -40; j <= 40; j+=4) {
+  for (let i = -40; i <= 40; i += 4) {
+    for (let j = -40; j <= 40; j += 4) {
       const mesh = new Mesh(scene);
       const instanceMaterial = material.createInstance();
       instanceMaterial.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
@@ -37,20 +47,12 @@ myApp.ready().then(async () => {
     }
   }
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
-  camera.lookAt(new Vector3(0, 0, 60), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 60), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', ev => {
-    camera.updateController();
-    camera.render(scene);
-    myApp.device.drawText(`DrawCall: ${myApp.device.frameInfo.drawCalls}`, 10, 10, '#ff0000');
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

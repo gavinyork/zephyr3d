@@ -13,7 +13,7 @@ The code below demonstrates how to use a directional light.
 // Create a directional light object
 const light = new DirectionalLight(scene);
 // light direction
-light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
 // light color
 light.color = new Vector4(1, 1, 0, 1);
 
@@ -49,7 +49,7 @@ The code below demonstrates how to use a spot light.
 // Creates a spot light object
 const light = new SpotLight(scene);
 // light direction
-light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0, 'ZYX');
+light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
 // light color
 light.color = new Vector4(1, 1, 1, 1);
 // light cutoff

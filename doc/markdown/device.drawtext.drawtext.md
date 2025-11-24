@@ -14,13 +14,103 @@ static drawText(device: AbstractDevice, text: string, color: string, x: number, 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  device | [AbstractDevice](doc/markdown/./device.abstractdevice.md) | The render device |
-|  text | string | The text to be drawn |
-|  color | string | The text color |
-|  x | number | X coordinate of the text |
-|  y | number | Y coordinate of the text |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+device
+
+
+</td><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+The render device
+
+
+</td></tr>
+<tr><td>
+
+text
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The text to be drawn
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The text color
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+X coordinate of the text
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Y coordinate of the text
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

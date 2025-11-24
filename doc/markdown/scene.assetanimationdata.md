@@ -14,10 +14,94 @@ interface AssetAnimationData
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [name](doc/markdown/./scene.assetanimationdata.name.md) |  | string |  |
-|  [nodes](doc/markdown/./scene.assetanimationdata.nodes.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] |  |
-|  [skeletons](doc/markdown/./scene.assetanimationdata.skeletons.md) |  | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->\[\] |  |
-|  [tracks](doc/markdown/./scene.assetanimationdata.tracks.md) |  | [AssetAnimationTrack](doc/markdown/./scene.assetanimationtrack.md)<!-- -->\[\] |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[name](doc/markdown/./scene.assetanimationdata.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[nodes](doc/markdown/./scene.assetanimationdata.nodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[skeletons](doc/markdown/./scene.assetanimationdata.skeletons.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[tracks](doc/markdown/./scene.assetanimationdata.tracks.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetAnimationTrack](doc/markdown/./scene.assetanimationtrack.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,13 +14,103 @@ clipStringToWidth(str: string, width: number, charMargin: number, start: number,
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  str | string | The string to be clipped |
-|  width | number | The desired maximum width |
-|  charMargin | number | Margin size between characters |
-|  start | number | Start index of the string to be clipped |
-|  font | [Font](doc/markdown/./device.font.md) | Font of the string |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+str
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The string to be clipped
+
+
+</td></tr>
+<tr><td>
+
+width
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The desired maximum width
+
+
+</td></tr>
+<tr><td>
+
+charMargin
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Margin size between characters
+
+
+</td></tr>
+<tr><td>
+
+start
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Start index of the string to be clipped
+
+
+</td></tr>
+<tr><td>
+
+font
+
+
+</td><td>
+
+[Font](doc/markdown/./device.font.md)
+
+
+</td><td>
+
+Font of the string
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

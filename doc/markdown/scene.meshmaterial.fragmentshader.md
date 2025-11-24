@@ -4,7 +4,7 @@
 
 ## MeshMaterial.fragmentShader() method
 
-Fragment shader implementation of this material
+Fragment shader hook. Declares pass-dependent uniforms (e.g., opacity, objectColor, alphaCutoff). Override to implement per-fragment logic, and call `outputFragmentColor` to finalize writes.
 
 **Signature:**
 
@@ -14,11 +14,43 @@ fragmentShader(scope: PBFunctionScope): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md) | Shader scope |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)
+
+
+</td><td>
+
+Fragment shader function scope.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

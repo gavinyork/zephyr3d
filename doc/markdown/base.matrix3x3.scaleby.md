@@ -9,18 +9,48 @@ Scale this matrix by a scalar number component-wise.
 **Signature:**
 
 ```typescript
-scaleBy(f: number): Matrix3x3;
+scaleBy(f: number): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  f | number | amount to scale this matrix by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+f
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+amount to scale this matrix by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+this
 
 self
 

@@ -4,19 +4,99 @@
 
 ## Octree.(constructor)
 
-Creates an instance of octree
+Create an octree.
 
 **Signature:**
 
 ```typescript
-constructor(scene: Scene, rootSize?: number, leafSize?: number);
+constructor(scene: Scene, rootSize?: number, leafSize?: number, maxRootSize?: number);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the octree belongs |
-|  rootSize | number | _(Optional)_ Root size of the octre |
-|  leafSize | number | _(Optional)_ Leaf size of the octree |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+Owning scene instance.
+
+
+</td></tr>
+<tr><td>
+
+rootSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Initial root world size (edge length), power of two. Defaults to 8.
+
+
+</td></tr>
+<tr><td>
+
+leafSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Minimum leaf cell size (edge length), power of two. Defaults to 8.
+
+
+</td></tr>
+<tr><td>
+
+maxRootSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Hard cap for dynamic growth. Defaults to 65536.
+
+
+</td></tr>
+</tbody></table>
+
+## Remarks
+
+The octree is initialized on construction; use `finalize()` to clear all data.
 

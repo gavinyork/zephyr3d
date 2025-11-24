@@ -4,65 +4,1522 @@
 
 ## SceneNode class
 
-The base class for any kind of scene objects
+The base class of all scene graph objects.
 
 **Signature:**
 
 ```typescript
-declare class SceneNode extends XForm<SceneNode> 
+declare class SceneNode extends SceneNode_base implements IDisposable 
 ```
-**Extends:** [XForm](doc/markdown/./scene.xform.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt;
+**Extends:** SceneNode\_base
+
+**Implements:** [IDisposable](doc/markdown/./base.idisposable.md)
 
 ## Remarks
 
-We use a data structure called SceneGraph to store scenes, which consists of a couple of scene objects forming a hierarchical structure. This is the base class for any kind of the scene object, which contains the basic properties such as position, rotation, and scale of the object.
+Responsibilities: - Defines hierarchical transform (position, rotation, scale) with lazily computed matrices. - Integrates with the scene graph (parent/children, attachment notifications). - Provides traversal utilities (`iterate`<!-- -->, `iterateBottomToTop`<!-- -->, `traverse`<!-- -->). - Manages visibility state and CPU/GPU picking flags. - Computes and caches local/world bounding volumes, notifies scene for spatial updates. - Supports cloning and shared model instancing. - Emits events on visibility, transform, bounding volume, attachment, and disposal.
+
+Performance: - `localMatrix`<!-- -->, `worldMatrix`<!-- -->, and `invWorldMatrix` are cached until invalidated. - Transform mutations and `invalidateBoundingVolume` update caches and spatial structures.
+
+Events: - `nodeattached`<!-- -->, `noderemoved`<!-- -->, `visiblechanged`<!-- -->, `transformchanged`<!-- -->, `bvchanged`<!-- -->, `dispose`<!-- -->.
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.scenenode._constructor_.md) |  | Creates a new scene node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.scenenode._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct a scene node.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [attached](doc/markdown/./scene.scenenode.attached.md) | <code>readonly</code> | boolean | true if the node is attached to the scene node, false otherwise |
-|  [BBOXDRAW\_DISABLED](doc/markdown/./scene.scenenode.bboxdraw_disabled.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [BBOXDRAW\_INHERITED](doc/markdown/./scene.scenenode.bboxdraw_inherited.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [BBOXDRAW\_LOCAL](doc/markdown/./scene.scenenode.bboxdraw_local.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [BBOXDRAW\_WORLD](doc/markdown/./scene.scenenode.bboxdraw_world.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [boundingBoxDrawMode](doc/markdown/./scene.scenenode.boundingboxdrawmode.md) |  | number | Bounding box draw mode |
-|  [clipTestEnabled](doc/markdown/./scene.scenenode.cliptestenabled.md) |  | boolean | Clip mode |
-|  [computedBoundingBoxDrawMode](doc/markdown/./scene.scenenode.computedboundingboxdrawmode.md) | <code>readonly</code> | number | Computed value for bounding box draw mode |
-|  [hidden](doc/markdown/./scene.scenenode.hidden.md) | <code>readonly</code> | boolean | Computed value of show state |
-|  [name](doc/markdown/./scene.scenenode.name.md) |  | string | Name of the scene node |
-|  [pickable](doc/markdown/./scene.scenenode.pickable.md) |  | boolean | Computed value of pick mode |
-|  [scene](doc/markdown/./scene.scenenode.scene.md) | <code>readonly</code> | [Scene](doc/markdown/./scene.scene.md) | The scene to which the node belongs |
-|  [showState](doc/markdown/./scene.scenenode.showstate.md) |  | [SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md) | Show state |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[animationSet](doc/markdown/./scene.scenenode.animationset.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AnimationSet](doc/markdown/./scene.animationset.md)
+
+
+</td><td>
+
+Lazily created animation set for this node.
+
+
+</td></tr>
+<tr><td>
+
+[attached](doc/markdown/./scene.scenenode.attached.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this node is currently attached under the scene's root.
+
+
+</td></tr>
+<tr><td>
+
+[BBOXDRAW\_DISABLED](doc/markdown/./scene.scenenode.bboxdraw_disabled.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Disable bounding-box visualization.
+
+
+</td></tr>
+<tr><td>
+
+[BBOXDRAW\_INHERITED](doc/markdown/./scene.scenenode.bboxdraw_inherited.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Bounding-box draw mode inherited from nearest graph ancestor.
+
+
+</td></tr>
+<tr><td>
+
+[BBOXDRAW\_LOCAL](doc/markdown/./scene.scenenode.bboxdraw_local.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Draw local-space bounding box.
+
+
+</td></tr>
+<tr><td>
+
+[BBOXDRAW\_WORLD](doc/markdown/./scene.scenenode.bboxdraw_world.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Draw world-space bounding box.
+
+
+</td></tr>
+<tr><td>
+
+[boundingBoxDrawMode](doc/markdown/./scene.scenenode.boundingboxdrawmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bounding box draw mode
+
+
+</td></tr>
+<tr><td>
+
+[children](doc/markdown/./scene.scenenode.children.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[DRef](doc/markdown/./base.dref.md)<!-- -->&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->&gt;\[\]
+
+
+</td><td>
+
+Children of this xform
+
+
+</td></tr>
+<tr><td>
+
+[clipTestEnabled](doc/markdown/./scene.scenenode.cliptestenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Clip mode
+
+
+</td></tr>
+<tr><td>
+
+[computedBoundingBoxDrawMode](doc/markdown/./scene.scenenode.computedboundingboxdrawmode.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Computed value for bounding box draw mode
+
+
+</td></tr>
+<tr><td>
+
+[gpuPickable](doc/markdown/./scene.scenenode.gpupickable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this node is enabled for GPU picking
+
+
+</td></tr>
+<tr><td>
+
+[hidden](doc/markdown/./scene.scenenode.hidden.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Computed value of show state
+
+
+</td></tr>
+<tr><td>
+
+[invWorldMatrix](doc/markdown/./scene.scenenode.invworldmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+Inverse of the world transformation matrix of the xform
+
+
+</td></tr>
+<tr><td>
+
+[jointTypeR](doc/markdown/./scene.scenenode.jointtyper.md)
+
+
+</td><td>
+
+
+</td><td>
+
+"none" \| "animated" \| "static"
+
+
+</td><td>
+
+Rotation type if this is a joint node of any skeleton
+
+
+</td></tr>
+<tr><td>
+
+[jointTypeS](doc/markdown/./scene.scenenode.jointtypes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+"none" \| "animated" \| "static"
+
+
+</td><td>
+
+Scale type if this is a joint node of any skeleton
+
+
+</td></tr>
+<tr><td>
+
+[jointTypeT](doc/markdown/./scene.scenenode.jointtypet.md)
+
+
+</td><td>
+
+
+</td><td>
+
+"none" \| "animated" \| "static"
+
+
+</td><td>
+
+Translation type if this is a joint node of any skeleton
+
+
+</td></tr>
+<tr><td>
+
+[localMatrix](doc/markdown/./scene.scenenode.localmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+Local transformation matrix of the xform
+
+
+</td></tr>
+<tr><td>
+
+[metaData](doc/markdown/./scene.scenenode.metadata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Metadata$1
+
+
+</td><td>
+
+Arbitrary metadata associated with this node.
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./scene.scenenode.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Display name of the node (for UI/debugging).
+
+
+</td></tr>
+<tr><td>
+
+[parent](doc/markdown/./scene.scenenode.parent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+Parent of the xform
+
+
+</td></tr>
+<tr><td>
+
+[persistentId](doc/markdown/./scene.scenenode.persistentid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Node's persistent identifier.
+
+
+</td></tr>
+<tr><td>
+
+[pickable](doc/markdown/./scene.scenenode.pickable.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this node is enabled for CPU picking
+
+
+</td></tr>
+<tr><td>
+
+[placeToOctree](doc/markdown/./scene.scenenode.placetooctree.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether the node should be inserted into the scene's spatial structure.
+
+
+</td></tr>
+<tr><td>
+
+[position](doc/markdown/./scene.scenenode.position.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Position of the xform relative to it's parent
+
+
+</td></tr>
+<tr><td>
+
+[prefabId](doc/markdown/./scene.scenenode.prefabid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+If not empty, this node was loaded from a prefab
+
+
+</td></tr>
+<tr><td>
+
+[rotation](doc/markdown/./scene.scenenode.rotation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+Rotation of the xform
+
+
+</td></tr>
+<tr><td>
+
+[runtimeId](doc/markdown/./scene.scenenode.runtimeid.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Node's runtime unique identifier
+
+
+</td></tr>
+<tr><td>
+
+[scale](doc/markdown/./scene.scenenode.scale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Scaling of the xform
+
+
+</td></tr>
+<tr><td>
+
+[scene](doc/markdown/./scene.scenenode.scene.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The owning scene.
+
+
+</td></tr>
+<tr><td>
+
+[script](doc/markdown/./scene.scenenode.script.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Attached script filename or identifier (engine-specific).
+
+
+</td></tr>
+<tr><td>
+
+[sealed](doc/markdown/./scene.scenenode.sealed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+If true, the node is logically sealed; some operations (like cloning as child) may be restricted by engine policies.
+
+
+</td></tr>
+<tr><td>
+
+[sharedModel](doc/markdown/./scene.scenenode.sharedmodel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SharedModel](doc/markdown/./scene.sharedmodel.md)
+
+
+</td><td>
+
+Shared model reference for instancing/streaming systems.
+
+
+</td></tr>
+<tr><td>
+
+[showState](doc/markdown/./scene.scenenode.showstate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SceneNodeVisible](doc/markdown/./scene.scenenodevisible.md)
+
+
+</td><td>
+
+Show state
+
+
+</td></tr>
+<tr><td>
+
+[worldMatrix](doc/markdown/./scene.scenenode.worldmatrix.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+World transformation matrix of the xform
+
+
+</td></tr>
+<tr><td>
+
+[worldMatrixDet](doc/markdown/./scene.scenenode.worldmatrixdet.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The determinant of world matrix
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [computeBoundingVolume()](doc/markdown/./scene.scenenode.computeboundingvolume.md) |  | Computes the bounding volume of the node |
-|  [dispose()](doc/markdown/./scene.scenenode.dispose.md) |  | Disposes the node |
-|  [getBoundingVolume()](doc/markdown/./scene.scenenode.getboundingvolume.md) |  | Gets the bounding volume of the node |
-|  [getWorldBoundingVolume()](doc/markdown/./scene.scenenode.getworldboundingvolume.md) |  | Gets the world space bounding volume of the node |
-|  [hasChild(child)](doc/markdown/./scene.scenenode.haschild.md) |  | Check if given node is a direct child of the node |
-|  [invalidateBoundingVolume()](doc/markdown/./scene.scenenode.invalidateboundingvolume.md) |  | Force the bounding volume to be recalculated |
-|  [invalidateWorldBoundingVolume(transformChanged)](doc/markdown/./scene.scenenode.invalidateworldboundingvolume.md) |  | Force the world space bounding volume to be recalculated |
-|  [isBatchGroup()](doc/markdown/./scene.scenenode.isbatchgroup.md) |  | true if this is a batch group, false otherwise |
-|  [isCamera()](doc/markdown/./scene.scenenode.iscamera.md) |  | true if this is a camera node, false otherwise |
-|  [isGraphNode()](doc/markdown/./scene.scenenode.isgraphnode.md) |  | true if this is a graph node, false otherwise |
-|  [isLight()](doc/markdown/./scene.scenenode.islight.md) |  | true if this is a light node, false otherwise |
-|  [isMesh()](doc/markdown/./scene.scenenode.ismesh.md) |  | true if this is a mesh node, false otherwise |
-|  [isParentOf(child)](doc/markdown/./scene.scenenode.isparentof.md) |  | Checks if this node is the direct parent or indirect parent of a given node |
-|  [isPunctualLight()](doc/markdown/./scene.scenenode.ispunctuallight.md) |  | true if this is a punctual light node, false otherwise |
-|  [isTerrain()](doc/markdown/./scene.scenenode.isterrain.md) |  | true if this is a terrain node, false otherwise |
-|  [iterate(callback)](doc/markdown/./scene.scenenode.iterate.md) |  | Iterate self and all of the children |
-|  [remove()](doc/markdown/./scene.scenenode.remove.md) |  | Removes this node from it's parent |
-|  [removeChildren()](doc/markdown/./scene.scenenode.removechildren.md) |  | Removes all children from this node |
-|  [setBoundingVolume(bv)](doc/markdown/./scene.scenenode.setboundingvolume.md) |  | Sets the bounding volume of the node |
-|  [traverse(v, inverse)](doc/markdown/./scene.scenenode.traverse.md) |  | Traverse the entire subtree of this node by a visitor |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_onAttached()](doc/markdown/./scene.scenenode._onattached.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Get called when this node is attached to scene
+
+
+</td></tr>
+<tr><td>
+
+[\_onDetached()](doc/markdown/./scene.scenenode._ondetached.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Get called when this node is detached from scene
+
+
+</td></tr>
+<tr><td>
+
+[calculateLocalTransform(outMatrix)](doc/markdown/./scene.scenenode.calculatelocaltransform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate local transform matrix
+
+
+</td></tr>
+<tr><td>
+
+[calculateWorldTransform(outMatrix)](doc/markdown/./scene.scenenode.calculateworldtransform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate world transform matrix
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.scenenode.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clone this node.
+
+
+</td></tr>
+<tr><td>
+
+[computeBoundingVolume()](doc/markdown/./scene.scenenode.computeboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Computes the bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[computeWorldBoundingVolume(localBV)](doc/markdown/./scene.scenenode.computeworldboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Computes the world space bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[findNodeById(id)](doc/markdown/./scene.scenenode.findnodebyid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Finds a scene node by its persistent ID.
+
+
+</td></tr>
+<tr><td>
+
+[findNodeByName(name)](doc/markdown/./scene.scenenode.findnodebyname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Finds a scene node by name.
+
+If multiple nodes share the same name, returns the first match encountered during traversal.
+
+
+</td></tr>
+<tr><td>
+
+[findSkeletonById(id)](doc/markdown/./scene.scenenode.findskeletonbyid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Finds a skeleton object by its persistent ID.
+
+
+</td></tr>
+<tr><td>
+
+[getBoundingVolume()](doc/markdown/./scene.scenenode.getboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[getPrefabNode()](doc/markdown/./scene.scenenode.getprefabnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get prefab node this node belongs to, or null if this node does not belongs to any prefab
+
+
+</td></tr>
+<tr><td>
+
+[getWorldBoundingVolume()](doc/markdown/./scene.scenenode.getworldboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the world space bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[getWorldPosition(outPos)](doc/markdown/./scene.scenenode.getworldposition.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the position of the xform in world space
+
+
+</td></tr>
+<tr><td>
+
+[hasChild(child)](doc/markdown/./scene.scenenode.haschild.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the given node is a direct child of this node.
+
+
+</td></tr>
+<tr><td>
+
+[invalidateBoundingVolume()](doc/markdown/./scene.scenenode.invalidateboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Force the bounding volume to be recalculated
+
+
+</td></tr>
+<tr><td>
+
+[invalidateWorldBoundingVolume(transformChanged)](doc/markdown/./scene.scenenode.invalidateworldboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Force the world space bounding volume to be recalculated
+
+
+</td></tr>
+<tr><td>
+
+[isBatchGroup()](doc/markdown/./scene.scenenode.isbatchgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a batch group.
+
+
+</td></tr>
+<tr><td>
+
+[isCamera()](doc/markdown/./scene.scenenode.iscamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+true if this is a camera node, false otherwise
+
+
+</td></tr>
+<tr><td>
+
+[isClipmapTerrain()](doc/markdown/./scene.scenenode.isclipmapterrain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a clipmap terrain.
+
+
+</td></tr>
+<tr><td>
+
+[isGraphNode()](doc/markdown/./scene.scenenode.isgraphnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a graph node.
+
+
+</td></tr>
+<tr><td>
+
+[isLight()](doc/markdown/./scene.scenenode.islight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a light.
+
+
+</td></tr>
+<tr><td>
+
+[isMesh()](doc/markdown/./scene.scenenode.ismesh.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a mesh.
+
+
+</td></tr>
+<tr><td>
+
+[isParentOf(child)](doc/markdown/./scene.scenenode.isparentof.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this node is an ancestor (direct or indirect) of the given node.
+
+
+</td></tr>
+<tr><td>
+
+[isParticleSystem()](doc/markdown/./scene.scenenode.isparticlesystem.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a particle system.
+
+
+</td></tr>
+<tr><td>
+
+[isPunctualLight()](doc/markdown/./scene.scenenode.ispunctuallight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+true if this is a punctual light node, false otherwise
+
+
+</td></tr>
+<tr><td>
+
+[isTerrain()](doc/markdown/./scene.scenenode.isterrain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a terrain.
+
+
+</td></tr>
+<tr><td>
+
+[isWater()](doc/markdown/./scene.scenenode.iswater.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Type guard: true if this node is a water node.
+
+
+</td></tr>
+<tr><td>
+
+[iterate(callback)](doc/markdown/./scene.scenenode.iterate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Iterate self and descendants in pre-order.
+
+Warning: Do not remove children during this iteration. To allow removal, use `iterateBottomToTop`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[iterateBottomToTop(callback)](doc/markdown/./scene.scenenode.iteratebottomtotop.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Iterate self and descendants in reverse post-order (bottom-to-top).
+
+Child nodes can be safely removed during this iteration.
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(eye, target, up)](doc/markdown/./scene.scenenode.lookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the local tranformation matrix by a look-at matrix
+
+
+</td></tr>
+<tr><td>
+
+[moveBy(delta)](doc/markdown/./scene.scenenode.moveby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Moves the xform by an offset vector
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.scenenode.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the node
+
+
+</td></tr>
+<tr><td>
+
+[onPostClone()](doc/markdown/./scene.scenenode.onpostclone.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Get called when the node was just created by cloning from other node
+
+
+</td></tr>
+<tr><td>
+
+[otherToThis(other, v, result)](doc/markdown/./scene.scenenode.othertothis.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform coordinate in other coordinate space to local space
+
+
+</td></tr>
+<tr><td>
+
+[otherToThis(other, v, result)](doc/markdown/./scene.scenenode.othertothis_1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[remove()](doc/markdown/./scene.scenenode.remove.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Detach this node from its parent.
+
+
+</td></tr>
+<tr><td>
+
+[removeChildren()](doc/markdown/./scene.scenenode.removechildren.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove all children from this node.
+
+
+</td></tr>
+<tr><td>
+
+[reparent(p)](doc/markdown/./scene.scenenode.reparent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes this node from it's parent and add this node to another parent node if required
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(factor)](doc/markdown/./scene.scenenode.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scales the xform by a given scale factor
+
+
+</td></tr>
+<tr><td>
+
+[setBoundingVolume(bv)](doc/markdown/./scene.scenenode.setboundingvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the bounding volume of the node
+
+
+</td></tr>
+<tr><td>
+
+[setLocalTransform(matrix)](doc/markdown/./scene.scenenode.setlocaltransform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the local transform matrix of the xform
+
+
+</td></tr>
+<tr><td>
+
+[thisToOther(other, v, result)](doc/markdown/./scene.scenenode.thistoother.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform local space coordinate to other coordinate space
+
+
+</td></tr>
+<tr><td>
+
+[thisToOther(other, v, result)](doc/markdown/./scene.scenenode.thistoother_1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[thisToWorld(v, result)](doc/markdown/./scene.scenenode.thistoworld.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform local coordinate to world space
+
+
+</td></tr>
+<tr><td>
+
+[thisToWorld(v, result)](doc/markdown/./scene.scenenode.thistoworld_1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[traverse(v)](doc/markdown/./scene.scenenode.traverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Depth-first traversal of this node's subtree (pre-order).
+
+
+</td></tr>
+<tr><td>
+
+[update(frameId, elapsedInSeconds, deltaInSeconds)](doc/markdown/./scene.scenenode.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update node state once per-frame
+
+
+</td></tr>
+<tr><td>
+
+[updatePerCamera(\_camera, \_elapsedInSeconds, \_deltaInSeconds)](doc/markdown/./scene.scenenode.updatepercamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update node state once per-camera
+
+
+</td></tr>
+<tr><td>
+
+[worldToThis(v, result)](doc/markdown/./scene.scenenode.worldtothis.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform world coordinate to local space
+
+
+</td></tr>
+<tr><td>
+
+[worldToThis(v, result)](doc/markdown/./scene.scenenode.worldtothis_1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

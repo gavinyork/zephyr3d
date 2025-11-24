@@ -14,9 +14,39 @@ setReference(ref: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ref | number | The reference value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ref
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The reference value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

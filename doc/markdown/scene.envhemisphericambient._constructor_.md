@@ -14,8 +14,53 @@ constructor(ambientUp: Vector4, ambientDown: Vector4);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ambientUp | [Vector4](doc/markdown/./base.vector4.md) | The upside ambient color |
-|  ambientDown | [Vector4](doc/markdown/./base.vector4.md) | The downside ambient color |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ambientUp
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The upside ambient color
+
+
+</td></tr>
+<tr><td>
+
+ambientDown
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The downside ambient color
+
+
+</td></tr>
+</tbody></table>
 

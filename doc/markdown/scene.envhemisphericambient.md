@@ -15,26 +15,216 @@ declare class EnvHemisphericAmbient extends EnvironmentLighting
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(ambientUp, ambientDown)](doc/markdown/./scene.envhemisphericambient._constructor_.md) |  | Creates an instance of EnvConstantAmbient |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(ambientUp, ambientDown)](doc/markdown/./scene.envhemisphericambient._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of EnvConstantAmbient
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [ambientDown](doc/markdown/./scene.envhemisphericambient.ambientdown.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The downside ambient color |
-|  [ambientUp](doc/markdown/./scene.envhemisphericambient.ambientup.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The upside ambient color |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ambientDown](doc/markdown/./scene.envhemisphericambient.ambientdown.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The downside ambient color
+
+
+</td></tr>
+<tr><td>
+
+[ambientUp](doc/markdown/./scene.envhemisphericambient.ambientup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The upside ambient color
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getIrradiance(scope, normal)](doc/markdown/./scene.envhemisphericambient.getirradiance.md) |  | Get irradiance for a fragment |
-|  [getRadiance(scope, refl, roughness)](doc/markdown/./scene.envhemisphericambient.getradiance.md) |  | Get radiance for a fragment |
-|  [getType()](doc/markdown/./scene.envhemisphericambient.gettype.md) |  | The environment light type |
-|  [hasIrradiance()](doc/markdown/./scene.envhemisphericambient.hasirradiance.md) |  | Returns whether this environment lighting supports diffuse light |
-|  [hasRadiance()](doc/markdown/./scene.envhemisphericambient.hasradiance.md) |  | Returns whether this environment lighting supports reflective light |
-|  [initShaderBindings(pb)](doc/markdown/./scene.envhemisphericambient.initshaderbindings.md) |  | Initialize shader bindings |
-|  [updateBindGroup(bg)](doc/markdown/./scene.envhemisphericambient.updatebindgroup.md) |  | Updates the uniform values |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getIrradiance(scope, normal)](doc/markdown/./scene.envhemisphericambient.getirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get irradiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getRadiance(scope, refl, \_roughness)](doc/markdown/./scene.envhemisphericambient.getradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get radiance for a fragment
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.envhemisphericambient.gettype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+The environment light type
+
+
+</td></tr>
+<tr><td>
+
+[hasIrradiance()](doc/markdown/./scene.envhemisphericambient.hasirradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports diffuse light
+
+
+</td></tr>
+<tr><td>
+
+[hasRadiance()](doc/markdown/./scene.envhemisphericambient.hasradiance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns whether this environment lighting supports reflective light
+
+
+</td></tr>
+<tr><td>
+
+[initShaderBindings(pb)](doc/markdown/./scene.envhemisphericambient.initshaderbindings.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize shader bindings
+
+
+</td></tr>
+<tr><td>
+
+[updateBindGroup(bg)](doc/markdown/./scene.envhemisphericambient.updatebindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Updates the uniform values
+
+
+</td></tr>
+</tbody></table>
 

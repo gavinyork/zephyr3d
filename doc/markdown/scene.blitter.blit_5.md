@@ -4,22 +4,97 @@
 
 ## Blitter.blit() method
 
-Blits given face of a cube texture to a 2d texture or frame buffer
+Blits given layer of a 2d array texture to a 2d texture or frame buffer
 
 **Signature:**
 
 ```typescript
-blit(source: TextureCube, dest: Texture2D | FrameBuffer, face: number, sampler?: TextureSampler): void;
+blit(source: Texture2DArray, dest: Texture2D, layer: number, sampler?: TextureSampler): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  source | [TextureCube](doc/markdown/./device.texturecube.md) | The source texture |
-|  dest | [Texture2D](doc/markdown/./device.texture2d.md) \| [FrameBuffer](doc/markdown/./device.framebuffer.md) | The destination texture or frame buffer |
-|  face | number | The face to be copied |
-|  sampler | [TextureSampler](doc/markdown/./device.texturesampler.md) | _(Optional)_ Sampler for source texture |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+source
+
+
+</td><td>
+
+[Texture2DArray](doc/markdown/./device.texture2darray.md)
+
+
+</td><td>
+
+The source texture
+
+
+</td></tr>
+<tr><td>
+
+dest
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The destination texture or frame buffer
+
+
+</td></tr>
+<tr><td>
+
+layer
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The layer to be copied
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+_(Optional)_ Sampler for source texture
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

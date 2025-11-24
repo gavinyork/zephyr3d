@@ -4,7 +4,7 @@
 
 ## DrawContext.HiZTexture property
 
-hierarchical depth buffer
+Hi-Z (hierarchical Z) depth texture, when generated.
 
 **Signature:**
 

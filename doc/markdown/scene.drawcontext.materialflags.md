@@ -4,7 +4,7 @@
 
 ## DrawContext.materialFlags property
 
-Material varying flags
+Material varying bit flags that influence shader selection.
 
 **Signature:**
 

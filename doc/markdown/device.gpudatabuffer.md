@@ -15,15 +15,97 @@ interface GPUDataBuffer<T = unknown> extends GPUObject<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [byteLength](doc/markdown/./device.gpudatabuffer.bytelength.md) | <code>readonly</code> | number |  |
-|  [usage](doc/markdown/./device.gpudatabuffer.usage.md) | <code>readonly</code> | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[byteLength](doc/markdown/./device.gpudatabuffer.bytelength.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[usage](doc/markdown/./device.gpudatabuffer.usage.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [bufferSubData(dstByteOffset, data, srcOffset, srcLength)](doc/markdown/./device.gpudatabuffer.buffersubdata.md) |  |
-|  [getBufferSubData(dstBuffer, offsetInBytes, sizeInBytes)](doc/markdown/./device.gpudatabuffer.getbuffersubdata.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bufferSubData(dstByteOffset, data, srcOffset, srcLength)](doc/markdown/./device.gpudatabuffer.buffersubdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getBufferSubData(dstBuffer, offsetInBytes, sizeInBytes)](doc/markdown/./device.gpudatabuffer.getbuffersubdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

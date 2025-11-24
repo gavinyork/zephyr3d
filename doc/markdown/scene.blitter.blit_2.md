@@ -4,27 +4,99 @@
 
 ## Blitter.blit() method
 
-Blits a 2d array texture to another 2d array texture
+Blits a 2D texture to given layer of a 2D array texture
 
 **Signature:**
 
 ```typescript
-blit(source: Texture2DArray, dest: Texture2DArray, sampler?: TextureSampler): void;
+blit(source: Texture2D, dest: Texture2DArray, layer: number, sampler?: TextureSampler): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  source | [Texture2DArray](doc/markdown/./device.texture2darray.md) | The source texture |
-|  dest | [Texture2DArray](doc/markdown/./device.texture2darray.md) | The destination texture |
-|  sampler | [TextureSampler](doc/markdown/./device.texturesampler.md) | _(Optional)_ Sampler for source texture |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+source
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The source texture
+
+
+</td></tr>
+<tr><td>
+
+dest
+
+
+</td><td>
+
+[Texture2DArray](doc/markdown/./device.texture2darray.md)
+
+
+</td><td>
+
+The destination texture
+
+
+</td></tr>
+<tr><td>
+
+layer
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The layer of the destination texture
+
+
+</td></tr>
+<tr><td>
+
+sampler
+
+
+</td><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+_(Optional)_ Sampler for source texture
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
-
-## Remarks
-
-All layers of the source texture will be copied to the destination texture
 

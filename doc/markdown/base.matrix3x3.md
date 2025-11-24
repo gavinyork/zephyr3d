@@ -19,67 +19,851 @@ The matrix is column-major: \| m00, m10, m20 \| \| m01, m11, m21 \| \| m02, m12,
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(m00, m10, m20, m01, m11, m21, m02, m12, m22)](doc/markdown/./base.matrix3x3._constructor_.md) |  | Creates a Matrix3x3 initialized with values. |
-|  [(constructor)(elements)](doc/markdown/./base.matrix3x3._constructor__1.md) |  | Creates a Matrix3x3 initialized with values in an array. |
-|  [(constructor)(array)](doc/markdown/./base.matrix3x3._constructor__2.md) |  | Cerates a Matrix3x3 initialized with values in a Float32Array. |
-|  [(constructor)(buffer, offset)](doc/markdown/./base.matrix3x3._constructor__3.md) |  | Creates a new Matrix3x3 placed on a given ArrayBuffer object. |
-|  [(constructor)()](doc/markdown/./base.matrix3x3._constructor__4.md) |  | Creates a new identity Matrix3x3. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(m00, m10, m20, m01, m11, m21, m02, m12, m22)](doc/markdown/./base.matrix3x3._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a Matrix3x3 initialized with values.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(elements)](doc/markdown/./base.matrix3x3._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a Matrix3x3 initialized with values in an array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(array)](doc/markdown/./base.matrix3x3._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Cerates a Matrix3x3 initialized with values in a Float32Array.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(buffer, offset)](doc/markdown/./base.matrix3x3._constructor__3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Matrix3x3 placed on a given ArrayBuffer object.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)()](doc/markdown/./base.matrix3x3._constructor__4.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new identity Matrix3x3.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [m00](doc/markdown/./base.matrix3x3.m00.md) |  | number | Get the element at row 0, column 0 |
-|  [m01](doc/markdown/./base.matrix3x3.m01.md) |  | number | Get the element at row 1, column 0 |
-|  [m02](doc/markdown/./base.matrix3x3.m02.md) |  | number | Get the element at row 2, column 0 |
-|  [m10](doc/markdown/./base.matrix3x3.m10.md) |  | number | Get the element at row 0, column 1 |
-|  [m11](doc/markdown/./base.matrix3x3.m11.md) |  | number | Get the element at row 1, column 1 |
-|  [m12](doc/markdown/./base.matrix3x3.m12.md) |  | number | Get the element at row 2, column 1 |
-|  [m20](doc/markdown/./base.matrix3x3.m20.md) |  | number | Get the element at row 0, column 2 |
-|  [m21](doc/markdown/./base.matrix3x3.m21.md) |  | number | Get the element at row 1, column 2 |
-|  [m22](doc/markdown/./base.matrix3x3.m22.md) |  | number | Get the element at row 2, column 2 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[m00](doc/markdown/./base.matrix3x3.m00.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m01](doc/markdown/./base.matrix3x3.m01.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m02](doc/markdown/./base.matrix3x3.m02.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 0
+
+
+</td></tr>
+<tr><td>
+
+[m10](doc/markdown/./base.matrix3x3.m10.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m11](doc/markdown/./base.matrix3x3.m11.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m12](doc/markdown/./base.matrix3x3.m12.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 1
+
+
+</td></tr>
+<tr><td>
+
+[m20](doc/markdown/./base.matrix3x3.m20.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 0, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m21](doc/markdown/./base.matrix3x3.m21.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 1, column 2
+
+
+</td></tr>
+<tr><td>
+
+[m22](doc/markdown/./base.matrix3x3.m22.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the element at row 2, column 2
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [add(a, b, result)](doc/markdown/./base.matrix3x3.add.md) | <code>static</code> | Adds two Matrix3x3's component-wise. |
-|  [addBy(other)](doc/markdown/./base.matrix3x3.addby.md) |  | Add a matrix to this matrix component-wise. |
-|  [clone()](doc/markdown/./base.matrix3x3.clone.md) |  | Creates a new Matrix3x3 initialized with values from this matrix. |
-|  [div(a, b, result)](doc/markdown/./base.matrix3x3.div.md) | <code>static</code> | Divides two Matrix3x3's component-wise. |
-|  [divBy(other)](doc/markdown/./base.matrix3x3.divby.md) |  | Divide this matrix by a matrix component-wise. |
-|  [getCol(col, result)](doc/markdown/./base.matrix3x3.getcol.md) |  | Get the values in a column as a Vector3 |
-|  [getRow(row, result)](doc/markdown/./base.matrix3x3.getrow.md) |  | Get the values in a row as a Vector3 |
-|  [identity()](doc/markdown/./base.matrix3x3.identity.md) |  | Make this matrix identity. |
-|  [identity(result)](doc/markdown/./base.matrix3x3.identity.md) | <code>static</code> | Creates an identity Matrix3x3. |
-|  [inplaceInvert()](doc/markdown/./base.matrix3x3.inplaceinvert.md) |  | Calculate the inverse of this matrix inplace. |
-|  [invert(matrix, result)](doc/markdown/./base.matrix3x3.invert.md) | <code>static</code> | Inverts a Matrix3x3 |
-|  [mul(a, b, result)](doc/markdown/./base.matrix3x3.mul.md) | <code>static</code> | Multiplys two Matrix3x3's component-wise. |
-|  [mulBy(other)](doc/markdown/./base.matrix3x3.mulby.md) |  | Multiplies this matrix by a matrix component-wise. |
-|  [multiply(m1, m2, result)](doc/markdown/./base.matrix3x3.multiply.md) | <code>static</code> | Multiplies two Matrix3x3's |
-|  [multiplyLeft(other)](doc/markdown/./base.matrix3x3.multiplyleft.md) |  | Pre-multiply by a matrix inplace. |
-|  [multiplyRight(other)](doc/markdown/./base.matrix3x3.multiplyright.md) |  | Post-multiply by a matrix inplace. |
-|  [rotation(axis, angle)](doc/markdown/./base.matrix3x3.rotation.md) |  | Calculates a rotation around a given axis. |
-|  [rotation(axis, angle, result)](doc/markdown/./base.matrix3x3.rotation.md) | <code>static</code> | Creates a Matrix3x3 that presents a rotation around a given axis. |
-|  [rotationX(angle)](doc/markdown/./base.matrix3x3.rotationx.md) |  | Calculates a rotation around x axis inplace. |
-|  [rotationX(angle, result)](doc/markdown/./base.matrix3x3.rotationx.md) | <code>static</code> | Creates a Matrix3x3 that presents a rotation around x axis. |
-|  [rotationY(angle)](doc/markdown/./base.matrix3x3.rotationy.md) |  | Calculates a rotation around y axis inplace. |
-|  [rotationY(angle, result)](doc/markdown/./base.matrix3x3.rotationy.md) | <code>static</code> | Creates a Matrix3x3 that presents a rotation around y axis. |
-|  [rotationZ(angle)](doc/markdown/./base.matrix3x3.rotationz.md) |  | Calculates a rotation around z axis inplace. |
-|  [rotationZ(angle, result)](doc/markdown/./base.matrix3x3.rotationz.md) | <code>static</code> | Creates a Matrix3x3 that presents a rotation around z axis. |
-|  [scale(a, f, result)](doc/markdown/./base.matrix3x3.scale.md) | <code>static</code> | Scales a Matrix3x3 by a scalar number component-wise. |
-|  [scaleBy(f)](doc/markdown/./base.matrix3x3.scaleby.md) |  | Scale this matrix by a scalar number component-wise. |
-|  [setCol(col, v)](doc/markdown/./base.matrix3x3.setcol.md) |  | Set values to a column in the matrix. |
-|  [setColXYZ(col, x, y, z)](doc/markdown/./base.matrix3x3.setcolxyz.md) |  | Set values to a column in the matrix. |
-|  [setRow(row, v)](doc/markdown/./base.matrix3x3.setrow.md) |  | Set values to a row in the matrix. |
-|  [setRowXYZ(row, x, y, z)](doc/markdown/./base.matrix3x3.setrowxyz.md) |  | Set values to a row in the matrix. |
-|  [sub(a, b, result)](doc/markdown/./base.matrix3x3.sub.md) | <code>static</code> | Subtracts two Matrix3x3's component-wise. |
-|  [subBy(other)](doc/markdown/./base.matrix3x3.subby.md) |  | Subtract a matrix from this matrix component-wise. |
-|  [transform(vec, result)](doc/markdown/./base.matrix3x3.transform.md) |  | Transform a vector by this matrix. |
-|  [transformPoint(vec, result)](doc/markdown/./base.matrix3x3.transformpoint.md) |  | Transform a vector by this matrix. |
-|  [transformVector(vec, result)](doc/markdown/./base.matrix3x3.transformvector.md) |  | Transform a vector by this matrix. |
-|  [transpose()](doc/markdown/./base.matrix3x3.transpose.md) |  | Calculate the transpose of this matrix inplace. |
-|  [transpose(matrix, result)](doc/markdown/./base.matrix3x3.transpose.md) | <code>static</code> | Transpose a Matrix3x3. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[add(a, b, result)](doc/markdown/./base.matrix3x3.add.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Adds two Matrix3x3's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[addBy(other)](doc/markdown/./base.matrix3x3.addby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a matrix to this matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./base.matrix3x3.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Matrix3x3 initialized with values from this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[div(a, b, result)](doc/markdown/./base.matrix3x3.div.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Divides two Matrix3x3's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[divBy(other)](doc/markdown/./base.matrix3x3.divby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Divide this matrix by a matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[getCol(col, result)](doc/markdown/./base.matrix3x3.getcol.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the values in a column as a Vector3
+
+
+</td></tr>
+<tr><td>
+
+[getRow(row, result)](doc/markdown/./base.matrix3x3.getrow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the values in a row as a Vector3
+
+
+</td></tr>
+<tr><td>
+
+[identity()](doc/markdown/./base.matrix3x3.identity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Make this matrix identity.
+
+
+</td></tr>
+<tr><td>
+
+[identity(result)](doc/markdown/./base.matrix3x3.identity.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates an identity Matrix3x3.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceInvert()](doc/markdown/./base.matrix3x3.inplaceinvert.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate the inverse of this matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[invert(matrix, result)](doc/markdown/./base.matrix3x3.invert.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Inverts a Matrix3x3
+
+
+</td></tr>
+<tr><td>
+
+[mul(a, b, result)](doc/markdown/./base.matrix3x3.mul.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiplys two Matrix3x3's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[mulBy(other)](doc/markdown/./base.matrix3x3.mulby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Multiplies this matrix by a matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[multiply(m1, m2, result)](doc/markdown/./base.matrix3x3.multiply.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Multiplies two Matrix3x3's
+
+
+</td></tr>
+<tr><td>
+
+[multiplyLeft(other)](doc/markdown/./base.matrix3x3.multiplyleft.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Pre-multiply by a matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[multiplyRight(other)](doc/markdown/./base.matrix3x3.multiplyright.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Post-multiply by a matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotation(axis, angle)](doc/markdown/./base.matrix3x3.rotation.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around a given axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotation(axis, angle, result)](doc/markdown/./base.matrix3x3.rotation.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix3x3 that presents a rotation around a given axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationX(angle)](doc/markdown/./base.matrix3x3.rotationx.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around x axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationX(angle, result)](doc/markdown/./base.matrix3x3.rotationx.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix3x3 that presents a rotation around x axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationY(angle)](doc/markdown/./base.matrix3x3.rotationy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around y axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationY(angle, result)](doc/markdown/./base.matrix3x3.rotationy.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix3x3 that presents a rotation around y axis.
+
+
+</td></tr>
+<tr><td>
+
+[rotationZ(angle)](doc/markdown/./base.matrix3x3.rotationz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates a rotation around z axis inplace.
+
+
+</td></tr>
+<tr><td>
+
+[rotationZ(angle, result)](doc/markdown/./base.matrix3x3.rotationz.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Creates a Matrix3x3 that presents a rotation around z axis.
+
+
+</td></tr>
+<tr><td>
+
+[scale(a, f, result)](doc/markdown/./base.matrix3x3.scale.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Scales a Matrix3x3 by a scalar number component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[scaleBy(f)](doc/markdown/./base.matrix3x3.scaleby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Scale this matrix by a scalar number component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[setCol(col, v)](doc/markdown/./base.matrix3x3.setcol.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a column in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setColXYZ(col, x, y, z)](doc/markdown/./base.matrix3x3.setcolxyz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a column in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setRow(row, v)](doc/markdown/./base.matrix3x3.setrow.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a row in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[setRowXYZ(row, x, y, z)](doc/markdown/./base.matrix3x3.setrowxyz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set values to a row in the matrix.
+
+
+</td></tr>
+<tr><td>
+
+[sub(a, b, result)](doc/markdown/./base.matrix3x3.sub.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Subtracts two Matrix3x3's component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[subBy(other)](doc/markdown/./base.matrix3x3.subby.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Subtract a matrix from this matrix component-wise.
+
+
+</td></tr>
+<tr><td>
+
+[transform(vec, result)](doc/markdown/./base.matrix3x3.transform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transformPoint(vec, result)](doc/markdown/./base.matrix3x3.transformpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transformVector(vec, result)](doc/markdown/./base.matrix3x3.transformvector.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Transform a vector by this matrix.
+
+
+</td></tr>
+<tr><td>
+
+[transpose()](doc/markdown/./base.matrix3x3.transpose.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate the transpose of this matrix inplace.
+
+
+</td></tr>
+<tr><td>
+
+[transpose(matrix, result)](doc/markdown/./base.matrix3x3.transpose.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Transpose a Matrix3x3.
+
+
+</td></tr>
+</tbody></table>
 

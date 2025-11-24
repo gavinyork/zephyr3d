@@ -14,12 +14,87 @@ drawText(text: string, x: number, y: number, color: string): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  text | string | The string that will be drawn |
-|  x | number | x coordinate in pixels related to the viewport origin |
-|  y | number | y coordinate in pixels related to the viewport origin |
-|  color | string | A CSS color value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+text
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The string that will be drawn
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+x coordinate in pixels related to the viewport origin
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+y coordinate in pixels related to the viewport origin
+
+
+</td></tr>
+<tr><td>
+
+color
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+A CSS color value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

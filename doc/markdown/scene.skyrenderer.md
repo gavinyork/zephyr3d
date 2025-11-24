@@ -9,42 +9,730 @@ The sky renderer
 **Signature:**
 
 ```typescript
-declare class SkyRenderer 
+declare class SkyRenderer extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.skyrenderer._constructor_.md) |  | Creates an instance of SkyRenderer |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.skyrenderer._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of SkyRenderer
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [aerialPerspectiveDensity](doc/markdown/./scene.skyrenderer.aerialperspectivedensity.md) |  | number | Aerial perspective density |
-|  [autoUpdateIBLMaps](doc/markdown/./scene.skyrenderer.autoupdateiblmaps.md) |  | boolean | Wether the IBL maps should be updated automatically. |
-|  [bakedSkyTexture](doc/markdown/./scene.skyrenderer.bakedskytexture.md) | <code>readonly</code> | [TextureCube](doc/markdown/./device.texturecube.md) | Baked sky texture |
-|  [cloudIntensity](doc/markdown/./scene.skyrenderer.cloudintensity.md) |  | number | Intensity of the sky color |
-|  [cloudy](doc/markdown/./scene.skyrenderer.cloudy.md) |  | number | Light density of the sky. |
-|  [drawGround](doc/markdown/./scene.skyrenderer.drawground.md) |  | boolean | Whether ground should be rendered |
-|  [fogColor](doc/markdown/./scene.skyrenderer.fogcolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The fog color if fog type is not scatter |
-|  [fogDensity](doc/markdown/./scene.skyrenderer.fogdensity.md) |  | number | Density of exp/exp2 fog |
-|  [fogEnd](doc/markdown/./scene.skyrenderer.fogend.md) |  | number | End distance of linear fog |
-|  [fogStart](doc/markdown/./scene.skyrenderer.fogstart.md) |  | number | Start distance of linear fog |
-|  [fogTop](doc/markdown/./scene.skyrenderer.fogtop.md) |  | number | Top distance of fog if fog type is not scatter |
-|  [fogType](doc/markdown/./scene.skyrenderer.fogtype.md) |  | [FogType](doc/markdown/./scene.fogtype.md) | Current fog type |
-|  [irradianceMap](doc/markdown/./scene.skyrenderer.irradiancemap.md) | <code>readonly</code> | [TextureCube](doc/markdown/./device.texturecube.md) | Irradiance map of the sky. |
-|  [radianceMap](doc/markdown/./scene.skyrenderer.radiancemap.md) | <code>readonly</code> | [TextureCube](doc/markdown/./device.texturecube.md) | Radiance map of the sky. |
-|  [skyboxTexture](doc/markdown/./scene.skyrenderer.skyboxtexture.md) |  | [TextureCube](doc/markdown/./device.texturecube.md) | Cube texture for skybox. |
-|  [skyColor](doc/markdown/./scene.skyrenderer.skycolor.md) |  | [Vector4](doc/markdown/./base.vector4.md) | The solid sky color |
-|  [skyType](doc/markdown/./scene.skyrenderer.skytype.md) |  | [SkyType](doc/markdown/./scene.skytype.md) | Which type of the sky should be rendered |
-|  [wind](doc/markdown/./scene.skyrenderer.wind.md) |  | [Vector2](doc/markdown/./base.vector2.md) | Wind velocity |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[aerialPerspectiveDistance](doc/markdown/./scene.skyrenderer.aerialperspectivedistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Aerial perspective density
+
+
+</td></tr>
+<tr><td>
+
+[atmosphereExposure](doc/markdown/./scene.skyrenderer.atmosphereexposure.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Atmosphere exposure
+
+
+</td></tr>
+<tr><td>
+
+[cameraHeightScale](doc/markdown/./scene.skyrenderer.cameraheightscale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Aerial perspective density
+
+
+</td></tr>
+<tr><td>
+
+[cloudIntensity](doc/markdown/./scene.skyrenderer.cloudintensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Intensity of the sky color
+
+
+</td></tr>
+<tr><td>
+
+[cloudy](doc/markdown/./scene.skyrenderer.cloudy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Light density of the sky.
+
+
+</td></tr>
+<tr><td>
+
+[envTextureFormat](doc/markdown/./scene.skyrenderer.envtextureformat.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+Gets the preferred environment texture format.
+
+
+</td></tr>
+<tr><td>
+
+[fogType](doc/markdown/./scene.skyrenderer.fogtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FogType](doc/markdown/./scene.fogtype.md)
+
+
+</td><td>
+
+Current fog type
+
+
+</td></tr>
+<tr><td>
+
+[heightFogAtmosphereContribution](doc/markdown/./scene.skyrenderer.heightfogatmospherecontribution.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog atmosphere contribution strength
+
+
+</td></tr>
+<tr><td>
+
+[heightFogColor](doc/markdown/./scene.skyrenderer.heightfogcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Height fog color
+
+
+</td></tr>
+<tr><td>
+
+[heightFogDensity](doc/markdown/./scene.skyrenderer.heightfogdensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog density
+
+
+</td></tr>
+<tr><td>
+
+[heightFogDirColor](doc/markdown/./scene.skyrenderer.heightfogdircolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Height fog directional inscattering color
+
+
+</td></tr>
+<tr><td>
+
+[heightFogDirExponent](doc/markdown/./scene.skyrenderer.heightfogdirexponent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog directional exponent
+
+
+</td></tr>
+<tr><td>
+
+[heightFogEndDistance](doc/markdown/./scene.skyrenderer.heightfogenddistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog end distance
+
+
+</td></tr>
+<tr><td>
+
+[heightFogFalloff](doc/markdown/./scene.skyrenderer.heightfogfalloff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog falloff
+
+
+</td></tr>
+<tr><td>
+
+[heightFogMaxOpacity](doc/markdown/./scene.skyrenderer.heightfogmaxopacity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog maximum opacity
+
+
+</td></tr>
+<tr><td>
+
+[heightFogStartDistance](doc/markdown/./scene.skyrenderer.heightfogstartdistance.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog start distance
+
+
+</td></tr>
+<tr><td>
+
+[heightFogStartHeight](doc/markdown/./scene.skyrenderer.heightfogstartheight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Height fog start height
+
+
+</td></tr>
+<tr><td>
+
+[irradianceConvSamples](doc/markdown/./scene.skyrenderer.irradianceconvsamples.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Sample count for irradiance convolution
+
+
+</td></tr>
+<tr><td>
+
+[irradianceSH](doc/markdown/./scene.skyrenderer.irradiancesh.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+Irradiance SH coeffecients buffer
+
+
+</td></tr>
+<tr><td>
+
+[irradianceSHFB](doc/markdown/./scene.skyrenderer.irradianceshfb.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Irradiance SH coeffecients texture
+
+
+</td></tr>
+<tr><td>
+
+[radianceConvSamples](doc/markdown/./scene.skyrenderer.radianceconvsamples.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Sample count for radiance convolution
+
+
+</td></tr>
+<tr><td>
+
+[radianceMap](doc/markdown/./scene.skyrenderer.radiancemap.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+Radiance map of the sky.
+
+
+</td></tr>
+<tr><td>
+
+[shWindowWeights](doc/markdown/./scene.skyrenderer.shwindowweights.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Window weights for SH projection
+
+
+</td></tr>
+<tr><td>
+
+[skyboxTexture](doc/markdown/./scene.skyrenderer.skyboxtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+Cube texture for skybox.
+
+
+</td></tr>
+<tr><td>
+
+[skyColor](doc/markdown/./scene.skyrenderer.skycolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector4](doc/markdown/./base.vector4.md)
+
+
+</td><td>
+
+The color used when sky type is `image`
+
+
+</td></tr>
+<tr><td>
+
+[skyImage](doc/markdown/./scene.skyrenderer.skyimage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The image used when sky type is `image`
+
+
+</td></tr>
+<tr><td>
+
+[skyType](doc/markdown/./scene.skyrenderer.skytype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SkyType](doc/markdown/./scene.skytype.md)
+
+
+</td><td>
+
+Which type of the sky should be rendered
+
+
+</td></tr>
+<tr><td>
+
+[wind](doc/markdown/./scene.skyrenderer.wind.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+Wind velocity
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [invalidateIBLMaps()](doc/markdown/./scene.skyrenderer.invalidateiblmaps.md) |  | Force the radiance map and irradiance map to be regenerated. |
-|  [updateIBLMaps(sunDir)](doc/markdown/./scene.skyrenderer.updateiblmaps.md) |  | Regenerate the radiance map and irradiance map |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getBakedSkyTexture(ctx)](doc/markdown/./scene.skyrenderer.getbakedskytexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Baked sky texture
+
+
+</td></tr>
+<tr><td>
+
+[invalidate()](doc/markdown/./scene.skyrenderer.invalidate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Force the radiance map and irradiance map to be regenerated.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.skyrenderer.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes resources of this SkyRenderer
+
+
+</td></tr>
+<tr><td>
+
+[renderAtmosphereLUTs(ctx)](doc/markdown/./scene.skyrenderer.renderatmosphereluts.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[renderSkyDistantLut(ctx, skybox)](doc/markdown/./scene.skyrenderer.renderskydistantlut.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[renderUberFog(camera, depthTexture)](doc/markdown/./scene.skyrenderer.renderuberfog.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[update(ctx)](doc/markdown/./scene.skyrenderer.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[updateBakedSkyMap(ctx)](doc/markdown/./scene.skyrenderer.updatebakedskymap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

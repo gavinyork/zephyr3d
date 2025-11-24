@@ -15,23 +15,176 @@ declare class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(elementType, dimension)](doc/markdown/./device.pbarraytypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBArrayTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(elementType, dimension)](doc/markdown/./device.pbarraytypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBArrayTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [dimension](doc/markdown/./device.pbarraytypeinfo.dimension.md) | <code>readonly</code> | number | Get dimension of the array type |
-|  [elementType](doc/markdown/./device.pbarraytypeinfo.elementtype.md) | <code>readonly</code> | [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) | Get the element type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[dimension](doc/markdown/./device.pbarraytypeinfo.dimension.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get dimension of the array type
+
+
+</td></tr>
+<tr><td>
+
+[elementType](doc/markdown/./device.pbarraytypeinfo.elementtype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) \| [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md)
+
+
+</td><td>
+
+Get the element type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [haveAtomicMembers()](doc/markdown/./device.pbarraytypeinfo.haveatomicmembers.md) |  | Wether array have atomic members |
-|  [isArrayType()](doc/markdown/./device.pbarraytypeinfo.isarraytype.md) |  | returns true if this is an array type |
-|  [isCompatibleType(other)](doc/markdown/./device.pbarraytypeinfo.iscompatibletype.md) |  |  |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbarraytypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[haveAtomicMembers()](doc/markdown/./device.pbarraytypeinfo.haveatomicmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Wether array have atomic members
+
+
+</td></tr>
+<tr><td>
+
+[isArrayType()](doc/markdown/./device.pbarraytypeinfo.isarraytype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an array type
+
+
+</td></tr>
+<tr><td>
+
+[isCompatibleType(other)](doc/markdown/./device.pbarraytypeinfo.iscompatibletype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbarraytypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

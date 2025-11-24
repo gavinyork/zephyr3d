@@ -9,26 +9,183 @@ Terrain grass material
 **Signature:**
 
 ```typescript
-declare class GrassMaterial extends GrassMaterial_base 
+declare class GrassMaterial extends GrassMaterial_base implements Clonable<GrassMaterial> 
 ```
 **Extends:** GrassMaterial\_base
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[GrassMaterial](doc/markdown/./scene.grassmaterial.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md) |  | Creates an instance of GrassMaterial class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(terrainSize, normalMap, grassTexture)](doc/markdown/./scene.grassmaterial._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of GrassMaterial class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx)](doc/markdown/./scene.grassmaterial.apply.md) |  |  |
-|  [applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.grassmaterial.applyuniformvalues.md) |  |  |
-|  [fragmentShader(scope)](doc/markdown/./scene.grassmaterial.fragmentshader.md) |  |  |
-|  [isTransparentPass(pass)](doc/markdown/./scene.grassmaterial.istransparentpass.md) |  | Determine if a certain pass of this material is translucent. |
-|  [supportInstancing()](doc/markdown/./scene.grassmaterial.supportinstancing.md) |  | Returns true if this material supports geometry instancing |
-|  [supportLighting()](doc/markdown/./scene.grassmaterial.supportlighting.md) |  | Returns true if shading of the material will be affected by lights |
-|  [updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.grassmaterial.updaterenderstates.md) | <code>protected</code> |  |
-|  [vertexShader(scope)](doc/markdown/./scene.grassmaterial.vertexshader.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx)](doc/markdown/./scene.grassmaterial.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[applyUniformValues(bindGroup, ctx, pass)](doc/markdown/./scene.grassmaterial.applyuniformvalues.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.grassmaterial.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[fragmentShader(scope)](doc/markdown/./scene.grassmaterial.fragmentshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isTransparentPass(\_pass)](doc/markdown/./scene.grassmaterial.istransparentpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether the given pass is transparent. Default returns true when `blendMode !== 'none'`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[supportInstancing()](doc/markdown/./scene.grassmaterial.supportinstancing.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material supports hardware instancing.
+
+Override and return `false` if per-instance data is not supported in the shader.
+
+
+</td></tr>
+<tr><td>
+
+[supportLighting()](doc/markdown/./scene.grassmaterial.supportlighting.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this material's shading is affected by scene lights.
+
+Override and return `false` for unlit materials.
+
+
+</td></tr>
+<tr><td>
+
+[updateRenderStates(pass, stateSet, ctx)](doc/markdown/./scene.grassmaterial.updaterenderstates.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexShader(scope)](doc/markdown/./scene.grassmaterial.vertexshader.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

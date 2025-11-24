@@ -6,214 +6,2210 @@
 
 ## Classes
 
-|  Class | Description |
-|  --- | --- |
-|  [CPUTimer](doc/markdown/./device.cputimer.md) | CPU timer class |
-|  [DeviceGPUObjectAddedEvent](doc/markdown/./device.devicegpuobjectaddedevent.md) | Event that will be fired when any gpu object is created |
-|  [DeviceGPUObjectRemovedEvent](doc/markdown/./device.devicegpuobjectremovedevent.md) | Event that will be fired when any gpu object is disposed |
-|  [DeviceGPUObjectRenameEvent](doc/markdown/./device.devicegpuobjectrenameevent.md) | Event that will be fired when any gpu object name is changed |
-|  [DeviceLostEvent](doc/markdown/./device.devicelostevent.md) | Event that will be fired when device is lost |
-|  [DeviceResizeEvent](doc/markdown/./device.deviceresizeevent.md) | Event that will be fired when size of back buffer has changed |
-|  [DeviceRestoreEvent](doc/markdown/./device.devicerestoreevent.md) | Event that will be fired when device has just been restored |
-|  [DrawText](doc/markdown/./device.drawtext.md) | Helper class to draw some text onto the screen |
-|  [Font](doc/markdown/./device.font.md) | The font class |
-|  [GlyphManager](doc/markdown/./device.glyphmanager.md) | Manager of texture glyphs |
-|  [PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md) | The void type info |
-|  [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) | The array type info |
-|  [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) | The atomic int type info |
-|  [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) | The atomic int type info |
-|  [PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md) | The builtin scope of a shader |
-|  [PBDoWhileScope](doc/markdown/./device.pbdowhilescope.md) | Scope that insides a do..while statement |
-|  [PBForScope](doc/markdown/./device.pbforscope.md) | Scope that insides a for statement |
-|  [PBFunctionScope](doc/markdown/./device.pbfunctionscope.md) | Scope that insides a function |
-|  [PBFunctionTypeInfo](doc/markdown/./device.pbfunctiontypeinfo.md) | The function type info |
-|  [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | The global scope of a shader |
-|  [PBIfScope](doc/markdown/./device.pbifscope.md) | Scope that insides an if statement |
-|  [PBInputScope](doc/markdown/./device.pbinputscope.md) | The input scope of a shader |
-|  [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Scope that is inside a function |
-|  [PBLocalScope](doc/markdown/./device.pblocalscope.md) | The local scope of a shader |
-|  [PBNakedScope](doc/markdown/./device.pbnakedscope.md) | A naked scope |
-|  [PBOutputScope](doc/markdown/./device.pboutputscope.md) | The output scope of a shader |
-|  [PBPointerTypeInfo](doc/markdown/./device.pbpointertypeinfo.md) | The pointer type info |
-|  [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) | The primitive type info |
-|  [PBReflection](doc/markdown/./device.pbreflection.md) | Reflection interface for program builder |
-|  [PBSamplerTypeInfo](doc/markdown/./device.pbsamplertypeinfo.md) | The sampler type info |
-|  [PBScope](doc/markdown/./device.pbscope.md) | Base class for scope of the shader program |
-|  [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | Base class for a expression in the shader |
-|  [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) | The struct type info |
-|  [PBTextureTypeInfo](doc/markdown/./device.pbtexturetypeinfo.md) | The texture type info |
-|  [PBVoidTypeInfo](doc/markdown/./device.pbvoidtypeinfo.md) | The void type info |
-|  [PBWhileScope](doc/markdown/./device.pbwhilescope.md) | Scope that insides a while statement |
-|  [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder class |
-|  [StructuredBufferData](doc/markdown/./device.structuredbufferdata.md) | Structured buffer data |
-|  [TextureAtlasManager](doc/markdown/./device.textureatlasmanager.md) | Texture atlas manager |
-|  [VertexData](doc/markdown/./device.vertexdata.md) | The vertex data class |
+<table><thead><tr><th>
+
+Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[CPUTimer](doc/markdown/./device.cputimer.md)
+
+
+</td><td>
+
+CPU timer class
+
+
+</td></tr>
+<tr><td>
+
+[DrawText](doc/markdown/./device.drawtext.md)
+
+
+</td><td>
+
+Helper class to draw some text onto the screen
+
+
+</td></tr>
+<tr><td>
+
+[Font](doc/markdown/./device.font.md)
+
+
+</td><td>
+
+The font class
+
+
+</td></tr>
+<tr><td>
+
+[GlyphManager](doc/markdown/./device.glyphmanager.md)
+
+
+</td><td>
+
+Manager of texture glyphs
+
+
+</td></tr>
+<tr><td>
+
+[PBAnyTypeInfo](doc/markdown/./device.pbanytypeinfo.md)
+
+
+</td><td>
+
+The void type info
+
+
+</td></tr>
+<tr><td>
+
+[PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md)
+
+
+</td><td>
+
+The array type info
+
+
+</td></tr>
+<tr><td>
+
+[PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md)
+
+
+</td><td>
+
+The atomic int type info
+
+
+</td></tr>
+<tr><td>
+
+[PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md)
+
+
+</td><td>
+
+The atomic int type info
+
+
+</td></tr>
+<tr><td>
+
+[PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md)
+
+
+</td><td>
+
+The builtin scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBDoWhileScope](doc/markdown/./device.pbdowhilescope.md)
+
+
+</td><td>
+
+Scope that insides a do..while statement
+
+
+</td></tr>
+<tr><td>
+
+[PBForScope](doc/markdown/./device.pbforscope.md)
+
+
+</td><td>
+
+Scope that insides a for statement
+
+
+</td></tr>
+<tr><td>
+
+[PBFunctionScope](doc/markdown/./device.pbfunctionscope.md)
+
+
+</td><td>
+
+Scope that insides a function
+
+
+</td></tr>
+<tr><td>
+
+[PBFunctionTypeInfo](doc/markdown/./device.pbfunctiontypeinfo.md)
+
+
+</td><td>
+
+The function type info
+
+
+</td></tr>
+<tr><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+The global scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBIfScope](doc/markdown/./device.pbifscope.md)
+
+
+</td><td>
+
+Scope that insides an if statement
+
+
+</td></tr>
+<tr><td>
+
+[PBInputScope](doc/markdown/./device.pbinputscope.md)
+
+
+</td><td>
+
+The input scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Scope that is inside a function
+
+
+</td></tr>
+<tr><td>
+
+[PBLocalScope](doc/markdown/./device.pblocalscope.md)
+
+
+</td><td>
+
+The local scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBNakedScope](doc/markdown/./device.pbnakedscope.md)
+
+
+</td><td>
+
+A naked scope
+
+
+</td></tr>
+<tr><td>
+
+[PBOutputScope](doc/markdown/./device.pboutputscope.md)
+
+
+</td><td>
+
+The output scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBPointerTypeInfo](doc/markdown/./device.pbpointertypeinfo.md)
+
+
+</td><td>
+
+The pointer type info
+
+
+</td></tr>
+<tr><td>
+
+[PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md)
+
+
+</td><td>
+
+The primitive type info
+
+
+</td></tr>
+<tr><td>
+
+[PBReflection](doc/markdown/./device.pbreflection.md)
+
+
+</td><td>
+
+Reflection interface for program builder
+
+
+</td></tr>
+<tr><td>
+
+[PBSamplerTypeInfo](doc/markdown/./device.pbsamplertypeinfo.md)
+
+
+</td><td>
+
+The sampler type info
+
+
+</td></tr>
+<tr><td>
+
+[PBScope](doc/markdown/./device.pbscope.md)
+
+
+</td><td>
+
+Base class for scope of the shader program
+
+
+</td></tr>
+<tr><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+Base class for a expression in the shader
+
+
+</td></tr>
+<tr><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+The struct type info
+
+
+</td></tr>
+<tr><td>
+
+[PBTextureTypeInfo](doc/markdown/./device.pbtexturetypeinfo.md)
+
+
+</td><td>
+
+The texture type info
+
+
+</td></tr>
+<tr><td>
+
+[PBVoidTypeInfo](doc/markdown/./device.pbvoidtypeinfo.md)
+
+
+</td><td>
+
+The void type info
+
+
+</td></tr>
+<tr><td>
+
+[PBWhileScope](doc/markdown/./device.pbwhilescope.md)
+
+
+</td><td>
+
+Scope that insides a while statement
+
+
+</td></tr>
+<tr><td>
+
+[Pool](doc/markdown/./device.pool.md)
+
+
+</td><td>
+
+ObjectPool class is responsible for managing and reusing textures and framebuffers.
+
+
+</td></tr>
+<tr><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+The program builder class
+
+
+</td></tr>
+<tr><td>
+
+[StructuredBufferData](doc/markdown/./device.structuredbufferdata.md)
+
+
+</td><td>
+
+Structured buffer data
+
+
+</td></tr>
+<tr><td>
+
+[TextureAtlasManager](doc/markdown/./device.textureatlasmanager.md)
+
+
+</td><td>
+
+Texture atlas manager
+
+
+</td></tr>
+<tr><td>
+
+[VertexData](doc/markdown/./device.vertexdata.md)
+
+
+</td><td>
+
+The vertex data class
+
+
+</td></tr>
+</tbody></table>
 
 ## Abstract Classes
 
-|  Abstract Class | Description |
-|  --- | --- |
-|  [BaseDevice](doc/markdown/./device.basedevice.md) | Base class for rendering device |
-|  [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Abstract base class for any type |
-|  [Proxiable](doc/markdown/./device.proxiable.md) | Base class for proxiable object |
+<table><thead><tr><th>
+
+Abstract Class
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[BaseDevice](doc/markdown/./device.basedevice.md)
+
+
+</td><td>
+
+Base class for rendering device
+
+
+</td></tr>
+<tr><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Abstract base class for any type
+
+
+</td></tr>
+<tr><td>
+
+[Proxiable](doc/markdown/./device.proxiable.md)
+
+
+</td><td>
+
+Base class for proxiable object
+
+
+</td></tr>
+</tbody></table>
 
 ## Enumerations
 
-|  Enumeration | Description |
-|  --- | --- |
-|  [GPUResourceUsageFlags](doc/markdown/./device.gpuresourceusageflags.md) | The gpu resource usage flags |
-|  [PBAddressSpace](doc/markdown/./device.pbaddressspace.md) | Shader variable address space |
-|  [PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md) | Primitive types |
-|  [PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md) | Sampler access mode |
-|  [PBTextureType](doc/markdown/./device.pbtexturetype.md) | Texture types |
-|  [ShaderType](doc/markdown/./device.shadertype.md) | Shader type |
+<table><thead><tr><th>
+
+Enumeration
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[GPUResourceUsageFlags](doc/markdown/./device.gpuresourceusageflags.md)
+
+
+</td><td>
+
+The gpu resource usage flags
+
+
+</td></tr>
+<tr><td>
+
+[PBAddressSpace](doc/markdown/./device.pbaddressspace.md)
+
+
+</td><td>
+
+Shader variable address space
+
+
+</td></tr>
+<tr><td>
+
+[PBPrimitiveType](doc/markdown/./device.pbprimitivetype.md)
+
+
+</td><td>
+
+Primitive types
+
+
+</td></tr>
+<tr><td>
+
+[PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md)
+
+
+</td><td>
+
+Sampler access mode
+
+
+</td></tr>
+<tr><td>
+
+[PBTextureType](doc/markdown/./device.pbtexturetype.md)
+
+
+</td><td>
+
+Texture types
+
+
+</td></tr>
+<tr><td>
+
+[ShaderType](doc/markdown/./device.shadertype.md)
+
+
+</td><td>
+
+Shader type
+
+
+</td></tr>
+</tbody></table>
 
 ## Functions
 
-|  Function | Description |
-|  --- | --- |
-|  [genDefaultName(obj)](doc/markdown/./device.gendefaultname.md) | Creates the default name for the type of given gpu object |
-|  [getTextureFormatBlockHeight(format)](doc/markdown/./device.gettextureformatblockheight.md) | Get block height of given texture format |
-|  [getTextureFormatBlockSize(format)](doc/markdown/./device.gettextureformatblocksize.md) | Get block size of given texture format |
-|  [getTextureFormatBlockWidth(format)](doc/markdown/./device.gettextureformatblockwidth.md) | Get block width of given texture format |
-|  [getVertexAttribByName(name)](doc/markdown/./device.getvertexattribbyname.md) | Get vertex attribute index by semantic |
-|  [getVertexAttribFormat(semantic, type, count)](doc/markdown/./device.getvertexattribformat.md) | Get vertex format by semantic and component type and component count |
-|  [getVertexAttribName(attrib)](doc/markdown/./device.getvertexattribname.md) | Get vertex semantic by attribute index |
-|  [getVertexBufferAttribType(vertexBufferType, attrib)](doc/markdown/./device.getvertexbufferattribtype.md) | Get primitive type of a vertex attribute by specified vertex attribute index |
-|  [getVertexBufferAttribTypeBySemantic(vertexBufferType, semantic)](doc/markdown/./device.getvertexbufferattribtypebysemantic.md) | Get primitive type of a vertex attribute by specified vertex semantic |
-|  [getVertexBufferLength(vertexBufferType)](doc/markdown/./device.getvertexbufferlength.md) | Get the length of a vertex buffer by specified structure type of the vertex buffer |
-|  [getVertexBufferStride(vertexBufferType)](doc/markdown/./device.getvertexbufferstride.md) | Get byte stride of a vertex buffer by specified structure type of the vertex buffer |
-|  [getVertexFormatComponentCount(fmt)](doc/markdown/./device.getvertexformatcomponentcount.md) | Get number of components of specified vertex format |
-|  [getVertexFormatSize(fmt)](doc/markdown/./device.getvertexformatsize.md) | Get byte size of specified vertex format |
-|  [hasAlphaChannel(format)](doc/markdown/./device.hasalphachannel.md) | Check if a given texture format contains an alpha channel. |
-|  [hasBlueChannel(format)](doc/markdown/./device.hasbluechannel.md) | Check if a given texture format contains a blue channel. |
-|  [hasDepthChannel(format)](doc/markdown/./device.hasdepthchannel.md) | Check if a given texture format contains a depth channel. |
-|  [hasGreenChannel(format)](doc/markdown/./device.hasgreenchannel.md) | Check if a given texture format contains a green channel. |
-|  [hasRedChannel(format)](doc/markdown/./device.hasredchannel.md) | Check if a given texture format contains a red channel. |
-|  [hasStencilChannel(format)](doc/markdown/./device.hasstencilchannel.md) | Check if a given texture format contains a stencil channel. |
-|  [isCompressedTextureFormat(format)](doc/markdown/./device.iscompressedtextureformat.md) | Check whether a given texture format is a compressed format. |
-|  [isFloatTextureFormat(format)](doc/markdown/./device.isfloattextureformat.md) | Check whether a given texture format is floating-point. |
-|  [isIntegerTextureFormat(format)](doc/markdown/./device.isintegertextureformat.md) | Check whether a given texture format is integer. |
-|  [isSignedTextureFormat(format)](doc/markdown/./device.issignedtextureformat.md) | Check whether a given texture format is signed. |
-|  [isSRGBTextureFormat(format)](doc/markdown/./device.issrgbtextureformat.md) | Check whether a given texture format is sRGB format. |
-|  [linearTextureFormatToSRGB(format)](doc/markdown/./device.lineartextureformattosrgb.md) | Converts a non-sRGB texture format to the corresponding sRGB texture format |
-|  [makeVertexBufferType(length, attributes)](doc/markdown/./device.makevertexbuffertype.md) | Get the structure type of a vertex buffer by specified vertex attribute formats and the length of the vertex buffer |
+<table><thead><tr><th>
+
+Function
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[genDefaultName(obj)](doc/markdown/./device.gendefaultname.md)
+
+
+</td><td>
+
+Creates the default name for the type of given gpu object
+
+
+</td></tr>
+<tr><td>
+
+[getTextureFormatBlockHeight(format)](doc/markdown/./device.gettextureformatblockheight.md)
+
+
+</td><td>
+
+Get block height of given texture format
+
+
+</td></tr>
+<tr><td>
+
+[getTextureFormatBlockSize(format)](doc/markdown/./device.gettextureformatblocksize.md)
+
+
+</td><td>
+
+Get block size of given texture format
+
+
+</td></tr>
+<tr><td>
+
+[getTextureFormatBlockWidth(format)](doc/markdown/./device.gettextureformatblockwidth.md)
+
+
+</td><td>
+
+Get block width of given texture format
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttribByName(name)](doc/markdown/./device.getvertexattribbyname.md)
+
+
+</td><td>
+
+Get vertex attribute index by semantic
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttribFormat(semantic, type, count)](doc/markdown/./device.getvertexattribformat.md)
+
+
+</td><td>
+
+Get vertex format by semantic and component type and component count
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttribName(attrib)](doc/markdown/./device.getvertexattribname.md)
+
+
+</td><td>
+
+Get vertex semantic by attribute index
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttributeFormat(fmt)](doc/markdown/./device.getvertexattributeformat.md)
+
+
+</td><td>
+
+Get vertex attribute type of specified vertex format
+
+
+</td></tr>
+<tr><td>
+
+[getVertexAttributeIndex(fmt)](doc/markdown/./device.getvertexattributeindex.md)
+
+
+</td><td>
+
+Get vertex attribute index of specified vertex format
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferAttribType(vertexBufferType, attrib)](doc/markdown/./device.getvertexbufferattribtype.md)
+
+
+</td><td>
+
+Get primitive type of a vertex attribute by specified vertex attribute index
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferAttribTypeBySemantic(vertexBufferType, semantic)](doc/markdown/./device.getvertexbufferattribtypebysemantic.md)
+
+
+</td><td>
+
+Get primitive type of a vertex attribute by specified vertex semantic
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferLength(vertexBufferType)](doc/markdown/./device.getvertexbufferlength.md)
+
+
+</td><td>
+
+Get the length of a vertex buffer by specified structure type of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferStride(vertexBufferType)](doc/markdown/./device.getvertexbufferstride.md)
+
+
+</td><td>
+
+Get byte stride of a vertex buffer by specified structure type of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[getVertexFormatComponentCount(fmt)](doc/markdown/./device.getvertexformatcomponentcount.md)
+
+
+</td><td>
+
+Get number of components of specified vertex format
+
+
+</td></tr>
+<tr><td>
+
+[getVertexFormatSize(fmt)](doc/markdown/./device.getvertexformatsize.md)
+
+
+</td><td>
+
+Get byte size of specified vertex format
+
+
+</td></tr>
+<tr><td>
+
+[hasAlphaChannel(format)](doc/markdown/./device.hasalphachannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains an alpha channel.
+
+
+</td></tr>
+<tr><td>
+
+[hasBlueChannel(format)](doc/markdown/./device.hasbluechannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains a blue channel.
+
+
+</td></tr>
+<tr><td>
+
+[hasDepthChannel(format)](doc/markdown/./device.hasdepthchannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains a depth channel.
+
+
+</td></tr>
+<tr><td>
+
+[hasGreenChannel(format)](doc/markdown/./device.hasgreenchannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains a green channel.
+
+
+</td></tr>
+<tr><td>
+
+[hasRedChannel(format)](doc/markdown/./device.hasredchannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains a red channel.
+
+
+</td></tr>
+<tr><td>
+
+[hasStencilChannel(format)](doc/markdown/./device.hasstencilchannel.md)
+
+
+</td><td>
+
+Check if a given texture format contains a stencil channel.
+
+
+</td></tr>
+<tr><td>
+
+[isCompressedTextureFormat(format)](doc/markdown/./device.iscompressedtextureformat.md)
+
+
+</td><td>
+
+Check whether a given texture format is a compressed format.
+
+
+</td></tr>
+<tr><td>
+
+[isFloatTextureFormat(format)](doc/markdown/./device.isfloattextureformat.md)
+
+
+</td><td>
+
+Check whether a given texture format is floating-point.
+
+
+</td></tr>
+<tr><td>
+
+[isIntegerTextureFormat(format)](doc/markdown/./device.isintegertextureformat.md)
+
+
+</td><td>
+
+Check whether a given texture format is integer.
+
+
+</td></tr>
+<tr><td>
+
+[isSignedTextureFormat(format)](doc/markdown/./device.issignedtextureformat.md)
+
+
+</td><td>
+
+Check whether a given texture format is signed.
+
+
+</td></tr>
+<tr><td>
+
+[isSRGBTextureFormat(format)](doc/markdown/./device.issrgbtextureformat.md)
+
+
+</td><td>
+
+Check whether a given texture format is sRGB format.
+
+
+</td></tr>
+<tr><td>
+
+[linearTextureFormatToSRGB(format)](doc/markdown/./device.lineartextureformattosrgb.md)
+
+
+</td><td>
+
+Converts a non-sRGB texture format to the corresponding sRGB texture format
+
+
+</td></tr>
+<tr><td>
+
+[makeVertexBufferType(length, attributes)](doc/markdown/./device.makevertexbuffertype.md)
+
+
+</td><td>
+
+Get the structure type of a vertex buffer by specified vertex attribute formats and the length of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+[matchVertexBuffer(buffer, name)](doc/markdown/./device.matchvertexbuffer.md)
+
+
+</td><td>
+
+Test whether a vertex buffer matches given semantic
+
+
+</td></tr>
+</tbody></table>
 
 ## Interfaces
 
-|  Interface | Description |
-|  --- | --- |
-|  [AbstractDevice](doc/markdown/./device.abstractdevice.md) | Abstract interface for the rendering device. |
-|  [ArrayTypeDetail](doc/markdown/./device.arraytypedetail.md) | Detail informations for array type |
-|  [AtlasInfo](doc/markdown/./device.atlasinfo.md) | Information of a texture atlas |
-|  [AtomicTypeInfoDetail](doc/markdown/./device.atomictypeinfodetail.md) | Detail information for atomic type |
-|  [BaseCreationOptions](doc/markdown/./device.basecreationoptions.md) | Common options for createing texture or buffer |
-|  [BaseDevice](doc/markdown/./device.basedevice.md) | Merge event target interface |
-|  [BaseTexture](doc/markdown/./device.basetexture.md) | Abstract interface for texture |
-|  [BindGroup](doc/markdown/./device.bindgroup.md) | Abstract interface for bind group |
-|  [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md) | Defines how the resources bound in a [BindGroup](doc/markdown/./device.bindgroup.md) |
-|  [BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md) | Information of bind group entries |
-|  [BindPointInfo](doc/markdown/./device.bindpointinfo.md) | Binding point information for a uniform |
-|  [BlendingState](doc/markdown/./device.blendingstate.md) | The render states related to alpha blending |
-|  [BufferBindingLayout](doc/markdown/./device.bufferbindinglayout.md) | Binding layout of a uniform buffer or storage buffer |
-|  [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) | Options for creating gpu buffer |
-|  [ColorState](doc/markdown/./device.colorstate.md) | The render states related to the fragment output |
-|  [ComputeProgramConstructParams](doc/markdown/./device.computeprogramconstructparams.md) | Creation options of computing shader program |
-|  [DepthState](doc/markdown/./device.depthstate.md) | The render states related to depth buffer |
-|  [DeviceBackend](doc/markdown/./device.devicebackend.md) | The device backend interface |
-|  [DeviceCaps](doc/markdown/./device.devicecaps.md) | The device capabilities |
-|  [DeviceOptions](doc/markdown/./device.deviceoptions.md) | Creation options for device |
-|  [ExternalTextureBindingLayout](doc/markdown/./device.externaltexturebindinglayout.md) | Binding layout of an external texture |
-|  [FrameBuffer](doc/markdown/./device.framebuffer.md) | Abstract interface for frame buffer |
-|  [FramebufferCaps](doc/markdown/./device.framebuffercaps.md) | Frame buffer related capabilities of the device |
-|  [FrameBufferOptions](doc/markdown/./device.framebufferoptions.md) | The frame buffer creation options |
-|  [FrameBufferTextureAttachment](doc/markdown/./device.framebuffertextureattachment.md) | Frame buffer texture attachment information |
-|  [FrameInfo](doc/markdown/./device.frameinfo.md) | Frame information |
-|  [FunctionTypeDetail](doc/markdown/./device.functiontypedetail.md) | Detail information for a function type |
-|  [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) | Abstract interface for GPU buffer |
-|  [GPUObject](doc/markdown/./device.gpuobject.md) | Base class for a GPU object |
-|  [GPUObjectList](doc/markdown/./device.gpuobjectlist.md) | List of all gpu objects |
-|  [GPUProgram](doc/markdown/./device.gpuprogram.md) | Abstract interface for GPU program |
-|  [GPUProgramConstructParams](doc/markdown/./device.gpuprogramconstructparams.md) | Creation options for shader program |
-|  [IndexBuffer](doc/markdown/./device.indexbuffer.md) | Abstract interface for index buffer |
-|  [ITimer](doc/markdown/./device.itimer.md) | Abstract timer interface |
-|  [MiscCaps](doc/markdown/./device.misccaps.md) | Miscellaneous capabilities of the device |
-|  [PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md) | The builtin scope of a shader |
-|  [PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md) | Compute program build options |
-|  [PBRenderOptions](doc/markdown/./device.pbrenderoptions.md) | Render program build options |
-|  [PointerTypeDetail](doc/markdown/./device.pointertypedetail.md) | Detail informations for pointer type |
-|  [PrimitiveTypeDetail](doc/markdown/./device.primitivetypedetail.md) | Detail informations for primitive type |
-|  [ProgramBuilder](doc/markdown/./device.programbuilder.md) | The program builder interface |
-|  [RasterizerState](doc/markdown/./device.rasterizerstate.md) | The render states related to primitive rasterization |
-|  [RenderProgramConstructParams](doc/markdown/./device.renderprogramconstructparams.md) | Creation options of rendering shader program |
-|  [RenderStateSet](doc/markdown/./device.renderstateset.md) | Set of the render statements |
-|  [SamplerBindingLayout](doc/markdown/./device.samplerbindinglayout.md) | Binding layout of a sampler |
-|  [SamplerOptions](doc/markdown/./device.sampleroptions.md) | Sampler creation options |
-|  [SamplerTypeDetail](doc/markdown/./device.samplertypedetail.md) | Detail informations for sampler type |
-|  [ShaderCaps](doc/markdown/./device.shadercaps.md) | Shader related capabilities of the device |
-|  [ShaderExpTagRecord](doc/markdown/./device.shaderexptagrecord.md) |  |
-|  [StencilState](doc/markdown/./device.stencilstate.md) | The render states related to the stencil buffer |
-|  [StorageTextureBindingLayout](doc/markdown/./device.storagetexturebindinglayout.md) | Binding layout of a storage texture |
-|  [StructTypeDetail](doc/markdown/./device.structtypedetail.md) | Detail informations for struct type |
-|  [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) | Abstract interface for structured buffer |
-|  [Texture2D](doc/markdown/./device.texture2d.md) | Abstract interface for 2D texture |
-|  [Texture2DArray](doc/markdown/./device.texture2darray.md) | Abstract interface for 2D array texture |
-|  [Texture3D](doc/markdown/./device.texture3d.md) | Abstract interface for 3D texture |
-|  [TextureBindingLayout](doc/markdown/./device.texturebindinglayout.md) | Binding layout of a texture for sampling |
-|  [TextureCaps](doc/markdown/./device.texturecaps.md) | Texture related capabilities of the device' |
-|  [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | Options for creating texture |
-|  [TextureCube](doc/markdown/./device.texturecube.md) | Abstract interface for cube texture |
-|  [TextureFormatInfo](doc/markdown/./device.textureformatinfo.md) | Information of a texture format |
-|  [TextureMipmapData](doc/markdown/./device.texturemipmapdata.md) | A data structure that holds the texture data of all mipmap levels |
-|  [TextureMipmapLevelData](doc/markdown/./device.texturemipmapleveldata.md) | A data structure that holds the texture data of a mipmap level |
-|  [TextureSampler](doc/markdown/./device.texturesampler.md) | Abstract interface for texture sampler |
-|  [TextureTypeDetail](doc/markdown/./device.texturetypedetail.md) | Detail informations for texture type |
-|  [TextureVideo](doc/markdown/./device.texturevideo.md) | Abstract interface for video texture |
-|  [UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md) | The uniform buffer layout |
-|  [UniformLayout](doc/markdown/./device.uniformlayout.md) | Layout of a uniform in a uniform buffer |
-|  [VertexLayout](doc/markdown/./device.vertexlayout.md) | Abstract interface for vertex layout |
+<table><thead><tr><th>
+
+Interface
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[AbstractDevice](doc/markdown/./device.abstractdevice.md)
+
+
+</td><td>
+
+Abstract interface for the rendering device.
+
+
+</td></tr>
+<tr><td>
+
+[ArrayTypeDetail](doc/markdown/./device.arraytypedetail.md)
+
+
+</td><td>
+
+Detail informations for array type
+
+
+</td></tr>
+<tr><td>
+
+[AtlasInfo](doc/markdown/./device.atlasinfo.md)
+
+
+</td><td>
+
+Information of a texture atlas
+
+
+</td></tr>
+<tr><td>
+
+[AtomicTypeInfoDetail](doc/markdown/./device.atomictypeinfodetail.md)
+
+
+</td><td>
+
+Detail information for atomic type
+
+
+</td></tr>
+<tr><td>
+
+[BaseCreationOptions](doc/markdown/./device.basecreationoptions.md)
+
+
+</td><td>
+
+Common options for createing texture or buffer
+
+
+</td></tr>
+<tr><td>
+
+[BaseDevice](doc/markdown/./device.basedevice.md)
+
+
+</td><td>
+
+Merge event target interface
+
+
+</td></tr>
+<tr><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+Abstract interface for texture
+
+
+</td></tr>
+<tr><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+Abstract interface for bind group
+
+
+</td></tr>
+<tr><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)
+
+
+</td><td>
+
+Defines how the resources bound in a [BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td></tr>
+<tr><td>
+
+[BindGroupLayoutEntry](doc/markdown/./device.bindgrouplayoutentry.md)
+
+
+</td><td>
+
+Information of bind group entries
+
+
+</td></tr>
+<tr><td>
+
+[BindPointInfo](doc/markdown/./device.bindpointinfo.md)
+
+
+</td><td>
+
+Binding point information for a uniform
+
+
+</td></tr>
+<tr><td>
+
+[BlendingState](doc/markdown/./device.blendingstate.md)
+
+
+</td><td>
+
+The render states related to alpha blending
+
+
+</td></tr>
+<tr><td>
+
+[BufferBindingLayout](doc/markdown/./device.bufferbindinglayout.md)
+
+
+</td><td>
+
+Binding layout of a uniform buffer or storage buffer
+
+
+</td></tr>
+<tr><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+Options for creating gpu buffer
+
+
+</td></tr>
+<tr><td>
+
+[ColorState](doc/markdown/./device.colorstate.md)
+
+
+</td><td>
+
+The render states related to the fragment output
+
+
+</td></tr>
+<tr><td>
+
+[ComputeProgramConstructParams](doc/markdown/./device.computeprogramconstructparams.md)
+
+
+</td><td>
+
+Creation options of computing shader program
+
+
+</td></tr>
+<tr><td>
+
+[DepthState](doc/markdown/./device.depthstate.md)
+
+
+</td><td>
+
+The render states related to depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[DeviceBackend](doc/markdown/./device.devicebackend.md)
+
+
+</td><td>
+
+The device backend interface
+
+
+</td></tr>
+<tr><td>
+
+[DeviceCaps](doc/markdown/./device.devicecaps.md)
+
+
+</td><td>
+
+The device capabilities
+
+
+</td></tr>
+<tr><td>
+
+[DeviceOptions](doc/markdown/./device.deviceoptions.md)
+
+
+</td><td>
+
+Creation options for device
+
+
+</td></tr>
+<tr><td>
+
+[ExternalTextureBindingLayout](doc/markdown/./device.externaltexturebindinglayout.md)
+
+
+</td><td>
+
+Binding layout of an external texture
+
+
+</td></tr>
+<tr><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+Abstract interface for frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[FramebufferCaps](doc/markdown/./device.framebuffercaps.md)
+
+
+</td><td>
+
+Frame buffer related capabilities of the device
+
+
+</td></tr>
+<tr><td>
+
+[FrameBufferOptions](doc/markdown/./device.framebufferoptions.md)
+
+
+</td><td>
+
+The frame buffer creation options
+
+
+</td></tr>
+<tr><td>
+
+[FrameBufferTextureAttachment](doc/markdown/./device.framebuffertextureattachment.md)
+
+
+</td><td>
+
+Frame buffer texture attachment information
+
+
+</td></tr>
+<tr><td>
+
+[FrameInfo](doc/markdown/./device.frameinfo.md)
+
+
+</td><td>
+
+Frame information
+
+
+</td></tr>
+<tr><td>
+
+[FunctionTypeDetail](doc/markdown/./device.functiontypedetail.md)
+
+
+</td><td>
+
+Detail information for a function type
+
+
+</td></tr>
+<tr><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+Abstract interface for GPU buffer
+
+
+</td></tr>
+<tr><td>
+
+[GPUObject](doc/markdown/./device.gpuobject.md)
+
+
+</td><td>
+
+Base class for a GPU object
+
+
+</td></tr>
+<tr><td>
+
+[GPUObjectList](doc/markdown/./device.gpuobjectlist.md)
+
+
+</td><td>
+
+List of all gpu objects
+
+
+</td></tr>
+<tr><td>
+
+[GPUProgram](doc/markdown/./device.gpuprogram.md)
+
+
+</td><td>
+
+Abstract interface for GPU program
+
+
+</td></tr>
+<tr><td>
+
+[GPUProgramConstructParams](doc/markdown/./device.gpuprogramconstructparams.md)
+
+
+</td><td>
+
+Creation options for shader program
+
+
+</td></tr>
+<tr><td>
+
+[IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+
+</td><td>
+
+Abstract interface for index buffer
+
+
+</td></tr>
+<tr><td>
+
+[ITimer](doc/markdown/./device.itimer.md)
+
+
+</td><td>
+
+Abstract timer interface
+
+
+</td></tr>
+<tr><td>
+
+[MiscCaps](doc/markdown/./device.misccaps.md)
+
+
+</td><td>
+
+Miscellaneous capabilities of the device
+
+
+</td></tr>
+<tr><td>
+
+[PBBuiltinScope](doc/markdown/./device.pbbuiltinscope.md)
+
+
+</td><td>
+
+The builtin scope of a shader
+
+
+</td></tr>
+<tr><td>
+
+[PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md)
+
+
+</td><td>
+
+Compute program build options
+
+
+</td></tr>
+<tr><td>
+
+[PBRenderOptions](doc/markdown/./device.pbrenderoptions.md)
+
+
+</td><td>
+
+Render program build options
+
+
+</td></tr>
+<tr><td>
+
+[PointerTypeDetail](doc/markdown/./device.pointertypedetail.md)
+
+
+</td><td>
+
+Detail informations for pointer type
+
+
+</td></tr>
+<tr><td>
+
+[PrimitiveTypeDetail](doc/markdown/./device.primitivetypedetail.md)
+
+
+</td><td>
+
+Detail informations for primitive type
+
+
+</td></tr>
+<tr><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+The program builder interface
+
+
+</td></tr>
+<tr><td>
+
+[RasterizerState](doc/markdown/./device.rasterizerstate.md)
+
+
+</td><td>
+
+The render states related to primitive rasterization
+
+
+</td></tr>
+<tr><td>
+
+[RenderProgramConstructParams](doc/markdown/./device.renderprogramconstructparams.md)
+
+
+</td><td>
+
+Creation options of rendering shader program
+
+
+</td></tr>
+<tr><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+Set of the render statements
+
+
+</td></tr>
+<tr><td>
+
+[SamplerBindingLayout](doc/markdown/./device.samplerbindinglayout.md)
+
+
+</td><td>
+
+Binding layout of a sampler
+
+
+</td></tr>
+<tr><td>
+
+[SamplerOptions](doc/markdown/./device.sampleroptions.md)
+
+
+</td><td>
+
+Sampler creation options
+
+
+</td></tr>
+<tr><td>
+
+[SamplerTypeDetail](doc/markdown/./device.samplertypedetail.md)
+
+
+</td><td>
+
+Detail informations for sampler type
+
+
+</td></tr>
+<tr><td>
+
+[ShaderCaps](doc/markdown/./device.shadercaps.md)
+
+
+</td><td>
+
+Shader related capabilities of the device
+
+
+</td></tr>
+<tr><td>
+
+[ShaderExpTagRecord](doc/markdown/./device.shaderexptagrecord.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[StencilState](doc/markdown/./device.stencilstate.md)
+
+
+</td><td>
+
+The render states related to the stencil buffer
+
+
+</td></tr>
+<tr><td>
+
+[StorageTextureBindingLayout](doc/markdown/./device.storagetexturebindinglayout.md)
+
+
+</td><td>
+
+Binding layout of a storage texture
+
+
+</td></tr>
+<tr><td>
+
+[StructTypeDetail](doc/markdown/./device.structtypedetail.md)
+
+
+</td><td>
+
+Detail informations for struct type
+
+
+</td></tr>
+<tr><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
+
+
+</td><td>
+
+Abstract interface for structured buffer
+
+
+</td></tr>
+<tr><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+Abstract interface for 2D texture
+
+
+</td></tr>
+<tr><td>
+
+[Texture2DArray](doc/markdown/./device.texture2darray.md)
+
+
+</td><td>
+
+Abstract interface for 2D array texture
+
+
+</td></tr>
+<tr><td>
+
+[Texture3D](doc/markdown/./device.texture3d.md)
+
+
+</td><td>
+
+Abstract interface for 3D texture
+
+
+</td></tr>
+<tr><td>
+
+[TextureBindingLayout](doc/markdown/./device.texturebindinglayout.md)
+
+
+</td><td>
+
+Binding layout of a texture for sampling
+
+
+</td></tr>
+<tr><td>
+
+[TextureCaps](doc/markdown/./device.texturecaps.md)
+
+
+</td><td>
+
+Texture related capabilities of the device'
+
+
+</td></tr>
+<tr><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+Options for creating texture
+
+
+</td></tr>
+<tr><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+Abstract interface for cube texture
+
+
+</td></tr>
+<tr><td>
+
+[TextureFormatInfo](doc/markdown/./device.textureformatinfo.md)
+
+
+</td><td>
+
+Information of a texture format
+
+
+</td></tr>
+<tr><td>
+
+[TextureMipmapData](doc/markdown/./device.texturemipmapdata.md)
+
+
+</td><td>
+
+A data structure that holds the texture data of all mipmap levels
+
+
+</td></tr>
+<tr><td>
+
+[TextureMipmapLevelData](doc/markdown/./device.texturemipmapleveldata.md)
+
+
+</td><td>
+
+A data structure that holds the texture data of a mipmap level
+
+
+</td></tr>
+<tr><td>
+
+[TextureSampler](doc/markdown/./device.texturesampler.md)
+
+
+</td><td>
+
+Abstract interface for texture sampler
+
+
+</td></tr>
+<tr><td>
+
+[TextureTypeDetail](doc/markdown/./device.texturetypedetail.md)
+
+
+</td><td>
+
+Detail informations for texture type
+
+
+</td></tr>
+<tr><td>
+
+[TextureVideo](doc/markdown/./device.texturevideo.md)
+
+
+</td><td>
+
+Abstract interface for video texture
+
+
+</td></tr>
+<tr><td>
+
+[UniformBufferLayout](doc/markdown/./device.uniformbufferlayout.md)
+
+
+</td><td>
+
+The uniform buffer layout
+
+
+</td></tr>
+<tr><td>
+
+[UniformLayout](doc/markdown/./device.uniformlayout.md)
+
+
+</td><td>
+
+Layout of a uniform in a uniform buffer
+
+
+</td></tr>
+<tr><td>
+
+[VertexLayout](doc/markdown/./device.vertexlayout.md)
+
+
+</td><td>
+
+Abstract interface for vertex layout
+
+
+</td></tr>
+</tbody></table>
 
 ## Variables
 
-|  Variable | Description |
-|  --- | --- |
-|  [semanticList](doc/markdown/./device.semanticlist.md) | Vertex semantic list |
+<table><thead><tr><th>
+
+Variable
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[MAX\_BINDING\_GROUPS](doc/markdown/./device.max_binding_groups.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[MAX\_TEXCOORD\_INDEX\_COUNT](doc/markdown/./device.max_texcoord_index_count.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[MAX\_VERTEX\_ATTRIBUTES](doc/markdown/./device.max_vertex_attributes.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[semanticList](doc/markdown/./device.semanticlist.md)
+
+
+</td><td>
+
+Vertex semantic list
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_BLEND\_INDICES](doc/markdown/./device.vertex_attrib_blend_indices.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_BLEND\_WEIGHT](doc/markdown/./device.vertex_attrib_blend_weight.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_DIFFUSE](doc/markdown/./device.vertex_attrib_diffuse.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_NORMAL](doc/markdown/./device.vertex_attrib_normal.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_POSITION](doc/markdown/./device.vertex_attrib_position.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TANGENT](doc/markdown/./device.vertex_attrib_tangent.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD0](doc/markdown/./device.vertex_attrib_texcoord0.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD1](doc/markdown/./device.vertex_attrib_texcoord1.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD2](doc/markdown/./device.vertex_attrib_texcoord2.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD3](doc/markdown/./device.vertex_attrib_texcoord3.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD4](doc/markdown/./device.vertex_attrib_texcoord4.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD5](doc/markdown/./device.vertex_attrib_texcoord5.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD6](doc/markdown/./device.vertex_attrib_texcoord6.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[VERTEX\_ATTRIB\_TEXCOORD7](doc/markdown/./device.vertex_attrib_texcoord7.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+</tbody></table>
 
 ## Type Aliases
 
-|  Type Alias | Description |
-|  --- | --- |
-|  [BlendEquation](doc/markdown/./device.blendequation.md) | Type of the alpha blending equations |
-|  [BlendFunc](doc/markdown/./device.blendfunc.md) | Type of the blending functions |
-|  [BufferUsage](doc/markdown/./device.bufferusage.md) | Buffer usage type |
-|  [CompareFunc](doc/markdown/./device.comparefunc.md) | The comparison function type |
-|  [DataType](doc/markdown/./device.datatype.md) | Scalar data type |
-|  [DeviceEventMap](doc/markdown/./device.deviceeventmap.md) | The device event map |
-|  [DeviceViewport](doc/markdown/./device.deviceviewport.md) | Structure that contains the device viewport information |
-|  [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | Non-array value type of shader expression |
-|  [ExpValueType](doc/markdown/./device.expvaluetype.md) | Value type for shader of shader expression |
-|  [FaceMode](doc/markdown/./device.facemode.md) | The face mode |
-|  [FaceWinding](doc/markdown/./device.facewinding.md) | The type of face winding |
-|  [PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md) | Shader variable getter function type |
-|  [PBStructLayout](doc/markdown/./device.pbstructlayout.md) | Struct layout types |
-|  [PrimitiveType](doc/markdown/./device.primitivetype.md) | The primitive type |
-|  [RenderBundle](doc/markdown/./device.renderbundle.md) | Render bundle |
-|  [ShaderExpTagValue](doc/markdown/./device.shaderexptagvalue.md) |  |
-|  [ShaderKind](doc/markdown/./device.shaderkind.md) | Shader kind |
-|  [ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md) | type of a shader variable constructor |
-|  [StencilOp](doc/markdown/./device.stencilop.md) | Stencil operations |
-|  [StructuredValue](doc/markdown/./device.structuredvalue.md) | Type of values that can be set to a structured buffer |
-|  [TextureAddressMode](doc/markdown/./device.textureaddressmode.md) | The texture address mode |
-|  [TextureColorSpace](doc/markdown/./device.texturecolorspace.md) | Supported colorspace types for texture |
-|  [TextureFilterMode](doc/markdown/./device.texturefiltermode.md) | The texture filter mode |
-|  [TextureFormat](doc/markdown/./device.textureformat.md) | Texture format type |
-|  [TextureImageElement](doc/markdown/./device.textureimageelement.md) | The types of image element that can be uploaded to textures |
-|  [TextureType](doc/markdown/./device.texturetype.md) | The texture type |
-|  [TypeDetailInfo](doc/markdown/./device.typedetailinfo.md) | Type detail information |
-|  [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md) | The vertex format types |
-|  [VertexBufferInfo](doc/markdown/./device.vertexbufferinfo.md) | Vertex buffer information |
-|  [VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md) | Options for creating vertex layout |
-|  [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The semantic type of vertex |
-|  [VertexStepMode](doc/markdown/./device.vertexstepmode.md) | Vertex step mode. |
-|  [WebGLContext](doc/markdown/./device.webglcontext.md) | The webgl context type |
+<table><thead><tr><th>
+
+Type Alias
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[BlendEquation](doc/markdown/./device.blendequation.md)
+
+
+</td><td>
+
+Type of the alpha blending equations
+
+
+</td></tr>
+<tr><td>
+
+[BlendFunc](doc/markdown/./device.blendfunc.md)
+
+
+</td><td>
+
+Type of the blending functions
+
+
+</td></tr>
+<tr><td>
+
+[BufferUsage](doc/markdown/./device.bufferusage.md)
+
+
+</td><td>
+
+Buffer usage type
+
+
+</td></tr>
+<tr><td>
+
+[CompareFunc](doc/markdown/./device.comparefunc.md)
+
+
+</td><td>
+
+The comparison function type
+
+
+</td></tr>
+<tr><td>
+
+[DataType](doc/markdown/./device.datatype.md)
+
+
+</td><td>
+
+Scalar data type
+
+
+</td></tr>
+<tr><td>
+
+[DeviceEventMap](doc/markdown/./device.deviceeventmap.md)
+
+
+</td><td>
+
+The device event map
+
+
+</td></tr>
+<tr><td>
+
+[DeviceViewport](doc/markdown/./device.deviceviewport.md)
+
+
+</td><td>
+
+Structure that contains the device viewport information
+
+
+</td></tr>
+<tr><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+Non-array value type of shader expression
+
+
+</td></tr>
+<tr><td>
+
+[ExpValueType](doc/markdown/./device.expvaluetype.md)
+
+
+</td><td>
+
+Value type for shader of shader expression
+
+
+</td></tr>
+<tr><td>
+
+[FaceMode](doc/markdown/./device.facemode.md)
+
+
+</td><td>
+
+The face mode
+
+
+</td></tr>
+<tr><td>
+
+[FaceWinding](doc/markdown/./device.facewinding.md)
+
+
+</td><td>
+
+The type of face winding
+
+
+</td></tr>
+<tr><td>
+
+[PBReflectionTagGetter](doc/markdown/./device.pbreflectiontaggetter.md)
+
+
+</td><td>
+
+Shader variable getter function type
+
+
+</td></tr>
+<tr><td>
+
+[PBStructLayout](doc/markdown/./device.pbstructlayout.md)
+
+
+</td><td>
+
+Struct layout types
+
+
+</td></tr>
+<tr><td>
+
+[PrimitiveType](doc/markdown/./device.primitivetype.md)
+
+
+</td><td>
+
+The primitive type
+
+
+</td></tr>
+<tr><td>
+
+[RenderBundle](doc/markdown/./device.renderbundle.md)
+
+
+</td><td>
+
+Render bundle
+
+
+</td></tr>
+<tr><td>
+
+[ShaderExpTagValue](doc/markdown/./device.shaderexptagvalue.md)
+
+
+</td><td>
+
+
+
+</td></tr>
+<tr><td>
+
+[ShaderKind](doc/markdown/./device.shaderkind.md)
+
+
+</td><td>
+
+Shader kind
+
+
+</td></tr>
+<tr><td>
+
+[ShaderTypeFunc](doc/markdown/./device.shadertypefunc.md)
+
+
+</td><td>
+
+type of a shader variable constructor
+
+
+</td></tr>
+<tr><td>
+
+[StencilOp](doc/markdown/./device.stencilop.md)
+
+
+</td><td>
+
+Stencil operations
+
+
+</td></tr>
+<tr><td>
+
+[StructuredValue](doc/markdown/./device.structuredvalue.md)
+
+
+</td><td>
+
+Type of values that can be set to a structured buffer
+
+
+</td></tr>
+<tr><td>
+
+[TextureAddressMode](doc/markdown/./device.textureaddressmode.md)
+
+
+</td><td>
+
+The texture address mode
+
+
+</td></tr>
+<tr><td>
+
+[TextureColorSpace](doc/markdown/./device.texturecolorspace.md)
+
+
+</td><td>
+
+Supported colorspace types for texture
+
+
+</td></tr>
+<tr><td>
+
+[TextureFilterMode](doc/markdown/./device.texturefiltermode.md)
+
+
+</td><td>
+
+The texture filter mode
+
+
+</td></tr>
+<tr><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+Texture format type
+
+
+</td></tr>
+<tr><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)
+
+
+</td><td>
+
+The types of image element that can be uploaded to textures
+
+
+</td></tr>
+<tr><td>
+
+[TextureType](doc/markdown/./device.texturetype.md)
+
+
+</td><td>
+
+The texture type
+
+
+</td></tr>
+<tr><td>
+
+[TypeDetailInfo](doc/markdown/./device.typedetailinfo.md)
+
+
+</td><td>
+
+Type detail information
+
+
+</td></tr>
+<tr><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)
+
+
+</td><td>
+
+The vertex format types
+
+
+</td></tr>
+<tr><td>
+
+[VertexBufferInfo](doc/markdown/./device.vertexbufferinfo.md)
+
+
+</td><td>
+
+Vertex buffer information
+
+
+</td></tr>
+<tr><td>
+
+[VertexLayoutOptions](doc/markdown/./device.vertexlayoutoptions.md)
+
+
+</td><td>
+
+Options for creating vertex layout
+
+
+</td></tr>
+<tr><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The semantic type of vertex
+
+
+</td></tr>
+<tr><td>
+
+[VertexStepMode](doc/markdown/./device.vertexstepmode.md)
+
+
+</td><td>
+
+Vertex step mode.
+
+
+</td></tr>
+<tr><td>
+
+[WebGLContext](doc/markdown/./device.webglcontext.md)
+
+
+</td><td>
+
+The webgl context type
+
+
+</td></tr>
+</tbody></table>
 

@@ -15,26 +15,255 @@ declare class OrthoCamera extends Camera
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, left, right, bottom, top, near, far)](doc/markdown/./scene.orthocamera._constructor_.md) |  | Creates an instance of PerspectiveCamera |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, left, right, bottom, top, near, far)](doc/markdown/./scene.orthocamera._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of PerspectiveCamera
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bottom](doc/markdown/./scene.orthocamera.bottom.md) |  | number | The bottom clip plane |
-|  [far](doc/markdown/./scene.orthocamera.far.md) |  | number | The far clip plane |
-|  [left](doc/markdown/./scene.orthocamera.left.md) |  | number | The left clip plane |
-|  [near](doc/markdown/./scene.orthocamera.near.md) |  | number | The near clip plane |
-|  [right](doc/markdown/./scene.orthocamera.right.md) |  | number | The right clip plane |
-|  [top](doc/markdown/./scene.orthocamera.top.md) |  | number | The top clip plane |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bottom](doc/markdown/./scene.orthocamera.bottom.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The bottom clip plane
+
+
+</td></tr>
+<tr><td>
+
+[far](doc/markdown/./scene.orthocamera.far.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The far clip plane
+
+
+</td></tr>
+<tr><td>
+
+[left](doc/markdown/./scene.orthocamera.left.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The left clip plane
+
+
+</td></tr>
+<tr><td>
+
+[near](doc/markdown/./scene.orthocamera.near.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The near clip plane
+
+
+</td></tr>
+<tr><td>
+
+[right](doc/markdown/./scene.orthocamera.right.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The right clip plane
+
+
+</td></tr>
+<tr><td>
+
+[top](doc/markdown/./scene.orthocamera.top.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The top clip plane
+
+
+</td></tr>
+<tr><td>
+
+[window](doc/markdown/./scene.orthocamera.window.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Sub-window of the frustum
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.orthocamera.setortho.md) |  | Setup a orthogonal projection matrix for the camera |
-|  [setPerspective()](doc/markdown/./scene.orthocamera.setperspective.md) |  | Not valid for OrthoCamera |
-|  [setProjectionMatrix(matrix)](doc/markdown/./scene.orthocamera.setprojectionmatrix.md) |  | Setup a projection matrix for the camera |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[setOrtho(left, right, bottom, top, near, far)](doc/markdown/./scene.orthocamera.setortho.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a orthogonal projection matrix for the camera
+
+
+</td></tr>
+<tr><td>
+
+[setPerspective()](doc/markdown/./scene.orthocamera.setperspective.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Not valid for OrthoCamera
+
+
+</td></tr>
+<tr><td>
+
+[setProjectionMatrix(matrix)](doc/markdown/./scene.orthocamera.setprojectionmatrix.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup a projection matrix for the camera
+
+
+</td></tr>
+</tbody></table>
 

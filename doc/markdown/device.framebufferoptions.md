@@ -14,8 +14,64 @@ interface FrameBufferOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [ignoreDepthStencil?](doc/markdown/./device.framebufferoptions.ignoredepthstencil.md) |  | boolean | _(Optional)_ Whether to ignore the depth stencil attachment when resolving multisample frame buffer |
-|  [sampleCount?](doc/markdown/./device.framebufferoptions.samplecount.md) |  | number | _(Optional)_ Sample count of the frame buffer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[ignoreDepthStencil?](doc/markdown/./device.framebufferoptions.ignoredepthstencil.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether to ignore the depth stencil attachment when resolving multisample frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[sampleCount?](doc/markdown/./device.framebufferoptions.samplecount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Sample count of the frame buffer
+
+
+</td></tr>
+</tbody></table>
 

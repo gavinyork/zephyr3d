@@ -14,9 +14,39 @@ getNormal(result?: Vector3): Vector3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  result | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ A vector object to which the result will be written, if not specified, a new vector will be returned. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+result
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ A vector object to which the result will be written, if not specified, a new vector will be returned.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

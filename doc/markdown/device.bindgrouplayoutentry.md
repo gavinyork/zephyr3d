@@ -14,15 +14,197 @@ interface BindGroupLayoutEntry
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [binding](doc/markdown/./device.bindgrouplayoutentry.binding.md) |  | number | The binding location |
-|  [buffer?](doc/markdown/./device.bindgrouplayoutentry.buffer.md) |  | [BufferBindingLayout](doc/markdown/./device.bufferbindinglayout.md) | _(Optional)_ Binding layout if the resource is a buffer |
-|  [externalTexture?](doc/markdown/./device.bindgrouplayoutentry.externaltexture.md) |  | [ExternalTextureBindingLayout](doc/markdown/./device.externaltexturebindinglayout.md) | _(Optional)_ Binding layout if the resource is an external texture |
-|  [name](doc/markdown/./device.bindgrouplayoutentry.name.md) |  | string | Name of this binding resource |
-|  [sampler?](doc/markdown/./device.bindgrouplayoutentry.sampler.md) |  | [SamplerBindingLayout](doc/markdown/./device.samplerbindinglayout.md) | _(Optional)_ Binding layout if the resource is a sampler |
-|  [storageTexture?](doc/markdown/./device.bindgrouplayoutentry.storagetexture.md) |  | [StorageTextureBindingLayout](doc/markdown/./device.storagetexturebindinglayout.md) | _(Optional)_ Binding layout if the resource is a storage texture |
-|  [texture?](doc/markdown/./device.bindgrouplayoutentry.texture.md) |  | [TextureBindingLayout](doc/markdown/./device.texturebindinglayout.md) | _(Optional)_ Binding layout if the resource is a texture for sampling |
-|  [type](doc/markdown/./device.bindgrouplayoutentry.type.md) |  | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Type of the binding resource |
-|  [visibility](doc/markdown/./device.bindgrouplayoutentry.visibility.md) |  | number | Visibility mask |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[binding](doc/markdown/./device.bindgrouplayoutentry.binding.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The binding location
+
+
+</td></tr>
+<tr><td>
+
+[buffer?](doc/markdown/./device.bindgrouplayoutentry.buffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BufferBindingLayout](doc/markdown/./device.bufferbindinglayout.md)
+
+
+</td><td>
+
+_(Optional)_ Binding layout if the resource is a buffer
+
+
+</td></tr>
+<tr><td>
+
+[externalTexture?](doc/markdown/./device.bindgrouplayoutentry.externaltexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ExternalTextureBindingLayout](doc/markdown/./device.externaltexturebindinglayout.md)
+
+
+</td><td>
+
+_(Optional)_ Binding layout if the resource is an external texture
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./device.bindgrouplayoutentry.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of this binding resource
+
+
+</td></tr>
+<tr><td>
+
+[sampler?](doc/markdown/./device.bindgrouplayoutentry.sampler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SamplerBindingLayout](doc/markdown/./device.samplerbindinglayout.md)
+
+
+</td><td>
+
+_(Optional)_ Binding layout if the resource is a sampler
+
+
+</td></tr>
+<tr><td>
+
+[storageTexture?](doc/markdown/./device.bindgrouplayoutentry.storagetexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[StorageTextureBindingLayout](doc/markdown/./device.storagetexturebindinglayout.md)
+
+
+</td><td>
+
+_(Optional)_ Binding layout if the resource is a storage texture
+
+
+</td></tr>
+<tr><td>
+
+[texture?](doc/markdown/./device.bindgrouplayoutentry.texture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureBindingLayout](doc/markdown/./device.texturebindinglayout.md)
+
+
+</td><td>
+
+_(Optional)_ Binding layout if the resource is a texture for sampling
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./device.bindgrouplayoutentry.type.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Type of the binding resource
+
+
+</td></tr>
+<tr><td>
+
+[visibility](doc/markdown/./device.bindgrouplayoutentry.visibility.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Visibility mask
+
+
+</td></tr>
+</tbody></table>
 

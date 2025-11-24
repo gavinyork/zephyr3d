@@ -14,9 +14,39 @@ setCullMode(mode: FaceMode): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  mode | [FaceMode](doc/markdown/./device.facemode.md) | The cull mode to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+mode
+
+
+</td><td>
+
+[FaceMode](doc/markdown/./device.facemode.md)
+
+
+</td><td>
+
+The cull mode to set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

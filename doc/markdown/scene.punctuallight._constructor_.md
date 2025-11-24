@@ -14,8 +14,53 @@ constructor(scene: Scene, type: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the punctual light belongs |
-|  type | number | The light type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene to which the punctual light belongs
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The light type
+
+
+</td></tr>
+</tbody></table>
 

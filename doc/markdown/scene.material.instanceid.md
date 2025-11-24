@@ -4,7 +4,7 @@
 
 ## Material.instanceId property
 
-Unique identifier of the material
+Runtime-unique numeric identifier for the material instance.
 
 **Signature:**
 

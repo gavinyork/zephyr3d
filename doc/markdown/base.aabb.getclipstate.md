@@ -14,9 +14,39 @@ getClipState(viewProjMatrix: Matrix4x4): ClipState;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  viewProjMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The view projection matrix of the frustum. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+viewProjMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The view projection matrix of the frustum.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

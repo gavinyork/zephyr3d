@@ -14,15 +14,197 @@ interface FrameInfo
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [computeCalls](doc/markdown/./device.frameinfo.computecalls.md) |  | number | How many compute calls were sent to the GPU in current frame |
-|  [drawCalls](doc/markdown/./device.frameinfo.drawcalls.md) |  | number | How many draw calls were sent to the GPU in current frame |
-|  [elapsedFrame](doc/markdown/./device.frameinfo.elapsedframe.md) |  | number | time spent from last frame, in milliseconds |
-|  [elapsedOverall](doc/markdown/./device.frameinfo.elapsedoverall.md) |  | number | time spent from the first frame, in milliseconds |
-|  [elapsedTimeCPU](doc/markdown/./device.frameinfo.elapsedtimecpu.md) |  | number | time spent by the CPU from last frame, in milliseconds |
-|  [elapsedTimeGPU](doc/markdown/./device.frameinfo.elapsedtimegpu.md) |  | number | time spent by the GPU from last frame, in milliseconds |
-|  [FPS](doc/markdown/./device.frameinfo.fps.md) |  | number | the FPS calculated for the last one second |
-|  [frameCounter](doc/markdown/./device.frameinfo.framecounter.md) |  | number | counter of frames |
-|  [frameTimestamp](doc/markdown/./device.frameinfo.frametimestamp.md) |  | number | timestamp of current frame, in milliseconds |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[computeCalls](doc/markdown/./device.frameinfo.computecalls.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How many compute calls were sent to the GPU in current frame
+
+
+</td></tr>
+<tr><td>
+
+[drawCalls](doc/markdown/./device.frameinfo.drawcalls.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How many draw calls were sent to the GPU in current frame
+
+
+</td></tr>
+<tr><td>
+
+[elapsedFrame](doc/markdown/./device.frameinfo.elapsedframe.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+time spent from last frame, in milliseconds
+
+
+</td></tr>
+<tr><td>
+
+[elapsedOverall](doc/markdown/./device.frameinfo.elapsedoverall.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+time spent from the first frame, in milliseconds
+
+
+</td></tr>
+<tr><td>
+
+[elapsedTimeCPU](doc/markdown/./device.frameinfo.elapsedtimecpu.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+time spent by the CPU from last frame, in milliseconds
+
+
+</td></tr>
+<tr><td>
+
+[elapsedTimeGPU](doc/markdown/./device.frameinfo.elapsedtimegpu.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+time spent by the GPU from last frame, in milliseconds
+
+
+</td></tr>
+<tr><td>
+
+[FPS](doc/markdown/./device.frameinfo.fps.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+the FPS calculated for the last one second
+
+
+</td></tr>
+<tr><td>
+
+[frameCounter](doc/markdown/./device.frameinfo.framecounter.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+counter of frames
+
+
+</td></tr>
+<tr><td>
+
+[frameTimestamp](doc/markdown/./device.frameinfo.frametimestamp.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+timestamp of current frame, in milliseconds
+
+
+</td></tr>
+</tbody></table>
 

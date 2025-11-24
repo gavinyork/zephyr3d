@@ -9,14 +9,44 @@ Sets the buffer that contains the morph target information
 **Signature:**
 
 ```typescript
-setMorphInfo(info: GPUDataBuffer): void;
+setMorphInfo(info: MorphInfo): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  info | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) | The buffer that contains the morph target information |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+info
+
+
+</td><td>
+
+[MorphInfo](doc/markdown/./scene.morphinfo.md)
+
+
+</td><td>
+
+The buffer that contains the morph target information
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

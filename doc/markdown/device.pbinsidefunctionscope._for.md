@@ -9,17 +9,124 @@ Creates a 'for' statement
 **Signature:**
 
 ```typescript
-$for(counter: PBShaderExp, init: number | PBShaderExp, end: number | PBShaderExp, body: (this: PBForScope) => void): void;
+$for(counter: PBShaderExp, init: number | PBShaderExp, end: number | PBShaderExp, open?: boolean | ((this: PBForScope) => void), reverse?: boolean | ((this: PBForScope) => void), body?: (this: PBForScope) => void): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  counter | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The repeat counter variable declaration |
-|  init | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | initial value of the repeat counter variable |
-|  end | number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | end value of the counter exclusive |
-|  body | (this: [PBForScope](doc/markdown/./device.pbforscope.md)<!-- -->) =&gt; void | Generator function for the scope that inside the for statement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+counter
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The repeat counter variable declaration
+
+
+</td></tr>
+<tr><td>
+
+init
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+initial value of the repeat counter variable
+
+
+</td></tr>
+<tr><td>
+
+end
+
+
+</td><td>
+
+number \| [PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+end value of the counter exclusive
+
+
+</td></tr>
+<tr><td>
+
+open
+
+
+</td><td>
+
+boolean \| ((this: [PBForScope](doc/markdown/./device.pbforscope.md)<!-- -->) =&gt; void)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+reverse
+
+
+</td><td>
+
+boolean \| ((this: [PBForScope](doc/markdown/./device.pbforscope.md)<!-- -->) =&gt; void)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBForScope](doc/markdown/./device.pbforscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+_(Optional)_ Generator function for the scope that inside the for statement
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

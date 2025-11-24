@@ -14,9 +14,69 @@ constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  terrainSize | [Vector2](doc/markdown/./base.vector2.md) | terrain size |
-|  normalMap | [Texture2D](doc/markdown/./device.texture2d.md) | normal map |
-|  grassTexture | [Texture2D](doc/markdown/./device.texture2d.md) | _(Optional)_ grass texture |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+terrainSize
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+terrain size
+
+
+</td></tr>
+<tr><td>
+
+normalMap
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+normal map
+
+
+</td></tr>
+<tr><td>
+
+grassTexture
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+_(Optional)_ grass texture
+
+
+</td></tr>
+</tbody></table>
 

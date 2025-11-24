@@ -14,10 +14,53 @@ declare function getVertexBufferAttribType(vertexBufferType: PBStructTypeInfo, a
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vertexBufferType | [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) | The structure type of the vertex buffer |
-|  attrib | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vertexBufferType
+
+
+</td><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+The structure type of the vertex buffer
+
+
+</td></tr>
+<tr><td>
+
+attrib
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -10,4 +10,6 @@ Gets the interpolation mode
 
 ```typescript
 get mode(): InterpolationMode;
+
+set mode(val: InterpolationMode);
 ```

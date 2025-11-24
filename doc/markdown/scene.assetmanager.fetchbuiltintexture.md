@@ -4,24 +4,71 @@
 
 ## AssetManager.fetchBuiltinTexture() method
 
-Fetches a built-in texture
+Fetch a built-in texture synchronously by name.
+
+- If this built-in was not created yet, the registered loader is invoked. - Registers a device restore handler so the texture can be re-initialized after device loss. - If an existing texture is provided, the loader uploads into it.
 
 **Signature:**
 
 ```typescript
-fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T>;
+fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the built-in texture |
-|  texture | [BaseTexture](doc/markdown/./device.basetexture.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Built-in texture identifier.
+
+
+</td></tr>
+<tr><td>
+
+texture
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+_(Optional)_ Optional destination texture to populate.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-Promise&lt;T&gt;
+T
 
-The built-in texture
+The built-in texture (created or populated).
 

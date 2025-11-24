@@ -4,37 +4,456 @@
 
 ## Scene class
 
-Presents a world that manages a couple of objects that will be rendered
+Represents a renderable world that manages scene graph, spatial indexing, and environment.
+
+Core responsibilities: - Owns the root [SceneNode](doc/markdown/./scene.scenenode.md) and maintains a spatial [Octree](doc/markdown/./scene.octree.md) for culling/raycasting. - Manages environment/lighting via [Environment](doc/markdown/./scene.environment.md)<!-- -->. - Provides per-frame update queues (global and per-camera) for scene nodes. - Offers utilities like ray construction and raycasting. - Emits observable events: `update`<!-- -->, `startrender`<!-- -->, `endrender`<!-- -->.
+
+Performance notes: - Octree placement is lazily synchronized on demand before reads (e.g., `octree`<!-- -->, `boundingBox`<!-- -->) and during per-frame updates. - Update queues use weak references to avoid retaining disposed nodes.
 
 **Signature:**
 
 ```typescript
-declare class Scene extends Scene_base 
+declare class Scene extends Scene_base implements IRenderable 
 ```
 **Extends:** Scene\_base
 
+**Implements:** [IRenderable](doc/markdown/./scene.irenderable.md)
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.scene._constructor_.md) |  | Creates an instance of scene |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name)](doc/markdown/./scene.scene._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of Scene.
+
+Initializes: - Unique ID - Empty environment - Octree with default depth/leaf capacities - Root scene node named "Root"
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [boundingBox](doc/markdown/./scene.scene.boundingbox.md) | <code>readonly</code> | [AABB](doc/markdown/./base.aabb.md) | Gets the bounding box of the scene |
-|  [env](doc/markdown/./scene.scene.env.md) | <code>readonly</code> | [Environment](doc/markdown/./scene.environment.md) | The environment of the scene |
-|  [id](doc/markdown/./scene.scene.id.md) | <code>readonly</code> | number | Gets the unique identifier of the scene |
-|  [octree](doc/markdown/./scene.scene.octree.md) | <code>readonly</code> | [Octree](doc/markdown/./scene.octree.md) | Gets the octree |
-|  [rootNode](doc/markdown/./scene.scene.rootnode.md) | <code>readonly</code> | [SceneNode](doc/markdown/./scene.scenenode.md) | Gets the root scene node of the scene |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[boundingBox](doc/markdown/./scene.scene.boundingbox.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+Gets the world-axis-aligned bounding box of the scene.
+
+Ensures pending node placements are synchronized before computing.
+
+
+</td></tr>
+<tr><td>
+
+[env](doc/markdown/./scene.scene.env.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Environment](doc/markdown/./scene.environment.md)
+
+
+</td><td>
+
+The environment (sky, lights, IBL) of the scene.
+
+
+</td></tr>
+<tr><td>
+
+[id](doc/markdown/./scene.scene.id.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the unique identifier of the scene.
+
+
+</td></tr>
+<tr><td>
+
+[mainCamera](doc/markdown/./scene.scene.maincamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+Main camera used to render the scene by default.
+
+
+</td></tr>
+<tr><td>
+
+[metaData](doc/markdown/./scene.scene.metadata.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Metadata$1
+
+
+</td><td>
+
+Arbitrary metadata associated with the scene (e.g., imported asset info).
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./scene.scene.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the scene
+
+
+</td></tr>
+<tr><td>
+
+[octree](doc/markdown/./scene.scene.octree.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Octree](doc/markdown/./scene.octree.md)
+
+
+</td><td>
+
+Gets the octree used for spatial organization and queries.
+
+Ensures pending node placements are synchronized before returning.
+
+
+</td></tr>
+<tr><td>
+
+[rootNode](doc/markdown/./scene.scene.rootnode.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+Gets the root scene node of the scene
+
+
+</td></tr>
+<tr><td>
+
+[script](doc/markdown/./scene.scene.script.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Attached script filename or identifier (engine-specific).
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [constructRay(camera, viewportWidth, viewportHeight, screenX, screenY, invModelMatrix)](doc/markdown/./scene.scene.constructray.md) |  | Constructs a ray by a given camera and the position on screen |
-|  [dispose()](doc/markdown/./scene.scene.dispose.md) |  | Disposes the scene |
-|  [raycast(ray, length)](doc/markdown/./scene.scene.raycast.md) |  | Cast a ray into the scene to get the closest object hit by the ray |
-|  [updateNodePlacement(octree, list)](doc/markdown/./scene.scene.updatenodeplacement.md) |  | Update node placement in the octree |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[constructRay(camera, viewportWidth, viewportHeight, screenX, screenY, invModelMatrix)](doc/markdown/./scene.scene.constructray.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a world-space ray from a camera and a screen position.
+
+
+</td></tr>
+<tr><td>
+
+[findNodeById(id)](doc/markdown/./scene.scene.findnodebyid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Finds a scene node by its persistent ID.
+
+
+</td></tr>
+<tr><td>
+
+[findNodeByName(name)](doc/markdown/./scene.scene.findnodebyname.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Finds a scene node by name.
+
+If multiple nodes share the same name, returns the first match encountered during traversal.
+
+
+</td></tr>
+<tr><td>
+
+[frameUpdate()](doc/markdown/./scene.scene.frameupdate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Performs per-frame scene updates, once per device frame.
+
+Steps: - Ensure this runs only once per frame (via `frameInfo.frameCounter`<!-- -->). - Update environment light synchronization. - Dispatch `update` event. - Drain the one-shot node update queue and call `node.update(...)`<!-- -->. - Apply pending octree placement updates.
+
+
+</td></tr>
+<tr><td>
+
+[frameUpdatePerCamera(camera)](doc/markdown/./scene.scene.frameupdatepercamera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Performs per-camera scene updates for the current frame.
+
+Steps: - Drain the per-camera update queue and call `node.updatePerCamera(camera, ...)`<!-- -->. - Apply pending octree placement updates.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.scene.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the scene and its owned resources.
+
+Disposes: - Environment - Root node (and, by extension, its hierarchy) - Main camera reference wrapper
+
+
+</td></tr>
+<tr><td>
+
+[queuePerCameraUpdateNode(node)](doc/markdown/./scene.scene.queuepercameraupdatenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Queues a node for a one-shot per-camera update before render.
+
+The node's `updatePerCamera(camera, elapsedSeconds, deltaSeconds)` will be called once for each camera during [Scene.frameUpdatePerCamera()](doc/markdown/./scene.scene.frameupdatepercamera.md)<!-- -->, then removed.
+
+
+</td></tr>
+<tr><td>
+
+[queueUpdateNode(node)](doc/markdown/./scene.scene.queueupdatenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Queues a node for a one-shot update before the next render.
+
+The node's `update(frame, elapsedSeconds, deltaSeconds)` will be called during Scene.frameUpdate and then the node is removed from the queue.
+
+
+</td></tr>
+<tr><td>
+
+[raycast(ray, length)](doc/markdown/./scene.scene.raycast.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Casts a ray into the scene and returns the closest intersection, if any.
+
+
+</td></tr>
+<tr><td>
+
+[render()](doc/markdown/./scene.scene.render.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Renders this scene using the `mainCamera`<!-- -->, if present.
+
+Equivalent to `mainCamera.render(this)` when `mainCamera` is set.
+
+
+</td></tr>
+<tr><td>
+
+[updateNodePlacement(octree, list)](doc/markdown/./scene.scene.updatenodeplacement.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Applies placement changes for nodes in `list` to the given `octree`<!-- -->.
+
+Rules: - If node is not disposed, attached, not hidden, and `placeToOctree` is true, it is placed; otherwise removed. - Drains `list` until empty.
+
+
+</td></tr>
+</tbody></table>
 

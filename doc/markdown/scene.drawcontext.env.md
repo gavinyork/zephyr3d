@@ -4,7 +4,7 @@
 
 ## DrawContext.env property
 
-The scene environment
+Scene environment (sky, IBL, exposure, etc.) used for shading.
 
 **Signature:**
 

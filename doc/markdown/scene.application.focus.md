@@ -4,7 +4,7 @@
 
 ## Application.focus() method
 
-Set focus
+Set keyboard focus to the device's canvas element.
 
 **Signature:**
 

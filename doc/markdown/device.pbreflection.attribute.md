@@ -14,9 +14,39 @@ attribute(attrib: VertexSemantic): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  attrib | [VertexSemantic](doc/markdown/./device.vertexsemantic.md) | The vertex semantic |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+attrib
+
+
+</td><td>
+
+[VertexSemantic](doc/markdown/./device.vertexsemantic.md)
+
+
+</td><td>
+
+The vertex semantic
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

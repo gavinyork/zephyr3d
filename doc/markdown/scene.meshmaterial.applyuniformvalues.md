@@ -4,7 +4,7 @@
 
 ## MeshMaterial.applyUniformValues() method
 
-Submit Uniform values before rendering with this material.
+Submit material uniforms/resources to the material bind group (set 2). Handles alpha cutoff, opacity (non-instanced transparent), OIT, object color, and TAA strength.
 
 **Signature:**
 
@@ -14,13 +14,75 @@ applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | Bind group for this material |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
-|  pass | number | Current pass of the material |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+The material bind group to write into.
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Current draw context.
+
+
+</td></tr>
+<tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current material pass index.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

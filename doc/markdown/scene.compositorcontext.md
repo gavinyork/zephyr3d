@@ -14,10 +14,77 @@ interface CompositorContext
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [finalFramebuffer](doc/markdown/./scene.compositorcontext.finalframebuffer.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) |  |
-|  [msTexture?](doc/markdown/./scene.compositorcontext.mstexture.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md) | _(Optional)_ |
-|  [pingpongFramebuffers](doc/markdown/./scene.compositorcontext.pingpongframebuffers.md) |  | [FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->\[\] |  |
-|  [writeIndex](doc/markdown/./scene.compositorcontext.writeindex.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[finalFramebuffer](doc/markdown/./scene.compositorcontext.finalframebuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[pingpongFramebuffers](doc/markdown/./scene.compositorcontext.pingpongframebuffers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[writeIndex](doc/markdown/./scene.compositorcontext.writeindex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

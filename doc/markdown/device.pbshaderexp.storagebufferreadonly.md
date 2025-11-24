@@ -14,10 +14,55 @@ storageBufferReadonly(group: number, bindingSize?: number): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  group | number | The bind group index |
-|  bindingSize | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+group
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The bind group index
+
+
+</td></tr>
+<tr><td>
+
+bindingSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

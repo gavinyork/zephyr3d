@@ -15,8 +15,60 @@ interface AssetRotationTrack extends AssetAnimationTrack
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [keyFrames](doc/markdown/./scene.assetrotationtrack.keyframes.md) |  | Record&lt;number, [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->\[\]&gt; |  |
-|  [nodes](doc/markdown/./scene.assetrotationtrack.nodes.md) |  | number\[\] |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[keyFrames](doc/markdown/./scene.assetrotationtrack.keyframes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;number, [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->\[\]&gt;
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[nodes](doc/markdown/./scene.assetrotationtrack.nodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

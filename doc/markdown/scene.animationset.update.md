@@ -4,13 +4,52 @@
 
 ## AnimationSet.update() method
 
-Updates all animations of the model
+Advance and apply active animations.
+
+Responsibilities per call: - Update time cursor for each active clip (respecting speedRatio and looping). - Enforce repeat limits and apply fade-out termination if configured. - For each animated target, blend active tracks (weighted by clip weight × fade-in × fade-out) and apply the resulting state to the target. - Apply all active skeletons to update skinning transforms.
 
 **Signature:**
 
 ```typescript
-update(): void;
+update(deltaInSeconds: number): void;
 ```
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+deltaInSeconds
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Time step in seconds since last update.
+
+
+</td></tr>
+</tbody></table>
+
 **Returns:**
 
 void

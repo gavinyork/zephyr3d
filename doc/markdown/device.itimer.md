@@ -14,10 +14,52 @@ interface ITimer
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [begin()](doc/markdown/./device.itimer.begin.md) |  |
-|  [elapsed()](doc/markdown/./device.itimer.elapsed.md) |  |
-|  [end()](doc/markdown/./device.itimer.end.md) |  |
-|  [ended()](doc/markdown/./device.itimer.ended.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[begin()](doc/markdown/./device.itimer.begin.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[elapsed()](doc/markdown/./device.itimer.elapsed.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[end()](doc/markdown/./device.itimer.end.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[ended()](doc/markdown/./device.itimer.ended.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

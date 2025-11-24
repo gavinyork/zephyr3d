@@ -4,7 +4,7 @@
 
 ## SceneNode.isParentOf() method
 
-Checks if this node is the direct parent or indirect parent of a given node
+Whether this node is an ancestor (direct or indirect) of the given node.
 
 **Signature:**
 
@@ -14,13 +14,39 @@ isParentOf(child: SceneNode): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  child | [SceneNode](doc/markdown/./scene.scenenode.md) | The node to be checked |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+child
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
-
-true if this node is the direct parent or indirect parent of the given node, false otherwise
 

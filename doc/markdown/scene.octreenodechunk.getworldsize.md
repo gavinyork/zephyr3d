@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getWorldSize() method
 
-Gets the root size of the octree
+Root world size of the octree.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getWorldSize(): number;
 
 number
 
-The root size of the octree
+The root world size (edge length) of the octree.
+
+## Remarks
+
+Same across all chunks; used to convert between world coordinates and indices.
 

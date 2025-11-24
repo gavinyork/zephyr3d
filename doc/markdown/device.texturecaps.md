@@ -14,32 +14,432 @@ interface TextureCaps
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [maxCubeTextureSize](doc/markdown/./device.texturecaps.maxcubetexturesize.md) |  | number | The maximum size for cube texture |
-|  [maxTextureSize](doc/markdown/./device.texturecaps.maxtexturesize.md) |  | number | The maximum size for 2d texture |
-|  [npo2Mipmapping](doc/markdown/./device.texturecaps.npo2mipmapping.md) |  | boolean | True if mipmapping is supported for non power of 2 textures |
-|  [npo2Repeating](doc/markdown/./device.texturecaps.npo2repeating.md) |  | boolean | True if repeat address mode is supported for non power of 2 textures |
-|  [support3DTexture](doc/markdown/./device.texturecaps.support3dtexture.md) |  | boolean | True if device supports 3d texture |
-|  [supportAnisotropicFiltering](doc/markdown/./device.texturecaps.supportanisotropicfiltering.md) |  | boolean | True if device supports anisotropic filtering |
-|  [supportASTC](doc/markdown/./device.texturecaps.supportastc.md) |  | boolean | True if device supports astc texture format |
-|  [supportBPTC](doc/markdown/./device.texturecaps.supportbptc.md) |  | boolean | True if device supports bptc texture format |
-|  [supportDepthTexture](doc/markdown/./device.texturecaps.supportdepthtexture.md) |  | boolean | True if device supports depth texture |
-|  [supportFloatBlending](doc/markdown/./device.texturecaps.supportfloatblending.md) |  | boolean | True if device supports alpha blending with floating-point frame buffer |
-|  [supportFloatColorBuffer](doc/markdown/./device.texturecaps.supportfloatcolorbuffer.md) |  | boolean | True if device supports rendering into a 32bit floating-point frame buffer |
-|  [supportFloatTexture](doc/markdown/./device.texturecaps.supportfloattexture.md) |  | boolean | True if device supports 32bit floating-point texture |
-|  [supportHalfFloatColorBuffer](doc/markdown/./device.texturecaps.supporthalffloatcolorbuffer.md) |  | boolean | True if device supports rendering into a 16bit floating-point frame buffer |
-|  [supportHalfFloatTexture](doc/markdown/./device.texturecaps.supporthalffloattexture.md) |  | boolean | True if device supports 16bit floating-point texture |
-|  [supportLinearFloatTexture](doc/markdown/./device.texturecaps.supportlinearfloattexture.md) |  | boolean | True if device supports linear filtering on 32bit floating-point textures |
-|  [supportLinearHalfFloatTexture](doc/markdown/./device.texturecaps.supportlinearhalffloattexture.md) |  | boolean | True if device supports linear filtering on 16bit floating-point textures |
-|  [supportRGTC](doc/markdown/./device.texturecaps.supportrgtc.md) |  | boolean | True if device supports rgtc texture format |
-|  [supportS3TC](doc/markdown/./device.texturecaps.supports3tc.md) |  | boolean | True if device supports dxt1, dxt3, dxt5 texture format |
-|  [supportS3TCSRGB](doc/markdown/./device.texturecaps.supports3tcsrgb.md) |  | boolean | True if device supports dxt1\_srgb, dxt3-srgb, dxt5-srgb texture format |
-|  [supportSRGBTexture](doc/markdown/./device.texturecaps.supportsrgbtexture.md) |  | boolean | True if device supports sRGB texture |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[maxCubeTextureSize](doc/markdown/./device.texturecaps.maxcubetexturesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum size for cube texture
+
+
+</td></tr>
+<tr><td>
+
+[maxTextureSize](doc/markdown/./device.texturecaps.maxtexturesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum size for 2d texture
+
+
+</td></tr>
+<tr><td>
+
+[npo2Mipmapping](doc/markdown/./device.texturecaps.npo2mipmapping.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if mipmapping is supported for non power of 2 textures
+
+
+</td></tr>
+<tr><td>
+
+[npo2Repeating](doc/markdown/./device.texturecaps.npo2repeating.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if repeat address mode is supported for non power of 2 textures
+
+
+</td></tr>
+<tr><td>
+
+[support3DTexture](doc/markdown/./device.texturecaps.support3dtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports 3d texture
+
+
+</td></tr>
+<tr><td>
+
+[supportAnisotropicFiltering](doc/markdown/./device.texturecaps.supportanisotropicfiltering.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports anisotropic filtering
+
+
+</td></tr>
+<tr><td>
+
+[supportASTC](doc/markdown/./device.texturecaps.supportastc.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports astc texture format
+
+
+</td></tr>
+<tr><td>
+
+[supportBPTC](doc/markdown/./device.texturecaps.supportbptc.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports bptc texture format
+
+
+</td></tr>
+<tr><td>
+
+[supportDepthTexture](doc/markdown/./device.texturecaps.supportdepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports depth texture
+
+
+</td></tr>
+<tr><td>
+
+[supportFloatBlending](doc/markdown/./device.texturecaps.supportfloatblending.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports alpha blending with floating-point frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportFloatColorBuffer](doc/markdown/./device.texturecaps.supportfloatcolorbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports rendering into a 32bit floating-point frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportFloatTexture](doc/markdown/./device.texturecaps.supportfloattexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports 32bit floating-point texture
+
+
+</td></tr>
+<tr><td>
+
+[supportHalfFloatColorBuffer](doc/markdown/./device.texturecaps.supporthalffloatcolorbuffer.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports rendering into a 16bit floating-point frame buffer
+
+
+</td></tr>
+<tr><td>
+
+[supportHalfFloatTexture](doc/markdown/./device.texturecaps.supporthalffloattexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports 16bit floating-point texture
+
+
+</td></tr>
+<tr><td>
+
+[supportLinearFloatTexture](doc/markdown/./device.texturecaps.supportlinearfloattexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports linear filtering on 32bit floating-point textures
+
+
+</td></tr>
+<tr><td>
+
+[supportLinearHalfFloatTexture](doc/markdown/./device.texturecaps.supportlinearhalffloattexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports linear filtering on 16bit floating-point textures
+
+
+</td></tr>
+<tr><td>
+
+[supportRGTC](doc/markdown/./device.texturecaps.supportrgtc.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports rgtc texture format
+
+
+</td></tr>
+<tr><td>
+
+[supportS3TC](doc/markdown/./device.texturecaps.supports3tc.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports dxt1, dxt3, dxt5 texture format
+
+
+</td></tr>
+<tr><td>
+
+[supportS3TCSRGB](doc/markdown/./device.texturecaps.supports3tcsrgb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports dxt1\_srgb, dxt3-srgb, dxt5-srgb texture format
+
+
+</td></tr>
+<tr><td>
+
+[supportSRGBTexture](doc/markdown/./device.texturecaps.supportsrgbtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+True if device supports sRGB texture
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [getTextureFormatInfo(format)](doc/markdown/./device.texturecaps.gettextureformatinfo.md) | Get information of a given texture format |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getTextureFormatInfo(format)](doc/markdown/./device.texturecaps.gettextureformatinfo.md)
+
+
+</td><td>
+
+Get information of a given texture format
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,14 +14,119 @@ pushCanvas(key: string, ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  key | string | Key of the atlas |
-|  ctx | CanvasRenderingContext2D | The canvas context |
-|  x | number | x offset of the rectangle |
-|  y | number | y offset of the rectangle |
-|  w | number | width of the rectangle |
-|  h | number | height of the rectangle |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+key
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Key of the atlas
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+CanvasRenderingContext2D
+
+
+</td><td>
+
+The canvas context
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+x offset of the rectangle
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+y offset of the rectangle
+
+
+</td></tr>
+<tr><td>
+
+w
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+width of the rectangle
+
+
+</td></tr>
+<tr><td>
+
+h
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+height of the rectangle
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

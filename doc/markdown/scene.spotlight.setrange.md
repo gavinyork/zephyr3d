@@ -14,9 +14,39 @@ setRange(val: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number | The value to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The value to set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

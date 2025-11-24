@@ -4,7 +4,7 @@
 
 ## MeshMaterial.opacity property
 
-A value between 0 and 1, presents the opacity
+Material opacity in \[0, 1\]. - Used in transparent passes. Changing marks uniforms dirty only.
 
 **Signature:**
 

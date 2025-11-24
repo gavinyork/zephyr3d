@@ -15,25 +15,223 @@ declare class OrbitCameraController extends BaseCameraController
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.orbitcameracontroller._constructor_.md) |  | Creates an instance of OrbitCameraController |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.orbitcameracontroller._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of OrbitCameraController
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [center](doc/markdown/./scene.orbitcameracontroller.center.md) |  | [Vector3](doc/markdown/./base.vector3.md) | Rotation center |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[center](doc/markdown/./scene.orbitcameracontroller.center.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Rotation center
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [\_onMouseDown(evt)](doc/markdown/./scene.orbitcameracontroller._onmousedown.md) | <code>protected</code> | Mouse down event handler |
-|  [\_onMouseMove(evt)](doc/markdown/./scene.orbitcameracontroller._onmousemove.md) | <code>protected</code> | Mouse move event handler |
-|  [\_onMouseUp(evt)](doc/markdown/./scene.orbitcameracontroller._onmouseup.md) | <code>protected</code> | Mouse up event handler |
-|  [\_onMouseWheel(evt)](doc/markdown/./scene.orbitcameracontroller._onmousewheel.md) | <code>protected</code> | Mouse wheel event handler |
-|  [reset()](doc/markdown/./scene.orbitcameracontroller.reset.md) |  | Resets state |
-|  [setOptions(opt)](doc/markdown/./scene.orbitcameracontroller.setoptions.md) |  | Set options |
-|  [update()](doc/markdown/./scene.orbitcameracontroller.update.md) |  | Updates state |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_onMouseDown(evt)](doc/markdown/./scene.orbitcameracontroller._onmousedown.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Mouse down event handler
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseMove(evt)](doc/markdown/./scene.orbitcameracontroller._onmousemove.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer move handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseUp(evt)](doc/markdown/./scene.orbitcameracontroller._onmouseup.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer up handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseWheel(evt)](doc/markdown/./scene.orbitcameracontroller._onmousewheel.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Mouse wheel handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(from, to, up)](doc/markdown/./scene.orbitcameracontroller.lookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[reset()](doc/markdown/./scene.orbitcameracontroller.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Reset the controller's internal state.
+
+Called automatically when a camera is attached via `_setCamera`<!-- -->. Subclasses should override this to reset accumulators, velocities, targets, etc.
+
+
+</td></tr>
+<tr><td>
+
+[setOptions(opt)](doc/markdown/./scene.orbitcameracontroller.setoptions.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set options
+
+
+</td></tr>
+<tr><td>
+
+[update()](doc/markdown/./scene.orbitcameracontroller.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Per-frame update.
+
+Subclasses should override this to: - Integrate velocities/accelerations and apply damping. - Smoothly interpolate camera transforms. - Clamp angles/distances/FOV, etc.
+
+Called once per frame by the owning system.
+
+
+</td></tr>
+</tbody></table>
 

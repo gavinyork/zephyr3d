@@ -14,10 +14,55 @@ static distanceSq(v1: Vector3, v2: Vector3): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v1 | [Vector3](doc/markdown/./base.vector3.md) | The first vector. |
-|  v2 | [Vector3](doc/markdown/./base.vector3.md) | The second vector. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v1
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The first vector.
+
+
+</td></tr>
+<tr><td>
+
+v2
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The second vector.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,9 @@
 
 ## Application.stop() method
 
-Stop running the rendering loop
+Stop the application's render loop.
+
+Uses `device.exitLoop()` to end the scheduling started by `run()`<!-- -->.
 
 **Signature:**
 

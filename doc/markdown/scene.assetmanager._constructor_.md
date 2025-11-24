@@ -9,5 +9,42 @@ Creates an instance of AssetManager
 **Signature:**
 
 ```typescript
-constructor();
+constructor(resourceManager?: ResourceManager);
 ```
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+resourceManager
+
+
+</td><td>
+
+[ResourceManager](doc/markdown/./scene.resourcemanager.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
+

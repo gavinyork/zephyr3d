@@ -14,9 +14,39 @@ setProjectionMatrix(matrix: Matrix4x4): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The projection matrix |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The projection matrix
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

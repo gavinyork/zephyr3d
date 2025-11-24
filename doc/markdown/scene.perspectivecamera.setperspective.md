@@ -14,12 +14,87 @@ setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  fovY | number | The vertical field of view in radians. |
-|  aspect | number | The aspect ratio |
-|  zNear | number | The near clip plane |
-|  zFar | number | The far clip plane |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+fovY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The vertical field of view in radians.
+
+
+</td></tr>
+<tr><td>
+
+aspect
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The aspect ratio
+
+
+</td></tr>
+<tr><td>
+
+zNear
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The near clip plane
+
+
+</td></tr>
+<tr><td>
+
+zFar
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The far clip plane
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

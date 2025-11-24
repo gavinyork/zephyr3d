@@ -4,10 +4,49 @@
 
 ## Scene.(constructor)
 
-Creates an instance of scene
+Creates an instance of Scene.
+
+Initializes: - Unique ID - Empty environment - Octree with default depth/leaf capacities - Root scene node named "Root"
 
 **Signature:**
 
 ```typescript
-constructor();
+constructor(name?: string);
 ```
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Optional scene name for diagnostics/UI.
+
+
+</td></tr>
+</tbody></table>
+

@@ -14,7 +14,37 @@ constructor(light: PunctualLight);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  light | [PunctualLight](doc/markdown/./scene.punctuallight.md) | The light that is used to generate shadow map |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+light
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)
+
+
+</td><td>
+
+The light that is used to generate shadow map
+
+
+</td></tr>
+</tbody></table>
 

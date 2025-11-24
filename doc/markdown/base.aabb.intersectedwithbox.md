@@ -14,9 +14,39 @@ intersectedWithBox(other: AABB): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [AABB](doc/markdown/./base.aabb.md) | The destination AABB. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+The destination AABB.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

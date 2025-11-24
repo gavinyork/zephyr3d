@@ -14,9 +14,39 @@ sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): PB
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | 'float' \| 'unfilterable-float' \| 'sint' \| 'uint' \| 'depth' | sample type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+'float' \| 'unfilterable-float' \| 'sint' \| 'uint' \| 'depth'
+
+
+</td><td>
+
+sample type
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

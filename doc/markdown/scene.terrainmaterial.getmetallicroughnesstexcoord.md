@@ -2,23 +2,10 @@
 
 [Home](doc/markdown/./index.md) &gt; [@zephyr3d/scene](doc/markdown/./scene.md) &gt; [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) &gt; [getMetallicRoughnessTexCoord](doc/markdown/./scene.terrainmaterial.getmetallicroughnesstexcoord.md)
 
-## TerrainMaterial.getMetallicRoughnessTexCoord() method
-
-@<!-- -->ts-ignore
+## TerrainMaterial.getMetallicRoughnessTexCoord property
 
 **Signature:**
 
 ```typescript
-getMetallicRoughnessTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) |  |
-
-**Returns:**
-
-[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
-

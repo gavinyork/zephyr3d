@@ -12,9 +12,37 @@ isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->&lt;[TypeDetailInfo](doc/markdown/./device.typedetailinfo.md)<!-- -->&gt; |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->&lt;[TypeDetailInfo](doc/markdown/./device.typedetailinfo.md)<!-- -->&gt;
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -23,7 +23,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 
 // 给定像素格式和宽高，创建可写入的2D纹理(仅WebGPU)
 const texture = device.createTexture2D('rgba8unorm', 256, 256, {
-  samplerOptions: { mipFilter: 'none' },
+  mipmapping: false,
   writable: true
 });
 
@@ -66,12 +66,12 @@ const texture = device.createTexture2DFromMipmapData(data, false, {
 
 以上是创建2D纹理的主要几种方式，还有类似创建2D数组纹理，3D纹理, 立方体纹理的方法，以下是相关的接口文档：
 
+- [device.createTextureFromMipmapData()](/doc/markdown/./device.abstractdevice.createtexturefrommipmapdata)
 - [device.createTexture2DArray()](/doc/markdown/./device.abstractdevice.createtexture2darray)
 - [device.createTexture2DArrayFromImages()](/doc/markdown/./device.abstractdevice.createtexture2darrayfromimages)
 - [device.createTexture2DArrayFromMipmapData](/doc/markdown/./device.abstractdevice.createtexture2darrayfrommipmapdata)
 - [device.createTexture3D()](/doc/markdown/./device.abstractdevice.createtexture3d)
 - [device.createCubeTexture()](/doc/markdown/./device.abstractdevice.createcubetexture)
-- [device.createCubeTextureFromMipmapData()](/doc/markdown/./device.abstractdevice.createcubetexturefrommipmapdata)
 - [device.createTextureVideo()](/doc/markdown/./device.abstractdevice.createtexturevideo)
 
 可用的纹理格式参见文档：[纹理格式](/doc/markdown/./device.textureformat)
@@ -111,7 +111,7 @@ texture.update(pixels, 10, 10, 20, 20);
 
 // 更新纹理
 texture.update(pixels, 0, 0, textureWidth, textureHeight);
-// 生成mipmap
+// 生成mipmap，在这里可以省略，因为texture.update()方法会隐式调用generateMipmaps()
 texture.generateMipmaps();
 
 ```

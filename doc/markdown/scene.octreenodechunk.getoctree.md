@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getOctree() method
 
-Gets the octree that the chunk belongs to
+The octree that owns this chunk.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getOctree(): Octree;
 
 [Octree](doc/markdown/./scene.octree.md)
 
-The octree
+The owning `Octree` instance.
 

@@ -4,7 +4,7 @@
 
 ## OctreeNode.getOrCreateChild() method
 
-Gets or creates a child node by a given placement
+Get or create a child node by placement from the next (finer) chunk.
 
 **Signature:**
 
@@ -14,13 +14,47 @@ getOrCreateChild(placement: OctreePlacement): OctreeNode;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  placement | [OctreePlacement](doc/markdown/./scene.octreeplacement.md) | The placement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+placement
+
+
+</td><td>
+
+[OctreePlacement](doc/markdown/./scene.octreeplacement.md)
+
+
+</td><td>
+
+Child octant placement.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-The child node fetched
+The existing or newly created child `OctreeNode`<!-- -->, or `null` if creation is not possible.
+
+## Remarks
+
+Returns `null` if the next chunk does not exist.
 

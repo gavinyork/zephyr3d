@@ -4,34 +4,346 @@
 
 ## AnimationClip class
 
-Animation that contains multiple tracks
+Animation clip
+
+Represents a named animation composed of multiple tracks targeting various objects/properties, with an overall duration, weight, and optional auto-play behavior. Tracks may target different objects and are grouped by a per-target array. Skeletons used by this clip are tracked for lifecycle and application during playback.
+
+Typical workflow: - Create a clip via `AnimationSet.createAnimation(name)`<!-- -->. - Add one or more `AnimationTrack`<!-- -->s via `addTrack(target, track)`<!-- -->. - Optionally register skeletons via `addSkeleton(...)`<!-- -->. - Start playback through the owning `AnimationSet.playAnimation(name, options)`<!-- -->.
 
 **Signature:**
 
 ```typescript
-declare class AnimationClip 
+declare class AnimationClip extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name)](doc/markdown/./scene.animationclip._constructor_.md) |  | Creates an animation instance |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name, animationSet, embedded)](doc/markdown/./scene.animationclip._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an animation instance
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [name](doc/markdown/./scene.animationclip.name.md) | <code>readonly</code> | string | Gets the name of the animation |
-|  [skeletons](doc/markdown/./scene.animationclip.skeletons.md) | <code>readonly</code> | Set&lt;[Skeleton](doc/markdown/./scene.skeleton.md)<!-- -->&gt; | Gets all skeletons |
-|  [timeDuration](doc/markdown/./scene.animationclip.timeduration.md) | <code>readonly</code> | number | The duration of the animation |
-|  [tracks](doc/markdown/./scene.animationclip.tracks.md) | <code>readonly</code> | Map&lt;[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->, [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;unknown&gt;\[\]&gt; | Gets all the tracks of this animation |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_weight](doc/markdown/./scene.animationclip._weight.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[animationSet](doc/markdown/./scene.animationclip.animationset.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[AnimationSet](doc/markdown/./scene.animationset.md)
+
+
+</td><td>
+
+The `AnimationSet` that owns this clip.
+
+
+</td></tr>
+<tr><td>
+
+[autoPlay](doc/markdown/./scene.animationclip.autoplay.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this clip should start playing automatically when loaded/instantiated.
+
+
+</td></tr>
+<tr><td>
+
+[embedded](doc/markdown/./scene.animationclip.embedded.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this clip is embedded (owned inline by its container/resource).
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./scene.animationclip.name.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The unique name of this clip.
+
+
+</td></tr>
+<tr><td>
+
+[skeletons](doc/markdown/./scene.animationclip.skeletons.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set&lt;string&gt;
+
+
+</td><td>
+
+All skeletons referenced by this clip.
+
+
+</td></tr>
+<tr><td>
+
+[timeDuration](doc/markdown/./scene.animationclip.timeduration.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Total time span of the clip in seconds.
+
+Automatically extended when adding tracks with longer duration.
+
+
+</td></tr>
+<tr><td>
+
+[tracks](doc/markdown/./scene.animationclip.tracks.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+Map&lt;object, [AnimationTrack](doc/markdown/./scene.animationtrack.md)<!-- -->&lt;unknown&gt;\[\]&gt;
+
+
+</td><td>
+
+All animation tracks grouped by target object.
+
+Key: target object; Value: list of `AnimationTrack`<!-- -->s affecting that target.
+
+
+</td></tr>
+<tr><td>
+
+[weight](doc/markdown/./scene.animationclip.weight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Global blend weight for the clip.
+
+Used by the animation system when combining multiple active clips.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addSkeleton(skeleton)](doc/markdown/./scene.animationclip.addskeleton.md) |  | Adds a skeleton to the animation |
-|  [addTrack(node, track)](doc/markdown/./scene.animationclip.addtrack.md) |  | Adds an animation track to the animation |
-|  [dispose()](doc/markdown/./scene.animationclip.dispose.md) |  | Disposes self |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addSkeleton(skeletonId)](doc/markdown/./scene.animationclip.addskeleton.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a skeleton used by this clip.
+
+
+</td></tr>
+<tr><td>
+
+[addTrack(target, track)](doc/markdown/./scene.animationclip.addtrack.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a track to this clip for a specific target object.
+
+Constraints: - The track must not already belong to another clip. - Only one track with the same blendId may exist per target in a single clip.
+
+Side effects: - Assigns this clip to `track.animation`<!-- -->. - Extends `timeDuration` to cover the track duration if longer. - Calls `track.reset(target)` to initialize the target state if needed.
+
+
+</td></tr>
+<tr><td>
+
+[deleteTrack(track)](doc/markdown/./scene.animationclip.deletetrack.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove a specific track from this clip.
+
+Errors if the track does not belong to this clip. Does nothing if not found.
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.animationclip.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Dispose internal resources/references held by this clip.
+
+Notes: - Clears track collections and disposes registered skeletons. - The clip becomes unusable after disposing.
+
+
+</td></tr>
+</tbody></table>
 

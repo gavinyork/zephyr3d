@@ -4,7 +4,7 @@
 
 ## DrawContext.forceCullMode property
 
-Force cull mode
+Force cull mode override for special passes (optional).
 
 **Signature:**
 

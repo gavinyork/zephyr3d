@@ -9,18 +9,48 @@ Multiply this quaternion by another quaternion at the right side inplace.
 **Signature:**
 
 ```typescript
-multiplyRight(other: Quaternion): Quaternion;
+multiplyRight(other: Quaternion): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Quaternion](doc/markdown/./base.quaternion.md) | The quaternion that to be multiplied by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The quaternion that to be multiplied by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Quaternion](doc/markdown/./base.quaternion.md)
+this
 
 self
 

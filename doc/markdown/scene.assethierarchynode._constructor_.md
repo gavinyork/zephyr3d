@@ -14,8 +14,53 @@ constructor(name: string, parent?: AssetHierarchyNode);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the node |
-|  parent | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | _(Optional)_ Parent of the node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the node
+
+
+</td></tr>
+<tr><td>
+
+parent
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+_(Optional)_ Parent of the node
+
+
+</td></tr>
+</tbody></table>
 

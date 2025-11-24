@@ -1,23 +1,28 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, OrbitCameraController, DirectionalLight, Compositor, Tonemap } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
-  const device = myApp.device;
-
+myApp.ready().then(async () => {
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   // Create a directional light (which automatically sets the sunlight properties)
   const sunLight = new DirectionalLight(scene);
@@ -27,23 +32,11 @@ myApp.ready().then(async() => {
   // Set the sky rendering mode to Atmospheric Scattering
   scene.env.sky.skyType = 'scatter';
   // Set cloud density
-  scene.env.sky.cloudy = 0.7;
+  scene.env.sky.cloudy = 0.5;
   // Set cloud move speed
   scene.env.sky.wind.setXY(600, 0);
 
-  // Added a Tonemap post-processing effect
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

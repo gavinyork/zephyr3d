@@ -4,7 +4,7 @@
 
 ## OctreeNode.addNode() method
 
-Adds a scene node to this node
+Add a scene node to this octree node.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ addNode(node: GraphNode): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  node | [GraphNode](doc/markdown/./scene.graphnode.md) | The scene node to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+node
+
+
+</td><td>
+
+[GraphNode](doc/markdown/./scene.graphnode.md)
+
+
+</td><td>
+
+Scene node to add.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

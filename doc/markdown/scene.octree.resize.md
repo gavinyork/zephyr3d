@@ -4,6 +4,8 @@
 
 ## Octree.resize() method
 
+Resize the octree root size and rebuild chunks.
+
 **Signature:**
 
 ```typescript
@@ -12,11 +14,45 @@ resize(size: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  size | number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+size
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+New root world size (edge length). Rounded up to the next power of two and clamped to `leafSize`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
+
+## Remarks
+
+- Reinitializes chunks and reinserts previously placed nodes. - No-op if the size does not change.
 

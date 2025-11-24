@@ -1,7 +1,7 @@
 {
   "metadata": {
     "toolPackage": "@microsoft/api-extractor",
-    "toolVersion": "7.36.4",
+    "toolVersion": "7.55.1",
     "schemaVersion": 1011,
     "oldestForwardsCompatibleVersion": 1001,
     "tsdocConfig": {
@@ -115,6 +115,22 @@
           "syntaxKind": "modifier"
         },
         {
+          "tagName": "@jsx",
+          "syntaxKind": "block"
+        },
+        {
+          "tagName": "@jsxRuntime",
+          "syntaxKind": "block"
+        },
+        {
+          "tagName": "@jsxFrag",
+          "syntaxKind": "block"
+        },
+        {
+          "tagName": "@jsxImportSource",
+          "syntaxKind": "block"
+        },
+        {
           "tagName": "@betaDocumentation",
           "syntaxKind": "modifier"
         },
@@ -191,6 +207,69 @@
         },
         {
           "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiCalcTextSize:function(1)",
+          "docComment": "/**\n * Calculate text size\n *\n * @remarks\n *\n * The function ensures all glyphs in text been created\n *\n * @param text - text to calculated\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiCalcTextSize(text: "
+            },
+            {
+              "kind": "Content",
+              "text": "string"
+            },
+            {
+              "kind": "Content",
+              "text": ", out?: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ImVec2",
+              "canonicalReference": "@zephyr3d/imgui!~ImVec2:class"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Reference",
+              "text": "ImVec2",
+              "canonicalReference": "@zephyr3d/imgui!~ImVec2:class"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 5,
+            "endIndex": 6
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "text",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            },
+            {
+              "parameterName": "out",
+              "parameterTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "isOptional": true
+            }
+          ],
+          "name": "imGuiCalcTextSize"
+        },
+        {
+          "kind": "Function",
           "canonicalReference": "@zephyr3d/imgui!imGuiEndFrame:function(1)",
           "docComment": "/**\n * Ends current frame\n *\n * @public\n */\n",
           "excerptTokens": [
@@ -216,6 +295,67 @@
           "overloadIndex": 1,
           "parameters": [],
           "name": "imGuiEndFrame"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiGetCharCodeMap:function(1)",
+          "docComment": "/**\n * Get char code map, for emoji conversion\n *\n * @returns char code map\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiGetCharCodeMap(): "
+            },
+            {
+              "kind": "Reference",
+              "text": "Record",
+              "canonicalReference": "!Record:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<number, string>"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [],
+          "name": "imGuiGetCharCodeMap"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiInFrame:function(1)",
+          "docComment": "/**\n * Whether a frame is currently rendering\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiInFrame(): "
+            },
+            {
+              "kind": "Content",
+              "text": "boolean"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [],
+          "name": "imGuiInFrame"
         },
         {
           "kind": "Function",
@@ -389,6 +529,163 @@
           "overloadIndex": 1,
           "parameters": [],
           "name": "imGuiNewFrame"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiSetCharCodeMap:function(1)",
+          "docComment": "/**\n * Sets char code map, for emoji conversion\n *\n * @param map - Char code map to set\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiSetCharCodeMap(map: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Record",
+              "canonicalReference": "!Record:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<number, string>"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "void"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 4,
+            "endIndex": 5
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "map",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "imGuiSetCharCodeMap"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiSetFontGlyph:function(1)",
+          "docComment": "/**\n * Set special text glyph font\n *\n * @param charCode - char code of glyph\n *\n * @param font - Web font\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiSetFontGlyph(charCode: "
+            },
+            {
+              "kind": "Content",
+              "text": "number"
+            },
+            {
+              "kind": "Content",
+              "text": ", font: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Font",
+              "canonicalReference": "@zephyr3d/device!Font:class"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "void"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 5,
+            "endIndex": 6
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "charCode",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            },
+            {
+              "parameterName": "font",
+              "parameterTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "imGuiSetFontGlyph"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@zephyr3d/imgui!imGuiWantCaptureKeyboard:function(1)",
+          "docComment": "/**\n * Manual set keyboard capture\n *\n * @param capture - Whether keyboard should be captured by ImGUI\n *\n * @public\n */\n",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "declare function imGuiWantCaptureKeyboard(capture: "
+            },
+            {
+              "kind": "Content",
+              "text": "boolean"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "void"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "dist/index.d.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 3,
+            "endIndex": 4
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "capture",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "imGuiWantCaptureKeyboard"
         }
       ]
     }

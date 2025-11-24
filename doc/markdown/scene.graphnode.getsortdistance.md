@@ -4,7 +4,7 @@
 
 ## GraphNode.getSortDistance() method
 
-Gets the distance for object sorting
+Computes the distance used for sorting (e.g., transparent draw order).
 
 **Signature:**
 
@@ -14,9 +14,39 @@ getSortDistance(camera: Camera): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  camera | [Camera](doc/markdown/./scene.camera.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+camera
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+Camera from which to compute distance (usually camera -<!-- -->&gt; object).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

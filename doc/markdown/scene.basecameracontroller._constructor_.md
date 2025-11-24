@@ -4,7 +4,9 @@
 
 ## BaseCameraController.(constructor)
 
-Creates an instance of BaseCameraController
+Create a base camera controller.
+
+The controller starts without an attached camera. Call the internal `_setCamera` to attach a camera (performed by the owning system), which triggers `reset()`<!-- -->.
 
 **Signature:**
 

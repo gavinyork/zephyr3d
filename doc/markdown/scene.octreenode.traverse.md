@@ -4,7 +4,7 @@
 
 ## OctreeNode.traverse() method
 
-Traverse this node by a visitor
+Traverse this node and existing children in pre-order.
 
 **Signature:**
 
@@ -14,11 +14,45 @@ traverse(v: Visitor<OctreeNode>): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v | [Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[OctreeNode](doc/markdown/./scene.octreenode.md)<!-- -->&gt; | The visitor |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v
+
+
+</td><td>
+
+[Visitor](doc/markdown/./scene.visitor.md)<!-- -->&lt;[OctreeNode](doc/markdown/./scene.octreenode.md)<!-- -->&gt;
+
+
+</td><td>
+
+Visitor invoked on each node; if it returns `true`<!-- -->, traversal continues into children.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 void
+
+## Remarks
+
+Children are visited in octant order \[PPP, PPN, PNP, PNN, NPP, NPN, NNP, NNN\].
 

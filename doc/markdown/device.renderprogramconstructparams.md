@@ -14,10 +14,102 @@ interface RenderProgramConstructParams
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindGroupLayouts](doc/markdown/./device.renderprogramconstructparams.bindgrouplayouts.md) |  | [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\] | Bind group layouts for the program |
-|  [fs](doc/markdown/./device.renderprogramconstructparams.fs.md) |  | string | The fragment shader source code |
-|  [vertexAttributes](doc/markdown/./device.renderprogramconstructparams.vertexattributes.md) |  | number\[\] | Vertex attributes used in the program |
-|  [vs](doc/markdown/./device.renderprogramconstructparams.vs.md) |  | string | The vertex shader source code |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindGroupLayouts](doc/markdown/./device.renderprogramconstructparams.bindgrouplayouts.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\]
+
+
+</td><td>
+
+Bind group layouts for the program
+
+
+</td></tr>
+<tr><td>
+
+[fs](doc/markdown/./device.renderprogramconstructparams.fs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The fragment shader source code
+
+
+</td></tr>
+<tr><td>
+
+[vertexAttributes](doc/markdown/./device.renderprogramconstructparams.vertexattributes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Vertex attributes used in the program
+
+
+</td></tr>
+<tr><td>
+
+[vs](doc/markdown/./device.renderprogramconstructparams.vs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The vertex shader source code
+
+
+</td></tr>
+</tbody></table>
 

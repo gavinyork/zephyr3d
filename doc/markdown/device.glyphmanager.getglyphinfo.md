@@ -14,10 +14,55 @@ getGlyphInfo(char: string, font: Font): AtlasInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  char | string | The character |
-|  font | [Font](doc/markdown/./device.font.md) | Font of the character |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+char
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The character
+
+
+</td></tr>
+<tr><td>
+
+font
+
+
+</td><td>
+
+[Font](doc/markdown/./device.font.md)
+
+
+</td><td>
+
+Font of the character
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

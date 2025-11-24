@@ -4,6 +4,8 @@
 
 ## MeshMaterial.alphaToCoverage property
 
+Alpha-to-coverage toggle. - Useful to approximate transparency for MSAA targets. - Managed as a shader feature; toggling rebuilds variants.
+
 **Signature:**
 
 ```typescript

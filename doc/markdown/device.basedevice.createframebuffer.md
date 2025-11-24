@@ -12,11 +12,67 @@ abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: Bas
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  colorAttachments | [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->\[\] |  |
-|  depthAttachment | [BaseTexture](doc/markdown/./device.basetexture.md) |  |
-|  options | [FrameBufferOptions](doc/markdown/./device.framebufferoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+colorAttachments
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+depthAttachment
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[FrameBufferOptions](doc/markdown/./device.framebufferoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

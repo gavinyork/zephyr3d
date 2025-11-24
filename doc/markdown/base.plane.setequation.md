@@ -14,12 +14,87 @@ setEquation(a: number, b: number, c: number, d: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | number | The coefficient A of the equation |
-|  b | number | The coefficient B of the equation |
-|  c | number | The coefficient C of the equation |
-|  d | number | The coefficient D of the equation |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The coefficient A of the equation
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The coefficient B of the equation
+
+
+</td></tr>
+<tr><td>
+
+c
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The coefficient C of the equation
+
+
+</td></tr>
+<tr><td>
+
+d
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The coefficient D of the equation
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

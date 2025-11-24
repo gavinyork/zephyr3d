@@ -14,10 +14,94 @@ interface Tuple4
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [w](doc/markdown/./base.tuple4.w.md) |  | number |  |
-|  [x](doc/markdown/./base.tuple4.x.md) |  | number |  |
-|  [y](doc/markdown/./base.tuple4.y.md) |  | number |  |
-|  [z](doc/markdown/./base.tuple4.z.md) |  | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[w](doc/markdown/./base.tuple4.w.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[x](doc/markdown/./base.tuple4.x.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[y](doc/markdown/./base.tuple4.y.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[z](doc/markdown/./base.tuple4.z.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

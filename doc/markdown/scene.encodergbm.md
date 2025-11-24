@@ -14,11 +14,71 @@ declare function encodeRGBM(scope: PBInsideFunctionScope, rgb: PBShaderExp, maxR
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  rgb | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The color value to be encoded |
-|  maxRange | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | The max range of color components |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+rgb
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The color value to be encoded
+
+
+</td></tr>
+<tr><td>
+
+maxRange
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+The max range of color components
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

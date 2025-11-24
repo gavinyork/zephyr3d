@@ -4,7 +4,9 @@
 
 ## SceneNodeVisible type
 
-Scene node visible state
+Visibility state of a node.
+
+- 'visible': force visible - 'hidden': force hidden - 'inherit': inherits from the closest ancestor that is not 'inherit'
 
 **Signature:**
 

@@ -15,24 +15,214 @@ declare class CullVisitor implements Visitor<SceneNode | OctreeNode>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(renderPass, camera, renderQueue, primaryCamera)](doc/markdown/./scene.cullvisitor._constructor_.md) |  | Creates an instance of CullVisitor |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(renderPass, camera, renderQueue, primaryCamera)](doc/markdown/./scene.cullvisitor._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of CullVisitor
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [camera](doc/markdown/./scene.cullvisitor.camera.md) |  | [Camera](doc/markdown/./scene.camera.md) | The camera that will be used for culling |
-|  [frustum](doc/markdown/./scene.cullvisitor.frustum.md) | <code>readonly</code> | [\_zephyr3d\_base.Frustum](doc/markdown/./base.frustum.md) | Frustum for culling |
-|  [frustumCulling](doc/markdown/./scene.cullvisitor.frustumculling.md) |  | boolean | true if cull with frustum culling, otherwise false. default is true |
-|  [primaryCamera](doc/markdown/./scene.cullvisitor.primarycamera.md) | <code>readonly</code> | [Camera](doc/markdown/./scene.camera.md) | The camera position of the primary render pass |
-|  [renderPass](doc/markdown/./scene.cullvisitor.renderpass.md) | <code>readonly</code> | [RenderPass](doc/markdown/./scene.renderpass.md) | Render pass for the culling task |
-|  [renderQueue](doc/markdown/./scene.cullvisitor.renderqueue.md) |  | [RenderQueue](doc/markdown/./scene.renderqueue.md) | The result of culling |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[camera](doc/markdown/./scene.cullvisitor.camera.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera that will be used for culling
+
+
+</td></tr>
+<tr><td>
+
+[frustum](doc/markdown/./scene.cullvisitor.frustum.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[\_zephyr3d\_base.Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+Frustum for culling
+
+
+</td></tr>
+<tr><td>
+
+[frustumCulling](doc/markdown/./scene.cullvisitor.frustumculling.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if cull with frustum culling, otherwise false. default is true
+
+
+</td></tr>
+<tr><td>
+
+[primaryCamera](doc/markdown/./scene.cullvisitor.primarycamera.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Camera](doc/markdown/./scene.camera.md)
+
+
+</td><td>
+
+The camera position of the primary render pass
+
+
+</td></tr>
+<tr><td>
+
+[renderPass](doc/markdown/./scene.cullvisitor.renderpass.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+Render pass for the culling task
+
+
+</td></tr>
+<tr><td>
+
+[renderQueue](doc/markdown/./scene.cullvisitor.renderqueue.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[RenderQueue](doc/markdown/./scene.renderqueue.md)
+
+
+</td><td>
+
+The result of culling
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [visit(target)](doc/markdown/./scene.cullvisitor.visit.md) |  | Visits a node |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[visit(target)](doc/markdown/./scene.cullvisitor.visit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Visits a node
+
+
+</td></tr>
+</tbody></table>
 

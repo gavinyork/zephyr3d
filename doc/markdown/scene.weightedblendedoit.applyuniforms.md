@@ -11,15 +11,56 @@ This function will be called when ever the transparent material will upload unif
 **Signature:**
 
 ```typescript
-applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
+applyUniforms(_ctx: DrawContext, _bindGroup: BindGroup): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | The draw context. |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+\_bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

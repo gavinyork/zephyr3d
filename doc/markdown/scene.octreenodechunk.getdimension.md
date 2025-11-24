@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getDimension() method
 
-Gets the dimension of this chunk
+Dimension of this chunk (number of cells per axis).
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getDimension(): number;
 
 number
 
-Dimension of this chunk
+The dimension (cells per axis) for this chunk.
+
+## Remarks
+
+Equals (<!-- -->2^<!-- -->{<!-- -->level<!-- -->}<!-- -->)<!-- -->.
 

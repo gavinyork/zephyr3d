@@ -14,14 +14,117 @@ readTexel(scope: PBInsideFunctionScope, type: BlitType, srcTex: PBShaderExp, uv:
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | The shader scope |
-|  type | [BlitType](doc/markdown/./scene.blittype.md) | The blit type |
-|  srcTex | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The source texture |
-|  uv | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The texture coordinate from where the texel will be read |
-|  srcLayer | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The layer of the source texture |
-|  sampleType | 'float' \| 'int' \| 'uint' \| 'depth' |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+The shader scope
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+[BlitType](doc/markdown/./scene.blittype.md)
+
+
+</td><td>
+
+The blit type
+
+
+</td></tr>
+<tr><td>
+
+srcTex
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The source texture
+
+
+</td></tr>
+<tr><td>
+
+uv
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The texture coordinate from where the texel will be read
+
+
+</td></tr>
+<tr><td>
+
+srcLayer
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The layer of the source texture
+
+
+</td></tr>
+<tr><td>
+
+sampleType
+
+
+</td><td>
+
+'float' \| 'int' \| 'uint' \| 'depth'
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

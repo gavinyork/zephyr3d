@@ -7,9 +7,9 @@
 **Signature:**
 
 ```typescript
-reload(): Promise<void>;
+reload(): void;
 ```
 **Returns:**
 
-Promise&lt;void&gt;
+void
 

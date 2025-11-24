@@ -15,7 +15,33 @@ declare class PBDoWhileScope extends PBInsideFunctionScope
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [$while(condition)](doc/markdown/./device.pbdowhilescope._while.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$while(condition)](doc/markdown/./device.pbdowhilescope._while.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

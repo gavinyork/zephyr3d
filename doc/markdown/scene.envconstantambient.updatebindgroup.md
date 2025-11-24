@@ -15,9 +15,39 @@ updateBindGroup(bg: BindGroup): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bg | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group to be updated |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bg
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+The bind group to be updated
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

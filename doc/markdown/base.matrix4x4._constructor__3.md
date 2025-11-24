@@ -14,8 +14,53 @@ constructor(buffer: ArrayBuffer, offset: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | ArrayBuffer | The array buffer object. |
-|  offset | number | The byte offset of the buffer where the matrix placed at. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+ArrayBuffer
+
+
+</td><td>
+
+The array buffer object.
+
+
+</td></tr>
+<tr><td>
+
+offset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The byte offset of the buffer where the matrix placed at.
+
+
+</td></tr>
+</tbody></table>
 

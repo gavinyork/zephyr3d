@@ -9,11 +9,11 @@ Normalize this quaternion inplace.
 **Signature:**
 
 ```typescript
-inplaceNormalize(): Quaternion;
+inplaceNormalize(): this;
 ```
 **Returns:**
 
-[Quaternion](doc/markdown/./base.quaternion.md)
+this
 
 self
 

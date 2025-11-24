@@ -14,10 +14,55 @@ insert(data: T, at: ListIterator<T>): ListIterator<T>;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | T | The data to be inserted to the list |
-|  at | [ListIterator](doc/markdown/./base.listiterator.md)<!-- -->&lt;T&gt; | An iterator pointing to the element at the insert position |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The data to be inserted to the list
+
+
+</td></tr>
+<tr><td>
+
+at
+
+
+</td><td>
+
+[ListIterator](doc/markdown/./base.listiterator.md)<!-- -->&lt;T&gt;
+
+
+</td><td>
+
+An iterator pointing to the element at the insert position
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

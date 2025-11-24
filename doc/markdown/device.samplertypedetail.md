@@ -14,7 +14,45 @@ interface SamplerTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [accessMode](doc/markdown/./device.samplertypedetail.accessmode.md) |  | [PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md) | Access mode of the sampler type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[accessMode](doc/markdown/./device.samplertypedetail.accessmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBSamplerAccessMode](doc/markdown/./device.pbsampleraccessmode.md)
+
+
+</td><td>
+
+Access mode of the sampler type
+
+
+</td></tr>
+</tbody></table>
 

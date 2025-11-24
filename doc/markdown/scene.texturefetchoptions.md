@@ -4,7 +4,9 @@
 
 ## TextureFetchOptions type
 
-Options for texture fetching
+Options for texture fetching.
+
+Controls how a texture is loaded, converted, and optionally uploaded into an existing texture object.
 
 **Signature:**
 

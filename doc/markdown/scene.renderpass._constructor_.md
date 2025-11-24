@@ -14,7 +14,37 @@ constructor(type: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | number | Render pass type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Render pass type
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,8 +14,64 @@ interface UniformBufferLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [byteSize](doc/markdown/./device.uniformbufferlayout.bytesize.md) |  | number | Byte size of the uniform buffer |
-|  [entries](doc/markdown/./device.uniformbufferlayout.entries.md) |  | [UniformLayout](doc/markdown/./device.uniformlayout.md)<!-- -->\[\] | Entries for the uniform buffer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[byteSize](doc/markdown/./device.uniformbufferlayout.bytesize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Byte size of the uniform buffer
+
+
+</td></tr>
+<tr><td>
+
+[entries](doc/markdown/./device.uniformbufferlayout.entries.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[UniformLayout](doc/markdown/./device.uniformlayout.md)<!-- -->\[\]
+
+
+</td><td>
+
+Entries for the uniform buffer
+
+
+</td></tr>
+</tbody></table>
 

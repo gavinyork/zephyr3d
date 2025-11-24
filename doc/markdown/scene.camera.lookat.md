@@ -14,11 +14,71 @@ lookAt(eye: Vector3, target: Vector3, up: Vector3): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  eye | [Vector3](doc/markdown/./base.vector3.md) | The camera position |
-|  target | [Vector3](doc/markdown/./base.vector3.md) | The target point to look at |
-|  up | [Vector3](doc/markdown/./base.vector3.md) | The up vector |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+eye
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The camera position
+
+
+</td></tr>
+<tr><td>
+
+target
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The target point to look at
+
+
+</td></tr>
+<tr><td>
+
+up
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The up vector
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

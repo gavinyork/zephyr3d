@@ -14,9 +14,39 @@ getTextureFormatInfo(format: TextureFormat): TextureFormatInfo;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+The texture format
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,10 +14,55 @@ static normalize(q: Quaternion, result?: Quaternion): Quaternion;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  q | [Quaternion](doc/markdown/./base.quaternion.md) | The input quaternion |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion (can be the same as q), if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+q
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The input quaternion
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion (can be the same as q), if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

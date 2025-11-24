@@ -4,7 +4,7 @@
 
 ## AnimationSet.numAnimations property
 
-How many animations in this set
+Number of animation clips registered in this set.
 
 **Signature:**
 

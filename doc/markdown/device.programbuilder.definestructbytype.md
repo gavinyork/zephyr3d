@@ -14,9 +14,39 @@ defineStructByType(structType: PBStructTypeInfo): ShaderTypeFunc;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  structType | [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) | The structure type info |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+structType
+
+
+</td><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+The structure type info
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

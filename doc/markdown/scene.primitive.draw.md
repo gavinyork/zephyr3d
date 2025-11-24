@@ -4,7 +4,9 @@
 
 ## Primitive.draw() method
 
-Draw the prmitive
+Issue a non-instanced draw for the current topology and range.
+
+Preconditions: A valid vertex layout and `indexCount > 0`<!-- -->.
 
 **Signature:**
 

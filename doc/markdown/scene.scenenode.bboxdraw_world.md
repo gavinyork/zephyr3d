@@ -4,6 +4,8 @@
 
 ## SceneNode.BBOXDRAW\_WORLD property
 
+Draw world-space bounding box.
+
 **Signature:**
 
 ```typescript

@@ -9,14 +9,44 @@ Sets the texture that contains the morph target data
 **Signature:**
 
 ```typescript
-setMorphData(data: Texture2D): void;
+setMorphData(data: MorphData): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [Texture2D](doc/markdown/./device.texture2d.md) | The texture that contains the morph target data |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[MorphData](doc/markdown/./scene.morphdata.md)
+
+
+</td><td>
+
+The texture that contains the morph target data
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -9,7 +9,8 @@ A generic constructor type
 **Signature:**
 
 ```typescript
-type GenericConstructor<T = {}> = {
+type GenericConstructor<T = object> = {
     new (...args: any[]): T;
+    isPrototypeOf(v: object): boolean;
 };
 ```

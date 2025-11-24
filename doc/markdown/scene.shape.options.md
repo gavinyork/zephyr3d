@@ -4,10 +4,12 @@
 
 ## Shape.options property
 
-Creation options
+Get shape creation options
 
 **Signature:**
 
 ```typescript
 get options(): T;
+
+set options(options: T);
 ```

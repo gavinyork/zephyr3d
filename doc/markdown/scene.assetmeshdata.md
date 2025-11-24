@@ -14,8 +14,62 @@ interface AssetMeshData
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [morphWeights?](doc/markdown/./scene.assetmeshdata.morphweights.md) |  | number\[\] | _(Optional)_ |
-|  [subMeshes](doc/markdown/./scene.assetmeshdata.submeshes.md) |  | [AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md)<!-- -->\[\] |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[morphWeights?](doc/markdown/./scene.assetmeshdata.morphweights.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+[subMeshes](doc/markdown/./scene.assetmeshdata.submeshes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

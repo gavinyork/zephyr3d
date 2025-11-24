@@ -14,10 +14,51 @@ compute(this: PBGlobalScope, pb: ProgramBuilder): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  this | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) |  |
-|  pb | [ProgramBuilder](doc/markdown/./device.programbuilder.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+this
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+pb
+
+
+</td><td>
+
+[ProgramBuilder](doc/markdown/./device.programbuilder.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

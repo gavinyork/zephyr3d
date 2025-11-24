@@ -14,48 +14,608 @@ declare class AABB
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./base.aabb._constructor_.md) |  | Construct an AABB with zero size at zero point. |
-|  [(constructor)(box)](doc/markdown/./base.aabb._constructor__1.md) |  | Construct an AABB by copying from another AABB. |
-|  [(constructor)(minPoint, maxPoint)](doc/markdown/./base.aabb._constructor__2.md) |  | Construct AABB from the min/max point. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./base.aabb._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct an AABB with zero size at zero point.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(box)](doc/markdown/./base.aabb._constructor__1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct an AABB by copying from another AABB.
+
+
+</td></tr>
+<tr><td>
+
+[(constructor)(minPoint, maxPoint)](doc/markdown/./base.aabb._constructor__2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Construct AABB from the min/max point.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [center](doc/markdown/./base.aabb.center.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Get center point of the AABB. |
-|  [ClipBack](doc/markdown/./base.aabb.clipback.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the back side |
-|  [ClipBottom](doc/markdown/./base.aabb.clipbottom.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the bottom side |
-|  [ClipFront](doc/markdown/./base.aabb.clipfront.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the front side |
-|  [ClipLeft](doc/markdown/./base.aabb.clipleft.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the left side |
-|  [ClipRight](doc/markdown/./base.aabb.clipright.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the right side |
-|  [ClipTop](doc/markdown/./base.aabb.cliptop.md) | <p><code>static</code></p><p><code>readonly</code></p> | number | Clip to the top side |
-|  [diagonalLength](doc/markdown/./base.aabb.diagonallength.md) | <code>readonly</code> | number | Get the diagonal length of the AABB. |
-|  [extents](doc/markdown/./base.aabb.extents.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Get half size of the AABB. |
-|  [maxPoint](doc/markdown/./base.aabb.maxpoint.md) |  | [Vector3](doc/markdown/./base.vector3.md) | Get the max point of the AABB. |
-|  [minPoint](doc/markdown/./base.aabb.minpoint.md) |  | [Vector3](doc/markdown/./base.vector3.md) | Get the min point of the AABB. |
-|  [size](doc/markdown/./base.aabb.size.md) | <code>readonly</code> | [Vector3](doc/markdown/./base.vector3.md) | Get size of the AABB. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[center](doc/markdown/./base.aabb.center.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get center point of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[ClipBack](doc/markdown/./base.aabb.clipback.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the back side
+
+
+</td></tr>
+<tr><td>
+
+[ClipBottom](doc/markdown/./base.aabb.clipbottom.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the bottom side
+
+
+</td></tr>
+<tr><td>
+
+[ClipFront](doc/markdown/./base.aabb.clipfront.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the front side
+
+
+</td></tr>
+<tr><td>
+
+[ClipLeft](doc/markdown/./base.aabb.clipleft.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the left side
+
+
+</td></tr>
+<tr><td>
+
+[ClipRight](doc/markdown/./base.aabb.clipright.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the right side
+
+
+</td></tr>
+<tr><td>
+
+[ClipTop](doc/markdown/./base.aabb.cliptop.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Clip to the top side
+
+
+</td></tr>
+<tr><td>
+
+[diagonalLength](doc/markdown/./base.aabb.diagonallength.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Get the diagonal length of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[extents](doc/markdown/./base.aabb.extents.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get half size of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[maxPoint](doc/markdown/./base.aabb.maxpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get the max point of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[minPoint](doc/markdown/./base.aabb.minpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get the min point of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[size](doc/markdown/./base.aabb.size.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+Get size of the AABB.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [beginExtend()](doc/markdown/./base.aabb.beginextend.md) |  | Invalidate the min/max point so that we can start extending the AABB. |
-|  [behindPlane(p)](doc/markdown/./base.aabb.behindplane.md) |  | Check if the box is behind a plane. |
-|  [computePoints()](doc/markdown/./base.aabb.computepoints.md) |  | Calculate the coordinates of the eight corners of the AABB. |
-|  [containsBox(other)](doc/markdown/./base.aabb.containsbox.md) |  | Check if the AABB contains all of the eight corner point of another AABB |
-|  [containsPoint(pt)](doc/markdown/./base.aabb.containspoint.md) |  | Check if the box contains specified point. |
-|  [equalsTo(other, epsl)](doc/markdown/./base.aabb.equalsto.md) |  | Check if the AABB is close enough to another AABB. |
-|  [extend(v)](doc/markdown/./base.aabb.extend.md) |  | Extend the AABB so that it can contain specified point. |
-|  [extend3(x, y, z)](doc/markdown/./base.aabb.extend3.md) |  | Extend the AABB so that it can contain specified point. |
-|  [getClipState(viewProjMatrix)](doc/markdown/./base.aabb.getclipstate.md) |  | Do a clip test at the AABB and a frustum. |
-|  [getClipStateMask(viewProjMatrix, mask)](doc/markdown/./base.aabb.getclipstatemask.md) |  | Do a clip test at the AABB and a frustum. |
-|  [getClipStateWithFrustum(frustum)](doc/markdown/./base.aabb.getclipstatewithfrustum.md) |  | Do a clip test at the AABB and a frustum. |
-|  [getClipStateWithFrustumMask(frustum, mask)](doc/markdown/./base.aabb.getclipstatewithfrustummask.md) |  | Do a clip test at the AABB and a frustum. |
-|  [inplaceTransform(matrix)](doc/markdown/./base.aabb.inplacetransform.md) |  | Inplace transform the AABB. |
-|  [intersectedWithBox(other)](doc/markdown/./base.aabb.intersectedwithbox.md) |  | Check if the AABB intersects with another AABB. |
-|  [isValid()](doc/markdown/./base.aabb.isvalid.md) |  | Check if the AABB is valid. |
-|  [transform(bbox, matrix, result)](doc/markdown/./base.aabb.transform.md) | <code>static</code> | Get an AABB by transforming another AABB |
-|  [union(other)](doc/markdown/./base.aabb.union.md) |  | Merge the AABB with another AABB. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[beginExtend()](doc/markdown/./base.aabb.beginextend.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Invalidate the min/max point so that we can start extending the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[behindPlane(p)](doc/markdown/./base.aabb.behindplane.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the box is behind a plane.
+
+
+</td></tr>
+<tr><td>
+
+[computePoints()](doc/markdown/./base.aabb.computepoints.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate the coordinates of the eight corners of the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[containsBox(other)](doc/markdown/./base.aabb.containsbox.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the AABB contains all of the eight corner point of another AABB
+
+
+</td></tr>
+<tr><td>
+
+[containsPoint(pt)](doc/markdown/./base.aabb.containspoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the box contains specified point.
+
+
+</td></tr>
+<tr><td>
+
+[equalsTo(other, epsl)](doc/markdown/./base.aabb.equalsto.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the AABB is close enough to another AABB.
+
+
+</td></tr>
+<tr><td>
+
+[extend(v)](doc/markdown/./base.aabb.extend.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Extend the AABB so that it can contain specified point.
+
+
+</td></tr>
+<tr><td>
+
+[extend3(x, y, z)](doc/markdown/./base.aabb.extend3.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Extend the AABB so that it can contain specified point.
+
+
+</td></tr>
+<tr><td>
+
+[getClipState(viewProjMatrix)](doc/markdown/./base.aabb.getclipstate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a clip test at the AABB and a frustum.
+
+
+</td></tr>
+<tr><td>
+
+[getClipStateMask(viewProjMatrix, mask)](doc/markdown/./base.aabb.getclipstatemask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a clip test at the AABB and a frustum.
+
+
+</td></tr>
+<tr><td>
+
+[getClipStateWithFrustum(frustum)](doc/markdown/./base.aabb.getclipstatewithfrustum.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a clip test at the AABB and a frustum.
+
+
+</td></tr>
+<tr><td>
+
+[getClipStateWithFrustumMask(frustum, mask)](doc/markdown/./base.aabb.getclipstatewithfrustummask.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do a clip test at the AABB and a frustum.
+
+
+</td></tr>
+<tr><td>
+
+[inplaceTransform(matrix)](doc/markdown/./base.aabb.inplacetransform.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inplace transform the AABB.
+
+
+</td></tr>
+<tr><td>
+
+[intersectedWithBox(other)](doc/markdown/./base.aabb.intersectedwithbox.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the AABB intersects with another AABB.
+
+
+</td></tr>
+<tr><td>
+
+[isValid()](doc/markdown/./base.aabb.isvalid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the AABB is valid.
+
+
+</td></tr>
+<tr><td>
+
+[transform(bbox, matrix, result)](doc/markdown/./base.aabb.transform.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Get an AABB by transforming another AABB
+
+
+</td></tr>
+<tr><td>
+
+[union(other)](doc/markdown/./base.aabb.union.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Merge the AABB with another AABB.
+
+
+</td></tr>
+</tbody></table>
 

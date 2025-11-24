@@ -12,10 +12,53 @@ createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TextureMipmapData](doc/markdown/./device.texturemipmapdata.md) |  |
-|  creationFlags | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TextureMipmapData](doc/markdown/./device.texturemipmapdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+creationFlags
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

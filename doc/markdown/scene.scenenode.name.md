@@ -4,7 +4,7 @@
 
 ## SceneNode.name property
 
-Name of the scene node
+Display name of the node (for UI/debugging).
 
 **Signature:**
 

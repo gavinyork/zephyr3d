@@ -14,10 +14,55 @@ getClipStateMask(viewProjMatrix: Matrix4x4, mask: number): ClipState;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  viewProjMatrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The view projection matrix of the frustum. |
-|  mask | number | The frustum planes that needs to be tested. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+viewProjMatrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The view projection matrix of the frustum.
+
+
+</td></tr>
+<tr><td>
+
+mask
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The frustum planes that needs to be tested.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

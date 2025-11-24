@@ -9,11 +9,11 @@ Inverse this vector inplace.
 **Signature:**
 
 ```typescript
-inplaceInverse(): Vector4;
+inplaceInverse(): this;
 ```
 **Returns:**
 
-[Vector4](doc/markdown/./base.vector4.md)
+this
 
 self
 

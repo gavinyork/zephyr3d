@@ -14,13 +14,103 @@ setRowXYZW(row: number, x: number, y: number, z: number, w: number): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  row | number | The row index |
-|  x | number | The first value of the row to be set |
-|  y | number | The second value of the row to be set |
-|  z | number | The third value of the row to be set |
-|  w | number | The fourth value of the row to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+row
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The row index
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The first value of the row to be set
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The second value of the row to be set
+
+
+</td></tr>
+<tr><td>
+
+z
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The third value of the row to be set
+
+
+</td></tr>
+<tr><td>
+
+w
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The fourth value of the row to be set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

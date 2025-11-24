@@ -14,9 +14,37 @@ declare function getVertexFormatSize(fmt: VertexAttribFormat): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  fmt | [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+fmt
+
+
+</td><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

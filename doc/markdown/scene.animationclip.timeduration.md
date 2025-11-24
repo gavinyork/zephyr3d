@@ -4,10 +4,14 @@
 
 ## AnimationClip.timeDuration property
 
-The duration of the animation
+Total time span of the clip in seconds.
+
+Automatically extended when adding tracks with longer duration.
 
 **Signature:**
 
 ```typescript
 get timeDuration(): number;
+
+set timeDuration(val: number);
 ```

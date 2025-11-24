@@ -9,12 +9,72 @@ Creates an animation instance
 **Signature:**
 
 ```typescript
-constructor(name: string);
+constructor(name: string, animationSet: AnimationSet, embedded?: boolean);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the animation |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the animation
+
+
+</td></tr>
+<tr><td>
+
+animationSet
+
+
+</td><td>
+
+[AnimationSet](doc/markdown/./scene.animationset.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+embedded
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

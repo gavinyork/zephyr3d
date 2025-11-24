@@ -14,9 +14,39 @@ declare function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  BaseCls | T | class to mix in |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+BaseCls
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+class to mix in
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

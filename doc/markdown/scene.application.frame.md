@@ -4,7 +4,11 @@
 
 ## Application.frame() method
 
-Render one frame
+Render a single frame.
+
+Steps: - Flushes pending disposals from the previous frame. - Clears device state (framebuffer, viewport, scissor). - Queries frame timing from the device (`elapsedFrame`<!-- -->, `elapsedOverall`<!-- -->). - Updates the runtime manager (scripting/behaviors). - Emits `tick` with delta/elapsed times.
+
+Safe to call manually; also used by the run loop.
 
 **Signature:**
 

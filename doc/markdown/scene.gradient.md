@@ -14,11 +14,69 @@ declare function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBSha
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | Current shader scope |
-|  p | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | random seed |
-|  t | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+p
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+random seed
+
+
+</td></tr>
+<tr><td>
+
+t
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -9,15 +9,56 @@ Update uniforms of the bind group
 **Signature:**
 
 ```typescript
-setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture): void;
+setUniforms(_bindGroup: BindGroup, _sourceTex: BaseTexture): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | The bind group to be updated |
-|  sourceTex | [BaseTexture](doc/markdown/./device.basetexture.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+\_sourceTex
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

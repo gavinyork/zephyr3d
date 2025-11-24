@@ -4,24 +4,87 @@
 
 ## AssetManager.fetchTexture() method
 
-Fetches a texture resource from a given URL
+Fetch a texture resource via registered loaders.
+
+- Chooses loader by explicit MIME type or by VFS file extension inference. - Deduplicates in-flight requests and caches ready textures. - If `options.texture` is provided, the asset will be uploaded/blitted into that texture. - On WebGL backends, enforces constraints by repacking non-power-of-two or sRGB textures.
 
 **Signature:**
 
 ```typescript
-fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T>;
+fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>, VFSs?: VFS[]): Promise<T>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  url | string | The URL from where to fetch the resource |
-|  options | [TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md)<!-- -->&lt;T&gt; | _(Optional)_ Options for texture fetching |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+url
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Resource URL or VFS path.
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureFetchOptions](doc/markdown/./scene.texturefetchoptions.md)<!-- -->&lt;T&gt;
+
+
+</td><td>
+
+_(Optional)_ Texture fetching options (color space, sampler, target texture).
+
+
+</td></tr>
+<tr><td>
+
+VFSs
+
+
+</td><td>
+
+[VFS](doc/markdown/./base.vfs.md)<!-- -->\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 Promise&lt;T&gt;
 
-The fetched texture
+A promise that resolves to the loaded texture.
 

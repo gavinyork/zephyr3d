@@ -4,12 +4,12 @@
 
 ## EnvLightWrapper.irradianceSH property
 
-Irradiance SH for environment light type ibl-sh
+Irradiance SH buffer for environment light type ibl
 
 **Signature:**
 
 ```typescript
-get irradianceSH(): Float32Array;
+get irradianceSH(): GPUDataBuffer;
 
-set irradianceSH(value: Float32Array);
+set irradianceSH(value: GPUDataBuffer);
 ```

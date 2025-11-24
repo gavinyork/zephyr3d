@@ -4,7 +4,9 @@
 
 ## Primitive.setIndexBuffer() method
 
-Adds an index buffer to the primitive
+Set or replace the index buffer.
+
+Ownership note: The primitive retains the buffer; previous buffer is released. Marks the vertex layout dirty and invalidates bundles.
 
 **Signature:**
 
@@ -14,11 +16,43 @@ setIndexBuffer(buffer: IndexBuffer): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [IndexBuffer](doc/markdown/./device.indexbuffer.md) | The index buffer to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+
+</td><td>
+
+The index buffer to set (non-null).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

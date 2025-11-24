@@ -4,7 +4,7 @@
 
 ## MeshMaterial.useFeature() method
 
-Use or unuse a feature of the material, this will cause the shader to be rebuild.
+Enable or disable a feature and trigger variant rebuild when changed. Calls `optionChanged(true)` internally on change.
 
 **Signature:**
 
@@ -14,12 +14,59 @@ useFeature(feature: number, use: unknown): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  feature | number | Which feature will be used or unused |
-|  use | unknown | true if use the feature, otherwise false |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+feature
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The feature index to set.
+
+
+</td></tr>
+<tr><td>
+
+use
+
+
+</td><td>
+
+unknown
+
+
+</td><td>
+
+The new feature value (typed by convention).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

@@ -15,7 +15,33 @@ declare class PBFunctionScope extends PBInsideFunctionScope
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [$isMain()](doc/markdown/./device.pbfunctionscope._ismain.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$isMain()](doc/markdown/./device.pbfunctionscope._ismain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

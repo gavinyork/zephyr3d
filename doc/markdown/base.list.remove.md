@@ -14,9 +14,39 @@ remove(it: ListIterator<T>): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  it | [ListIterator](doc/markdown/./base.listiterator.md)<!-- -->&lt;T&gt; | An iterator pointing to the element that needs to be removed |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+it
+
+
+</td><td>
+
+[ListIterator](doc/markdown/./base.listiterator.md)<!-- -->&lt;T&gt;
+
+
+</td><td>
+
+An iterator pointing to the element that needs to be removed
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

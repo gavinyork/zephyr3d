@@ -14,7 +14,37 @@ constructor(numLayers?: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  numLayers | number | _(Optional)_ How many transparent layers, default is 16 |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+numLayers
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ How many transparent layers, default is 16
+
+
+</td></tr>
+</tbody></table>
 

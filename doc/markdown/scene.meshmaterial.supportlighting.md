@@ -4,7 +4,7 @@
 
 ## MeshMaterial.supportLighting() method
 
-Returns true if shading of the material will be affected by lights
+Whether this material responds to scene lighting. Override to return false for unlit materials.
 
 **Signature:**
 
@@ -14,4 +14,6 @@ supportLighting(): boolean;
 **Returns:**
 
 boolean
+
+True if lighting affects this material; otherwise false.
 

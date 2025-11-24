@@ -2,23 +2,10 @@
 
 [Home](doc/markdown/./index.md) &gt; [@zephyr3d/scene](doc/markdown/./scene.md) &gt; [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) &gt; [getNormalTexCoord](doc/markdown/./scene.terrainmaterial.getnormaltexcoord.md)
 
-## TerrainMaterial.getNormalTexCoord() method
-
-@<!-- -->ts-ignore
+## TerrainMaterial.getNormalTexCoord property
 
 **Signature:**
 
 ```typescript
-getNormalTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) |  |
-
-**Returns:**
-
-[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
-

@@ -4,7 +4,7 @@
 
 ## Primitive.getBoundingVolume() method
 
-Gets the bounding volume of the primitive
+Get the bounding volume associated with this primitive.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getBoundingVolume(): BoundingVolume;
 
 [BoundingVolume](doc/markdown/./scene.boundingvolume.md)
 
-The bounding volume of the primitive, or null if no bounding volume set
+The current bounding volume, or `null` if not set.
 

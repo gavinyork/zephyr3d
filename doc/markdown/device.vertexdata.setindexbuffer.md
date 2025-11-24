@@ -14,9 +14,39 @@ setIndexBuffer(buffer: IndexBuffer): IndexBuffer;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [IndexBuffer](doc/markdown/./device.indexbuffer.md) | Index buffer to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+
+</td><td>
+
+Index buffer to be set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

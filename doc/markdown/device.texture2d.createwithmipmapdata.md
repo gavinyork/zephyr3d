@@ -12,11 +12,67 @@ createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: num
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  data | [TextureMipmapData](doc/markdown/./device.texturemipmapdata.md) |  |
-|  sRGB | boolean |  |
-|  creationFlags | number | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+data
+
+
+</td><td>
+
+[TextureMipmapData](doc/markdown/./device.texturemipmapdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+sRGB
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+creationFlags
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

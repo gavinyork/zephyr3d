@@ -8,7 +8,9 @@ import {
   Mesh,
   DirectionalLight,
   TorusShape,
-  PBRMetallicRoughnessMaterial
+  PBRMetallicRoughnessMaterial,
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 const myApp = new Application({
@@ -17,8 +19,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -30,34 +30,47 @@ myApp.ready().then(async () => {
     const material = new PBRMetallicRoughnessMaterial();
     material.albedoColor = new Vector4(Math.random(), Math.random(), Math.random(), 1);
     const mesh = new Mesh(scene, torusShape, material);
-    mesh.position.setRandom(-50, 50);
+    mesh.position.setRandom(-10, 10);
     mesh.rotation.fromEulerAngle(
       Math.random() * Math.PI * 2,
       Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-      'ZYX'
+      Math.random() * Math.PI * 2
     );
     mesh.pickable = true;
   }
 
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    500
-  );
-  camera.lookAt(new Vector3(0, 0, 100), new Vector3(0, 0, 0), Vector3.axisPY());
-  camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 20), new Vector3(0, 0, 0), Vector3.axisPY());
+  scene.mainCamera.controller = new OrbitCameraController();
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   /** @type {*} */
   let lastPickResult;
 
+  getInput().use((ev) => {
+    if (ev instanceof PointerEvent && ev.type === 'pointermove') {
+      const x = ev.offsetX;
+      const y = ev.offsetY;
+      const ray = scene.mainCamera.constructRay(x, y);
+      const pickResult = scene.raycast(ray);
+      if (lastPickResult !== pickResult?.target.node) {
+        if (lastPickResult) {
+          lastPickResult.material.emissiveColor = Vector3.zero();
+          lastPickResult = null;
+        }
+        if (pickResult) {
+          lastPickResult = pickResult.target.node;
+          lastPickResult.material.emissiveColor = new Vector3(1, 1, 0);
+        }
+      }
+    }
+    return false;
+  });
+  /*
   myApp.device.canvas.addEventListener('pointermove', (ev) => {
     const x = ev.offsetX;
     const y = ev.offsetY;
-    const ray = camera.constructRay(x, y);
+    const ray = scene.mainCamera.constructRay(x, y);
     const pickResult = scene.raycast(ray);
     if (lastPickResult !== pickResult?.target.node) {
       if (lastPickResult) {
@@ -70,11 +83,9 @@ myApp.ready().then(async () => {
       }
     }
   });
+  */
 
-  myApp.on('tick', (ev) => {
-    camera.updateController();
-    camera.render(scene);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

@@ -9,5 +9,5 @@ Environment light type
 **Signature:**
 
 ```typescript
-type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none';
+type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
 ```

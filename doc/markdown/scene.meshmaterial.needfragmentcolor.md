@@ -4,7 +4,7 @@
 
 ## MeshMaterial.needFragmentColor() method
 
-Check if the color should be computed in fragment shader, this is required for forward render pass or alpha test is in use or alpha to coverage is in use.
+Whether the fragment shader needs to compute color. Returns true for LIGHT pass, or when alpha test or alpha-to-coverage is enabled. Override if the material writes color in other passes.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ needFragmentColor(ctx?: DrawContext): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+_(Optional)_ Optional draw context; defaults to the last captured `drawContext`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-- true if the color should be computed in fragment shader, otherwise false.
+True if fragment color computation is needed; otherwise false.
 

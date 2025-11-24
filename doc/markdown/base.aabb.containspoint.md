@@ -14,9 +14,39 @@ containsPoint(pt: Vector3): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pt | [Vector3](doc/markdown/./base.vector3.md) | The point to be checked. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pt
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point to be checked.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

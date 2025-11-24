@@ -4,7 +4,7 @@
 
 ## Octree.getChunk() method
 
-Gets the chunk by a given index
+Get a chunk by level index.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getChunk(level: number): OctreeNodeChunk;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  level | number | The chunk index |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+level
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Chunk level (0 is root).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
 
-The chunk at given index
+The `OctreeNodeChunk` at the given level.
 

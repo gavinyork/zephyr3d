@@ -15,13 +15,79 @@ declare class AssetScene extends NamedObject
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name)](doc/markdown/./scene.assetscene._constructor_.md) |  | Creates an instance of AssetScene |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name)](doc/markdown/./scene.assetscene._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of AssetScene
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [rootNodes](doc/markdown/./scene.assetscene.rootnodes.md) |  | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\] | Root nodes of the scene |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[rootNodes](doc/markdown/./scene.assetscene.rootnodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)<!-- -->\[\]
+
+
+</td><td>
+
+Root nodes of the scene
+
+
+</td></tr>
+</tbody></table>
 

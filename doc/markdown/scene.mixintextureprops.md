@@ -14,9 +14,39 @@ declare function mixinTextureProps<U extends string>(name: U): <T extends typeof
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | U | Texture name |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+U
+
+
+</td><td>
+
+Texture name
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

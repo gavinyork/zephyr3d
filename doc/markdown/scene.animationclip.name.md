@@ -4,7 +4,7 @@
 
 ## AnimationClip.name property
 
-Gets the name of the animation
+The unique name of this clip.
 
 **Signature:**
 

@@ -7,9 +7,9 @@
 **Signature:**
 
 ```typescript
-restore(): Promise<void>;
+restore(): void;
 ```
 **Returns:**
 
-Promise&lt;void&gt;
+void
 

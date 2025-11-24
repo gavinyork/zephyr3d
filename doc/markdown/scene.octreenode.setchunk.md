@@ -4,7 +4,7 @@
 
 ## OctreeNode.setChunk() method
 
-Sets the octree chunk
+Assign the chunk that owns this node.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setChunk(chunk: OctreeNodeChunk): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  chunk | [OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md) | The octree chunk to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+chunk
+
+
+</td><td>
+
+[OctreeNodeChunk](doc/markdown/./scene.octreenodechunk.md)
+
+
+</td><td>
+
+Owning chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -12,10 +12,53 @@ protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: Buff
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md) |  |
-|  defaultUsage | [BufferUsage](doc/markdown/./device.bufferusage.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[BufferCreationOptions](doc/markdown/./device.buffercreationoptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+defaultUsage
+
+
+</td><td>
+
+[BufferUsage](doc/markdown/./device.bufferusage.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

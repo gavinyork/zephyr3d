@@ -4,7 +4,7 @@
 
 ## Octree class
 
-Octree class
+Spatial acceleration structure for scene graph nodes using an octree hierarchy.
 
 **Signature:**
 
@@ -12,26 +12,247 @@ Octree class
 declare class Octree 
 ```
 
+## Remarks
+
+- Organizes `GraphNode` instances into a multi-level grid of `OctreeNodeChunk`<!-- -->s. - Supports dynamic resizing to accommodate large scenes while maintaining a minimum leaf size. - Placement is driven by world-space AABBs; nodes are mapped to an appropriate level by size. - Maintains a weak map from `GraphNode` to the current `OctreeNode` for efficient updates.
+
+Performance: - Nodes and chunks are created lazily. - Resizing re-inserts existing nodes; use sparingly and prefer reasonable initial sizes.
+
+Invariants: - `rootSize` and `leafSize` are powers of two; `rootSize >= leafSize`<!-- -->. - Level 0 chunk exists after initialization.
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene, rootSize, leafSize)](doc/markdown/./scene.octree._constructor_.md) |  | Creates an instance of octree |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene, rootSize, leafSize, maxRootSize)](doc/markdown/./scene.octree._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create an octree.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [finalize()](doc/markdown/./scene.octree.finalize.md) |  | Free up the octree |
-|  [getChunk(level)](doc/markdown/./scene.octree.getchunk.md) |  | Gets the chunk by a given index |
-|  [getLeafSize()](doc/markdown/./scene.octree.getleafsize.md) |  | Gets the leaf size of the octree |
-|  [getNumChunks()](doc/markdown/./scene.octree.getnumchunks.md) |  | Gets the number of chunks in the octree |
-|  [getRootNode()](doc/markdown/./scene.octree.getrootnode.md) |  | Gets the root node of the octree |
-|  [getRootSize()](doc/markdown/./scene.octree.getrootsize.md) |  | Gets the root size of the octree |
-|  [getScene()](doc/markdown/./scene.octree.getscene.md) |  | Gets the scene to which the octree belongs |
-|  [initialize(rootSize, leafSize)](doc/markdown/./scene.octree.initialize.md) |  | Initialize the octree with specified root size and leaf size |
-|  [locateNodeChain(candidate, center, radius)](doc/markdown/./scene.octree.locatenodechain.md) |  | Locates a node chain in the octree by a sphere |
-|  [placeNode(node)](doc/markdown/./scene.octree.placenode.md) |  | Place a scene node into the octree |
-|  [removeNode(node)](doc/markdown/./scene.octree.removenode.md) |  | Removes a scene node from the octree |
-|  [resize(size)](doc/markdown/./scene.octree.resize.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[finalize()](doc/markdown/./scene.octree.finalize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Free all nodes and chunks owned by this octree.
+
+
+</td></tr>
+<tr><td>
+
+[getChunk(level)](doc/markdown/./scene.octree.getchunk.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get a chunk by level index.
+
+
+</td></tr>
+<tr><td>
+
+[getLeafSize()](doc/markdown/./scene.octree.getleafsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Minimum leaf cell size (edge length).
+
+
+</td></tr>
+<tr><td>
+
+[getNumChunks()](doc/markdown/./scene.octree.getnumchunks.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Number of chunks (levels) in the octree hierarchy.
+
+
+</td></tr>
+<tr><td>
+
+[getRootNode()](doc/markdown/./scene.octree.getrootnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the root node (level 0, index 0), creating it if necessary.
+
+
+</td></tr>
+<tr><td>
+
+[getRootSize()](doc/markdown/./scene.octree.getrootsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Root world size (edge length).
+
+
+</td></tr>
+<tr><td>
+
+[getScene()](doc/markdown/./scene.octree.getscene.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Owning scene.
+
+
+</td></tr>
+<tr><td>
+
+[initialize(rootSize, leafSize)](doc/markdown/./scene.octree.initialize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Initialize the octree with specified root and leaf sizes.
+
+
+</td></tr>
+<tr><td>
+
+[locateNodeChain(candidate, center, radius)](doc/markdown/./scene.octree.locatenodechain.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Locate the best-fit node chain for a sphere.
+
+
+</td></tr>
+<tr><td>
+
+[placeNode(node)](doc/markdown/./scene.octree.placenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Place or update a scene node in the octree.
+
+
+</td></tr>
+<tr><td>
+
+[prune()](doc/markdown/./scene.octree.prune.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Shrink the octree to the minimum size if the first finer level is empty.
+
+
+</td></tr>
+<tr><td>
+
+[removeNode(node)](doc/markdown/./scene.octree.removenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove a scene node from the octree.
+
+
+</td></tr>
+<tr><td>
+
+[resize(size)](doc/markdown/./scene.octree.resize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Resize the octree root size and rebuild chunks.
+
+
+</td></tr>
+</tbody></table>
 

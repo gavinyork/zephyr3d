@@ -9,19 +9,64 @@ Calculates the interpolated value at a given time
 **Signature:**
 
 ```typescript
-interpolate(t: number, result: Float32Array): Float32Array;
+interpolate<T extends InterpolateData>(t: number, result: T): T;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  t | number | The time to calcuate interpolation |
-|  result | Float32Array | The calculated interpolation value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+t
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The time to calcuate interpolation
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The calculated interpolation value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-Float32Array
+T
 
 The calcuated interpolation value
 

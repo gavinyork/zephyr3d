@@ -12,9 +12,37 @@ abstract createBindGroup(layout: BindGroupLayout): BindGroup;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  layout | [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+layout
+
+
+</td><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

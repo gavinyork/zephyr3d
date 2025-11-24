@@ -15,13 +15,79 @@ declare class ShadowMapPass extends RenderPass
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.shadowmappass._constructor_.md) |  | Creates an instance of ShadowMapPass |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.shadowmappass._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of ShadowMapPass
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [light](doc/markdown/./scene.shadowmappass.light.md) |  | [PunctualLight](doc/markdown/./scene.punctuallight.md) | The light that will be used to render shadow map |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[light](doc/markdown/./scene.shadowmappass.light.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)
+
+
+</td><td>
+
+The light that will be used to render shadow map
+
+
+</td></tr>
+</tbody></table>
 

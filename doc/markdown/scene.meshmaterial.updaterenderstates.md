@@ -4,7 +4,7 @@
 
 ## MeshMaterial.updateRenderStates() method
 
-Update render states according to draw context and current material pass
+Update render states per pass and draw context. Sets blending, alpha-to-coverage, depth test/write, cull mode, color mask, and cooperates with OIT.
 
 **Signature:**
 
@@ -14,13 +14,75 @@ protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawCo
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number | Current material pass |
-|  stateSet | [RenderStateSet](doc/markdown/./device.renderstateset.md) |  |
-|  ctx | [DrawContext](doc/markdown/./scene.drawcontext.md) | Draw context |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Current material pass index.
+
+
+</td></tr>
+<tr><td>
+
+stateSet
+
+
+</td><td>
+
+[RenderStateSet](doc/markdown/./device.renderstateset.md)
+
+
+</td><td>
+
+Render state set to update.
+
+
+</td></tr>
+<tr><td>
+
+ctx
+
+
+</td><td>
+
+[DrawContext](doc/markdown/./scene.drawcontext.md)
+
+
+</td><td>
+
+Current draw context.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
+
+void
 
 void
 

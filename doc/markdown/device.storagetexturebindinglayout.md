@@ -14,9 +14,83 @@ interface StorageTextureBindingLayout
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [access](doc/markdown/./device.storagetexturebindinglayout.access.md) |  | 'write-only' | Access mode |
-|  [format](doc/markdown/./device.storagetexturebindinglayout.format.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format |
-|  [viewDimension](doc/markdown/./device.storagetexturebindinglayout.viewdimension.md) |  | '1d' \| '2d' \| '2d-array' \| 'cube' \| 'cube-array' \| '3d' | View dimension |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[access](doc/markdown/./device.storagetexturebindinglayout.access.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'write-only'
+
+
+</td><td>
+
+Access mode
+
+
+</td></tr>
+<tr><td>
+
+[format](doc/markdown/./device.storagetexturebindinglayout.format.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+The texture format
+
+
+</td></tr>
+<tr><td>
+
+[viewDimension](doc/markdown/./device.storagetexturebindinglayout.viewdimension.md)
+
+
+</td><td>
+
+
+</td><td>
+
+'1d' \| '2d' \| '2d-array' \| 'cube' \| 'cube-array' \| '3d'
+
+
+</td><td>
+
+View dimension
+
+
+</td></tr>
+</tbody></table>
 

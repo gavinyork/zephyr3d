@@ -1,6 +1,20 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Scene, Application, PerspectiveCamera, MeshMaterial, ShaderHelper, OrbitCameraController, Mesh, TorusShape, Compositor, Tonemap, AssetManager, applyMaterialMixins, DirectionalLight, mixinLambert } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  PerspectiveCamera,
+  MeshMaterial,
+  ShaderHelper,
+  OrbitCameraController,
+  Mesh,
+  TorusShape,
+  AssetManager,
+  applyMaterialMixins,
+  DirectionalLight,
+  mixinLambert,
+  getInput
+} from '@zephyr3d/scene';
 
 // 自定义Lambert材质
 // 我们需要混入mixinLight组件
@@ -34,7 +48,10 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
     scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(scope, pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1)));
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
     scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
     // 变体判断
     if (this.diffuseTexture) {
@@ -56,7 +73,10 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
       scope.$l.viewVec = pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), scope.$inputs.worldPos));
       // 变体判断
       if (this.diffuseTexture) {
-        scope.$l.diffuse = pb.mul(pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord), scope.diffuseColor);
+        scope.$l.diffuse = pb.mul(
+          pb.textureSample(scope.diffuseTexture, scope.$inputs.texcoord),
+          scope.diffuseColor
+        );
       } else {
         scope.$l.diffuse = scope.diffuseColor;
       }
@@ -70,13 +90,13 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) 
     }
   }
   // 设置材质的Uniform常量
-  applyUniformValues(bindGroup, ctx, pass){
+  applyUniformValues(bindGroup, ctx, pass) {
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx)){
+    if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('diffuseColor', this.color);
       // 变体判断
       if (this.diffuseTexture) {
-        bindGroup.setTexture('diffuseTexture', this.diffuseTexture)
+        bindGroup.setTexture('diffuseTexture', this.diffuseTexture);
       }
     }
   }
@@ -88,8 +108,6 @@ const myApp = new Application({
 });
 
 myApp.ready().then(async () => {
-  const device = myApp.device;
-
   const scene = new Scene();
 
   // Creates a directional light
@@ -97,27 +115,24 @@ myApp.ready().then(async () => {
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
   const assetManager = new AssetManager();
-  const tex = await assetManager.loadTexture('./assets/images/layer.jpg');
+  const tex = await assetManager.loadTexture('https://cdn.zephyr3d.org/doc/assets/images/layer.jpg');
   const material = new MyLambertMaterial();
   material.color.setXYZW(1, 1, 0, 1);
-  material.diffuseTexture = tex
+  material.diffuseTexture = tex;
   material.uniformChanged();
 
   new Mesh(scene, new TorusShape(), material);
 
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 500);
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
   camera.lookAt(new Vector3(25, 15, 0), new Vector3(0, 0, 0), Vector3.axisPY());
   camera.controller = new OrbitCameraController();
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(camera.handleEvent.bind(camera));
 
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
+  myApp.on('resize', (width, height) => {
+    camera.aspect = width / height;
   });
 
-  myApp.on('keyup', ev => {
+  myApp.on('keyup', (ev) => {
     if (ev.code === 'Space') {
       if (material.diffuseTexture) {
         material.diffuseTexture = null;
@@ -125,10 +140,10 @@ myApp.ready().then(async () => {
         material.diffuseTexture = tex;
       }
     }
-  })
-  myApp.on('tick', ev => {
+  });
+  myApp.on('tick', () => {
     camera.updateController();
-    camera.render(scene, compositor);
+    camera.render(scene);
   });
 
   myApp.run();

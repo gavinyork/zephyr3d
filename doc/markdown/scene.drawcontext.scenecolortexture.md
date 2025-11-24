@@ -4,7 +4,7 @@
 
 ## DrawContext.sceneColorTexture property
 
-Scene color texture
+Scene color texture bound for sampling (previous pass or resolved color).
 
 **Signature:**
 

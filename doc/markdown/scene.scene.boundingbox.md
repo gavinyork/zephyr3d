@@ -4,7 +4,9 @@
 
 ## Scene.boundingBox property
 
-Gets the bounding box of the scene
+Gets the world-axis-aligned bounding box of the scene.
+
+Ensures pending node placements are synchronized before computing.
 
 **Signature:**
 

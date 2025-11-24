@@ -12,11 +12,67 @@ abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iter
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number |  |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) |  |
-|  dynamicOffsets | Iterable&lt;number&gt; | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+dynamicOffsets
+
+
+</td><td>
+
+Iterable&lt;number&gt;
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

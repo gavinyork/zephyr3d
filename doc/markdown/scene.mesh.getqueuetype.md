@@ -4,7 +4,7 @@
 
 ## Mesh.getQueueType() method
 
-Gets the type of render queue
+Returns the type/category of render queue this object belongs to.
 
 **Signature:**
 

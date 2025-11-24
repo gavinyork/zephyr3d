@@ -15,22 +15,178 @@ declare class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(name, returnType, argTypes)](doc/markdown/./device.pbfunctiontypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBFunctionTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(name, returnType, argTypes)](doc/markdown/./device.pbfunctiontypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBFunctionTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [argHash](doc/markdown/./device.pbfunctiontypeinfo.arghash.md) | <code>readonly</code> | string | Get hash for parameter types |
-|  [argTypes](doc/markdown/./device.pbfunctiontypeinfo.argtypes.md) | <code>readonly</code> | { type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\] | Get all the argument types for this function |
-|  [name](doc/markdown/./device.pbfunctiontypeinfo.name.md) | <code>readonly</code> | string | Get name of the function |
-|  [returnType](doc/markdown/./device.pbfunctiontypeinfo.returntype.md) | <code>readonly</code> | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Get return type of the function |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[argHash](doc/markdown/./device.pbfunctiontypeinfo.arghash.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get hash for parameter types
+
+
+</td></tr>
+<tr><td>
+
+[argTypes](doc/markdown/./device.pbfunctiontypeinfo.argtypes.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+{ type: [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->; byRef?: boolean; }\[\]
+
+
+</td><td>
+
+Get all the argument types for this function
+
+
+</td></tr>
+<tr><td>
+
+[name](doc/markdown/./device.pbfunctiontypeinfo.name.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get name of the function
+
+
+</td></tr>
+<tr><td>
+
+[returnType](doc/markdown/./device.pbfunctiontypeinfo.returntype.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Get return type of the function
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbfunctiontypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbfunctiontypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

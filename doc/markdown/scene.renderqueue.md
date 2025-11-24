@@ -9,37 +9,343 @@ A queue that contains the items to be rendered
 **Signature:**
 
 ```typescript
-declare class RenderQueue 
+declare class RenderQueue extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(renderPass, bindGroupAllocator)](doc/markdown/./scene.renderqueue._constructor_.md) |  | Creates an instance of a render queue |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(renderPass, bindGroupAllocator)](doc/markdown/./scene.renderqueue._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of a render queue
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [drawTransparent](doc/markdown/./scene.renderqueue.drawtransparent.md) | <code>readonly</code> | boolean | Whether this render queue has transparent objects to be drawn |
-|  [itemList](doc/markdown/./scene.renderqueue.itemlist.md) | <code>readonly</code> | RenderItemList | Gets the items of the render queue |
-|  [needSceneColor](doc/markdown/./scene.renderqueue.needscenecolor.md) | <code>readonly</code> | boolean | Whether this render queue requires scene color pass |
-|  [ref](doc/markdown/./scene.renderqueue.ref.md) | <code>readonly</code> | RenderQueueRef | Gets the indirect reference of this |
-|  [renderPass](doc/markdown/./scene.renderqueue.renderpass.md) | <code>readonly</code> | [RenderPass](doc/markdown/./scene.renderpass.md) | The render pass to which the render queue belongs |
-|  [shadowedLights](doc/markdown/./scene.renderqueue.shadowedlights.md) | <code>readonly</code> | [PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\] | Gets the shadowed lights |
-|  [sunLight](doc/markdown/./scene.renderqueue.sunlight.md) |  | [DirectionalLight](doc/markdown/./scene.directionallight.md) | The sun light |
-|  [unshadowedLights](doc/markdown/./scene.renderqueue.unshadowedlights.md) | <code>readonly</code> | [PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\] | Gets the unshadowed lights |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[drawTransparent](doc/markdown/./scene.renderqueue.drawtransparent.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this render queue has transparent objects to be drawn
+
+
+</td></tr>
+<tr><td>
+
+[itemList](doc/markdown/./scene.renderqueue.itemlist.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+RenderItemList
+
+
+</td><td>
+
+Gets the items of the render queue
+
+
+</td></tr>
+<tr><td>
+
+[ref](doc/markdown/./scene.renderqueue.ref.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+RenderQueueRef
+
+
+</td><td>
+
+Gets the indirect reference of this
+
+
+</td></tr>
+<tr><td>
+
+[renderPass](doc/markdown/./scene.renderqueue.renderpass.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[RenderPass](doc/markdown/./scene.renderpass.md)
+
+
+</td><td>
+
+The render pass to which the render queue belongs
+
+
+</td></tr>
+<tr><td>
+
+[shadowedLights](doc/markdown/./scene.renderqueue.shadowedlights.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\]
+
+
+</td><td>
+
+Gets the shadowed lights
+
+
+</td></tr>
+<tr><td>
+
+[sunLight](doc/markdown/./scene.renderqueue.sunlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[DirectionalLight](doc/markdown/./scene.directionallight.md)
+
+
+</td><td>
+
+The sun light
+
+
+</td></tr>
+<tr><td>
+
+[unshadowedLights](doc/markdown/./scene.renderqueue.unshadowedlights.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[PunctualLight](doc/markdown/./scene.punctuallight.md)<!-- -->\[\]
+
+
+</td><td>
+
+Gets the unshadowed lights
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [binaryInsert(itemList, item)](doc/markdown/./scene.renderqueue.binaryinsert.md) |  |  |
-|  [getInstanceInfo(drawable)](doc/markdown/./scene.renderqueue.getinstanceinfo.md) |  | Gets the instance information for given drawable object |
-|  [push(camera, drawable)](doc/markdown/./scene.renderqueue.push.md) |  | Push an item to the render queue |
-|  [pushLight(light)](doc/markdown/./scene.renderqueue.pushlight.md) |  | Push a punctual light |
-|  [pushRenderQueue(queue)](doc/markdown/./scene.renderqueue.pushrenderqueue.md) |  | Push items from another render queue |
-|  [reset()](doc/markdown/./scene.renderqueue.reset.md) |  | Removes all items in the render queue |
-|  [sortTransparentItems(cameraPos)](doc/markdown/./scene.renderqueue.sorttransparentitems.md) |  | Sorts the items in the render queue for rendering |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[binaryInsert(itemList, item)](doc/markdown/./scene.renderqueue.binaryinsert.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceInfo(drawable)](doc/markdown/./scene.renderqueue.getinstanceinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the instance information for given drawable object
+
+
+</td></tr>
+<tr><td>
+
+[onDispose()](doc/markdown/./scene.renderqueue.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the render queue
+
+
+</td></tr>
+<tr><td>
+
+[push(camera, drawable)](doc/markdown/./scene.renderqueue.push.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Push an item to the render queue
+
+
+</td></tr>
+<tr><td>
+
+[pushLight(light)](doc/markdown/./scene.renderqueue.pushlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Push a punctual light
+
+
+</td></tr>
+<tr><td>
+
+[pushRenderQueue(queue)](doc/markdown/./scene.renderqueue.pushrenderqueue.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Push items from another render queue
+
+
+</td></tr>
+<tr><td>
+
+[reset()](doc/markdown/./scene.renderqueue.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes all items in the render queue
+
+
+</td></tr>
+<tr><td>
+
+[sortTransparentItems(cameraPos)](doc/markdown/./scene.renderqueue.sorttransparentitems.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sorts the items in the render queue for rendering
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,69 @@ constructor(scene: Scene, primitive?: Primitive, material?: MeshMaterial);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the mesh node belongs |
-|  primitive | [Primitive](doc/markdown/./scene.primitive.md) | _(Optional)_ |
-|  material | [MeshMaterial](doc/markdown/./scene.meshmaterial.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene to which the mesh node belongs
+
+
+</td></tr>
+<tr><td>
+
+primitive
+
+
+</td><td>
+
+[Primitive](doc/markdown/./scene.primitive.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+material
+
+
+</td><td>
+
+[MeshMaterial](doc/markdown/./scene.meshmaterial.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

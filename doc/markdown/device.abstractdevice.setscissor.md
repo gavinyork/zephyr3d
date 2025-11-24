@@ -14,9 +14,39 @@ setScissor(scissor?: DeviceViewport | number[]): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scissor | [DeviceViewport](doc/markdown/./device.deviceviewport.md) \| number\[\] | _(Optional)_ The scissor rectangle position and size, if not specified, the scissor rectangle will be set to \[0, 0, drawingBufferWidth,drawingBufferHeight\] |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scissor
+
+
+</td><td>
+
+[DeviceViewport](doc/markdown/./device.deviceviewport.md) \| number\[\]
+
+
+</td><td>
+
+_(Optional)_ The scissor rectangle position and size, if not specified, the scissor rectangle will be set to \[0, 0, drawingBufferWidth,drawingBufferHeight\]
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

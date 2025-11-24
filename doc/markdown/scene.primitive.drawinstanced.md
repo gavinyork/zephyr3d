@@ -4,7 +4,9 @@
 
 ## Primitive.drawInstanced() method
 
-Draw multiple instances of the primitive
+Issue an instanced draw for the current topology and range.
+
+Preconditions: A valid vertex layout and `indexCount > 0`<!-- -->.
 
 **Signature:**
 
@@ -14,9 +16,39 @@ drawInstanced(numInstances: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  numInstances | number | How many instances of the primitive should be drawn |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+numInstances
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of instances to draw.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

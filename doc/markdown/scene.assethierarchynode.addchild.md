@@ -14,9 +14,39 @@ addChild(child: AssetHierarchyNode): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  child | [AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md) | The child node to be added |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+child
+
+
+</td><td>
+
+[AssetHierarchyNode](doc/markdown/./scene.assethierarchynode.md)
+
+
+</td><td>
+
+The child node to be added
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

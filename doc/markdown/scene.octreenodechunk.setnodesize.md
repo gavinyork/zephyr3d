@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.setNodeSize() method
 
-Sets the size of octree node in this chunk
+Set the node size at this level.
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setNodeSize(size: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  size | number | The node size to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+size
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+World-space edge length per cell.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

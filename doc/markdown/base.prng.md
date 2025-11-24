@@ -14,13 +14,69 @@ declare class PRNG
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(seed)](doc/markdown/./base.prng._constructor_.md) |  | Creates an instance of PRNG |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(seed)](doc/markdown/./base.prng._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of PRNG
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [get()](doc/markdown/./base.prng.get.md) |  | Gets next random value between 0 and 1 |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[get()](doc/markdown/./base.prng.get.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets next random value between 0 and 1
+
+
+</td></tr>
+</tbody></table>
 

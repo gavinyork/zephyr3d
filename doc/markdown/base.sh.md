@@ -14,15 +14,124 @@ declare class SH
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [MAX\_ORDER](doc/markdown/./base.sh.max_order.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) | Maximum supported harmonics order |
-|  [MIN\_ORDER](doc/markdown/./base.sh.min_order.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) | Minimum supported harmonics order |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[MAX\_ORDER](doc/markdown/./base.sh.max_order.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Maximum supported harmonics order
+
+
+</td></tr>
+<tr><td>
+
+[MIN\_ORDER](doc/markdown/./base.sh.min_order.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Minimum supported harmonics order
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [evalBasis(direction, order)](doc/markdown/./base.sh.evalbasis.md) | <code>static</code> | Evaluate SH basis for specific order |
-|  [evalDirectionLight(direction, color, order)](doc/markdown/./base.sh.evaldirectionlight.md) | <code>static</code> | Evaluates a directional light and returns spectral SH data |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[evalBasis(direction, order)](doc/markdown/./base.sh.evalbasis.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Evaluate SH basis for specific order
+
+
+</td></tr>
+<tr><td>
+
+[evalDirectionLight(direction, color, order)](doc/markdown/./base.sh.evaldirectionlight.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Evaluates a directional light and returns spectral SH data
+
+
+</td></tr>
+</tbody></table>
 

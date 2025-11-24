@@ -19,13 +19,103 @@ setFramebuffer(color: (BaseTexture | {
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  color | ([BaseTexture](doc/markdown/./device.basetexture.md) \| { texture: [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->; miplevel?: number; face?: number; layer?: number; })\[\] | An array of BaseTextures or objects containing a BaseTexture and optional properties. Each BaseTexture or object will serve as a color attachment. - If an object is provided, it can specify: - <code>texture</code>: The BaseTexture to use. - <code>miplevel</code>: Optional MIP level for this specific texture. default is 0. - <code>face</code>: Optional face index for cube map textures, specifying the cube face this texture is attached to. default is 0. - <code>layer</code>: Optional layer index, useful for texture arrays. default is 0. |
-|  depth | [BaseTexture](doc/markdown/./device.basetexture.md) | _(Optional)_ Optional BaseTexture to serve as the depth attachment. |
-|  miplevel | number | _(Optional)_ |
-|  face | number | _(Optional)_ |
-|  sampleCount | number | _(Optional)_ Optional sample count defining the number of samples for multisampling. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+color
+
+
+</td><td>
+
+([BaseTexture](doc/markdown/./device.basetexture.md) \| { texture: [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->; miplevel?: number; face?: number; layer?: number; })\[\]
+
+
+</td><td>
+
+An array of BaseTextures or objects containing a BaseTexture and optional properties. Each BaseTexture or object will serve as a color attachment. - If an object is provided, it can specify: - `texture`<!-- -->: The BaseTexture to use. - `miplevel`<!-- -->: Optional MIP level for this specific texture. default is 0. - `face`<!-- -->: Optional face index for cube map textures, specifying the cube face this texture is attached to. default is 0. - `layer`<!-- -->: Optional layer index, useful for texture arrays. default is 0.
+
+
+</td></tr>
+<tr><td>
+
+depth
+
+
+</td><td>
+
+[BaseTexture](doc/markdown/./device.basetexture.md)
+
+
+</td><td>
+
+_(Optional)_ Optional BaseTexture to serve as the depth attachment.
+
+
+</td></tr>
+<tr><td>
+
+miplevel
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+face
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+sampleCount
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Optional sample count defining the number of samples for multisampling.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

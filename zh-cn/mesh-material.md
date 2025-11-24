@@ -32,10 +32,10 @@ const sphere = new Mesh(scene, new SphereShape(), material);
 
 // 创建相机
 // 创建的网格默认位于世界坐标系原点，我们将摄像机放置在(0,0,4)并看向原点
-const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
 // Orbit控制器旋转中心设为原点
-camera.controller = new OrbitCameraController({ center: Vector3.zero() });
+scene.mainCamera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
 ```
 
@@ -43,19 +43,13 @@ camera.controller = new OrbitCameraController({ center: Vector3.zero() });
 
 下面我们给球体一个PBR材质并添加贴图。
 
-我们使用[AssetManager](/doc/markdown/./scene.assetmanager)类的fetchTexture()方法加载贴图。<br>
-[AssetManager.fetchTexture()](/doc/markdown/./scene.assetmanager.fetchtexture)方法接受一个URL地址参数以及一个可选的[Options](/doc/markdown/./scene.texturefetchoptions)对象。<br>
+我们使用[ResourceManager](/doc/markdown/./scene.resourcemanager)类的fetchTexture()方法加载贴图。<br>
+[ResourceManager.fetchTexture()](/doc/markdown/./scene.resourcemanager.fetchtexture)方法接受一个URL地址参数以及一个可选的[Options](/doc/markdown/./scene.texturefetchoptions)对象。<br>
 
-AssetManager会对加载的资源进行缓存，如果该贴图已经加载则不会重新加载。
+ResourceManager会对加载的资源进行缓存，如果该贴图已经加载则不会重新加载。
 
 
 ```javascript
-
-import { AssetManager } from "@zephyr3d/scene";
-
-// ... ...
-
-const assetManager = new AssetManager();
 
 // 创建一个PBR材质
 const material = new PBRMetallicRoughnessMaterial();
@@ -64,11 +58,11 @@ material.metallic = 0.9;
 // 粗糙度 0.6
 material.roughness = 0.6;
 // 添加diffuse贴图
-assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
+getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg').then(texture => {
   material.albedoTexture = texture;
 });
 // 添加法线贴图
-assetManager.fetchTexture('assets/images/earthnormal.png', {
+getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
   linearColorSpace: true
 }).then(texture => {
   material.normalTexture = texture;
@@ -77,6 +71,64 @@ assetManager.fetchTexture('assets/images/earthnormal.png', {
 ```
 
 <div class="showcase" case="tut-6"></div>
+
+## 加载现有材质
+
+如果使用编辑器工作流，可以在编辑器中创建自定义材质，然后调用[ResourceManager.fetchMaterial()](/doc/markdown/./scene.resourcemanager.fetchmaterial)方法加载该材质。
+
+```javascript
+
+import { HttpFS, Vector3 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  SphereShape,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    // 使用编辑器工作流时，一定要配置正确的资产路径
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-50')
+  }
+});
+
+myApp.ready().then(function () {
+  // 创建主光源
+  const scene = new Scene();
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  // 加载材质然后创建模型
+  getEngine()
+    .resourceManager.fetchMaterial('/assets/earth.zmtl')
+    .then((material) => {
+      new Mesh(scene, new SphereShape(), material);
+    });
+
+  // 创建主摄像机
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
+
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
+
+  myApp.run();
+});
+
+```
+
+<div class="showcase" case="tut-50"></div>
 
 ## 手动填充网格顶点
 
@@ -109,17 +161,55 @@ assetManager.fetchTexture('assets/images/earthnormal.png', {
 
 ## 加载模型
 
-最常用的创建网格的方法就是加载现有的模型。目前我们支持GLTF/GLB模型。
-
-加载模型可以很方便地通过AssetManager完成。
+最常用的创建网格的方法就是加载现有的模型。为精简核心，避免核心库包含大量不同模型格式的加载器代码，你需要先通过编辑器导入模型存为zephyr3d预制件(.zprefb)，然后可以通过ResourceManager来加载。
 
 ```javascript
 
-  const assetManager = new AssetManager();
-  // 加载模型到场景
-  assetManager.fetchModel(scene, 'assets/models/Duck.glb').then(info => {
-    info.group.position.setXYZ(0, 0, -10);
-  });
+import { HttpFS, Vector3 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  OrbitCameraController,
+  PerspectiveCamera,
+  DirectionalLight,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+
+const myApp = new Application({
+  backend: backendWebGL2,
+  canvas: document.querySelector('#my-canvas'),
+  runtimeOptions: {
+    // 使用编辑器工作流时，一定要配置正确的资产路径
+    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-10')
+  }
+});
+
+myApp.ready().then(function () {
+  // 创建主光源
+  const scene = new Scene();
+  const light = new DirectionalLight(scene);
+  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+
+  // 加载模型
+  getEngine()
+    .resourceManager.instantiatePrefab(scene.rootNode, '/assets/Duck.zprefab')
+    .then((model) => {
+      model.position.setXYZ(0, -0.5, 0);
+    });
+
+  // 创建主摄像机
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
+
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
+
+  myApp.run();
+});
 
 ```
 

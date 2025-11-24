@@ -4,7 +4,7 @@
 
 ## BaseLight.isLight() method
 
-true if this is a light node, false otherwise
+Type guard: true if this node is a light.
 
 **Signature:**
 

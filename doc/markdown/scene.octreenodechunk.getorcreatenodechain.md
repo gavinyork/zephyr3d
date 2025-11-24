@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getOrCreateNodeChain() method
 
-Gets or creates an octree node chain at a given index
+Ensure the node chain (this level and all parents) exists for a given index.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getOrCreateNodeChain(index: number): OctreeNode;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index of the head node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Linear index at this level.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [OctreeNode](doc/markdown/./scene.octreenode.md)
 
-The head node of the chain
+The `OctreeNode` at this level; parent nodes are created as needed.
 

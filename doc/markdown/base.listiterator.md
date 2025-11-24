@@ -14,19 +14,179 @@ declare class ListIterator<T = unknown>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [data](doc/markdown/./base.listiterator.data.md) |  | T | Gets the data associated with the iterator |
-|  [list](doc/markdown/./base.listiterator.list.md) | <code>readonly</code> | [List](doc/markdown/./base.list.md)<!-- -->&lt;T&gt; | Returns the list object to which the iterator belongs. |
-|  [reversed](doc/markdown/./base.listiterator.reversed.md) | <code>readonly</code> | boolean | Returns whether the iterator is reversed. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[data](doc/markdown/./base.listiterator.data.md)
+
+
+</td><td>
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+Gets the data associated with the iterator
+
+The exception is thrown if the iterator is invalid
+
+
+</td></tr>
+<tr><td>
+
+[list](doc/markdown/./base.listiterator.list.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[List](doc/markdown/./base.list.md)<!-- -->&lt;T&gt;
+
+
+</td><td>
+
+Returns the list object to which the iterator belongs.
+
+
+</td></tr>
+<tr><td>
+
+[reversed](doc/markdown/./base.listiterator.reversed.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Returns whether the iterator is reversed.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [getNext()](doc/markdown/./base.listiterator.getnext.md) |  | Get a new iterator pointing to the next list node |
-|  [getPrev()](doc/markdown/./base.listiterator.getprev.md) |  | Get a new iterator pointing to the previous list node |
-|  [next()](doc/markdown/./base.listiterator.next.md) |  | Let the iterator point to the next list node |
-|  [prev()](doc/markdown/./base.listiterator.prev.md) |  | Let the iterator point to the previous list node |
-|  [valid()](doc/markdown/./base.listiterator.valid.md) |  | Check that the iterator points to a valid list node |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getNext()](doc/markdown/./base.listiterator.getnext.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get a new iterator pointing to the next list node
+
+
+</td></tr>
+<tr><td>
+
+[getPrev()](doc/markdown/./base.listiterator.getprev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get a new iterator pointing to the previous list node
+
+
+</td></tr>
+<tr><td>
+
+[next()](doc/markdown/./base.listiterator.next.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Let the iterator point to the next list node
+
+
+</td></tr>
+<tr><td>
+
+[prev()](doc/markdown/./base.listiterator.prev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Let the iterator point to the previous list node
+
+
+</td></tr>
+<tr><td>
+
+[valid()](doc/markdown/./base.listiterator.valid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check that the iterator points to a valid list node
+
+
+</td></tr>
+</tbody></table>
 

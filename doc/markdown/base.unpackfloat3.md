@@ -9,15 +9,60 @@ Decompresses the three floats that was compressed to R11F\_G11F\_B10F format
 **Signature:**
 
 ```typescript
-declare function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void;
+declare function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pk | number | The compressed value |
-|  result | T | A float array that will store the decompressed floats |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pk
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The compressed value
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+A float array that will store the decompressed floats
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

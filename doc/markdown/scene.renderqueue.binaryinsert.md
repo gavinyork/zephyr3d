@@ -12,10 +12,51 @@ binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  itemList | RenderQueueItem\[\] |  |
-|  item | RenderQueueItem |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+itemList
+
+
+</td><td>
+
+RenderQueueItem\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+item
+
+
+</td><td>
+
+RenderQueueItem
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

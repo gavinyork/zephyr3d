@@ -4,10 +4,12 @@
 
 ## AnimationClip.skeletons property
 
-Gets all skeletons
+All skeletons referenced by this clip.
 
 **Signature:**
 
 ```typescript
-get skeletons(): Set<Skeleton>;
+get skeletons(): Set<string>;
+
+set skeletons(val: Set<string>);
 ```

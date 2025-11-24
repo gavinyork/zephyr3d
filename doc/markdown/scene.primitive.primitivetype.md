@@ -4,7 +4,7 @@
 
 ## Primitive.primitiveType property
 
-Primitive type
+Primitive topology.
 
 **Signature:**
 

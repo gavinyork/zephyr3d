@@ -4,7 +4,7 @@
 
 ## DrawContext.sunLight property
 
-the sun light
+Sun/directional light reference for passes that need it.
 
 **Signature:**
 

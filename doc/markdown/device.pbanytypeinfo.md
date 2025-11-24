@@ -15,15 +15,97 @@ declare class PBAnyTypeInfo extends PBTypeInfo<null>
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.pbanytypeinfo._constructor_.md) |  | Constructs a new instance of the <code>PBAnyTypeInfo</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.pbanytypeinfo._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBAnyTypeInfo` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isAnyType()](doc/markdown/./device.pbanytypeinfo.isanytype.md) |  | returns true if this is an any type |
-|  [isCompatibleType(other)](doc/markdown/./device.pbanytypeinfo.iscompatibletype.md) |  | Check whether a given type is compatible with this type |
-|  [toBufferLayout(offset)](doc/markdown/./device.pbanytypeinfo.tobufferlayout.md) |  | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[isAnyType()](doc/markdown/./device.pbanytypeinfo.isanytype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an any type
+
+
+</td></tr>
+<tr><td>
+
+[isCompatibleType(\_other)](doc/markdown/./device.pbanytypeinfo.iscompatibletype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check whether a given type is compatible with this type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(\_offset)](doc/markdown/./device.pbanytypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

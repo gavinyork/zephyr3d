@@ -4,7 +4,7 @@
 
 ## OctreeNode.getBoxLoosed() method
 
-Gets the loosed bounding box of the node
+Get the loosed AABB of this node.
 
 **Signature:**
 
@@ -15,5 +15,9 @@ getBoxLoosed(): AABB;
 
 [AABB](doc/markdown/./base.aabb.md)
 
-The loosed bounding box of the node
+The loosed `AABB` of this node.
+
+## Remarks
+
+The loosed AABB expands the node by half a node size in each direction, forming a conservative region used for stable placement.
 

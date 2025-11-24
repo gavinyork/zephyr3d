@@ -4,23 +4,53 @@
 
 ## BaseCameraController.\_onMouseUp() method
 
-Mouse up event handler
+Pointer up handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
-protected _onMouseUp(evt: PointerEvent): boolean;
+protected _onMouseUp(_evt: IControllerPointerUpEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | PointerEvent | Mouse event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_evt
+
+
+</td><td>
+
+[IControllerPointerUpEvent](doc/markdown/./scene.icontrollerpointerupevent.md)
+
+
+</td><td>
+
+Pointer event.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

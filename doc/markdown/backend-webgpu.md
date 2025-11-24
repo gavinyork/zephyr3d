@@ -6,7 +6,27 @@
 
 ## Variables
 
-|  Variable | Description |
-|  --- | --- |
-|  [backendWebGPU](doc/markdown/./backend-webgpu.backendwebgpu.md) | The WebGPU backend |
+<table><thead><tr><th>
+
+Variable
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[backendWebGPU](doc/markdown/./backend-webgpu.backendwebgpu.md)
+
+
+</td><td>
+
+The WebGPU backend
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,14 +14,119 @@ readPixels(index: number, x: number, y: number, w: number, h: number, buffer: Ty
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | color attachment index |
-|  x | number | x position of the reading area |
-|  y | number | y position of the reading area |
-|  w | number | width of the reading area |
-|  h | number | height of the reading area |
-|  buffer | [TypedArray](doc/markdown/./base.typedarray.md) | The output buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+color attachment index
+
+
+</td></tr>
+<tr><td>
+
+x
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+x position of the reading area
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+y position of the reading area
+
+
+</td></tr>
+<tr><td>
+
+w
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+width of the reading area
+
+
+</td></tr>
+<tr><td>
+
+h
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+height of the reading area
+
+
+</td></tr>
+<tr><td>
+
+buffer
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+The output buffer
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -38,12 +38,8 @@
     - [Bloom](zh-cn/posteffect-bloom.md)
     - [SSAO](zh-cn/posteffect-sao.md)
     - [FXAA](zh-cn/posteffect-fxaa.md)
+    - [TAA](zh-cn/posteffect-taa.md)
     - [SSR](zh-cn/posteffect-ssr.md)
-  - 自然景观
-    - [地形渲染](zh-cn/terrain.md)
-    - [天空渲染](zh-cn/sky.md)
-    - [大气及雾效](zh-cn/fog.md)
-    - [水面渲染](zh-cn/water.md)
   - 场景拾取
     - [概述](zh-cn/picking.md)
   - 几何体实例化
@@ -52,10 +48,37 @@
     - [概述](zh-cn/oit.md)
   - 多视口渲染
     - [概述](zh-cn/multi-views.md)
-  - 自定义材质
-    - [材质基础](zh-cn/user-material.md)
-    - [无光照材质](zh-cn/user-material-unlit.md)
-    - [光照材质](zh-cn/user-material-lit.md)
-    - [多遍材质](zh-cn/user-material-multipass.md)
-    - [Shader变体](zh-cn/user-material-var.md)
+  - 进阶内容
+    - [内存管理](zh-cn/lifetime.md)
+    - [虚拟文件系统](zh-cn/vfs.md)
+
+- Zephyr3d Editor 使用指南
+
+  - 总体介绍
+    - [概述](zh-cn/editor/overview.md)
+    - [快速开始](zh-cn/editor/getting-started.md)
+
+  - 编辑器界面
+    - [总体布局](zh-cn/editor/ui-layout.md)
+    - [编辑场景](zh-cn/editor/scene-editor.md)
+    - [资产管理](zh-cn/editor/content-browser.md)
+
+  - 材质系统
+    - [材质蓝图基础](zh-cn/editor/material-blueprint.md)
+    - [自定义材质](zh-cn/editor/custom-material.md)
+
+  - 脚本系统
+    - [概述](zh-cn/editor/scripting.md)
+    - [创建脚本](zh-cn/editor/create-script.md)
+
+  - 地形系统
+    - [编辑地形](zh-cn/editor/terrain-tools.md)
+
+  - 动画系统
+    - [概述](zh-cn/editor/animation-overview.md)
+    - [编辑动画](zh-cn/editor/edit-animation.md)
+
+  - 项目构建与发布
+    - [实时预览](zh-cn/editor/preview.md)
+    - [构建与部署](zh-cn/editor/build-deploy.md)
 

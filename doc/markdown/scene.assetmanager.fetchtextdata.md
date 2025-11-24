@@ -4,28 +4,103 @@
 
 ## AssetManager.fetchTextData() method
 
-Fetches a text resource from a given URL
+Fetch a UTF-8 text resource via VFS.
+
+- Results are cached per resolved URL (via HttpRequest.urlResolver if provided; otherwise the raw URL). - If cached, any provided postProcess is ignored for subsequent calls; create a separate AssetManager if you need different post-processing of the same URL.
 
 **Signature:**
 
 ```typescript
-fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string>;
+fetchTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<string>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  url | string | The URL from where to fetch the resource |
-|  postProcess | (text: string) =&gt; string | _(Optional)_ A function that will be involved when the text data was loaded. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+url
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Resource URL or VFS path.
+
+
+</td></tr>
+<tr><td>
+
+postProcess
+
+
+</td><td>
+
+(text: string) =&gt; string
+
+
+</td><td>
+
+_(Optional)_ Optional transformation applied to the loaded text.
+
+
+</td></tr>
+<tr><td>
+
+httpRequest
+
+
+</td><td>
+
+[HttpRequest](doc/markdown/./base.httprequest.md)
+
+
+</td><td>
+
+_(Optional)_ Optional HttpRequest for custom URL resolution/headers.
+
+
+</td></tr>
+<tr><td>
+
+VFSs
+
+
+</td><td>
+
+[VFS](doc/markdown/./base.vfs.md)<!-- -->\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 Promise&lt;string&gt;
 
-The fetched text
-
-## Remarks
-
-If a text data has already been loaded, the function will ignore the postProcess parameter and directly return the text loaded previously. To load the same text with different postProcess parameters, use different AssetManager instances separately.
+A promise that resolves to the loaded (and optionally processed) text.
 

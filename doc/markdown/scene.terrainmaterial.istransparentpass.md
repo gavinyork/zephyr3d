@@ -4,24 +4,52 @@
 
 ## TerrainMaterial.isTransparentPass() method
 
-Determine if a certain pass of this material is translucent.
+Whether the given pass is transparent. Default returns true when `blendMode !== 'none'`<!-- -->.
 
 **Signature:**
 
 ```typescript
 /** @override */
-isTransparentPass(pass: number): boolean;
+isTransparentPass(_pass: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pass | number | Pass of the material |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_pass
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-True if it is translucent, otherwise false.
+True if the pass is transparent; otherwise false.
 

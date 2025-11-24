@@ -14,17 +14,235 @@ interface TextureMipmapData
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [arraySize](doc/markdown/./device.texturemipmapdata.arraysize.md) |  | number | The array size if it holds texture data for array texture |
-|  [depth](doc/markdown/./device.texturemipmapdata.depth.md) |  | number | Texture depth of mipmap level 0 |
-|  [format](doc/markdown/./device.texturemipmapdata.format.md) |  | [TextureFormat](doc/markdown/./device.textureformat.md) | The texture format |
-|  [height](doc/markdown/./device.texturemipmapdata.height.md) |  | number | Texture height of mipmap level 0 |
-|  [isArray](doc/markdown/./device.texturemipmapdata.isarray.md) |  | boolean | true if it holds texture array |
-|  [isCompressed](doc/markdown/./device.texturemipmapdata.iscompressed.md) |  | boolean | true if the texture data are in compressed format |
-|  [isCubemap](doc/markdown/./device.texturemipmapdata.iscubemap.md) |  | boolean | true if it holds texture data for cube texture |
-|  [isVolume](doc/markdown/./device.texturemipmapdata.isvolume.md) |  | boolean | true if it holds texture data for 3d texture |
-|  [mipDatas](doc/markdown/./device.texturemipmapdata.mipdatas.md) |  | [TextureMipmapLevelData](doc/markdown/./device.texturemipmapleveldata.md)<!-- -->\[\]\[\] | The mipmap level datas |
-|  [mipLevels](doc/markdown/./device.texturemipmapdata.miplevels.md) |  | number | How many mipmap levels in the texture data |
-|  [width](doc/markdown/./device.texturemipmapdata.width.md) |  | number | Texture width of mipmap level 0 |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[arraySize](doc/markdown/./device.texturemipmapdata.arraysize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The array size if it holds texture data for array texture
+
+
+</td></tr>
+<tr><td>
+
+[depth](doc/markdown/./device.texturemipmapdata.depth.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Texture depth of mipmap level 0
+
+
+</td></tr>
+<tr><td>
+
+[format](doc/markdown/./device.texturemipmapdata.format.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+The texture format
+
+
+</td></tr>
+<tr><td>
+
+[height](doc/markdown/./device.texturemipmapdata.height.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Texture height of mipmap level 0
+
+
+</td></tr>
+<tr><td>
+
+[isArray](doc/markdown/./device.texturemipmapdata.isarray.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it holds texture array
+
+
+</td></tr>
+<tr><td>
+
+[isCompressed](doc/markdown/./device.texturemipmapdata.iscompressed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the texture data are in compressed format
+
+
+</td></tr>
+<tr><td>
+
+[isCubemap](doc/markdown/./device.texturemipmapdata.iscubemap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it holds texture data for cube texture
+
+
+</td></tr>
+<tr><td>
+
+[isVolume](doc/markdown/./device.texturemipmapdata.isvolume.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if it holds texture data for 3d texture
+
+
+</td></tr>
+<tr><td>
+
+[mipDatas](doc/markdown/./device.texturemipmapdata.mipdatas.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[TextureMipmapLevelData](doc/markdown/./device.texturemipmapleveldata.md)<!-- -->\[\]\[\]
+
+
+</td><td>
+
+The mipmap level datas
+
+
+</td></tr>
+<tr><td>
+
+[mipLevels](doc/markdown/./device.texturemipmapdata.miplevels.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How many mipmap levels in the texture data
+
+
+</td></tr>
+<tr><td>
+
+[width](doc/markdown/./device.texturemipmapdata.width.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Texture width of mipmap level 0
+
+
+</td></tr>
+</tbody></table>
 

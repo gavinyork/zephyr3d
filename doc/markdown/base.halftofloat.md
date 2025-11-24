@@ -14,9 +14,39 @@ declare function halfToFloat(val: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number | A 16-bits integer presents the half float value to be converted. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+A 16-bits integer presents the half float value to be converted.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

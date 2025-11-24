@@ -4,25 +4,87 @@
 
 ## Primitive.createAndSetVertexBuffer() method
 
-Creates a vertex buffer from the given options and then adds it to the primitive
+Create a vertex buffer from data and add it to the primitive.
+
+- For interleaved layouts, pass an array of `VertexAttribFormat`<!-- -->. - For a single attribute, pass a single `VertexAttribFormat`<!-- -->.
 
 **Signature:**
 
 ```typescript
-createAndSetVertexBuffer(format: VertexAttribFormat, data: TypedArray, stepMode?: VertexStepMode): StructuredBuffer;
+createAndSetVertexBuffer(format: VertexAttribFormat[] | VertexAttribFormat, data: TypedArray, stepMode?: VertexStepMode): StructuredBuffer;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md) | Vertex format for the vertex buffer |
-|  data | [TypedArray](doc/markdown/./base.typedarray.md) | Contents of the vertex buffer |
-|  stepMode | [VertexStepMode](doc/markdown/./device.vertexstepmode.md) | _(Optional)_ Step mode of the vertex buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
+
+[VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)<!-- -->\[\] \| [VertexAttribFormat](doc/markdown/./device.vertexattribformat.md)
+
+
+</td><td>
+
+Vertex attribute format(s).
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+[TypedArray](doc/markdown/./base.typedarray.md)
+
+
+</td><td>
+
+Typed array with vertex data.
+
+
+</td></tr>
+<tr><td>
+
+stepMode
+
+
+</td><td>
+
+[VertexStepMode](doc/markdown/./device.vertexstepmode.md)
+
+
+</td><td>
+
+_(Optional)_ Optional step mode (e.g., 'vertex', 'instance').
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
 
-The created vertex buffer
+The created `StructuredBuffer`<!-- -->.
 

@@ -14,13 +14,103 @@ static perspective(fovY: number, aspect: number, znear: number, zfar: number, re
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  fovY | number | The vertical field of view in radians. |
-|  aspect | number | The aspect ratio. |
-|  znear | number | The near clip plane. |
-|  zfar | number | The far clip plane. |
-|  result | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | _(Optional)_ The output matrix, if not specified, a new matrix will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+fovY
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The vertical field of view in radians.
+
+
+</td></tr>
+<tr><td>
+
+aspect
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The aspect ratio.
+
+
+</td></tr>
+<tr><td>
+
+znear
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The near clip plane.
+
+
+</td></tr>
+<tr><td>
+
+zfar
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The far clip plane.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+_(Optional)_ The output matrix, if not specified, a new matrix will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

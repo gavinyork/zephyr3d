@@ -14,11 +14,71 @@ static multiply(a: Quaternion, b: Quaternion, result?: Quaternion): Quaternion;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Quaternion](doc/markdown/./base.quaternion.md) | The first operand. |
-|  b | [Quaternion](doc/markdown/./base.quaternion.md) | The second operand. |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion (can be the same as a or b). if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion (can be the same as a or b). if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

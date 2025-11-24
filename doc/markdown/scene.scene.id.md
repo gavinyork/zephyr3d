@@ -4,7 +4,7 @@
 
 ## Scene.id property
 
-Gets the unique identifier of the scene
+Gets the unique identifier of the scene.
 
 **Signature:**
 

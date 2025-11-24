@@ -14,9 +14,39 @@ distanceToPoint(p: Vector3): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  p | [Vector3](doc/markdown/./base.vector3.md) | The point |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+p
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The point
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

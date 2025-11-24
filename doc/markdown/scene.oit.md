@@ -2,7 +2,7 @@
 
 [Home](doc/markdown/./index.md) &gt; [@zephyr3d/scene](doc/markdown/./scene.md) &gt; [OIT](doc/markdown/./scene.oit.md)
 
-## OIT class
+## OIT interface
 
 Abstract class for order-independent transparency renderers.
 
@@ -13,23 +13,215 @@ This abstract class defines the common interface for all OIT renderers. Specific
 **Signature:**
 
 ```typescript
-declare abstract class OIT 
+interface OIT extends IDisposable 
 ```
+**Extends:** [IDisposable](doc/markdown/./base.idisposable.md)
+
+## Properties
+
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[disposed](doc/markdown/./scene.oit.disposed.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this is disposed
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyUniforms(ctx, bindGroup)](doc/markdown/./scene.oit.applyuniforms.md) | <code>abstract</code> | <p>Applies the uniforms for the given draw context and bind group.</p><p>This function will be called when ever the transparent material will upload uniform variables.</p> |
-|  [begin(ctx)](doc/markdown/./scene.oit.begin.md) | <code>abstract</code> | Begins rendering the transparent objects. |
-|  [beginPass(ctx, pass)](doc/markdown/./scene.oit.beginpass.md) | <code>abstract</code> | Begins rendering for the given pass. |
-|  [calculateHash()](doc/markdown/./scene.oit.calculatehash.md) | <code>abstract</code> | Calculates the hash of the renderer. |
-|  [dispose()](doc/markdown/./scene.oit.dispose.md) | <code>abstract</code> | Disposes the renderer. |
-|  [end(ctx)](doc/markdown/./scene.oit.end.md) | <code>abstract</code> | Ends rendering the transparent objects. |
-|  [endPass(ctx, pass)](doc/markdown/./scene.oit.endpass.md) | <code>abstract</code> | Ends rendering for the given pass. |
-|  [getType()](doc/markdown/./scene.oit.gettype.md) | <code>abstract</code> | Returns the type of the renderer. |
-|  [outputFragmentColor(scope, color)](doc/markdown/./scene.oit.outputfragmentcolor.md) | <code>abstract</code> | Do the fragment color output. |
-|  [setRenderStates(rs)](doc/markdown/./scene.oit.setrenderstates.md) | <code>abstract</code> | <p>Sets the render states for the renderer.</p><p>This function will be called when the transparent object will be rendered.</p> |
-|  [setupFragmentOutput(scope)](doc/markdown/./scene.oit.setupfragmentoutput.md) | <code>abstract</code> | Sets up the fragment output. |
-|  [supportDevice(deviceType)](doc/markdown/./scene.oit.supportdevice.md) | <code>abstract</code> | Checks whether the renderer supports the given device type. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyUniforms(ctx, bindGroup)](doc/markdown/./scene.oit.applyuniforms.md)
+
+
+</td><td>
+
+Applies the uniforms for the given draw context and bind group.
+
+This function will be called when ever the transparent material will upload uniform variables.
+
+
+</td></tr>
+<tr><td>
+
+[begin(ctx)](doc/markdown/./scene.oit.begin.md)
+
+
+</td><td>
+
+Begins rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[beginPass(ctx, pass)](doc/markdown/./scene.oit.beginpass.md)
+
+
+</td><td>
+
+Begins rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[calculateHash()](doc/markdown/./scene.oit.calculatehash.md)
+
+
+</td><td>
+
+Calculates the hash of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[dispose()](doc/markdown/./scene.oit.dispose.md)
+
+
+</td><td>
+
+Disposes the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[end(ctx)](doc/markdown/./scene.oit.end.md)
+
+
+</td><td>
+
+Ends rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[endPass(ctx, pass)](doc/markdown/./scene.oit.endpass.md)
+
+
+</td><td>
+
+Ends rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.oit.gettype.md)
+
+
+</td><td>
+
+Returns the type of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[outputFragmentColor(scope, color)](doc/markdown/./scene.oit.outputfragmentcolor.md)
+
+
+</td><td>
+
+Do the fragment color output.
+
+
+</td></tr>
+<tr><td>
+
+[setRenderStates(rs)](doc/markdown/./scene.oit.setrenderstates.md)
+
+
+</td><td>
+
+Sets the render states for the renderer.
+
+This function will be called when the transparent object will be rendered.
+
+
+</td></tr>
+<tr><td>
+
+[setupFragmentOutput(scope)](doc/markdown/./scene.oit.setupfragmentoutput.md)
+
+
+</td><td>
+
+Sets up the fragment output.
+
+
+</td></tr>
+<tr><td>
+
+[supportDevice(deviceType)](doc/markdown/./scene.oit.supportdevice.md)
+
+
+</td><td>
+
+Checks whether the renderer supports the given device type.
+
+
+</td></tr>
+<tr><td>
+
+[wantsPremultipliedAlpha()](doc/markdown/./scene.oit.wantspremultipliedalpha.md)
+
+
+</td><td>
+
+Whether this OIT algorithm wants pre-multiplied alpha
+
+
+</td></tr>
+</tbody></table>
 

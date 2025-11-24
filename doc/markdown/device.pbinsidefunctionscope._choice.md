@@ -14,11 +14,71 @@ $choice(condition: ExpValueNonArrayType, first: ExpValueNonArrayType, second: Ex
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  condition | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | Condition expression |
-|  first | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | The first value |
-|  second | [ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md) | The second value |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+condition
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+Condition expression
+
+
+</td></tr>
+<tr><td>
+
+first
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+The first value
+
+
+</td></tr>
+<tr><td>
+
+second
+
+
+</td><td>
+
+[ExpValueNonArrayType](doc/markdown/./device.expvaluenonarraytype.md)
+
+
+</td><td>
+
+The second value
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

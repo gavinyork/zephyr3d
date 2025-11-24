@@ -9,18 +9,48 @@ Divide this vector by a vector.
 **Signature:**
 
 ```typescript
-divBy(other: Vector2): Vector2;
+divBy(other: Vector2): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Vector2](doc/markdown/./base.vector2.md) | The vector that will be divide by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Vector2](doc/markdown/./base.vector2.md)
+
+
+</td><td>
+
+The vector that will be divide by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Vector2](doc/markdown/./base.vector2.md)
+this
 
 self
 

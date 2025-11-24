@@ -9,9 +9,11 @@ Weighted-blended OIT renderer.
 **Signature:**
 
 ```typescript
-declare class WeightedBlendedOIT extends OIT 
+declare class WeightedBlendedOIT extends Disposable implements OIT 
 ```
-**Extends:** [OIT](doc/markdown/./scene.oit.md)
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [OIT](doc/markdown/./scene.oit.md)
 
 ## Remarks
 
@@ -19,30 +21,275 @@ The weighed-blended OIT renderer supports both WebGL, WebGL2 and WebGPU device.
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.weightedblendedoit._constructor_.md) |  | Creates an instance of WeightedBlendedOIT class. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.weightedblendedoit._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `WeightedBlendedOIT` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [type](doc/markdown/./scene.weightedblendedoit.type.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) | Type name of WeightedBlendedOIT |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[type](doc/markdown/./scene.weightedblendedoit.type.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+Type name of WeightedBlendedOIT
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyUniforms(ctx, bindGroup)](doc/markdown/./scene.weightedblendedoit.applyuniforms.md) |  | <p>Applies the uniforms for the given draw context and bind group.</p><p>This function will be called when ever the transparent material will upload uniform variables.</p> |
-|  [begin(ctx)](doc/markdown/./scene.weightedblendedoit.begin.md) |  | Begins rendering the transparent objects. |
-|  [beginPass(ctx, pass)](doc/markdown/./scene.weightedblendedoit.beginpass.md) |  | Begins rendering for the given pass. |
-|  [calculateHash()](doc/markdown/./scene.weightedblendedoit.calculatehash.md) |  | Calculates the hash of the renderer. |
-|  [dispose()](doc/markdown/./scene.weightedblendedoit.dispose.md) |  | Disposes the renderer. |
-|  [end(ctx)](doc/markdown/./scene.weightedblendedoit.end.md) |  | Ends rendering the transparent objects. |
-|  [endPass(ctx, pass)](doc/markdown/./scene.weightedblendedoit.endpass.md) |  | Ends rendering for the given pass. |
-|  [getType()](doc/markdown/./scene.weightedblendedoit.gettype.md) |  | Returns the type of the renderer. |
-|  [outputFragmentColor(scope, color)](doc/markdown/./scene.weightedblendedoit.outputfragmentcolor.md) |  | Do the fragment color output. |
-|  [setRenderStates(rs)](doc/markdown/./scene.weightedblendedoit.setrenderstates.md) |  | <p>Sets the render states for the renderer.</p><p>This function will be called when the transparent object will be rendered.</p> |
-|  [setupFragmentOutput(scope)](doc/markdown/./scene.weightedblendedoit.setupfragmentoutput.md) |  | Sets up the fragment output. |
-|  [supportDevice(deviceType)](doc/markdown/./scene.weightedblendedoit.supportdevice.md) |  | Checks whether the renderer supports the given device type. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyUniforms(\_ctx, \_bindGroup)](doc/markdown/./scene.weightedblendedoit.applyuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Applies the uniforms for the given draw context and bind group.
+
+This function will be called when ever the transparent material will upload uniform variables.
+
+
+</td></tr>
+<tr><td>
+
+[begin(\_ctx)](doc/markdown/./scene.weightedblendedoit.begin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Begins rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[beginPass(ctx, \_pass)](doc/markdown/./scene.weightedblendedoit.beginpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Begins rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[calculateHash()](doc/markdown/./scene.weightedblendedoit.calculatehash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculates the hash of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[end(\_ctx)](doc/markdown/./scene.weightedblendedoit.end.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Ends rendering the transparent objects.
+
+
+</td></tr>
+<tr><td>
+
+[endPass(ctx, \_pass)](doc/markdown/./scene.weightedblendedoit.endpass.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Ends rendering for the given pass.
+
+
+</td></tr>
+<tr><td>
+
+[getType()](doc/markdown/./scene.weightedblendedoit.gettype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Returns the type of the renderer.
+
+
+</td></tr>
+<tr><td>
+
+[outputFragmentColor(scope, color)](doc/markdown/./scene.weightedblendedoit.outputfragmentcolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Do the fragment color output.
+
+
+</td></tr>
+<tr><td>
+
+[setRenderStates(rs)](doc/markdown/./scene.weightedblendedoit.setrenderstates.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the render states for the renderer.
+
+This function will be called when the transparent object will be rendered.
+
+
+</td></tr>
+<tr><td>
+
+[setupFragmentOutput(scope)](doc/markdown/./scene.weightedblendedoit.setupfragmentoutput.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets up the fragment output.
+
+
+</td></tr>
+<tr><td>
+
+[supportDevice(\_deviceType)](doc/markdown/./scene.weightedblendedoit.supportdevice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether the renderer supports the given device type.
+
+
+</td></tr>
+<tr><td>
+
+[wantsPremultipliedAlpha()](doc/markdown/./scene.weightedblendedoit.wantspremultipliedalpha.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Whether this OIT algorithm wants pre-multiplied alpha
+
+
+</td></tr>
+</tbody></table>
 

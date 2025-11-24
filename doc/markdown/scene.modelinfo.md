@@ -4,7 +4,9 @@
 
 ## ModelInfo type
 
-Data structure returned by AssetManager.fetchModel()
+Data structure returned by AssetManager.fetchModel().
+
+Bundles the created scene node group and an optional animation set if present in the asset.
 
 **Signature:**
 

@@ -14,24 +14,183 @@ declare class TextureAtlasManager
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(device, binWidth, binHeight, rectBorderWidth, linearSpace)](doc/markdown/./device.textureatlasmanager._constructor_.md) |  | Creates a new texture atlas manager instance |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(device, binWidth, binHeight, rectBorderWidth, linearSpace)](doc/markdown/./device.textureatlasmanager._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new texture atlas manager instance
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [atlasTextureRestoreHandler](doc/markdown/./device.textureatlasmanager.atlastexturerestorehandler.md) |  | (tex: [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->) =&gt; Promise&lt;void&gt; | The texture restore handler callback function This callback function will be called whenever the device has been restored |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[atlasTextureRestoreHandler](doc/markdown/./device.textureatlasmanager.atlastexturerestorehandler.md)
+
+
+</td><td>
+
+
+</td><td>
+
+(tex: [BaseTexture](doc/markdown/./device.basetexture.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+The texture restore handler callback function This callback function will be called whenever the device has been restored
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [clear()](doc/markdown/./device.textureatlasmanager.clear.md) |  | Removes all created atlases |
-|  [getAtlasInfo(key)](doc/markdown/./device.textureatlasmanager.getatlasinfo.md) |  | Gets the information about specified atlas |
-|  [getAtlasTexture(index)](doc/markdown/./device.textureatlasmanager.getatlastexture.md) |  | Gets the atlas texture of a given index |
-|  [isEmpty()](doc/markdown/./device.textureatlasmanager.isempty.md) |  | Check if no atlas has been created |
-|  [pushBitmap(key, bitmap)](doc/markdown/./device.textureatlasmanager.pushbitmap.md) |  | Inserts a bitmap to the atlas texture |
-|  [pushCanvas(key, ctx, x, y, w, h)](doc/markdown/./device.textureatlasmanager.pushcanvas.md) |  | Inserts a rectangle of a canvas to the atlas texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clear()](doc/markdown/./device.textureatlasmanager.clear.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Removes all created atlases
+
+
+</td></tr>
+<tr><td>
+
+[getAtlasInfo(key)](doc/markdown/./device.textureatlasmanager.getatlasinfo.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the information about specified atlas
+
+
+</td></tr>
+<tr><td>
+
+[getAtlasTexture(index)](doc/markdown/./device.textureatlasmanager.getatlastexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the atlas texture of a given index
+
+
+</td></tr>
+<tr><td>
+
+[isEmpty()](doc/markdown/./device.textureatlasmanager.isempty.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if no atlas has been created
+
+
+</td></tr>
+<tr><td>
+
+[pushBitmap(key, bitmap)](doc/markdown/./device.textureatlasmanager.pushbitmap.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inserts a bitmap to the atlas texture
+
+
+</td></tr>
+<tr><td>
+
+[pushCanvas(key, ctx, x, y, w, h)](doc/markdown/./device.textureatlasmanager.pushcanvas.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Inserts a rectangle of a canvas to the atlas texture
+
+
+</td></tr>
+</tbody></table>
 

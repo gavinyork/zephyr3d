@@ -14,29 +14,289 @@ interface RenderStateSet
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [blendingState](doc/markdown/./device.renderstateset.blendingstate.md) | <code>readonly</code> | [BlendingState](doc/markdown/./device.blendingstate.md) | Alpha blending related render statements or null if the default values should be used |
-|  [colorState](doc/markdown/./device.renderstateset.colorstate.md) | <code>readonly</code> | [ColorState](doc/markdown/./device.colorstate.md) | Fragment output related render statements or null if the default values should be used |
-|  [depthState](doc/markdown/./device.renderstateset.depthstate.md) | <code>readonly</code> | [DepthState](doc/markdown/./device.depthstate.md) | Depth buffer related render statements or null if the default values should be used |
-|  [rasterizerState](doc/markdown/./device.renderstateset.rasterizerstate.md) | <code>readonly</code> | [RasterizerState](doc/markdown/./device.rasterizerstate.md) | Rasterization related render statements or null if the default values should be used |
-|  [stencilState](doc/markdown/./device.renderstateset.stencilstate.md) | <code>readonly</code> | [StencilState](doc/markdown/./device.stencilstate.md) | Stencil buffer related render statements or null if the default values should be used |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[blendingState](doc/markdown/./device.renderstateset.blendingstate.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[BlendingState](doc/markdown/./device.blendingstate.md)
+
+
+</td><td>
+
+Alpha blending related render statements or null if the default values should be used
+
+
+</td></tr>
+<tr><td>
+
+[colorState](doc/markdown/./device.renderstateset.colorstate.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[ColorState](doc/markdown/./device.colorstate.md)
+
+
+</td><td>
+
+Fragment output related render statements or null if the default values should be used
+
+
+</td></tr>
+<tr><td>
+
+[depthState](doc/markdown/./device.renderstateset.depthstate.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[DepthState](doc/markdown/./device.depthstate.md)
+
+
+</td><td>
+
+Depth buffer related render statements or null if the default values should be used
+
+
+</td></tr>
+<tr><td>
+
+[rasterizerState](doc/markdown/./device.renderstateset.rasterizerstate.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[RasterizerState](doc/markdown/./device.rasterizerstate.md)
+
+
+</td><td>
+
+Rasterization related render statements or null if the default values should be used
+
+
+</td></tr>
+<tr><td>
+
+[stencilState](doc/markdown/./device.renderstateset.stencilstate.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[StencilState](doc/markdown/./device.stencilstate.md)
+
+
+</td><td>
+
+Stencil buffer related render statements or null if the default values should be used
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [apply(force)](doc/markdown/./device.renderstateset.apply.md) | Applis the render statements to current device |
-|  [clone()](doc/markdown/./device.renderstateset.clone.md) | Creates a new RenderStateSet object by deep copy from this object |
-|  [copyFrom(stateSet)](doc/markdown/./device.renderstateset.copyfrom.md) | Shallow copy existing RenderStateSet object to this |
-|  [defaultBlendingState()](doc/markdown/./device.renderstateset.defaultblendingstate.md) | Deletes the BlendingState that was allocated by [RenderStateSet.useBlendingState()](doc/markdown/./device.renderstateset.useblendingstate.md)<!-- -->, so that the default value will be used |
-|  [defaultColorState()](doc/markdown/./device.renderstateset.defaultcolorstate.md) | Deletes the ColorState that was allocated by [RenderStateSet.useColorState()](doc/markdown/./device.renderstateset.usecolorstate.md)<!-- -->, so that the default value will be used |
-|  [defaultDepthState()](doc/markdown/./device.renderstateset.defaultdepthstate.md) | Deletes the DepthState that was allocated by [RenderStateSet.useDepthState()](doc/markdown/./device.renderstateset.usedepthstate.md)<!-- -->, so that the default value will be used |
-|  [defaultRasterizerState()](doc/markdown/./device.renderstateset.defaultrasterizerstate.md) | Deletes the RasterizerState that was allocated by [RenderStateSet.useRasterizerState()](doc/markdown/./device.renderstateset.userasterizerstate.md)<!-- -->, so that the default value will be used |
-|  [defaultStencilState()](doc/markdown/./device.renderstateset.defaultstencilstate.md) | Deletes the StencilState that was allocated by [RenderStateSet.useStencilState()](doc/markdown/./device.renderstateset.usestencilstate.md)<!-- -->, so that the default value will be used |
-|  [useBlendingState(state)](doc/markdown/./device.renderstateset.useblendingstate.md) | Allocates a BlendingState |
-|  [useColorState(state)](doc/markdown/./device.renderstateset.usecolorstate.md) | Allocates a ColorState |
-|  [useDepthState(state)](doc/markdown/./device.renderstateset.usedepthstate.md) | Allocates a DepthState |
-|  [useRasterizerState(state)](doc/markdown/./device.renderstateset.userasterizerstate.md) | Allocates a RasterizerState |
-|  [useStencilState(state)](doc/markdown/./device.renderstateset.usestencilstate.md) | Allocates a StencilState |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(force)](doc/markdown/./device.renderstateset.apply.md)
+
+
+</td><td>
+
+Applis the render statements to current device
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./device.renderstateset.clone.md)
+
+
+</td><td>
+
+Creates a new RenderStateSet object by deep copy from this object
+
+
+</td></tr>
+<tr><td>
+
+[copyFrom(stateSet)](doc/markdown/./device.renderstateset.copyfrom.md)
+
+
+</td><td>
+
+Shallow copy existing RenderStateSet object to this
+
+
+</td></tr>
+<tr><td>
+
+[defaultBlendingState()](doc/markdown/./device.renderstateset.defaultblendingstate.md)
+
+
+</td><td>
+
+Deletes the BlendingState that was allocated by [RenderStateSet.useBlendingState()](doc/markdown/./device.renderstateset.useblendingstate.md)<!-- -->, so that the default value will be used
+
+
+</td></tr>
+<tr><td>
+
+[defaultColorState()](doc/markdown/./device.renderstateset.defaultcolorstate.md)
+
+
+</td><td>
+
+Deletes the ColorState that was allocated by [RenderStateSet.useColorState()](doc/markdown/./device.renderstateset.usecolorstate.md)<!-- -->, so that the default value will be used
+
+
+</td></tr>
+<tr><td>
+
+[defaultDepthState()](doc/markdown/./device.renderstateset.defaultdepthstate.md)
+
+
+</td><td>
+
+Deletes the DepthState that was allocated by [RenderStateSet.useDepthState()](doc/markdown/./device.renderstateset.usedepthstate.md)<!-- -->, so that the default value will be used
+
+
+</td></tr>
+<tr><td>
+
+[defaultRasterizerState()](doc/markdown/./device.renderstateset.defaultrasterizerstate.md)
+
+
+</td><td>
+
+Deletes the RasterizerState that was allocated by [RenderStateSet.useRasterizerState()](doc/markdown/./device.renderstateset.userasterizerstate.md)<!-- -->, so that the default value will be used
+
+
+</td></tr>
+<tr><td>
+
+[defaultStencilState()](doc/markdown/./device.renderstateset.defaultstencilstate.md)
+
+
+</td><td>
+
+Deletes the StencilState that was allocated by [RenderStateSet.useStencilState()](doc/markdown/./device.renderstateset.usestencilstate.md)<!-- -->, so that the default value will be used
+
+
+</td></tr>
+<tr><td>
+
+[useBlendingState(state)](doc/markdown/./device.renderstateset.useblendingstate.md)
+
+
+</td><td>
+
+Allocates a BlendingState
+
+
+</td></tr>
+<tr><td>
+
+[useColorState(state)](doc/markdown/./device.renderstateset.usecolorstate.md)
+
+
+</td><td>
+
+Allocates a ColorState
+
+
+</td></tr>
+<tr><td>
+
+[useDepthState(state)](doc/markdown/./device.renderstateset.usedepthstate.md)
+
+
+</td><td>
+
+Allocates a DepthState
+
+
+</td></tr>
+<tr><td>
+
+[useRasterizerState(state)](doc/markdown/./device.renderstateset.userasterizerstate.md)
+
+
+</td><td>
+
+Allocates a RasterizerState
+
+
+</td></tr>
+<tr><td>
+
+[useStencilState(state)](doc/markdown/./device.renderstateset.usestencilstate.md)
+
+
+</td><td>
+
+Allocates a StencilState
+
+
+</td></tr>
+</tbody></table>
 

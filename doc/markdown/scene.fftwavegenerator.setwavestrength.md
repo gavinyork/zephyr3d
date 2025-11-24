@@ -14,10 +14,55 @@ setWaveStrength(cascade: number, strength: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cascade | number | The cascade index |
-|  strength | number | The new wave strength for the specified cascade |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cascade
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The cascade index
+
+
+</td></tr>
+<tr><td>
+
+strength
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The new wave strength for the specified cascade
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

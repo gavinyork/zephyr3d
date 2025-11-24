@@ -9,15 +9,60 @@ Handle input events
 **Signature:**
 
 ```typescript
-handleEvent(ev: Event, type?: string): boolean;
+handleEvent<T extends IBaseEvent<any>>(ev: T, type?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ev | Event | input event object |
-|  type | string | _(Optional)_ event type, default to ev.type |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ev
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+input event object
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ event type, default to ev.type
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -4,7 +4,9 @@
 
 ## Camera.HiZ property
 
-Gets whether Hi-Z acceleration is enabled. When enabled, it can significantly improve SSR performance with minimal quality impact.
+Whether Hi-Z acceleration is enabled.
+
+Often improves SSR performance with little quality impact when supported.
 
 **Signature:**
 

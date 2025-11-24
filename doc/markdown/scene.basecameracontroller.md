@@ -4,7 +4,19 @@
 
 ## BaseCameraController class
 
-Base class for any kind of camera controllers
+Base class for camera controllers.
+
+Provides a common lifecycle and event-handling surface for concrete camera controllers (e.g., orbit, fly, FPS). Subclasses implement protected handler methods to react to mouse/keyboard input, and update camera transforms in `update()`<!-- -->.
+
+Responsibilities: - Holds a reference to a `Camera` and resets internal state when the camera changes. - Offers a `lookAt(from, to, up)` helper that delegates to the camera. - Exposes public event entry points (`onMouseDown`<!-- -->, `onMouseUp`<!-- -->, `onMouseMove`<!-- -->, `onMouseWheel`<!-- -->, `onKeyDown`<!-- -->, `onKeyUp`<!-- -->) that forward to protected handlers which subclasses can override. - Defines `reset()` and `update()` lifecycle methods for state initialization and per-frame updates.
+
+Event handling contract: - Each public `onXxx` method returns a boolean that indicates whether the event was handled by the controller. Returning `true` allows upstream dispatchers to stop propagation if desired.
+
+Subclassing guidelines: - Override the protected `_onXxx` handlers rather than the public `onXxx` methods. - Override `reset()` to reinitialize controller state when a new camera is attached. - Override `update()` to advance state each frame (e.g., apply accumulated deltas with damping).
+
+Lifecycle: 1. A camera is attached via internal `_setCamera(camera)`<!-- -->, which calls `reset()`<!-- -->. 2. Input events are passed in through the public `onXxx` methods. 3. Per-frame, `update()` is called to apply state changes to the camera.
+
+Thread-safety/assumptions: - Designed for use on the main thread in a browser environment. - Pointer events are used for mouse input; keyboard events for key input.
 
 **Signature:**
 
@@ -14,20 +26,291 @@ declare class BaseCameraController
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.basecameracontroller._constructor_.md) |  | Creates an instance of BaseCameraController |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.basecameracontroller._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create a base camera controller.
+
+The controller starts without an attached camera. Call the internal `_setCamera` to attach a camera (performed by the owning system), which triggers `reset()`<!-- -->.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [\_onKeyDown(evt)](doc/markdown/./scene.basecameracontroller._onkeydown.md) | <code>protected</code> | Key down event handler |
-|  [\_onKeyUp(evt)](doc/markdown/./scene.basecameracontroller._onkeyup.md) | <code>protected</code> | Key up event handler |
-|  [\_onMouseDown(evt)](doc/markdown/./scene.basecameracontroller._onmousedown.md) | <code>protected</code> | Mouse down event handler |
-|  [\_onMouseMove(evt)](doc/markdown/./scene.basecameracontroller._onmousemove.md) | <code>protected</code> | Mouse move event handler |
-|  [\_onMouseUp(evt)](doc/markdown/./scene.basecameracontroller._onmouseup.md) | <code>protected</code> | Mouse up event handler |
-|  [\_onMouseWheel(evt)](doc/markdown/./scene.basecameracontroller._onmousewheel.md) | <code>protected</code> | Mouse wheel event handler |
-|  [reset()](doc/markdown/./scene.basecameracontroller.reset.md) |  | Resets state |
-|  [update()](doc/markdown/./scene.basecameracontroller.update.md) |  | Updates state |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_onKeyDown(\_evt)](doc/markdown/./scene.basecameracontroller._onkeydown.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Key down handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onKeyUp(\_evt)](doc/markdown/./scene.basecameracontroller._onkeyup.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Key up handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseDown(\_evt)](doc/markdown/./scene.basecameracontroller._onmousedown.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Mouse down event handler
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseMove(\_evt)](doc/markdown/./scene.basecameracontroller._onmousemove.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer move handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseUp(\_evt)](doc/markdown/./scene.basecameracontroller._onmouseup.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Pointer up handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[\_onMouseWheel(\_evt)](doc/markdown/./scene.basecameracontroller._onmousewheel.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Mouse wheel handler for subclasses to override.
+
+
+</td></tr>
+<tr><td>
+
+[lookAt(from, to, up)](doc/markdown/./scene.basecameracontroller.lookat.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Convenience method that delegates to `camera.lookAt`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+[onKeyDown(evt)](doc/markdown/./scene.basecameracontroller.onkeydown.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle key down events.
+
+Typical usage: WASD navigation, modifiers for speed, toggling modes.
+
+
+</td></tr>
+<tr><td>
+
+[onKeyUp(evt)](doc/markdown/./scene.basecameracontroller.onkeyup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle key up events.
+
+
+</td></tr>
+<tr><td>
+
+[onMouseDown(evt)](doc/markdown/./scene.basecameracontroller.onmousedown.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle pointer down (mouse/touch/pen) events.
+
+
+</td></tr>
+<tr><td>
+
+[onMouseMove(evt)](doc/markdown/./scene.basecameracontroller.onmousemove.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle pointer move events.
+
+Typical usage: orbit, pan, or look controls based on button/modifier state.
+
+
+</td></tr>
+<tr><td>
+
+[onMouseUp(evt)](doc/markdown/./scene.basecameracontroller.onmouseup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle pointer up events.
+
+
+</td></tr>
+<tr><td>
+
+[onMouseWheel(evt)](doc/markdown/./scene.basecameracontroller.onmousewheel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Handle mouse wheel (scroll) events.
+
+Typical usage: zoom/dolly control, FOV adjustments.
+
+
+</td></tr>
+<tr><td>
+
+[reset()](doc/markdown/./scene.basecameracontroller.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Reset the controller's internal state.
+
+Called automatically when a camera is attached via `_setCamera`<!-- -->. Subclasses should override this to reset accumulators, velocities, targets, etc.
+
+
+</td></tr>
+<tr><td>
+
+[update()](doc/markdown/./scene.basecameracontroller.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Per-frame update.
+
+Subclasses should override this to: - Integrate velocities/accelerations and apply damping. - Smoothly interpolate camera transforms. - Clamp angles/distances/FOV, etc.
+
+Called once per frame by the owning system.
+
+
+</td></tr>
+</tbody></table>
 

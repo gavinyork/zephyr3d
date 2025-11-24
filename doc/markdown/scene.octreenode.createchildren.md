@@ -4,7 +4,7 @@
 
 ## OctreeNode.createChildren() method
 
-Creates all children of this node
+Create all eight children for this node in the next (finer) chunk.
 
 **Signature:**
 
@@ -14,4 +14,8 @@ createChildren(): void;
 **Returns:**
 
 void
+
+## Remarks
+
+No-op when the next chunk does not exist.
 

@@ -14,9 +14,39 @@ getCorner(pos: number): Vector3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  pos | number | The corner index. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+pos
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The corner index.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

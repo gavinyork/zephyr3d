@@ -4,17 +4,12 @@
 
 ## MeshMaterial.(constructor)
 
-Creates an instance of MeshMaterial class
+Create a MeshMaterial with default opaque settings.
+
+Defaults: - `blendMode = 'none'` - `cullMode = 'back'` - `opacity = 1` - `alphaCutoff = 0` - `taaStrength = 1 - 1/16`
 
 **Signature:**
 
 ```typescript
-constructor(...args: any[]);
+constructor();
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  args | any\[\] | constructor arguments |
-

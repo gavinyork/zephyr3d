@@ -4,7 +4,7 @@
 
 ## OctreeNode.getMaxPoint() method
 
-Gets max point of the node
+Get the maximum (tight) corner point of this node in world space.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getMaxPoint(): Vector3;
 
 [Vector3](doc/markdown/./base.vector3.md)
 
-Max point of the node
+The maximum corner as a `Vector3`<!-- -->.
 

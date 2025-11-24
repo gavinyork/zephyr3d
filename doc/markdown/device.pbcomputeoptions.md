@@ -14,14 +14,90 @@ interface PBComputeOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [label?](doc/markdown/./device.pbcomputeoptions.label.md) |  | string | _(Optional)_ program label for debugging |
-|  [workgroupSize](doc/markdown/./device.pbcomputeoptions.workgroupsize.md) |  | \[number, number, number\] | workgroup size |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[label?](doc/markdown/./device.pbcomputeoptions.label.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ program label for debugging
+
+
+</td></tr>
+<tr><td>
+
+[workgroupSize](doc/markdown/./device.pbcomputeoptions.workgroupsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+\[number, number, number\]
+
+
+</td><td>
+
+workgroup size
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [compute(this, pb)](doc/markdown/./device.pbcomputeoptions.compute.md) | compute shader |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[compute(this, pb)](doc/markdown/./device.pbcomputeoptions.compute.md)
+
+
+</td><td>
+
+compute shader
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,69 @@ constructor(phase: 'horizonal' | 'vertical', kernelSize: number, blurSize: numbe
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  phase | 'horizonal' \| 'vertical' | phase of the blit operation |
-|  kernelSize | number | kernel size |
-|  blurSize | number | blur size |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+phase
+
+
+</td><td>
+
+'horizonal' \| 'vertical'
+
+
+</td><td>
+
+phase of the blit operation
+
+
+</td></tr>
+<tr><td>
+
+kernelSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+kernel size
+
+
+</td></tr>
+<tr><td>
+
+blurSize
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+blur size
+
+
+</td></tr>
+</tbody></table>
 

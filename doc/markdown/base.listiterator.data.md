@@ -6,6 +6,8 @@
 
 Gets the data associated with the iterator
 
+The exception is thrown if the iterator is invalid
+
 **Signature:**
 
 ```typescript

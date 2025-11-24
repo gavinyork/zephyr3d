@@ -14,10 +14,55 @@ setRow(row: number, v: Vector3): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  row | number | The row index |
-|  v | [Vector3](doc/markdown/./base.vector3.md) | The values to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+row
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The row index
+
+
+</td></tr>
+<tr><td>
+
+v
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The values to be set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

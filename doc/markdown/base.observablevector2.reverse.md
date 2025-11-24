@@ -9,9 +9,9 @@ Inherited from Float32Array.reverse
 **Signature:**
 
 ```typescript
-reverse(): Float32Array;
+reverse(): this;
 ```
 **Returns:**
 
-Float32Array
+this
 

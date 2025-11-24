@@ -15,8 +15,49 @@ declare class PBIfScope extends PBInsideFunctionScope
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [$else(body)](doc/markdown/./device.pbifscope._else.md) |  | Creates an 'else' branch |
-|  [$elseif(condition, body)](doc/markdown/./device.pbifscope._elseif.md) |  | Creates an 'else if' branch |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[$else(body)](doc/markdown/./device.pbifscope._else.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an 'else' branch
+
+
+</td></tr>
+<tr><td>
+
+[$elseif(condition, body)](doc/markdown/./device.pbifscope._elseif.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an 'else if' branch
+
+
+</td></tr>
+</tbody></table>
 

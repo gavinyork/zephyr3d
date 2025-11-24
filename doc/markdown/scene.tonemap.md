@@ -9,29 +9,147 @@ The tonemap post effect
 **Signature:**
 
 ```typescript
-declare class Tonemap extends AbstractPostEffect<'Tonemap'> 
+declare class Tonemap extends AbstractPostEffect 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'Tonemap'&gt;
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.tonemap._constructor_.md) |  | Creates an instance of tonemap post effect |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.tonemap._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of tonemap post effect
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [className](doc/markdown/./scene.tonemap.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "Tonemap" |  |
-|  [exposure](doc/markdown/./scene.tonemap.exposure.md) |  | number | Exposure value |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[exposure](doc/markdown/./scene.tonemap.exposure.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Exposure value
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.tonemap.apply.md) |  | Apply the post effect |
-|  [dispose()](doc/markdown/./scene.tonemap.dispose.md) |  | Disposes the post effect. |
-|  [requireDepthAttachment()](doc/markdown/./scene.tonemap.requiredepthattachment.md) |  | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture()](doc/markdown/./scene.tonemap.requirelineardepthtexture.md) |  | Checks whether this post effect requires the linear depth texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.tonemap.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply the post effect
+
+
+</td></tr>
+<tr><td>
+
+[requireDepthAttachment()](doc/markdown/./scene.tonemap.requiredepthattachment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the scene depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[requireLinearDepthTexture()](doc/markdown/./scene.tonemap.requirelineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the linear depth texture
+
+
+</td></tr>
+</tbody></table>
 

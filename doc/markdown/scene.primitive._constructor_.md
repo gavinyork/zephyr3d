@@ -4,7 +4,9 @@
 
 ## Primitive.(constructor)
 
-Creates an instance of a primitive
+Create an empty primitive.
+
+Defaults: - Primitive type: 'triangle-list' - `indexStart = 0`<!-- -->, `indexCount = null` (auto-computed) - No vertex/index buffers attached - No bounding volume
 
 **Signature:**
 

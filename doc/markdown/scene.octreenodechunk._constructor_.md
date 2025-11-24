@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.(constructor)
 
-Creates an instance of octree chunk
+Create a chunk for the given octree.
 
 **Signature:**
 
@@ -14,7 +14,37 @@ constructor(octree: Octree);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  octree | [Octree](doc/markdown/./scene.octree.md) | Octree to which the chunk belongs |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+octree
+
+
+</td><td>
+
+[Octree](doc/markdown/./scene.octree.md)
+
+
+</td><td>
+
+Owning octree.
+
+
+</td></tr>
+</tbody></table>
 

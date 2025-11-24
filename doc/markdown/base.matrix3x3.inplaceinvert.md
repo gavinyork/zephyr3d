@@ -9,11 +9,11 @@ Calculate the inverse of this matrix inplace.
 **Signature:**
 
 ```typescript
-inplaceInvert(): Matrix3x3;
+inplaceInvert(): this;
 ```
 **Returns:**
 
-[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+this
 
 self
 

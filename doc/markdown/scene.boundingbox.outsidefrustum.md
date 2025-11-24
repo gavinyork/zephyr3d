@@ -14,9 +14,39 @@ outsideFrustum(frustum: Frustum | Matrix4x4): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  frustum | [Frustum](doc/markdown/./base.frustum.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The frustum to check |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+frustum
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md) \| [Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The frustum to check
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

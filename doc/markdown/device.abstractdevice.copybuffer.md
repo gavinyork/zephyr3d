@@ -14,13 +14,103 @@ copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: nu
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sourceBuffer | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) | Source buffer |
-|  destBuffer | [GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md) | destination buffer |
-|  srcOffset | number | Source offset in bytes |
-|  dstOffset | number | Destination offset in bytes |
-|  bytes | number | How many bytes to be copy |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sourceBuffer
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+Source buffer
+
+
+</td></tr>
+<tr><td>
+
+destBuffer
+
+
+</td><td>
+
+[GPUDataBuffer](doc/markdown/./device.gpudatabuffer.md)
+
+
+</td><td>
+
+destination buffer
+
+
+</td></tr>
+<tr><td>
+
+srcOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Source offset in bytes
+
+
+</td></tr>
+<tr><td>
+
+dstOffset
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Destination offset in bytes
+
+
+</td></tr>
+<tr><td>
+
+bytes
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How many bytes to be copy
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

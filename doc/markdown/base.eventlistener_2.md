@@ -9,7 +9,7 @@ Event handler type
 **Signature:**
 
 ```typescript
-type EventListener<T extends EventMap, K extends keyof T> = (evt: T[K]) => void | Promise<void>;
+type EventListener<T extends EventMap, K extends keyof T> = (...args: T[K]) => void | Promise<void>;
 ```
 **References:** [EventMap](doc/markdown/./base.eventmap.md)
 

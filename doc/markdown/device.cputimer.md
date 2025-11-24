@@ -15,17 +15,115 @@ declare class CPUTimer implements ITimer
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./device.cputimer._constructor_.md) |  | Constructs a new instance of the <code>CPUTimer</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./device.cputimer._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `CPUTimer` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [begin()](doc/markdown/./device.cputimer.begin.md) |  |  |
-|  [elapsed()](doc/markdown/./device.cputimer.elapsed.md) |  |  |
-|  [end()](doc/markdown/./device.cputimer.end.md) |  |  |
-|  [ended()](doc/markdown/./device.cputimer.ended.md) |  |  |
-|  [now()](doc/markdown/./device.cputimer.now.md) |  |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[begin()](doc/markdown/./device.cputimer.begin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[elapsed()](doc/markdown/./device.cputimer.elapsed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[end()](doc/markdown/./device.cputimer.end.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[ended()](doc/markdown/./device.cputimer.ended.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[now()](doc/markdown/./device.cputimer.now.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

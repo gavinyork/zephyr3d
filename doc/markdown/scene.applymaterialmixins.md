@@ -4,24 +4,75 @@
 
 ## applyMaterialMixins() function
 
-Apply material mixins to specific material class
+Apply material mixins to a target material class.
+
+Useful for composing optional capabilities (e.g., base color, normal map, PBR terms).
 
 **Signature:**
 
 ```typescript
-declare function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M>;
+declare function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): ExtractMixinType<M> & T;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  target | T | Material class |
-|  mixins | M | mixins |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+target
+
+
+</td><td>
+
+T
+
+
+</td><td>
+
+The material class (constructor or prototype).
+
+
+</td></tr>
+<tr><td>
+
+mixins
+
+
+</td><td>
+
+M
+
+
+</td><td>
+
+One or more mixin functions.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[ExtractMixinType](doc/markdown/./scene.extractmixintype.md)<!-- -->&lt;M&gt;
+[ExtractMixinType](doc/markdown/./scene.extractmixintype.md)<!-- -->&lt;M&gt; &amp; T
 
-Mixed mesh material class
+The target class augmented with the mixins (intersection type).
+
+## Example
+
+class MyMaterial extends MeshMaterial {<!-- -->} const Mixed = applyMaterialMixins(MyMaterial, WithBaseColor, WithNormalMap); const m = new Mixed();
 

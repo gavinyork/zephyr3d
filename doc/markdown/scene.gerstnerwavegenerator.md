@@ -9,47 +9,484 @@ Gerstner wave generator.
 **Signature:**
 
 ```typescript
-declare class GerstnerWaveGenerator extends WaveGenerator 
+declare class GerstnerWaveGenerator extends Disposable implements WaveGenerator 
 ```
-**Extends:** [WaveGenerator](doc/markdown/./scene.wavegenerator.md)
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
+
+**Implements:** [WaveGenerator](doc/markdown/./scene.wavegenerator.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.gerstnerwavegenerator._constructor_.md) |  | Creates a new Gerstner wave generator. |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.gerstnerwavegenerator._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new Gerstner wave generator.
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [numWaves](doc/markdown/./scene.gerstnerwavegenerator.numwaves.md) |  | number | Gets the number of waves. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[numWaves](doc/markdown/./scene.gerstnerwavegenerator.numwaves.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gets the number of waves.
+
+
+</td></tr>
+<tr><td>
+
+[version](doc/markdown/./scene.gerstnerwavegenerator.version.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyWaterBindGroup(bindGroup)](doc/markdown/./scene.gerstnerwavegenerator.applywaterbindgroup.md) |  | Apply water bind group. |
-|  [calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.gerstnerwavegenerator.calcclipmaptileaabb.md) |  |  |
-|  [calcFragmentNormal(scope, xz)](doc/markdown/./scene.gerstnerwavegenerator.calcfragmentnormal.md) |  |  |
-|  [calcFragmentNormalAndFoam(scope, xz)](doc/markdown/./scene.gerstnerwavegenerator.calcfragmentnormalandfoam.md) |  | Calculate fragment normal and foam. |
-|  [calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.gerstnerwavegenerator.calcvertexpositionandnormal.md) |  | Calculate vertex position and normal. |
-|  [dispose()](doc/markdown/./scene.gerstnerwavegenerator.dispose.md) |  | Dispose the wave generator. |
-|  [getHash(device)](doc/markdown/./scene.gerstnerwavegenerator.gethash.md) |  | Get the shader hash of the wave generator. |
-|  [getOriginX(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getoriginx.md) |  | Gets the X coordinate of the wave origin if it is an omni-directional wave. |
-|  [getOriginZ(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getoriginz.md) |  | Gets the Z coordinate of the wave origin if it is an omni-directional wave. |
-|  [getWaveAmplitude(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwaveamplitude.md) |  | Gets the amplitude of the wave. |
-|  [getWaveDirection(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavedirection.md) |  | Gets the angle of the wave direction in radians. |
-|  [getWaveLength(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavelength.md) |  | Gets the length of the wave. |
-|  [getWaveSteepness(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavesteepness.md) |  | Gets the steepness of the wave. |
-|  [isOk()](doc/markdown/./scene.gerstnerwavegenerator.isok.md) |  | Check if the wave generator is ok. |
-|  [isOmniWave(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.isomniwave.md) |  | Query if the wave is an omni-directional wave. |
-|  [setOmniWave(waveIndex, isOmni)](doc/markdown/./scene.gerstnerwavegenerator.setomniwave.md) |  | Sets whether the wave is an omni-directional wave. |
-|  [setOrigin(waveIndex, x, z)](doc/markdown/./scene.gerstnerwavegenerator.setorigin.md) |  | Sets the X and Z coordinates of the wave origin if it is an omni-directional wave. |
-|  [setupUniforms(scope)](doc/markdown/./scene.gerstnerwavegenerator.setupuniforms.md) |  | Setup uniforms for the shader program. |
-|  [setWaveAmplitude(waveIndex, val)](doc/markdown/./scene.gerstnerwavegenerator.setwaveamplitude.md) |  | Sets the amplitude of the wave. |
-|  [setWaveDirection(waveIndex, angle)](doc/markdown/./scene.gerstnerwavegenerator.setwavedirection.md) |  | Sets the angle of the wave direction in radians. |
-|  [setWaveLength(waveIndex, val)](doc/markdown/./scene.gerstnerwavegenerator.setwavelength.md) |  | Sets the length of the wave. |
-|  [setWaveSteepness(waveIndex, steepness)](doc/markdown/./scene.gerstnerwavegenerator.setwavesteepness.md) |  | Sets the steepness of the wave. |
-|  [update(timeInSeconds)](doc/markdown/./scene.gerstnerwavegenerator.update.md) |  | Update the wave generator. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyWaterBindGroup(bindGroup)](doc/markdown/./scene.gerstnerwavegenerator.applywaterbindgroup.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply water bind group.
+
+
+</td></tr>
+<tr><td>
+
+[calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.gerstnerwavegenerator.calcclipmaptileaabb.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormal(scope, xz)](doc/markdown/./scene.gerstnerwavegenerator.calcfragmentnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormalAndFoam(scope, xz)](doc/markdown/./scene.gerstnerwavegenerator.calcfragmentnormalandfoam.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate fragment normal and foam.
+
+
+</td></tr>
+<tr><td>
+
+[calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.gerstnerwavegenerator.calcvertexpositionandnormal.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Calculate vertex position and normal.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.gerstnerwavegenerator.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[deleteWave(index)](doc/markdown/./scene.gerstnerwavegenerator.deletewave.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Delete wave at index
+
+
+</td></tr>
+<tr><td>
+
+[getHash()](doc/markdown/./scene.gerstnerwavegenerator.gethash.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the shader hash of the wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[getOriginX(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getoriginx.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the X coordinate of the wave origin if it is an omni-directional wave.
+
+
+</td></tr>
+<tr><td>
+
+[getOriginZ(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getoriginz.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the Z coordinate of the wave origin if it is an omni-directional wave.
+
+
+</td></tr>
+<tr><td>
+
+[getWaveAmplitude(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwaveamplitude.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the amplitude of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[getWaveDirection(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavedirection.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the angle of the wave direction in radians.
+
+
+</td></tr>
+<tr><td>
+
+[getWaveLength(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavelength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the length of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[getWaveSteepness(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.getwavesteepness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the steepness of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[insertWave(index)](doc/markdown/./scene.gerstnerwavegenerator.insertwave.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Delete wave at index
+
+
+</td></tr>
+<tr><td>
+
+[isOk()](doc/markdown/./scene.gerstnerwavegenerator.isok.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if the wave generator is ok.
+
+
+</td></tr>
+<tr><td>
+
+[isOmniWave(waveIndex)](doc/markdown/./scene.gerstnerwavegenerator.isomniwave.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Query if the wave is an omni-directional wave.
+
+
+</td></tr>
+<tr><td>
+
+[needUpdate()](doc/markdown/./scene.gerstnerwavegenerator.needupdate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Wether this wave generator's update() method should be called this frame
+
+
+</td></tr>
+<tr><td>
+
+[setOmniWave(waveIndex, isOmni)](doc/markdown/./scene.gerstnerwavegenerator.setomniwave.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets whether the wave is an omni-directional wave.
+
+
+</td></tr>
+<tr><td>
+
+[setOrigin(waveIndex, x, z)](doc/markdown/./scene.gerstnerwavegenerator.setorigin.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the X and Z coordinates of the wave origin if it is an omni-directional wave.
+
+
+</td></tr>
+<tr><td>
+
+[setupUniforms(scope, uniformGroup)](doc/markdown/./scene.gerstnerwavegenerator.setupuniforms.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Setup uniforms for the shader program.
+
+
+</td></tr>
+<tr><td>
+
+[setWaveAmplitude(waveIndex, val)](doc/markdown/./scene.gerstnerwavegenerator.setwaveamplitude.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the amplitude of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[setWaveDirection(waveIndex, angle)](doc/markdown/./scene.gerstnerwavegenerator.setwavedirection.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the angle of the wave direction in radians.
+
+
+</td></tr>
+<tr><td>
+
+[setWaveLength(waveIndex, val)](doc/markdown/./scene.gerstnerwavegenerator.setwavelength.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the length of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[setWaveSteepness(waveIndex, steepness)](doc/markdown/./scene.gerstnerwavegenerator.setwavesteepness.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the steepness of the wave.
+
+
+</td></tr>
+<tr><td>
+
+[update()](doc/markdown/./scene.gerstnerwavegenerator.update.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Update the wave generator.
+
+
+</td></tr>
+</tbody></table>
 

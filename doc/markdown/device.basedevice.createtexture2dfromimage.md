@@ -12,11 +12,67 @@ abstract createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, o
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  element | [TextureImageElement](doc/markdown/./device.textureimageelement.md) |  |
-|  sRGB | boolean |  |
-|  options | [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | _(Optional)_ |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+element
+
+
+</td><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+sRGB
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

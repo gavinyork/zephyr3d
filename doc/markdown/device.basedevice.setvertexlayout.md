@@ -12,9 +12,37 @@ abstract setVertexLayout(vertexData: VertexLayout): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vertexData | [VertexLayout](doc/markdown/./device.vertexlayout.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vertexData
+
+
+</td><td>
+
+[VertexLayout](doc/markdown/./device.vertexlayout.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

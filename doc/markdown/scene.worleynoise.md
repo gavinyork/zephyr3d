@@ -14,11 +14,71 @@ declare function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | current shader scope |
-|  uv | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | uv coordinate |
-|  freq | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number | frequency |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+current shader scope
+
+
+</td></tr>
+<tr><td>
+
+uv
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+uv coordinate
+
+
+</td></tr>
+<tr><td>
+
+freq
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| number
+
+
+</td><td>
+
+frequency
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -14,9 +14,39 @@ declare function parseColor(input: string): ColorRGBA;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  input | string | The css color value. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+input
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The css color value.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

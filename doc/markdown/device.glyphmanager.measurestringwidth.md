@@ -14,11 +14,71 @@ measureStringWidth(str: string, charMargin: number, font: Font): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  str | string | The string to be measured |
-|  charMargin | number | margin size between characters |
-|  font | [Font](doc/markdown/./device.font.md) | Font of the string |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+str
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+The string to be measured
+
+
+</td></tr>
+<tr><td>
+
+charMargin
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+margin size between characters
+
+
+</td></tr>
+<tr><td>
+
+font
+
+
+</td><td>
+
+[Font](doc/markdown/./device.font.md)
+
+
+</td><td>
+
+Font of the string
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

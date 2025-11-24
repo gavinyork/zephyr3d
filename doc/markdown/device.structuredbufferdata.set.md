@@ -14,10 +14,55 @@ set(name: string, value: StructuredValue): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of the member |
-|  value | [StructuredValue](doc/markdown/./device.structuredvalue.md) | Value to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the member
+
+
+</td></tr>
+<tr><td>
+
+value
+
+
+</td><td>
+
+[StructuredValue](doc/markdown/./device.structuredvalue.md)
+
+
+</td><td>
+
+Value to set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,13 +15,67 @@ interface StructuredBuffer<T = unknown> extends GPUDataBuffer<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [structure](doc/markdown/./device.structuredbuffer.structure.md) |  | [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[structure](doc/markdown/./device.structuredbuffer.structure.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [set(name, value)](doc/markdown/./device.structuredbuffer.set.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[set(name, value)](doc/markdown/./device.structuredbuffer.set.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

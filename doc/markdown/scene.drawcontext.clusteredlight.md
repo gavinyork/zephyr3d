@@ -4,7 +4,7 @@
 
 ## DrawContext.clusteredLight property
 
-clustered light index
+Clustered light index/structure for lighting in forward+, clustered shading, etc.
 
 **Signature:**
 

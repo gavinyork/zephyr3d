@@ -4,7 +4,9 @@
 
 ## Skeleton.jointTexture property
 
-The texture that contains the transform matrices of all the joints
+Texture containing joint matrices for GPU skinning.
+
+Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
 
 **Signature:**
 

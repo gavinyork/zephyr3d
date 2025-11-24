@@ -4,7 +4,9 @@
 
 ## AssetManager.clearCache() method
 
-Removes all cached assets
+Clear cached references and promises.
+
+- Disposes any DWeakRef holders maintained by this manager. - Empties internal maps for textures, models, and raw data (text/json/binary). - Does not forcibly dispose GPU resources; it only clears references so they can be GC'd if no other owners are holding them.
 
 **Signature:**
 

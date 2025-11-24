@@ -17,7 +17,5 @@ T
 
 The data associated to the first element in the linked list
 
-## Exceptions
-
-Error The exception is thrown if the list is empty
+The exception is thrown if the list is empty
 

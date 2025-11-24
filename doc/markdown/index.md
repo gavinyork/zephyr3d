@@ -6,12 +6,70 @@
 
 ## Packages
 
-|  Package | Description |
-|  --- | --- |
-|  [@zephyr3d/backend-webgl](doc/markdown/./backend-webgl.md) |  |
-|  [@zephyr3d/backend-webgpu](doc/markdown/./backend-webgpu.md) |  |
-|  [@zephyr3d/base](doc/markdown/./base.md) |  |
-|  [@zephyr3d/device](doc/markdown/./device.md) |  |
-|  [@zephyr3d/imgui](doc/markdown/./imgui.md) |  |
-|  [@zephyr3d/scene](doc/markdown/./scene.md) |  |
+<table><thead><tr><th>
+
+Package
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[@zephyr3d/backend-webgl](doc/markdown/./backend-webgl.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[@zephyr3d/backend-webgpu](doc/markdown/./backend-webgpu.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[@zephyr3d/base](doc/markdown/./base.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[@zephyr3d/device](doc/markdown/./device.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[@zephyr3d/imgui](doc/markdown/./imgui.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[@zephyr3d/scene](doc/markdown/./scene.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -1,19 +1,14 @@
-# FXAA
+# FXAA（快速近似抗锯齿）
 
-FXAA是一种屏幕空间的抗锯齿技术，位于Transparent组。
+**用途**：一种低开销的屏幕空间抗锯齿算法，平滑边缘、降低走样。
 
+**属性接口**：
+
+- `camera.FXAA`: `boolean` — 启用或禁用 FXAA 效果。
+
+**示例**：
 ```javascript
-
-// 创建Compositor实例
-const compositor = new Compositor();
-// 创建FXAA后处理实例
-const fxaa = new FXAA();
-// 添加该效果到compositor
-compositor.appendPostEffect(fxaa);
-// ...
-// 渲染场景并应用效果
-camera.render(scene, compositor);
-
+camera.FXAA = true; // 开启 FXAA 抗锯齿
 ```
 
 <div class="showcase" case="tut-30" style="width:600px;height:800px;"></div>

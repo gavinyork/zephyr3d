@@ -14,16 +14,112 @@ interface RasterizerState
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [cullMode](doc/markdown/./device.rasterizerstate.cullmode.md) |  | [FaceMode](doc/markdown/./device.facemode.md) | Triangle cull mode |
-|  [depthClampEnabled](doc/markdown/./device.rasterizerstate.depthclampenabled.md) |  | boolean | Depth clamp enabled |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[cullMode](doc/markdown/./device.rasterizerstate.cullmode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[FaceMode](doc/markdown/./device.facemode.md)
+
+
+</td><td>
+
+Triangle cull mode
+
+
+</td></tr>
+<tr><td>
+
+[depthClampEnabled](doc/markdown/./device.rasterizerstate.depthclampenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Depth clamp enabled
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [clone()](doc/markdown/./device.rasterizerstate.clone.md) | Creates a new RasterizerState by copying this one |
-|  [enableDepthClamp(enable)](doc/markdown/./device.rasterizerstate.enabledepthclamp.md) | Enable or disable depth clamp if supported |
-|  [setCullMode(mode)](doc/markdown/./device.rasterizerstate.setcullmode.md) | Sets the cull mode |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.rasterizerstate.clone.md)
+
+
+</td><td>
+
+Creates a new RasterizerState by copying this one
+
+
+</td></tr>
+<tr><td>
+
+[enableDepthClamp(enable)](doc/markdown/./device.rasterizerstate.enabledepthclamp.md)
+
+
+</td><td>
+
+Enable or disable depth clamp if supported
+
+
+</td></tr>
+<tr><td>
+
+[setCullMode(mode)](doc/markdown/./device.rasterizerstate.setcullmode.md)
+
+
+</td><td>
+
+Sets the cull mode
+
+
+</td></tr>
+</tbody></table>
 

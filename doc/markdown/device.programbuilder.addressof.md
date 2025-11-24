@@ -14,9 +14,39 @@ addressOf(ref: PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ref | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The reference variable |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ref
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The reference variable
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

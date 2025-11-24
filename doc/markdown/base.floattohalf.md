@@ -14,9 +14,39 @@ declare function floatToHalf(val: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number | The float value to be converted. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The float value to be converted.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

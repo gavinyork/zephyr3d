@@ -14,9 +14,39 @@ $else(body: (this: PBIfScope) => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  body | (this: [PBIfScope](doc/markdown/./device.pbifscope.md)<!-- -->) =&gt; void | Generator function for the scope that insides the else statement |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+body
+
+
+</td><td>
+
+(this: [PBIfScope](doc/markdown/./device.pbifscope.md)<!-- -->) =&gt; void
+
+
+</td><td>
+
+Generator function for the scope that insides the else statement
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

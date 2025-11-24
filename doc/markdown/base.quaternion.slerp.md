@@ -14,12 +14,87 @@ static slerp(a: Quaternion, b: Quaternion, t: number, result?: Quaternion): Quat
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | [Quaternion](doc/markdown/./base.quaternion.md) | The first operand. |
-|  b | [Quaternion](doc/markdown/./base.quaternion.md) | The second operand. |
-|  t | number | The interpolation amount, in the range \[0-1\]. |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion (can be the same as a or b), if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The first operand.
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+The second operand.
+
+
+</td></tr>
+<tr><td>
+
+t
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The interpolation amount, in the range \[0-1\].
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion (can be the same as a or b), if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

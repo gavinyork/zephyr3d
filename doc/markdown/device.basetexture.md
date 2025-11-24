@@ -15,31 +15,299 @@ interface BaseTexture<T = unknown> extends GPUObject<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [depth](doc/markdown/./device.basetexture.depth.md) | <code>readonly</code> | number |  |
-|  [format](doc/markdown/./device.basetexture.format.md) | <code>readonly</code> | [TextureFormat](doc/markdown/./device.textureformat.md) |  |
-|  [height](doc/markdown/./device.basetexture.height.md) | <code>readonly</code> | number |  |
-|  [memCost](doc/markdown/./device.basetexture.memcost.md) | <code>readonly</code> | number |  |
-|  [mipLevelCount](doc/markdown/./device.basetexture.miplevelcount.md) | <code>readonly</code> | number |  |
-|  [samplerOptions](doc/markdown/./device.basetexture.sampleroptions.md) |  | [SamplerOptions](doc/markdown/./device.sampleroptions.md) |  |
-|  [target](doc/markdown/./device.basetexture.target.md) | <code>readonly</code> | [TextureType](doc/markdown/./device.texturetype.md) |  |
-|  [width](doc/markdown/./device.basetexture.width.md) | <code>readonly</code> | number |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[depth](doc/markdown/./device.basetexture.depth.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[format](doc/markdown/./device.basetexture.format.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TextureFormat](doc/markdown/./device.textureformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[height](doc/markdown/./device.basetexture.height.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[memCost](doc/markdown/./device.basetexture.memcost.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[mipLevelCount](doc/markdown/./device.basetexture.miplevelcount.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[samplerOptions](doc/markdown/./device.basetexture.sampleroptions.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[SamplerOptions](doc/markdown/./device.sampleroptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[target](doc/markdown/./device.basetexture.target.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[TextureType](doc/markdown/./device.texturetype.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[width](doc/markdown/./device.basetexture.width.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [generateMipmaps()](doc/markdown/./device.basetexture.generatemipmaps.md) |  |
-|  [getDefaultSampler(comparison)](doc/markdown/./device.basetexture.getdefaultsampler.md) |  |
-|  [init()](doc/markdown/./device.basetexture.init.md) |  |
-|  [isCompressedFormat()](doc/markdown/./device.basetexture.iscompressedformat.md) |  |
-|  [isDepth()](doc/markdown/./device.basetexture.isdepth.md) |  |
-|  [isFilterable()](doc/markdown/./device.basetexture.isfilterable.md) |  |
-|  [isFloatFormat()](doc/markdown/./device.basetexture.isfloatformat.md) |  |
-|  [isIntegerFormat()](doc/markdown/./device.basetexture.isintegerformat.md) |  |
-|  [isSignedFormat()](doc/markdown/./device.basetexture.issignedformat.md) |  |
-|  [isSRGBFormat()](doc/markdown/./device.basetexture.issrgbformat.md) |  |
-|  [readPixels(x, y, w, h, faceOrLayer, mipLevel, buffer)](doc/markdown/./device.basetexture.readpixels.md) |  |
-|  [readPixelsToBuffer(x, y, w, h, faceOrLayer, mipLevel, buffer)](doc/markdown/./device.basetexture.readpixelstobuffer.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[generateMipmaps()](doc/markdown/./device.basetexture.generatemipmaps.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getDefaultSampler(comparison)](doc/markdown/./device.basetexture.getdefaultsampler.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[init()](doc/markdown/./device.basetexture.init.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isCompressedFormat()](doc/markdown/./device.basetexture.iscompressedformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isDepth()](doc/markdown/./device.basetexture.isdepth.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isFilterable()](doc/markdown/./device.basetexture.isfilterable.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isFloatFormat()](doc/markdown/./device.basetexture.isfloatformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isIntegerFormat()](doc/markdown/./device.basetexture.isintegerformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isSignedFormat()](doc/markdown/./device.basetexture.issignedformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isSRGBFormat()](doc/markdown/./device.basetexture.issrgbformat.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[readPixels(x, y, w, h, faceOrLayer, mipLevel, buffer)](doc/markdown/./device.basetexture.readpixels.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[readPixelsToBuffer(x, y, w, h, faceOrLayer, mipLevel, buffer)](doc/markdown/./device.basetexture.readpixelstobuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

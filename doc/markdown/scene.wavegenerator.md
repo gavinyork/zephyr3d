@@ -2,28 +2,157 @@
 
 [Home](doc/markdown/./index.md) &gt; [@zephyr3d/scene](doc/markdown/./scene.md) &gt; [WaveGenerator](doc/markdown/./scene.wavegenerator.md)
 
-## WaveGenerator class
+## WaveGenerator interface
 
 Abstract class for wave generators.
 
 **Signature:**
 
 ```typescript
-declare abstract class WaveGenerator 
+interface WaveGenerator extends IDisposable 
 ```
+**Extends:** [IDisposable](doc/markdown/./base.idisposable.md)
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyWaterBindGroup(bindGroup)](doc/markdown/./scene.wavegenerator.applywaterbindgroup.md) | <code>abstract</code> | Apply water bind group. |
-|  [calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.wavegenerator.calcclipmaptileaabb.md) | <code>abstract</code> |  |
-|  [calcFragmentNormal(scope, xz, vertexNormal)](doc/markdown/./scene.wavegenerator.calcfragmentnormal.md) | <code>abstract</code> |  |
-|  [calcFragmentNormalAndFoam(scope, xz, vertexNormal)](doc/markdown/./scene.wavegenerator.calcfragmentnormalandfoam.md) | <code>abstract</code> | Calculate fragment normal and foam. |
-|  [calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.wavegenerator.calcvertexpositionandnormal.md) | <code>abstract</code> | Calculate vertex position and normal. |
-|  [dispose()](doc/markdown/./scene.wavegenerator.dispose.md) | <code>abstract</code> | Dispose the wave generator. |
-|  [getHash(device)](doc/markdown/./scene.wavegenerator.gethash.md) | <code>abstract</code> | Get the shader hash of the wave generator. |
-|  [isOk(device)](doc/markdown/./scene.wavegenerator.isok.md) | <code>abstract</code> | Check if the wave generator is ok. |
-|  [setupUniforms(scope)](doc/markdown/./scene.wavegenerator.setupuniforms.md) | <code>abstract</code> | Setup uniforms for the shader program. |
-|  [update(timeInSeconds)](doc/markdown/./scene.wavegenerator.update.md) | <code>abstract</code> | Update the wave generator. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyWaterBindGroup(bindGroup)](doc/markdown/./scene.wavegenerator.applywaterbindgroup.md)
+
+
+</td><td>
+
+Apply water bind group.
+
+
+</td></tr>
+<tr><td>
+
+[calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB)](doc/markdown/./scene.wavegenerator.calcclipmaptileaabb.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormal(scope, xz, vertexNormal)](doc/markdown/./scene.wavegenerator.calcfragmentnormal.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calcFragmentNormalAndFoam(scope, xz, vertexNormal)](doc/markdown/./scene.wavegenerator.calcfragmentnormalandfoam.md)
+
+
+</td><td>
+
+Calculate fragment normal and foam.
+
+
+</td></tr>
+<tr><td>
+
+[calcVertexPositionAndNormal(scope, inPos, outPos, outNormal)](doc/markdown/./scene.wavegenerator.calcvertexpositionandnormal.md)
+
+
+</td><td>
+
+Calculate vertex position and normal.
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.wavegenerator.clone.md)
+
+
+</td><td>
+
+Create a new instance from this
+
+
+</td></tr>
+<tr><td>
+
+[dispose()](doc/markdown/./scene.wavegenerator.dispose.md)
+
+
+</td><td>
+
+Dispose the wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[getHash()](doc/markdown/./scene.wavegenerator.gethash.md)
+
+
+</td><td>
+
+Get the shader hash of the wave generator.
+
+
+</td></tr>
+<tr><td>
+
+[isOk(device)](doc/markdown/./scene.wavegenerator.isok.md)
+
+
+</td><td>
+
+Check if the wave generator is ok.
+
+
+</td></tr>
+<tr><td>
+
+[needUpdate()](doc/markdown/./scene.wavegenerator.needupdate.md)
+
+
+</td><td>
+
+Wether this wave generator's update() method should be called this frame
+
+
+</td></tr>
+<tr><td>
+
+[setupUniforms(scope, uniformGroup)](doc/markdown/./scene.wavegenerator.setupuniforms.md)
+
+
+</td><td>
+
+Setup uniforms for the shader program.
+
+
+</td></tr>
+<tr><td>
+
+[update(timeInSeconds)](doc/markdown/./scene.wavegenerator.update.md)
+
+
+</td><td>
+
+Update the wave generator.
+
+
+</td></tr>
+</tbody></table>
 

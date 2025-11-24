@@ -9,8 +9,9 @@ Environment of scene
 **Signature:**
 
 ```typescript
-declare class Environment 
+declare class Environment extends Disposable 
 ```
+**Extends:** [Disposable](doc/markdown/./base.disposable.md)
 
 ## Remarks
 
@@ -18,8 +19,104 @@ The constructor for this class is marked as internal. Third-party code should no
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [light](doc/markdown/./scene.environment.light.md) | <code>readonly</code> | [EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md) | The environment lighting renderer |
-|  [sky](doc/markdown/./scene.environment.sky.md) | <code>readonly</code> | [SkyRenderer](doc/markdown/./scene.skyrenderer.md) | The sky renderer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[light](doc/markdown/./scene.environment.light.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[EnvLightWrapper](doc/markdown/./scene.envlightwrapper.md)
+
+
+</td><td>
+
+The environment lighting renderer
+
+
+</td></tr>
+<tr><td>
+
+[sky](doc/markdown/./scene.environment.sky.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[SkyRenderer](doc/markdown/./scene.skyrenderer.md)
+
+
+</td><td>
+
+The sky renderer
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[onDispose()](doc/markdown/./scene.environment.ondispose.md)
+
+
+</td><td>
+
+`protected`
+
+
+</td><td>
+
+Disposes the environment object
+
+
+</td></tr>
+</tbody></table>
 

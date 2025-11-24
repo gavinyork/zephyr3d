@@ -14,7 +14,37 @@ constructor(other: Frustum);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Frustum](doc/markdown/./base.frustum.md) | The frustum to copy from. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Frustum](doc/markdown/./base.frustum.md)
+
+
+</td><td>
+
+The frustum to copy from.
+
+
+</td></tr>
+</tbody></table>
 

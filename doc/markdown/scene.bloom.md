@@ -9,33 +9,244 @@ The bloom post effect
 **Signature:**
 
 ```typescript
-declare class Bloom extends AbstractPostEffect<'Bloom'> 
+declare class Bloom extends AbstractPostEffect 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'Bloom'&gt;
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.bloom._constructor_.md) |  | Creates an instance of tonemap post effect |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.bloom._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of tonemap post effect
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [className](doc/markdown/./scene.bloom.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "Bloom" |  |
-|  [downsampleLimit](doc/markdown/./scene.bloom.downsamplelimit.md) |  | number | Downsample resolution limitation |
-|  [intensity](doc/markdown/./scene.bloom.intensity.md) |  | number | Bloom intensity |
-|  [maxDownsampleLevel](doc/markdown/./scene.bloom.maxdownsamplelevel.md) |  | number | The maximum downsample levels |
-|  [threshold](doc/markdown/./scene.bloom.threshold.md) |  | number | Bloom threshold |
-|  [thresholdKnee](doc/markdown/./scene.bloom.thresholdknee.md) |  | number | Bloom threshold knee |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[className](doc/markdown/./scene.bloom.classname.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+"Bloom"
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[downsampleLimit](doc/markdown/./scene.bloom.downsamplelimit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Downsample resolution limitation
+
+
+</td></tr>
+<tr><td>
+
+[intensity](doc/markdown/./scene.bloom.intensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom intensity
+
+
+</td></tr>
+<tr><td>
+
+[maxDownsampleLevel](doc/markdown/./scene.bloom.maxdownsamplelevel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The maximum downsample levels
+
+
+</td></tr>
+<tr><td>
+
+[threshold](doc/markdown/./scene.bloom.threshold.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom threshold
+
+
+</td></tr>
+<tr><td>
+
+[thresholdKnee](doc/markdown/./scene.bloom.thresholdknee.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bloom threshold knee
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.bloom.apply.md) |  | Apply the post effect |
-|  [dispose()](doc/markdown/./scene.bloom.dispose.md) |  | Disposes the post effect. |
-|  [requireDepthAttachment()](doc/markdown/./scene.bloom.requiredepthattachment.md) |  | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture()](doc/markdown/./scene.bloom.requirelineardepthtexture.md) |  | Checks whether this post effect requires the linear depth texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx, inputColorTexture, \_sceneDepthTexture, \_srgbOutput)](doc/markdown/./scene.bloom.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply the post effect
+
+
+</td></tr>
+<tr><td>
+
+[requireDepthAttachment()](doc/markdown/./scene.bloom.requiredepthattachment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the scene depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[requireLinearDepthTexture()](doc/markdown/./scene.bloom.requirelineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the linear depth texture
+
+
+</td></tr>
+</tbody></table>
 

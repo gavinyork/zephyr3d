@@ -14,8 +14,53 @@ constructor(scene: Scene, type: number);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scene | [Scene](doc/markdown/./scene.scene.md) | The scene to which the light node belongs |
-|  type | number | Type of the light node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scene
+
+
+</td><td>
+
+[Scene](doc/markdown/./scene.scene.md)
+
+
+</td><td>
+
+The scene to which the light node belongs
+
+
+</td></tr>
+<tr><td>
+
+type
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Type of the light node
+
+
+</td></tr>
+</tbody></table>
 

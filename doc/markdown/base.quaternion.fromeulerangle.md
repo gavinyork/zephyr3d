@@ -9,18 +9,102 @@ Creates a quaternion from an euler angle in specific order.
 **Signature:**
 
 ```typescript
-static fromEulerAngle(a: number, b: number, c: number, order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY', result?: Quaternion): Quaternion;
+static fromEulerAngle(a: number, b: number, c: number, order?: EulerAngleOrder, result?: Quaternion): Quaternion;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  a | number |  |
-|  b | number |  |
-|  c | number |  |
-|  order | 'XYZ' \| 'YXZ' \| 'ZXY' \| 'ZYX' \| 'YZX' \| 'XZY' | Intrinsic order for conversion. |
-|  result | [Quaternion](doc/markdown/./base.quaternion.md) | _(Optional)_ The output quaternion, if not specified, a new quaternion will be created. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+a
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+b
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+c
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+order
+
+
+</td><td>
+
+[EulerAngleOrder](doc/markdown/./base.eulerangleorder.md)
+
+
+</td><td>
+
+_(Optional)_ Intrinsic order for conversion.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Quaternion](doc/markdown/./base.quaternion.md)
+
+
+</td><td>
+
+_(Optional)_ The output quaternion, if not specified, a new quaternion will be created.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

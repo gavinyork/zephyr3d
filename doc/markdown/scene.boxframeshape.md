@@ -9,13 +9,156 @@ Wireframe box shape
 **Signature:**
 
 ```typescript
-declare class BoxFrameShape extends Shape<BoxCreationOptions> 
+declare class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable<BoxFrameShape> 
 ```
 **Extends:** [Shape](doc/markdown/./scene.shape.md)<!-- -->&lt;[BoxCreationOptions](doc/markdown/./scene.boxcreationoptions.md)<!-- -->&gt;
 
+**Implements:** [Clonable](doc/markdown/./base.clonable.md)<!-- -->&lt;[BoxFrameShape](doc/markdown/./scene.boxframeshape.md)<!-- -->&gt;
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](doc/markdown/./scene.boxframeshape._constructor_.md) |  | Creates an instance of wireframe box shape |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(options)](doc/markdown/./scene.boxframeshape._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of wireframe box shape
+
+
+</td></tr>
+</tbody></table>
+
+## Properties
+
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[\_defaultOptions](doc/markdown/./scene.boxframeshape._defaultoptions.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+{ size: number; anchor: number; needNormal: boolean; needTangent: boolean; needUV: boolean; }
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./scene.boxframeshape.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+type of the shape
+
+
+</td></tr>
+</tbody></table>
+
+## Methods
+
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./scene.boxframeshape.clone.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[generateData(options, vertices, normals, tangents, uvs, indices, bbox, indexOffset, vertexCallback)](doc/markdown/./scene.boxframeshape.generatedata.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Generates the data for the box shape
+
+
+</td></tr>
+</tbody></table>
 

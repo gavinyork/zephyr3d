@@ -14,10 +14,55 @@ nearestPointToPoint(p: Vector3, result?: Vector3): Vector3;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  p | [Vector3](doc/markdown/./base.vector3.md) | The given point. |
-|  result | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ A point object to which the result will be written, if not specified, a new point object will be returned. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+p
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The given point.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ A point object to which the result will be written, if not specified, a new point object will be returned.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

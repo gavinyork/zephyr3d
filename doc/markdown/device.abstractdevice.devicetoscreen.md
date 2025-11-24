@@ -14,9 +14,39 @@ deviceToScreen(val: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  val | number | The position of current frame buffer in pixels |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+val
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The position of current frame buffer in pixels
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

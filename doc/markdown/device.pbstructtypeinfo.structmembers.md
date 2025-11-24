@@ -11,7 +11,7 @@ Get member types of the struct type
 ```typescript
 get structMembers(): {
         name: string;
-        type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+        type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo;
         alignment: number;
         size: number;
         defaultAlignment: number;

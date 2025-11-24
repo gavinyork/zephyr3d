@@ -14,9 +14,39 @@ toAxisAngle(axis: Vector3): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  axis | [Vector3](doc/markdown/./base.vector3.md) | A vector that receives the rotation axis. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+axis
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+A vector that receives the rotation axis.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

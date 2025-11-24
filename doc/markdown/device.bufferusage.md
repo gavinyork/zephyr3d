@@ -9,5 +9,5 @@ Buffer usage type
 **Signature:**
 
 ```typescript
-type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write';
+type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write' | 'pack-pixel' | 'unpack-pixel';
 ```

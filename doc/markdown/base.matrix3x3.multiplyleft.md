@@ -9,18 +9,48 @@ Pre-multiply by a matrix inplace.
 **Signature:**
 
 ```typescript
-multiplyLeft(other: Matrix3x3): Matrix3x3;
+multiplyLeft(other: Matrix3x3): this;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [Matrix3x3](doc/markdown/./base.matrix3x3.md) | The matrix that will be multiplied by. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+other
+
+
+</td><td>
+
+[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+
+
+</td><td>
+
+The matrix that will be multiplied by.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
-[Matrix3x3](doc/markdown/./base.matrix3x3.md)
+this
 
 self
 

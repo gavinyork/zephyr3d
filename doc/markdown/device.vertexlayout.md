@@ -15,20 +15,142 @@ interface VertexLayout<T = unknown> extends GPUObject<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [indexBuffer](doc/markdown/./device.vertexlayout.indexbuffer.md) | <code>readonly</code> | [IndexBuffer](doc/markdown/./device.indexbuffer.md) |  |
-|  [vertexBuffers](doc/markdown/./device.vertexlayout.vertexbuffers.md) | <code>readonly</code> | { \[semantic: number\]: { buffer: [StructuredBuffer](doc/markdown/./device.structuredbuffer.md)<!-- -->; offset: number; }; } |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[indexBuffer](doc/markdown/./device.vertexlayout.indexbuffer.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[IndexBuffer](doc/markdown/./device.indexbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[vertexBuffers](doc/markdown/./device.vertexlayout.vertexbuffers.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+{ \[semantic: number\]: { buffer: [StructuredBuffer](doc/markdown/./device.structuredbuffer.md)<!-- -->; offset: number; }; }
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [bind()](doc/markdown/./device.vertexlayout.bind.md) |  |
-|  [draw(primitiveType, first, count)](doc/markdown/./device.vertexlayout.draw.md) |  |
-|  [drawInstanced(primitiveType, first, count, numInstances)](doc/markdown/./device.vertexlayout.drawinstanced.md) |  |
-|  [getIndexBuffer()](doc/markdown/./device.vertexlayout.getindexbuffer.md) |  |
-|  [getVertexBuffer(semantic)](doc/markdown/./device.vertexlayout.getvertexbuffer.md) |  |
-|  [getVertexBufferInfo(semantic)](doc/markdown/./device.vertexlayout.getvertexbufferinfo.md) |  |
-|  [setDrawOffset(buffer, byteOffset)](doc/markdown/./device.vertexlayout.setdrawoffset.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bind()](doc/markdown/./device.vertexlayout.bind.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[draw(primitiveType, first, count)](doc/markdown/./device.vertexlayout.draw.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[drawInstanced(primitiveType, first, count, numInstances)](doc/markdown/./device.vertexlayout.drawinstanced.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getIndexBuffer()](doc/markdown/./device.vertexlayout.getindexbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBuffer(semantic)](doc/markdown/./device.vertexlayout.getvertexbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getVertexBufferInfo(semantic)](doc/markdown/./device.vertexlayout.getvertexbufferinfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setDrawOffset(buffer, byteOffset)](doc/markdown/./device.vertexlayout.setdrawoffset.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

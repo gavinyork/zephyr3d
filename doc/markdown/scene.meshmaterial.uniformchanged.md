@@ -4,7 +4,7 @@
 
 ## MeshMaterial.uniformChanged() method
 
-Indicate that the uniform has changed and needs to be resubmitted.
+Mark uniform-only changes so uniforms are re-uploaded on next apply, without rebuilding shader programs.
 
 **Signature:**
 

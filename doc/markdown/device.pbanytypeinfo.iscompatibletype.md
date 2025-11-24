@@ -9,14 +9,42 @@ Check whether a given type is compatible with this type
 **Signature:**
 
 ```typescript
-isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
+isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  other | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->&lt;[TypeDetailInfo](doc/markdown/./device.typedetailinfo.md)<!-- -->&gt; | The type to be checked |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_other
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)<!-- -->&lt;[TypeDetailInfo](doc/markdown/./device.typedetailinfo.md)<!-- -->&gt;
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

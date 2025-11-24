@@ -14,12 +14,87 @@ intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean): 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  v1 | [Vector3](doc/markdown/./base.vector3.md) | The first triangle vertex. |
-|  v2 | [Vector3](doc/markdown/./base.vector3.md) | The second triangle vertex. |
-|  v3 | [Vector3](doc/markdown/./base.vector3.md) | The third triangle vertex. |
-|  cull | boolean | Allow back side intersection if true. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+v1
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The first triangle vertex.
+
+
+</td></tr>
+<tr><td>
+
+v2
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The second triangle vertex.
+
+
+</td></tr>
+<tr><td>
+
+v3
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+The third triangle vertex.
+
+
+</td></tr>
+<tr><td>
+
+cull
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Allow back side intersection if true.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

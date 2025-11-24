@@ -9,15 +9,44 @@ Attach this node to a skeleton
 **Signature:**
 
 ```typescript
-attachToSkeleton(skeleton: AssetSkeleton, index: number): void;
+attachToSkeleton(skeleton: AssetSkeleton): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  skeleton | [AssetSkeleton](doc/markdown/./scene.assetskeleton.md) | The skeleton to which to node will attach |
-|  index | number | The joint index |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+skeleton
+
+
+</td><td>
+
+[AssetSkeleton](doc/markdown/./scene.assetskeleton.md)
+
+
+</td><td>
+
+The skeleton to which to node will attach
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

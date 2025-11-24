@@ -4,7 +4,7 @@
 
 ## MeshMaterial.featureUsed() method
 
-Check if a feature is in use for given render pass type.
+Query a feature flag’s current value.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ featureUsed<T = unknown>(feature: number): T;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  feature | number | The feature index |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+feature
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The feature index.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 T
 
-true if the feature is in use, otherwise false.
+The current value for the feature, typed as `T`<!-- -->.
 

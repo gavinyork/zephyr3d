@@ -4,7 +4,7 @@
 
 ## AnimationSet.get() method
 
-Gets an animation clip by name
+Retrieve an animation clip by name.
 
 **Signature:**
 
@@ -14,11 +14,43 @@ get(name: string): AnimationClip;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | name of the animation to get |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the animation.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [AnimationClip](doc/markdown/./scene.animationclip.md)
+
+The clip if present; otherwise null.
 

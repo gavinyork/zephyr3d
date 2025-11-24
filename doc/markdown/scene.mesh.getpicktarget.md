@@ -4,7 +4,9 @@
 
 ## Mesh.getPickTarget() method
 
-If set, the pick target will be returned as the pick result
+Returns the pick target override to be reported when this object is picked.
+
+If not set, a default target derived from the node/material may be used.
 
 **Signature:**
 

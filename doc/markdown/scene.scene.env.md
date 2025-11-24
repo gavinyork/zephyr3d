@@ -4,7 +4,7 @@
 
 ## Scene.env property
 
-The environment of the scene
+The environment (sky, lights, IBL) of the scene.
 
 **Signature:**
 

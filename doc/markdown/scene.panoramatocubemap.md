@@ -14,10 +14,53 @@ declare function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): 
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  tex | [Texture2D](doc/markdown/./device.texture2d.md) | The equirectangular image to be converted |
-|  outputCubeMap | [TextureCube](doc/markdown/./device.texturecube.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+tex
+
+
+</td><td>
+
+[Texture2D](doc/markdown/./device.texture2d.md)
+
+
+</td><td>
+
+The equirectangular image to be converted
+
+
+</td></tr>
+<tr><td>
+
+outputCubeMap
+
+
+</td><td>
+
+[TextureCube](doc/markdown/./device.texturecube.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

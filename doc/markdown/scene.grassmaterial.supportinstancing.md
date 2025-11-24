@@ -4,7 +4,9 @@
 
 ## GrassMaterial.supportInstancing() method
 
-Returns true if this material supports geometry instancing
+Whether this material supports hardware instancing.
+
+Override and return `false` if per-instance data is not supported in the shader.
 
 **Signature:**
 

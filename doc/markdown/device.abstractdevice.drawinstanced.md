@@ -14,12 +14,87 @@ drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numIns
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  primitiveType | [PrimitiveType](doc/markdown/./device.primitivetype.md) | The primitive type |
-|  first | number | The vertex offset (or index offset if an index buffer exists) |
-|  count | number | The vertex count (or index count if an index buffer exists) to be drawn |
-|  numInstances | number | How many instances to be drawn |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+primitiveType
+
+
+</td><td>
+
+[PrimitiveType](doc/markdown/./device.primitivetype.md)
+
+
+</td><td>
+
+The primitive type
+
+
+</td></tr>
+<tr><td>
+
+first
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The vertex offset (or index offset if an index buffer exists)
+
+
+</td></tr>
+<tr><td>
+
+count
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The vertex count (or index count if an index buffer exists) to be drawn
+
+
+</td></tr>
+<tr><td>
+
+numInstances
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How many instances to be drawn
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

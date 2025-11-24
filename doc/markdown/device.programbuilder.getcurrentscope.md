@@ -9,9 +9,9 @@ Gets the current scope
 **Signature:**
 
 ```typescript
-getCurrentScope(): PBScope;
+getCurrentScope<T extends PBScope = PBScope>(): T;
 ```
 **Returns:**
 
-[PBScope](doc/markdown/./device.pbscope.md)
+T
 

@@ -4,7 +4,7 @@
 
 ## SceneNode.remove() method
 
-Removes this node from it's parent
+Detach this node from its parent.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ remove(): this;
 
 this
 
-self
+this
 

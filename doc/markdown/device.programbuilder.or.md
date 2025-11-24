@@ -14,11 +14,65 @@ or(x: PBShaderExp | boolean, y: PBShaderExp | boolean, ...rest: (PBShaderExp | b
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  x | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean |  |
-|  y | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean |  |
-|  rest | ([PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean)\[\] |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+x
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+y
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+rest
+
+
+</td><td>
+
+([PBShaderExp](doc/markdown/./device.pbshaderexp.md) \| boolean)\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

@@ -15,19 +15,141 @@ declare class DirectionalLight extends PunctualLight
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(scene)](doc/markdown/./scene.directionallight._constructor_.md) |  | Creates an instance of directional light |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(scene)](doc/markdown/./scene.directionallight._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of directional light
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [sunLight](doc/markdown/./scene.directionallight.sunlight.md) |  | boolean | true if the light was defined as sun light |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[sunLight](doc/markdown/./scene.directionallight.sunlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if the light was defined as sun light
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [isDirectionLight()](doc/markdown/./scene.directionallight.isdirectionlight.md) |  | returns true if this is a directional light |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[getSunLight(scene)](doc/markdown/./scene.directionallight.getsunlight.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[isDirectionLight()](doc/markdown/./scene.directionallight.isdirectionlight.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a directional light
+
+
+</td></tr>
+<tr><td>
+
+[setSunLight(scene, light)](doc/markdown/./scene.directionallight.setsunlight.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

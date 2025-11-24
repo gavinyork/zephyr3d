@@ -14,24 +14,185 @@ declare class PBReflection
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(builder)](doc/markdown/./device.pbreflection._constructor_.md) |  | Constructs a new instance of the <code>PBReflection</code> class |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(builder)](doc/markdown/./device.pbreflection._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Constructs a new instance of the `PBReflection` class
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [vertexAttributes](doc/markdown/./device.pbreflection.vertexattributes.md) | <code>readonly</code> | number\[\] | Gets all the vertex attributes that was used by the program |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[vertexAttributes](doc/markdown/./device.pbreflection.vertexattributes.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number\[\]
+
+
+</td><td>
+
+Gets all the vertex attributes that was used by the program
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [attribute(attrib)](doc/markdown/./device.pbreflection.attribute.md) |  | Gets the variable which is the vertex attribute of specified semantic |
-|  [clear()](doc/markdown/./device.pbreflection.clear.md) |  | Clear all contents |
-|  [hasVertexAttribute(attrib)](doc/markdown/./device.pbreflection.hasvertexattribute.md) |  | Check if specified vertex attribute was used by the program |
-|  [tag(name)](doc/markdown/./device.pbreflection.tag.md) |  | Gets the variable that has tagged with given string |
-|  [tag(name, getter)](doc/markdown/./device.pbreflection.tag_1.md) |  | Creates a new tag by specifying a function to get the tagged variable |
-|  [tag(values)](doc/markdown/./device.pbreflection.tag_2.md) |  | Creates multiple tags from an object that contains the tag names and the getter functions |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[attribute(attrib)](doc/markdown/./device.pbreflection.attribute.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the variable which is the vertex attribute of specified semantic
+
+
+</td></tr>
+<tr><td>
+
+[clear()](doc/markdown/./device.pbreflection.clear.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Clear all contents
+
+
+</td></tr>
+<tr><td>
+
+[hasVertexAttribute(attrib)](doc/markdown/./device.pbreflection.hasvertexattribute.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check if specified vertex attribute was used by the program
+
+
+</td></tr>
+<tr><td>
+
+[tag(name)](doc/markdown/./device.pbreflection.tag.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Gets the variable that has tagged with given string
+
+
+</td></tr>
+<tr><td>
+
+[tag(name, getter)](doc/markdown/./device.pbreflection.tag_1.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new tag by specifying a function to get the tagged variable
+
+
+</td></tr>
+<tr><td>
+
+[tag(values)](doc/markdown/./device.pbreflection.tag_2.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates multiple tags from an object that contains the tag names and the getter functions
+
+
+</td></tr>
+</tbody></table>
 

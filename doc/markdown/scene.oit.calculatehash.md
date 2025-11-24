@@ -9,7 +9,7 @@ Calculates the hash of the renderer.
 **Signature:**
 
 ```typescript
-abstract calculateHash(): string;
+calculateHash(): string;
 ```
 **Returns:**
 

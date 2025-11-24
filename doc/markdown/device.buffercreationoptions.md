@@ -15,9 +15,83 @@ interface BufferCreationOptions extends BaseCreationOptions
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [managed?](doc/markdown/./device.buffercreationoptions.managed.md) |  | boolean | _(Optional)_ Whether the object content should be managed, default true for vertex buffer of index buffer |
-|  [storage?](doc/markdown/./device.buffercreationoptions.storage.md) |  | boolean | _(Optional)_ true if we are creating a storage buffer |
-|  [usage?](doc/markdown/./device.buffercreationoptions.usage.md) |  | [BufferUsage](doc/markdown/./device.bufferusage.md) | _(Optional)_ The buffer usage |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[managed?](doc/markdown/./device.buffercreationoptions.managed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Whether the object content should be managed, default true for vertex buffer of index buffer
+
+
+</td></tr>
+<tr><td>
+
+[storage?](doc/markdown/./device.buffercreationoptions.storage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ true if we are creating a storage buffer
+
+
+</td></tr>
+<tr><td>
+
+[usage?](doc/markdown/./device.buffercreationoptions.usage.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[BufferUsage](doc/markdown/./device.bufferusage.md)
+
+
+</td><td>
+
+_(Optional)_ The buffer usage
+
+
+</td></tr>
+</tbody></table>
 

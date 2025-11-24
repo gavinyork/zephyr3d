@@ -14,10 +14,55 @@ lookAtCubeFace(face: CubeFace, position?: Vector3): this;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  face | [CubeFace](doc/markdown/./base.cubeface.md) | The cube face to look at |
-|  position | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The camera position |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+face
+
+
+</td><td>
+
+[CubeFace](doc/markdown/./base.cubeface.md)
+
+
+</td><td>
+
+The cube face to look at
+
+
+</td></tr>
+<tr><td>
+
+position
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The camera position
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

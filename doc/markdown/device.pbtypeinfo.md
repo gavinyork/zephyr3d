@@ -14,25 +14,251 @@ declare abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [typeId](doc/markdown/./device.pbtypeinfo.typeid.md) | <code>readonly</code> | string | Get unique id for this type |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[typeId](doc/markdown/./device.pbtypeinfo.typeid.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Get unique id for this type
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [haveAtomicMembers()](doc/markdown/./device.pbtypeinfo.haveatomicmembers.md) |  | Wether this type have atomic members |
-|  [isAnyType()](doc/markdown/./device.pbtypeinfo.isanytype.md) |  | returns true if this is an any type |
-|  [isArrayType()](doc/markdown/./device.pbtypeinfo.isarraytype.md) |  | returns true if this is an array type |
-|  [isAtomicI32()](doc/markdown/./device.pbtypeinfo.isatomici32.md) |  | returns true if this is an atomic int type |
-|  [isAtomicU32()](doc/markdown/./device.pbtypeinfo.isatomicu32.md) |  | returns true if this is an atomic uint type |
-|  [isCompatibleType(other)](doc/markdown/./device.pbtypeinfo.iscompatibletype.md) |  | Check whether a given type is compatible with this type |
-|  [isPointerType()](doc/markdown/./device.pbtypeinfo.ispointertype.md) |  | returns true if this is a pointer type |
-|  [isPrimitiveType()](doc/markdown/./device.pbtypeinfo.isprimitivetype.md) |  | returns true if this is a primitive type |
-|  [isSamplerType()](doc/markdown/./device.pbtypeinfo.issamplertype.md) |  | returns true if this is a sampler type |
-|  [isStructType()](doc/markdown/./device.pbtypeinfo.isstructtype.md) |  | returns true if this is a struct type |
-|  [isTextureType()](doc/markdown/./device.pbtypeinfo.istexturetype.md) |  | returns true if this is a texture type |
-|  [isVoidType()](doc/markdown/./device.pbtypeinfo.isvoidtype.md) |  | returns true if this is a void type |
-|  [toBufferLayout(offset, layout)](doc/markdown/./device.pbtypeinfo.tobufferlayout.md) | <code>abstract</code> | Creates a buffer layout from this type |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[haveAtomicMembers()](doc/markdown/./device.pbtypeinfo.haveatomicmembers.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Wether this type have atomic members
+
+
+</td></tr>
+<tr><td>
+
+[isAnyType()](doc/markdown/./device.pbtypeinfo.isanytype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an any type
+
+
+</td></tr>
+<tr><td>
+
+[isArrayType()](doc/markdown/./device.pbtypeinfo.isarraytype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an array type
+
+
+</td></tr>
+<tr><td>
+
+[isAtomicI32()](doc/markdown/./device.pbtypeinfo.isatomici32.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an atomic int type
+
+
+</td></tr>
+<tr><td>
+
+[isAtomicU32()](doc/markdown/./device.pbtypeinfo.isatomicu32.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is an atomic uint type
+
+
+</td></tr>
+<tr><td>
+
+[isCompatibleType(other)](doc/markdown/./device.pbtypeinfo.iscompatibletype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Check whether a given type is compatible with this type
+
+
+</td></tr>
+<tr><td>
+
+[isPointerType()](doc/markdown/./device.pbtypeinfo.ispointertype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a pointer type
+
+
+</td></tr>
+<tr><td>
+
+[isPrimitiveType()](doc/markdown/./device.pbtypeinfo.isprimitivetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a primitive type
+
+
+</td></tr>
+<tr><td>
+
+[isSamplerType()](doc/markdown/./device.pbtypeinfo.issamplertype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a sampler type
+
+
+</td></tr>
+<tr><td>
+
+[isStructType()](doc/markdown/./device.pbtypeinfo.isstructtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a struct type
+
+
+</td></tr>
+<tr><td>
+
+[isTextureType()](doc/markdown/./device.pbtypeinfo.istexturetype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a texture type
+
+
+</td></tr>
+<tr><td>
+
+[isVoidType()](doc/markdown/./device.pbtypeinfo.isvoidtype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+returns true if this is a void type
+
+
+</td></tr>
+<tr><td>
+
+[toBufferLayout(offset, layout)](doc/markdown/./device.pbtypeinfo.tobufferlayout.md)
+
+
+</td><td>
+
+`abstract`
+
+
+</td><td>
+
+Creates a buffer layout from this type
+
+
+</td></tr>
+</tbody></table>
 

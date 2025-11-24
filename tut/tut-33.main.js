@@ -1,28 +1,36 @@
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, AssetManager, Application, PerspectiveCamera, OrbitCameraController, panoramaToCubemap, Compositor, Tonemap } from '@zephyr3d/scene';
+import {
+  Scene,
+  AssetManager,
+  Application,
+  PerspectiveCamera,
+  OrbitCameraController,
+  panoramaToCubemap,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 
 const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
-
-myApp.ready().then(async() => {
-  const device = myApp.device;
-
+myApp.ready().then(async () => {
   // Create scene
   const scene = new Scene();
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, device.canvas.width / device.canvas.height, 1, 500);
-  camera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 500);
+  scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
   const assetManager = new AssetManager();
   // Load panorama
   /** @type {import('@zephyr3d/device').Texture2D} */
-  const panorama = await assetManager.fetchTexture('assets/images/Wide_Street.hdr');
+  const panorama = await assetManager.fetchTexture(
+    'https://cdn.zephyr3d.org/doc/assets/images/Wide_Street.hdr'
+  );
   // Create the skybox cubemap
   const skyboxTexture = myApp.device.createCubeTexture('rgba16f', 512);
   // Call the built-in panoramaToCubemap method to render the panorama into the skybox texture
@@ -32,20 +40,10 @@ myApp.ready().then(async() => {
   scene.env.sky.skyType = 'skybox';
   // Set the skybox texture
   scene.env.sky.skyboxTexture = skyboxTexture;
+  // Disable height fog
+  scene.env.sky.fogType = 'none';
 
-  // High dynamic range sky requires tone mapping
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-
-  // Reset aspect ratio when size was changed
-  myApp.on('resize', ev => {
-    camera.aspect = ev.width / ev.height;
-  });
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

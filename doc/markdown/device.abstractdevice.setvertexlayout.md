@@ -14,9 +14,39 @@ setVertexLayout(vertexData: VertexLayout): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  vertexData | [VertexLayout](doc/markdown/./device.vertexlayout.md) | The vertex layout to be set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+vertexData
+
+
+</td><td>
+
+[VertexLayout](doc/markdown/./device.vertexlayout.md)
+
+
+</td><td>
+
+The vertex layout to be set
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

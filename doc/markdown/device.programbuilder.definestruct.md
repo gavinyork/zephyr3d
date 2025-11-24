@@ -14,10 +14,55 @@ defineStruct(members: PBShaderExp[], structName?: string): ShaderTypeFunc;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  members | [PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->\[\] | Members of the structure |
-|  structName | string | _(Optional)_ Name of the type, if not given, the name will be automatically generated |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+members
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)<!-- -->\[\]
+
+
+</td><td>
+
+Members of the structure
+
+
+</td></tr>
+<tr><td>
+
+structName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Name of the type, if not given, the name will be automatically generated
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

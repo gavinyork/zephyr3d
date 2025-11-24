@@ -4,7 +4,7 @@
 
 ## Mesh.getMaterial() method
 
-Gets the associated material
+Returns the bound material driving shading for this drawable.
 
 **Signature:**
 

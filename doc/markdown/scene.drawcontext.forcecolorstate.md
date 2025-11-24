@@ -4,7 +4,7 @@
 
 ## DrawContext.forceColorState property
 
-Force color mask state
+Force color mask state override for special passes (optional).
 
 **Signature:**
 

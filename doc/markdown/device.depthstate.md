@@ -14,18 +14,202 @@ interface DepthState
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [compareFunc](doc/markdown/./device.depthstate.comparefunc.md) |  | [CompareFunc](doc/markdown/./device.comparefunc.md) | The comparison function for depth testing |
-|  [testEnabled](doc/markdown/./device.depthstate.testenabled.md) |  | boolean | true if depth testing should be enabled |
-|  [writeEnabled](doc/markdown/./device.depthstate.writeenabled.md) |  | boolean | true if depth writing should be enabled |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[compareFunc](doc/markdown/./device.depthstate.comparefunc.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CompareFunc](doc/markdown/./device.comparefunc.md)
+
+
+</td><td>
+
+The comparison function for depth testing
+
+
+</td></tr>
+<tr><td>
+
+[depthBias](doc/markdown/./device.depthstate.depthbias.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Depth bias
+
+
+</td></tr>
+<tr><td>
+
+[depthBiasSlopeScale](doc/markdown/./device.depthstate.depthbiasslopescale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Slope scaled depth bias
+
+
+</td></tr>
+<tr><td>
+
+[testEnabled](doc/markdown/./device.depthstate.testenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if depth testing should be enabled
+
+
+</td></tr>
+<tr><td>
+
+[writeEnabled](doc/markdown/./device.depthstate.writeenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if depth writing should be enabled
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [clone()](doc/markdown/./device.depthstate.clone.md) | Creates a new DepthState by copying this one |
-|  [enableTest(b)](doc/markdown/./device.depthstate.enabletest.md) | Enable or disable depth testing |
-|  [enableWrite(b)](doc/markdown/./device.depthstate.enablewrite.md) | Enable or disable depth writing |
-|  [setCompareFunc(func)](doc/markdown/./device.depthstate.setcomparefunc.md) | Sets the comparison function for depth testing |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[clone()](doc/markdown/./device.depthstate.clone.md)
+
+
+</td><td>
+
+Creates a new DepthState by copying this one
+
+
+</td></tr>
+<tr><td>
+
+[enableTest(b)](doc/markdown/./device.depthstate.enabletest.md)
+
+
+</td><td>
+
+Enable or disable depth testing
+
+
+</td></tr>
+<tr><td>
+
+[enableWrite(b)](doc/markdown/./device.depthstate.enablewrite.md)
+
+
+</td><td>
+
+Enable or disable depth writing
+
+
+</td></tr>
+<tr><td>
+
+[setCompareFunc(func)](doc/markdown/./device.depthstate.setcomparefunc.md)
+
+
+</td><td>
+
+Sets the comparison function for depth testing
+
+
+</td></tr>
+<tr><td>
+
+[setDepthBias(value)](doc/markdown/./device.depthstate.setdepthbias.md)
+
+
+</td><td>
+
+Sets the depth bias
+
+
+</td></tr>
+<tr><td>
+
+[setDepthBiasSlopeScale(value)](doc/markdown/./device.depthstate.setdepthbiasslopescale.md)
+
+
+</td><td>
+
+Sets the slope scaled depth bias
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,39 @@ buildCompute(options: PBComputeOptions): readonly [string, BindGroupLayout[]];
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  options | [PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md) | The build programs |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+options
+
+
+</td><td>
+
+[PBComputeOptions](doc/markdown/./device.pbcomputeoptions.md)
+
+
+</td><td>
+
+The build programs
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

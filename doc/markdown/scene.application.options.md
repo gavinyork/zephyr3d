@@ -4,7 +4,9 @@
 
 ## Application.options property
 
-The options that was used to create the application
+The (sanitized) options used to create this application.
+
+Note: Defaults are applied for `enableMSAA` and `pixelRatio` if omitted.
 
 **Signature:**
 

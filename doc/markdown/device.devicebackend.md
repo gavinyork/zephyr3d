@@ -14,9 +14,43 @@ interface DeviceBackend
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [createDevice(cvs, options)](doc/markdown/./device.devicebackend.createdevice.md) |  |
-|  [supported()](doc/markdown/./device.devicebackend.supported.md) |  |
-|  [typeName()](doc/markdown/./device.devicebackend.typename.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createDevice(cvs, options)](doc/markdown/./device.devicebackend.createdevice.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[supported()](doc/markdown/./device.devicebackend.supported.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[typeName()](doc/markdown/./device.devicebackend.typename.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,7 +4,11 @@
 
 ## MeshMaterial.createInstance() method
 
-Create material instance
+Create a material instance (preferred for GPU instancing).
+
+- On WebGL1 (or when instancing unsupported), falls back to cloning. - Otherwise, returns a proxy instance that shares GPU programs and stores per-instance uniforms in a compact Float32Array.
+
+The returned instance: - Exposes properties defined by `defineInstanceUniform` with getter/setter that read/write the packed buffer and notify `RenderBundleWrapper`<!-- -->. - Delegates methods to the core material via prototype chain.
 
 **Signature:**
 

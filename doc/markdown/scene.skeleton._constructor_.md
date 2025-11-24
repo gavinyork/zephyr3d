@@ -4,21 +4,99 @@
 
 ## Skeleton.(constructor)
 
-Creates an instance of skeleton
+Create a skeleton instance.
 
 **Signature:**
 
 ```typescript
-constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], meshes: Mesh[], bounding: AssetSubMeshData[]);
+constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], jointTransforms?: {
+        scale: Vector3;
+        rotation: Quaternion;
+        position: Vector3;
+    }[]);
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  joints | [SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->\[\] | The joint nodes |
-|  inverseBindMatrices | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | The inverse binding matrices of the joints |
-|  bindPoseMatrices | [Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\] | The binding pose matrices of the joints |
-|  meshes | [Mesh](doc/markdown/./scene.mesh.md)<!-- -->\[\] |  |
-|  bounding | [AssetSubMeshData](doc/markdown/./scene.assetsubmeshdata.md)<!-- -->\[\] |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+joints
+
+
+</td><td>
+
+[SceneNode](doc/markdown/./scene.scenenode.md)<!-- -->\[\]
+
+
+</td><td>
+
+Joint scene nodes (one per joint), ordered to match skin data.
+
+
+</td></tr>
+<tr><td>
+
+inverseBindMatrices
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\]
+
+
+</td><td>
+
+Inverse bind matrices for each joint.
+
+
+</td></tr>
+<tr><td>
+
+bindPoseMatrices
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)<!-- -->\[\]
+
+
+</td><td>
+
+Bind pose matrices for each joint (model-space).
+
+
+</td></tr>
+<tr><td>
+
+jointTransforms
+
+
+</td><td>
+
+{ scale: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; rotation: [Quaternion](doc/markdown/./base.quaternion.md)<!-- -->; position: [Vector3](doc/markdown/./base.vector3.md)<!-- -->; }\[\]
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 

@@ -14,9 +14,39 @@ setAnimatedBoundingBox(bbox: BoundingBox): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bbox | [BoundingBox](doc/markdown/./scene.boundingbox.md) | The bounding box for animation |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bbox
+
+
+</td><td>
+
+[BoundingBox](doc/markdown/./scene.boundingbox.md)
+
+
+</td><td>
+
+The bounding box for animation
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

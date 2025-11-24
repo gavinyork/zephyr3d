@@ -4,7 +4,7 @@
 
 ## SkyRenderer.skyColor property
 
-The solid sky color
+The color used when sky type is `image`
 
 **Signature:**
 

@@ -14,8 +14,64 @@ interface PointerTypeDetail
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [addressSpace](doc/markdown/./device.pointertypedetail.addressspace.md) |  | [PBAddressSpace](doc/markdown/./device.pbaddressspace.md) | Address space of the pointer |
-|  [pointerType](doc/markdown/./device.pointertypedetail.pointertype.md) |  | [PBTypeInfo](doc/markdown/./device.pbtypeinfo.md) | Type of the pointer |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addressSpace](doc/markdown/./device.pointertypedetail.addressspace.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBAddressSpace](doc/markdown/./device.pbaddressspace.md)
+
+
+</td><td>
+
+Address space of the pointer
+
+
+</td></tr>
+<tr><td>
+
+[pointerType](doc/markdown/./device.pointertypedetail.pointertype.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[PBTypeInfo](doc/markdown/./device.pbtypeinfo.md)
+
+
+</td><td>
+
+Type of the pointer
+
+
+</td></tr>
+</tbody></table>
 

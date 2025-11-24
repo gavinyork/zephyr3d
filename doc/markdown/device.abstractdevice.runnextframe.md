@@ -14,9 +14,39 @@ runNextFrame(f: () => void): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  f | () =&gt; void | The function to be scheduled |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+f
+
+
+</td><td>
+
+() =&gt; void
+
+
+</td><td>
+
+The function to be scheduled
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

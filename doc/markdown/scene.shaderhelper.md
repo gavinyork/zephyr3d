@@ -14,68 +14,1211 @@ declare class ShaderHelper
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [BILLBOARD\_SPHERICAL](doc/markdown/./scene.shaderhelper.billboard_spherical.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [BILLBOARD\_SYLINDRAL](doc/markdown/./scene.shaderhelper.billboard_sylindral.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [FOG\_TYPE\_EXP](doc/markdown/./scene.shaderhelper.fog_type_exp.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [FOG\_TYPE\_EXP2](doc/markdown/./scene.shaderhelper.fog_type_exp2.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [FOG\_TYPE\_LINEAR](doc/markdown/./scene.shaderhelper.fog_type_linear.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [FOG\_TYPE\_NONE](doc/markdown/./scene.shaderhelper.fog_type_none.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
-|  [FOG\_TYPE\_SCATTER](doc/markdown/./scene.shaderhelper.fog_type_scatter.md) | <p><code>static</code></p><p><code>readonly</code></p> | (not declared) |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[BILLBOARD\_SPHERICAL](doc/markdown/./scene.shaderhelper.billboard_spherical.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[BILLBOARD\_SYLINDRAL](doc/markdown/./scene.shaderhelper.billboard_sylindral.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[MATERIAL\_INSTANCE\_DATA\_OFFSET](doc/markdown/./scene.shaderhelper.material_instance_data_offset.md)
+
+
+</td><td>
+
+`static`
+
+`readonly`
+
+
+</td><td>
+
+(not declared)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [applyFog(scope, worldPos, color, ctx)](doc/markdown/./scene.shaderhelper.applyfog.md) | <code>static</code> |  |
-|  [calculateMorphDelta(scope, attrib)](doc/markdown/./scene.shaderhelper.calculatemorphdelta.md) | <code>static</code> |  |
-|  [calculateShadow(scope, worldPos, NoL, ctx)](doc/markdown/./scene.shaderhelper.calculateshadow.md) | <code>static</code> | Calculates shadow of current fragment |
-|  [calculateSkinMatrix(scope)](doc/markdown/./scene.shaderhelper.calculateskinmatrix.md) | <code>static</code> | Calculate skinning matrix for current vertex |
-|  [computeFogFactor(scope, viewDir, fogType, fogParams)](doc/markdown/./scene.shaderhelper.computefogfactor.md) | <code>static</code> | Computes the fog factor for a given view vector |
-|  [computeFogFactorForType(scope, viewDir, fogParams, fogType)](doc/markdown/./scene.shaderhelper.computefogfactorfortype.md) | <code>static</code> | Computes the fog factor with given type for a given view vector |
-|  [discardIfClipped(scope, worldPos)](doc/markdown/./scene.shaderhelper.discardifclipped.md) | <code>static</code> | Discard the fragment if it was clipped by the clip plane |
-|  [encodeColorOutput(scope, outputColor)](doc/markdown/./scene.shaderhelper.encodecoloroutput.md) | <code>static</code> | Transform color to sRGB color space if nessesary |
-|  [getAerialPerspectiveLUT(scope)](doc/markdown/./scene.shaderhelper.getaerialperspectivelut.md) | <code>static</code> | Gets the aerial perspective LUT |
-|  [getAPDensity(scope)](doc/markdown/./scene.shaderhelper.getapdensity.md) | <code>static</code> | Gets the uniform variable of type float which holds the aerial perspective density |
-|  [getBoneInvBindMatrixUniformName()](doc/markdown/./scene.shaderhelper.getboneinvbindmatrixuniformname.md) | <code>static</code> |  |
-|  [getBoneMatricesUniformName()](doc/markdown/./scene.shaderhelper.getbonematricesuniformname.md) | <code>static</code> |  |
-|  [getBoneTextureSizeUniformName()](doc/markdown/./scene.shaderhelper.getbonetexturesizeuniformname.md) | <code>static</code> |  |
-|  [getCameraClipPlane(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplane.md) | <code>static</code> | Gets the clip plane |
-|  [getCameraClipPlaneFlag(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplaneflag.md) | <code>static</code> | Gets the clip plane flag |
-|  [getCameraParams(scope)](doc/markdown/./scene.shaderhelper.getcameraparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the camera parameters |
-|  [getCameraPosition(scope)](doc/markdown/./scene.shaderhelper.getcameraposition.md) | <code>static</code> | Gets the uniform variable of type vec3 which holds the camera position |
-|  [getCameraRoughnessFactor(scope)](doc/markdown/./scene.shaderhelper.getcameraroughnessfactor.md) | <code>static</code> | Gets the uniform variable of type float which holds the roughness factor |
-|  [getDrawableBindGroupLayout(skinning, morphing, instancing)](doc/markdown/./scene.shaderhelper.getdrawablebindgrouplayout.md) | <code>static</code> |  |
-|  [getEnvLightStrength(scope)](doc/markdown/./scene.shaderhelper.getenvlightstrength.md) | <code>static</code> | Gets the uniform variable of type float which holds the strength of the environment light |
-|  [getFogColor(scope)](doc/markdown/./scene.shaderhelper.getfogcolor.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
-|  [getFogParams(scope)](doc/markdown/./scene.shaderhelper.getfogparams.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog parameters |
-|  [getFogType(scope)](doc/markdown/./scene.shaderhelper.getfogtype.md) | <code>static</code> | Gets the uniform variable of type vec4 which holds the fog color |
-|  [getGlobalUniforms(scope)](doc/markdown/./scene.shaderhelper.getglobaluniforms.md) | <code>static</code> | Get global uniforms |
-|  [getInstanceDataOffsetUniformName()](doc/markdown/./scene.shaderhelper.getinstancedataoffsetuniformname.md) | <code>static</code> |  |
-|  [getInstanceDataStrideUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatastrideuniformname.md) | <code>static</code> |  |
-|  [getInstanceDataUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatauniformname.md) | <code>static</code> |  |
-|  [getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.shaderhelper.getinstanceduniform.md) | <code>static</code> | Gets the instance uniform value of type vec4 by uniform index |
-|  [getLightBufferUniformName()](doc/markdown/./scene.shaderhelper.getlightbufferuniformname.md) | <code>static</code> |  |
-|  [getMorphDataUniformName()](doc/markdown/./scene.shaderhelper.getmorphdatauniformname.md) | <code>static</code> |  |
-|  [getMorphInfoUniformName()](doc/markdown/./scene.shaderhelper.getmorphinfouniformname.md) | <code>static</code> |  |
-|  [getNormalMatrix(scope)](doc/markdown/./scene.shaderhelper.getnormalmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn |
-|  [getProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the projection matrix of current camera |
-|  [getShadowMap(scope)](doc/markdown/./scene.shaderhelper.getshadowmap.md) | <code>static</code> | Get shadow map uniform value |
-|  [getViewMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view matrix of current camera |
-|  [getViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewprojectionmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the view projection matrix of current camera |
-|  [getWorldMatrix(scope)](doc/markdown/./scene.shaderhelper.getworldmatrix.md) | <code>static</code> | Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn |
-|  [getWorldMatrixUniformName()](doc/markdown/./scene.shaderhelper.getworldmatrixuniformname.md) | <code>static</code> |  |
-|  [hasMorphing(scope)](doc/markdown/./scene.shaderhelper.hasmorphing.md) | <code>static</code> | This function checks if the shader needs to process morph target animation. |
-|  [hasSkinning(scope)](doc/markdown/./scene.shaderhelper.hasskinning.md) | <code>static</code> | This function checks if the shader needs to process skeletal animation. |
-|  [linearDepthToNonLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.lineardepthtononlinear.md) | <code>static</code> | Calculates the non-linear depth from linear depth |
-|  [nonLinearDepthToLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.nonlineardepthtolinear.md) | <code>static</code> | Calculates the linear depth from non-linear depth |
-|  [nonLinearDepthToLinearNormalized(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.nonlineardepthtolinearnormalized.md) | <code>static</code> | Calculates the normalized linear depth from non-linear depth |
-|  [prepareFragmentShader(pb, ctx)](doc/markdown/./scene.shaderhelper.preparefragmentshader.md) | <code>static</code> | Prepares the fragment shader which is going to be used in our material system |
-|  [prepareVertexShader(pb, ctx)](doc/markdown/./scene.shaderhelper.preparevertexshader.md) | <code>static</code> | Prepares the vertex shader which is going to be used in our material system |
-|  [resolveVertexNormal(scope, normal)](doc/markdown/./scene.shaderhelper.resolvevertexnormal.md) | <code>static</code> | Calculates the normal vector of type vec3 in object space |
-|  [resolveVertexPosition(scope, pos)](doc/markdown/./scene.shaderhelper.resolvevertexposition.md) | <code>static</code> | Calculates the vertex position of type vec3 in object space |
-|  [resolveVertexTangent(scope, tangent)](doc/markdown/./scene.shaderhelper.resolvevertextangent.md) | <code>static</code> | Calculates the tangent vector of type vec3 in object space |
-|  [setClipSpacePosition(scope, pos)](doc/markdown/./scene.shaderhelper.setclipspaceposition.md) | <code>static</code> | Sets the clip space position in vertex shader |
-|  [vertexShaderDrawableStuff(scope, skinning, morphing, instanced)](doc/markdown/./scene.shaderhelper.vertexshaderdrawablestuff.md) | <code>static</code> | Vertex shader drawable stuff |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[applyFog(scope, worldPos, color, ctx)](doc/markdown/./scene.shaderhelper.applyfog.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calculateMorphDelta(scope, attrib)](doc/markdown/./scene.shaderhelper.calculatemorphdelta.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[calculateShadow(scope, worldPos, NoL, ctx)](doc/markdown/./scene.shaderhelper.calculateshadow.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates shadow of current fragment
+
+
+</td></tr>
+<tr><td>
+
+[calculateSkinMatrix(scope)](doc/markdown/./scene.shaderhelper.calculateskinmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculate skinning matrix for current vertex
+
+
+</td></tr>
+<tr><td>
+
+[discardIfClipped(scope, worldPos)](doc/markdown/./scene.shaderhelper.discardifclipped.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Discard the fragment if it was clipped by the clip plane
+
+
+</td></tr>
+<tr><td>
+
+[encodeColorOutput(scope, outputColor)](doc/markdown/./scene.shaderhelper.encodecoloroutput.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Transform color to sRGB color space if nessesary
+
+
+</td></tr>
+<tr><td>
+
+[getAerialPerspectiveLUT(scope)](doc/markdown/./scene.shaderhelper.getaerialperspectivelut.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the aerial perspective LUT
+
+
+</td></tr>
+<tr><td>
+
+[getAtmosphereParams(scope)](doc/markdown/./scene.shaderhelper.getatmosphereparams.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable that contains atmosphere parameters
+
+
+</td></tr>
+<tr><td>
+
+[getBakedSkyTexture(scope)](doc/markdown/./scene.shaderhelper.getbakedskytexture.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets current baked skybox texture
+
+
+</td></tr>
+<tr><td>
+
+[getBoneInvBindMatrixUniformName()](doc/markdown/./scene.shaderhelper.getboneinvbindmatrixuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getBoneMatricesUniformName()](doc/markdown/./scene.shaderhelper.getbonematricesuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getBoneTextureSizeUniformName()](doc/markdown/./scene.shaderhelper.getbonetexturesizeuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getCameraClipPlane(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplane.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the clip plane
+
+
+</td></tr>
+<tr><td>
+
+[getCameraClipPlaneFlag(scope)](doc/markdown/./scene.shaderhelper.getcameraclipplaneflag.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the clip plane flag
+
+
+</td></tr>
+<tr><td>
+
+[getCameraParams(scope)](doc/markdown/./scene.shaderhelper.getcameraparams.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type vec4 which holds the camera parameters
+
+
+</td></tr>
+<tr><td>
+
+[getCameraPosition(scope)](doc/markdown/./scene.shaderhelper.getcameraposition.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type vec3 which holds the camera position
+
+
+</td></tr>
+<tr><td>
+
+[getCameraRoughnessFactor(scope)](doc/markdown/./scene.shaderhelper.getcameraroughnessfactor.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type float which holds the roughness factor
+
+
+</td></tr>
+<tr><td>
+
+[getDrawableBindGroupLayout(skinning, morphing, instancing)](doc/markdown/./scene.shaderhelper.getdrawablebindgrouplayout.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getElapsedTime(scope)](doc/markdown/./scene.shaderhelper.getelapsedtime.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the elapsed time in seconds
+
+
+</td></tr>
+<tr><td>
+
+[getElapsedTimeFrame(scope)](doc/markdown/./scene.shaderhelper.getelapsedtimeframe.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the elapsed time since last frame in seconds
+
+
+</td></tr>
+<tr><td>
+
+[getEnvLightStrength(scope)](doc/markdown/./scene.shaderhelper.getenvlightstrength.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type float which holds the strength of the environment light
+
+
+</td></tr>
+<tr><td>
+
+[getFramestamp(scope)](doc/markdown/./scene.shaderhelper.getframestamp.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type uint which holds the framestamp
+
+
+</td></tr>
+<tr><td>
+
+[getHiZDepthTexture(scope)](doc/markdown/./scene.shaderhelper.gethizdepthtexture.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets current HiZ depth texture
+
+
+</td></tr>
+<tr><td>
+
+[getHiZDepthTextureMipLevelCount(scope)](doc/markdown/./scene.shaderhelper.gethizdepthtexturemiplevelcount.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the mipmap levels count of current HiZ depth texture
+
+
+</td></tr>
+<tr><td>
+
+[getHiZDepthTextureSize(scope)](doc/markdown/./scene.shaderhelper.gethizdepthtexturesize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the size of current HiZ depth texture
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceDataOffsetUniformName()](doc/markdown/./scene.shaderhelper.getinstancedataoffsetuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceDataStrideUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatastrideuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getInstanceDataUniformName()](doc/markdown/./scene.shaderhelper.getinstancedatauniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getInstancedUniform(scope, uniformIndex)](doc/markdown/./scene.shaderhelper.getinstanceduniform.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the instance uniform value of type vec4 by uniform index
+
+
+</td></tr>
+<tr><td>
+
+[getInvProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getinvprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the inversed projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getInvViewMatrix(scope)](doc/markdown/./scene.shaderhelper.getinvviewmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the inv-view matrix of current camera (camera space to world space)
+
+
+</td></tr>
+<tr><td>
+
+[getInvViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getinvviewprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the inversed view projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getJitteredInvVPMatrix(scope)](doc/markdown/./scene.shaderhelper.getjitteredinvvpmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the jittered inversed view-projection matrix
+
+
+</td></tr>
+<tr><td>
+
+[getLightBufferUniformName()](doc/markdown/./scene.shaderhelper.getlightbufferuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getLinearDepthTexture(scope)](doc/markdown/./scene.shaderhelper.getlineardepthtexture.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets current linear depth texture
+
+
+</td></tr>
+<tr><td>
+
+[getLinearDepthTextureSize(scope)](doc/markdown/./scene.shaderhelper.getlineardepthtexturesize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the size of current linear depth texture
+
+
+</td></tr>
+<tr><td>
+
+[getMorphDataUniformName()](doc/markdown/./scene.shaderhelper.getmorphdatauniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getMorphInfoUniformName()](doc/markdown/./scene.shaderhelper.getmorphinfouniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getNormalMatrix(scope)](doc/markdown/./scene.shaderhelper.getnormalmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
+
+
+</td></tr>
+<tr><td>
+
+[getObjectColorUniformName()](doc/markdown/./scene.shaderhelper.getobjectcoloruniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getPrevUnjitteredViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getprevunjitteredviewprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the unjittered view projection at previous frame matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getPrevWorldMatrix(scope)](doc/markdown/./scene.shaderhelper.getprevworldmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the world matrix at previous frame of current object to be drawn
+
+
+</td></tr>
+<tr><td>
+
+[getPrevWorldMatrixFrameUniformName()](doc/markdown/./scene.shaderhelper.getprevworldmatrixframeuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getPrevWorldMatrixUniformName()](doc/markdown/./scene.shaderhelper.getprevworldmatrixuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getProjectionMatrixJitterValue(scope)](doc/markdown/./scene.shaderhelper.getprojectionmatrixjittervalue.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type vec2 which holds the jitter value of the projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getRenderSize(scope)](doc/markdown/./scene.shaderhelper.getrendersize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets framebuffer size for rendering
+
+
+</td></tr>
+<tr><td>
+
+[getSceneColorTexture(scope)](doc/markdown/./scene.shaderhelper.getscenecolortexture.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets current scene color texture
+
+
+</td></tr>
+<tr><td>
+
+[getSceneColorTextureSize(scope)](doc/markdown/./scene.shaderhelper.getscenecolortexturesize.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the size of current scene color texture
+
+
+</td></tr>
+<tr><td>
+
+[getShadowMap(scope)](doc/markdown/./scene.shaderhelper.getshadowmap.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Get shadow map uniform value
+
+
+</td></tr>
+<tr><td>
+
+[getUnjitteredViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getunjitteredviewprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the unjittered view projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getViewMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the view matrix of current camera (world space to camera space)
+
+
+</td></tr>
+<tr><td>
+
+[getViewProjectionMatrix(scope)](doc/markdown/./scene.shaderhelper.getviewprojectionmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the view projection matrix of current camera
+
+
+</td></tr>
+<tr><td>
+
+[getWorldMatrix(scope)](doc/markdown/./scene.shaderhelper.getworldmatrix.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn
+
+
+</td></tr>
+<tr><td>
+
+[getWorldMatrixUniformName()](doc/markdown/./scene.shaderhelper.getworldmatrixuniformname.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[hasMorphing(scope)](doc/markdown/./scene.shaderhelper.hasmorphing.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+This function checks if the shader needs to process morph target animation.
+
+
+</td></tr>
+<tr><td>
+
+[hasSkinning(scope)](doc/markdown/./scene.shaderhelper.hasskinning.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+This function checks if the shader needs to process skeletal animation.
+
+
+</td></tr>
+<tr><td>
+
+[linearDepthToNonLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.lineardepthtononlinear.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the non-linear depth from linear depth
+
+
+</td></tr>
+<tr><td>
+
+[nonLinearDepthToLinear(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.nonlineardepthtolinear.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the linear depth from non-linear depth
+
+
+</td></tr>
+<tr><td>
+
+[nonLinearDepthToLinearNormalized(scope, depth, nearFar)](doc/markdown/./scene.shaderhelper.nonlineardepthtolinearnormalized.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the normalized linear depth from non-linear depth
+
+
+</td></tr>
+<tr><td>
+
+[prepareFragmentShader(pb, ctx)](doc/markdown/./scene.shaderhelper.preparefragmentshader.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Prepares the fragment shader which is going to be used in our material system
+
+
+</td></tr>
+<tr><td>
+
+[prepareVertexShader(pb, ctx)](doc/markdown/./scene.shaderhelper.preparevertexshader.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Prepares the vertex shader which is going to be used in our material system
+
+
+</td></tr>
+<tr><td>
+
+[resolveMotionVector(scope, worldPos, prevWorldPos)](doc/markdown/./scene.shaderhelper.resolvemotionvector.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Resolve motion vector
+
+
+</td></tr>
+<tr><td>
+
+[resolveVertexNormal(scope, normal)](doc/markdown/./scene.shaderhelper.resolvevertexnormal.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the normal vector of type vec3 in object space
+
+
+</td></tr>
+<tr><td>
+
+[resolveVertexPosition(scope)](doc/markdown/./scene.shaderhelper.resolvevertexposition.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the vertex position of type vec3 in object space
+
+
+</td></tr>
+<tr><td>
+
+[resolveVertexTangent(scope, tangent)](doc/markdown/./scene.shaderhelper.resolvevertextangent.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Calculates the tangent vector of type vec3 in object space
+
+
+</td></tr>
+<tr><td>
+
+[sampleLinearDepth(scope, tex, uv, level)](doc/markdown/./scene.shaderhelper.samplelineardepth.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Sample linear depth from linear depth texture
+
+
+</td></tr>
+<tr><td>
+
+[sampleLinearDepthWithBackface(scope, tex, uv, level)](doc/markdown/./scene.shaderhelper.samplelineardepthwithbackface.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Sample linear depth from linear depth texture with backface
+
+
+</td></tr>
+<tr><td>
+
+[samplePositionFromDepth(scope, depthTex, uv, mat, cameraNearFar)](doc/markdown/./scene.shaderhelper.samplepositionfromdepth.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[setClipSpacePosition(scope, pos)](doc/markdown/./scene.shaderhelper.setclipspaceposition.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Sets the clip space position in vertex shader
+
+
+</td></tr>
+<tr><td>
+
+[vertexShaderDrawableStuff(scope, skinning, morphing, instanced)](doc/markdown/./scene.shaderhelper.vertexshaderdrawablestuff.md)
+
+
+</td><td>
+
+`static`
+
+
+</td><td>
+
+Vertex shader drawable stuff
+
+
+</td></tr>
+</tbody></table>
 

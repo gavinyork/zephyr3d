@@ -14,9 +14,39 @@ setFramebuffer(rt: FrameBuffer): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  rt | [FrameBuffer](doc/markdown/./device.framebuffer.md) | The FrameBuffer object to set as the current framebuffer. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rt
+
+
+</td><td>
+
+[FrameBuffer](doc/markdown/./device.framebuffer.md)
+
+
+</td><td>
+
+The FrameBuffer object to set as the current framebuffer.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

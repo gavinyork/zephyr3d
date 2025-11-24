@@ -14,10 +14,55 @@ setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): Structured
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  buffer | [StructuredBuffer](doc/markdown/./device.structuredbuffer.md) | The vertex buffer object |
-|  stepMode | [VertexStepMode](doc/markdown/./device.vertexstepmode.md) | _(Optional)_ Step mode of the buffer |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+buffer
+
+
+</td><td>
+
+[StructuredBuffer](doc/markdown/./device.structuredbuffer.md)
+
+
+</td><td>
+
+The vertex buffer object
+
+
+</td></tr>
+<tr><td>
+
+stepMode
+
+
+</td><td>
+
+[VertexStepMode](doc/markdown/./device.vertexstepmode.md)
+
+
+</td><td>
+
+_(Optional)_ Step mode of the buffer
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

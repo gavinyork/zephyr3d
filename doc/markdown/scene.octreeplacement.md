@@ -4,7 +4,7 @@
 
 ## OctreePlacement enum
 
-Octree placement
+Child placement within an octree node.
 
 **Signature:**
 
@@ -14,14 +14,137 @@ declare enum OctreePlacement
 
 ## Enumeration Members
 
-|  Member | Value | Description |
-|  --- | --- | --- |
-|  NNN | <code>7</code> |  |
-|  NNP | <code>6</code> |  |
-|  NPN | <code>5</code> |  |
-|  NPP | <code>4</code> |  |
-|  PNN | <code>3</code> |  |
-|  PNP | <code>2</code> |  |
-|  PPN | <code>1</code> |  |
-|  PPP | <code>0</code> |  |
+<table><thead><tr><th>
+
+Member
+
+
+</th><th>
+
+Value
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+NNN
+
+
+</td><td>
+
+`7`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+NNP
+
+
+</td><td>
+
+`6`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+NPN
+
+
+</td><td>
+
+`5`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+NPP
+
+
+</td><td>
+
+`4`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PNN
+
+
+</td><td>
+
+`3`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PNP
+
+
+</td><td>
+
+`2`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PPN
+
+
+</td><td>
+
+`1`
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+PPP
+
+
+</td><td>
+
+`0`
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
+
+## Remarks
+
+Encodes the child octant by the sign of (<!-- -->(x, y, z)<!-- -->)<!-- -->: - `P` for positive, `N` for negative. - Example: `PPN` means (<!-- -->+x, +y, -z<!-- -->)<!-- -->.
 

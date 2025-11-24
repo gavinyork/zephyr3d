@@ -2,23 +2,10 @@
 
 [Home](doc/markdown/./index.md) &gt; [@zephyr3d/scene](doc/markdown/./scene.md) &gt; [TerrainMaterial](doc/markdown/./scene.terrainmaterial.md) &gt; [getAlbedoTexCoord](doc/markdown/./scene.terrainmaterial.getalbedotexcoord.md)
 
-## TerrainMaterial.getAlbedoTexCoord() method
-
-@<!-- -->ts-ignore
+## TerrainMaterial.getAlbedoTexCoord property
 
 **Signature:**
 
 ```typescript
-getAlbedoTexCoord(scope: PBInsideFunctionScope): PBShaderExp;
+getAlbedoTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp;
 ```
-
-## Parameters
-
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) |  |
-
-**Returns:**
-
-[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
-

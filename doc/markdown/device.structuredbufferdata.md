@@ -14,21 +14,157 @@ declare class StructuredBufferData
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(layout, buffer)](doc/markdown/./device.structuredbufferdata._constructor_.md) |  | Creates a new structured buffer data |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)(layout, buffer)](doc/markdown/./device.structuredbufferdata._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates a new structured buffer data
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [buffer](doc/markdown/./device.structuredbufferdata.buffer.md) | <code>readonly</code> | ArrayBuffer | Get the data cache buffer |
-|  [byteLength](doc/markdown/./device.structuredbufferdata.bytelength.md) | <code>readonly</code> | number | The buffer size in bytes |
-|  [uniforms](doc/markdown/./device.structuredbufferdata.uniforms.md) | <code>readonly</code> | Record&lt;string, [TypedArray](doc/markdown/./base.typedarray.md)<!-- -->&gt; | Get all the uniform datas |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[buffer](doc/markdown/./device.structuredbufferdata.buffer.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+ArrayBuffer
+
+
+</td><td>
+
+Get the data cache buffer
+
+
+</td></tr>
+<tr><td>
+
+[byteLength](doc/markdown/./device.structuredbufferdata.bytelength.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+The buffer size in bytes
+
+
+</td></tr>
+<tr><td>
+
+[uniforms](doc/markdown/./device.structuredbufferdata.uniforms.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+Record&lt;string, [TypedArray](doc/markdown/./base.typedarray.md)<!-- -->&gt;
+
+
+</td><td>
+
+Get all the uniform datas
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [set(name, value)](doc/markdown/./device.structuredbufferdata.set.md) |  | Sets the value of a structure member |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[set(name, value)](doc/markdown/./device.structuredbufferdata.set.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the value of a structure member
+
+
+</td></tr>
+</tbody></table>
 

@@ -4,7 +4,7 @@
 
 ## OctreeNode.getMaxPointLoosed() method
 
-Gets the loosed max point of the node
+Get the loosed maximum corner point of this node in world space.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getMaxPointLoosed(): Vector3;
 
 [Vector3](doc/markdown/./base.vector3.md)
 
-Loosed max point of the node
+The loosed maximum corner as a `Vector3`<!-- -->.
 

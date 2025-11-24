@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.getParentIndex() method
 
-Gets the index of the parent node
+Compute the parent index in the previous chunk for a given child index.
 
 **Signature:**
 
@@ -14,13 +14,43 @@ getParentIndex(index: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index of the child node |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Child node index in this chunk.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 number
 
-Index of the parent node
+The linear index of the parent in the previous chunk.
 

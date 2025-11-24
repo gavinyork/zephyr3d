@@ -4,7 +4,9 @@
 
 ## StopAnimationOptions type
 
-Options for stop playing animation
+Options for stopping an animation.
+
+Allows a graceful fade-out instead of abrupt stop.
 
 **Signature:**
 

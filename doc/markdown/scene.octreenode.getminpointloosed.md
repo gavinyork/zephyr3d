@@ -4,7 +4,7 @@
 
 ## OctreeNode.getMinPointLoosed() method
 
-Gets the loosed min point of the node
+Get the loosed minimum corner point of this node in world space.
 
 **Signature:**
 
@@ -15,5 +15,5 @@ getMinPointLoosed(): Vector3;
 
 [Vector3](doc/markdown/./base.vector3.md)
 
-Loosed min point of the node
+The loosed minimum corner as a `Vector3`<!-- -->.
 

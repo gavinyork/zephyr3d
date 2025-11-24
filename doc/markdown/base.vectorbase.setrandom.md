@@ -14,10 +14,55 @@ setRandom(minValue: number, maxValue: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  minValue | number | Minimum value of any component of the vector |
-|  maxValue | number | Maximum value of any component of the vector |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+minValue
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Minimum value of any component of the vector
+
+
+</td></tr>
+<tr><td>
+
+maxValue
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum value of any component of the vector
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

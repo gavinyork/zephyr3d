@@ -4,7 +4,7 @@
 
 ## OctreeNode class
 
-Octree node
+A single node (cell) within the octree hierarchy.
 
 **Signature:**
 
@@ -12,35 +12,355 @@ Octree node
 declare class OctreeNode 
 ```
 
+## Remarks
+
+- Holds scene graph nodes that spatially belong to the node's region. - Computes tight and loosed AABBs on demand. - Provides navigation to parent/children based on placement.
+
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.octreenode._constructor_.md) |  | Creates an instance of octree node |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.octreenode._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create an empty octree node.
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [addNode(node)](doc/markdown/./scene.octreenode.addnode.md) |  | Adds a scene node to this node |
-|  [clearNodes()](doc/markdown/./scene.octreenode.clearnodes.md) |  | Removes all the scene nodes that this octree node contains |
-|  [createChildren()](doc/markdown/./scene.octreenode.createchildren.md) |  | Creates all children of this node |
-|  [getBox()](doc/markdown/./scene.octreenode.getbox.md) |  | Get the bounding box of the octree node |
-|  [getBoxLoosed()](doc/markdown/./scene.octreenode.getboxloosed.md) |  | Gets the loosed bounding box of the node |
-|  [getChild(placement)](doc/markdown/./scene.octreenode.getchild.md) |  | Gets the child node by a given placement |
-|  [getChunk()](doc/markdown/./scene.octreenode.getchunk.md) |  | Gets the octree chunk |
-|  [getLevel()](doc/markdown/./scene.octreenode.getlevel.md) |  | Gets the level index of the octree node |
-|  [getMaxPoint()](doc/markdown/./scene.octreenode.getmaxpoint.md) |  | Gets max point of the node |
-|  [getMaxPointLoosed()](doc/markdown/./scene.octreenode.getmaxpointloosed.md) |  | Gets the loosed max point of the node |
-|  [getMinPoint()](doc/markdown/./scene.octreenode.getminpoint.md) |  | Gets min point of the node |
-|  [getMinPointLoosed()](doc/markdown/./scene.octreenode.getminpointloosed.md) |  | Gets the loosed min point of the node |
-|  [getNodes()](doc/markdown/./scene.octreenode.getnodes.md) |  | Get all the scene nodes that this octree node contains |
-|  [getOrCreateChild(placement)](doc/markdown/./scene.octreenode.getorcreatechild.md) |  | Gets or creates a child node by a given placement |
-|  [getOrCreateParent()](doc/markdown/./scene.octreenode.getorcreateparent.md) |  | Gets or creates the parent node |
-|  [getParent()](doc/markdown/./scene.octreenode.getparent.md) |  | Gets parent of the node |
-|  [getPosition()](doc/markdown/./scene.octreenode.getposition.md) |  | Gets the position of the octree node |
-|  [removeNode(node)](doc/markdown/./scene.octreenode.removenode.md) |  | Removes a scene node from this node |
-|  [setChunk(chunk)](doc/markdown/./scene.octreenode.setchunk.md) |  | Sets the octree chunk |
-|  [setPosition(index)](doc/markdown/./scene.octreenode.setposition.md) |  | Sets the position of the node |
-|  [traverse(v)](doc/markdown/./scene.octreenode.traverse.md) |  | Traverse this node by a visitor |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[addNode(node)](doc/markdown/./scene.octreenode.addnode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Add a scene node to this octree node.
+
+
+</td></tr>
+<tr><td>
+
+[clearNodes()](doc/markdown/./scene.octreenode.clearnodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove all scene nodes from this octree node.
+
+
+</td></tr>
+<tr><td>
+
+[createChildren()](doc/markdown/./scene.octreenode.createchildren.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Create all eight children for this node in the next (finer) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getBox()](doc/markdown/./scene.octreenode.getbox.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the tight AABB of this node, computed from its existing children.
+
+
+</td></tr>
+<tr><td>
+
+[getBoxLoosed()](doc/markdown/./scene.octreenode.getboxloosed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the loosed AABB of this node.
+
+
+</td></tr>
+<tr><td>
+
+[getChild(placement)](doc/markdown/./scene.octreenode.getchild.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get a child node by placement from the next (finer) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getChunk()](doc/markdown/./scene.octreenode.getchunk.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the chunk that owns this node.
+
+
+</td></tr>
+<tr><td>
+
+[getLevel()](doc/markdown/./scene.octreenode.getlevel.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the hierarchical level index of this node.
+
+
+</td></tr>
+<tr><td>
+
+[getMaxPoint()](doc/markdown/./scene.octreenode.getmaxpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the maximum (tight) corner point of this node in world space.
+
+
+</td></tr>
+<tr><td>
+
+[getMaxPointLoosed()](doc/markdown/./scene.octreenode.getmaxpointloosed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the loosed maximum corner point of this node in world space.
+
+
+</td></tr>
+<tr><td>
+
+[getMinPoint()](doc/markdown/./scene.octreenode.getminpoint.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the minimum (tight) corner point of this node in world space.
+
+
+</td></tr>
+<tr><td>
+
+[getMinPointLoosed()](doc/markdown/./scene.octreenode.getminpointloosed.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the loosed minimum corner point of this node in world space.
+
+
+</td></tr>
+<tr><td>
+
+[getNodes()](doc/markdown/./scene.octreenode.getnodes.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get all scene nodes contained in this octree node.
+
+
+</td></tr>
+<tr><td>
+
+[getOrCreateChild(placement)](doc/markdown/./scene.octreenode.getorcreatechild.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get or create a child node by placement from the next (finer) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getOrCreateParent()](doc/markdown/./scene.octreenode.getorcreateparent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get or create the parent node from the previous (coarser) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getParent()](doc/markdown/./scene.octreenode.getparent.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the parent node from the previous (coarser) chunk.
+
+
+</td></tr>
+<tr><td>
+
+[getPosition()](doc/markdown/./scene.octreenode.getposition.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Get the node's linear position index within the owning chunk.
+
+
+</td></tr>
+<tr><td>
+
+[removeNode(node)](doc/markdown/./scene.octreenode.removenode.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Remove a scene node from this octree node.
+
+
+</td></tr>
+<tr><td>
+
+[setChunk(chunk)](doc/markdown/./scene.octreenode.setchunk.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Assign the chunk that owns this node.
+
+
+</td></tr>
+<tr><td>
+
+[setPosition(index)](doc/markdown/./scene.octreenode.setposition.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Set the node's linear position index within the owning chunk.
+
+
+</td></tr>
+<tr><td>
+
+[traverse(v)](doc/markdown/./scene.octreenode.traverse.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Traverse this node and existing children in pre-order.
+
+
+</td></tr>
+</tbody></table>
 

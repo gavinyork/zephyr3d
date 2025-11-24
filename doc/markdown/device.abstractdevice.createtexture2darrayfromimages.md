@@ -14,15 +14,75 @@ createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, o
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  elements | [TextureImageElement](doc/markdown/./device.textureimageelement.md)<!-- -->\[\] | image elements |
-|  sRGB | boolean |  |
-|  options | [TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md) | _(Optional)_ The creation options |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+elements
+
+
+</td><td>
+
+[TextureImageElement](doc/markdown/./device.textureimageelement.md)<!-- -->\[\]
+
+
+</td><td>
+
+image elements
+
+
+</td></tr>
+<tr><td>
+
+sRGB
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+[TextureCreationOptions](doc/markdown/./device.texturecreationoptions.md)
+
+
+</td><td>
+
+_(Optional)_ The creation options
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [Texture2DArray](doc/markdown/./device.texture2darray.md)
+
+The created 2D array texture.
 
 ## Remarks
 

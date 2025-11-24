@@ -7,5 +7,5 @@
 **Signature:**
 
 ```typescript
-fragDepth: PBShaderExp;
+fragDepth: PBShaderExp | number;
 ```

@@ -14,12 +14,85 @@ static vertexShaderDrawableStuff(scope: PBGlobalScope, skinning: boolean, morphi
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBGlobalScope](doc/markdown/./device.pbglobalscope.md) | Current shader scope |
-|  skinning | boolean | true if skinning is used, otherwise false. |
-|  morphing | boolean |  |
-|  instanced | boolean | true if instancing is used, otherwise false. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBGlobalScope](doc/markdown/./device.pbglobalscope.md)
+
+
+</td><td>
+
+Current shader scope
+
+
+</td></tr>
+<tr><td>
+
+skinning
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if skinning is used, otherwise false.
+
+
+</td></tr>
+<tr><td>
+
+morphing
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+instanced
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+true if instancing is used, otherwise false.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

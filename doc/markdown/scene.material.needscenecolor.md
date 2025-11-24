@@ -4,7 +4,7 @@
 
 ## Material.needSceneColor() method
 
-Return true if this material requires the scene color texture
+Whether this material requires the scene color texture (e.g., for refraction).
 
 **Signature:**
 

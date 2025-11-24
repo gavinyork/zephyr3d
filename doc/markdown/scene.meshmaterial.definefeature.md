@@ -4,7 +4,7 @@
 
 ## MeshMaterial.defineFeature() method
 
-Define feature index
+Define a new feature bit/index for shader variants. Subclasses may use this to add their own switches.
 
 **Signature:**
 

@@ -4,7 +4,9 @@
 
 ## TerrainMaterial.supportLighting() method
 
-Returns true if shading of the material will be affected by lights
+Whether this material's shading is affected by scene lights.
+
+Override and return `false` for unlit materials.
 
 **Signature:**
 

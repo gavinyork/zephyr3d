@@ -4,10 +4,12 @@
 
 ## AnimationClip.tracks property
 
-Gets all the tracks of this animation
+All animation tracks grouped by target object.
+
+Key: target object; Value: list of `AnimationTrack`<!-- -->s affecting that target.
 
 **Signature:**
 
 ```typescript
-get tracks(): Map<SceneNode, AnimationTrack<unknown>[]>;
+get tracks(): Map<object, AnimationTrack<unknown>[]>;
 ```

@@ -4,7 +4,7 @@
 
 ## OctreeNodeChunk.setDimension() method
 
-Sets the dimension of this chunk
+Set the dimension (cells per axis).
 
 **Signature:**
 
@@ -14,9 +14,39 @@ setDimension(dimension: number): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  dimension | number | The dimension to set |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+dimension
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Dimension for this chunk (typically (<!-- -->2^<!-- -->{<!-- -->level<!-- -->}<!-- -->)<!-- -->).
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

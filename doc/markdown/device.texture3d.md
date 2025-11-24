@@ -15,8 +15,34 @@ interface Texture3D<T = unknown> extends BaseTexture<T>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [createWithMipmapData(data, creationFlags)](doc/markdown/./device.texture3d.createwithmipmapdata.md) |  |
-|  [update(data, xOffset, yOffset, zOffset, width, height, depth)](doc/markdown/./device.texture3d.update.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createWithMipmapData(data, creationFlags)](doc/markdown/./device.texture3d.createwithmipmapdata.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[update(data, xOffset, yOffset, zOffset, width, height, depth)](doc/markdown/./device.texture3d.update.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

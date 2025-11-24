@@ -14,11 +14,71 @@ static transform(bbox: AABB, matrix: Matrix4x4, result?: AABB): AABB;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bbox | [AABB](doc/markdown/./base.aabb.md) | The AABB to be transformed. |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix. |
-|  result | [AABB](doc/markdown/./base.aabb.md) | _(Optional)_ The out AABB to be write to. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bbox
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+The AABB to be transformed.
+
+
+</td></tr>
+<tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The transform matrix.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[AABB](doc/markdown/./base.aabb.md)
+
+
+</td><td>
+
+_(Optional)_ The out AABB to be write to.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

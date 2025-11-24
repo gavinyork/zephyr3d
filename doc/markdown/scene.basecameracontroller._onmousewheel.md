@@ -4,23 +4,53 @@
 
 ## BaseCameraController.\_onMouseWheel() method
 
-Mouse wheel event handler
+Mouse wheel handler for subclasses to override.
 
 **Signature:**
 
 ```typescript
-protected _onMouseWheel(evt: WheelEvent): boolean;
+protected _onMouseWheel(_evt: IControllerWheelEvent): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  evt | WheelEvent | Mouse event |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+\_evt
+
+
+</td><td>
+
+[IControllerWheelEvent](doc/markdown/./scene.icontrollerwheelevent.md)
+
+
+</td><td>
+
+Wheel event.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 boolean
 
-Boolean value indices whether this event was handled
+`true` if handled; otherwise `false`<!-- -->.
 

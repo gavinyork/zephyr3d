@@ -14,10 +14,55 @@ declare function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PB
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  scope | [PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md) | current shader scope |
-|  p | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | 3d position at where to calculate noise |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+scope
+
+
+</td><td>
+
+[PBInsideFunctionScope](doc/markdown/./device.pbinsidefunctionscope.md)
+
+
+</td><td>
+
+current shader scope
+
+
+</td></tr>
+<tr><td>
+
+p
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+3d position at where to calculate noise
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

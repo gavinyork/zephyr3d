@@ -14,11 +14,71 @@ static transform(plane: Plane, matrix: Matrix4x4, result?: Plane): Plane;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  plane | [Plane](doc/markdown/./base.plane.md) | The plane that will be transformed. |
-|  matrix | [Matrix4x4](doc/markdown/./base.matrix4x4.md) | The transform matrix. |
-|  result | [Plane](doc/markdown/./base.plane.md) | _(Optional)_ A plane object to which the result will be written, if not specified, a new plane object will be returned. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+plane
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+The plane that will be transformed.
+
+
+</td></tr>
+<tr><td>
+
+matrix
+
+
+</td><td>
+
+[Matrix4x4](doc/markdown/./base.matrix4x4.md)
+
+
+</td><td>
+
+The transform matrix.
+
+
+</td></tr>
+<tr><td>
+
+result
+
+
+</td><td>
+
+[Plane](doc/markdown/./base.plane.md)
+
+
+</td><td>
+
+_(Optional)_ A plane object to which the result will be written, if not specified, a new plane object will be returned.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

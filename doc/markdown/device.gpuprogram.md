@@ -15,18 +15,124 @@ interface GPUProgram<T = unknown> extends GPUObject<T>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bindGroupLayouts](doc/markdown/./device.gpuprogram.bindgrouplayouts.md) | <code>readonly</code> | [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\] |  |
-|  [type](doc/markdown/./device.gpuprogram.type.md) | <code>readonly</code> | 'render' \| 'compute' |  |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bindGroupLayouts](doc/markdown/./device.gpuprogram.bindgrouplayouts.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)<!-- -->\[\]
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[type](doc/markdown/./device.gpuprogram.type.md)
+
+
+</td><td>
+
+`readonly`
+
+
+</td><td>
+
+'render' \| 'compute'
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [createUniformBuffer(uniform)](doc/markdown/./device.gpuprogram.createuniformbuffer.md) |  |
-|  [getBindingInfo(name)](doc/markdown/./device.gpuprogram.getbindinginfo.md) |  |
-|  [getCompileError()](doc/markdown/./device.gpuprogram.getcompileerror.md) |  |
-|  [getShaderSource(kind)](doc/markdown/./device.gpuprogram.getshadersource.md) |  |
-|  [use()](doc/markdown/./device.gpuprogram.use.md) |  |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[createUniformBuffer(uniform)](doc/markdown/./device.gpuprogram.createuniformbuffer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getBindingInfo(name)](doc/markdown/./device.gpuprogram.getbindinginfo.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getCompileError()](doc/markdown/./device.gpuprogram.getcompileerror.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[getShaderSource(kind)](doc/markdown/./device.gpuprogram.getshadersource.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[use()](doc/markdown/./device.gpuprogram.use.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

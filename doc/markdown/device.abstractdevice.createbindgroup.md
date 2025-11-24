@@ -14,11 +14,43 @@ createBindGroup(layout: BindGroupLayout): BindGroup;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  layout | [BindGroupLayout](doc/markdown/./device.bindgrouplayout.md) | Layout of the bind group |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+layout
+
+
+</td><td>
+
+[BindGroupLayout](doc/markdown/./device.bindgrouplayout.md)
+
+
+</td><td>
+
+Layout of the bind group
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 
 [BindGroup](doc/markdown/./device.bindgroup.md)
+
+The created bind group.
 

@@ -14,8 +14,53 @@ constructor(origin?: Vector3, directionNormalized?: Vector3);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  origin | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The ray origin if not specified, zero vector will be used. |
-|  directionNormalized | [Vector3](doc/markdown/./base.vector3.md) | _(Optional)_ The normalized direction vector. if not specified, (0, 0, 1) will be used. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+origin
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The ray origin if not specified, zero vector will be used.
+
+
+</td></tr>
+<tr><td>
+
+directionNormalized
+
+
+</td><td>
+
+[Vector3](doc/markdown/./base.vector3.md)
+
+
+</td><td>
+
+_(Optional)_ The normalized direction vector. if not specified, (0, 0, 1) will be used.
+
+
+</td></tr>
+</tbody></table>
 

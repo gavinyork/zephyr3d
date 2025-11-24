@@ -8,7 +8,9 @@ import {
   Mesh,
   DirectionalLight,
   BoxShape,
-  PlaneShape
+  PlaneShape,
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -26,7 +28,7 @@ myApp.ready().then(function () {
   // Create a directional light
   const dirLight = new DirectionalLight(scene);
   // light direction
-  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0, 'ZYX');
+  dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // Enable shadowing
   dirLight.castShadow = true;
 
@@ -42,32 +44,23 @@ myApp.ready().then(function () {
   // Create floor
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
-  const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
-  floor.position.x = -50;
-  floor.position.z = -50;
+  new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
 
   // Create camera
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    myApp.device.canvas.width / myApp.device.canvas.height,
-    1,
-    600
-  );
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
 
   dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 6, 50));
 
-  camera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  getEngine().setRenderable(scene, 0);
 
   myApp.on('tick', function () {
     // light rotation
-    dirLight.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0, 'ZYX');
-
-    camera.updateController();
-    camera.render(scene);
+    dirLight.rotation.fromEulerAngle(-Math.PI / 4, myApp.device.frameInfo.elapsedOverall * 0.0005, 0);
   });
 
   myApp.run();

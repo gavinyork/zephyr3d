@@ -14,9 +14,39 @@ getBindGroup(index: number): [BindGroup, Iterable<number>];
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | index of the bind group to get |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+index of the bind group to get
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

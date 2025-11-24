@@ -14,8 +14,49 @@ constructor(cvs: HTMLCanvasElement, backend: DeviceBackend);
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cvs | HTMLCanvasElement |  |
-|  backend | [DeviceBackend](doc/markdown/./device.devicebackend.md) |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cvs
+
+
+</td><td>
+
+HTMLCanvasElement
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+backend
+
+
+</td><td>
+
+[DeviceBackend](doc/markdown/./device.devicebackend.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

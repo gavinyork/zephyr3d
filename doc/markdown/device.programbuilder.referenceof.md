@@ -14,9 +14,39 @@ referenceOf(ptr: PBShaderExp): PBShaderExp;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  ptr | [PBShaderExp](doc/markdown/./device.pbshaderexp.md) | The pointer variable |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+ptr
+
+
+</td><td>
+
+[PBShaderExp](doc/markdown/./device.pbshaderexp.md)
+
+
+</td><td>
+
+The pointer variable
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

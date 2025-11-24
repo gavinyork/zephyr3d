@@ -4,7 +4,7 @@
 
 ## PlaneCreationOptions.sizeY property
 
-Size of axis y
+Size of axis y, default value equals to size
 
 **Signature:**
 

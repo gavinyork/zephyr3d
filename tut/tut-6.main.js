@@ -1,5 +1,16 @@
 import { Vector3 } from '@zephyr3d/base';
-import { Scene, Application, Mesh, OrbitCameraController, PerspectiveCamera, Compositor, Tonemap, SphereShape, DirectionalLight, AssetManager, PBRMetallicRoughnessMaterial } from '@zephyr3d/scene';
+import {
+  Scene,
+  Application,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  SphereShape,
+  DirectionalLight,
+  PBRMetallicRoughnessMaterial,
+  getInput,
+  getEngine
+} from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
@@ -20,33 +31,29 @@ myApp.ready().then(function () {
   // roughness 0.6
   material.roughness = 0.6;
   // Load albedo map and normal map
-  const assetManager = new AssetManager();
-  assetManager.fetchTexture('assets/images/earthcolor.jpg').then(texture => {
-    material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
-  });
-  assetManager.fetchTexture('assets/images/earthnormal.png', {
-    linearColorSpace: true
-  }).then(texture => {
-    material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
-  });
+  getEngine()
+    .resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg')
+    .then((texture) => {
+      material.albedoTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
+    });
+  getEngine()
+    .resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
+      linearColorSpace: true
+    })
+    .then((texture) => {
+      material.normalTexture = /** @type {import('@zephyr3d/device').Texture2D} */ (texture);
+    });
   // Create a sphere mesh
-  const sphere = new Mesh(scene, new SphereShape(), material);
+  new Mesh(scene, new SphereShape(), material);
 
   // Create camera
-  const camera = new PerspectiveCamera(scene, Math.PI/3, myApp.device.canvas.width/myApp.device.canvas.height, 1, 100);
-  camera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
-  camera.controller = new OrbitCameraController();
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
+  scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
+  scene.mainCamera.controller = new OrbitCameraController();
 
-  const compositor = new Compositor();
-  // Add a Tonemap post-processing effect
-  compositor.appendPostEffect(new Tonemap());
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  myApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  myApp.on('tick', function () {
-    camera.updateController();
-    camera.render(scene, compositor);
-  });
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

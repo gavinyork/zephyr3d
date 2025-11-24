@@ -4,7 +4,7 @@
 
 ## Octree.finalize() method
 
-Free up the octree
+Free all nodes and chunks owned by this octree.
 
 **Signature:**
 
@@ -14,4 +14,8 @@ finalize(): void;
 **Returns:**
 
 void
+
+## Remarks
+
+Resets sizes, root node, and placement maps.
 

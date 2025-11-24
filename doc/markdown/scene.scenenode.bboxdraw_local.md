@@ -4,6 +4,8 @@
 
 ## SceneNode.BBOXDRAW\_LOCAL property
 
+Draw local-space bounding box.
+
 **Signature:**
 
 ```typescript

@@ -17,9 +17,63 @@ constructor(name: string, layout: PBStructLayout, members: {
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
-|  layout | [PBStructLayout](doc/markdown/./device.pbstructlayout.md) |  |
-|  members | { name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; }\[\] |  |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+layout
+
+
+</td><td>
+
+[PBStructLayout](doc/markdown/./device.pbstructlayout.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+members
+
+
+</td><td>
+
+{ name: string; type: [PBPrimitiveTypeInfo](doc/markdown/./device.pbprimitivetypeinfo.md) \| [PBArrayTypeInfo](doc/markdown/./device.pbarraytypeinfo.md) \| [PBAtomicI32TypeInfo](doc/markdown/./device.pbatomici32typeinfo.md) \| [PBAtomicU32TypeInfo](doc/markdown/./device.pbatomicu32typeinfo.md) \| [PBStructTypeInfo](doc/markdown/./device.pbstructtypeinfo.md)<!-- -->; }\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
 

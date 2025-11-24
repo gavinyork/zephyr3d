@@ -14,11 +14,71 @@ interface BoundingVolume
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [behindPlane(plane)](doc/markdown/./scene.boundingvolume.behindplane.md) | Check if this bounding volume is behind a plane |
-|  [clone()](doc/markdown/./scene.boundingvolume.clone.md) | Creates a new bounding volume by copying from this bounding volume |
-|  [outsideFrustum(frustum)](doc/markdown/./scene.boundingvolume.outsidefrustum.md) | Check if this bounding volume is outside a frustum |
-|  [toAABB()](doc/markdown/./scene.boundingvolume.toaabb.md) | Gets the minimum AABB that contains the bounding volume |
-|  [transform(matrix)](doc/markdown/./scene.boundingvolume.transform.md) | Creates a new bounding volume by tranforming this bounding volume by a matrix |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[behindPlane(plane)](doc/markdown/./scene.boundingvolume.behindplane.md)
+
+
+</td><td>
+
+Check if this bounding volume is behind a plane
+
+
+</td></tr>
+<tr><td>
+
+[clone()](doc/markdown/./scene.boundingvolume.clone.md)
+
+
+</td><td>
+
+Creates a new bounding volume by copying from this bounding volume
+
+
+</td></tr>
+<tr><td>
+
+[outsideFrustum(frustum)](doc/markdown/./scene.boundingvolume.outsidefrustum.md)
+
+
+</td><td>
+
+Check if this bounding volume is outside a frustum
+
+
+</td></tr>
+<tr><td>
+
+[toAABB()](doc/markdown/./scene.boundingvolume.toaabb.md)
+
+
+</td><td>
+
+Gets the minimum AABB that contains the bounding volume
+
+
+</td></tr>
+<tr><td>
+
+[transform(matrix)](doc/markdown/./scene.boundingvolume.transform.md)
+
+
+</td><td>
+
+Creates a new bounding volume by tranforming this bounding volume by a matrix
+
+
+</td></tr>
+</tbody></table>
 

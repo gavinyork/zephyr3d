@@ -9,14 +9,44 @@ Apply water bind group.
 **Signature:**
 
 ```typescript
-abstract applyWaterBindGroup(bindGroup: BindGroup): void;
+applyWaterBindGroup(bindGroup: BindGroup): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  bindGroup | [BindGroup](doc/markdown/./device.bindgroup.md) | Bind group to apply. |
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+bindGroup
+
+
+</td><td>
+
+[BindGroup](doc/markdown/./device.bindgroup.md)
+
+
+</td><td>
+
+Bind group to apply.
+
+
+</td></tr>
+</tbody></table>
 
 **Returns:**
 

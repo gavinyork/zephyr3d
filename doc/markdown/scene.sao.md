@@ -9,36 +9,280 @@ The Scalable Ambient Obscurance (SAO) post effect
 **Signature:**
 
 ```typescript
-declare class SAO extends AbstractPostEffect<'SAO'> 
+declare class SAO extends AbstractPostEffect 
 ```
-**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)<!-- -->&lt;'SAO'&gt;
+**Extends:** [AbstractPostEffect](doc/markdown/./scene.abstractposteffect.md)
 
 ## Constructors
 
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)()](doc/markdown/./scene.sao._constructor_.md) |  | Creates an instance of SAO post effect |
+<table><thead><tr><th>
+
+Constructor
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[(constructor)()](doc/markdown/./scene.sao._constructor_.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Creates an instance of SAO post effect
+
+
+</td></tr>
+</tbody></table>
 
 ## Properties
 
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [bias](doc/markdown/./scene.sao.bias.md) |  | number | Bias value |
-|  [blurDepthCutoff](doc/markdown/./scene.sao.blurdepthcutoff.md) |  | number | Cutoff of depth limited blur |
-|  [blurKernelSize](doc/markdown/./scene.sao.blurkernelsize.md) |  | number | Blur kernel size |
-|  [blurStdDev](doc/markdown/./scene.sao.blurstddev.md) |  | number | Gaussian blur stddev value |
-|  [className](doc/markdown/./scene.sao.classname.md) | <p><code>static</code></p><p><code>readonly</code></p> | "SAO" |  |
-|  [intensity](doc/markdown/./scene.sao.intensity.md) |  | number | SAO intensity |
-|  [minResolution](doc/markdown/./scene.sao.minresolution.md) |  | number | Minimum resolution |
-|  [radius](doc/markdown/./scene.sao.radius.md) |  | number | Radius value |
-|  [scale](doc/markdown/./scene.sao.scale.md) |  | number | Scale value |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[bias](doc/markdown/./scene.sao.bias.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Bias value
+
+
+</td></tr>
+<tr><td>
+
+[blurDepthCutoff](doc/markdown/./scene.sao.blurdepthcutoff.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Cutoff of depth limited blur
+
+
+</td></tr>
+<tr><td>
+
+[blurKernelSize](doc/markdown/./scene.sao.blurkernelsize.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Blur kernel size
+
+
+</td></tr>
+<tr><td>
+
+[blurStdDev](doc/markdown/./scene.sao.blurstddev.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Gaussian blur stddev value
+
+
+</td></tr>
+<tr><td>
+
+[intensity](doc/markdown/./scene.sao.intensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+SAO intensity
+
+
+</td></tr>
+<tr><td>
+
+[minResolution](doc/markdown/./scene.sao.minresolution.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Minimum resolution
+
+
+</td></tr>
+<tr><td>
+
+[radius](doc/markdown/./scene.sao.radius.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Radius value
+
+
+</td></tr>
+<tr><td>
+
+[scale](doc/markdown/./scene.sao.scale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Scale value
+
+
+</td></tr>
+</tbody></table>
 
 ## Methods
 
-|  Method | Modifiers | Description |
-|  --- | --- | --- |
-|  [apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.sao.apply.md) |  | Apply the post effect |
-|  [dispose()](doc/markdown/./scene.sao.dispose.md) |  | Disposes the post effect. |
-|  [requireDepthAttachment()](doc/markdown/./scene.sao.requiredepthattachment.md) |  | Checks whether this post effect requires the scene depth buffer |
-|  [requireLinearDepthTexture()](doc/markdown/./scene.sao.requirelineardepthtexture.md) |  | Checks whether this post effect requires the linear depth texture |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[apply(ctx, inputColorTexture, sceneDepthTexture, srgbOutput)](doc/markdown/./scene.sao.apply.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Apply the post effect
+
+
+</td></tr>
+<tr><td>
+
+[requireDepthAttachment()](doc/markdown/./scene.sao.requiredepthattachment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the scene depth buffer
+
+
+</td></tr>
+<tr><td>
+
+[requireLinearDepthTexture()](doc/markdown/./scene.sao.requirelineardepthtexture.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Checks whether this post effect requires the linear depth texture
+
+
+</td></tr>
+</tbody></table>
 
