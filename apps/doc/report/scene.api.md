@@ -2215,6 +2215,7 @@ export class Engine {
     // (undocumented)
     render(): void;
     get resourceManager(): ResourceManager;
+    get scriptingSystem(): ScriptingSystem;
     // (undocumented)
     setRenderable(renderable: IRenderable, layer?: number, hook?: IRenderHook): void;
     // (undocumented)
@@ -4800,6 +4801,7 @@ export type PlayAnimationOptions = {
     repeat?: number;
     speedRatio?: number;
     fadeIn?: number;
+    weight?: number;
 };
 
 // @public
@@ -5365,7 +5367,7 @@ export class ResourceManager {
     deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
     get editorMode(): boolean;
     fetchBinary(id: string): Promise<ArrayBuffer>;
-    fetchMaterial<T extends Material = Material>(id: string): Promise<T>;
+    fetchMaterial<T extends Material = MeshMaterial>(id: string): Promise<T>;
     fetchModel(id: string, scene: Scene, options?: ModelFetchOptions): Promise<ModelInfo>;
     fetchPrimitive<T extends Primitive = Primitive>(id: string): Promise<T>;
     fetchTexture<T extends Texture2D | TextureCube | Texture2DArray>(id: string, options?: TextureFetchOptions<T>): Promise<T>;
@@ -6315,6 +6317,7 @@ export class SkyRenderer extends Disposable {
     set cloudy(val: number);
     // @internal (undocumented)
     drawScatteredFog(_ctx: DrawContext): boolean;
+    get envTextureFormat(): TextureFormat;
     // @internal (undocumented)
     get fogPresents(): boolean;
     get fogType(): FogType;
@@ -6378,6 +6381,9 @@ export class SkyRenderer extends Disposable {
     set shWindowWeights(weights: Vector3);
     get skyboxTexture(): TextureCube;
     set skyboxTexture(tex: TextureCube);
+    // @internal (undocumented)
+    get skyboxTextureSize(): number;
+    set skyboxTextureSize(size: number);
     get skyColor(): Vector4;
     set skyColor(val: Vector4);
     get skyImage(): Texture2D;
@@ -7241,7 +7247,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:15138:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:15161:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 
