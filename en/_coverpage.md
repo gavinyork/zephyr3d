@@ -10,5 +10,6 @@
 [GitHub](https://github.com/gavinyork/zephyr3d/)
 [API](doc/markdown/index.md)
 [Quick start](/en/intro)
+[Home](https://zephyr3d.org/en/)
 
 ![color](#308080)
