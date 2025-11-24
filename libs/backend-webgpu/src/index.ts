@@ -1,6 +1,6 @@
 import { WebGPUDevice } from './device';
 import type { DeviceBackend, DeviceEventMap } from '@zephyr3d/device';
-import { makeEventTarget } from '@zephyr3d/base';
+import { makeObservable } from '@zephyr3d/base';
 
 /**
  * The WebGPU backend
@@ -15,7 +15,7 @@ export const backendWebGPU: DeviceBackend = {
   },
   async createDevice(cvs, options?) {
     try {
-      const factory = makeEventTarget(WebGPUDevice)<DeviceEventMap>();
+      const factory = makeObservable(WebGPUDevice)<DeviceEventMap>();
       const device = new factory(this, cvs, options);
       await device.initContext();
       device.setViewport();

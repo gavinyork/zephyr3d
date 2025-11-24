@@ -4,17 +4,26 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import type { Clonable } from '@zephyr3d/base';
 
 /**
  * Lambert material
  * @public
  */
-export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor) {
-  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
-  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+export class LambertMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor)
+  implements Clonable<LambertMaterial>
+{
+  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   constructor() {
     super();
     this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  clone(): LambertMaterial {
+    const other = new LambertMaterial();
+    other.copyFrom(this);
+    return other;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {
@@ -92,7 +101,13 @@ export class LambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLigh
             dirCutoff
           );
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-          this.$l.lightContrib = pb.mul(colorIntensity.rgb, colorIntensity.a, this.NoL, this.lightAtten);
+          this.$l.lightContrib = pb.mul(
+            colorIntensity.rgb,
+            colorIntensity.a,
+            this.NoL,
+            this.lightAtten,
+            1 / Math.PI
+          );
           if (shadow) {
             this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);

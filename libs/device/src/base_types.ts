@@ -1849,11 +1849,11 @@ export function getTextureFormatBlockHeight(format: TextureFormat): number {
   return (textureFormatMap[format] & BLOCK_HEIGHT_MASK) >> BLOCK_HEIGHT_SHIFT;
 }
 
-function normalizeColorComponent(val: number, maxval: number) {
+function normalizeColorComponent(val: number, maxval: number): number {
   return Math.min(maxval, Math.max(Math.floor(val * maxval), 0));
 }
 
-function normalizeColorComponentSigned(val: number, maxval: number) {
+function normalizeColorComponentSigned(val: number, maxval: number): number {
   return normalizeColorComponent(val * 0.5 + 0.5, maxval) - (maxval + 1) / 2;
 }
 
@@ -2167,6 +2167,8 @@ export interface DeviceCaps {
 export interface FramebufferCaps {
   /** The maximum number of framebuffer color attachment points */
   maxDrawBuffers: number;
+  /** True if device supports rendering to mipmap */
+  supportRenderMipmap: boolean;
   /** True if device supports multisampled frame buffer */
   supportMultisampledFramebuffer: boolean;
   /** True if device supports blending on float point frame buffer */
@@ -2232,6 +2234,12 @@ export interface TextureFormatInfo {
   renderable: boolean;
   /** True if the texture format is a compressed format */
   compressed: boolean;
+  /** Number of bytes per-block */
+  size: number;
+  /** Block width */
+  blockWidth: number;
+  /** Block height */
+  blockHeight: number;
 }
 
 /**
@@ -2327,86 +2335,6 @@ export interface GPUProgramConstructParams {
 }
 
 /**
- * Event that will be fired when device is lost
- * @public
- */
-export class DeviceLostEvent {
-  /** The event name */
-  static readonly NAME = 'devicelost' as const;
-  type = DeviceLostEvent.NAME;
-}
-
-/**
- * Event that will be fired when device has just been restored
- * @public
- */
-export class DeviceRestoreEvent {
-  /** The event name */
-  static readonly NAME = 'devicerestored' as const;
-  type = DeviceRestoreEvent.NAME;
-}
-
-/**
- * Event that will be fired when size of back buffer has changed
- * @public
- */
-export class DeviceResizeEvent {
-  /** The event name */
-  static readonly NAME = 'resize' as const;
-  width: number;
-  height: number;
-  type = DeviceResizeEvent.NAME;
-  constructor(width: number, height: number) {
-    this.width = width;
-    this.height = height;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object is created
- * @public
- */
-export class DeviceGPUObjectAddedEvent {
-  /** the event name */
-  static readonly NAME = 'gpuobject_added' as const;
-  object: GPUObject;
-  type = DeviceGPUObjectAddedEvent.NAME;
-  constructor(obj: GPUObject) {
-    this.object = obj;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object is disposed
- * @public
- */
-export class DeviceGPUObjectRemovedEvent {
-  /** The event name */
-  static readonly NAME: 'gpuobject_removed' = 'gpuobject_removed' as const;
-  object: GPUObject;
-  type = DeviceGPUObjectRemovedEvent.NAME;
-  constructor(obj: GPUObject) {
-    this.object = obj;
-  }
-}
-
-/**
- * Event that will be fired when any gpu object name is changed
- * @public
- */
-export class DeviceGPUObjectRenameEvent {
-  /** The event name */
-  static readonly NAME: 'gpuobject_rename' = 'gpuobject_rename' as const;
-  object: GPUObject;
-  lastName: string;
-  type = DeviceGPUObjectRenameEvent.NAME;
-  constructor(obj: GPUObject, lastName: string) {
-    this.object = obj;
-    this.lastName = lastName;
-  }
-}
-
-/**
  * Creation options for device
  * @public
  */
@@ -2422,12 +2350,12 @@ export interface DeviceOptions {
  * @public
  */
 export type DeviceEventMap = {
-  [DeviceResizeEvent.NAME]: DeviceResizeEvent;
-  [DeviceLostEvent.NAME]: DeviceLostEvent;
-  [DeviceRestoreEvent.NAME]: DeviceRestoreEvent;
-  [DeviceGPUObjectAddedEvent.NAME]: DeviceGPUObjectAddedEvent;
-  [DeviceGPUObjectRemovedEvent.NAME]: DeviceGPUObjectRemovedEvent;
-  [DeviceGPUObjectRenameEvent.NAME]: DeviceGPUObjectRenameEvent;
+  resize: [width: number, height: number];
+  devicelost: [];
+  devicerestored: [];
+  gpuobject_added: [obj: GPUObject];
+  gpuobject_removed: [obj: GPUObject];
+  gpuobject_rename: [obj: GPUObject, lastName: string];
 };
 
 /**
@@ -2460,6 +2388,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   pool: Pool;
   /** vSync */
   vSync: boolean;
+  /** Check if a pool with given key exists */
+  poolExists(key: string | symbol): boolean;
+  /** Get the pool with given key, or create a new one if not exists */
+  getPool(key: string | symbol): Pool;
   /** Get adapter information */
   getAdapterInfo(): any;
   /** Get sample count of current frame buffer */
@@ -2514,6 +2446,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /**
    * Creates a texture sampler object
    * @param options - The creation options
+   * @returns The created texture sampler
    */
   createSampler(options: SamplerOptions): TextureSampler;
   /**
@@ -2533,6 +2466,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param width - Pixel width of the texture
    * @param height - Pixel height of the texture
    * @param options - The creation options
+   * @returns The created 2D texture
    */
   createTexture2D(
     format: TextureFormat,
@@ -2541,19 +2475,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: TextureCreationOptions
   ): Texture2D;
   /**
-   * Creates a 2d texture from given mipmap data
-   * @param data - The mipmap data
-   * @param options - The creation options
-   */
-  createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D;
-  /**
    * Creates a 2d texture from a image element
    * @param element - The image element
    * @param options - The creation options
+   * @returns The created 2D texture.
    */
   createTexture2DFromImage(
     element: TextureImageElement,
@@ -2567,6 +2492,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param height - Pixel height of the texture
    * @param depth - Array length of the texture
    * @param options - The creation options
+   * @returns The created 2D array texture.
    */
   createTexture2DArray(
     format: TextureFormat,
@@ -2576,20 +2502,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: TextureCreationOptions
   ): Texture2DArray;
   /**
-   * Creates a 2d array texture from mipmap data
-   * @param data - mipmap data
-   * @param sRGB - whether texture should have sRGB texture format
-   * @param options - The creation options
-   */
-  createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
-    options?: TextureCreationOptions
-  ): Texture2DArray;
-  /**
    * Creates a 2d array texture from a seris of image elements
    * @remarks image elements must have the same size.
    * @param elements - image elements
    * @param options - The creation options
+   * @returns The created 2D array texture.
    */
   createTexture2DArrayFromImages(
     elements: TextureImageElement[],
@@ -2597,12 +2514,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: TextureCreationOptions
   ): Texture2DArray;
   /**
-   * Creates a 3d texture
+   * Creates a 3D texture
    * @param format - The texture format
    * @param width - Pixel width of the texture
    * @param height - Pixel height of the texture
    * @param depth - Pixel depth of the texture
    * @param options - The creation options
+   * @returns The created 3D texture.
    */
   createTexture3D(
     format: TextureFormat,
@@ -2616,21 +2534,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param format - The texture format
    * @param size - Pixel width of the texture
    * @param options - The creation options
+   * @returns The created cube texture.
    */
   createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
   /**
-   * Creates a cube texture from given mipmap data
-   * @param data - The mipmap data
-   * @param options - The creation options
-   */
-  createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube;
-  /**
    * Creates a video texture from a video element
    * @param el - The video element
+   * @returns The created video texture.
    */
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   /**
@@ -2673,17 +2583,20 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /**
    * Creates a gpu program
    * @param params - The creation options
+   * @returns The created program.
    */
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   /**
    * Creates a bind group
    * @param layout - Layout of the bind group
+   * @returns The created bind group.
    */
   createBindGroup(layout: BindGroupLayout): BindGroup;
   /**
    * Creates a gpu buffer
    * @param sizeInBytes - Size of the buffer in bytes
    * @param options - The creation options
+   * @returns The created buffer.
    */
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   /**
@@ -2705,13 +2618,18 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Creates an index buffer
    * @param data - Data of the index buffer
    * @param options - The creation options
+   * @returns The created index buffer.
    */
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer;
   /**
    * Creates a structured buffer
    * @param structureType - The structure type
    * @param options - The creation options
    * @param data - Data to be filled with
+   * @returns The created structured buffer.
    */
   createStructuredBuffer(
     structureType: PBStructTypeInfo,
@@ -2719,13 +2637,15 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     data?: TypedArray
   ): StructuredBuffer;
   /**
-   * Creates a vertex layout
+   * Creates a vertex layout object.
    * @param options - The creation options
+   * @returns The created vertex layout object.
    */
   createVertexLayout(options: VertexLayoutOptions): VertexLayout;
   /**
    * Creates a frame buffer
    * @param options - The creation options
+   * @returns The created framebuffer.
    */
   createFrameBuffer(
     colorAttachments: BaseTexture[],
@@ -2877,14 +2797,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Begins a frame for rendering
    *
    * @remarks
-   * All rendering call must occur between the {@link AbstractDevice.beginFrame} and {@link AbstractDevice.endFrame} methods
+   * All rendering call must occur between the @see AbstractDevice.beginFrame and @see AbstractDevice.endFrame methods
    */
   beginFrame(): boolean;
   /**
    * Ends a frame for rendering
    *
    * @remarks
-   * All rendering call must occur between the {@link AbstractDevice.beginFrame} and {@link AbstractDevice.endFrame} methods
+   * All rendering call must occur between the @see AbstractDevice.beginFrame and @see AbstractDevice.endFrame methods
    */
   endFrame(): void;
   /**
@@ -2905,6 +2825,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param attribFormats - The vertex attribute formats for each vertex stream in the vertex buffer
    * @param data - Data to be filled with
    * @param options - The creation options
+   * @returns The created vertex buffer.
    */
   createInterleavedVertexBuffer(
     attribFormats: VertexAttribFormat[],
@@ -2917,6 +2838,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param attribFormat - The vertex attribute format
    * @param data - Data to be filled with
    * @param options - The creation options
+   * @returns The created vertex buffer
    */
   createVertexBuffer(
     attribFormat: VertexAttribFormat,
@@ -2954,6 +2876,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param f - The function to be scheduled
    */
   runNextFrame(f: () => void): void;
+  /**
+   * Asyncronized version of scheduling a function to be executed at the beginning of the next frame
+   *
+   * @param f - The function to be scheduled
+   */
+  runNextFrameAsync(f: () => void): Promise<void>;
   /** Exits from current rendering loop */
   exitLoop(): void;
   /**

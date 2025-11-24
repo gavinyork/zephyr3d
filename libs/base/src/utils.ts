@@ -146,23 +146,32 @@ const colorNames = {
  * A generic constructor type
  * @public
  */
-export type GenericConstructor<T = {}> = {
+export type GenericConstructor<T = object> = {
   new (...args: any[]): T;
+  isPrototypeOf(v: object): boolean;
 };
+
+/**
+ * Clonable interface
+ * @public
+ */
+export interface Clonable<T> {
+  clone(): T;
+}
 
 /**
  * Typed array
  * @public
  */
 export type TypedArray =
-  | Int8Array
-  | Uint8Array
-  | Uint8ClampedArray
-  | Int16Array
-  | Uint16Array
-  | Int32Array
-  | Uint32Array
-  | Float32Array;
+  | Int8Array<ArrayBuffer>
+  | Uint8Array<ArrayBuffer>
+  | Uint8ClampedArray<ArrayBuffer>
+  | Int16Array<ArrayBuffer>
+  | Uint16Array<ArrayBuffer>
+  | Int32Array<ArrayBuffer>
+  | Uint32Array<ArrayBuffer>
+  | Float32Array<ArrayBuffer>;
 
 /**
  * Type of a typed array constructor
@@ -191,8 +200,8 @@ export class HttpRequest {
   private _crossOrigin: string;
   /** @internal */
   private _headers: Record<string, string>;
-  constructor() {
-    this._urlResolver = null;
+  constructor(urlResolver?: (url: string) => string) {
+    this._urlResolver = urlResolver;
     this._crossOrigin = '';
     this._headers = {};
   }
@@ -250,10 +259,22 @@ export class HttpRequest {
    */
   async requestText(url: string): Promise<string> {
     const response = await this.request(url);
-    if (!response.ok) {
+    if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
     }
     return response.text();
+  }
+  /**
+   * Fetch a json object from remote.
+   * @param url - The remote URL to fetch.
+   * @returns The fetch result.
+   */
+  async requestJson(url: string): Promise<string> {
+    const response = await this.request(url);
+    if (!response?.ok) {
+      throw new Error(`Asset download failed: ${url}`);
+    }
+    return response.json();
   }
   /**
    * Fetch an array buffer from remote.
@@ -262,7 +283,7 @@ export class HttpRequest {
    */
   async requestArrayBuffer(url: string): Promise<ArrayBuffer> {
     const response = await this.request(url);
-    if (!response.ok) {
+    if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
     }
     return response.arrayBuffer();
@@ -315,6 +336,115 @@ export interface ColorRGBA {
   g: number;
   b: number;
   a: number;
+}
+
+/**
+ * Generic Truthy type
+ * @public
+ */
+export type Truthy<T> = T extends false | 0 | '' | null | undefined | 0n ? never : T;
+
+/**
+ * Simple assertion which throws an error if the !!condition is false.
+ * @param condition - The condition to check.
+ * @public
+ */
+export function ASSERT(condition: boolean, message?: string): asserts condition {
+  if (!condition) {
+    throw new Error(message || 'Assertion failed');
+  }
+}
+
+/**
+ * Converts a Uint8Array to Base64 (Supports emoji character)
+ * @param array - Uint8Array to convert
+ * @returns Base64 string
+ * @public
+ */
+export function uint8ArrayToBase64(array: Uint8Array): string {
+  let binaryString = '';
+  for (let i = 0; i < array.length; i++) {
+    binaryString += String.fromCharCode(array[i]);
+  }
+  return btoa(binaryString);
+}
+
+/**
+ * Converts a string to Base64 (Supports emoji character)
+ * @param text - String to convert
+ * @returns Base64 string
+ * @public
+ */
+export function textToBase64(text: string): string {
+  const encoder = new TextEncoder();
+  const uint8Array = encoder.encode(text);
+  return uint8ArrayToBase64(uint8Array);
+}
+
+/**
+ * Converts a base64 string to text (Supports emoji character)
+ * @param base64 - Base64 string to convert
+ * @returns Original text
+ * @public
+ */
+export function base64ToText(base64: string): string {
+  const bytes = base64ToUint8Array(base64);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/**
+ * Converts a base64 string to Uint8Array (Supports emoji character)
+ * @param base64 - Base64 string to convert
+ * @returns Uint8Array
+ * @public
+ */
+export function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Generate 128bit random UUID
+ * @returns random UUID
+ * @public
+ */
+export function randomUUID() {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  } else {
+    const rnds = new Uint8Array(16);
+    crypto.getRandomValues(rnds);
+    // Per RFC 4122 v4
+    rnds[6] = (rnds[6] & 0x0f) | 0x40;
+    rnds[8] = (rnds[8] & 0x3f) | 0x80;
+
+    const hex = [...rnds].map((b) => b.toString(16).padStart(2, '0'));
+    return [
+      hex.slice(0, 4).join(''),
+      hex.slice(4, 6).join(''),
+      hex.slice(6, 8).join(''),
+      hex.slice(8, 10).join(''),
+      hex.slice(10, 16).join('')
+    ].join('-');
+  }
+}
+
+/**
+ * Check if a value is an instance of a specific constructor.
+ * @param value - The value to check.
+ * @param constructor - The constructor to check against.
+ * @returns True if the value is an instance of the constructor, false otherwise.
+ * @public
+ */
+export function IS_INSTANCE_OF<T extends GenericConstructor>(
+  value: unknown,
+  constructor: T
+): value is InstanceType<T> {
+  return value instanceof constructor;
 }
 
 /**
@@ -381,8 +511,8 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 export type ExtractMixinType<M> = M extends [infer First]
   ? ExtractMixinReturnType<First>
   : M extends [infer First, ...infer Rest]
-  ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
-  : never;
+    ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]>
+    : never;
 
 /**
  * Applies mixins to a constructor function.
@@ -402,6 +532,314 @@ export function applyMixins<M extends ((target: any) => any)[], T>(
     r = m(r);
   }
   return r;
+}
+
+type SprintfArg = string | number | boolean | null | undefined;
+
+interface FormatToken {
+  flags: {
+    leftAlign: boolean; // -
+    sign: boolean; // +
+    space: boolean; // (space)
+    zeroPad: boolean; // 0
+    alt: boolean; // #
+  };
+  width?: number; // number or from-arg
+  widthFromArg?: boolean; // *
+  precision?: number; // .number or from-arg
+  precisionFromArg?: boolean; // .*
+  type: string; // s d i u f x X o c %
+  explicitIndex?: number; // n$ style index (1-based)
+}
+
+const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc])/g;
+
+/**
+ * Simple sprintf implementation:
+ *
+ * @param format - The format string
+ * @param args - The format arguments
+ * @returns The formatted string
+ *
+ * Supported format:
+ * %%
+ * %s
+ * %c
+ * %d, %i, %u
+ * %f
+ * %x, %X, %o
+ *
+ * Supported flags:
+ * - (left align)
+ * + (always show sign for number)
+ *   (space if no sign for number)
+ * 0 (zero pad)
+ * # (alternate form, for x/X/o adds 0x/0X/0o prefix if value is non-zero)
+ * * (width or precision from argument)
+ * n$ (explicit argument index, 1-based)
+ * .precision for s (max length)
+ * .precision for d/i/u/x/X/o (min digits)
+ * .precision for f (number of digits after decimal point, default 6)
+ *
+ * @example
+ * ```ts
+ * formatString('Hello %s', 'World'); // 'Hello World'
+ * formatString('Hex: %#x', 255); // 'Hex: 0xff'
+ * formatString('Width: %*d', 5, 42); // 'Width:    42'
+ * formatString('Pi: %.2f', Math.PI); // 'Pi: 3.14'
+ * formatString('Index: %2$s %1$s', 'first', 'second'); // 'Index: second first'
+ * ```
+ *
+ * @public
+ */
+export function formatString(format: string, ...args: SprintfArg[]): string {
+  let out = '';
+  let lastIndex = 0;
+  let argIndex = 0;
+
+  const readArg = (explicit?: number): SprintfArg => {
+    if (explicit != null) {
+      const idx = explicit - 1;
+      if (idx < 0 || idx >= args.length) {
+        throw new Error(`Argument index ${explicit}$ out of range`);
+      }
+      return args[idx];
+    }
+    if (argIndex >= args.length) {
+      throw new Error('Too few arguments for format string');
+    }
+    return args[argIndex++];
+  };
+
+  const parseNumber = (val: SprintfArg, name: string): number => {
+    const n = typeof val === 'string' ? parseInt(val, 10) : Number(val);
+    if (!Number.isFinite(n)) {
+      throw new Error(`Invalid ${name}: ${val}`);
+    }
+    return n;
+  };
+
+  format.replace(formatRegex, (match, i$, flagsStr, widthStr, precStr, type, offset) => {
+    out += format.slice(lastIndex, offset);
+    lastIndex = offset + match.length;
+
+    const token: FormatToken = {
+      flags: {
+        leftAlign: false,
+        sign: false,
+        space: false,
+        zeroPad: false,
+        alt: false
+      },
+      type
+    };
+
+    if (i$) {
+      token.explicitIndex = parseInt(i$, 10);
+    }
+
+    // flags
+    for (const ch of flagsStr || '') {
+      switch (ch) {
+        case '-':
+          token.flags.leftAlign = true;
+          break;
+        case '+':
+          token.flags.sign = true;
+          break;
+        case ' ':
+          token.flags.space = true;
+          break;
+        case '0':
+          token.flags.zeroPad = true;
+          break;
+        case '#':
+          token.flags.alt = true;
+          break;
+      }
+    }
+
+    // width
+    if (widthStr === '*') {
+      token.widthFromArg = true;
+    } else if (widthStr) {
+      token.width = parseInt(widthStr, 10);
+    }
+
+    // precision
+    if (precStr === '*') {
+      token.precisionFromArg = true;
+    } else if (precStr) {
+      token.precision = parseInt(precStr, 10);
+    }
+
+    const render = (): string => {
+      // read * parameter of width/precision
+      if (token.widthFromArg) {
+        const wArg = readArg(token.explicitIndex);
+        token.width = parseNumber(wArg, 'width');
+      }
+      if (token.precisionFromArg) {
+        const pArg = readArg(token.explicitIndex);
+        token.precision = parseNumber(pArg, 'precision');
+        if (token.precision! < 0) {
+          token.precision = undefined;
+        }
+      }
+
+      const t = token.type;
+
+      if (t === '%') {
+        // literal %
+        return '%';
+      }
+
+      const raw = readArg(token.explicitIndex);
+
+      let body = '';
+      let signStr = '';
+
+      const asNumber = (v: SprintfArg): number => {
+        const n =
+          typeof v === 'boolean'
+            ? v
+              ? 1
+              : 0
+            : v == null
+              ? NaN
+              : typeof v === 'string' && v.trim() === ''
+                ? 0
+                : Number(v);
+        return n;
+      };
+
+      const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
+        if (!width || s.length >= width) {
+          return s;
+        }
+        const fill = padChar.repeat(width - s.length);
+        return leftAlign ? s + fill : fill + s;
+      };
+
+      const prefixForAlt = (t: string): string => {
+        if (t === 'x') {
+          return '0x';
+        }
+        if (t === 'X') {
+          return '0X';
+        }
+        if (t === 'o') {
+          return '0o';
+        }
+        return '';
+      };
+
+      switch (t) {
+        case 's': {
+          body = String(raw ?? '');
+          if (token.precision != null) {
+            // precision
+            body = body.slice(0, token.precision);
+          }
+          break;
+        }
+        case 'c': {
+          if (typeof raw === 'number') {
+            body = String.fromCharCode(raw);
+          } else {
+            const s = String(raw ?? '');
+            body = s.length ? s[0] : '\u0000';
+          }
+          break;
+        }
+        case 'd':
+        case 'i':
+        case 'u': {
+          let n = asNumber(raw);
+          if (t === 'u') {
+            n = Math.floor(Math.abs(n)) >>> 0; // unsigned 32bit
+            body = n.toString(10);
+          } else {
+            const isNeg = n < 0 || Object.is(n, -0);
+            const abs = Math.abs(n);
+            body = Math.trunc(abs).toString(10);
+            if (isNeg) {
+              signStr = '-';
+            } else if (token.flags.sign) {
+              signStr = '+';
+            } else if (token.flags.space) {
+              signStr = ' ';
+            }
+          }
+          if (token.precision != null) {
+            body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
+          }
+          body = signStr + body;
+          break;
+        }
+        case 'f': {
+          const n = asNumber(raw);
+          const prec = token.precision ?? 6;
+          if (!Number.isFinite(n)) {
+            body = String(n);
+          } else {
+            body = n.toFixed(Math.max(0, Math.min(100, prec)));
+          }
+          if (n >= 0) {
+            if (token.flags.sign) {
+              body = '+' + body;
+            } else if (token.flags.space) {
+              body = ' ' + body;
+            }
+          }
+          break;
+        }
+        case 'x':
+        case 'X':
+        case 'o': {
+          const n = asNumber(raw);
+          const isUpper = t === 'X';
+          const abs = Math.trunc(Math.abs(n));
+          let str = t === 'o' ? abs.toString(8) : abs.toString(16);
+          if (isUpper) {
+            str = str.toUpperCase();
+          }
+          if (token.precision != null) {
+            str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
+          }
+          const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
+          body = pre + str;
+          break;
+        }
+        default:
+          throw new Error(`Unsupported format type: ${t}`);
+      }
+
+      const useZeroPad =
+        token.flags.zeroPad &&
+        !token.flags.leftAlign &&
+        token.type !== 's' &&
+        token.precision == null &&
+        token.type !== '%';
+
+      if (useZeroPad) {
+        const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
+        const prefix = prefixMatch ? prefixMatch[0] : '';
+        const rest = body.slice(prefix.length);
+        body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
+      } else {
+        body = pad(body, token.width, token.flags.leftAlign, ' ');
+      }
+
+      return body;
+    };
+
+    out += render();
+    return match;
+  });
+
+  out += format.slice(lastIndex);
+  return out;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Matrix4x4, Vector3, Vector4, AABB, CubeFace, Frustum } from '@zephyr3d/base';
+import { retainObject, Matrix4x4, Vector3, Vector4, AABB, CubeFace, Frustum } from '@zephyr3d/base';
 import type {
   PBShaderExp,
   FrameBuffer,
@@ -18,7 +18,6 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import { Application } from '../app';
 import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
@@ -26,6 +25,7 @@ import type { ShadowImpl } from './shadow_impl';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 const tmpMatrix = new Matrix4x4();
 const tmpFrustum = new Frustum(Matrix4x4.identity());
@@ -74,21 +74,21 @@ export interface ShadowConfig {
  */
 export class ShadowMapper {
   /** @internal */
-  private static _snapMatrix = new Matrix4x4();
+  private static readonly _snapMatrix = new Matrix4x4();
   /** @internal */
-  private static _target = new Vector3();
+  private static readonly _target = new Vector3();
   /** @internal */
-  private static _up = new Vector3();
+  private static readonly _up = new Vector3();
   /** @internal */
-  private static _frustumMin = new Vector3();
+  private static readonly _frustumMin = new Vector3();
   /** @internal */
-  private static _frustumMax = new Vector3();
+  private static readonly _frustumMax = new Vector3();
   /** @internal */
-  private static _frustumCenter = new Vector3();
+  private static readonly _frustumCenter = new Vector3();
   /** @internal */
-  private static _lightCameras: WeakMap<Scene, Camera[]> = new WeakMap();
+  private static readonly _lightCameras: WeakMap<Scene, Camera[]> = new WeakMap();
   /** @internal */
-  private static _shadowMapParams: ShadowMapParams[] = [];
+  private static readonly _shadowMapParams: ShadowMapParams[] = [];
   /** @internal */
   protected _light: PunctualLight;
   /** @internal */
@@ -153,6 +153,27 @@ export class ShadowMapper {
     this._esmDepthScale = 200;
     this._shadowRegion = null;
     this.applyMode(this._shadowMode);
+  }
+  copyFrom(other: ShadowMapper) {
+    this.shadowMapSize = other.shadowMapSize;
+    this.shadowRegion = other.shadowRegion ? new AABB(other.shadowRegion) : null;
+    this.shadowDistance = other.shadowDistance;
+    this.numShadowCascades = other.numShadowCascades;
+    this.splitLambda = other.splitLambda;
+    this.depthBias = other.depthBias;
+    this.normalBias = other.normalBias;
+    this.nearClip = other.nearClip;
+    this.mode = other.mode;
+    this.pdSampleCount = other.pdSampleCount;
+    this.pdSampleRadius = other.pdSampleRadius;
+    this.pcfKernelSize = other.pcfKernelSize;
+    this.vsmBlurKernelSize = other.vsmBlurKernelSize;
+    this.vsmBlurRadius = other.vsmBlurRadius;
+    this.vsmDarkness = other.vsmDarkness;
+    this.esmBlur = other.esmBlur;
+    this.esmBlurKernelSize = other.esmBlurKernelSize;
+    this.esmBlurRadius = other.esmBlurRadius;
+    this.esmDepthScale = other.esmDepthScale;
   }
   /** The light that is used to generate shadow map */
   get light(): PunctualLight {
@@ -263,9 +284,8 @@ export class ShadowMapper {
     return `${shadowMapParams.impl.constructor.name}_${shadowMapParams.impl.getShaderHash()}_${
       shadowMapParams.lightType
     }_${shadowMapParams.shadowMap.target}_${Number(shadowMapParams.numShadowCascades > 1)}_${Number(
-      Application.instance.device
-        .getDeviceCaps()
-        .textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format).filterable
+      getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+        .filterable
     )}`;
   }
   /** Sample count for poisson disc PCF */
@@ -276,7 +296,10 @@ export class ShadowMapper {
     val = Math.min(Math.max(1, Number(val) >> 0), 64);
     if (val !== this._pdSampleCount) {
       this._pdSampleCount = val;
-      this.asPCFPD() && (this.asPCFPD().tapCount = this._pdSampleCount);
+      const pcfpd = this.asPCFPD();
+      if (pcfpd) {
+        pcfpd.tapCount = this._pdSampleCount;
+      }
     }
   }
   /** Radius for poisson disc PCF */
@@ -298,7 +321,10 @@ export class ShadowMapper {
     val = val !== 3 && val !== 5 && val !== 7 ? 5 : val;
     if (val !== this._pcfKernelSize) {
       this._pcfKernelSize = val;
-      this.asPCFOPT() && (this.asPCFOPT().kernelSize = this._pcfKernelSize);
+      const pcfopt = this.asPCFOPT();
+      if (pcfopt) {
+        pcfopt.kernelSize = this._pcfKernelSize;
+      }
     }
   }
   /** Kernel size of VSM */
@@ -309,7 +335,10 @@ export class ShadowMapper {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._vsmBlurKernelSize) {
       this._vsmBlurKernelSize = val;
-      this.asVSM() && (this.asVSM().kernelSize = this._vsmBlurKernelSize);
+      const vsm = this.asVSM();
+      if (vsm) {
+        vsm.kernelSize = this._vsmBlurKernelSize;
+      }
     }
   }
   /** Blur radius for VSM */
@@ -320,7 +349,10 @@ export class ShadowMapper {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._vsmBlurRadius) {
       this._vsmBlurRadius = val;
-      this.asVSM() && (this.asVSM().blurSize = this._vsmBlurRadius);
+      const vsm = this.asVSM();
+      if (vsm) {
+        vsm.blurSize = this._vsmBlurRadius;
+      }
     }
   }
   /** Darkness for VSM */
@@ -341,7 +373,10 @@ export class ShadowMapper {
   set esmBlur(val: boolean) {
     if (!!val !== this.esmBlur) {
       this._esmBlur = !!val;
-      this.asESM() && (this.asESM().blur = this._esmBlur);
+      const esm = this.asESM();
+      if (esm) {
+        esm.blur = this._esmBlur;
+      }
     }
   }
   /** Kernel size for ESM */
@@ -352,7 +387,10 @@ export class ShadowMapper {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._esmBlurKernelSize) {
       this._esmBlurKernelSize = val;
-      this.asESM() && (this.asESM().kernelSize = this._esmBlurKernelSize);
+      const esm = this.asESM();
+      if (esm) {
+        esm.kernelSize = this._esmBlurKernelSize;
+      }
     }
   }
   /** Blur radius for ESM */
@@ -363,7 +401,10 @@ export class ShadowMapper {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._esmBlurRadius) {
       this._esmBlurRadius = val;
-      this.asESM() && (this.asESM().blurSize = this._esmBlurRadius);
+      const esm = this.asESM();
+      if (esm) {
+        esm.blurSize = this._esmBlurRadius;
+      }
     }
   }
   /** Depth scale for ESM */
@@ -401,8 +442,7 @@ export class ShadowMapper {
     if (ctx.shadowMapInfo) {
       for (const k of ctx.shadowMapInfo.keys()) {
         const shadowMapParams = ctx.shadowMapInfo.get(k);
-        ctx.device.pool.releaseFrameBuffer(shadowMapParams.shadowMapFramebuffer);
-        shadowMapParams.impl.releaseTemporalResources(shadowMapParams);
+        //ctx.device.pool.releaseFrameBuffer(shadowMapParams.shadowMapFramebuffer);
         shadowMapParams.lightType = LIGHT_TYPE_NONE;
         shadowMapParams.depthClampEnabled = false;
         shadowMapParams.shaderHash = '';
@@ -479,9 +519,9 @@ export class ShadowMapper {
     height: number,
     depth: number
   ): Texture2D | TextureCube | Texture2DArray {
-    const device = Application.instance.device;
+    const device = getDevice();
     const options: TextureCreationOptions = {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     };
     switch (target) {
       case '2d':
@@ -505,7 +545,7 @@ export class ShadowMapper {
     depthFormat: TextureFormat,
     mipmapping?: boolean
   ) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const useTextureArray = numCascades > 1 && device.type !== 'webgl';
     const colorAttachments = colorFormat
       ? useTextureArray
@@ -520,15 +560,15 @@ export class ShadowMapper {
             )
           ]
         : lightType === LIGHT_TYPE_POINT
-        ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
-        : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
       : null;
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
         : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
-        ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
-        : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
     const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
     if (colorAttachments) {
@@ -541,7 +581,7 @@ export class ShadowMapper {
   }
   /** @internal */
   protected updateResources(shadowMapParams: ShadowMapParams) {
-    const device = Application.instance.device;
+    const device = getDevice();
     const colorFormat = shadowMapParams.impl.getShadowMapColorFormat(shadowMapParams);
     const depthFormat = shadowMapParams.impl.getShadowMapDepthFormat(shadowMapParams);
     const numCascades = shadowMapParams.numShadowCascades;
@@ -574,7 +614,7 @@ export class ShadowMapper {
     }
     */
     shadowMapParams.shadowMapFramebuffer = ShadowMapper.fetchTemporalFramebuffer(
-      false,
+      true,
       this._light.lightType,
       numCascades,
       shadowMapWidth,
@@ -588,7 +628,7 @@ export class ShadowMapper {
   /** @internal */
   protected createLightCameraPoint(lightCamera: Camera): void {
     //lightCamera.reparent(this._light);
-    lightCamera.reparent(lightCamera.scene.rootNode);
+    lightCamera.parent = lightCamera.scene.rootNode;
     lightCamera.position.setXYZ(0, 0, 0);
     lightCamera.rotation.identity();
     lightCamera.scale.setXYZ(1, 1, 1);
@@ -602,12 +642,12 @@ export class ShadowMapper {
   }
   /** @internal */
   protected createLightCameraSpot(lightCamera: Camera): void {
-    lightCamera.reparent(this._light);
+    lightCamera.parent = this._light;
     lightCamera.position.setXYZ(0, 0, 0);
     lightCamera.rotation.identity();
     lightCamera.scale.setXYZ(1, 1, 1);
     lightCamera.setPerspective(
-      2 * (this._light as SpotLight).cutoff,
+      2 * Math.acos((this._light as SpotLight).cutoff),
       1,
       this._config.nearClip,
       Math.min((this._shadowDistance, this._light as SpotLight).range)
@@ -773,7 +813,9 @@ export class ShadowMapper {
   private static fetchCameraForScene(scene: Scene) {
     const cameras = this._lightCameras.get(scene);
     if (!cameras || cameras.length === 0) {
-      return new Camera(scene);
+      const camera = new Camera(scene);
+      retainObject(camera);
+      return camera;
     } else {
       const camera = cameras.pop();
       camera.parent = scene.rootNode;
@@ -845,7 +887,7 @@ export class ShadowMapper {
     renderPass.light = this._light;
     this.updateResources(shadowMapParams);
     shadowMapParams.shaderHash = this.getShaderHash(shadowMapParams);
-    const device = Application.instance.device;
+    const device = getDevice();
     const fb = shadowMapParams.shadowMapFramebuffer;
     shadowMapParams.depthClampEnabled = false;
     renderPass.clearColor = fb.getColorAttachments()[0]
@@ -897,9 +939,8 @@ export class ShadowMapper {
         const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
         const shadowMapCullCamera = ShadowMapper.fetchCameraForScene(scene);
         shadowMapCullCamera.clipMask = AABB.ClipLeft | AABB.ClipRight | AABB.ClipBottom | AABB.ClipTop;
-        cascadeCamera.reparent(camera);
-        shadowMapParams.depthClampEnabled =
-          Application.instance.device.getDeviceCaps().shaderCaps.supportFragmentDepth;
+        cascadeCamera.parent = camera;
+        shadowMapParams.depthClampEnabled = getDevice().getDeviceCaps().shaderCaps.supportFragmentDepth;
         for (let split = 0; split < this._config.numCascades; split++) {
           cascadeCamera.setPerspective(
             camera.getFOV(),

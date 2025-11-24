@@ -75,12 +75,12 @@ export class Plane extends VectorBase {
         break;
       }
       default: {
-        console.log('ERROR: Plane constructor must have 0/2/3/4 arguments');
+        console.error('Plane constructor must have 0/2/3/4 arguments');
       }
     }
   }
   /** Get the coefficient A of the plane equation */
-  get a() {
+  get a(): number {
     return this[0];
   }
   set a(val: number) {
@@ -88,7 +88,7 @@ export class Plane extends VectorBase {
     this._npDirty = true;
   }
   /** Get the coefficient B of the plane equation */
-  get b() {
+  get b(): number {
     return this[1];
   }
   set b(val: number) {
@@ -96,7 +96,7 @@ export class Plane extends VectorBase {
     this._npDirty = true;
   }
   /** Get the coefficient C of the plane equation */
-  get c() {
+  get c(): number {
     return this[2];
   }
   set c(val: number) {
@@ -104,7 +104,7 @@ export class Plane extends VectorBase {
     this._npDirty = true;
   }
   /** Get the coefficient D of the plane equation */
-  get d() {
+  get d(): number {
     return this[3];
   }
   set d(val: number) {
@@ -112,7 +112,7 @@ export class Plane extends VectorBase {
     this._npDirty = true;
   }
   /** @internal */
-  get px() {
+  get px(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -120,7 +120,7 @@ export class Plane extends VectorBase {
     return this._px;
   }
   /** @internal */
-  get py() {
+  get py(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -128,7 +128,7 @@ export class Plane extends VectorBase {
     return this._py;
   }
   /** @internal */
-  get pz() {
+  get pz(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -136,7 +136,7 @@ export class Plane extends VectorBase {
     return this._pz;
   }
   /** @internal */
-  get nx() {
+  get nx(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -144,7 +144,7 @@ export class Plane extends VectorBase {
     return this._nx;
   }
   /** @internal */
-  get ny() {
+  get ny(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -152,7 +152,7 @@ export class Plane extends VectorBase {
     return this._ny;
   }
   /** @internal */
-  get nz() {
+  get nz(): number {
     if (this._npDirty) {
       this._npDirty = false;
       this._calcNP();
@@ -164,7 +164,7 @@ export class Plane extends VectorBase {
    * @param other - An array holding the coefficients.
    * @returns self
    */
-  assign(other: ArrayLike<number>) {
+  assign(other: ArrayLike<number>): this {
     this._npDirty = true;
     super.set(other);
     return this;
@@ -177,7 +177,7 @@ export class Plane extends VectorBase {
    * @param d - The coefficient D of the equation
    * @returns self
    */
-  setEquation(a: number, b: number, c: number, d: number) {
+  setEquation(a: number, b: number, c: number, d: number): this {
     this[0] = a;
     this[1] = b;
     this[2] = c;
@@ -191,7 +191,7 @@ export class Plane extends VectorBase {
    * @param normal - Normal of the plane.
    * @returns self
    */
-  initWithOriginNormal(origin: Vector3, normal: Vector3) {
+  initWithOriginNormal(origin: Vector3, normal: Vector3): this {
     // assume normal is normalized
     return this.setEquation(normal.x, normal.y, normal.z, -Vector3.dot(origin, normal));
   }
@@ -202,7 +202,7 @@ export class Plane extends VectorBase {
    * @param p2 - The third point.
    * @returns self
    */
-  initWithPoints(p0: Vector3, p1: Vector3, p2: Vector3) {
+  initWithPoints(p0: Vector3, p1: Vector3, p2: Vector3): this {
     const normal = Vector3.cross(Vector3.sub(p1, p0), Vector3.sub(p2, p0)).inplaceNormalize();
     return this.initWithOriginNormal(p0, normal);
   }
@@ -233,11 +233,11 @@ export class Plane extends VectorBase {
     return (result || new Vector3()).setXYZ(this[0], this[1], this[2]);
   }
   /** Inplace flip the normal vector . */
-  inplaceFlip() {
+  inplaceFlip(): Plane {
     return Plane.flip(this, this);
   }
   /** Inplace normalize the plane equation. */
-  inplaceNormalize() {
+  inplaceNormalize(): Plane {
     return Plane.normalize(this, this);
   }
   /**
@@ -256,7 +256,7 @@ export class Plane extends VectorBase {
    * @returns The result plane.
    */
   static normalize(plane: Plane, result?: Plane): Plane {
-    const len = Math.sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
+    const len = Math.hypot(plane[0], plane[1], plane[2]);
     return (result || new Plane()).setEquation(
       plane[0] / len,
       plane[1] / len,
@@ -279,7 +279,7 @@ export class Plane extends VectorBase {
     return ret.inplaceNormalize();
   }
   /** @internal */
-  private _calcNP() {
+  private _calcNP(): void {
     this._px = this[0] > 0 ? 1 : -1;
     this._py = this[1] > 0 ? 1 : -1;
     this._pz = this[2] > 0 ? 1 : -1;

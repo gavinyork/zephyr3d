@@ -5,6 +5,7 @@ import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
 import { ShaderHelper } from '../../shader/helper';
+import { MaterialVaryingFlags } from '../../../values';
 
 /**
  * Interface for blinn-phong lighting model mixin
@@ -33,12 +34,17 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinBlinnPhong };
   }
   const S = applyMaterialMixins(BaseCls, mixinLight);
+  const SHININESS_UNIFORM = S.defineInstanceUniform('shininess', 'float', 'Shininess');
   return class extends S {
     protected static blinnPhongMixed = true;
     private _shininess: number;
     constructor() {
       super();
       this._shininess = 32;
+    }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.shininess = other.shininess;
     }
     /** Shininess */
     get shininess(): number {
@@ -50,16 +56,22 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
         this.uniformChanged();
       }
     }
+    vertexShader(scope: PBFunctionScope): void {
+      super.vertexShader(scope);
+      if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+        scope.$outputs.zShininess = this.getInstancedUniform(scope, SHININESS_UNIFORM);
+      }
+    }
     fragmentShader(scope: PBFunctionScope): void {
       super.fragmentShader(scope);
       const pb = scope.$builder;
-      if (this.needFragmentColor()) {
+      if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         scope.zShininess = pb.float().uniform(2);
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (this.needFragmentColor(ctx)) {
+      if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zShininess', this._shininess);
       }
     }
@@ -87,6 +99,10 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           if (!that.needFragmentColor()) {
             this.$return(this.albedo.rgb);
           } else {
+            const shininess =
+              that.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+                ? this.$inputs.zShininess
+                : this.zShininess;
             if (that.needCalculateEnvLight() && !outRoughness) {
               this.$l.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
             } else {
@@ -106,8 +122,8 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-              this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
-              this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.zShininess));
+              this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
+              this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, shininess));
               if (shadow) {
                 this.$if(pb.greaterThan(this.NoL, 0), function () {
                   this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
@@ -120,7 +136,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
             });
             this.$l.litColor = pb.add(pb.mul(this.albedo.rgb, this.diffuseColor), this.specularColor);
             if (outRoughness) {
-              this.$l.roughness = pb.sqrt(pb.div(2, pb.add(this.zShininess, 2)));
+              this.$l.roughness = pb.sqrt(pb.div(2, pb.add(shininess, 2)));
               this.outRoughness = pb.vec4(
                 pb.mul(this.albedo.rgb, pb.sub(1, this.roughness)),
                 pb.mul(this.roughness, ShaderHelper.getCameraRoughnessFactor(this))

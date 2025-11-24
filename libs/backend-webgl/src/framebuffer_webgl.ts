@@ -31,19 +31,19 @@ export class WebGLFrameBuffer
   extends WebGLGPUObject<WebGLFramebuffer>
   implements FrameBuffer<WebGLFramebuffer>
 {
-  private _options: Options;
+  private readonly _options: Options;
   private _needBindBuffers: boolean;
   private _drawTags: number;
   private _lastDrawTag: number;
   private _status: number;
   private _statusAA: number;
-  private _width: number;
-  private _height: number;
-  private _isMRT: boolean;
+  private readonly _width: number;
+  private readonly _height: number;
+  private readonly _isMRT: boolean;
   private _drawBuffers: number[];
-  private _hash: string;
+  private readonly _hash: string;
   private _needGenerateMipmaps: boolean;
-  private _depthAttachmentTarget: number;
+  private readonly _depthAttachmentTarget: number;
   private _colorAttachmentsAA: WebGLRenderbuffer[];
   private _depthAttachmentAA: WebGLRenderbuffer;
   private _intermediateAttachments: Map<
@@ -92,7 +92,7 @@ export class WebGLFrameBuffer
             generateMipmaps: false
           }
         : null,
-      sampleCount: device.type === 'webgl' ? 1 : opt?.sampleCount ?? 1,
+      sampleCount: device.type === 'webgl' ? 1 : (opt?.sampleCount ?? 1),
       ignoreDepthStencil: opt?.ignoreDepthStencil ?? false
     };
     if (!this._options.colorAttachments && !this._options.depthAttachment) {
@@ -153,15 +153,15 @@ export class WebGLFrameBuffer
   getHash(): string {
     return this._hash;
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       if (this._options?.depthAttachment?.texture?.disposed) {
-        await this._options.depthAttachment.texture.reload();
+        this._options.depthAttachment.texture.reload();
       }
       if (this._options?.colorAttachments) {
         for (const k of this._options.colorAttachments) {
           if (k?.texture?.disposed) {
-            await k.texture.reload();
+            k.texture.reload();
           }
         }
       }
@@ -293,6 +293,9 @@ export class WebGLFrameBuffer
   }
   getColorAttachments(): BaseTexture[] {
     return this._options.colorAttachments?.map((val) => val.texture || null) || [];
+  }
+  getColorAttachment<T extends BaseTexture>(index: number): T {
+    return (this.getColorAttachments()[index] as unknown as T) ?? null;
   }
   bind(): boolean {
     if (!this._initialized) {
@@ -447,14 +450,14 @@ export class WebGLFrameBuffer
     if (this._device.isContextLost()) {
       return;
     }
-    do {
+    load: {
       if (this._options.sampleCount > 1) {
         this._framebufferAA = this._device.context.createFramebuffer();
         this._colorAttachmentsAA = [];
         this._depthAttachmentAA = null;
         if (!this._bindBuffersAA()) {
           this.dispose();
-          break;
+          break load;
         }
       }
       this._object = this._device.context.createFramebuffer();
@@ -462,7 +465,7 @@ export class WebGLFrameBuffer
       if (!this._bindBuffers()) {
         this.dispose();
       }
-    } while (0);
+    }
     this._lastDrawTag = -1;
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
     this._device.context._currentFramebuffer = null;
@@ -470,7 +473,11 @@ export class WebGLFrameBuffer
   private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment): boolean {
     if (info.texture) {
       let intermediateTexture: WebGLTexture = null;
-      if (this.device.type === 'webgl' && info.level > 0) {
+      if (
+        this.device.type === 'webgl' &&
+        !this.device.getDeviceCaps().framebufferCaps.supportRenderMipmap &&
+        info.level > 0
+      ) {
         if (!this._intermediateAttachments) {
           this._intermediateAttachments = new Map();
         }
@@ -520,22 +527,13 @@ export class WebGLFrameBuffer
         );
       } else {
         if (info.texture.isTexture2D()) {
-          if (intermediateTexture) {
-            this._device.context.framebufferRenderbuffer(
-              WebGLEnum.FRAMEBUFFER,
-              attachment,
-              WebGLEnum.RENDERBUFFER,
-              intermediateTexture
-            );
-          } else {
-            this._device.context.framebufferTexture2D(
-              WebGLEnum.FRAMEBUFFER,
-              attachment,
-              WebGLEnum.TEXTURE_2D,
-              info.texture.object,
-              info.level ?? 0
-            );
-          }
+          this._device.context.framebufferTexture2D(
+            WebGLEnum.FRAMEBUFFER,
+            attachment,
+            WebGLEnum.TEXTURE_2D,
+            info.texture.object,
+            info.level ?? 0
+          );
         } else if (info.texture.isTextureCube()) {
           this._device.context.framebufferTexture2D(
             WebGLEnum.FRAMEBUFFER,

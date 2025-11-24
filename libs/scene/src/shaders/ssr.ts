@@ -1,6 +1,5 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { decodeNormalizedFloatFromRGBA } from './misc';
-import { ShaderHelper } from '../material';
+import { ShaderHelper } from '../material/shader/helper';
 
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
@@ -169,27 +168,6 @@ function validateHit(
     : scope[funcName](hit2D, surfaceZ, uv, traceRay, viewMatrix, invProjMatrix, textureSize);
 }
 
-export function sampleLinearDepth(
-  scope: PBInsideFunctionScope,
-  tex: PBShaderExp,
-  uv: PBShaderExp,
-  level: PBShaderExp | number
-): PBShaderExp {
-  const pb = scope.$builder;
-  const depth = pb.textureSampleLevel(tex, uv, level);
-  return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
-}
-
-export function sampleLinearDepthWithBackface(
-  scope: PBInsideFunctionScope,
-  tex: PBShaderExp,
-  uv: PBShaderExp,
-  level: PBShaderExp | number
-): PBShaderExp {
-  const pb = scope.$builder;
-  return pb.textureSampleLevel(tex, uv, level).rg;
-}
-
 export function screenSpaceRayTracing_Linear2D(
   scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
@@ -218,11 +196,11 @@ export function screenSpaceRayTracing_Linear2D(
     function () {
       let thickness = this.thickness;
       if (useBackfaceDepth) {
-        this.$l.sceneZ = sampleLinearDepthWithBackface(this, linearDepthTex, this.uv, 0);
+        this.$l.sceneZ = ShaderHelper.sampleLinearDepthWithBackface(this, linearDepthTex, this.uv, 0);
         this.$l.sceneZMax01 = this.sceneZ.x;
         thickness = pb.max(this.thickness, pb.mul(pb.sub(this.sceneZ.y, this.sceneZ.x), this.cameraFar));
       } else {
-        this.$l.sceneZMax01 = sampleLinearDepth(this, linearDepthTex, this.uv, 0);
+        this.$l.sceneZMax01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.uv, 0);
       }
       this.sceneZMax = pb.neg(pb.mul(this.sceneZMax01, this.cameraFar));
       this.$return(
@@ -240,7 +218,6 @@ export function screenSpaceRayTracing_Linear2D(
       pb.vec3('rayOrigin'),
       pb.vec3('rayDirection'),
       pb.float('stride'),
-      pb.float('strideZCutoff'),
       pb.float('maxDistance'),
       pb.float('maxIterations'),
       pb.float('thickness'),
@@ -334,7 +311,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.hitUV = pb.vec2();
       this.$l.hitZ = pb.float();
       this.numIterations = 0;
-      this.skippedIterations = pb.min(this.maxIterations, 2);
+      this.skippedIterations = pb.min(this.maxIterations, 1);
       this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 1000 : this.maxIterations, function () {
         if (pb.getDevice().type === 'webgl') {
           this.$if(pb.greaterThanEqual(this.i, this.maxIterations), function () {
@@ -384,7 +361,6 @@ export function screenSpaceRayTracing_Linear2D(
       pb.mat4('projMatrix'),
       pb.mat4('invProjMatrix'),
       pb.float('stride'),
-      pb.float('strideZCutoff'),
       pb.float('maxDistance'),
       pb.float('maxIterations'),
       pb.float('thickness'),
@@ -400,7 +376,6 @@ export function screenSpaceRayTracing_Linear2D(
         this.rayOrigin,
         this.rayDirection,
         this.stride,
-        this.strideZCutoff,
         this.maxDistance,
         this.maxIterations,
         this.thickness,
@@ -415,7 +390,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$if(pb.not(this.intersected), function () {
         this.$return(pb.vec4(0));
       });
-      this.$l.surfaceZ01 = sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
+      this.$l.surfaceZ01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
       this.$if(pb.equal(this.surfaceZ01, 1), function () {
         this.$return(pb.vec4(0));
       });
@@ -453,7 +428,6 @@ export function screenSpaceRayTracing_Linear2D(
     projMatrix,
     invProjMatrix,
     stride,
-    100,
     maxDistance,
     maxIterations,
     thickness,
@@ -578,13 +552,6 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.currentMipResolution = this.getMipResolution(this.currentMip);
       this.$l.invCurrentMipResolution = pb.div(pb.vec2(1), this.currentMipResolution);
       this.$l.uvOffset = pb.div(pb.mul(0.005, pb.exp2(pb.float(this.mostDetailMip))), this.screenSize);
-      /*
-      this.$l.uvOffset = pb.div(
-        pb.vec2(0.001),
-        //pb.mul(pb.exp2(pb.float(this.mostDetailMip)), 0.005),
-        pb.vec2(pb.textureDimensions(HiZTexture, this.mostDetailMip))
-      );
-      */
       this.uvOffset = pb.vec2(
         this.$choice(pb.lessThan(this.screenSpaceDirection.x, 0), pb.neg(this.uvOffset.x), this.uvOffset.x),
         this.$choice(pb.lessThan(this.screenSpaceDirection.y, 0), pb.neg(this.uvOffset.y), this.uvOffset.y)
@@ -736,3 +703,83 @@ export function screenSpaceRayTracing_HiZ(
     maxIterations
   );
 }
+
+/*
+float2 cell(float2 ray, float2 cell_count, uint camera) {
+	return floor(ray.xy * cell_count);
+}
+
+float2 cell_count(float level) {
+	return input_texture2_size / (level == 0.0 ? 1.0 : exp2(level));
+}
+
+float3 intersect_cell_boundary(float3 pos, float3 dir, float2 cell_id, float2 cell_count, float2 cross_step, float2 cross_offset, uint camera) {
+	float2 cell_size = 1.0 / cell_count;
+	float2 planes = cell_id/cell_count + cell_size * cross_step;
+
+	float2 solutions = (planes - pos)/dir.xy;
+	float3 intersection_pos = pos + dir * min(solutions.x, solutions.y);
+
+	intersection_pos.xy += (solutions.x < solutions.y) ? float2(cross_offset.x, 0.0) : float2(0.0, cross_offset.y);
+
+	return intersection_pos;
+}
+
+bool crossed_cell_boundary(float2 cell_id_one, float2 cell_id_two) {
+	return (int)cell_id_one.x != (int)cell_id_two.x || (int)cell_id_one.y != (int)cell_id_two.y;
+}
+
+float minimum_depth_plane(float2 ray, float level, float2 cell_count, uint camera) {
+	return input_texture2.Load(int3(vr_stereo_to_mono(ray.xy, camera) * cell_count, level)).r;
+}
+
+float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
+	float level = HIZ_START_LEVEL;
+	float3 v_z = v/v.z;
+	float2 hi_z_size = cell_count(level);
+	float3 ray = p;
+
+	float2 cross_step = float2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+	float2 cross_offset = cross_step * 0.00001;
+	cross_step = saturate(cross_step);
+
+	float2 ray_cell = cell(ray.xy, hi_z_size.xy, camera);
+	ray = intersect_cell_boundary(ray, v, ray_cell, hi_z_size, cross_step, cross_offset, camera);
+
+	iterations = 0;
+	while(level >= HIZ_STOP_LEVEL && iterations < MAX_ITERATIONS) {
+		// get the cell number of the current ray
+		float2 current_cell_count = cell_count(level);
+		float2 old_cell_id = cell(ray.xy, current_cell_count, camera);
+
+		// get the minimum depth plane in which the current ray resides
+		float min_z = minimum_depth_plane(ray.xy, level, current_cell_count, camera);
+
+		// intersect only if ray depth is below the minimum depth plane
+		float3 tmp_ray = ray;
+		if(v.z > 0) {
+			float min_minus_ray = min_z - ray.z;
+			tmp_ray = min_minus_ray > 0 ? ray + v_z*min_minus_ray : tmp_ray;
+			float2 new_cell_id = cell(tmp_ray.xy, current_cell_count, camera);
+			if(crossed_cell_boundary(old_cell_id, new_cell_id)) {
+				tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
+				level = min(HIZ_MAX_LEVEL, level + 2.0f);
+			}else{
+				if(level == 1 && abs(min_minus_ray) > 0.0001) {
+					tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
+					level = 2;
+				}
+			}
+		} else if(ray.z < min_z) {
+			tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
+			level = min(HIZ_MAX_LEVEL, level + 2.0f);
+		}
+
+		ray.xyz = tmp_ray.xyz;
+		--level;
+
+		++iterations;
+	}
+	return ray;
+}
+*/

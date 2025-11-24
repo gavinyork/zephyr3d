@@ -16,7 +16,7 @@
    * path segment in the "$schema" field for all your Rush config files.  This will ensure
    * correct error-underlining and tab-completion for editors such as VS Code.
    */
-  "rushVersion": "5.99.0",
+  "rushVersion": "5.162.0",
 
   /**
    * The next field selects which package manager should be installed and determines its version.
@@ -424,10 +424,6 @@
     //   "tags": [ "tools" ]
     // }
     {
-      "packageName": "@zephyr3d/root",
-      "projectFolder": "/"
-    },
-    {
       "packageName": "@zephyr3d/base",
       "projectFolder": "libs/base",
       "shouldPublish": true
@@ -458,8 +454,8 @@
       "shouldPublish": true
     },
     {
-      "packageName": "@zephyr3d/inspector",
-      "projectFolder": "libs/inspector"
+      "packageName": "@zephyr3d/editor",
+      "projectFolder": "utility/editor"
     },
     {
       "packageName": "@zephyr3d/examples",
@@ -470,8 +466,8 @@
       "projectFolder": "test"
     },
     {
-      "packageName": "@zephyr3d/site",
-      "projectFolder": "site"
+      "packageName": "@zephyr3d/doc",
+      "projectFolder": "apps/doc"
     }
   ]
 }

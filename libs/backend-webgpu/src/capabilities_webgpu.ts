@@ -25,14 +25,12 @@ export interface TextureFormatInfoWebGPU extends TextureFormatInfo {
   renderable: boolean;
   compressed: boolean;
   writable: boolean;
-  size: number;
-  blockWidth?: number;
-  blockHeight?: number;
 }
 
 export class WebGPUFramebufferCaps implements FramebufferCaps {
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
+  supportRenderMipmap: boolean;
   supportMultisampledFramebuffer: boolean;
   supportFloatBlending: boolean;
   supportDepth32float: boolean;
@@ -40,8 +38,9 @@ export class WebGPUFramebufferCaps implements FramebufferCaps {
   constructor(device: WebGPUDevice) {
     this.maxDrawBuffers = device.device.limits.maxColorAttachments;
     this.maxColorAttachmentBytesPerSample = device.device.limits.maxColorAttachmentBytesPerSample;
+    this.supportRenderMipmap = true;
     this.supportMultisampledFramebuffer = true;
-    this.supportFloatBlending = true;
+    this.supportFloatBlending = device.device.features.has('float32-blendable');
     this.supportDepth32float = true;
     this.supportDepth32floatStencil8 = device.device.features.has('depth32float-stencil8');
   }
@@ -85,7 +84,7 @@ export class WebGPUShaderCaps implements ShaderCaps {
   }
 }
 export class WebGPUTextureCaps implements TextureCaps {
-  private _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGPU>;
+  private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGPU>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
   npo2Mipmapping: boolean;
@@ -132,6 +131,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         renderable: true,
         compressed: false,
         writable: true,
+        blockWidth: 1,
+        blockHeight: 1,
         size: 4
       },
       ['rgba8snorm']: {
@@ -140,6 +141,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         renderable: false,
         compressed: false,
         writable: true,
+        blockWidth: 1,
+        blockHeight: 1,
         size: 4
       },
       ['bgra8unorm']: {
@@ -148,6 +151,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         renderable: true,
         compressed: false,
         writable: false, // TODO: require "bgra8unorm-storage" feature
+        blockWidth: 1,
+        blockHeight: 1,
         size: 4
       }
     } as Record<TextureFormat, TextureFormatInfoWebGPU>;
@@ -174,8 +179,8 @@ export class WebGPUTextureCaps implements TextureCaps {
           filterable: true,
           renderable: false,
           compressed: true,
-          size: 16,
           writable: false,
+          size: 16,
           blockWidth: w,
           blockHeight: h
         };
@@ -197,8 +202,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 8,
         writable: false,
+        size: 8,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -207,8 +212,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -217,8 +222,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -229,8 +234,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 8,
         writable: false,
+        size: 8,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -239,8 +244,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 8,
         writable: false,
+        size: 8,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -250,8 +255,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       filterable: true,
       renderable: false,
       compressed: true,
-      size: 16,
       writable: false,
+      size: 16,
       blockWidth: 4,
       blockHeight: 4
     };
@@ -260,8 +265,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       filterable: true,
       renderable: false,
       compressed: true,
-      size: 16,
       writable: false,
+      size: 16,
       blockWidth: 4,
       blockHeight: 4
     };
@@ -271,8 +276,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -281,8 +286,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -291,8 +296,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -301,8 +306,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -313,8 +318,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 8,
         writable: false,
+        size: 8,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -323,8 +328,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -333,8 +338,8 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: false,
         compressed: true,
-        size: 16,
         writable: false,
+        size: 16,
         blockWidth: 4,
         blockHeight: 4
       };
@@ -345,30 +350,38 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 1
     };
-    (this._textureFormatInfos['r8snorm'] = {
+    this._textureFormatInfos['r8snorm'] = {
       gpuSampleType: 'float',
       filterable: true,
       renderable: false,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 1
-    }),
-      (this._textureFormatInfos['r16f'] = {
-        gpuSampleType: 'float',
-        filterable: true,
-        renderable: true,
-        compressed: false,
-        writable: false,
-        size: 2
-      });
+    };
+    this._textureFormatInfos['r16f'] = {
+      gpuSampleType: 'float',
+      filterable: true,
+      renderable: true,
+      compressed: false,
+      writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
     this._textureFormatInfos['r32f'] = {
       gpuSampleType: 'unfilterable-float',
       filterable: false,
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['r8ui'] = {
@@ -377,6 +390,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 1
     };
     this._textureFormatInfos['r8i'] = {
@@ -385,6 +400,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 1
     };
     this._textureFormatInfos['r16ui'] = {
@@ -393,6 +410,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['r16i'] = {
@@ -401,6 +420,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['r32ui'] = {
@@ -409,6 +430,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['r32i'] = {
@@ -417,6 +440,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rg8unorm'] = {
@@ -425,6 +450,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['rg8snorm'] = {
@@ -433,6 +460,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: false,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['rg16f'] = {
@@ -441,6 +470,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rg32f'] = {
@@ -449,6 +480,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rg8ui'] = {
@@ -457,6 +490,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['rg8i'] = {
@@ -465,6 +500,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['rg16ui'] = {
@@ -473,6 +510,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rg16i'] = {
@@ -481,6 +520,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rg32ui'] = {
@@ -489,6 +530,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rg32i'] = {
@@ -497,6 +540,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rgba8unorm-srgb'] = {
@@ -505,6 +550,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['bgra8unorm-srgb'] = {
@@ -513,6 +560,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rgba16f'] = {
@@ -521,6 +570,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rgba32f'] = {
@@ -529,6 +580,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 16
     };
     this._textureFormatInfos['rgba8ui'] = {
@@ -537,6 +590,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rgba8i'] = {
@@ -545,6 +600,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['rgba16ui'] = {
@@ -553,6 +610,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rgba16i'] = {
@@ -561,6 +620,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['rgba32ui'] = {
@@ -569,6 +630,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 16
     };
     this._textureFormatInfos['rgba32i'] = {
@@ -577,6 +640,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: true,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 16
     };
     this._textureFormatInfos['rg11b10uf'] = {
@@ -585,6 +650,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: device.device.features.has('rg11b10ufloat-renderable'),
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['d16'] = {
@@ -593,6 +660,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 2
     };
     this._textureFormatInfos['d24'] = {
@@ -601,6 +670,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['d32f'] = {
@@ -609,6 +680,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this._textureFormatInfos['d32fs8'] = {
@@ -617,6 +690,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 8
     };
     this._textureFormatInfos['d24s8'] = {
@@ -625,6 +700,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       renderable: true,
       compressed: false,
       writable: false,
+      blockWidth: 1,
+      blockHeight: 1,
       size: 4
     };
     this.supportLinearFloatTexture =

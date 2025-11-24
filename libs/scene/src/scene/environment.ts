@@ -1,31 +1,54 @@
-import { Vector4 } from '@zephyr3d/base';
+import type { Vector4 } from '@zephyr3d/base';
+import { Vector3, DRef, Disposable } from '@zephyr3d/base';
+import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
 import { EnvShIBL } from '../render';
-import { EnvConstantAmbient, EnvHemisphericAmbient, EnvIBL } from '../render';
+import { EnvConstantAmbient, EnvHemisphericAmbient } from '../render';
 import { SkyRenderer } from '../render/sky';
-import type { TextureCube } from '@zephyr3d/device';
+import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
 
 /**
  * Wrapper for environmant lighting
  * @public
  */
-export class EnvLightWrapper {
+export class EnvLightWrapper extends Disposable {
   private _envLight: EnvironmentLighting;
-  private _ambientColor: Vector4;
-  private _ambientDown: Vector4;
-  private _ambientUp: Vector4;
-  private _radianceMap: TextureCube;
-  private _irradianceMap: TextureCube;
-  private _irradianceSH: Float32Array;
+  private readonly _ambientColor: ObservableVector4;
+  private readonly _ambientDown: ObservableVector4;
+  private readonly _ambientUp: ObservableVector4;
+  private readonly _radianceMap: DRef<TextureCube>;
+  private readonly _irradianceMap: DRef<TextureCube>;
+  private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  private readonly _irradianceSHFB: DRef<FrameBuffer>;
+  private readonly _irradianceWindow: Vector3;
   private _strength: number;
   /** @internal */
   constructor() {
-    this._envLight = new EnvIBL();
-    this._ambientColor = new Vector4(0.2, 0.2, 0.2, 1);
-    this._ambientDown = new Vector4(0.2, 0.2, 0.2, 1);
-    this._ambientUp = new Vector4(0.3, 0.5, 0.8, 1);
-    this._radianceMap = null;
-    this._irradianceMap = null;
+    super();
+    this._envLight = new EnvShIBL();
+    this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1);
+    this._ambientColor.callback = () => {
+      if (this.type === 'constant') {
+        (this._envLight as EnvConstantAmbient).ambientColor.set(this._ambientColor);
+      }
+    };
+    this._ambientDown = new ObservableVector4(0.2, 0.2, 0.2, 1);
+    this._ambientDown.callback = () => {
+      if (this.type === 'hemisphere') {
+        (this._envLight as EnvHemisphericAmbient).ambientDown.set(this._ambientDown);
+      }
+    };
+    this._ambientUp = new ObservableVector4(0.3, 0.5, 0.8, 1);
+    this._ambientUp.callback = () => {
+      if (this.type === 'hemisphere') {
+        (this._envLight as EnvHemisphericAmbient).ambientUp.set(this._ambientUp);
+      }
+    };
+    this._radianceMap = new DRef();
+    this._irradianceMap = new DRef();
+    this._irradianceSH = new DRef();
+    this._irradianceSHFB = new DRef();
+    this._irradianceWindow = new Vector3();
     this._strength = 1;
   }
   /** @internal */
@@ -49,64 +72,63 @@ export class EnvLightWrapper {
   }
   /** Ambient light color for environment light type constant */
   get ambientColor(): Vector4 {
-    return this._ambientColor.clone();
+    return this._ambientColor;
   }
   set ambientColor(val: Vector4) {
     this._ambientColor.set(val);
-    if (this.type === 'constant') {
-      (this._envLight as EnvConstantAmbient).ambientColor = this._ambientColor;
-    }
   }
   /** Up color for environment light type hemisphere */
   get ambientUp(): Vector4 {
-    return this._ambientUp.clone();
+    return this._ambientUp;
   }
   set ambientUp(val: Vector4) {
     this._ambientUp.set(val);
-    if (this.type === 'hemisphere') {
-      (this._envLight as EnvHemisphericAmbient).ambientUp = this._ambientUp;
-    }
   }
   /** Down color for environment light type hemisphere */
   get ambientDown(): Vector4 {
-    return this._ambientDown.clone();
+    return this._ambientDown;
   }
   set ambientDown(val: Vector4) {
     this._ambientDown.set(val);
-    if (this.type === 'hemisphere') {
-      (this._envLight as EnvHemisphericAmbient).ambientDown = this._ambientDown;
-    }
   }
   /** Radiance map for environment light type ibl */
   get radianceMap(): TextureCube {
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex ?? null;
+    this._radianceMap.set(tex);
     if (this.type === 'ibl') {
-      (this._envLight as EnvIBL).radianceMap = this._radianceMap;
-    } else if (this.type === 'ibl-sh') {
-      (this._envLight as EnvShIBL).radianceMap = this._radianceMap;
+      (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
     }
   }
-  /** Irradiance map for environment light type ibl */
-  get irradianceMap(): TextureCube {
-    return this._irradianceMap;
+  /** Irradiance SH buffer for environment light type ibl */
+  get irradianceSH(): GPUDataBuffer {
+    return this._irradianceSH.get();
   }
-  set irradianceMap(tex: TextureCube) {
-    this._irradianceMap = tex ?? null;
+  set irradianceSH(value: GPUDataBuffer) {
+    this._irradianceSH.set(value);
     if (this.type === 'ibl') {
-      (this._envLight as EnvIBL).irradianceMap = this._irradianceMap;
+      (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
     }
   }
-  /** Irradiance SH for environment light type ibl-sh */
-  get irradianceSH(): Float32Array {
-    return this._irradianceSH;
+  /** Irradiance SH texture for environment light type ibl */
+  get irradianceSHFB(): FrameBuffer {
+    return this._irradianceSHFB.get();
   }
-  set irradianceSH(value: Float32Array) {
-    this._irradianceSH = value ?? null;
-    if (this.type === 'ibl-sh') {
-      (this._envLight as EnvShIBL).irradianceSH = this._irradianceSH;
+  set irradianceSHFB(value: FrameBuffer) {
+    this._irradianceSHFB.set(value);
+    if (this.type === 'ibl') {
+      (this._envLight as EnvShIBL).irradianceSHFB = this.irradianceSHFB;
+    }
+  }
+  /** Irradiance SH window for environment light type ibl */
+  get irradianceWindow(): Vector3 {
+    return this._irradianceWindow;
+  }
+  set irradianceWindow(value: Vector3) {
+    this._irradianceWindow.set(value);
+    if (this.type === 'ibl') {
+      (this._envLight as EnvShIBL).irradianceWindow = this._irradianceWindow;
     }
   }
   /** The environment light type */
@@ -120,17 +142,11 @@ export class EnvLightWrapper {
         break;
       case 'ibl':
         if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvIBL(this._radianceMap, this._irradianceMap);
-        }
-        (this._envLight as EnvIBL).radianceMap = this.radianceMap;
-        (this._envLight as EnvIBL).irradianceMap = this.irradianceMap;
-        break;
-      case 'ibl-sh':
-        if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvShIBL(this._radianceMap, this._irradianceSH);
+          this._envLight = new EnvShIBL(this.radianceMap, this.irradianceSH);
         }
         (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
         (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
+        (this._envLight as EnvShIBL).irradianceWindow = this.irradianceWindow;
         break;
       case 'constant':
         if (this._envLight?.getType() !== val) {
@@ -146,17 +162,27 @@ export class EnvLightWrapper {
         break;
     }
   }
+  /** Disposes the environment lighting wrapper */
+  protected onDispose() {
+    super.onDispose();
+    this._envLight?.dispose();
+    this._radianceMap.dispose();
+    this._irradianceMap.dispose();
+    this._irradianceSHFB.dispose();
+    this._irradianceSH.dispose();
+  }
 }
 
 /**
  * Environment of scene
  * @public
  */
-export class Environment {
-  private _sky: SkyRenderer;
-  private _light: EnvLightWrapper;
+export class Environment extends Disposable {
+  private readonly _sky: SkyRenderer;
+  private readonly _light: EnvLightWrapper;
   /** @internal */
   constructor() {
+    super();
     this._sky = new SkyRenderer();
     this._light = new EnvLightWrapper();
   }
@@ -175,5 +201,11 @@ export class Environment {
   /** @internal */
   needSceneDepthTexture(): boolean {
     return this._sky.fogType !== 'none';
+  }
+  /** Disposes the environment object */
+  protected onDispose() {
+    super.onDispose();
+    this._sky.dispose();
+    this._light.dispose();
   }
 }

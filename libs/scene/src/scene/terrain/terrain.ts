@@ -1,9 +1,8 @@
 import type { Ray } from '@zephyr3d/base';
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4, DRef } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { Quadtree } from './quadtree';
 import { GraphNode } from '../graph_node';
-import { Application } from '../../app';
 import { GrassManager } from './grass';
 import type { Camera } from '../../camera/camera';
 import type { BoundingVolume } from '../../utility/bounding_volume';
@@ -11,7 +10,7 @@ import type { CullVisitor } from '../../render/cull_visitor';
 import type { Scene } from '../scene';
 import type { QuadtreeNode } from './quadtree';
 import { TerrainMaterial, type TerrainMaterialOptions } from '../../material/terrainmaterial';
-import { GrassMaterial } from '../../material/grassmaterial';
+import { getDevice } from '../../app/api';
 
 /**
  * Terrain node
@@ -19,9 +18,9 @@ import { GrassMaterial } from '../../material/grassmaterial';
  */
 export class Terrain extends GraphNode {
   /** @internal */
-  private _quadtree: Quadtree;
+  private readonly _quadtree: DRef<Quadtree>;
   /** @internal */
-  private _grassManager: GrassManager;
+  private readonly _grassManager: DRef<GrassManager>;
   /** @internal */
   private _maxPixelError: number;
   /** @internal */
@@ -29,7 +28,7 @@ export class Terrain extends GraphNode {
   /** @internal */
   private _lodCamera: Camera;
   /** @internal */
-  private _heightFieldScale: Vector3;
+  private readonly _heightFieldScale: Vector3;
   /** @internal */
   private _patchSize: number;
   /** @internal */
@@ -41,23 +40,17 @@ export class Terrain extends GraphNode {
   /** @internal */
   private _material: TerrainMaterial;
   /** @internal */
-  private _grassMaterial: GrassMaterial;
-  /** @internal */
-  private _wireframe: boolean;
-  /** @internal */
   private _viewPoint: Vector3;
   /** @internal */
   private _castShadow: boolean;
-  /** @internal */
-  private _instanceColor: Vector4;
   /**
    * Creates an instance of Terrain
    * @param scene - The scene to which the terrain belongs
    */
   constructor(scene: Scene) {
     super(scene);
-    this._quadtree = null;
-    this._grassManager = null;
+    this._quadtree = new DRef();
+    this._grassManager = new DRef();
     this._maxPixelError = 10;
     this._maxPixelErrorDirty = true;
     this._lodCamera = null;
@@ -67,27 +60,22 @@ export class Terrain extends GraphNode {
     this._width = 0;
     this._height = 0;
     this._material = null;
-    this._grassMaterial = null;
-    this._wireframe = false;
     this._viewPoint = null;
     this._castShadow = true;
-    this._instanceColor = Vector4.zero();
+  }
+  async clone(): Promise<this> {
+    console.error('Cloning terrain not implemented');
+    return null;
   }
   /** @internal */
   get quadtree(): Quadtree {
-    return this._quadtree;
+    return this._quadtree.get();
   }
   /**
    * {@inheritDoc Drawable.getName}
    */
   getName(): string {
     return this._name;
-  }
-  /**
-   * {@inheritDoc Drawable.getInstanceColor}
-   */
-  getInstanceColor(): Vector4 {
-    return this._instanceColor;
   }
   /** Wether the mesh node casts shadows */
   get castShadow(): boolean {
@@ -141,20 +129,9 @@ export class Terrain extends GraphNode {
   get material(): TerrainMaterial {
     return this._material;
   }
-  /** Grass material */
-  get grassMaterial(): GrassMaterial {
-    return this._grassMaterial;
-  }
-  /** Whether the terrain should be rendered in wireframe mode */
-  get wireframe(): boolean {
-    return this._wireframe;
-  }
-  set wireframe(b: boolean) {
-    this._wireframe = !!b;
-  }
   /** Normal map of the terrain */
   get normalMap(): Texture2D {
-    return this._quadtree.normalMap;
+    return this._quadtree.get()?.normalMap ?? null;
   }
   /**
    * Creates the terrain
@@ -174,20 +151,20 @@ export class Terrain extends GraphNode {
     patchSize: number,
     options?: TerrainMaterialOptions
   ): boolean {
-    this._quadtree = new Quadtree(this);
+    this._quadtree.set(new Quadtree(this));
     if (options?.splatMap && options.splatMap.format !== 'rgba8unorm') {
       throw new Error('SplatMap must be rgba8unorm format');
     }
     this._material = new TerrainMaterial(options);
-    if (!this._quadtree.build(patchSize, sizeX, sizeZ, elevations, scale.x, scale.y, scale.z, 24)) {
-      this._quadtree = null;
+    if (!this._quadtree.get().build(patchSize, sizeX, sizeZ, elevations, scale, 24)) {
+      this._quadtree.dispose();
       return false;
     }
     this._patchSize = patchSize;
     this._heightFieldScale.set(scale);
     this._width = sizeX;
     this._height = sizeZ;
-    this._material.normalTexture = this._quadtree.normalMap;
+    this._material.normalTexture = this._quadtree.get().normalMap;
     this._material.normalTexCoordIndex = -1;
     this._material.terrainInfo = new Vector4(this.scaledWidth, this.scaledHeight, 0, 0);
     this.invalidateBoundingVolume();
@@ -237,44 +214,31 @@ export class Terrain extends GraphNode {
     offset: number,
     grassTexture: Texture2D
   ) {
-    if (!this._grassManager) {
-      this._grassManager = new GrassManager(64, density);
+    if (!this._grassManager.get()) {
+      this._grassManager.set(new GrassManager(64, density));
     }
-    if (!this._grassMaterial) {
-      this._grassMaterial = new GrassMaterial(
-        new Vector2(this.scaledWidth, this.scaledHeight),
-        this._quadtree.normalMap,
-        grassTexture
-      );
-    }
-    this._grassManager.addGrassLayer(
-      Application.instance.device,
-      this,
-      density,
-      bladeWidth,
-      bladeHeight,
-      offset,
-      grassTexture
-    );
+    this._grassManager
+      .get()
+      .addGrassLayer(getDevice(), this, density, bladeWidth, bladeHeight, offset, grassTexture);
   }
   /** Get elevation at specified position in terrain coordinate space */
   getElevation(x: number, z: number): number {
-    return this._quadtree.getHeightField().getRealHeight(x, z);
+    return this._quadtree.get().getHeightField().getRealHeight(x, z);
   }
   /** Get normal at specified position in terrain coordinate space */
   getNormal(x: number, z: number, normal?: Vector3): Vector3 {
-    return this._quadtree.getHeightField().getRealNormal(x, z, normal);
+    return this._quadtree.get().getHeightField().getRealNormal(x, z, normal);
   }
   /** Get intersection distance by a ray in terrain coordinate space */
   rayIntersect(ray: Ray): number | null {
-    return this._quadtree.getHeightField().rayIntersect(ray);
+    return this._quadtree.get().getHeightField().rayIntersect(ray);
   }
   /**
    * {@inheritDoc SceneNode.computeBoundingVolume}
    * @override
    */
   computeBoundingVolume(): BoundingVolume {
-    return this._quadtree ? this._quadtree.getHeightField().getBBoxTree().getRootNode().bbox : null;
+    return this._quadtree.get()?.getHeightField().getBoundingbox();
   }
   /**
    * Traverse quadtree node top down
@@ -290,9 +254,9 @@ export class Terrain extends GraphNode {
         }
       }
     }
-    const rootNode = this._quadtree.rootNode;
+    const rootNode = this._quadtree.get().rootNode;
     if (rootNode) {
-      visitQuadtreeNode_r(this._quadtree.rootNode);
+      visitQuadtreeNode_r(this._quadtree.get().rootNode);
     }
   }
   /** @internal */
@@ -301,11 +265,11 @@ export class Terrain extends GraphNode {
     if (tanHalfFovy !== this._lastTanHalfFOVY || this._maxPixelErrorDirty) {
       this._maxPixelErrorDirty = false;
       this._lastTanHalfFOVY = tanHalfFovy;
-      this._quadtree.setupCamera(1024, tanHalfFovy, this._maxPixelError);
+      this._quadtree.get().setupCamera(1024, tanHalfFovy, this._maxPixelError);
     }
     const worldEyePos = cullVisitor.primaryCamera.getWorldPosition();
     this._viewPoint = this.invWorldMatrix.transformPointAffine(worldEyePos);
-    return this._quadtree.cull(cullVisitor, this._viewPoint, this.worldMatrix);
+    return this._quadtree.get().cull(cullVisitor, this._viewPoint, this.worldMatrix);
   }
   /**
    * {@inheritDoc SceneNode.isTerrain}
@@ -313,5 +277,11 @@ export class Terrain extends GraphNode {
    */
   isTerrain(): this is Terrain {
     return true;
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._grassManager.dispose();
+    this._material?.dispose();
+    this._quadtree.dispose();
   }
 }

@@ -11,11 +11,11 @@ import type { BlitType } from '../blitter';
 import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { ShadowMapper } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
+import { computeShadowBias, computeShadowBiasCSM } from './shader';
+import { getDevice } from '../app/api';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -68,8 +68,8 @@ class VSMBlitter extends Blitter {
             ? pb.vec3(1, 0, 0)
             : pb.vec3(0, 1, 0)
           : this._phase === 'horizonal'
-          ? pb.vec2(1, 0)
-          : pb.vec2(0, 1);
+            ? pb.vec2(1, 0)
+            : pb.vec2(0, 1);
       scope.numBlurPixelsPerSide = pb.float((this._kernelSize + 1) / 2);
       scope.weight = pb.float(1 / (this._kernelSize * this._kernelSize));
     }
@@ -230,7 +230,7 @@ export class VSM extends ShadowImpl {
   getType(): ShadowMode {
     return 'vsm';
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -241,6 +241,51 @@ export class VSM extends ShadowImpl {
         : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
     ) as ShadowMapType;
   }
+  /** @internal */
+  fetchTemporalFramebuffer(
+    autoRelease: boolean,
+    lightType: number,
+    numCascades: number,
+    width: number,
+    height: number,
+    colorFormat: TextureFormat,
+    depthFormat: TextureFormat,
+    mipmapping?: boolean
+  ) {
+    const device = getDevice();
+    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const colorAttachments = colorFormat
+      ? useTextureArray
+        ? [
+            device.pool.fetchTemporalTexture2DArray(
+              false,
+              colorFormat,
+              width,
+              height,
+              numCascades,
+              mipmapping
+            )
+          ]
+        : lightType === LIGHT_TYPE_POINT
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+      : null;
+    const depthAttachment = depthFormat
+      ? useTextureArray
+        ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
+        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+      : null;
+    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
+    if (colorAttachments) {
+      device.pool.releaseTexture(colorAttachments[0]);
+    }
+    if (depthAttachment) {
+      device.pool.releaseTexture(depthAttachment);
+    }
+    return fb;
+  }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const colorFormat = this.getShadowMapColorFormat(shadowMapParams);
     //const target = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].target;
@@ -248,7 +293,7 @@ export class VSM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -258,7 +303,7 @@ export class VSM extends ShadowImpl {
           null,
           false
         ),
-        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer2: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -292,27 +337,24 @@ export class VSM extends ShadowImpl {
       );
     }
   }
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {
-    return;
-  }
   getShaderHash(): string {
     return '';
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
-    const device = Application.instance.device;
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
+    const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
       device.getDeviceCaps().textureCaps.supportLinearFloatTexture
       ? device.type === 'webgl'
         ? 'rgba32f'
         : 'rg32f'
       : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer &&
-        device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
-      ? device.type === 'webgl'
-        ? 'rgba16f'
-        : 'rg16f'
-      : 'rgba8unorm';
+          device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
+        ? device.type === 'webgl'
+          ? 'rgba16f'
+          : 'rg16f'
+        : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
   computeShadowMapDepth(
@@ -352,12 +394,7 @@ export class VSM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
-          this.$l.shadowBias = ShadowMapper.computeShadowBiasCSM(
-            shadowMapParams,
-            this,
-            this.NdotL,
-            this.split
-          );
+          this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
           this.shadow = filterShadowVSM(
             this,
@@ -387,8 +424,8 @@ export class VSM extends ShadowImpl {
           pb.length(this.dir),
           ShaderHelper.getLightPositionAndRangeForShadow(this).w
         );
-        this.$l.shadowBias = ShadowMapper.computeShadowBias(
-          shadowMapParams,
+        this.$l.shadowBias = computeShadowBias(
+          shadowMapParams.lightType,
           this,
           this.distance,
           this.NdotL,
@@ -423,16 +460,16 @@ export class VSM extends ShadowImpl {
               this.shadowCoord.z,
               this.nearFar
             );
-            this.$l.shadowBias = ShadowMapper.computeShadowBias(
-              shadowMapParams,
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
               this,
               this.shadowCoord.z,
               this.NdotL,
               true
             );
           } else {
-            this.$l.shadowBias = ShadowMapper.computeShadowBias(
-              shadowMapParams,
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
               this,
               this.shadowCoord.z,
               this.NdotL,
@@ -452,7 +489,7 @@ export class VSM extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return false;
   }
 }

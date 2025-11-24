@@ -1,22 +1,12 @@
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { floatToHalf, halfToFloat, unpackFloat3, Vector4 } from '@zephyr3d/base';
 import { AssetManager, Application } from '@zephyr3d/scene';
 import * as common from '../common';
-import {
-  TestTexture2D,
-  TestTexture2DArray,
-  TestTexture3D,
-  TestTextureCube,
-  TestTextureCubeSH,
-  TestTextureVideo
-} from './case';
+import { TestTexture2D, TestTexture2DArray, TestTexture3D, TestTextureCube, TestTextureVideo } from './case';
 import { packFloat3 } from '@zephyr3d/base';
-import { Inspector } from '@zephyr3d/inspector';
 
 const test2D = true;
 const test3D = true;
 const testCube = true;
-const testCubeSH = true;
 const test2DArray = true;
 const testVideo = true;
 
@@ -50,9 +40,6 @@ const textureApp = new Application({
 
 textureApp.ready().then(async () => {
   const device = textureApp.device;
-  await imGuiInit(device);
-  const inspector = new Inspector(null, null);
-  textureApp.inputManager.use(imGuiInjectEvent);
   const assetManager = new AssetManager();
   function getSubViewport(index: number) {
     const width = (device.deviceToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
@@ -65,14 +52,12 @@ textureApp.ready().then(async () => {
   await case3d?.init();
   const caseCube = new TestTextureCube(assetManager);
   await caseCube.init();
-  const caseCubeSH = new TestTextureCubeSH(assetManager);
-  await caseCubeSH.init();
   const case2dArray = device.type === 'webgl' ? null : new TestTexture2DArray(assetManager);
   await case2dArray?.init();
   const caseVideo = new TestTextureVideo(assetManager, './assets/images/sample-video.mp4');
   await caseVideo.init();
 
-  textureApp.on('tick', (ev) => {
+  textureApp.on('tick', () => {
     device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
     device.pushDeviceStates();
     {
@@ -80,47 +65,47 @@ textureApp.ready().then(async () => {
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test2D && case2d.draw(vp[2], vp[3]);
+      if (test2D) {
+        case2d.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(1);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test3D && case3d?.draw(vp[2], vp[3]);
+      if (test3D) {
+        case3d?.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(2);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      test2DArray && case2dArray && case2dArray.draw(vp[2], vp[3]);
+      if (test2DArray && case2dArray) {
+        case2dArray.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(3);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testCubeSH && caseCubeSH.draw(vp[2], vp[3]);
+      if (testCube) {
+        caseCube.draw(vp[2], vp[3]);
+      }
     }
     {
       const vp = getSubViewport(4);
       device.setViewport(vp);
       device.setScissor(vp);
       device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testCube && caseCube.draw(vp[2], vp[3]);
-    }
-    {
-      const vp = getSubViewport(5);
-      device.setViewport(vp);
-      device.setScissor(vp);
-      device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
-      testVideo && caseVideo.draw(vp[2], vp[3]);
+      if (testVideo) {
+        caseVideo.draw(vp[2], vp[3]);
+      }
     }
     device.popDeviceStates();
-    imGuiNewFrame();
-    inspector.render();
-    imGuiEndFrame();
   });
 
   textureApp.run();

@@ -14,7 +14,13 @@ export class WebGLStructuredBuffer extends WebGLGPUBuffer implements StructuredB
     if (usage & GPUResourceUsageFlags.BF_INDEX) {
       throw new Error('structured buffer must not have Index usage flag');
     }
-    if (usage & GPUResourceUsageFlags.BF_READ || usage & GPUResourceUsageFlags.BF_WRITE) {
+    if (
+      usage &
+      (GPUResourceUsageFlags.BF_READ |
+        GPUResourceUsageFlags.BF_WRITE |
+        GPUResourceUsageFlags.BF_PACK_PIXEL |
+        GPUResourceUsageFlags.BF_UNPACK_PIXEL)
+    ) {
       throw new Error('structured buffer must not have Read or Write usage flags');
     }
     if (usage & GPUResourceUsageFlags.BF_VERTEX) {

@@ -2,7 +2,7 @@ import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { Texture2D, BaseTexture, TextureCube } from '@zephyr3d/device';
 import type { AssetManager } from './assetmanager';
-import { Application } from '../app';
+import { getDevice } from '../app/api';
 
 /*
 interface MicrofacetDistributionSample {
@@ -13,34 +13,34 @@ interface MicrofacetDistributionSample {
 }
 */
 /** @internal */
-export function getTestCubemapLoader(): (assetManager: AssetManager) => Promise<TextureCube> {
-  return async function (assetManager: AssetManager): Promise<TextureCube> {
-    const tex = Application.instance.device.createCubeTexture('rgba8unorm', 32, {
-      samplerOptions: { mipFilter: 'none' }
-    });
-    const fb = Application.instance.device.createFrameBuffer([tex], null);
-    Application.instance.device.pushDeviceStates();
-    Application.instance.device.setFramebuffer(fb);
-    const colors = [
-      new Vector4(1, 0, 0, 1),
-      new Vector4(0.2, 0, 0, 1),
-      new Vector4(0, 1, 0, 1),
-      new Vector4(0, 0.2, 0, 1),
-      new Vector4(0, 0, 1, 1),
-      new Vector4(0, 0, 0.2, 1)
-    ];
-    for (let i = 0; i < 6; i++) {
-      fb.setColorAttachmentCubeFace(0, i);
-      Application.instance.device.clearFrameBuffer(colors[i], null, null);
-    }
-    Application.instance.device.popDeviceStates();
-    fb.dispose();
-    return tex;
-  };
+export function testCubemapLoader(): TextureCube {
+  const device = getDevice();
+  const tex = device.createCubeTexture('rgba8unorm', 32, {
+    mipmapping: false
+  });
+  const fb = device.createFrameBuffer([tex], null);
+  device.pushDeviceStates();
+  device.setFramebuffer(fb);
+  const colors = [
+    new Vector4(1, 0, 0, 1),
+    new Vector4(0.2, 0, 0, 1),
+    new Vector4(0, 1, 0, 1),
+    new Vector4(0, 0.2, 0, 1),
+    new Vector4(0, 0, 1, 1),
+    new Vector4(0, 0, 0.2, 1)
+  ];
+  for (let i = 0; i < 6; i++) {
+    fb.setColorAttachmentCubeFace(0, i);
+    device.clearFrameBuffer(colors[i], null, null);
+  }
+  device.popDeviceStates();
+  fb.dispose();
+
+  return tex;
 }
 
 /** @internal */
-export function getSheenLutLoader(textureSize: number): (assetManager: AssetManager) => Promise<Texture2D> {
+export function getSheenLutLoader(textureSize: number): (assetManager: AssetManager) => Texture2D {
   const bits = new Uint32Array(1);
 
   //Van der Corput radical inverse
@@ -179,7 +179,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
   }
 
   async function createSheenLUT(): Promise<Texture2D> {
-    const tex = Application.instance.device.createTexture2D('rgba8unorm', textureSize, textureSize);
+    const tex = getDevice().createTexture2D('rgba8unorm', textureSize, textureSize);
     const image = new Uint8Array(textureSize * textureSize * 4);
     let p = 0;
     const c = new Vector4();
@@ -371,10 +371,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
   }
   */
 
-  async function createSheenLUTFilament(
-    assetManager: AssetManager,
-    texture?: BaseTexture
-  ): Promise<Texture2D> {
+  function createSheenLUTFilament(assetManager: AssetManager, texture?: BaseTexture): Texture2D {
     if (texture) {
       if (!texture.isTexture2D()) {
         throw new Error('can not reload sheen lut texture: invalid texture type');
@@ -386,9 +383,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
         throw new Error('can not reload sheen lut texture: invalid texture size');
       }
     }
-    const tex =
-      (texture as Texture2D) ||
-      Application.instance.device.createTexture2D('rgba16f', textureSize, textureSize);
+    const tex = (texture as Texture2D) || getDevice().createTexture2D('rgba16f', textureSize, textureSize);
     const image = new Uint16Array(textureSize * textureSize * 4);
     let p = 0;
     const one = encodeF16(1);

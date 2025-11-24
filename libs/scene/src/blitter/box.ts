@@ -74,8 +74,8 @@ export class BoxFilterBlitter extends Blitter {
             ? pb.vec3(1, 0, 0)
             : pb.vec3(0, 1, 0)
           : this._phase === 'horizonal'
-          ? pb.vec2(1, 0)
-          : pb.vec2(0, 1);
+            ? pb.vec2(1, 0)
+            : pb.vec2(0, 1);
       scope.numBlurPixelsPerSide = pb.float((this._kernelSize + 1) / 2);
       scope.weight = pb.float(1 / this._kernelSize);
     }

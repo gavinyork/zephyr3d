@@ -1,4 +1,4 @@
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -8,23 +8,15 @@ import { fetchSampler } from '../utility/misc';
  * Grayscale post effect
  * @public
  */
-export class Grayscale extends AbstractPostEffect<'Grayscale'> {
-  static readonly className = 'Grayscale' as const;
+export class Grayscale extends AbstractPostEffect {
   private static _program: GPUProgram = null;
-  private _bindgroup: BindGroup;
+  private static _bindgroup: BindGroup = null;
   /**
    * Creates an instance of grayscale post effect
    */
   constructor() {
     super();
-    this._opaque = false;
-    this._bindgroup = null;
-  }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose() {
-    super.dispose();
-    this._bindgroup?.dispose();
-    this._bindgroup = null;
+    this._layer = PostEffectLayer.transparent;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -38,11 +30,11 @@ export class Grayscale extends AbstractPostEffect<'Grayscale'> {
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
     this._prepare(device);
-    this._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
-    this._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    this._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    Grayscale._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
+    Grayscale._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
+    Grayscale._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     device.setProgram(Grayscale._program);
-    device.setBindGroup(0, this._bindgroup);
+    device.setBindGroup(0, Grayscale._bindgroup);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -76,9 +68,8 @@ export class Grayscale extends AbstractPostEffect<'Grayscale'> {
           });
         }
       });
-    }
-    if (!this._bindgroup) {
-      this._bindgroup = device.createBindGroup(Grayscale._program.bindGroupLayouts[0]);
+      Grayscale._program.name = '@Grayscale';
+      Grayscale._bindgroup = device.createBindGroup(Grayscale._program.bindGroupLayouts[0]);
     }
   }
 }

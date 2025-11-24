@@ -7,11 +7,11 @@ import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuffer<GPUBuffer> {
-  private _size: number;
-  private _usage: number;
+  private readonly _size: number;
+  private readonly _usage: number;
   private _gpuUsage: number;
   private _memCost: number;
-  private _ringBuffer: UploadRingBuffer;
+  private readonly _ringBuffer: UploadRingBuffer;
   protected _pendingUploads: UploadBuffer[];
   constructor(device: WebGPUDevice, usage: number, data: TypedArray | number) {
     super(device);
@@ -112,14 +112,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array,
+    dstBuffer?: Uint8Array<ArrayBuffer>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array> {
-    if (!(this._usage & GPUResourceUsageFlags.BF_READ)) {
-      throw new Error('getBufferSubData() failed: buffer does not have BF_READ flag set');
-    }
-    this.sync();
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    let sourceBuffer: GPUDataBuffer = this;
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
     if (offsetInBytes < 0 || offsetInBytes + sizeInBytes > this.byteLength) {
@@ -128,14 +125,31 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (dstBuffer && dstBuffer.byteLength < sizeInBytes) {
       throw new Error('no enough space for querying buffer data');
     }
+    if (!(this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL))) {
+      if (this._gpuUsage & GPUBufferUsage.COPY_SRC) {
+        sourceBuffer = this._device.createBuffer(sizeInBytes, { usage: 'read' });
+        this.sync();
+        this._device.copyBuffer(this, sourceBuffer, offsetInBytes, 0, sizeInBytes);
+      } else {
+        throw new Error('getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set');
+      }
+    } else {
+      this.sync();
+    }
+    const buffer = sourceBuffer.object as GPUBuffer;
+    await buffer.mapAsync(GPUMapMode.READ);
+    const range = buffer.getMappedRange();
     dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
-    await this._object.mapAsync(GPUMapMode.READ);
-    const range = this._object.getMappedRange();
     dstBuffer.set(new Uint8Array(range, offsetInBytes, sizeInBytes));
-    this._object.unmap();
+    buffer.unmap();
+
+    if (sourceBuffer !== this) {
+      sourceBuffer.dispose();
+    }
+
     return dstBuffer;
   }
-  async restore() {
+  restore() {
     if (!this._device.isContextLost()) {
       this.load();
     }
@@ -187,11 +201,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         this._gpuUsage = 0;
         let label = '';
         if (this._usage & GPUResourceUsageFlags.BF_VERTEX) {
-          this._gpuUsage |= GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[vertex]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_INDEX) {
-          this._gpuUsage |= GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
+          this._gpuUsage |= GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[index]';
         }
         if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {
@@ -202,11 +216,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
           this._gpuUsage |= GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
           label += '[storage]';
         }
-        if (this._usage & GPUResourceUsageFlags.BF_READ) {
+        if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL)) {
           this._gpuUsage |= GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ;
           label += '[mapRead]';
         }
-        if (this._usage & GPUResourceUsageFlags.BF_WRITE) {
+        if (this._usage & (GPUResourceUsageFlags.BF_WRITE | GPUResourceUsageFlags.BF_UNPACK_PIXEL)) {
           this._gpuUsage |= GPUBufferUsage.COPY_SRC | GPUBufferUsage.MAP_WRITE;
           label += '[mapWrite]';
         }

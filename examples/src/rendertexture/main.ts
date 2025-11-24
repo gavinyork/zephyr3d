@@ -140,7 +140,7 @@ import { DrawText } from '@zephyr3d/device';
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
-    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0).toMatrix4x4();
     const worldMatrix = Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4));
     device.setVertexLayout(vertexLayout);
 

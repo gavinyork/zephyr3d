@@ -17,7 +17,7 @@ export class WebGLVertexLayout
   extends WebGLGPUObject<WebGLVertexArrayObject | WebGLVertexArrayObjectOES>
   implements VertexLayout<WebGLVertexArrayObject | WebGLVertexArrayObjectOES>
 {
-  private _vertexData: VertexData;
+  private readonly _vertexData: VertexData;
   private _dirty: boolean;
   constructor(device: WebGLDevice, options: VertexLayoutOptions) {
     super(device);
@@ -37,7 +37,7 @@ export class WebGLVertexLayout
     }
     this._object = null;
   }
-  async restore() {
+  restore() {
     if (!this._device.isContextLost()) {
       this.load();
     }

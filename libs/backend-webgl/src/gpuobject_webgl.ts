@@ -14,29 +14,26 @@ import type {
   GPUObject,
   AbstractDevice
 } from '@zephyr3d/device';
-import { genDefaultName, DeviceGPUObjectRenameEvent } from '@zephyr3d/device';
+import { genDefaultName } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
-import { makeEventTarget } from '@zephyr3d/base';
+import { Disposable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
-export abstract class WebGLGPUObject<T>
-  extends makeEventTarget(Object)<{ disposed: null }>()
-  implements GPUObject<T>
-{
+export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<T> {
   protected _device: WebGLDevice;
   protected _object: T;
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
-  protected _restoreHandler: (obj: GPUObject) => Promise<void>;
+  protected _restoreHandler: (obj: GPUObject) => void;
   constructor(device: WebGLDevice) {
     super();
     this._device = device;
     this._object = null;
     this._uid = ++_uniqueId;
     this._cid = 1;
-    this._name = `${genDefaultName(this)}#${this._uid}`;
+    this._name = genDefaultName(this);
     this._restoreHandler = null;
     this._device.addGPUObject(this);
   }
@@ -46,13 +43,10 @@ export abstract class WebGLGPUObject<T>
   get object(): T {
     return this._object;
   }
-  get disposed(): boolean {
-    return !this._object;
-  }
-  get restoreHandler(): (obj: GPUObject) => Promise<void> {
+  get restoreHandler(): (obj: GPUObject) => void {
     return this._restoreHandler;
   }
-  set restoreHandler(handler: (obj: GPUObject) => Promise<void>) {
+  set restoreHandler(handler: (obj: GPUObject) => void) {
     this._restoreHandler = handler;
   }
   get uid(): number {
@@ -66,9 +60,9 @@ export abstract class WebGLGPUObject<T>
   }
   set name(val: string) {
     if (val !== this._name) {
-      const evt = new DeviceGPUObjectRenameEvent(this, this._name);
+      const lastName = this._name;
       this._name = val;
-      this._device.dispatchEvent(evt);
+      this._device.dispatchEvent('gpuobject_rename', this, lastName);
     }
   }
   isVertexLayout(): this is VertexLayout {
@@ -107,22 +101,20 @@ export abstract class WebGLGPUObject<T>
   isBindGroup(): this is BindGroup {
     return false;
   }
-  dispose(): void {
-    if (!this.disposed) {
-      this._device.disposeObject(this, true);
-    }
-  }
-  async reload(): Promise<void> {
+  reload(): void {
     if (this.disposed) {
-      const p = this._device.restoreObject(this);
+      this._device.restoreObject(this);
       this._cid++;
-      return p;
     }
   }
   destroy(): void {
     throw new Error('Abstract function call: destroy()');
   }
-  async restore(): Promise<void> {
+  restore(): void {
     throw new Error('Abstract function call: restore()');
+  }
+  protected onDispose(): void {
+    super.onDispose();
+    this._device.disposeObject(this, true);
   }
 }

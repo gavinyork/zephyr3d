@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import type { AbstractDevice, ShaderKind } from '../base_types';
 import { ShaderType } from '../base_types';
 import type { GPUProgram, BindGroupLayout, BindGroupLayoutEntry, VertexSemantic } from '../gpuobject';
@@ -7,13 +5,7 @@ import { MAX_BINDING_GROUPS, getVertexAttribByName } from '../gpuobject';
 import type { PBReflectionTagGetter } from './reflection';
 import { PBReflection } from './reflection';
 import type { ShaderExpTagValue, ShaderTypeFunc } from './base';
-import {
-  PBShaderExp,
-  setCurrentProgramBuilder,
-  getCurrentProgramBuilder,
-  makeConstructor,
-  Proxiable
-} from './base';
+import { PBShaderExp, makeConstructor, Proxiable } from './base';
 import * as AST from './ast';
 import * as errors from './errors';
 import { setBuiltinFuncs } from './builtinfunc';
@@ -42,15 +34,16 @@ import {
 } from './types';
 
 import type { StorageTextureConstructor } from './constructors';
+import { getCurrentProgramBuilder, setCurrentProgramBuilder } from './misc';
 
-const COMPUTE_UNIFORM_NAME = 'ch_compute_uniform_block';
-const COMPUTE_STORAGE_NAME = 'ch_compute_storage_block';
-const VERTEX_UNIFORM_NAME = 'ch_vertex_uniform_block';
-const FRAGMENT_UNIFORM_NAME = 'ch_fragment_uniform_block';
-const SHARED_UNIFORM_NAME = 'ch_shared_uniform_block';
-const VERTEX_STORAGE_NAME = 'ch_vertex_storage_block';
-const FRAGMENT_STORAGE_NAME = 'ch_fragment_storage_block';
-const SHARED_STORAGE_NAME = 'ch_shared_storage_block';
+const COMPUTE_UNIFORM_NAME = 'zUBC';
+const COMPUTE_STORAGE_NAME = 'zSBC';
+const VERTEX_UNIFORM_NAME = 'zUBV';
+const FRAGMENT_UNIFORM_NAME = 'zUBF';
+const SHARED_UNIFORM_NAME = 'zUBA';
+const VERTEX_STORAGE_NAME = 'zSBV';
+const FRAGMENT_STORAGE_NAME = 'zSBF';
+const SHARED_STORAGE_NAME = 'zSBA';
 interface UniformInfo {
   group: number;
   binding: number;
@@ -131,7 +124,7 @@ export interface ProgramBuilder {
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope;
   /** Gets the current scope */
-  getCurrentScope(): PBScope;
+  getCurrentScope<T extends PBScope = PBScope>(): T;
   /**
    * Query the global variable by the name
    * @param name - Name of the variable
@@ -712,6 +705,8 @@ export interface ProgramBuilder {
   max(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** Same as clamp builtin function in GLSL and WGSL */
   clamp(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
+  /** Clamp to [0, 1] */
+  saturate(x: PBShaderExp): PBShaderExp;
   /** Same as mix builtin function in GLSL and WGSL */
   mix(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
   /** Same as step builtin function in GLSL and WGSL */
@@ -725,13 +720,13 @@ export interface ProgramBuilder {
   /** add two values */
   add_2(x: number | PBShaderExp, y: number | PBShaderExp);
   /** add a couple of values togeter */
-  add(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
   /** subtract two values */
   sub(x: number | PBShaderExp, y: number | PBShaderExp);
   /** multiply two values */
   mul_2(x: number | PBShaderExp, y: number | PBShaderExp);
   /** multiply a couple of values togeter */
-  mul(x: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
   /** divide the first number by the second number */
   div(x: number | PBShaderExp, y: number | PBShaderExp);
   /** Same as length builtin function in GLSL and WGSL */
@@ -1085,10 +1080,10 @@ export class ProgramBuilder {
     return this._shaderType === ShaderType.Vertex
       ? 'vertex'
       : this._shaderType === ShaderType.Fragment
-      ? 'fragment'
-      : this._shaderType === ShaderType.Compute
-      ? 'compute'
-      : null;
+        ? 'fragment'
+        : this._shaderType === ShaderType.Compute
+          ? 'compute'
+          : null;
   }
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope {
@@ -1159,8 +1154,8 @@ export class ProgramBuilder {
     return this._scopeStack.shift();
   }
   /** Gets the current scope */
-  getCurrentScope(): PBScope {
-    return this._scopeStack[0];
+  getCurrentScope<T extends PBScope = PBScope>(): T {
+    return this._scopeStack[0] as T;
   }
   /** Gets the current function scope */
   getCurrentFunctionScope(): PBFunctionScope {
@@ -1599,8 +1594,8 @@ export class ProgramBuilder {
       shaderType === ShaderType.Vertex
         ? 'vertex'
         : shaderType === ShaderType.Fragment
-        ? 'fragment'
-        : 'compute';
+          ? 'fragment'
+          : 'compute';
     const builtinVars = AST.builtinVariables['webgpu'];
     const args: { name: string; type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo }[] = [];
     const prefix: string[] = [];
@@ -1945,7 +1940,7 @@ export class ProgramBuilder {
         return null;
       } else {
         this._lastError = Object.prototype.toString.call(err);
-        console.log(`Error: ${this._lastError}`);
+        console.error(`Error: ${this._lastError}`);
         return null;
       }
     }
@@ -2030,7 +2025,7 @@ export class ProgramBuilder {
         return null;
       } else {
         this._lastError = Object.prototype.toString.call(err);
-        console.log(`Error: ${this._lastError}`);
+        console.error(`Error: ${this._lastError}`);
         return null;
       }
     }
@@ -2041,7 +2036,7 @@ export class ProgramBuilder {
     if (this._emulateDepthClamp && this._shaderType === ShaderType.Vertex) {
       this._globalScope.$outputs.clamppedDepth = this.float().tag('CLAMPPED_DEPTH');
     }
-    body && body.call(this._globalScope, this);
+    body?.call(this._globalScope, this);
     this.popScope();
 
     // Global delcarations should be at the first
@@ -2450,7 +2445,7 @@ export class ProgramBuilder {
           minBindingSize: uniformInfo.block.bindingSize,
           hasDynamicOffset: !!uniformInfo.block.bindingSize,
           uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
-          dynamicOffsetIndex: !!uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
+          dynamicOffsetIndex: uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
       } else if (uniformInfo.texture) {
@@ -2487,8 +2482,8 @@ export class ProgramBuilder {
             this._device.type === 'webgpu'
               ? uniformInfo.texture.exp.$sampleType
               : uniformInfo.texture.autoBindSampler && entry.type.isDepthTexture()
-              ? 'float'
-              : uniformInfo.texture.exp.$sampleType;
+                ? 'float'
+                : uniformInfo.texture.exp.$sampleType;
           let viewDimension: typeof entry.texture.viewDimension;
           if (entry.type.isArrayTexture()) {
             viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';
@@ -3111,7 +3106,7 @@ export class PBLocalScope extends PBScope {
 export interface PBBuiltinScope {
   position: PBShaderExp;
   pointSize: PBShaderExp | number;
-  fragDepth: PBShaderExp;
+  fragDepth: PBShaderExp | number;
   readonly fragCoord: PBShaderExp;
   readonly frontFacing: PBShaderExp;
   readonly vertexIndex: PBShaderExp;
@@ -3443,9 +3438,7 @@ export class PBGlobalScope extends PBScope {
   }
   /** @internal */
   $createFunctionIfNotExists(name: string, params: PBShaderExp[], body?: (this: PBFunctionScope) => void) {
-    if (true || !this.$builder.getFunction(name)) {
-      this.$internalCreateFunction(name, params, false, body);
-    }
+    this.$internalCreateFunction(name, params, false, body);
   }
   /** @internal */
   $getFunctions(name: string): AST.ASTFunction[] {
@@ -3724,18 +3717,33 @@ export class PBInsideFunctionScope extends PBScope {
     counter: PBShaderExp,
     init: number | PBShaderExp,
     end: number | PBShaderExp,
-    body: (this: PBForScope) => void
+    open?: boolean | ((this: PBForScope) => void),
+    reverse?: boolean | ((this: PBForScope) => void),
+    body?: (this: PBForScope) => void
   ) {
     const initializerType = counter.$ast.getType();
     if (!initializerType.isPrimitiveType() || !initializerType.isScalarType()) {
       throw new errors.PBASTError(counter.$ast, 'invalid for range initializer type');
     }
     const initval = init instanceof PBShaderExp ? init.$ast : new AST.ASTScalar(init, initializerType);
+    if (typeof open === 'function') {
+      body = open;
+      open = true;
+      reverse = false;
+    } else if (typeof reverse === 'function') {
+      body = reverse;
+      open = !!open;
+      reverse = false;
+    } else {
+      open = !!open;
+      reverse = !!reverse;
+    }
     const astFor = new AST.ASTRange(
       counter.$ast as AST.ASTPrimitive,
       initval,
       end instanceof PBShaderExp ? end.$ast : new AST.ASTScalar(end, initializerType),
-      true
+      open,
+      reverse
     );
     this.$ast.statements.push(astFor);
     new PBForScope(this, counter, end, astFor, body);
@@ -3776,6 +3784,15 @@ export class PBInsideFunctionScope extends PBScope {
     }
     return null;
   }
+  /** Gets main function scope */
+  $getMainScope(): PBFunctionScope {
+    for (let scope: PBScope = this; scope; scope = scope.$parent) {
+      if (scope instanceof PBFunctionScope && scope.$isMain()) {
+        return scope;
+      }
+    }
+    return null;
+  }
 }
 
 /**
@@ -3801,7 +3818,7 @@ export class PBFunctionScope extends PBInsideFunctionScope {
       this.$_registerVar(param);
     }
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   $isMain(): boolean {
@@ -3819,7 +3836,7 @@ export class PBWhileScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3834,7 +3851,7 @@ export class PBDoWhileScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   $while(condition: ExpValueNonArrayType) {
@@ -3862,7 +3879,7 @@ export class PBForScope extends PBInsideFunctionScope {
     this.$ast = ast;
     this.$_registerVar(counter);
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3877,7 +3894,7 @@ export class PBNakedScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
 }
@@ -3892,7 +3909,7 @@ export class PBIfScope extends PBInsideFunctionScope {
     super(parent);
     this.$ast = ast;
     getCurrentProgramBuilder().pushScope(this);
-    body && body.call(this);
+    body?.call(this);
     getCurrentProgramBuilder().popScope();
   }
   /**

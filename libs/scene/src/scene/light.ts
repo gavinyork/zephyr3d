@@ -1,4 +1,5 @@
-import { Vector3, Vector4, Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { Vector3, Vector4, DWeakRef } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -95,16 +96,6 @@ export abstract class BaseLight extends GraphNode {
     return this.invWorldMatrix;
   }
   /**
-   * View-projection matrix of the light
-   *
-   * @remarks
-   * The view-projection matrix of the light is used to transform
-   * a point from the world space to the clip space of the light view
-   */
-  get viewProjMatrix(): Matrix4x4 {
-    return null;
-  }
-  /**
    * Sets the intensity of the light
    * @param val - Intensity of the light
    * @returns self
@@ -157,59 +148,15 @@ export abstract class AmbientLight extends BaseLight {
 }
 */
 
-/*
-export class HemiSphericLight extends AmbientLight {
-  protected _colorUp: Vector4;
-  protected _colorDown: Vector4;
-  constructor(scene: Scene) {
-    super(scene, LIGHT_TYPE_HEMISPHERIC);
-    this._colorUp = Vector4.zero();
-    this._colorDown = Vector4.zero();
-  }
-  get colorUp() {
-    return this._colorUp;
-  }
-  set colorUp(val: Vector4) {
-    this.setColorUp(val);
-  }
-  setColorUp(val: Vector4) {
-    this._colorUp.set(val);
-    this.invalidateUniforms();
-    return this;
-  }
-  get colorDown() {
-    return this._colorDown;
-  }
-  set colorDown(val: Vector4) {
-    this.setColorDown(val);
-  }
-  setColorDown(val: Vector4) {
-    this._colorDown.set(val);
-    this.invalidateUniforms();
-    return this;
-  }
-  isHemiSphericLight(): this is HemiSphericLight {
-    return true;
-  }
-  computeUniforms() {
-    this._positionRange = this.colorUp;
-    this._directionCutoff = this.colorDown;
-    this._diffuseIntensity = new Vector4(1, 1, 1, this.intensity);
-  }
-}
-*/
-
 /**
  * Base class for any kind of puncual light
  * @public
  */
-export abstract class PunctualLight extends BaseLight {
+export class PunctualLight extends BaseLight {
   /** @internal */
   protected _color: Vector4;
   /** @internal */
   protected _castShadow: boolean;
-  /** @internal */
-  protected _lightViewProjectionMatrix: Matrix4x4;
   /** @internal */
   protected _shadowMapper: ShadowMapper;
   /**
@@ -221,12 +168,11 @@ export abstract class PunctualLight extends BaseLight {
     super(scene, type);
     this._color = Vector4.one();
     this._castShadow = false;
-    this._lightViewProjectionMatrix = Matrix4x4.identity();
     this._shadowMapper = new ShadowMapper(this);
   }
   /** Color of the light */
   get color(): Vector4 {
-    return this._color;
+    return this._color.clone();
   }
   set color(clr: Vector4) {
     this.setColor(clr);
@@ -236,7 +182,7 @@ export abstract class PunctualLight extends BaseLight {
    * @param color - The color to set
    * @returns self
    */
-  setColor(color: Vector4) {
+  setColor(color: Vector4 | Vector3) {
     this._color.set(color);
     this.invalidateUniforms();
     return this;
@@ -257,28 +203,9 @@ export abstract class PunctualLight extends BaseLight {
     this._castShadow = b;
     return this;
   }
-  /**
-   * {@inheritDoc BaseLight.viewProjMatrix}
-   * @override
-   */
-  get viewProjMatrix(): Matrix4x4 {
-    return this._lightViewProjectionMatrix;
-  }
-  set viewProjMatrix(mat: Matrix4x4) {
-    this.setLightViewProjectionMatrix(mat);
-  }
   /** The shadow mapper for this light */
   get shadow(): ShadowMapper {
     return this._shadowMapper;
-  }
-  /**
-   * Sets the view projection matrix for this light
-   * @param mat - The matrix to set
-   * @returns self
-   */
-  setLightViewProjectionMatrix(mat: Matrix4x4): this {
-    this._lightViewProjectionMatrix.set(mat);
-    return this;
   }
   /**
    * {@inheritDoc BaseLight.isPunctualLight}
@@ -293,6 +220,8 @@ export abstract class PunctualLight extends BaseLight {
     this.invalidateUniforms();
     // this._transformCallback(true, false);
   }
+  /** @internal */
+  computeUniforms(): void {}
 }
 
 /**
@@ -300,19 +229,30 @@ export abstract class PunctualLight extends BaseLight {
  * @public
  */
 export class DirectionalLight extends PunctualLight {
-  private static _currentSunLight: DirectionalLight = null;
-  private _sunLight: boolean;
+  private static readonly _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
   /**
    * Creates an instance of directional light
    * @param scene - The scene to which the light belongs
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
-    if (!DirectionalLight._currentSunLight) {
-      DirectionalLight._currentSunLight = this;
-      this._sunLight = true;
+    this.intensity = 10;
+    if (!DirectionalLight.getSunLight(scene)) {
+      DirectionalLight.setSunLight(scene, this);
+    }
+  }
+  static getSunLight(scene: Scene) {
+    return this._currentSunLight.get(scene)?.get() ?? null;
+  }
+  static setSunLight(scene: Scene, light: DirectionalLight) {
+    if (light && scene !== light.scene) {
+      throw new Error('setSunLight(): Light does not belongs to scene');
+    }
+    const ref = this._currentSunLight.get(scene);
+    if (!ref) {
+      this._currentSunLight.set(scene, new DWeakRef(light));
     } else {
-      this._sunLight = false;
+      ref.set(light);
     }
   }
   /**
@@ -322,19 +262,14 @@ export class DirectionalLight extends PunctualLight {
    * Only one directional light will be marked as sun light.
    **/
   get sunLight(): boolean {
-    return this._sunLight;
+    return DirectionalLight.getSunLight(this.scene) === this;
   }
   set sunLight(val: boolean) {
-    if (!!val !== this._sunLight) {
-      this._sunLight = !!val;
-      if (this._sunLight) {
-        DirectionalLight._currentSunLight._sunLight = false;
-        DirectionalLight._currentSunLight = this;
-      } else {
-        DirectionalLight._currentSunLight = null;
-      }
+    if (val) {
+      DirectionalLight.setSunLight(this.scene, this);
+    } else if (DirectionalLight.getSunLight(this.scene) === this) {
+      DirectionalLight.setSunLight(this.scene, null);
     }
-    this._sunLight = !!val;
   }
   /**
    * {@inheritDoc BaseLight.isDirectionLight}
@@ -552,7 +487,7 @@ export class PointLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_POINT);
-    this._range = 1;
+    this._range = 10;
     this.invalidateBoundingVolume();
   }
   /** The range of the light */
@@ -615,7 +550,7 @@ export class SpotLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_SPOT);
-    this._range = 1;
+    this._range = 10;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
   }
@@ -682,7 +617,7 @@ export class SpotLight extends PunctualLight {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
     this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
-    this._directionCutoff = new Vector4(b.x, b.y, b.z, Math.cos(this.cutoff));
+    this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
   }
 }

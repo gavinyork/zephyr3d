@@ -39,7 +39,7 @@ import type {
   DepthState,
   StencilState
 } from '@zephyr3d/device';
-import { getTextureFormatBlockSize, DeviceResizeEvent, BaseDevice } from '@zephyr3d/device';
+import { getTextureFormatBlockSize, BaseDevice } from '@zephyr3d/device';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUProgram } from './gpuprogram_webgpu';
 import { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -77,9 +77,15 @@ import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPURenderPass } from './renderpass_webgpu';
 import type { WebGPUComputePass } from './computepass_webgpu';
 
+type WebGPURenderBundle = {
+  dc: number;
+  encoder: GPURenderBundleEncoder;
+  renderBundle: GPURenderBundle;
+};
+
 export class WebGPUDevice extends BaseDevice {
   private _context: GPUCanvasContext;
-  private _dpr: number;
+  private readonly _dpr: number;
   private _device: GPUDevice;
   private _adapter: GPUAdapter;
   private _deviceCaps: DeviceCaps;
@@ -94,7 +100,7 @@ export class WebGPUDevice extends BaseDevice {
   private _pipelineCache: PipelineCache;
   private _bindGroupCache: BindGroupCache;
   private _vertexLayoutCache: VertexLayoutCache;
-  private _samplerCache: SamplerCache;
+  private readonly _samplerCache: SamplerCache;
   private _currentProgram: WebGPUProgram;
   private _currentVertexData: WebGPUVertexLayout;
   private _currentStateSet: WebGPURenderStateSet;
@@ -102,11 +108,11 @@ export class WebGPUDevice extends BaseDevice {
   private _currentBindGroupOffsets: Iterable<number>[];
   private _commandQueue: CommandQueueImmediate;
   private _gpuObjectHashCounter: number;
-  private _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
+  private readonly _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
   private _defaultRenderPassDesc: GPURenderPassDescriptor;
-  private _sampleCount: number;
+  private readonly _sampleCount: number;
   private _emptyBindGroup: GPUBindGroup;
-  private _captureRenderBundle: GPURenderBundleEncoder;
+  private _captureRenderBundle: WebGPURenderBundle;
   private _adapterInfo: any;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
@@ -226,9 +232,6 @@ export class WebGPUDevice extends BaseDevice {
     if (!this._adapter) {
       throw new Error('WebGPU: requestAdapter() failed');
     }
-    if (this._adapter.isFallbackAdapter) {
-      console.warn('using a fallback adapter');
-    }
     this._adapterInfo = this._adapter['requestAdapterInfo']
       ? await this._adapter['requestAdapterInfo']()
       : {};
@@ -236,9 +239,9 @@ export class WebGPUDevice extends BaseDevice {
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
       requiredLimits: { ...this._adapter.limits } as any
     });
-    console.log('WebGPU device features:');
+    console.info('WebGPU device features:');
     for (const feature of this._device.features) {
-      console.log(` - ${feature}`);
+      console.info(` - ${feature}`);
     }
     this.device.lost.then((info) => {
       console.error(`WebGPU device was lost: ${info.message}`);
@@ -271,7 +274,7 @@ export class WebGPUDevice extends BaseDevice {
     this.setViewport(null);
     this.setScissor(null);
 
-    this.on('resize', (evt) => {
+    this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
       if (width !== this.canvas.width || height !== this.canvas.height) {
@@ -282,13 +285,13 @@ export class WebGPUDevice extends BaseDevice {
         this.setScissor(null);
       }
     });
-    this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
+    this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
   }
   nextFrame(callback: () => void): number {
     this._commandQueue.finish().then(callback);
     return 0;
   }
-  cancelNextFrame(handle: number) {
+  cancelNextFrame(_handle: number) {
     return;
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
@@ -332,18 +335,22 @@ export class WebGPUDevice extends BaseDevice {
     if (data.isCubemap) {
       const tex = new WebGPUTextureCube(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isVolume) {
       const tex = new WebGPUTexture3D(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isArray) {
       const tex = new WebGPUTexture2DArray(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else {
       const tex = new WebGPUTexture2D(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     }
   }
@@ -359,20 +366,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, width, height, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D {
-    const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
-    if (!tex.isTexture2D()) {
-      console.error('createTexture2DFromMipmapData() failed: options.texture must be 2d texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -403,19 +396,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, width, height, depth, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
-    options?: TextureCreationOptions
-  ): Texture2DArray {
-    const tex = (options?.texture as WebGPUTexture2DArray) ?? new WebGPUTexture2DArray(this);
-    if (!tex.isTexture2DArray()) {
-      console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -495,20 +475,6 @@ export class WebGPUDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, size, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube {
-    const tex = (options?.texture as WebGPUTextureCube) ?? new WebGPUTextureCube(this);
-    if (!tex.isTextureCube()) {
-      console.error('createCubeTextureFromMipmapData() failed: options.texture must be cube texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -601,7 +567,10 @@ export class WebGPUDevice extends BaseDevice {
       bytes
     );
   }
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer<unknown> {
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer<unknown> {
     return new WebGPUIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
   createStructuredBuffer(
@@ -805,15 +774,11 @@ export class WebGPUDevice extends BaseDevice {
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
-    const texWidth = fb ? fb.getColorAttachments()[index]?.width : this.getDrawingBufferWidth();
-    const texHeight = fb ? fb.getColorAttachments()[index]?.height : this.getDrawingBufferHeight();
     if (colorAttachment && texFormat) {
       this.flush();
       WebGPUBaseTexture.copyTexturePixelsToBuffer(
         this._device,
         colorAttachment,
-        texWidth,
-        texHeight,
         texFormat,
         x,
         y,
@@ -845,18 +810,26 @@ export class WebGPUDevice extends BaseDevice {
       depthStencilFormat: frameBuffer.depthFormat,
       sampleCount: frameBuffer.sampleCount
     };
-    this._captureRenderBundle = this._device.createRenderBundleEncoder(desc);
+    this._captureRenderBundle = {
+      dc: 0,
+      encoder: this._device.createRenderBundleEncoder(desc),
+      renderBundle: null
+    };
   }
   endCapture(): RenderBundle {
     if (!this._captureRenderBundle) {
       throw new Error('Device.endCapture() failed: device is not capturing draw commands');
     }
-    const renderBundle = this._captureRenderBundle.finish();
+    this._captureRenderBundle.renderBundle = this._captureRenderBundle.encoder.finish();
+    const ret = this._captureRenderBundle;
     this._captureRenderBundle = null;
-    return renderBundle;
+    return ret;
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
-    this._commandQueue.executeRenderBundle(renderBundle as GPURenderBundle);
+  protected _executeRenderBundle(renderBundle: RenderBundle): number {
+    this._commandQueue.executeRenderBundle(
+      (renderBundle as WebGPURenderBundle).renderBundle as GPURenderBundle
+    );
+    return (renderBundle as WebGPURenderBundle).dc;
   }
   bufferUpload(buffer: WebGPUBuffer) {
     this._commandQueue.bufferUpload(buffer);
@@ -898,8 +871,9 @@ export class WebGPUDevice extends BaseDevice {
       1
     );
     if (this._captureRenderBundle) {
+      this._captureRenderBundle.dc++;
       this._commandQueue.capture(
-        this._captureRenderBundle,
+        this._captureRenderBundle.encoder,
         this._currentProgram,
         this._currentVertexData,
         this._currentStateSet,
@@ -931,8 +905,9 @@ export class WebGPUDevice extends BaseDevice {
       numInstances
     );
     if (this._captureRenderBundle) {
+      this._captureRenderBundle.dc++;
       this._commandQueue.capture(
-        this._captureRenderBundle,
+        this._captureRenderBundle.encoder,
         this._currentProgram,
         this._currentVertexData,
         this._currentStateSet,

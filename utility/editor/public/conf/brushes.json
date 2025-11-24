@@ -1,0 +1,14 @@
+{
+  "default": "images/defaultBrush.png",
+  "square": "images/12Square.png",
+  "waveripple": "images/31WaveRipple.png",
+  "rough": "images/13Rough.png",
+  "crater": "images/14Crater.png",
+  "cobblestone": "images/21CobbleStone.png",
+  "thickrough": "images/33ThickRough.png",
+  "tiles": "images/41Tiles.png",
+  "splotch": "images/43Splotch.png",
+  "splat": "images/23Spat.png",
+  "sparkle": "images/24Sparkle.png",
+  "fuzzysquare": "images/22FuzzySquare.png"
+}

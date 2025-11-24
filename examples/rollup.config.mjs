@@ -39,9 +39,17 @@ function getTargetES6(input, output) {
       format: 'esm',
       sourcemap: true
     },
+    onwarn(warning, warn) {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+        console.error(warning.message);
+      }
+    },
     plugins: [
       nodeResolve(),
-      swc(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      }),
       // terser()
       copy({
         targets: [
@@ -62,6 +70,6 @@ function getTargetES6(input, output) {
 
 export default (args) => {
   const targets = srcfiles.map((f) => getTargetES6(f[0], f[1]));
-  console.log(JSON.stringify(targets));
+  console.log(JSON.stringify(targets, null, 2));
   return targets;
 };

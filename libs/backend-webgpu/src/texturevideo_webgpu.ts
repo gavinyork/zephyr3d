@@ -8,8 +8,8 @@ export class WebGPUTextureVideo
   extends WebGPUBaseTexture<GPUExternalTexture>
   implements TextureVideo<GPUExternalTexture>
 {
-  private _source: HTMLVideoElement;
-  private _refBindGroups: WebGPUBindGroup[];
+  private readonly _source: HTMLVideoElement;
+  private readonly _refBindGroups: WebGPUBindGroup[];
   constructor(device: WebGPUDevice, element: HTMLVideoElement) {
     super(device, '2d');
     this._source = element;
@@ -39,7 +39,7 @@ export class WebGPUTextureVideo
   get source(): HTMLVideoElement {
     return this._source;
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.loadElement(this._source);
     }
@@ -53,31 +53,31 @@ export class WebGPUTextureVideo
     }
     return false;
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(_level?: number, _face?: number, _mipCount?: number): GPUTextureView {
     return null;
   }
   init(): void {
     this.loadFromElement();
   }
   readPixels(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    faceOrLayer: number,
-    mipLevel: number,
-    buffer: TypedArray
+    _x: number,
+    _y: number,
+    _w: number,
+    _h: number,
+    _faceOrLayer: number,
+    _mipLevel: number,
+    _buffer: TypedArray
   ): Promise<void> {
     throw new Error(`Video texture does not support readPixels()`);
   }
   readPixelsToBuffer(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    faceOrLayer: number,
-    mipLevel: number,
-    buffer: GPUDataBuffer<unknown>
+    _x: number,
+    _y: number,
+    _w: number,
+    _h: number,
+    _faceOrLayer: number,
+    _mipLevel: number,
+    _buffer: GPUDataBuffer<unknown>
   ): void {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }

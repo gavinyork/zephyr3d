@@ -27,6 +27,8 @@ import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUTextureCaps, TextureFormatInfoWebGPU } from './capabilities_webgpu';
+import type { WebGPUBindGroup } from './bindgroup_webgpu';
+import { WebGPUMipmapGenerator } from './utils_webgpu';
 
 export abstract class WebGPUBaseTexture<
   T extends GPUTexture | GPUExternalTexture = GPUTexture
@@ -48,6 +50,7 @@ export abstract class WebGPUBaseTexture<
   protected _mipLevelCount: number;
   protected _samplerOptions: SamplerOptions;
   protected _ringBuffer: UploadRingBuffer;
+  protected _mipBindGroups: WebGPUBindGroup[][];
   protected _pendingUploads: (UploadTexture | UploadImage)[];
   constructor(device: WebGPUDevice, target: TextureType) {
     super(device);
@@ -64,6 +67,7 @@ export abstract class WebGPUBaseTexture<
     this._samplerOptions = null;
     this._memCost = 0;
     this._mipmapDirty = false;
+    this._mipBindGroups = [];
     this._views = [];
     this._defaultView = null;
     this._ringBuffer = new UploadRingBuffer(device);
@@ -155,9 +159,17 @@ export abstract class WebGPUBaseTexture<
       this._object = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
+      this._ringBuffer.purge();
+      this._views = [];
+      for (const face of this._mipBindGroups) {
+        for (const level of face) {
+          level?.dispose();
+        }
+      }
+      this._mipBindGroups = [];
     }
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.init();
     }
@@ -207,10 +219,10 @@ export abstract class WebGPUBaseTexture<
         dimension: this.isTextureCube()
           ? 'cube'
           : this.isTexture3D()
-          ? '3d'
-          : this.isTexture2DArray()
-          ? '2d-array'
-          : '2d',
+            ? '3d'
+            : this.isTexture2DArray()
+              ? '2d-array'
+              : '2d',
         arrayLayerCount: this.isTextureCube() ? 6 : this.isTexture2DArray() ? this._depth : 1,
         aspect: hasDepthChannel(this.format) ? 'depth-only' : 'all'
       });
@@ -233,8 +245,6 @@ export abstract class WebGPUBaseTexture<
     WebGPUBaseTexture.copyTexturePixelsToBuffer(
       this._device.device,
       this.object as GPUTexture,
-      this.width,
-      this.height,
       this.format,
       x,
       y,
@@ -345,7 +355,7 @@ export abstract class WebGPUBaseTexture<
     */
   }
   /** @internal */
-  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, depth: number): number {
+  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, _depth: number): number {
     if (hasDepthChannel(format) || this.isTexture3D() || this.isTextureVideo()) {
       return 1;
     }
@@ -429,12 +439,26 @@ export abstract class WebGPUBaseTexture<
       }
     }
   }
+  static calculateBufferSizeForCopy(
+    width: number,
+    height: number,
+    format: TextureFormat
+  ): { size: number; sizeAligned: number; strideAligned: number; numRows: number; stride: number } {
+    const blockWidth = getTextureFormatBlockWidth(format);
+    const blockHeight = getTextureFormatBlockHeight(format);
+    const blockSize = getTextureFormatBlockSize(format);
+    const blocksPerRow = Math.ceil(width / blockWidth);
+    const blocksPerCol = Math.ceil(height / blockHeight);
+    const rowStride = blocksPerRow * blockSize;
+    const bufferStride = (rowStride + 255) & ~255;
+    const size = blocksPerCol * rowStride;
+    const sizeAligned = blocksPerCol * bufferStride;
+    return { size, sizeAligned, strideAligned: bufferStride, stride: rowStride, numRows: blocksPerCol };
+  }
   /** @internal */
   static copyTexturePixelsToBuffer(
     device: GPUDevice,
     texture: GPUTexture,
-    texWidth: number,
-    texHeight: number,
     format: TextureFormat,
     x: number,
     y: number,
@@ -445,26 +469,24 @@ export abstract class WebGPUBaseTexture<
     buffer: GPUDataBuffer
   ): void {
     if (!((buffer as WebGPUBuffer).gpuUsage & GPUBufferUsage.COPY_DST)) {
-      throw new Error(
+      console.error(
         'copyTexturePixelsToBuffer() failed: destination buffer does not have COPY_DST usage set'
       );
+      return;
     }
-    const blockWidth = getTextureFormatBlockWidth(format);
-    const blockHeight = getTextureFormatBlockHeight(format);
-    const blockSize = getTextureFormatBlockSize(format);
-    const blocksPerRow = texWidth / blockWidth;
-    const blocksPerCol = texHeight / blockHeight;
-    const rowStride = blocksPerRow * blockSize;
-    const bufferStride = (rowStride + 255) & ~255;
-    const bufferSize = blocksPerCol * rowStride;
-    const bufferSizeAligned = blocksPerCol * bufferStride;
-    if (buffer.byteLength < bufferSize) {
-      throw new Error(
-        `copyTexturePixelsToBuffer() failed: destination buffer size is ${buffer.byteLength}, should be at least ${bufferSize}`
+    const { size, sizeAligned, stride, strideAligned, numRows } = this.calculateBufferSizeForCopy(
+      w,
+      h,
+      format
+    );
+    if (buffer.byteLength < size) {
+      console.error(
+        `copyTexturePixelsToBuffer() failed: destination buffer size is ${buffer.byteLength}, should be at least ${size}`
       );
+      return;
     }
     const tmpBuffer = device.createBuffer({
-      size: bufferSizeAligned,
+      size: sizeAligned,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC
     });
     const encoder = device.createCommandEncoder();
@@ -481,7 +503,7 @@ export abstract class WebGPUBaseTexture<
       {
         buffer: tmpBuffer as GPUBuffer,
         offset: 0,
-        bytesPerRow: bufferStride
+        bytesPerRow: strideAligned
       },
       {
         width: w,
@@ -489,18 +511,18 @@ export abstract class WebGPUBaseTexture<
         depthOrArrayLayers: 1
       }
     );
-    if (bufferSize !== bufferSizeAligned) {
-      for (let i = 0; i < blocksPerCol; i++) {
+    if (size !== sizeAligned) {
+      for (let i = 0; i < numRows; i++) {
         encoder.copyBufferToBuffer(
           tmpBuffer,
-          i * bufferStride,
+          i * strideAligned,
           buffer.object as GPUBuffer,
-          i * rowStride,
-          rowStride
+          i * stride,
+          stride
         );
       }
     } else {
-      encoder.copyBufferToBuffer(tmpBuffer, 0, buffer.object as GPUBuffer, 0, bufferSize);
+      encoder.copyBufferToBuffer(tmpBuffer, 0, buffer.object as GPUBuffer, 0, size);
     }
     device.queue.submit([encoder.finish()]);
     tmpBuffer.destroy();
@@ -527,12 +549,13 @@ export abstract class WebGPUBaseTexture<
     const blocksPerRow = Math.ceil(width / blockWidth);
     const blocksPerCol = Math.ceil(height / blockHeight);
     const rowStride = blocksPerRow * info.size;
-    if (rowStride * blocksPerCol * depth !== data.byteLength) {
+    if (rowStride * blocksPerCol * depth > data.byteLength) {
       throw new Error(`WebGPUTexture.update() invalid data size: ${data.byteLength}`);
     }
     if (!this._device.isTextureUploading(this as any)) {
       this.clearPendingUploads();
-      const destination: GPUImageCopyTexture = {
+      //this._device.textureUpload(this as WebGPUBaseTexture);
+      const destination: GPUTexelCopyTextureInfo = {
         texture: this._object as GPUTexture,
         mipLevel: miplevel,
         origin: {
@@ -541,7 +564,7 @@ export abstract class WebGPUBaseTexture<
           z: offsetZ
         }
       };
-      const dataLayout: GPUImageDataLayout = {
+      const dataLayout: GPUTexelCopyBufferLayout = {
         bytesPerRow: rowStride,
         rowsPerImage: blockHeight * blocksPerCol
       };
@@ -603,12 +626,11 @@ export abstract class WebGPUBaseTexture<
       return;
     }
     if (
-      false &&
       !this._device.isTextureUploading(this as any) &&
       this._device.device.queue.copyExternalImageToTexture
     ) {
       this.clearPendingUploads();
-      const copyView: GPUImageCopyTextureTagged = {
+      const copyView: GPUCopyExternalImageDestInfo = {
         texture: this._object as GPUTexture,
         origin: {
           x: destX,
@@ -639,6 +661,23 @@ export abstract class WebGPUBaseTexture<
       });
       this._device.textureUpload(this as WebGPUBaseTexture);
     }
+  }
+  getMipmapGenerationBindGroup(level: number, face: number) {
+    const faceGroups = this._mipBindGroups;
+    let levelGroups = faceGroups[face];
+    if (!levelGroups) {
+      levelGroups = [];
+      faceGroups[face] = levelGroups;
+    }
+    let levelGroup = levelGroups[level];
+    if (!levelGroup) {
+      levelGroup = this._device.createBindGroup(
+        WebGPUMipmapGenerator.getMipmapGenerationBindGroupLayout(this._device)
+      ) as WebGPUBindGroup;
+      levelGroup.setTextureView('tex', this, level - 1, face, 1);
+      levelGroups[level] = levelGroup;
+    }
+    return levelGroup;
   }
   /** @internal */
   protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean): SamplerOptions {

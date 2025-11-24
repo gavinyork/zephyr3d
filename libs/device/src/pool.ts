@@ -10,28 +10,34 @@ export class Pool {
   /** @internal */
   private _memCost: number;
   /** @internal */
-  private _memCostThreshold: number;
+  private readonly _memCostThreshold: number;
   /** @internal */
-  private _device: AbstractDevice;
+  private readonly _device: AbstractDevice;
+  /** @internal */
+  private readonly _id: string | symbol;
   /** @internal */
   private _freeTextures: Record<string, BaseTexture[]> = {};
   /** @internal */
-  private _allocatedTextures: WeakMap<BaseTexture, { hash: string; refcount: number; dispose: boolean }> =
-    new WeakMap();
+  private readonly _allocatedTextures: WeakMap<
+    BaseTexture,
+    { hash: string; refcount: number; dispose: boolean }
+  > = new WeakMap();
   /** @internal */
-  private _autoReleaseTextures: Set<BaseTexture> = new Set();
+  private readonly _autoReleaseTextures: Set<BaseTexture> = new Set();
   /** @internal */
   private _freeFramebuffers: Record<string, FrameBuffer[]> = {};
   /** @internal */
-  private _allocatedFramebuffers: WeakMap<FrameBuffer, string> = new WeakMap();
+  private readonly _allocatedFramebuffers: WeakMap<FrameBuffer, { hash: string; refcount: number }> =
+    new WeakMap();
   /** @internal */
-  private _autoReleaseFramebuffers: Set<FrameBuffer> = new Set();
+  private readonly _autoReleaseFramebuffers: Set<FrameBuffer> = new Set();
   /**
    * Creates an instance of Pool class
    * @param device - Rendering device
    */
-  constructor(device: AbstractDevice, memCostThreshold = 1024 * 1024 * 1024) {
+  constructor(device: AbstractDevice, id: string | symbol, memCostThreshold = 1024 * 1024 * 1024) {
     this._device = device;
+    this._id = id;
     this._memCost = 0;
     this._memCostThreshold = memCostThreshold;
     this._freeTextures = {};
@@ -42,7 +48,13 @@ export class Pool {
     this._autoReleaseFramebuffers = new Set();
     this._memCost = 0;
   }
-  autoRelease() {
+  /**
+   * Id for this pool
+   */
+  get id(): string | symbol {
+    return this._id;
+  }
+  autoRelease(): void {
     // auto release objects
     for (const tex of this._autoReleaseTextures) {
       this.releaseTexture(tex);
@@ -77,12 +89,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createTexture2D(
-        format,
-        width,
-        height,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createTexture2D(format, width, height, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();
@@ -118,13 +125,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createTexture2DArray(
-        format,
-        width,
-        height,
-        numLayers,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createTexture2DArray(format, width, height, numLayers, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();
@@ -156,11 +157,7 @@ export class Pool {
     let texture: BaseTexture = null;
     const list = this._freeTextures[hash];
     if (!list) {
-      texture = this._device.createCubeTexture(
-        format,
-        size,
-        mipmapping ? {} : { samplerOptions: { mipFilter: 'none' } }
-      );
+      texture = this._device.createCubeTexture(format, size, { mipmapping });
       this._memCost += texture.memCost;
     } else {
       texture = list.pop();
@@ -205,8 +202,8 @@ export class Pool {
     const colors = Array.isArray(colorTexOrFormat)
       ? colorTexOrFormat
       : colorTexOrFormat
-      ? [colorTexOrFormat]
-      : [];
+        ? [colorTexOrFormat]
+        : [];
     const colorAttachments = colors.map((val) => {
       return typeof val === 'string'
         ? this.fetchTemporalTexture2D(false, val, width, height, mipmapping)
@@ -257,7 +254,7 @@ export class Pool {
     attachmentMipLevel = 0,
     attachmentCubeface = 0,
     attachmentLayer = 0
-  ) {
+  ): FrameBuffer {
     colorAttachments = colorAttachments ?? [];
     let hash = `${depthAttachment?.uid ?? 0}:${sampleCount ?? 1}:${ignoreDepthStencil ? 1 : 0}`;
     if (colorAttachments.length > 0) {
@@ -295,7 +292,7 @@ export class Pool {
         info.refcount++;
       }
     }
-    this._allocatedFramebuffers.set(fb, hash);
+    this._allocatedFramebuffers.set(fb, { hash, refcount: 1 });
     if (autoRelease) {
       this._autoReleaseFramebuffers.add(fb);
     }
@@ -321,10 +318,22 @@ export class Pool {
     }
   }
   /**
+   * Increment reference counter for given texture
+   * @param texture - The texture to retain
+   */
+  retainTexture(texture: BaseTexture): void {
+    const info = this._allocatedTextures.get(texture);
+    if (!info) {
+      console.error(`ObjectPool.retainTexture(): texture is not allocated from pool`);
+    } else {
+      info.refcount++;
+    }
+  }
+  /**
    * Dispose a framebuffer that is allocated from the object pool.
    * @param fb - The framebuffer to dispose.
    */
-  disposeFrameBuffer(fb: FrameBuffer) {
+  disposeFrameBuffer(fb: FrameBuffer): void {
     const hash = this._allocatedFramebuffers.get(fb);
     if (!hash) {
       console.error(`ObjectPool.disposeFrameBuffer(): framebuffer is not allocated from pool`);
@@ -337,24 +346,39 @@ export class Pool {
    * Release a framebuffer back to the object pool.
    * @param fb - The framebuffer to release.
    */
-  releaseFrameBuffer(fb: FrameBuffer) {
-    const hash = this._allocatedFramebuffers.get(fb);
-    if (!hash) {
+  releaseFrameBuffer(fb: FrameBuffer): void {
+    const info = this._allocatedFramebuffers.get(fb);
+    if (!info) {
       console.error(`ObjectPool.releaseFrameBuffer(): framebuffer is not allocated from pool`);
     } else {
-      this.internalDisposeFrameBuffer(fb);
-      const list = this._freeFramebuffers[hash];
-      if (list) {
-        list.push(fb);
-      } else {
-        this._freeFramebuffers[hash] = [fb];
+      info.refcount--;
+      if (info.refcount <= 0) {
+        this.internalDisposeFrameBuffer(fb);
+        const list = this._freeFramebuffers[info.hash];
+        if (list) {
+          list.push(fb);
+        } else {
+          this._freeFramebuffers[info.hash] = [fb];
+        }
       }
+    }
+  }
+  /**
+   * Increment reference counter for given framebuffer
+   * @param fb - The framebuffer to retain
+   */
+  retainFrameBuffer(fb: FrameBuffer): void {
+    const info = this._allocatedFramebuffers.get(fb);
+    if (!info) {
+      console.error(`ObjectPool.retainFrameBuffer(): framebuffer is not allocated from pool`);
+    } else {
+      info.refcount++;
     }
   }
   /**
    * Purge the object pool by disposing all free framebuffers and textures.
    */
-  purge() {
+  purge(): void {
     for (const k in this._freeFramebuffers) {
       const list = this._freeFramebuffers[k];
       if (list) {
@@ -375,7 +399,7 @@ export class Pool {
     this._freeTextures = {};
   }
   /** @internal */
-  private internalDisposeFrameBuffer(fb: FrameBuffer) {
+  private internalDisposeFrameBuffer(fb: FrameBuffer): void {
     if (fb) {
       // Release attachment textures
       const colorAttachments = fb.getColorAttachments();
@@ -393,11 +417,11 @@ export class Pool {
     }
   }
   /** @internal */
-  private safeReleaseTexture(texture: BaseTexture, purge = false) {
+  private safeReleaseTexture(texture: BaseTexture, purge = false): void {
     const info = this._allocatedTextures.get(texture);
     if (info) {
       info.refcount--;
-      if (info.refcount === 0) {
+      if (info.refcount <= 0) {
         this._allocatedTextures.delete(texture);
         this._autoReleaseTextures.delete(texture);
         if (purge || info.dispose) {

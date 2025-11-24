@@ -2,7 +2,7 @@ import { WebGPUTextureSampler } from './sampler_webgpu';
 import type { SamplerOptions } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 export class SamplerCache {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _samplers: Record<string, WebGPUTextureSampler>;
   constructor(device: WebGPUDevice) {
     this._device = device;

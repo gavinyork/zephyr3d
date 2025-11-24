@@ -1,5 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Ray, TypedArray } from '@zephyr3d/base';
+import {
+  Disposable,
+  makeObservable,
+  releaseObject,
+  retainObject,
+  type Clonable,
+  type Ray,
+  type TypedArray
+} from '@zephyr3d/base';
 import {
   type VertexStepMode,
   type VertexLayout,
@@ -10,42 +17,69 @@ import {
   type VertexSemantic,
   type VertexAttribFormat,
   type VertexBufferInfo,
-  PBPrimitiveType
+  PBPrimitiveType,
+  matchVertexBuffer
 } from '@zephyr3d/device';
-import { Application } from '../app';
 import type { BoundingVolume } from '../utility/bounding_volume';
+import { RenderBundleWrapper } from './renderbundle_wrapper';
+import { getDevice } from '../app/api';
 
 /**
- * Primitive contains only the vertex and index data of a mesh
+ * Holds vertex/index data and draw parameters for a mesh geometry.
+ *
+ * Responsibilities:
+ * - Owns one or more vertex buffers and an optional index buffer.
+ * - Defines primitive topology, draw range (start/count), and vertex layout.
+ * - Provides utilities to create/set/remove buffers and query vertex/face counts.
+ * - Tracks changes via a change tag and notifies render-bundle caching.
+ * - Optionally stores a bounding volume and supports ray intersection tests.
+ *
+ * Ownership and lifecycle:
+ * - When adding buffers (`setVertexBuffer`, `setIndexBuffer`), the primitive retains them.
+ * - When removing/overwriting buffers, the primitive releases the previous buffers.
+ * - Disposing the primitive also disposes the internal `VertexLayout` and releases retained buffers.
+ *
  * @public
  */
-export class Primitive {
-  /** @internal */
+export class Primitive
+  extends makeObservable(Disposable)<{
+    bv_changed: [];
+  }>()
+  implements Clonable<Primitive>
+{
+  /** @internal Current vertex layout object (created lazily from options). */
   protected _vertexLayout: VertexLayout;
-  /** @internal */
+  /** @internal Mutable options used to build the vertex layout. */
   protected _vertexLayoutOptions: VertexLayoutOptions;
-  /** @internal */
+  /** @internal Primitive topology (e.g., 'triangle-list', 'line-strip'). */
   protected _primitiveType: PrimitiveType;
-  /** @internal */
+  /** @internal First index/vertex to draw. */
   protected _indexStart: number;
-  /** @internal */
+  /** @internal Number of indices/vertices to draw (computed lazily if null). */
   protected _indexCount: number;
-  /** @internal */
+  /** @internal Cached default index count (derived when needed). */
   protected _defaultIndexCount: number;
-  /** @internal */
+  /** @internal Marks layout dirty when buffers/topology change. */
   protected _vertexLayoutDirty: boolean;
-  /** @internal */
+  /** @internal Monotonic runtime id. */
   private static _nextId = 0;
-  /** @internal */
+  /** @internal Unique runtime id for the instance. */
   protected _id: number;
-  /** @internal */
+  /** @internal Optional bounding volume for culling/raycast. */
   protected _bbox: BoundingVolume;
-  /** @internal */
-  protected _bboxChangeCallback: (() => void)[];
+  /** @internal Change tag increments when draw-affecting state changes. */
+  private _changeTag: number;
   /**
-   * Creates an instance of a primitive
+   * Create an empty primitive.
+   *
+   * Defaults:
+   * - Primitive type: 'triangle-list'
+   * - `indexStart = 0`, `indexCount = null` (auto-computed)
+   * - No vertex/index buffers attached
+   * - No bounding volume
    */
   constructor() {
+    super();
     this._vertexLayout = null;
     this._vertexLayoutOptions = { vertexBuffers: [] };
     this._primitiveType = 'triangle-list';
@@ -54,68 +88,114 @@ export class Primitive {
     this._defaultIndexCount = 0;
     this._vertexLayoutDirty = false;
     this._id = ++Primitive._nextId;
+    this._changeTag = 0;
     this._bbox = null;
-    this._bboxChangeCallback = [];
   }
   /**
-   * Unique identifier of the primitive
+   * Unique runtime identifier of this primitive.
+   *
+   * @returns The numeric instance id.
    * @internal
    */
   get id(): number {
     return this._id;
   }
   /**
-   * Adds a callback function that will be called whenever the bounding box of the primitive changes.
-   * @param cb - The callback function
+   * Change tag that increments whenever draw-affecting state changes.
+   * Useful for invalidating cached render bundles.
    *
-   * @internal
+   * @returns The current change tag value.
    */
-  addBoundingboxChangeCallback(cb: () => void): void {
-    cb && this._bboxChangeCallback.push(cb);
+  get changeTag() {
+    return this._changeTag;
   }
   /**
-   * Removes a callback function for bounding box changing
-   * @param cb - The callback function to be removed
+   * Create a shallow clone: copies topology, draw range, and buffers.
+   *
+   * Note: Buffers are re-retained on the new primitive.
+   *
+   * @returns A cloned Primitive instance.
    */
-  removeBoundingboxChangeCallback(cb: () => void) {
-    const index = this._bboxChangeCallback.indexOf(cb);
-    if (index >= 0) {
-      this._bboxChangeCallback.splice(index, 1);
-    }
+  clone(): Primitive {
+    const other = new Primitive();
+    other.copyFrom(this);
+    return other;
   }
-  /** Primitive type */
+  /**
+   * Copy from another primitive.
+   *
+   * Copies:
+   * - All vertex buffers and the index buffer
+   * - Primitive type, index start, index count
+   *
+   * @param other - The source primitive to copy from.
+   * @returns void
+   */
+  copyFrom(other: this) {
+    for (const info of other._vertexLayoutOptions.vertexBuffers) {
+      this.setVertexBuffer(info.buffer, info.stepMode);
+    }
+    this.setIndexBuffer(other._vertexLayoutOptions.indexBuffer);
+    this.primitiveType = other.primitiveType;
+    this.indexStart = other.indexStart;
+    this.indexCount = other.indexCount;
+  }
+  /**
+   * Primitive topology.
+   */
   get primitiveType() {
     return this._primitiveType;
   }
   set primitiveType(type) {
-    this._primitiveType = type;
+    if (type !== this._primitiveType) {
+      this._primitiveType = type;
+      this._changeTag++;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
-  /** Start index for drawing */
+  /**
+   * Starting index/vertex for drawing.
+   */
   get indexStart() {
     return this._indexStart;
   }
   set indexStart(val) {
-    this._indexStart = val;
+    if (val !== this._indexStart) {
+      this._indexStart = val;
+      this._changeTag++;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
-  /** The number of the indices or vertices to be drawn */
+  /**
+   * Number of indices/vertices to draw.
+   */
   get indexCount() {
     this._indexCount = this._indexCount ?? this.calcDefaultIndexCount();
     return this._indexCount;
   }
   set indexCount(val) {
-    this._indexCount = val;
+    if (val !== this._indexCount) {
+      this._indexCount = val;
+      this._changeTag++;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
   /**
-   * Query total vertex count
-   * @returns Total vertex count, 0 if no position vertex buffer set
+   * Query total vertex count from the position buffer, if present.
+   *
+   * @returns Total vertex count; 0 if no position buffer is set.
    */
   getNumVertices(): number {
     const posInfo = this.getVertexBufferInfo('position');
     return posInfo?.buffer ? (posInfo.buffer.byteLength / posInfo.stride) >> 0 : 0;
   }
   /**
-   * Query total face count
-   * @returns Total face count
+   * Query total face/segment count based on topology and buffer size.
+   *
+   * - For indexed geometry: derived from index buffer.
+   * - For non-indexed: derived from position vertex count.
+   *
+   * @returns Total primitive count for the current topology.
    */
   getNumFaces(): number {
     const ib = this.getIndexBuffer();
@@ -140,73 +220,106 @@ export class Primitive {
     }
   }
   /**
-   * Removes a vertex buffer from the primitive
-   * @param buffer - The vertex buffer to be removed
+   * Remove all vertex buffers that match a given semantic.
+   *
+   * This releases retained buffers, marks the layout dirty, and invalidates bundles.
+   *
+   * @param semantic - The vertex semantic to remove (e.g., 'position', 'normal').
+   * @returns void
    */
-  removeVertexBuffer(buffer: StructuredBuffer): void {
-    for (let loc = 0; loc < this._vertexLayoutOptions.vertexBuffers.length; loc++) {
-      const info = this._vertexLayoutOptions.vertexBuffers[loc];
-      if (info?.buffer === buffer) {
-        info[loc] = null;
+  removeVertexBuffer(semantic: VertexSemantic): void {
+    for (let i = this._vertexLayoutOptions.vertexBuffers.length - 1; i >= 0; i--) {
+      const info = this._vertexLayoutOptions.vertexBuffers[i];
+      if (matchVertexBuffer(info.buffer, semantic)) {
+        releaseObject(info.buffer);
+        this._vertexLayoutOptions.vertexBuffers.splice(i, 1);
         this._vertexLayoutDirty = true;
       }
     }
+    if (this._vertexLayoutDirty) {
+      this._changeTag++;
+      RenderBundleWrapper.primitiveChanged(this);
+    }
   }
   /**
-   * Gets the vertex buffer by a given semantic
-   * @param semantic - The semantic of the vertex buffer
-   * @returns The vertex buffer which semantic matches the given value
+   * Get the vertex buffer that matches a given semantic.
+   *
+   * @param semantic - The vertex semantic to look up.
+   * @returns The matching vertex buffer, or `null` if not found.
    */
   getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
-    this.checkVertexLayout();
-    return this._vertexLayout.getVertexBuffer(semantic);
+    for (const info of this._vertexLayoutOptions.vertexBuffers) {
+      if (info.buffer && matchVertexBuffer(info.buffer, semantic)) {
+        return info.buffer;
+      }
+    }
+    return null;
   }
   /**
-   * Gets the vertex buffer information by a given semantic
-   * @param semantic - The semantic of the vertex buffer
-   * @returns The vertex buffer information of the given semantic
+   * Get vertex buffer information for a given semantic.
+   *
+   * @param semantic - The vertex semantic to look up.
+   * @returns The `VertexBufferInfo`, or `null` if not found.
    */
   getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
     this.checkVertexLayout();
-    return this._vertexLayout.getVertexBufferInfo(semantic);
+    return this._vertexLayout?.getVertexBufferInfo(semantic) ?? null;
   }
   /**
-   * Creates a vertex buffer from the given options and then adds it to the primitive
-   * @param format - Vertex format for the vertex buffer
-   * @param data - Contents of the vertex buffer
-   * @param stepMode - Step mode of the vertex buffer
-   * @returns The created vertex buffer
+   * Create a vertex buffer from data and add it to the primitive.
+   *
+   * - For interleaved layouts, pass an array of `VertexAttribFormat`.
+   * - For a single attribute, pass a single `VertexAttribFormat`.
+   *
+   * @param format - Vertex attribute format(s).
+   * @param data - Typed array with vertex data.
+   * @param stepMode - Optional step mode (e.g., 'vertex', 'instance').
+   * @returns The created `StructuredBuffer`.
    */
   createAndSetVertexBuffer(
-    format: VertexAttribFormat,
+    format: VertexAttribFormat[] | VertexAttribFormat,
     data: TypedArray,
     stepMode?: VertexStepMode
   ): StructuredBuffer {
-    const buffer = Application.instance.device.createVertexBuffer(format, data);
+    const device = getDevice();
+    const buffer = Array.isArray(format)
+      ? device.createInterleavedVertexBuffer(format, data)
+      : device.createVertexBuffer(format, data);
     return this.setVertexBuffer(buffer, stepMode);
   }
   /**
-   * Adds a vertex buffer to the primitive
-   * @param buffer - The vertex buffer to be added
-   * @param stepMode - Step mode of the vertex buffer
-   * @returns The added vertex buffer
+   * Add an existing vertex buffer to the primitive.
+   *
+   * Ownership note: The primitive retains the buffer; it will be released or disposed when replaced or on dispose.
+   *
+   * @param buffer - The vertex buffer to add.
+   * @param stepMode - Optional step mode for the buffer.
+   * @returns The same buffer.
    */
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
+    retainObject(buffer);
     this._vertexLayoutOptions.vertexBuffers.push({
       buffer,
       stepMode
     });
     this._vertexLayoutDirty = true;
+    this._changeTag++;
+    RenderBundleWrapper.primitiveChanged(this);
     return buffer;
   }
   /**
-   * Creates an index buffer from the given options and then adds it to the prmitive
-   * @param data - Contents of the index buffer
-   * @param dynamic - true if the index buffer is dynamic
-   * @returns The created index buffer
+   * Create an index buffer from data and set it on the primitive.
+   *
+   * @param data - Index data as Uint16Array or Uint32Array.
+   * @param dynamic - Whether the index buffer is dynamic (unmanaged).
+   * @returns The created `IndexBuffer`.
    */
-  createAndSetIndexBuffer(data: Uint16Array | Uint32Array, dynamic?: boolean): IndexBuffer {
-    const buffer = Application.instance.device.createIndexBuffer(data, {
+  createAndSetIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    dynamic?: boolean
+  ): IndexBuffer {
+    const device = getDevice();
+    const buffer = device.createIndexBuffer(data, {
       dynamic: !!dynamic,
       managed: !dynamic
     });
@@ -214,24 +327,36 @@ export class Primitive {
     return buffer;
   }
   /**
-   * Adds an index buffer to the primitive
-   * @param buffer - The index buffer to be added
+   * Set or replace the index buffer.
+   *
+   * Ownership note: The primitive retains the buffer; previous buffer is released.
+   * Marks the vertex layout dirty and invalidates bundles.
+   *
+   * @param buffer - The index buffer to set (non-null).
+   * @returns void
    */
   setIndexBuffer(buffer: IndexBuffer): void {
     if (this._vertexLayoutOptions.indexBuffer !== buffer) {
+      retainObject(buffer);
+      releaseObject(this._vertexLayoutOptions.indexBuffer);
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
+      this._changeTag++;
+      RenderBundleWrapper.primitiveChanged(this);
     }
   }
   /**
-   * Gets the index buffer of the primitive
-   * @returns The index buffer of the primitive
+   * Get the current index buffer.
+   *
+   * @returns The index buffer, or `undefined`/`null` if none set.
    */
   getIndexBuffer(): IndexBuffer {
     return this._vertexLayoutOptions.indexBuffer;
   }
   /**
-   * Draw the prmitive
+   * Issue a non-instanced draw for the current topology and range.
+   *
+   * Preconditions: A valid vertex layout and `indexCount > 0`.
    */
   draw() {
     this.checkVertexLayout();
@@ -240,8 +365,11 @@ export class Primitive {
     }
   }
   /**
-   * Draw multiple instances of the primitive
-   * @param numInstances - How many instances of the primitive should be drawn
+   * Issue an instanced draw for the current topology and range.
+   *
+   * Preconditions: A valid vertex layout and `indexCount > 0`.
+   *
+   * @param numInstances - Number of instances to draw.
    */
   drawInstanced(numInstances: number): void {
     this.checkVertexLayout();
@@ -250,25 +378,19 @@ export class Primitive {
     }
   }
   /**
-   * Disposes the primitive
-   *
-   * @remarks
-   * The vertex buffers and index buffer will also be disposed.
-   * To prevent specific vertex buffer or index buffer to be disposed,
-   * call removeVertexBuffer() or setIndexBuffer(null) first.
+   * Dispose this primitive and release associated GPU resources.
    */
-  dispose() {
-    if (this._vertexLayout) {
-      const vertexBuffers = this._vertexLayout.vertexBuffers;
-      for (const k in vertexBuffers) {
-        vertexBuffers[k]?.buffer?.dispose();
+  protected onDispose() {
+    super.onDispose();
+    this._vertexLayout?.dispose();
+    this._vertexLayout = null;
+    if (this._vertexLayoutOptions) {
+      releaseObject(this._vertexLayoutOptions.indexBuffer);
+      for (const info of this._vertexLayoutOptions.vertexBuffers) {
+        releaseObject(info.buffer);
       }
-      this._vertexLayout.indexBuffer?.dispose();
-      this._vertexLayout.dispose();
-      this._vertexLayout = null;
+      this._vertexLayoutOptions = null;
     }
-    this._indexCount = null;
-    this._indexStart = 0;
   }
   /*
   createAABBTree(): AABBTree {
@@ -280,28 +402,32 @@ export class Primitive {
   }
   */
   /**
-   * Gets the bounding volume of the primitive
-   * @returns The bounding volume of the primitive, or null if no bounding volume set
+   * Get the bounding volume associated with this primitive.
+   *
+   * @returns The current bounding volume, or `null` if not set.
    */
   getBoundingVolume(): BoundingVolume {
     return this._bbox;
   }
   /**
-   * Sets the bounding volume of the primitive
-   * @param bv - The bounding volume to be set
+   * Set or replace the bounding volume of this primitive.
+   *
+   * Triggers registered bounding-volume change callbacks.
+   *
+   * @param bv - The bounding volume to set.
+   * @returns void
    */
   setBoundingVolume(bv: BoundingVolume): void {
     if (bv !== this._bbox) {
       this._bbox = bv;
-      for (const cb of this._bboxChangeCallback) {
-        cb();
-      }
+      this.dispatchEvent('bv_changed');
     }
   }
   /**
-   * Ray intersection test
-   * @param ray - Ray object used to do intersection test with this object
-   * @returns The distance from ray origin to the intersection point if ray intersects with this object, otherwise null
+   * Test intersection against the current axis-aligned bounding box (AABB).
+   *
+   * @param ray - Ray to test against the primitive's AABB (derived from its bounding volume).
+   * @returns The distance from ray origin to the intersection, or `null` if no hit or no AABB.
    */
   raycast(ray: Ray): number {
     const aabb = this.getBoundingVolume()?.toAABB();
@@ -311,7 +437,8 @@ export class Primitive {
   private checkVertexLayout() {
     if (this._vertexLayoutDirty) {
       this._vertexLayout?.dispose();
-      this._vertexLayout = Application.instance.device.createVertexLayout(this._vertexLayoutOptions);
+      const device = getDevice();
+      this._vertexLayout = device.createVertexLayout(this._vertexLayoutOptions);
       this._vertexLayoutDirty = false;
     }
   }

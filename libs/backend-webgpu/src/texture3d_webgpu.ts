@@ -1,10 +1,5 @@
 import type { Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
-import {
-  getTextureFormatBlockWidth,
-  getTextureFormatBlockHeight,
-  getTextureFormatBlockSize,
-  GPUResourceUsageFlags
-} from '@zephyr3d/device';
+import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
@@ -46,7 +41,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(_level?: number, face?: number, _mipCount?: number): GPUTextureView {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -69,23 +64,18 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixels(): parameter mipLevel must be 0`);
     }
-    const blockWidth = getTextureFormatBlockWidth(this.format);
-    const blockHeight = getTextureFormatBlockHeight(this.format);
-    const blockSize = getTextureFormatBlockSize(this.format);
-    const blocksPerRow = this.width / blockWidth;
-    const blocksPerCol = this.height / blockHeight;
-    const imageSize = blocksPerRow * blocksPerCol * blockSize;
-    if (buffer.byteLength < imageSize) {
+    const { size } = WebGPUBaseTexture.calculateBufferSizeForCopy(w, h, this.format);
+    if (buffer.byteLength < size) {
       throw new Error(
-        `Texture2D.readPixels() failed: destination buffer size is ${buffer.byteLength}, should be at least ${imageSize}`
+        `Texture2D.readPixels() failed: destination buffer size is ${buffer.byteLength}, should be at least ${size}`
       );
     }
-    const tmpBuffer = this._device.createBuffer(imageSize, { usage: 'read' });
+    const tmpBuffer = this._device.createBuffer(size, { usage: 'read' });
     await this.copyPixelDataToBuffer(x, y, w, h, layer, 0, tmpBuffer);
     await tmpBuffer.getBufferSubData(
       new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
       0,
-      imageSize
+      size
     );
     tmpBuffer.dispose();
   }
@@ -136,7 +126,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     if (!this._device.isContextLost()) {
       for (let layer = 0; layer < depth; layer++) {
         if (levels.mipDatas[layer].length !== levels.mipLevels) {
-          console.log(`Texture3D.loadLevels() failed: Invalid texture data`);
+          console.error(`Texture3D.loadLevels() failed: Invalid texture data`);
           return;
         }
         for (let i = 0; i < levels.mipLevels; i++) {

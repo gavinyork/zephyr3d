@@ -5,8 +5,8 @@
  * @public
  */
 export class OrderedStringSet {
-  private _items: string[];
-  private _allowDuplicates: boolean;
+  private readonly _items: string[];
+  private readonly _allowDuplicates: boolean;
 
   /**
    * Creates a new instance of the OrderedStringSet class.
@@ -25,36 +25,11 @@ export class OrderedStringSet {
     return [...this._items];
   }
   /**
-   * Uses binary search to find the correct insertion position for a string.
-   * If duplicates are not allowed, it returns null for existing strings.
-   *
-   * @param str The string for which to find the insertion position.
-   * @returns The position to insert the string, or null if the string exists and duplicates are not allowed.
-   */
-  private findInsertPosition(str: string): number | null {
-    let low = 0;
-    let high = this._items.length - 1;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      if (this._items[mid] < str) {
-        low = mid + 1;
-      } else if (this._allowDuplicates || this._items[mid] > str) {
-        high = mid - 1;
-      } else {
-        return this._allowDuplicates ? mid : null;
-      }
-    }
-
-    return low; // The position where the element should be inserted.
-  }
-
-  /**
    * Adds a new string to the set. If duplicates are not allowed and the string already exists, it is not added.
    *
    * @param str The string to add to the set.
    */
-  public add(str: string): void {
+  add(str: string): void {
     const position = this.findInsertPosition(str);
 
     if (position !== null) {
@@ -68,7 +43,7 @@ export class OrderedStringSet {
    *
    * @param str The string to remove from the set.
    */
-  public remove(str: string): void {
+  remove(str: string): void {
     const position = this.findStringPosition(str);
     if (position !== -1) {
       // Only attempt to remove if the element exists.
@@ -86,11 +61,13 @@ export class OrderedStringSet {
    *
    * @param str - The string to be removed from the collection.
    */
-  public removeAll(str: string): void {
+  removeAll(str: string): void {
     const index = this.findStringPosition(str);
 
     // Return immediately if no matching element is found
-    if (index === -1) return;
+    if (index === -1) {
+      return;
+    }
 
     // After finding the first matching element, continue to search for all
     // consecutive matching elements
@@ -109,7 +86,7 @@ export class OrderedStringSet {
    * @param str - The string to search for in the collection.
    * @returns true if the string is found in the collection; otherwise, false.
    */
-  public has(str: string): boolean {
+  has(str: string): boolean {
     return this.findStringPosition(str) >= 0;
   }
 
@@ -141,5 +118,29 @@ export class OrderedStringSet {
       }
     }
     return -1; // Element not found
+  }
+  /**
+   * Uses binary search to find the correct insertion position for a string.
+   * If duplicates are not allowed, it returns null for existing strings.
+   *
+   * @param str The string for which to find the insertion position.
+   * @returns The position to insert the string, or null if the string exists and duplicates are not allowed.
+   */
+  private findInsertPosition(str: string): number | null {
+    let low = 0;
+    let high = this._items.length - 1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (this._items[mid] < str) {
+        low = mid + 1;
+      } else if (this._allowDuplicates || this._items[mid] > str) {
+        high = mid - 1;
+      } else {
+        return this._allowDuplicates ? mid : null;
+      }
+    }
+
+    return low; // The position where the element should be inserted.
   }
 }

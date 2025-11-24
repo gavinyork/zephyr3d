@@ -14,6 +14,7 @@ import { ShaderHelper } from '../material/shader/helper';
 export class DepthPass extends RenderPass {
   private _renderBackface: boolean;
   private _encodeDepth: boolean;
+  private _transmission: boolean;
   /**
    * Creates an instance of DepthRenderPass
    */
@@ -21,6 +22,13 @@ export class DepthPass extends RenderPass {
     super(RENDER_PASS_TYPE_DEPTH);
     this._renderBackface = false;
     this._encodeDepth = false;
+    this._transmission = false;
+  }
+  get transmission() {
+    return this._transmission;
+  }
+  set transmission(val: boolean) {
+    this._transmission = val;
   }
   get renderBackface(): boolean {
     return this._renderBackface;
@@ -36,25 +44,26 @@ export class DepthPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}`;
+    return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}:${Number(ctx.motionVectors)}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
-      ctx.applyFog = null;
+      ctx.fogFlags = 0;
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.flip = this.isAutoFlip(ctx);
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
-      for (const lit of items.opaque.lit) {
+      const list = this._transmission ? items.transmission : items.opaque;
+      for (const lit of list.lit) {
         this.drawItemList(lit, ctx, reverseWinding);
       }
-      for (const unlit of items.opaque.unlit) {
+      for (const unlit of list.unlit) {
         this.drawItemList(unlit, ctx, reverseWinding);
       }
     }

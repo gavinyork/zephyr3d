@@ -9,7 +9,7 @@ function getTargetDts() {
     input: './src/index.ts',
     output: [{ file: './dist/index.d.ts', format: 'es' }],
     plugins: [dts()]
-  }
+  };
 }
 
 function getTargetES6() {
@@ -26,12 +26,21 @@ function getTargetES6() {
     output: {
       dir: 'dist',
       preserveModules: true,
+      preserveModulesRoot: 'src',
       format: 'esm',
       sourcemap: true
     },
+    onwarn(warning, warn) {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') {
+        console.error(warning.message);
+      }
+    },
     plugins: [
       nodeResolve(),
-      swc(),
+      swc({
+        sourceMaps: true,
+        inlineSourcesContent: false
+      })
     ]
   };
 }

@@ -1,13 +1,13 @@
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { Application } from '../app';
 import { CopyBlitter } from '../blitter';
 import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 let hzbProgram: GPUProgram = null;
 let hzbBindGroup: BindGroup = null;
 let blitter: CopyBlitter = null;
-let srcSize: Int32Array = null;
+let srcSize: Int32Array<ArrayBuffer> = null;
 
 /*
 vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
@@ -189,7 +189,7 @@ float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
 */
 
 function buildHZBProgram(device: AbstractDevice): GPUProgram {
-  return device.buildRenderProgram({
+  const program = device.buildRenderProgram({
     label: 'HZBBuilder',
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -225,6 +225,8 @@ function buildHZBProgram(device: AbstractDevice): GPUProgram {
       });
     }
   });
+  program.name = '@HZB_Builder';
+  return program;
 }
 
 function buildHiZLevel(
@@ -266,7 +268,7 @@ function buildHiZLevel(
 }
 
 export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
-  const device = Application.instance.device;
+  const device = getDevice();
   if (!hzbProgram) {
     hzbProgram = buildHZBProgram(device);
     hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);

@@ -85,14 +85,9 @@ import { DrawText } from '@zephyr3d/device';
     indexBuffer: ib
   });
 
-  // load texture
-  const img = document.createElement('img');
-  img.src = 'layer.jpg';
-  await img.decode();
-
   // load video texture
   const el = document.createElement('video');
-  el.src = 'sample-video.mp4';
+  el.src = 'https://cdn.zephyr3d.org/doc/assets/images/sample-video.mp4';
   el.loop = true;
   el.muted = true;
   await el.play();
@@ -148,7 +143,7 @@ import { DrawText } from '@zephyr3d/device';
   // start render loop
   device.runLoop((device) => {
     const t = device.frameInfo.elapsedOverall * 0.002;
-    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0, 'XYZ').toMatrix4x4();
+    const rotateMatrix = Quaternion.fromEulerAngle(t, t, 0).toMatrix4x4();
     bindGroup1.setValue(
       'projMatrix',
       Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)

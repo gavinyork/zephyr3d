@@ -1,5 +1,4 @@
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
-import { Application } from '../app';
 import { MAX_CLUSTERED_LIGHTS } from '../values';
 import type {
   AbstractDevice,
@@ -15,12 +14,13 @@ import type {
 import type { Camera } from '../camera/camera';
 import type { RenderQueue } from './render_queue';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 export class ClusteredLight {
-  private _tileCountX: number;
-  private _tileCountY: number;
-  private _tileCountZ: number;
-  private _lights: Float32Array;
+  private readonly _tileCountX: number;
+  private readonly _tileCountY: number;
+  private readonly _tileCountZ: number;
+  private readonly _lights: Float32Array<ArrayBuffer>;
   private _lightIndexTexture: Texture2D;
   private _lightIndexFramebuffer: FrameBuffer;
   private _lightIndexProgram: GPUProgram;
@@ -28,9 +28,9 @@ export class ClusteredLight {
   private _lightIndexVertexLayout: VertexLayout;
   private _lightIndexRenderStates: RenderStateSet;
   private _lightBuffer: StructuredBuffer;
-  private _sizeParam: Vector4;
-  private _countParam: Int32Array;
-  private _clusterParam: Vector4;
+  private readonly _sizeParam: Vector4;
+  private _countParam: Int32Array<ArrayBuffer>;
+  private readonly _clusterParam: Vector4;
   constructor() {
     this._tileCountX = 16;
     this._tileCountY = 16;
@@ -307,6 +307,7 @@ export class ClusteredLight {
         });
       }
     });
+    this._lightIndexProgram.name = '@ClusteredLight_Index';
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
     this._lightBuffer?.dispose();
     const lightBufferType = this._lightIndexProgram.getBindingInfo(
@@ -329,7 +330,7 @@ export class ClusteredLight {
       device.type === 'webgl' ? 'rgba32f' : 'rgba32ui',
       textureWidth,
       textureHeight,
-      { samplerOptions: { mipFilter: 'none' } }
+      { mipmapping: false }
     );
     this._lightIndexTexture.name = 'ClusterLightIndex';
     this._lightIndexFramebuffer?.dispose();
@@ -337,7 +338,7 @@ export class ClusteredLight {
   }
   calculateLightIndex(camera: Camera, renderQueue: RenderQueue) {
     const numLights = this.getVisibleLights(renderQueue, this._lights);
-    const device = Application.instance.device;
+    const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
     }
@@ -362,6 +363,9 @@ export class ClusteredLight {
     device.pushDeviceStates();
     device.setFramebuffer(this._lightIndexFramebuffer);
     if (numLights > 0) {
+      if (this._lightBuffer.disposed) {
+        this._lightBuffer.reload();
+      }
       this._lightBuffer.bufferSubData(0, this._lights);
       this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
       this._countParam[0] = this._tileCountX;

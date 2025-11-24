@@ -107,7 +107,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     faceOrLevel: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (faceOrLevel !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter 'faceOrLayer' must be 0`);
     }
@@ -115,18 +115,12 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       throw new Error(`Texture2D.readPixels(): invalid miplevel: ${mipLevel}`);
     }
     if (!this.device.isContextLost() && !this.disposed) {
-      return new Promise((resolve) => {
-        const fb = this._device.createFrameBuffer([this], null);
-        fb.setColorAttachmentMipLevel(0, mipLevel);
-        fb.setColorAttachmentGenerateMipmaps(0, false);
-        this._device.pushDeviceStates();
-        this._device.setFramebuffer(fb);
-        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-          fb.dispose();
-          resolve();
-        });
-        this._device.popDeviceStates();
-      });
+      const fb = this._getFramebufferForRead(0, mipLevel);
+      this._device.pushDeviceStates();
+      this._device.setFramebuffer(fb);
+      const result = this._device.readPixels(0, x, y, w, h, buffer);
+      this._device.popDeviceStates();
+      return result;
     }
   }
   readPixelsToBuffer(
@@ -275,14 +269,8 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       (this.device as WebGLDevice).clearErrors();
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);
-      //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 4);
       this._device.context.texSubImage2D(target, 0, 0, 0, params.glFormat, params.glType[0], element);
-      const err = (this.device as WebGLDevice).getError();
-      if (err) {
-        console.error(err);
-        false;
-      }
       if (this._mipLevelCount > 1) {
         this.generateMipmaps();
       }

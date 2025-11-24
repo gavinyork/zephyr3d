@@ -1,10 +1,17 @@
 import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
-import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import type { Texture2D, TextureSampler } from '@zephyr3d/device';
+import { DRef } from '@zephyr3d/base';
+import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { type Texture2D, type TextureSampler } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
-import type { Mesh } from '../scene/mesh';
+import { Mesh } from '../scene/mesh';
 import type { BoundingBox } from '../utility';
+import type { Scene } from '../scene';
+import { SceneNode } from '../scene/scene_node';
+import { NodeRotationTrack, NodeScaleTrack, Skeleton, NodeTranslationTrack } from '../animation';
+import { processMorphData } from '../animation/morphtarget';
+import { MAX_MORPH_TARGETS } from '../values';
+import { MorphTargetTrack } from '../animation/morphtrack';
 
 /**
  * Named object interface for model loading
@@ -161,8 +168,8 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
  * @public
  */
 export interface AssetSubMeshData {
-  primitive: Primitive;
-  material: MeshMaterial;
+  primitive: DRef<Primitive>;
+  material: DRef<MeshMaterial>;
   mesh?: Mesh;
   rawPositions: Float32Array;
   rawBlendIndices: TypedArray;
@@ -257,8 +264,8 @@ export class AssetHierarchyNode extends NamedObject {
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
   private _weights: number[];
-  private _children: AssetHierarchyNode[];
-  private _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
+  private readonly _children: AssetHierarchyNode[];
+  private readonly _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
   /**
    * Creates an instance of AssetHierarchyNode
    * @param name - Name of the node
@@ -393,7 +400,7 @@ export class AssetHierarchyNode extends NamedObject {
    * @param skeleton - The skeleton to which to node will attach
    * @param index - The joint index
    */
-  attachToSkeleton(skeleton: AssetSkeleton, index: number) {
+  attachToSkeleton(skeleton: AssetSkeleton) {
     if (!this._attachToSkeleton) {
       this._attachToSkeleton = new Set();
     }
@@ -437,7 +444,7 @@ export class AssetSkeleton extends NamedObject {
    * @param inverseBindMatrix - Inverse binding matrix of the joint
    */
   addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4) {
-    joint.attachToSkeleton(this, this.joints.length);
+    joint.attachToSkeleton(this);
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
     this.bindPoseMatrices.push(joint.worldMatrix);
@@ -465,7 +472,7 @@ export class AssetScene extends NamedObject {
  * Model information that can be shared by multiple model nodes
  * @public
  */
-export class SharedModel {
+export class SharedModel extends Disposable {
   /** @internal */
   private _name: string;
   /** @internal */
@@ -483,6 +490,7 @@ export class SharedModel {
    * @param name - Name of the model
    */
   constructor(name?: string) {
+    super();
     this._name = name || '';
     this._skeletons = [];
     this._nodes = [];
@@ -545,5 +553,171 @@ export class SharedModel {
    */
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
+  }
+  createSceneNode(scene: Scene, instancing: boolean): SceneNode {
+    const group = new SceneNode(scene);
+    group.name = this.name;
+    const animationSet = group.animationSet;
+    for (let i = 0; i < this.scenes.length; i++) {
+      const assetScene = this.scenes[i];
+      const skeletonMeshMap: Map<
+        AssetSkeleton,
+        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
+      > = new Map();
+      const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
+      for (let k = 0; k < assetScene.rootNodes.length; k++) {
+        this.setAssetNodeToSceneNode(
+          scene,
+          group,
+          assetScene.rootNodes[k],
+          skeletonMeshMap,
+          nodeMap,
+          instancing
+        );
+      }
+      for (const animationData of this.animations) {
+        let name = animationData.name ?? `_embbeded_animation`;
+        if (animationSet.getAnimationClip(name)) {
+          const baseName = name;
+          for (let t = 1; ; t++) {
+            name = `${baseName}_${t}`;
+            if (!animationSet.getAnimationClip(name)) {
+              break;
+            }
+          }
+        }
+        const animation = animationSet.createAnimation(name, true);
+        for (const track of animationData.tracks) {
+          if (track.type === 'translation') {
+            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));
+          } else if (track.type === 'scale') {
+            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator, true));
+          } else if (track.type === 'rotation') {
+            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator, true));
+          } else if (track.type === 'weights') {
+            for (const m of track.node.mesh.subMeshes) {
+              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                console.error(
+                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                );
+              } else {
+                const morphTrack = new MorphTargetTrack(
+                  track.interpolator,
+                  track.defaultMorphWeights,
+                  m.targetBox,
+                  m.mesh.getBoundingVolume().toAABB(),
+                  true
+                );
+                animation.addTrack(m.mesh, morphTrack);
+              }
+            }
+          } else {
+            console.error(`Invalid animation track type: ${track.type}`);
+          }
+        }
+        for (const sk of animationData.skeletons) {
+          const nodes = skeletonMeshMap.get(sk);
+          if (nodes) {
+            if (!nodes.skeleton) {
+              nodes.skeleton = new Skeleton(
+                sk.joints.map((val) => nodeMap.get(val)),
+                sk.inverseBindMatrices,
+                sk.bindPoseMatrices
+              );
+              for (let i = 0; i < nodes.mesh.length; i++) {
+                const mesh = nodes.mesh[i];
+                const v = {
+                  positions: nodes.bounding[i].rawPositions,
+                  blendIndices: nodes.bounding[i].rawBlendIndices,
+                  weights: nodes.bounding[i].rawJointWeights
+                };
+                mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
+                mesh.skeletonName = nodes.skeleton.persistentId;
+              }
+              animationSet.skeletons.push(new DRef(nodes.skeleton));
+            }
+            animation.addSkeleton(nodes.skeleton.persistentId);
+          }
+        }
+      }
+    }
+    group.iterate((child) => {
+      if (child !== group) {
+        child.sealed = true;
+      }
+    });
+    group.sharedModel = this;
+    return group;
+  }
+  protected onDispose() {
+    super.onDispose();
+    const nodes = [...this._nodes];
+    while (nodes.length > 0) {
+      const node = nodes.shift();
+      nodes.push(...node.children);
+      const mesh = node.mesh;
+      if (mesh) {
+        for (const subMesh of mesh.subMeshes) {
+          subMesh.primitive?.dispose();
+          subMesh.material?.dispose();
+        }
+      }
+    }
+    this._nodes = [];
+    this._skeletons = [];
+    this._scenes = [];
+    this._animations = [];
+  }
+  private setAssetNodeToSceneNode(
+    scene: Scene,
+    parent: SceneNode,
+    assetNode: AssetHierarchyNode,
+    skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
+    nodeMap: Map<AssetHierarchyNode, SceneNode>,
+    instancing: boolean
+  ) {
+    const node: SceneNode = new SceneNode(scene);
+    nodeMap.set(assetNode, node);
+    node.name = assetNode.name ?? '';
+    node.position.set(assetNode.position);
+    node.rotation.set(assetNode.rotation);
+    node.scale.set(assetNode.scaling);
+    if (assetNode.mesh) {
+      const meshData = assetNode.mesh;
+      const skeleton = assetNode.skeleton;
+      for (const subMesh of meshData.subMeshes) {
+        for (const instance of assetNode.instances) {
+          const meshNode = new Mesh(scene);
+          meshNode.position = instance.t;
+          meshNode.scale = instance.s;
+          meshNode.rotation = instance.r;
+          meshNode.name = subMesh.name;
+          meshNode.clipTestEnabled = true;
+          meshNode.showState = 'inherit';
+          meshNode.skinAnimation = !!skeleton;
+          meshNode.morphAnimation = subMesh.numTargets > 0;
+          meshNode.primitive = subMesh.primitive.get();
+          meshNode.material =
+            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
+              ? subMesh.material.get().createInstance()
+              : subMesh.material.get().clone();
+          meshNode.parent = node;
+          subMesh.mesh = meshNode;
+          processMorphData(subMesh, meshData.morphWeights);
+          if (skeleton) {
+            if (!skeletonMeshMap.has(skeleton)) {
+              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
+            } else {
+              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
+              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+            }
+          }
+        }
+      }
+    }
+    node.parent = parent;
+    for (const child of assetNode.children) {
+      this.setAssetNodeToSceneNode(scene, node, child, skeletonMeshMap, nodeMap, instancing);
+    }
   }
 }

@@ -12,28 +12,26 @@ export interface HeightfieldBBoxTreeNode {
 
 /** @internal */
 export class HeightfieldBBoxTree {
-  private _resX: number;
-  private _resY: number;
-  private _spacingX: number;
-  private _spacingZ: number;
-  private _heights: Float32Array;
+  private readonly _resX: number;
+  private readonly _resY: number;
+  private readonly _spacingX: number;
+  private readonly _spacingZ: number;
+  private readonly _leafSize: number;
+  private readonly _heights: Float32Array;
   private _rootNode: HeightfieldBBoxTreeNode;
-  constructor(res_x: number, res_y: number, spacing_x: number, spacing_z: number, vertices: Vector4[]) {
+  constructor(res_x: number, res_y: number, spacing_x: number, spacing_z: number, vertices: number[]) {
     this._rootNode = null;
-    this._heights = null;
+    this._leafSize = 16;
     this._spacingX = spacing_x;
     this._spacingZ = spacing_z;
-    this.create(res_x, res_y, vertices);
-  }
-  create(res_x: number, res_y: number, vertices: Vector4[]): boolean {
     this._resX = res_x;
     this._resY = res_y;
+    this._heights = new Float32Array(vertices);
+    //this.create();
+  }
+  create(): boolean {
     this._rootNode = this.allocNode();
-    this._heights = new Float32Array(res_x * res_y);
-    for (let i = 0; i < this._heights.length; i++) {
-      this._heights[i] = vertices[i].y;
-    }
-    this.createChildNode(this._rootNode, 0, 0, res_x - 1, res_y - 1, vertices);
+    this.createChildNode(this._rootNode, 0, 0, this._resX - 1, this._resY - 1);
     return true;
   }
   getHeight(x: number, y: number): number {
@@ -49,17 +47,15 @@ export class HeightfieldBBoxTree {
     const h10 = this._heights[x + 1 + y * this._resX];
     const sx = (h00 + h01 - h11 - h10) * 0.5;
     const sy = (h00 + h10 - h01 - h11) * 0.5;
-    const tileSizeX = (this._rootNode.bbox.maxPoint.x - this._rootNode.bbox.minPoint.x) / (this._resX - 1);
-    const tileSizeY = (this._rootNode.bbox.maxPoint.z - this._rootNode.bbox.minPoint.z) / (this._resY - 1);
+    const tileSizeX = this._spacingX;
+    const tileSizeY = this._spacingZ;
     normal.setXYZ(sx * tileSizeY, 2 * tileSizeX * tileSizeY, -sy * tileSizeX).inplaceNormalize();
     return normal;
   }
   getRealNormal(x: number, y: number, normal?: Vector3): Vector3 {
     normal = normal ?? new Vector3();
-    x -= this._rootNode.bbox.minPoint.x;
-    y -= this._rootNode.bbox.minPoint.z;
-    const tileSizeX = (this._rootNode.bbox.maxPoint.x - this._rootNode.bbox.minPoint.x) / (this._resX - 1);
-    const tileSizeY = (this._rootNode.bbox.maxPoint.z - this._rootNode.bbox.minPoint.z) / (this._resY - 1);
+    const tileSizeX = this._spacingX;
+    const tileSizeY = this._spacingZ;
     const x_unscale = x / tileSizeX;
     const y_unscale = y / tileSizeY;
     let l = Math.floor(x_unscale);
@@ -87,10 +83,8 @@ export class HeightfieldBBoxTree {
     return normal;
   }
   getRealHeight(x: number, y: number): number {
-    x -= this._rootNode.bbox.minPoint.x;
-    y -= this._rootNode.bbox.minPoint.z;
-    const tileSizeX = (this._rootNode.bbox.maxPoint.x - this._rootNode.bbox.minPoint.x) / (this._resX - 1);
-    const tileSizeY = (this._rootNode.bbox.maxPoint.z - this._rootNode.bbox.minPoint.z) / (this._resY - 1);
+    const tileSizeX = this._spacingX;
+    const tileSizeY = this._spacingZ;
     const x_unscale = x / tileSizeX;
     const y_unscale = y / tileSizeY;
     const l = Math.floor(x_unscale);
@@ -122,9 +116,6 @@ export class HeightfieldBBoxTree {
       }
     }
   }
-  getRootNode(): HeightfieldBBoxTreeNode {
-    return this._rootNode;
-  }
   getHeights(): Float32Array {
     return this._heights;
   }
@@ -146,19 +137,12 @@ export class HeightfieldBBoxTree {
       }
     }
   }
-  createChildNode(
-    node: HeightfieldBBoxTreeNode,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    vertices: Vector4[]
-  ): boolean {
+  createChildNode(node: HeightfieldBBoxTreeNode, x: number, y: number, w: number, h: number): boolean {
     node.rc.x = x;
     node.rc.y = y;
     node.rc.w = w;
     node.rc.h = h;
-    if (w <= 16 && h <= 16) {
+    if (w <= this._leafSize && h <= this._leafSize) {
       node.left = null;
       node.right = null;
       let hMin = Infinity;
@@ -183,16 +167,16 @@ export class HeightfieldBBoxTree {
         const w1 = w >> 1;
         const w2 = w - w1;
         node.left = this.allocNode();
-        this.createChildNode(node.left, x, y, w1, h, vertices);
+        this.createChildNode(node.left, x, y, w1, h);
         node.right = this.allocNode();
-        this.createChildNode(node.right, x + w1, y, w2, h, vertices);
+        this.createChildNode(node.right, x + w1, y, w2, h);
       } else {
         const h1 = h >> 1;
         const h2 = h - h1;
         node.left = this.allocNode();
-        this.createChildNode(node.left, x, y, w, h1, vertices);
+        this.createChildNode(node.left, x, y, w, h1);
         node.right = this.allocNode();
-        this.createChildNode(node.right, x, y + h1, w, h2, vertices);
+        this.createChildNode(node.right, x, y + h1, w, h2);
       }
       node.bbox.beginExtend();
       node.bbox.extend(node.left.bbox.minPoint);
@@ -205,17 +189,13 @@ export class HeightfieldBBoxTree {
   rayIntersect(ray: Ray): number | null {
     return this.rayIntersectRecursive(ray);
   }
-  rayIntersectLeaf(ray: Ray, node: HeightfieldBBoxTreeNode): number | null {
+  rayIntersectDDA(ray: Ray, x: number, y: number, w: number, h: number): number | null {
     let x0 = ray.origin.x;
     let y0 = ray.origin.z;
     let dx = ray.direction.x;
     let dy = ray.direction.z;
     const gridSizeX = this._spacingX;
     const gridSizeY = this._spacingZ;
-    const x = node.rc.x;
-    const y = node.rc.y;
-    const w = node.rc.w;
-    const h = node.rc.h;
     const epsl = 0.001;
     let tx = 0;
     let ty = 0;
@@ -297,7 +277,13 @@ export class HeightfieldBBoxTree {
     }
     return null;
   }
+  rayIntersectLeaf(ray: Ray, node: HeightfieldBBoxTreeNode): number | null {
+    return this.rayIntersectDDA(ray, node.rc.x, node.rc.y, node.rc.w, node.rc.h);
+  }
   rayIntersectRecursive(ray: Ray): number | null {
+    if (!this._rootNode) {
+      return this.rayIntersectDDA(ray, 0, 0, this._resX - 1, this._resY - 1);
+    }
     const q: HeightfieldBBoxTreeNode[] = [this._rootNode];
     while (q.length > 0) {
       const node = q.shift();
@@ -330,12 +316,13 @@ export class HeightfieldBBoxTree {
 
 /** @internal */
 export class HeightField {
-  private m_v4Range: Vector4;
-  private m_scale: Vector3;
+  private readonly m_v4Range: Vector4;
+  private readonly m_scale: Vector3;
   private m_sizeX: number;
   private m_sizeZ: number;
   private m_bboxTree: HeightfieldBBoxTree;
   private m_normals: Vector3[];
+  private m_boundingBox: BoundingBox;
   constructor() {
     this.m_v4Range = Vector4.zero();
     this.m_bboxTree = null;
@@ -343,38 +330,33 @@ export class HeightField {
     this.m_sizeX = 0;
     this.m_sizeZ = 0;
     this.m_normals = null;
+    this.m_boundingBox = null;
   }
-  init(
-    sizeX: number,
-    sizeZ: number,
-    offsetX: number,
-    offsetZ: number,
-    scaleX: number,
-    scaleY: number,
-    scaleZ: number,
-    heights: Float32Array
-  ): boolean {
-    const v: Vector4[] = [];
+  init(sizeX: number, sizeZ: number, scale: Vector3, heights: Float32Array): boolean {
+    const v: number[] = [];
+    let minY = Infinity;
+    let maxY = -Infinity;
     for (let i = 0; i < sizeZ; ++i) {
       const srcOffset = i * sizeX;
       const dstOffset = (sizeZ - i - 1) * sizeX;
       for (let j = 0; j < sizeX; ++j) {
-        v[dstOffset + j] = new Vector4(
-          offsetX + j * scaleX,
-          heights[srcOffset + j] * scaleY,
-          offsetZ + i * scaleZ,
-          1
-        );
+        const y = heights[srcOffset + j] * scale.y;
+        v[dstOffset + j] = y;
+        if (y > maxY) {
+          maxY = y;
+        }
+        if (y < minY) {
+          minY = y;
+        }
       }
     }
-    this.m_bboxTree = new HeightfieldBBoxTree(sizeX, sizeZ, scaleX, scaleZ, v);
-    this.m_v4Range.setXYZW(
-      this.m_bboxTree.getRootNode().bbox.minPoint.x,
-      this.m_bboxTree.getRootNode().bbox.minPoint.z,
-      this.m_bboxTree.getRootNode().bbox.extents.x * 2,
-      this.m_bboxTree.getRootNode().bbox.extents.z * 2
+    this.m_bboxTree = new HeightfieldBBoxTree(sizeX, sizeZ, scale.x, scale.z, v);
+    this.m_boundingBox = new BoundingBox(
+      new Vector3(0, minY, 0),
+      new Vector3((sizeX - 1) * scale.x, maxY, (sizeZ - 1) * scale.z)
     );
-    this.m_scale.setXYZ(scaleX, scaleY, scaleZ);
+    this.m_v4Range.setXYZW(0, 0, (sizeX - 1) * scale.x, (sizeZ - 1) * scale.z);
+    this.m_scale.set(scale);
     this.m_sizeX = sizeX;
     this.m_sizeZ = sizeZ;
     this.m_normals = this.computeNormalVectors();
@@ -393,7 +375,7 @@ export class HeightField {
   rayIntersect(ray: Ray): number | null {
     return this.m_bboxTree.rayIntersect(ray);
   }
-  computeNormals(): Uint8Array {
+  computeNormals(): Uint8Array<ArrayBuffer> {
     const scaleX = this.m_scale.x;
     const scaleZ = this.m_scale.z;
     const heights = this.getHeights();
@@ -463,7 +445,7 @@ export class HeightField {
     return this.m_v4Range.y;
   }
   getBoundingbox(): BoundingBox {
-    return this.m_bboxTree?.getRootNode()?.bbox || null;
+    return this.m_boundingBox;
   }
   getHeights(): Float32Array {
     return this.m_bboxTree?.getHeights() || null;
@@ -476,11 +458,8 @@ export class HeightField {
   }
   getRealNormal(x: number, z: number, normal?: Vector3): Vector3 {
     normal = normal ?? new Vector3();
-    const bboxRootNode = this.m_bboxTree.getRootNode();
-    x -= bboxRootNode.bbox.minPoint.x;
-    z -= bboxRootNode.bbox.minPoint.z;
-    const tileSizeX = (bboxRootNode.bbox.maxPoint.x - bboxRootNode.bbox.minPoint.x) / (this.m_sizeX - 1);
-    const tileSizeY = (bboxRootNode.bbox.maxPoint.z - bboxRootNode.bbox.minPoint.z) / (this.m_sizeZ - 1);
+    const tileSizeX = this.m_scale.x;
+    const tileSizeY = this.m_scale.z;
     const x_unscale = x / tileSizeX;
     const y_unscale = z / tileSizeY;
     let l = Math.floor(x_unscale);

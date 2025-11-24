@@ -1,5 +1,5 @@
 import type { ColorRGBA } from '@zephyr3d/base';
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
   type RenderStateSet,
@@ -11,11 +11,11 @@ import {
   type VertexLayoutOptions
 } from '@zephyr3d/device';
 
-export class Renderer {
+export class Renderer extends Disposable {
   /** @internal */
-  private static readonly VERTEX_BUFFER_SIZE = 8192;
+  private static readonly VERTEX_BUFFER_SIZE = 65536;
   /** @internal */
-  private static readonly INDEX_BUFFER_SIZE = 16384;
+  private static readonly INDEX_BUFFER_SIZE = 65536 * 3;
   /** @internal */
   private _device: AbstractDevice;
   /** @internal */
@@ -27,33 +27,25 @@ export class Renderer {
   /** @internal */
   private _indexPosition: number;
   /** @internal */
-  private _drawCount: number;
+  private readonly _program: GPUProgram;
   /** @internal */
-  private _indexCount: number;
+  private readonly _textureSampler: TextureSampler;
   /** @internal */
-  private _currentTexture: Texture2D;
+  private readonly _programTexture: GPUProgram;
   /** @internal */
-  private _program: GPUProgram;
+  private readonly _bindGroup: BindGroup;
   /** @internal */
-  private _textureSampler: TextureSampler;
+  private readonly _bindGroupTexture: BindGroup;
   /** @internal */
-  private _programTexture: GPUProgram;
+  private readonly _renderStateSet: RenderStateSet;
   /** @internal */
-  private _bindGroup: BindGroup;
+  private _vertexCache: Uint8Array<ArrayBuffer>;
   /** @internal */
-  private _bindGroupTexture: BindGroup;
+  private readonly _indexCache: Uint16Array<ArrayBuffer>;
   /** @internal */
-  private _renderStateSet: RenderStateSet;
-  /** @internal */
-  private _vertexCache: Uint8Array;
-  /** @internal */
-  private _indexCache: Uint16Array;
-  /** @internal */
-  private _projectionMatrix: Matrix4x4;
+  private readonly _projectionMatrix: Matrix4x4;
   /** @internal */
   private _flipMatrix: Matrix4x4;
-  /** @internal */
-  private _scissor: number[];
   /** @internal */
   private _clearBeforeRender: boolean;
   /**
@@ -61,6 +53,7 @@ export class Renderer {
    * @param device - The render device
    */
   constructor(device: AbstractDevice) {
+    super();
     this._device = device;
     this._projectionMatrix = new Matrix4x4();
     this._flipMatrix = new Matrix4x4();
@@ -69,8 +62,8 @@ export class Renderer {
     this._bindGroup = this._device.createBindGroup(this._program.bindGroupLayouts[0]);
     this._bindGroupTexture = this._device.createBindGroup(this._programTexture.bindGroupLayouts[0]);
     this._textureSampler = this._device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
+      magFilter: 'linear',
+      minFilter: 'linear',
       mipFilter: 'none'
     });
     this._renderStateSet = this.createStateSet();
@@ -95,10 +88,6 @@ export class Renderer {
     }
     this._drawPosition = 0;
     this._indexPosition = 0;
-    this._drawCount = 0;
-    this._indexCount = 0;
-    this._scissor = [0, 0, 0, 0];
-    this._currentTexture = null;
     this._clearBeforeRender = false;
   }
   /** Gets the render device */
@@ -110,12 +99,6 @@ export class Renderer {
   }
   set clearBeforeRender(val: boolean) {
     this._clearBeforeRender = val;
-  }
-  /** Disposes this renderer */
-  dispose() {
-    this._primitiveBuffer = null;
-    this._vertexCache = null;
-    this._device = null;
   }
   /** @internal */
   getCanvas(): HTMLCanvasElement {
@@ -140,7 +123,7 @@ export class Renderer {
   /** @internal */
   createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     if (color) {
       this.clearTexture(tex, color);
@@ -165,7 +148,7 @@ export class Renderer {
   /** @internal */
   updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number): void {
     const originValues = new Uint8Array(bitmap.data.buffer);
-    console.assert(texture.format === 'rgba8unorm');
+    ASSERT(texture.format === 'rgba8unorm');
     texture.update(originValues, x, y, bitmap.width, bitmap.height);
   }
   /** @internal */
@@ -203,8 +186,8 @@ export class Renderer {
   }
   /** @internal */
   stream(
-    vertexData: Uint8Array,
-    indexData: Uint16Array,
+    vertexData: Uint8Array<ArrayBuffer>,
+    indexData: Uint16Array<ArrayBuffer>,
     indexOffset: number,
     indexCount: number,
     texture: Texture2D,
@@ -270,6 +253,13 @@ export class Renderer {
   }
   /** @internal */
   endRender() {}
+  /** Disposes this renderer */
+  protected onDispose() {
+    super.onDispose();
+    this._primitiveBuffer = null;
+    this._vertexCache = null;
+    this._device = null;
+  }
   /** @internal */
   private createStateSet(): RenderStateSet {
     const rs = this._device.createRenderStateSet();
@@ -280,7 +270,7 @@ export class Renderer {
   }
   /** @internal */
   private createProgram(diffuseMap: boolean): GPUProgram {
-    return this._device.buildRenderProgram({
+    const program = this._device.buildRenderProgram({
       label: 'UI',
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -302,7 +292,7 @@ export class Renderer {
       fragment(pb) {
         this.$outputs.outColor = pb.vec4();
         if (diffuseMap) {
-          this.tex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.tex = pb.tex2D().uniform(0);
         }
         pb.main(function () {
           if (diffuseMap) {
@@ -314,5 +304,7 @@ export class Renderer {
         });
       }
     });
+    program.name = diffuseMap ? '@UI_withDiffuse' : '@UI_noDiffuse';
+    return program;
   }
 }

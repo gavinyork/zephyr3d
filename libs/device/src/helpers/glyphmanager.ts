@@ -65,7 +65,7 @@ export class GlyphManager extends TextureAtlasManager {
    * @param font - Font of the string
    * @returns
    */
-  clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font) {
+  clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font): number {
     let sum = 0;
     let i = start;
     for (; i < str.length; i++) {
@@ -75,15 +75,6 @@ export class GlyphManager extends TextureAtlasManager {
       }
     }
     return i - start;
-  }
-  /** @internal */
-  private _hash(char: string, font: Font) {
-    return `${font.family}@${font.size}&${char}`;
-  }
-  /** @internal */
-  private _cacheGlyph(char: string, font: Font): AtlasInfo {
-    const bitmap = this._getGlyphBitmap(char, font) as ImageData;
-    return this.pushBitmap(this._hash(char, font), bitmap);
   }
   /**
    * Measuring width of a character
@@ -129,5 +120,14 @@ export class GlyphManager extends TextureAtlasManager {
     FontCanvas.context.clearRect(0, 0, w + 2, h);
     FontCanvas.context.fillText(char, 0, -font.topScaled);
     return FontCanvas.context.getImageData(0, 0, w, h);
+  }
+  /** @internal */
+  private _hash(char: string, font: Font): string {
+    return `${font.family}@${font.size}&${char}`;
+  }
+  /** @internal */
+  private _cacheGlyph(char: string, font: Font): AtlasInfo {
+    const bitmap = this._getGlyphBitmap(char, font) as ImageData;
+    return this.pushBitmap(this._hash(char, font), bitmap);
   }
 }

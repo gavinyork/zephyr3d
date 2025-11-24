@@ -29,7 +29,7 @@ export class ShadowMapPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `sm:${ctx.shadowMapInfo.get(this.light).shaderHash}`;
+    return `${ctx.shadowMapInfo.get(this.light).shaderHash}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
@@ -37,13 +37,13 @@ export class ShadowMapPass extends RenderPass {
     if (items) {
       ctx.drawEnvLight = false;
       ctx.env = null;
-      ctx.applyFog = null;
+      ctx.fogFlags = 0;
       ctx.flip = this.isAutoFlip(ctx);
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
       ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       for (const lit of items.opaque.lit) {
         this.drawItemList(lit, ctx, reverseWinding);

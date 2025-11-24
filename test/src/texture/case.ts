@@ -9,15 +9,7 @@ import type {
   RenderStateSet
 } from '@zephyr3d/device';
 import type { AssetManager } from '@zephyr3d/scene';
-import {
-  BoxShape,
-  panoramaToCubemap,
-  prefilterCubemap,
-  projectCubemap,
-  projectCubemapCPU,
-  Application,
-  linearToGamma
-} from '@zephyr3d/scene';
+import { BoxShape, panoramaToCubemap, prefilterCubemap, linearToGamma, getDevice } from '@zephyr3d/scene';
 
 const panorama = './assets/images/cloudy.hdr';
 const texture = './assets/images/Di-3d.png';
@@ -42,14 +34,14 @@ export abstract class TextureTestCase {
     this.texture = await this.createTexture();
     this.bindgroup = this.createBindGroup();
     this.box = new BoxShape({ size: 2 });
-    this.renderStates = Application.instance.device.createRenderStateSet();
+    this.renderStates = getDevice().createRenderStateSet();
     this.renderStates.useDepthState().enableTest(true);
   }
   draw(w: number, h: number) {
     this.updateBindGroup(Date.now(), w, h);
-    Application.instance.device.setProgram(this.program);
-    Application.instance.device.setRenderStates(this.renderStates);
-    Application.instance.device.setBindGroup(0, this.bindgroup);
+    getDevice().setProgram(this.program);
+    getDevice().setRenderStates(this.renderStates);
+    getDevice().setBindGroup(0, this.bindgroup);
     this.box.draw();
   }
   protected abstract createProgram(): GPUProgram;
@@ -59,7 +51,7 @@ export abstract class TextureTestCase {
 }
 
 export class TestTexture2D extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -69,7 +61,7 @@ export class TestTexture2D extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -95,7 +87,7 @@ export class TestTexture2D extends TextureTestCase {
     return (await this.assetManager.fetchTexture(texture)) as Texture2D;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -109,9 +101,9 @@ export class TestTexture2D extends TextureTestCase {
 }
 
 export class TestTextureVideo extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   private el: HTMLVideoElement;
-  private videoSrc: string;
+  private readonly videoSrc: string;
   constructor(assetManager: AssetManager, video: string) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -122,7 +114,7 @@ export class TestTextureVideo extends TextureTestCase {
     this.videoSrc = video;
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -152,10 +144,10 @@ export class TestTextureVideo extends TextureTestCase {
     document.body.append(this.el);
     await this.el.play();
 
-    return Application.instance.device.createTextureVideo(this.el);
+    return getDevice().createTextureVideo(this.el);
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -169,7 +161,7 @@ export class TestTextureVideo extends TextureTestCase {
 }
 
 export class TestTexture2DArray extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -179,7 +171,7 @@ export class TestTexture2DArray extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '2d-array',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -281,12 +273,12 @@ export class TestTexture2DArray extends TextureTestCase {
       ...yellow,
       ...purple
     ]);
-    const tex = Application.instance.device.createTexture2DArray('rgba8unorm', 4, 4, 4);
+    const tex = getDevice().createTexture2DArray('rgba8unorm', 4, 4, 4);
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -300,7 +292,7 @@ export class TestTexture2DArray extends TextureTestCase {
 }
 
 export class TestTexture3D extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   constructor(assetManager: AssetManager) {
     super(assetManager);
     this.viewMatrix = Matrix4x4.lookAt(
@@ -310,7 +302,7 @@ export class TestTexture3D extends TextureTestCase {
     ).inplaceInvertAffine();
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: '3d',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -408,14 +400,14 @@ export class TestTexture3D extends TextureTestCase {
       ...yellow,
       ...purple
     ]);
-    const tex = Application.instance.device.createTexture3D('rgba8unorm', 4, 4, 4, {
-      samplerOptions: { mipFilter: 'none' }
+    const tex = getDevice().createTexture3D('rgba8unorm', 4, 4, 4, {
+      mipmapping: false
     });
     tex.update(pixels, 0, 0, 0, 4, 4, 4);
     return tex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -429,7 +421,7 @@ export class TestTexture3D extends TextureTestCase {
 }
 
 export class TestTextureCube extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
+  private readonly viewMatrix: Matrix4x4;
   private srcTex: TextureCube;
   private prefilteredTex: TextureCube;
   constructor(assetManager: AssetManager) {
@@ -443,7 +435,7 @@ export class TestTextureCube extends TextureTestCase {
     this.prefilteredTex = null;
   }
   protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
+    return getDevice().buildRenderProgram({
       label: 'cube',
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -469,17 +461,17 @@ export class TestTextureCube extends TextureTestCase {
   }
   protected async createTexture(): Promise<BaseTexture> {
     const tex = await this.assetManager.fetchTexture<Texture2D>(panorama);
-    this.srcTex = Application.instance.device.createCubeTexture(tex.format, 128);
+    this.srcTex = getDevice().createCubeTexture(tex.format, 128);
     panoramaToCubemap(tex, this.srcTex);
     tex.dispose();
-    this.prefilteredTex = Application.instance.device.createCubeTexture('rgba16f', 128, {
-      samplerOptions: { mipFilter: 'none' }
+    this.prefilteredTex = getDevice().createCubeTexture('rgba16f', 128, {
+      mipmapping: false
     });
     prefilterCubemap(this.srcTex, 'lambertian', this.prefilteredTex, 300);
     return this.srcTex;
   }
   protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
+    const bindGroup = getDevice().createBindGroup(this.program.bindGroupLayouts[0]);
     bindGroup.setTexture('tex', this.texture);
     return bindGroup;
   }
@@ -490,136 +482,5 @@ export class TestTextureCube extends TextureTestCase {
       : vpMatrix;
     this.bindgroup.setValue('mvpMatrix', matrix);
     this.bindgroup.setTexture('tex', this.prefilteredTex);
-  }
-}
-
-export class TestTextureCubeSH extends TextureTestCase {
-  private viewMatrix: Matrix4x4;
-  private shCoeff: Vector3[];
-  private prefiltered: TextureCube;
-  private srcTex: TextureCube;
-  constructor(assetManager: AssetManager) {
-    super(assetManager);
-    this.viewMatrix = Matrix4x4.lookAt(
-      new Vector3(3, 3, 3),
-      Vector3.zero(),
-      Vector3.axisPY()
-    ).inplaceInvertAffine();
-    this.shCoeff = Array.from({ length: 9 }).map(() => Vector3.zero());
-    this.prefiltered = null;
-  }
-  protected createProgram(): GPUProgram {
-    return Application.instance.device.buildRenderProgram({
-      label: 'cube',
-      vertex(pb) {
-        this.$inputs.pos = pb.vec3().attrib('position');
-        this.$outputs.texcoord = pb.vec3();
-        this.mvpMatrix = pb.mat4().uniform(0);
-        pb.main(function () {
-          this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 1));
-          this.$outputs.texcoord = this.$inputs.pos;
-        });
-      },
-      fragment(pb) {
-        const structSH = pb.defineStruct([
-          pb.vec3('sh0'),
-          pb.vec3('sh1'),
-          pb.vec3('sh2'),
-          pb.vec3('sh3'),
-          pb.vec3('sh4'),
-          pb.vec3('sh5'),
-          pb.vec3('sh6'),
-          pb.vec3('sh7'),
-          pb.vec3('sh8')
-        ]);
-        this.sh = structSH().uniform(0);
-        this.$outputs.color = pb.vec4();
-        pb.func('Y0', [pb.vec3('v')], function () {
-          this.$return(0.2820947917);
-        });
-        pb.func('Y1', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.y, -0.4886025119));
-        });
-        pb.func('Y2', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.z, 0.4886025119));
-        });
-        pb.func('Y3', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.x, -0.4886025119));
-        });
-        pb.func('Y4', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.x, this.v.y, 1.0925484306));
-        });
-        pb.func('Y5', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.y, this.v.z, -1.0925484306));
-        });
-        pb.func('Y6', [pb.vec3('v')], function () {
-          this.$return(pb.mul(pb.sub(pb.mul(this.v.z, this.v.z, 3), 1), 0.3153915652));
-        });
-        pb.func('Y7', [pb.vec3('v')], function () {
-          this.$return(pb.mul(this.v.x, this.v.z, -1.0925484306));
-        });
-        pb.func('Y8', [pb.vec3('v')], function () {
-          this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
-        });
-        pb.main(function () {
-          this.$l.v = pb.normalize(this.$inputs.texcoord);
-          this.$l.c = pb.mul(this.sh.sh0, this.Y0(this.v));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh1, this.Y1(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh2, this.Y2(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh3, this.Y3(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh4, this.Y4(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh5, this.Y5(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh6, this.Y6(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh7, this.Y7(this.v)));
-          this.c = pb.add(this.c, pb.mul(this.sh.sh8, this.Y8(this.v)));
-          this.$outputs.color = pb.vec4(this.c, 1);
-        });
-      }
-    });
-  }
-  protected async createTexture(): Promise<BaseTexture> {
-    const hdrTex = await this.assetManager.fetchTexture<Texture2D>(panorama);
-    this.srcTex = Application.instance.device.createCubeTexture(hdrTex.format, hdrTex.height);
-    panoramaToCubemap(hdrTex, this.srcTex);
-    this.prefiltered = Application.instance.device.createCubeTexture('rgba16f', 64, {
-      samplerOptions: { mipFilter: 'none' }
-    });
-    prefilterCubemap(this.srcTex, 'lambertian', this.prefiltered, 2048);
-    hdrTex.dispose();
-    if (1) {
-      console.time('GPU projection');
-      this.shCoeff = await projectCubemap(this.prefiltered);
-      console.timeEnd('GPU projection');
-      console.log(this.shCoeff);
-    } else {
-      console.time('CPU projection');
-      this.shCoeff = await projectCubemapCPU(this.prefiltered);
-      console.timeEnd('CPU projection');
-      console.log(this.shCoeff);
-    }
-    return this.prefiltered;
-  }
-  protected createBindGroup(): BindGroup {
-    const bindGroup = Application.instance.device.createBindGroup(this.program.bindGroupLayouts[0]);
-    bindGroup.setValue('sh', {
-      sh0: this.shCoeff[0],
-      sh1: this.shCoeff[1],
-      sh2: this.shCoeff[2],
-      sh3: this.shCoeff[3],
-      sh4: this.shCoeff[4],
-      sh5: this.shCoeff[5],
-      sh6: this.shCoeff[6],
-      sh7: this.shCoeff[7],
-      sh8: this.shCoeff[8]
-    });
-    return bindGroup;
-  }
-  protected updateBindGroup(t: number, w: number, h: number) {
-    const vpMatrix = Matrix4x4.multiply(Matrix4x4.perspective(Math.PI / 3, w / h, 1, 10), this.viewMatrix);
-    const matrix = this.animate
-      ? Matrix4x4.multiply(vpMatrix, Matrix4x4.rotationY((t * 0.001) % (2 * Math.PI)))
-      : vpMatrix;
-    this.bindgroup.setValue('mvpMatrix', matrix);
-    prefilterCubemap(this.srcTex, 'lambertian', this.prefiltered, 64);
   }
 }

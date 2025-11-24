@@ -1,4 +1,4 @@
-import type { VectorBase, CubeFace, TypedArray, IEventTarget } from '@zephyr3d/base';
+import type { VectorBase, CubeFace, TypedArray, IDisposable } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
 import type { PBTypeInfo } from './builder/types';
 import { PBArrayTypeInfo, PBPrimitiveTypeInfo, PBStructTypeInfo, PBPrimitiveType } from './builder/types';
@@ -19,39 +19,39 @@ import type { VertexBufferInfo } from './vertexdata';
  */
 export type TextureImageElement = ImageBitmap | HTMLCanvasElement;
 
-/** @internal */
+/** @public */
 export const MAX_VERTEX_ATTRIBUTES = 16;
-/** @internal */
+/** @public */
 export const MAX_BINDING_GROUPS = 4;
-/** @internal */
+/** @public */
 export const MAX_TEXCOORD_INDEX_COUNT = 8;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_POSITION = 0;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_NORMAL = 1;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_DIFFUSE = 2;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TANGENT = 3;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD0 = 4;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD1 = 5;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD2 = 6;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD3 = 7;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD4 = 8;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD5 = 9;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD6 = 10;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_TEXCOORD7 = 11;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_BLEND_WEIGHT = 12;
-/** @internal */
+/** @public */
 export const VERTEX_ATTRIB_BLEND_INDICES = 13;
 
 /**
@@ -332,7 +332,7 @@ export type VertexAttribFormat =
   | 'blendindices_f32x4'
   | 'blendindices_u32x4';
 
-const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType, number, string, number]> = {
+const vertexAttribFormatMap = {
   position_u8normx2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U8VEC2_NORM, 2, 'u8norm', 2],
   position_u8normx4: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U8VEC4_NORM, 4, 'u8norm', 4],
   position_i8normx2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.I8VEC2_NORM, 2, 'i8norm', 2],
@@ -605,7 +605,7 @@ const vertexAttribFormatMap: Record<VertexAttribFormat, [number, PBPrimitiveType
   blendindices_f16x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendindices_f32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
   blendindices_u32x4: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U32VEC4, 16, 'u32', 4]
-};
+} as const;
 
 /**
  * The semantic type of vertex
@@ -627,7 +627,7 @@ export type VertexSemantic =
   | 'texCoord6'
   | 'texCoord7';
 
-const vertexAttribNameMap: Record<VertexSemantic, number> = {
+const vertexAttribNameMap = {
   position: VERTEX_ATTRIB_POSITION,
   normal: VERTEX_ATTRIB_NORMAL,
   diffuse: VERTEX_ATTRIB_DIFFUSE,
@@ -642,7 +642,7 @@ const vertexAttribNameMap: Record<VertexSemantic, number> = {
   texCoord5: VERTEX_ATTRIB_TEXCOORD5,
   texCoord6: VERTEX_ATTRIB_TEXCOORD6,
   texCoord7: VERTEX_ATTRIB_TEXCOORD7
-};
+} as const;
 
 const vertexAttribNameRevMap = {
   [VERTEX_ATTRIB_POSITION]: 'position',
@@ -659,7 +659,7 @@ const vertexAttribNameRevMap = {
   [VERTEX_ATTRIB_TEXCOORD5]: 'texCoord5',
   [VERTEX_ATTRIB_TEXCOORD6]: 'texCoord6',
   [VERTEX_ATTRIB_TEXCOORD7]: 'texCoord7'
-};
+} as const;
 
 /**
  * Options for creating vertex layout
@@ -670,14 +670,7 @@ export type VertexLayoutOptions = {
    * vertex buffers in this vertex layout
    */
   vertexBuffers: {
-    /**
-     * vertex buffer object created by device
-     */
     buffer: StructuredBuffer;
-    /**
-     * the vertex buffer step mode,
-     * value can be 'vertex' or 'instance', default is 'vertex'
-     */
     stepMode?: VertexStepMode;
   }[];
   /**
@@ -696,7 +689,7 @@ export type TextureColorSpace = 'srgb' | 'linear';
  * Buffer usage type
  * @public
  */
-export type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write';
+export type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write' | 'pack-pixel' | 'unpack-pixel';
 
 /**
  * Common options for createing texture or buffer
@@ -715,6 +708,7 @@ export interface BaseCreationOptions {
 export interface TextureCreationOptions extends BaseCreationOptions {
   writable?: boolean;
   texture?: BaseTexture;
+  mipmapping?: boolean;
   samplerOptions?: SamplerOptions;
 }
 /**
@@ -745,8 +739,10 @@ export enum GPUResourceUsageFlags {
   BF_WRITE = 1 << 8,
   BF_UNIFORM = 1 << 9,
   BF_STORAGE = 1 << 10,
-  DYNAMIC = 1 << 11,
-  MANAGED = 1 << 12
+  BF_PACK_PIXEL = 1 << 11,
+  BF_UNPACK_PIXEL = 1 << 12,
+  DYNAMIC = 1 << 13,
+  MANAGED = 1 << 14
 }
 
 /**
@@ -766,7 +762,58 @@ export function getVertexAttribName(attrib: number): VertexSemantic {
 }
 
 /**
+ * Test whether a vertex buffer matches given semantic
+ * @param buffer - Vertex buffer
+ * @param name - Semantic to test
+ * @returns true if the vertex buffer matches given semantic, otherwise false
+ *
+ * @public
+ */
+export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic): boolean {
+  if (!buffer) {
+    return false;
+  }
+  const bufferType = buffer.structure.structMembers[0].type;
+  if (!bufferType.isArrayType()) {
+    return false;
+  }
+  const vertexType = bufferType.elementType;
+  if (vertexType.isStructType()) {
+    for (const attrib of vertexType.structMembers) {
+      if (attrib.name === name) {
+        return true;
+      }
+    }
+  } else {
+    return buffer.structure.structMembers[0].name === name;
+  }
+}
+
+/**
+ * Get vertex attribute type of specified vertex format
+ * @param fmt - The vertex format
+ * @returns Vertex attribute type, possible values are 'f32', 'f16', 'i32', 'u32', 'i16', 'u16', 'i8norm', 'u8norm', 'i16norm', 'u16norm'
+ *
+ * @public
+ */
+export function getVertexAttributeFormat(fmt: VertexAttribFormat) {
+  return vertexAttribFormatMap[fmt][3];
+}
+
+/**
+ * Get vertex attribute index of specified vertex format
+ * @param fmt - The vertex format
+ * @returns Vertex attribute index
+ *
+ * @public
+ */
+export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
+  return vertexAttribFormatMap[fmt][0];
+}
+
+/**
  * Get byte size of specified vertex format
+ *
  * @public
  */
 export function getVertexFormatSize(fmt: VertexAttribFormat): number {
@@ -775,6 +822,7 @@ export function getVertexFormatSize(fmt: VertexAttribFormat): number {
 
 /**
  * Get number of components of specified vertex format
+ *
  * @public
  */
 export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
@@ -787,6 +835,7 @@ export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
  * @param type - Data type of vertex component
  * @param count - The count of vertex components
  * @returns Vertex format
+ *
  * @public
  */
 export function getVertexAttribFormat(
@@ -808,6 +857,7 @@ export function getVertexAttribFormat(
  * Get the length of a vertex buffer by specified structure type of the vertex buffer
  * @param vertexBufferType - The structure type of the vertex buffer
  * @returns The length of the vertex buffer
+ *
  * @public
  */
 export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
@@ -818,6 +868,7 @@ export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
  * Get byte stride of a vertex buffer by specified structure type of the vertex buffer
  * @param vertexBufferType - The structure type of the vertex buffer
  * @returns The byte stride of the vertex buffer
+ *
  * @public
  */
 export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
@@ -838,6 +889,7 @@ export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
  * @param vertexBufferType - The structure type of the vertex buffer
  * @param semantic - The vertex semantic
  * @returns - The primitive type of the vertex attribute
+ *
  * @public
  */
 export function getVertexBufferAttribTypeBySemantic(
@@ -863,6 +915,7 @@ export function getVertexBufferAttribTypeBySemantic(
  * @param vertexBufferType - The structure type of the vertex buffer
  * @param semantic - The vertex attribute index
  * @returns - The primitive type of the vertex attribute
+ *
  * @public
  */
 export function getVertexBufferAttribType(
@@ -881,6 +934,7 @@ export function getVertexBufferAttribType(
  * @param length - The length of the vertex buffer
  * @param attributes - The vertex attributes
  * @returns The structure type of the vertex buffer
+ *
  * @public
  */
 export function makeVertexBufferType(length: number, ...attributes: VertexAttribFormat[]): PBStructTypeInfo {
@@ -915,12 +969,14 @@ export function makeVertexBufferType(length: number, ...attributes: VertexAttrib
 
 /**
  * Vertex step mode.
+ *
  * @public
  */
 export type VertexStepMode = 'vertex' | 'instance';
 
 /**
  * Vertex semantic list
+ *
  * @public
  */
 export const semanticList: string[] = (function () {
@@ -1201,7 +1257,7 @@ export interface SamplerOptions {
  * Base class for a GPU object
  * @public
  */
-export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: null }> {
+export interface GPUObject<T = unknown> extends IDisposable {
   /** The object was created by which device */
   readonly device: AbstractDevice;
   /** The internal GPU object  */
@@ -1211,7 +1267,7 @@ export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: null }>
   readonly cid: number;
   readonly disposed: boolean;
   name: string;
-  restoreHandler: (tex: GPUObject) => Promise<void>;
+  restoreHandler: (tex: GPUObject) => void;
   isVertexLayout(): this is VertexLayout;
   isFramebuffer(): this is FrameBuffer;
   isSampler(): this is TextureSampler;
@@ -1225,9 +1281,9 @@ export interface GPUObject<T = unknown> extends IEventTarget<{ disposed: null }>
   isBuffer(): this is GPUDataBuffer;
   isBindGroup(): this is BindGroup;
   dispose(): void;
-  reload(): Promise<void>;
+  reload(): void;
   destroy(): void;
-  restore(): Promise<void>;
+  restore(): void;
 }
 
 /**
@@ -1396,7 +1452,11 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
   readonly byteLength: number;
   readonly usage: number;
   bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void;
-  getBufferSubData(dstBuffer?: Uint8Array, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array>;
+  getBufferSubData(
+    dstBuffer?: Uint8Array<ArrayBuffer>,
+    offsetInBytes?: number,
+    sizeInBytes?: number
+  ): Promise<Uint8Array<ArrayBuffer>>;
 }
 
 /**
@@ -1458,6 +1518,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
   getDepthAttachmentLayer(): number;
   getColorAttachments(): BaseTexture[];
   getDepthAttachment(): BaseTexture;
+  getColorAttachment<T extends BaseTexture = BaseTexture>(index: number): T;
   bind(): boolean;
   unbind(): void;
 }
@@ -1490,7 +1551,7 @@ export interface BindGroup extends GPUObject<unknown> {
   getLayout(): BindGroupLayout;
   getDynamicOffsets(): number[];
   getGPUId(): string;
-  getBuffer(name: string): GPUDataBuffer;
+  getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
   getTexture(name: string): BaseTexture;
   setBuffer(
     name: string,

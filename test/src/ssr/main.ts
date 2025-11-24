@@ -2,22 +2,18 @@ import {
   Scene,
   Application,
   PerspectiveCamera,
-  Compositor,
   BatchGroup,
   DirectionalLight,
   WeightedBlendedOIT,
   ABufferOIT,
   Mesh,
   FPSCameraController,
-  Tonemap,
   BoxShape,
-  SphereShape,
   BlinnMaterial,
-  createGradientNoiseTexture
+  createGradientNoiseTexture,
+  getInput
 } from '@zephyr3d/scene';
 import * as common from '../common';
-import { createAxisGroup, Inspector } from '@zephyr3d/inspector';
-import { imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 
 const ssrApp = new Application({
@@ -30,31 +26,16 @@ ssrApp.ready().then(async () => {
   const device = ssrApp.device;
   const noiseTex = createGradientNoiseTexture(device, 128, 50, false);
   noiseTex.name = 'GradientNoiseTexture';
-  await imGuiInit(device);
   const scene = new Scene();
-  scene.env.sky.skyType = 'color';
+  scene.env.sky.skyType = 'image';
   scene.env.sky.skyColor = new Vector4(0, 0, 1, 1);
   scene.env.sky.fogType = 'none';
   scene.env.sky.skyType = 'scatter';
-  const camera = new PerspectiveCamera(
-    scene,
-    Math.PI / 3,
-    device.getDrawingBufferWidth() / device.getDrawingBufferHeight(),
-    1,
-    300
-  );
-  camera.lookAt(new Vector3(0, 6, 20), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
+  const camera = new PerspectiveCamera(scene, Math.PI / 3, 1, 300);
+  camera.lookAt(new Vector3(2, 8, 2), new Vector3(0, 6, 0), new Vector3(0, 1, 0));
   camera.controller = new FPSCameraController();
   camera.oit = device.type === 'webgpu' ? new ABufferOIT() : new WeightedBlendedOIT();
   camera.depthPrePass = true;
-  camera.enablePicking = true;
-
-  ssrApp.inputManager.use(imGuiInjectEvent);
-  ssrApp.inputManager.use(camera.handleEvent.bind(camera));
-
-  const compositor = new Compositor();
-  compositor.appendPostEffect(new Tonemap());
-  const inspector = new Inspector(scene, compositor, camera);
 
   const batchGroup = new BatchGroup(scene);
   const mat1 = new BlinnMaterial();
@@ -69,37 +50,34 @@ ssrApp.ready().then(async () => {
   mat3.albedoColor = new Vector4(1, 1, 0, 1);
   mat3.shininess = 5;
 
-  const sphereShape = new SphereShape({ radius: 4 });
-  const sphere = new Mesh(scene, sphereShape, mat3);
-  sphere.position.setXYZ(0, 6, 0);
-  sphere.parent = batchGroup;
+  const boxShape = new BoxShape({ size: 8 });
+  const box = new Mesh(scene, boxShape, mat3);
+  box.position.setXYZ(0, 6, 0);
+  box.parent = batchGroup;
 
-  const axisGroup = createAxisGroup(scene, 10, 1, 5, 2);
-  axisGroup.parent = sphere;
-
-  const light = new DirectionalLight(scene).setCastShadow(false).setColor(new Vector4(1, 1, 1, 1));
+  const light = new DirectionalLight(scene)
+    .setCastShadow(false)
+    .setColor(new Vector4(1, 1, 1, 1))
+    .setIntensity(15);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  ssrApp.on('resize', (ev) => {
-    camera.setPerspective(camera.getFOV(), ev.width / ev.height, camera.getNearPlane(), camera.getFarPlane());
+  getInput().use(camera.handleEvent.bind(camera));
+
+  ssrApp.on('resize', (width, height) => {
+    camera.setPerspective(camera.getFOV(), width / height, camera.getNearPlane(), camera.getFarPlane());
   });
 
   ssrApp.device.canvas.addEventListener('pointermove', (ev) => {
-    camera.pickPosX = ev.offsetX;
-    camera.pickPosY = ev.offsetY;
-  });
-
-  ssrApp.on('tick', (ev) => {
-    camera.updateController();
-    camera.render(scene, compositor);
-    imGuiNewFrame();
-    inspector.render();
-    imGuiEndFrame();
-    camera.pickResultAsync.then((pickResult) => {
+    camera.pickAsync(ev.offsetX, ev.offsetY).then((pickResult) => {
       if (pickResult?.target?.node?.isMesh()) {
         console.log(`Mesh ${pickResult.target.node.name ?? '???'} picked`);
       }
     });
+  });
+
+  ssrApp.on('tick', () => {
+    camera.updateController();
+    camera.render(scene);
   });
   ssrApp.run();
 });

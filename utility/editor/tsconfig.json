@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "downlevelIteration": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitAny": false,
+    "preserveConstEnums": false,
+    "listEmittedFiles": true,
+    "noUnusedLocals": true,
+    "strictNullChecks": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "sourceMap": true,
+    "stripInternal": true,
+    "rootDir": "./src",
+    "typeRoots": ["./node_modules/@webgpu/types"]
+  },
+  "include": ["./src"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
+}

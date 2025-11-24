@@ -1,6 +1,7 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import { Matrix4x4 } from '@zephyr3d/base';
+import { getDevice } from '../app/api';
 
 /**
  * Perspective camera class
@@ -12,6 +13,7 @@ export class PerspectiveCamera extends Camera {
   private _far: number;
   private _fovY: number;
   private _aspect: number;
+  private _autoAspect: boolean;
   private _window: number[];
   /**
    * Creates an instance of PerspectiveCamera
@@ -21,12 +23,13 @@ export class PerspectiveCamera extends Camera {
    * @param near - The near clip plane
    * @param far - The far clip plane
    */
-  constructor(scene: Scene, fovY: number, aspect: number, near: number, far: number) {
+  constructor(scene: Scene, fovY = Math.PI / 3, near = 1, far = 1000, aspect = 1) {
     super(scene);
     this._fovY = fovY;
     this._aspect = aspect;
     this._near = near;
     this._far = far;
+    this._autoAspect = true;
     this._window = null;
     this._invalidate(true);
   }
@@ -35,8 +38,15 @@ export class PerspectiveCamera extends Camera {
     return this._window;
   }
   set window(val: number[]) {
-    this._window = val ?? null;
+    this._window = val?.slice() ?? null;
     this._invalidate(true);
+  }
+  /** Automatically calculate aspect ratio before render according to current viewport */
+  get autoAspect() {
+    return this._autoAspect;
+  }
+  set autoAspect(val: boolean) {
+    this._autoAspect = !!val;
   }
   /** The near clip plane */
   get near(): number {
@@ -63,9 +73,6 @@ export class PerspectiveCamera extends Camera {
     return this._fovY;
   }
   set fovY(val: number) {
-    if (val === 0) {
-      debugger;
-    }
     if (val !== this._fovY) {
       this._fovY = val;
       this._invalidate(true);
@@ -81,13 +88,19 @@ export class PerspectiveCamera extends Camera {
       this._invalidate(true);
     }
   }
+  /** Adjust aspect ratio according to viewport settings of the camera */
+  adjustAspectRatio() {
+    if (this._viewport) {
+      this.aspect = this._viewport[2] / this._viewport[3];
+    } else {
+      const vp = getDevice().getViewport();
+      this.aspect = vp.width / vp.height;
+    }
+  }
   /**
    * {@inheritDoc Camera.setPerspective}
    */
   setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
-    if (fovY === 0) {
-      debugger;
-    }
     this._aspect = aspect;
     this._fovY = fovY;
     this._near = zNear;
@@ -101,7 +114,7 @@ export class PerspectiveCamera extends Camera {
    * @remarks
    * This method is only valid for {@link Camera} class or {@link OrthoCamera} class.
    */
-  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+  setOrtho(_left: number, _right: number, _bottom: number, _top: number, _near: number, _far: number): this {
     throw new Error(`setOrtho() not allowed on PerspectiveCamera`);
   }
   /**
@@ -109,20 +122,26 @@ export class PerspectiveCamera extends Camera {
    * @param matrix - The projection matrix
    */
   setProjectionMatrix(matrix: Matrix4x4): void {
-    if (matrix && matrix !== this._projMatrix && matrix.isPerspective()) {
-      if (matrix.getFov() === 0) {
-        debugger;
+    if (matrix !== this._projMatrix) {
+      if (matrix?.isPerspective()) {
+        super.setProjectionMatrix(matrix);
+        this._aspect = matrix.getAspect();
+        this._fovY = matrix.getFov();
+        this._near = matrix.getNearPlane();
+        this._far = matrix.getFarPlane();
+      } else {
+        throw new Error(
+          `PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`
+        );
       }
-      this._aspect = matrix.getAspect();
-      this._fovY = matrix.getFov();
-      this._near = matrix.getNearPlane();
-      this._far = matrix.getFarPlane();
-      this._invalidate(true);
-    } else {
-      throw new Error(
-        `PerspectiveCamera.setProjectionMatrix(): param is not a perspective projection matrix`
-      );
     }
+  }
+  /** {@inheritDoc Camera.render} */
+  render(scene: Scene) {
+    if (this._autoAspect) {
+      this.adjustAspectRatio();
+    }
+    super.render(scene);
   }
   /** @internal */
   protected _computeProj(): void {
@@ -141,6 +160,6 @@ export class PerspectiveCamera extends Camera {
       top = bottom + height * this._window[3];
     }
     this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
-    //this._projMatrix.perspective(this._fovY, this._aspect, this._near, this._far);
+    Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

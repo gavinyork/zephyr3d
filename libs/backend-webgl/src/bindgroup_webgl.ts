@@ -19,9 +19,10 @@ import type { WebGLDevice } from './device_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
-  private _layout: BindGroupLayout;
+  private readonly _layout: BindGroupLayout;
   private _dynamicOffsets: number[];
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
+  private _createdBuffers: WebGLGPUBuffer[];
   constructor(device: WebGLDevice, layout: BindGroupLayout) {
     super(device);
     this._device = device;
@@ -29,6 +30,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     this._dynamicOffsets = null;
     this._resources = {};
     this._object = {};
+    this._createdBuffers = [];
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.buffer.hasDynamicOffset) {
         if (!this._dynamicOffsets) {
@@ -44,21 +46,23 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getLayout(): BindGroupLayout {
     return this._layout;
   }
-  getBuffer(name: string): GPUDataBuffer {
-    return this._getBuffer(name, true);
+  getBuffer(name: string, nocreate = true): GPUDataBuffer {
+    return this._getBuffer(name, nocreate);
   }
   getDynamicOffsets(): number[] {
     return this._dynamicOffsets;
   }
-  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number) {
+  setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, _bindOffset?: number, _bindSize?: number) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.name === bindName) {
         if (!entry.buffer) {
-          console.log(`setBuffer() failed: resource '${name}' is not buffer`);
+          console.error(`setBuffer() failed: resource '${name}' is not buffer`);
         } else {
           if (buffer && !(buffer.usage & GPUResourceUsageFlags.BF_UNIFORM)) {
-            console.log(`setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`);
+            console.error(
+              `setBuffer() failed: buffer resource '${name}' must be type '${entry.buffer.type}'`
+            );
           } else if (buffer !== this._resources[entry.name]) {
             this._resources[entry.name] = buffer as WebGLGPUBuffer;
           }
@@ -69,7 +73,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
         return;
       }
     }
-    console.log(`setBuffer() failed: no buffer resource named '${name}'`);
+    console.error(`setBuffer() failed: no buffer resource named '${name}'`);
   }
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number) {
     const mappedName = this._layout.nameMap?.[name];
@@ -80,7 +84,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       if (buffer) {
         buffer.bufferSubData(byteOffset, data, srcPos, srcLength);
       } else {
-        console.log(`set(): no uniform buffer named '${name}'`);
+        console.error(`set(): no uniform buffer named '${name}'`);
       }
     }
   }
@@ -102,17 +106,17 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
           }
         }
       } else {
-        console.log(`set(): no uniform buffer named '${name}'`);
+        console.error(`set(): no uniform buffer named '${name}'`);
       }
     }
   }
   setTextureView(
-    name: string,
-    value: BaseTexture,
-    level?: number,
-    face?: number,
-    mipCount?: number,
-    sampler?: TextureSampler
+    _name: string,
+    _value: BaseTexture,
+    _level?: number,
+    _face?: number,
+    _mipCount?: number,
+    _sampler?: TextureSampler
   ) {
     throw new Error('setTextureView() not supported for webgl device');
   }
@@ -133,10 +137,10 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
           texture.getDefaultSampler(!!entry.texture?.autoBindSamplerComparison)) as WebGLTextureSampler
       ];
     } else {
-      console.log(`setTexture() failed: no texture uniform named '${name}'`);
+      console.error(`setTexture() failed: no texture uniform named '${name}'`);
     }
   }
-  setSampler(name: string, value: TextureSampler) {
+  setSampler(_name: string, _value: TextureSampler) {
     // no sampler uniform support for webgl
   }
   apply(program: WebGLGPUProgram, offsets?: Iterable<number>) {
@@ -171,8 +175,12 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   destroy(): void {
     this._resources = {};
     this._object = null;
+    for (const buffer of this._createdBuffers) {
+      buffer.dispose();
+    }
+    this._createdBuffers = [];
   }
-  async restore(): Promise<void> {
+  restore(): void {
     this._object = {};
   }
   isBindGroup(): this is BindGroup {
@@ -188,6 +196,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
             usage: 'uniform'
           }) as WebGLStructuredBuffer;
           this._resources[entry.name] = buffer;
+          this._createdBuffers.push(buffer);
         }
         return buffer as GPUDataBuffer;
       }

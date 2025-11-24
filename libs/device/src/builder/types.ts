@@ -1,3 +1,4 @@
+import { ASSERT } from '@zephyr3d/base';
 import type { TextureFormat } from '../base_types';
 import type { UniformBufferLayout } from '../gpuobject';
 
@@ -44,7 +45,7 @@ function getAlignment(type: LayoutableType): number {
     return Math.max(alignment, 16);
   }
 }
-function getAlignmentPacked(type: LayoutableType): number {
+function getAlignmentPacked(_type: LayoutableType): number {
   return 1;
 }
 function getSize(type: LayoutableType): number {
@@ -643,7 +644,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
     return false;
   }
   /** @internal */
-  getConstructorOverloads(deviceType: string): PBFunctionTypeInfo[] {
+  getConstructorOverloads(_deviceType: string): PBFunctionTypeInfo[] {
     return [];
   }
   /**
@@ -688,7 +689,7 @@ export class PBVoidTypeInfo extends PBTypeInfo<null> {
     return 'void';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
 }
@@ -714,11 +715,11 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     return 'any';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** {@inheritDoc PBTypeInfo.isCompatibleType} */
-  isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
+  isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean {
     return true;
   }
 }
@@ -959,7 +960,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1281,8 +1282,8 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       const typename = `array<${elementTypeName}${this.dimension ? ', ' + this.dimension : ''}>`;
       return varName ? `${varName}: ${typename}` : typename;
     } else {
-      console.assert(!!this.dimension, 'runtime-sized array not supported for webgl');
-      console.assert(!this.elementType.isArrayType(), 'multi-dimensional arrays not supported for webgl');
+      ASSERT(!!this.dimension, 'runtime-sized array not supported for webgl');
+      ASSERT(!this.elementType.isArrayType(), 'multi-dimensional arrays not supported for webgl');
       const elementTypeName = this.elementType.toTypeName(deviceType, varName);
       return `${elementTypeName}[${this.dimension}]`;
     }
@@ -1292,8 +1293,8 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     return layout === 'packed' || this.elementType.isAnyType()
       ? 1
       : layout === 'std430'
-      ? this.elementType.getLayoutAlignment(layout)
-      : align(this.elementType.getLayoutAlignment(layout), 16);
+        ? this.elementType.getLayoutAlignment(layout)
+        : align(this.elementType.getLayoutAlignment(layout), 16);
   }
   /** @internal */
   getLayoutSize(layout: PBStructLayout): number {
@@ -1307,7 +1308,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       : this.dimension * align(this.elementType.getLayoutSize(layout), elementAlignment);
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
@@ -1337,7 +1338,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
       pointerType,
       addressSpace
     });
-    console.assert(pointerType.isStorable(), 'the pointee type must be storable');
+    ASSERT(pointerType.isStorable(), 'the pointee type must be storable');
     this.writable = false;
   }
   /** Get type of the pointer */
@@ -1384,7 +1385,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1427,11 +1428,11 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout): number {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
@@ -1482,11 +1483,11 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout): number {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
@@ -1535,7 +1536,7 @@ export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1561,8 +1562,8 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       writable,
       storageTexelFormat: texelFormat || null
     });
-    console.assert(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
-    console.assert(
+    ASSERT(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
+    ASSERT(
       !(textureType & BITFLAG_STORAGE) || !!storageTexelFormatMap[texelFormat],
       'invalid texel format for storage texture'
     );
@@ -1656,12 +1657,12 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       const typename = (deviceType === 'webgl' ? textureTypeMapWebGL : textureTypeMapWebGL2)[
         this.textureType
       ];
-      console.assert(!!typename, 'unsupported texture type');
+      ASSERT(!!typename, 'unsupported texture type');
       return varName ? `${typename} ${varName}` : typename;
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */
@@ -1703,7 +1704,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     return `fn(${this.argHash}):${this.returnType.typeId}`;
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): UniformBufferLayout {
     return null;
   }
   /** @internal */

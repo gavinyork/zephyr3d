@@ -4,22 +4,31 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinBlinnPhong } from './mixins/lightmodel/blinnphong';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import type { Clonable } from '@zephyr3d/base';
 
 /**
  * Blinn material
  * @public
  */
-export class BlinnMaterial extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong, mixinVertexColor) {
+export class BlinnMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinBlinnPhong, mixinVertexColor)
+  implements Clonable<BlinnMaterial>
+{
   /** @internal */
-  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   /** @internal */
-  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /**
    * Creates an instance of BlinnMaterial class
    */
   constructor() {
     super();
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  clone(): BlinnMaterial {
+    const other = new BlinnMaterial();
+    other.copyFrom(this);
+    return other;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {

@@ -1,4 +1,11 @@
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import type {
+  IControllerKeydownEvent,
+  IControllerKeyupEvent,
+  IControllerPointerDownEvent,
+  IControllerPointerMoveEvent,
+  IControllerPointerUpEvent
+} from './base';
 import { BaseCameraController } from './base';
 
 /**
@@ -27,7 +34,7 @@ export interface FPSCameraControllerOptions {
  */
 export class FPSCameraController extends BaseCameraController {
   /** @internal */
-  private options: FPSCameraControllerOptions;
+  private readonly options: FPSCameraControllerOptions;
   /** @internal */
   private mouseDown: boolean;
   /** @internal */
@@ -67,6 +74,7 @@ export class FPSCameraController extends BaseCameraController {
       },
       options || {}
     );
+    this.reset();
   }
   /**
    * {@inheritDoc BaseCameraController.reset}
@@ -87,7 +95,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: PointerEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
     if (evt.button === 0) {
       this.mouseDown = true;
       this.lastMouseX = evt.offsetX;
@@ -100,7 +108,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: PointerEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
     if (evt.button === 0 && this.mouseDown) {
       this.mouseDown = false;
       return true;
@@ -111,7 +119,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: PointerEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     if (this.mouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -156,7 +164,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyDown}
    * @override
    */
-  protected _onKeyDown(evt: KeyboardEvent): boolean {
+  protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = true;
@@ -185,7 +193,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyUp}
    * @override
    */
-  protected _onKeyUp(evt: KeyboardEvent): boolean {
+  protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = false;
@@ -215,7 +223,7 @@ export class FPSCameraController extends BaseCameraController {
    * @param opt - options
    */
   setOptions(opt?: FPSCameraControllerOptions) {
-    opt && Object.assign(this.options, opt);
+    Object.assign(this.options, opt ?? {});
     this.reset();
   }
   /**
@@ -226,13 +234,7 @@ export class FPSCameraController extends BaseCameraController {
     const x = this._getCamera().worldMatrix.getRow(0).xyz();
     x.y = 0;
     x.inplaceNormalize();
-    if (x.isNaN()) {
-      console.log(`Camera error 1: ${x.toString()}`);
-    }
     const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
-    if (z.isNaN()) {
-      console.log(`Camera error 2: ${z.toString()}`);
-    }
     const move = new Vector3(0, 0, 0);
     let changed = false;
     if (this.keyForward) {
@@ -271,9 +273,6 @@ export class FPSCameraController extends BaseCameraController {
           Matrix4x4.invertAffine(this._getCamera().parent.worldMatrix)
         );
         newLocalMatrix.decompose(scale, rotation, pos);
-        if (scale.isNaN() || rotation.isNaN() || pos.isNaN()) {
-          console.log(`Camera error 3: ${scale.toString()} ${rotation.toString()} ${pos.toString()}`);
-        }
         this._getCamera().position.set(pos);
         this._getCamera().scale.set(scale);
         this._getCamera().rotation.set(rotation);

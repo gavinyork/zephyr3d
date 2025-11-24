@@ -25,7 +25,7 @@ const VALIDATION_FAILED = 1 << 1;
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 export class WebGPURenderPass {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _renderCommandEncoder: GPUCommandEncoder;
   private _renderPassEncoder: GPURenderPassEncoder;
   private _fbBindFlag: number;
@@ -108,11 +108,13 @@ export class WebGPURenderPass {
     const vy = this._device.screenToDevice(this._currentViewport.y);
     const vw = this._device.screenToDevice(this._currentViewport.width);
     const vh = this._device.screenToDevice(this._currentViewport.height);
+    /*
     if (vx < 0 || vy < 0 || vw > this._device.drawingBufferWidth || vh > this._device.drawingBufferHeight) {
-      console.log(
+      console.error(
         `** VIEWPORT ERROR **: (${vx}, ${vy}, ${vw}, ${vh}) => (0, 0, ${this._device.drawingBufferWidth}, ${this._device.drawingBufferHeight})`
       );
     }
+    */
     if (this._renderPassEncoder) {
       this._renderPassEncoder.setViewport(vx, this._device.drawingBufferHeight - vy - vh, vw, vh, 0, 1);
     }
@@ -264,8 +266,8 @@ export class WebGPURenderPass {
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
             ? attachment.layer
             : depthAttachmentTexture.isTextureCube()
-            ? attachment.face
-            : 0;
+              ? attachment.face
+              : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
       this._fbBindFlag = frameBuffer.bindFlag;
@@ -281,8 +283,8 @@ export class WebGPURenderPass {
                 tex.isTexture2DArray() || tex.isTexture3D()
                   ? attachment.layer
                   : tex.isTextureCube()
-                  ? attachment.face
-                  : 0;
+                    ? attachment.face
+                    : 0;
               if (frameBuffer.getOptions().sampleCount === 1) {
                 return {
                   view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),

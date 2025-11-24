@@ -24,10 +24,10 @@ interface TimerQuery {
 }
 
 export class GPUTimer implements ITimer {
-  private _device: WebGLDevice;
-  private _query: unknown;
+  private readonly _device: WebGLDevice;
+  private readonly _query: unknown;
   private _state: QueryState;
-  private _timerQuery: TimerQuery;
+  private readonly _timerQuery: TimerQuery;
   private _gpuTime: number;
   constructor(device: WebGLDevice) {
     this._device = device;

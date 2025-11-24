@@ -4,26 +4,36 @@ import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import type { Clonable } from '@zephyr3d/base';
 
 /**
  * PBRSpecularGlossinessMaterial class
  * @public
  */
-export class PBRSpecularGlossinessMaterial extends applyMaterialMixins(
-  MeshMaterial,
-  mixinPBRSpecularGlossness,
-  mixinVertexColor
-) {
+export class PBRSpecularGlossinessMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinPBRSpecularGlossness, mixinVertexColor)
+  implements Clonable<PBRSpecularGlossinessMaterial>
+{
   /** @internal */
-  private static FEATURE_VERTEX_NORMAL = this.defineFeature();
+  private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   /** @internal */
-  private static FEATURE_VERTEX_TANGENT = this.defineFeature();
+  private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /**
    * Creates an instance of PBRSpecularGlossinessMaterial class
    */
   constructor() {
     super();
     this.useFeature(PBRSpecularGlossinessMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+  clone(): PBRSpecularGlossinessMaterial {
+    const other = new PBRSpecularGlossinessMaterial();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.vertexNormal = other.vertexNormal;
+    this.vertexTangent = other.vertexTangent;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal(): boolean {

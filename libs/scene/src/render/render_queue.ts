@@ -1,6 +1,5 @@
-import { Application } from '../app';
 import type { Vector4 } from '@zephyr3d/base';
-import { Vector3 } from '@zephyr3d/base';
+import { Disposable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -11,6 +10,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { Material } from '../material';
 import { ShaderHelper } from '../material';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export type CachedBindGroup = {
@@ -46,7 +46,7 @@ export class InstanceBindGroupAllocator {
       }
     }
     if (!InstanceBindGroupAllocator._instanceBindGroupLayout) {
-      const buildInfo = new ProgramBuilder(Application.instance.device).buildRender({
+      const buildInfo = new ProgramBuilder(getDevice()).buildRender({
         vertex(pb) {
           this[ShaderHelper.getInstanceDataUniformName()] = pb.vec4[65536 >> 4]().uniformBuffer(3);
           pb.main(function () {});
@@ -58,9 +58,7 @@ export class InstanceBindGroupAllocator {
       InstanceBindGroupAllocator._instanceBindGroupLayout = buildInfo[2][3];
     }
     const bindGroup = {
-      bindGroup: Application.instance.device.createBindGroup(
-        InstanceBindGroupAllocator._instanceBindGroupLayout
-      ),
+      bindGroup: getDevice().createBindGroup(InstanceBindGroupAllocator._instanceBindGroupLayout),
       buffer: new Float32Array(maxBufferSizeInFloats),
       offset: 0,
       dirty: true
@@ -149,11 +147,11 @@ export interface DrawableInstanceInfo {
  * A queue that contains the items to be rendered
  * @public
  */
-export class RenderQueue {
+export class RenderQueue extends Disposable {
   /** @internal */
   private _itemList: RenderItemList;
   /** @internal */
-  private _renderPass: RenderPass;
+  private readonly _renderPass: RenderPass;
   /** @internal */
   private _shadowedLightList: PunctualLight[];
   /** @internal */
@@ -161,22 +159,25 @@ export class RenderQueue {
   /** @internal */
   private _sunLight: DirectionalLight;
   /** @internal */
-  private _bindGroupAllocator: InstanceBindGroupAllocator;
+  private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
-  private _ref: RenderQueueRef;
+  private readonly _ref: RenderQueueRef;
   /** @internal */
-  private _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
+  private readonly _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
   /** @internal */
   private _needSceneColor: boolean;
+  private _needSceneDepth: boolean;
+  private _needSceneColorWithDepth: boolean;
   /** @internal */
   private _drawTransparent: boolean;
   /** @internal */
-  private _objectColorMaps: Map<number, Drawable>[];
+  private readonly _objectColorMaps: Map<number, Drawable>[];
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
    */
   constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
+    super();
     this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
     this._itemList = null;
     this._renderPass = renderPass;
@@ -186,6 +187,8 @@ export class RenderQueue {
     this._ref = { ref: this };
     this._instanceInfo = new Map();
     this._needSceneColor = false;
+    this._needSceneDepth = false;
+    this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
   }
@@ -196,9 +199,17 @@ export class RenderQueue {
   set sunLight(light: DirectionalLight) {
     this._sunLight = light;
   }
-  /** Whether this render queue requires scene color pass */
-  get needSceneColor(): boolean {
+  /** @internal */
+  needSceneColor(): boolean {
     return this._needSceneColor;
+  }
+  /** @internal */
+  needSceneDepth(): boolean {
+    return this._needSceneDepth;
+  }
+  /** @internal */
+  needSceneColorWithDepth(): boolean {
+    return this._needSceneColorWithDepth;
   }
   /** Whether this render queue has transparent objects to be drawn */
   get drawTransparent(): boolean {
@@ -247,7 +258,7 @@ export class RenderQueue {
    * @internal
    */
   getMaxBatchSize() {
-    return Application.instance.device.getDeviceCaps().shaderCaps.maxUniformBufferSize / 64;
+    return getDevice().getDeviceCaps().shaderCaps.maxUniformBufferSize / 64;
   }
   /**
    * Push a punctual light
@@ -284,6 +295,8 @@ export class RenderQueue {
     this._itemList.transmission_trans.lit.push(...newItemLists.transmission_trans.lit);
     this._itemList.transmission_trans.unlit.push(...newItemLists.transmission_trans.unlit);
     this._needSceneColor ||= queue._needSceneColor;
+    this._needSceneDepth ||= queue._needSceneDepth;
+    this._needSceneColorWithDepth ||= queue._needSceneColorWithDepth;
     this._drawTransparent ||= queue._drawTransparent;
     this._objectColorMaps.push(...queue._objectColorMaps);
   }
@@ -294,17 +307,21 @@ export class RenderQueue {
    */
   push(camera: Camera, drawable: Drawable): void {
     if (drawable) {
+      drawable.pushRenderQueueRef(this._ref);
       if (!this._itemList) {
         this._itemList = this.newRenderItemList();
       }
       const trans = drawable.getQueueType() === QUEUE_TRANSPARENT;
       const unlit = drawable.isUnlit();
-      const transmission = drawable.needSceneColor();
+      const needDepth = !!drawable.needSceneDepth();
+      const transmission = !!drawable.needSceneColor() || needDepth;
       this._needSceneColor ||= transmission;
+      this._needSceneDepth ||= drawable.needSceneDepth();
+      this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
-      if (camera.enablePicking) {
+      if (camera.getPickResultResolveFunc()) {
         drawable.getMaterial().objectColor = drawable.getObjectColor();
-        this._objectColorMaps[0].set(drawable.getId(), drawable);
+        this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
         const instanceList = trans
@@ -313,15 +330,15 @@ export class RenderQueue {
               ? this._itemList.transmission_trans.unlit[0].instanceList
               : this._itemList.transmission_trans.lit[0].instanceList
             : unlit
-            ? this._itemList.transparent.unlit[0].instanceList
-            : this._itemList.transparent.lit[0].instanceList
+              ? this._itemList.transparent.unlit[0].instanceList
+              : this._itemList.transparent.lit[0].instanceList
           : transmission
-          ? unlit
-            ? this._itemList.transmission.unlit[0].instanceList
-            : this._itemList.transmission.lit[0].instanceList
-          : unlit
-          ? this._itemList.opaque.unlit[0].instanceList
-          : this._itemList.opaque.lit[0].instanceList;
+            ? unlit
+              ? this._itemList.transmission.unlit[0].instanceList
+              : this._itemList.transmission.lit[0].instanceList
+            : unlit
+              ? this._itemList.opaque.unlit[0].instanceList
+              : this._itemList.opaque.lit[0].instanceList;
         const hash = drawable.getInstanceId(this._renderPass);
         let drawableList = instanceList[hash];
         if (!drawableList) {
@@ -336,15 +353,15 @@ export class RenderQueue {
               ? this._itemList.transmission_trans.unlit[0]
               : this._itemList.transmission_trans.lit[0]
             : unlit
-            ? this._itemList.transparent.unlit[0]
-            : this._itemList.transparent.lit[0]
+              ? this._itemList.transparent.unlit[0]
+              : this._itemList.transparent.lit[0]
           : transmission
-          ? unlit
-            ? this._itemList.transmission.unlit[0]
-            : this._itemList.transmission.lit[0]
-          : unlit
-          ? this._itemList.opaque.unlit[0]
-          : this._itemList.opaque.lit[0];
+            ? unlit
+              ? this._itemList.transmission.unlit[0]
+              : this._itemList.transmission.lit[0]
+            : unlit
+              ? this._itemList.opaque.unlit[0]
+              : this._itemList.opaque.lit[0];
         const skinAnimation = !!drawable.getBoneMatrices();
         const morphAnimation = !!drawable.getMorphData();
         let queue: RenderQueueItem[];
@@ -362,17 +379,16 @@ export class RenderQueue {
           sortDistance: drawable.getSortDistance(camera),
           instanceData: null
         });
-        drawable.applyTransformUniforms(this);
         const mat = drawable.getMaterial();
         if (mat) {
           list.materialList.add(mat.coreMaterial);
         }
+        drawable.applyTransformUniforms(this);
       }
-      drawable.pushRenderQueueRef(this._ref);
     }
   }
   /** @internal */
-  getDrawableByColor(c: Uint8Array) {
+  getDrawableByColor(c: Uint8Array<ArrayBuffer>) {
     const id = (c[0] << 24) + (c[1] << 16) + (c[2] << 8) + c[3];
     for (const m of this._objectColorMaps) {
       const drawable = m.get(id);
@@ -419,17 +435,13 @@ export class RenderQueue {
     this._unshadowedLightList = [];
     this._sunLight = null;
     this._needSceneColor = false;
+    this._needSceneDepth = false;
+    this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
   }
   /** @internal */
-  dispose() {
-    this._ref.ref = null;
-    this._ref = null;
-    this.reset();
-  }
-  /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
-    const frameCounter = Application.instance.device.frameInfo.frameCounter;
+    const frameCounter = getDevice().frameInfo.frameCounter;
     const itemList = this._itemList;
     if (!this.itemList) {
       return this;
@@ -459,7 +471,7 @@ export class RenderQueue {
             const drawable = drawables[i];
             const instanceUniforms = drawable.getInstanceUniforms();
             const instanceUniformsSize = instanceUniforms?.length ?? 0;
-            const stride = 16 + instanceUniformsSize;
+            const stride = ShaderHelper.MATERIAL_INSTANCE_DATA_OFFSET * 4 + instanceUniformsSize;
             if (!bindGroup || bindGroup.offset + stride > maxBufferSizeInFloats) {
               bindGroup = this._bindGroupAllocator.allocateInstanceBindGroup(frameCounter, stride);
               item = {
@@ -574,8 +586,14 @@ export class RenderQueue {
       );
     }
   }
+  /** Disposes the render queue */
+  protected onDispose() {
+    super.onDispose();
+    this.reset();
+  }
+
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
-    const drawablePos = drawable.getXForm().position;
+    const drawablePos = drawable.getNode().position;
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
   private newRenderItemListInfo(): RenderItemListInfo {

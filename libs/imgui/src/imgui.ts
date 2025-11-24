@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars, no-empty-function, @typescript-eslint/no-explicit-any */
 import type { Texture2D } from '@zephyr3d/device';
 export interface XY {
   x: number;
@@ -313,7 +312,10 @@ export function IM_ARRAYSIZE(_ARR: ArrayLike<any> | ImStringBuffer): number {
 
 export { ImStringBuffer as StringBuffer };
 export class ImStringBuffer {
-  constructor(public size: number, public buffer: string = '') {}
+  constructor(
+    public size: number,
+    public buffer: string = ''
+  ) {}
 }
 
 export type ImAccess<T> = Bind.ImAccess<T>;
@@ -1009,7 +1011,10 @@ export class ImVec2 implements Bind.interface_ImVec2 {
   public static readonly UNIT_X: Readonly<ImVec2> = new ImVec2(1.0, 0.0);
   public static readonly UNIT_Y: Readonly<ImVec2> = new ImVec2(0.0, 1.0);
 
-  constructor(public x: number = 0.0, public y: number = 0.0) {}
+  constructor(
+    public x: number = 0.0,
+    public y: number = 0.0
+  ) {}
 
   public Set(x: number, y: number): this {
     this.x = x;
@@ -1225,14 +1230,20 @@ export class ImGuiTextFilter {
   }
   // IMGUI_API bool      Draw(const char* label = "Filter (inc,-exc)", float width = 0.0f);    // Helper calling InputText+Build
   public Draw(label = 'Filter (inc,-exc)', width = 0.0): boolean {
-    if (width !== 0.0) bind.PushItemWidth(width);
+    if (width !== 0.0) {
+      bind.PushItemWidth(width);
+    }
     const value_changed: boolean = InputText(label, this.InputBuf, IM_ARRAYSIZE(this.InputBuf));
-    if (width !== 0.0) bind.PopItemWidth();
-    if (value_changed) this.Build();
+    if (width !== 0.0) {
+      bind.PopItemWidth();
+    }
+    if (value_changed) {
+      this.Build();
+    }
     return value_changed;
   }
   // IMGUI_API bool      PassFilter(const char* text, const char* text_end = NULL) const;
-  public PassFilter(text: string, text_end: number | null = null): boolean {
+  public PassFilter(_text: string, _text_end: number | null = null): boolean {
     // if (Filters.empty())
     //     return true;
 
@@ -1259,7 +1270,9 @@ export class ImGuiTextFilter {
     // }
 
     // Implicit * grep
-    if (this.CountGrep === 0) return true;
+    if (this.CountGrep === 0) {
+      return true;
+    }
 
     return false;
   }
@@ -1622,7 +1635,10 @@ export type ImGuiSizeCallback<T> = (data: ImGuiSizeCallbackData<T>) => void;
 // NB: For basic min/max size constraint on each axis you don't need to use the callback! The SetNextWindowSizeConstraints() parameters are enough.
 export { ImGuiSizeCallbackData as SizeCallbackData };
 export class ImGuiSizeCallbackData<T> {
-  constructor(public readonly native: Bind.reference_ImGuiSizeCallbackData, public readonly UserData: T) {}
+  constructor(
+    public readonly native: Bind.reference_ImGuiSizeCallbackData,
+    public readonly UserData: T
+  ) {}
 
   get Pos(): Readonly<Bind.interface_ImVec2> {
     return this.native.Pos;
@@ -1665,7 +1681,7 @@ export class ImGuiTableSortSpecs {
     });
   }
 
-  private _Specs: Readonly<ImGuiTableColumnSortSpecs[]>;
+  private readonly _Specs: Readonly<ImGuiTableColumnSortSpecs[]>;
   get Specs(): Readonly<ImGuiTableColumnSortSpecs[]> {
     return this._Specs;
   }
@@ -1879,12 +1895,12 @@ export class ImDrawList {
   // This is what you have to render
   // ImVector<ImDrawCmd>     CmdBuffer;          // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
   // ImVector<ImDrawIdx>     IdxBuffer;          // Index buffer. Each command consume ImDrawCmd::ElemCount of those
-  get IdxBuffer(): Uint8Array {
-    return this.native.IdxBuffer;
+  get IdxBuffer(): Uint8Array<ArrayBuffer> {
+    return this.native.IdxBuffer as Uint8Array<ArrayBuffer>;
   }
   // ImVector<ImDrawVert>    VtxBuffer;          // Vertex buffer.
-  get VtxBuffer(): Uint8Array {
-    return this.native.VtxBuffer;
+  get VtxBuffer(): Uint8Array<ArrayBuffer> {
+    return this.native.VtxBuffer as Uint8Array<ArrayBuffer>;
   }
   // ImDrawListFlags         Flags;              // Flags, you may poke into these to adjust anti-aliasing settings per-primitive.
   get Flags(): ImDrawListFlags {
@@ -3135,15 +3151,15 @@ export class ImFont {
   }
   // IMGUI_API void              RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width = 0.0f, bool cpu_fine_clip = false) const;
   public RenderText(
-    draw_list: ImDrawList,
-    size: number,
-    pos: Readonly<Bind.interface_ImVec2>,
-    col: Bind.ImU32,
-    clip_rect: Readonly<Bind.interface_ImVec4>,
-    text_begin: string,
-    text_end: number | null = null,
-    wrap_width = 0.0,
-    cpu_fine_clip = false
+    _draw_list: ImDrawList,
+    _size: number,
+    _pos: Readonly<Bind.interface_ImVec2>,
+    _col: Bind.ImU32,
+    _clip_rect: Readonly<Bind.interface_ImVec4>,
+    _text_begin: string,
+    _text_end: number | null = null,
+    _wrap_width = 0.0,
+    _cpu_fine_clip = false
   ): void {}
 
   // [Internal]
@@ -3156,7 +3172,7 @@ export class ImFont {
   // #endif
 
   // IMGUI_API bool              IsGlyphRangeUnused(unsigned int c_begin, unsigned int c_last);
-  public IsGlyphRangeUnused(c_begin: number, c_last: number): boolean {
+  public IsGlyphRangeUnused(_c_begin: number, _c_last: number): boolean {
     return false;
   } // TODO
 
@@ -3225,7 +3241,7 @@ class script_ImGuiStyle implements Bind.interface_ImGuiStyle {
   public AntiAliasedFill = true;
   public CurveTessellationTol = 1.25;
   public CircleSegmentMaxError = 1.6;
-  private Colors: ImVec4[] = [];
+  private readonly Colors: ImVec4[] = [];
   public _getAt_Colors(index: number): Bind.interface_ImVec4 {
     return this.Colors[index];
   }
@@ -5369,14 +5385,14 @@ export function DragIntRange2(
 export function DragScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   v_speed: number,
   v_min: number | null = null,
   v_max: number | null = null,
@@ -5602,14 +5618,14 @@ export function SliderInt4(
 export function SliderScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   v_min: number,
   v_max: number,
   format: string | null = null,
@@ -5959,14 +5975,14 @@ export function InputDouble(
 export function InputScalar(
   label: string,
   v:
-    | Int8Array
-    | Uint8Array
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array,
+    | Int8Array<ArrayBuffer>
+    | Uint8Array<ArrayBuffer>
+    | Int16Array<ArrayBuffer>
+    | Uint16Array<ArrayBuffer>
+    | Int32Array<ArrayBuffer>
+    | Uint32Array<ArrayBuffer>
+    | Float32Array<ArrayBuffer>
+    | Float64Array<ArrayBuffer>,
   step: number | null = null,
   step_fast: number | null = null,
   format: string | null = null,
@@ -7209,16 +7225,16 @@ export function SetClipboardText(text: string): void {
 // IMGUI_API void          LoadIniSettingsFromMemory(const char* ini_data, size_t ini_size=0); // call after CreateContext() and before the first call to NewFrame() to provide .ini data from your own data source.
 // IMGUI_API void          SaveIniSettingsToDisk(const char* ini_filename);                    // this is automatically called (if io.IniFilename is not empty) a few seconds after any modification that should be reflected in the .ini file (and also by DestroyContext).
 // IMGUI_API const char*   SaveIniSettingsToMemory(size_t* out_ini_size = NULL);               // return a zero-terminated string with the .ini data which you can save by your own mean. call when io.WantSaveIniSettings is set, then save data by your own mean and clear io.WantSaveIniSettings.
-export function LoadIniSettingsFromDisk(ini_filename: string): void {
+export function LoadIniSettingsFromDisk(_ini_filename: string): void {
   throw new Error();
 } // TODO
-export function LoadIniSettingsFromMemory(ini_data: string, ini_size = 0): void {
+export function LoadIniSettingsFromMemory(ini_data: string, _ini_size = 0): void {
   bind.LoadIniSettingsFromMemory(ini_data);
 }
-export function SaveIniSettingsToDisk(ini_filename: string): void {
+export function SaveIniSettingsToDisk(_ini_filename: string): void {
   throw new Error();
 } // TODO
-export function SaveIniSettingsToMemory(out_ini_size: Bind.ImScalar<number> | null = null): string {
+export function SaveIniSettingsToMemory(_out_ini_size: Bind.ImScalar<number> | null = null): string {
   return bind.SaveIniSettingsToMemory();
 }
 

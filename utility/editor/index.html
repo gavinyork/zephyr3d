@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zephyr3d Editor</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+      }
+      canvas {
+        touch-action: none;
+        overscroll-behavior: contain;
+        overflow: hidden;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@zephyr3d/base": "./modules/zephyr3d_base.js",
+          "@zephyr3d/device": "./modules/zephyr3d_device.js",
+          "@zephyr3d/scene": "./modules/zephyr3d_scene.js",
+          "@zephyr3d/imgui": "./modules/zephyr3d_imgui.js",
+          "@zephyr3d/backend-webgl": "./modules/zephyr3d_backend-webgl.js",
+          "@zephyr3d/backend-webgpu": "./modules/zephyr3d_backend-webgpu.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="/vendor/typescript.js"></script>
+    <script src="/vendor/draco_decoder.js"></script>
+    <script>
+      // Load CSS for monaco editor
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = './vendor/monaco/vs/editor/editor.main.css';
+      css.type = 'text/css';
+      document.head.append(css);
+      // Load monaco editor stuff
+      const script = document.createElement('script');
+      script.src = './vendor/monaco/vs/loader.js';
+      script.onload = function () {
+        const a = document.createElement('a');
+        a.href = './vendor/monaco/vs';
+        require.config({ paths: { vs: a.href } });
+        window.MonacoEnvironment = {
+          getWorkerUrl: function (workerId, label) {
+            return './vendor/monaco/vs/base/worker/workerMain.js';
+          }
+        };
+        require(['vs/editor/editor.main'], async () => {
+          monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+          const typeFiles = [
+            { path: './vendor/zephyr3d/base/dist/index.d.ts', name: '@zephyr3d/base' },
+            { path: './vendor/zephyr3d/device/dist/index.d.ts', name: '@zephyr3d/device' },
+            { path: './vendor/zephyr3d/scene/dist/index.d.ts', name: '@zephyr3d/scene' },
+            { path: './vendor/zephyr3d/imgui/dist/index.d.ts', name: '@zephyr3d/imgui' },
+            { path: './vendor/zephyr3d/backend-webgl/dist/index.d.ts', name: '@zephyr3d/backend-webgl' },
+            { path: './vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' }
+          ];
+          async function loadTypeFiles(files) {
+            const loadPromises = files.map(async (file) => {
+              try {
+                const response = await fetch(file.path);
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const content = await response.text();
+                const fileName = `file:///node_modules/${file.name}/index.d.ts`;
+                monaco.languages.typescript.typescriptDefaults.addExtraLib(content, fileName);
+                return { success: true, file: file.path };
+              } catch (error) {
+                console.warn(`Failed to load ${file.path}:`, error.message);
+                return { success: false, file: file.path, error: error.message };
+              }
+            });
+            return await Promise.allSettled(loadPromises);
+          }
+          monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+            allowNonTsExtensions: true,
+            target: monaco.languages.typescript.ScriptTarget.ESNext,
+            module: monaco.languages.typescript.ModuleKind.ESNext,
+            moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+            allowJs: true,
+            checkJs: false,
+            strictNullChecks: false,
+            noImplicitAny: false,
+            esModuleInterop: true,
+            allowSyntheticDefaultImports: true,
+            strict: true,
+            skipLibCheck: true,
+            declaration: true,
+            baseUrl: '.',
+            typeRoots: ['file:///node_modules/@types'],
+            resolveJsonModule: true
+          });
+          await loadTypeFiles(typeFiles);
+          monaco.languages.registerCompletionItemProvider('typescript', {
+            triggerCharacters: ["'", '"', '/'],
+            provideCompletionItems: (model, position) => {
+              const textUntilPosition = model.getValueInRange({
+                startLineNumber: position.lineNumber,
+                startColumn: 1,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column
+              });
+              const importMatch = textUntilPosition.match(/import\s+.*\s+from\s+['"]([^'"]*)$/);
+              if (!importMatch) {
+                return { suggestions: [] };
+              }
+              const typedPath = importMatch[1];
+              const suggestions = [];
+              // Provides intellisence for zephyr3d packages
+              const zephyrPackages = [
+                '@zephyr3d/base',
+                '@zephyr3d/device',
+                '@zephyr3d/scene',
+                '@zephyr3d/backend-webgl',
+                '@zephyr3d/backend-webgpu'
+              ];
+              zephyrPackages.forEach((pkg) => {
+                if (pkg.startsWith(typedPath)) {
+                  suggestions.push({
+                    label: pkg,
+                    kind: monaco.languages.CompletionItemKind.Module,
+                    insertText: pkg,
+                    range: {
+                      startLineNumber: position.lineNumber,
+                      endLineNumber: position.lineNumber,
+                      startColumn: position.column - typedPath.length,
+                      endColumn: position.column
+                    },
+                    detail: `Zephyr3D module: ${pkg}`,
+                    documentation: `Import from ${pkg}`
+                  });
+                }
+              });
+              return { suggestions };
+            }
+          });
+        });
+      };
+      document.head.appendChild(script);
+    </script>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>

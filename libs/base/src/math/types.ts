@@ -29,7 +29,7 @@ export enum ClipState {
   /** B is inside A */
   B_INSIDE_A = 2,
   /** A and B partially overlap */
-  CLIPPED = 2
+  CLIPPED = 3
 }
 
 /**

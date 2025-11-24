@@ -12,14 +12,14 @@ const tmpMatrix = new Matrix4x4();
  * @public
  */
 export class BatchGroup extends GraphNode {
-  private _renderQueueMap: Map<
+  private readonly _renderQueueMap: Map<
     RenderPass,
     {
       queue: RenderQueue;
       tag: number;
     }
   >;
-  private _bindGroupAllocator: InstanceBindGroupAllocator;
+  private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   private _changeTag: number;
   private _staticBV: boolean;
   /**
@@ -37,6 +37,15 @@ export class BatchGroup extends GraphNode {
         this.invalidateBoundingVolume();
       }
     }.bind(this);
+    this.on('visiblechanged', (node) => {
+      node.iterate((child) => {
+        if (child.isMesh()) {
+          this._changeTag++;
+          return true;
+        }
+        return false;
+      });
+    });
     this.on('nodeattached', (node) => {
       node.iterate((child) => {
         if (child.isMesh()) {
@@ -81,7 +90,8 @@ export class BatchGroup extends GraphNode {
     this._changeTag++;
   }
   /** @internal */
-  protected _detached(): void {
+  protected _onDetached(): void {
+    super._onDetached();
     // Usually the node will be garbage collected after it is detached,
     // We should reset the render queue to release the render bundles.
     this._renderQueueMap.forEach((val) => {
@@ -90,7 +100,7 @@ export class BatchGroup extends GraphNode {
     this.invalidate();
   }
   /** @internal */
-  protected _attached(): void {
+  protected _onAttached(): void {
     // Reset the render queue when attached to a new scene.
     this.invalidate();
   }

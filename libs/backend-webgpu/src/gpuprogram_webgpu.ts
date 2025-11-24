@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
   GPUProgramConstructParams,
   RenderProgramConstructParams,
@@ -15,15 +14,15 @@ import type { WebGPUDevice } from './device';
 
 export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private static _hashCounter = 0;
-  private _type: 'render' | 'compute';
-  private _vs: string;
-  private _fs: string;
-  private _cs: string;
-  private _label: string;
-  private _hash: string;
+  private readonly _type: 'render' | 'compute';
+  private readonly _vs: string;
+  private readonly _fs: string;
+  private readonly _cs: string;
+  private readonly _label: string;
+  private readonly _hash: string;
   private _error: string;
-  private _bindGroupLayouts: BindGroupLayout[];
-  private _vertexAttributes: string;
+  private readonly _bindGroupLayouts: BindGroupLayout[];
+  private readonly _vertexAttributes: string;
   private _csModule: GPUShaderModule;
   private _vsModule: GPUShaderModule;
   private _fsModule: GPUShaderModule;
@@ -31,7 +30,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   constructor(device: WebGPUDevice, params: GPUProgramConstructParams) {
     super(device);
     this._type = params.type;
-    this._label = params.label;
+    this._label = params.label ?? `Program ${this.uid}`;
     this._bindGroupLayouts = [...params.params.bindGroupLayouts];
     this._error = '';
     if (params.type === 'render') {
@@ -116,7 +115,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._pipelineLayout = null;
     this._object = null;
   }
-  async restore() {
+  restore() {
     if (!this._object) {
       this._load();
     }
@@ -148,8 +147,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     });
   }
   private createShaderModule(code: string): GPUShaderModule {
-    const t0 = Date.now();
-    let sm = this._device.device.createShaderModule({ code });
+    let sm = this._device.device.createShaderModule({ label: this._label, code });
     if (sm) {
       const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
         (sm as any).compilationInfo || (sm as any).getCompilationInfo;
@@ -157,10 +155,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
         return sm;
       }
       func.call(sm).then((compilationInfo) => {
-        const elapsed = Date.now() - t0;
-        if (false && elapsed > 1000) {
-          console.log(`compile shader took ${elapsed}ms: \n${code}`);
-        }
         let err = false;
         if (compilationInfo?.messages?.length > 0) {
           let msg = '';
@@ -179,7 +173,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
             } else if (message.type === 'warning') {
               console.warn(msg);
             } else {
-              console.log(msg);
+              console.info(msg);
             }
             this._error += msg;
           }

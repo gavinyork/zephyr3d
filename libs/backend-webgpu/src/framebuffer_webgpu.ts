@@ -20,11 +20,11 @@ type WebGPUFrameBufferOptions = {
 };
 
 export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuffer<unknown> {
-  private _options: WebGPUFrameBufferOptions;
-  private _width: number;
-  private _height: number;
+  private readonly _options: WebGPUFrameBufferOptions;
+  private readonly _width: number;
+  private readonly _height: number;
   private _bindFlag: number;
-  private _hash: string;
+  private readonly _hash: string;
   private _msaaColorTextures: GPUTexture[];
   private _msaaDepthTexture: GPUTexture;
   constructor(
@@ -107,14 +107,14 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
     return attachment ? Math.max(attachment.texture.height >> attachment.level, 1) : 0;
   }
-  async restore() {
+  restore() {
     if (this._options?.depthAttachment?.texture?.disposed) {
-      await this._options.depthAttachment.texture.reload();
+      this._options.depthAttachment.texture.reload();
     }
     if (this._options?.colorAttachments) {
       for (const k of this._options.colorAttachments) {
         if (k?.texture?.disposed) {
-          await k.texture.reload();
+          k.texture.reload();
         }
       }
     }
@@ -199,6 +199,9 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   }
   getColorAttachments(): BaseTexture[] {
     return this._options?.colorAttachments?.map((val) => val?.texture || null) || [];
+  }
+  getColorAttachment<T extends BaseTexture>(index: number): T {
+    return (this.getColorAttachments()[index] as unknown as T) ?? null;
   }
   getMSAADepthAttachment(): GPUTexture {
     return this._msaaDepthTexture;

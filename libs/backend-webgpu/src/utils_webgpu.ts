@@ -10,17 +10,16 @@ import type { WebGPURenderPass } from './renderpass_webgpu';
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
     {};
-  private static _clearBindGroup: WebGPUBindGroup = null;
   private static _clearStateSet: WebGPURenderStateSet = null;
-  private static _defaultClearColor = new Vector4(0, 0, 0, 1);
+  private static readonly _defaultClearColor = new Vector4(0, 0, 0, 1);
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,
-    clearColor: Float32Array,
+    clearColor: Float32Array<ArrayBuffer>,
     clearDepth: number,
     clearStencil: number
   ) {
-    if (!this._clearBindGroup) {
+    if (!this._clearStateSet) {
       this.initClearQuad(renderPass);
     }
     const hash = renderPass.getFrameBufferInfo().clearHash;
@@ -79,8 +78,8 @@ export class WebGPUClearQuad {
                 colorAttachments[i] === 'f'
                   ? pb.vec4()
                   : colorAttachments[i] === 'i'
-                  ? pb.ivec4()
-                  : pb.uvec4();
+                    ? pb.ivec4()
+                    : pb.uvec4();
             }
             pb.main(function () {
               for (let i = 0; i < colorAttachments.length; i++) {
@@ -88,8 +87,8 @@ export class WebGPUClearQuad {
                   colorAttachments[i] === 'f'
                     ? this.clearColor
                     : colorAttachments[i] === 'i'
-                    ? pb.ivec4(this.clearColor)
-                    : pb.uvec4(this.clearColor);
+                      ? pb.ivec4(this.clearColor)
+                      : pb.uvec4(this.clearColor);
               }
             });
           }
@@ -121,8 +120,13 @@ export class WebGPUClearQuad {
 export class WebGPUMipmapGenerator {
   static _frameBufferInfo: FrameBufferInfo = null;
   static _mipmapGenerationProgram: WebGPUProgram = null;
-  static _mipmapGenerationBindGroup: WeakMap<WebGPUBaseTexture, WebGPUBindGroup[][]> = new WeakMap();
   static _mipmapGenerationStateSet: WebGPURenderStateSet = null;
+  static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
+    if (!this._mipmapGenerationProgram) {
+      this.initMipmapGeneration(device);
+    }
+    return this._mipmapGenerationProgram.bindGroupLayouts[0];
+  }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     if (!tex.isRenderable()) {
       return;
@@ -165,10 +169,7 @@ export class WebGPUMipmapGenerator {
     face: number
   ) {
     const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format, dstLevel, face);
-    renderPassEncoder.setBindGroup(
-      0,
-      this.getMipmapGenerationBindGroup(device, srcTex, srcLevel, face).bindGroup
-    );
+    renderPassEncoder.setBindGroup(0, srcTex.getMipmapGenerationBindGroup(srcLevel, face).bindGroup);
     const pipeline = device.pipelineCache.fetchRenderPipeline(
       this._mipmapGenerationProgram,
       null,
@@ -219,32 +220,6 @@ export class WebGPUMipmapGenerator {
     const renderPassEncoder = encoder.beginRenderPass(passDesc);
     renderPassEncoder.insertDebugMarker('MipmapGeneration');
     return renderPassEncoder;
-  }
-  private static getMipmapGenerationBindGroup(
-    device: WebGPUDevice,
-    texture: WebGPUBaseTexture,
-    level: number,
-    face: number
-  ): WebGPUBindGroup {
-    let faceGroups = this._mipmapGenerationBindGroup.get(texture);
-    if (!faceGroups) {
-      faceGroups = [];
-      this._mipmapGenerationBindGroup.set(texture, faceGroups);
-    }
-    let levelGroups = faceGroups[face];
-    if (!levelGroups) {
-      levelGroups = [];
-      faceGroups[face] = levelGroups;
-    }
-    let levelGroup = levelGroups[level];
-    if (!levelGroup) {
-      levelGroup = device.createBindGroup(
-        this._mipmapGenerationProgram.bindGroupLayouts[0]
-      ) as WebGPUBindGroup;
-      levelGroup.setTextureView('tex', texture, level - 1, face, 1);
-      levelGroups[level] = levelGroup;
-    }
-    return levelGroup;
   }
   private static initMipmapGeneration(device: WebGPUDevice): void {
     this._mipmapGenerationProgram = device.buildRenderProgram({

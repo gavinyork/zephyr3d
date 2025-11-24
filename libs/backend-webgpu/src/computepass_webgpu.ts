@@ -1,15 +1,14 @@
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUDevice } from './device';
-import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
 
 const VALIDATION_FAILED = 1 << 0;
 
 export class WebGPUComputePass {
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _computeCommandEncoder: GPUCommandEncoder;
   private _computePassEncoder: GPUComputePassEncoder;
-  constructor(device: WebGPUDevice, frameBuffer?: WebGPUFrameBuffer) {
+  constructor(device: WebGPUDevice) {
     this._device = device;
     this._computeCommandEncoder = this._device.device.createCommandEncoder();
     this._computePassEncoder = null;

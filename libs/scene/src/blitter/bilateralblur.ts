@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA } from '../shaders';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { Vector2 } from '@zephyr3d/base';
 import { fetchSampler } from '../utility/misc';
 
@@ -30,7 +30,7 @@ export class BilateralBlurBlitter extends Blitter {
   protected _uvStep: Vector2;
   protected _size: Vector2;
   protected _stdDev: number;
-  protected _offsetsAndWeights: Float32Array;
+  protected _offsetsAndWeights: Float32Array<ArrayBuffer>;
   protected _finalPhase: boolean;
   constructor(finalPhase: boolean) {
     super();

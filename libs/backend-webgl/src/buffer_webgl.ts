@@ -9,7 +9,7 @@ import type { WebGLDevice } from './device_webgl';
 export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDataBuffer<WebGLBuffer> {
   protected _size: number;
   protected _usage: number;
-  protected _systemMemoryBuffer: Uint8Array;
+  protected _systemMemoryBuffer: Uint8Array<ArrayBuffer>;
   protected _systemMemory: boolean;
   protected _memCost: number;
   constructor(device: WebGLDevice, usage: number, data: TypedArray | number, systemMemory = false) {
@@ -98,6 +98,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_WRITE)) {
         target = WebGLEnum.COPY_WRITE_BUFFER;
+      } else if (
+        this._usage &
+        (GPUResourceUsageFlags.BF_PACK_PIXEL | GPUResourceUsageFlags.BF_UNPACK_PIXEL)
+      ) {
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
       } else {
         throw new Error(`Invalid buffer usage`);
       }
@@ -116,20 +121,20 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array,
+    dstBuffer?: Uint8Array<ArrayBuffer>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     if (this.disposed) {
       this.reload();
     }
     return this._getBufferData(dstBuffer, offsetInBytes, sizeInBytes);
   }
   protected async _getBufferData(
-    dstBuffer?: Uint8Array,
+    dstBuffer?: Uint8Array<ArrayBuffer>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
     if (offsetInBytes < 0 || offsetInBytes + sizeInBytes > this.byteLength) {
@@ -140,12 +145,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
     if (this._systemMemoryBuffer) {
-      dstBuffer.set(new Uint8Array(this._systemMemoryBuffer, offsetInBytes, sizeInBytes));
+      dstBuffer.set(new Uint8Array(this._systemMemoryBuffer.buffer, offsetInBytes, sizeInBytes));
     } else {
       const gl = this._device.context as WebGL2RenderingContext;
       if (isWebGL2(gl)) {
         const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        gl.flush();
         await this.clientWaitAsync(gl, sync, 0, 10);
         gl.deleteSync(sync);
       }
@@ -159,6 +163,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_WRITE)) {
         target = WebGLEnum.COPY_READ_BUFFER;
+      } else if (
+        this._usage &
+        (GPUResourceUsageFlags.BF_PACK_PIXEL | GPUResourceUsageFlags.BF_UNPACK_PIXEL)
+      ) {
+        target = WebGLEnum.PIXEL_UNPACK_BUFFER;
       } else {
         throw new Error(`Invalid buffer usage`);
       }
@@ -168,7 +177,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     return dstBuffer;
   }
-  async restore() {
+  restore(): void {
     if (!this._systemMemory && !this._object && !this._device.isContextLost()) {
       this.load(this._systemMemoryBuffer);
     }
@@ -200,10 +209,15 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       } else if (this._usage & GPUResourceUsageFlags.BF_UNIFORM) {
         target = WebGLEnum.UNIFORM_BUFFER;
       } else if (this._usage & GPUResourceUsageFlags.BF_READ) {
-        target = WebGLEnum.COPY_READ_BUFFER;
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
         usage = WebGLEnum.STREAM_READ;
       } else if (this._usage & GPUResourceUsageFlags.BF_WRITE) {
         target = WebGLEnum.COPY_WRITE_BUFFER;
+      } else if (this._usage & GPUResourceUsageFlags.BF_PACK_PIXEL) {
+        target = WebGLEnum.PIXEL_PACK_BUFFER;
+        usage = WebGLEnum.STREAM_READ;
+      } else if (this._usage & GPUResourceUsageFlags.BF_UNPACK_PIXEL) {
+        target = WebGLEnum.PIXEL_UNPACK_BUFFER;
       } else {
         throw new Error(`WebGLGPUBuffer.load() failed: invalid buffer usage: ${this._usage}`);
       }

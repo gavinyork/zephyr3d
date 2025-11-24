@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zephyr3d Demos</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="description" content="Zephyr3d demo page" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      .fullpage {
+        position: fixed;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+      }
+
+      .flex-row {
+        display: flex;
+        flex-flow: row nowrap;
+      }
+
+      .flex-col {
+        display: flex;
+        flex-flow: column nowrap;
+      }
+
+      .nav {
+        position: relative;
+        left: 0;
+        flex: 1 1;
+        max-width: 260px;
+        height: 100vh;
+        overflow: auto;
+        background: #eaf1b3;
+        padding: 0 15px;
+        color: #045b88;
+        border: 1px solid #a0a0a0;
+      }
+
+      .maximized {
+        flex-grow: 1;
+      }
+
+      .fit {
+        flex-shrink: 1;
+      }
+
+      li {
+        padding: 3px;
+        cursor: pointer;
+        display: flex;
+        margin: 10px;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      li img {
+        display: block;
+        height: auto;
+        width: 100%;
+        margin-bottom: 5px;
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .active {
+        color: red;
+      }
+
+      .title {
+        text-align: center;
+        font-family: 'Segoe UI Light', 'Segoe UI', 'Trebuchet MS', Tahoma, Arial, Helvetica;
+        font-weight: lighter;
+      }
+    </style>
+  </head>
+
+  <body class="fullpage flex-col">
+    <div class="flex-row maximized fit">
+      <nav class="flex-col nav" style="padding: 15px; width: 200px">
+        <h1 class="title">zephyr3d demos</h1>
+        <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0">
+          <li id="demo-0">
+            <span>GLTF viewer</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/gltf.jpg" alt="GLTF viewer" />
+          </li>
+          <li id="demo-1">
+            <span>Custom Material</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/material.jpg" alt="Custom material" />
+          </li>
+          <li id="demo-2">
+            <span>Clustered lighting</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/lights.jpg" alt="Clustered lighting" />
+          </li>
+          <li id="demo-3">
+            <span>Terrain</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/terrain.jpg" alt="Terrain" />
+          </li>
+          <li id="demo-5">
+            <span>Instancing</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/instancing.jpg" alt="Instancing" />
+          </li>
+          <li id="demo-4">
+            <span>Physics</span
+            ><img src="https://cdn.zephyr3d.org/doc/assets/images/physics.jpg" alt="Physics" />
+          </li>
+          <li id="demo-6" dev="webgpu">
+            <span>CommandBuffer Reuse</span
+            ><img
+              src="https://cdn.zephyr3d.org/doc/assets/images/commandbufferreuse.jpg"
+              alt="Command buffer reuse"
+            />
+          </li>
+          <li id="demo-7" dev="webgpu">
+            <span>OIT</span
+            ><img
+              src="https://cdn.zephyr3d.org/doc/assets/images/oit.jpg"
+              alt="Order-independent-transparency"
+            />
+          </li>
+        </ul>
+      </nav>
+      <iframe class="maximized fit" style="border-width: 0" title="render window" scrolling="no"></iframe>
+    </div>
+    <script type="text/javascript">
+      const iframe = document.querySelector('iframe');
+      const linkCallback = function () {
+        const id = this.id;
+        const dev = this.getAttribute('dev');
+        iframe.src = 'tut/' + id + '.html' + '?dev=' + (dev || 'webgl2') + '&ui=1';
+        const links = document.querySelectorAll('li');
+        for (const link of links) {
+          if (link === this) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        }
+      };
+      const links = document.querySelectorAll('li');
+      for (const link of links) {
+        link.addEventListener('click', linkCallback);
+      }
+      linkCallback.call(links[0]);
+    </script>
+  </body>
+</html>

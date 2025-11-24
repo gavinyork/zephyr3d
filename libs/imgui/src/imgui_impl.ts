@@ -1,9 +1,7 @@
-import type { AbstractDevice, Texture2D } from '@zephyr3d/device';
+import type { AbstractDevice, AtlasInfo, Texture2D } from '@zephyr3d/device';
 import { GlyphManager, Font as DeviceFont } from '@zephyr3d/device';
 import { Renderer } from './renderer';
-import type { Font } from './font';
 import * as ImGui from './imgui';
-import * as Input from './input';
 import { Vector4 } from '@zephyr3d/base';
 
 let clipboard_text = '';
@@ -11,7 +9,58 @@ let renderer: Renderer = null;
 let prev_time = 0;
 let g_FontTexture: Texture2D = null;
 let glyphManager: GlyphManager = null;
+let wantKeyboard = false;
 const fonts: Record<string, DeviceFont> = {};
+
+export class Input {
+  public _dom_input: HTMLInputElement;
+  constructor(cvs: HTMLCanvasElement) {
+    this._dom_input = document.createElement('input');
+    this._dom_input.style.position = 'fixed';
+    this._dom_input.style.top = -10000 + 'px';
+    this._dom_input.style.left = -10000 + 'px';
+    this._dom_input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      this.onKeydown(e as KeyboardEvent);
+    });
+    this._dom_input.addEventListener('keyup', (e) => {
+      e.stopPropagation();
+      this.onKeyup(e as KeyboardEvent);
+    });
+    this._dom_input.addEventListener('keypress', (e) => {
+      e.stopPropagation();
+      this.onKeypress(e as KeyboardEvent);
+    });
+    this._dom_input.addEventListener('compositionend', (e) => {
+      this.onCompositionEnd(e as CompositionEvent);
+    });
+    cvs.appendChild(this._dom_input);
+    this.blur();
+  }
+  onKeydown(e: KeyboardEvent) {
+    canvas_on_keydown(e);
+  }
+  onKeyup(e: KeyboardEvent) {
+    canvas_on_keyup(e);
+  }
+  onKeypress(e: KeyboardEvent) {
+    e.preventDefault();
+    canvas_on_keypress(e);
+  }
+  onCompositionEnd(e: CompositionEvent) {
+    e.preventDefault();
+    for (let i = 0; i < e.data.length; i++) {
+      const io = ImGui.GetIO();
+      io.AddInputCharacter(e.data.codePointAt(i));
+    }
+  }
+  blur() {
+    this._dom_input.blur();
+  }
+  focus() {
+    this._dom_input.focus();
+  }
+}
 
 /*
 function document_on_copy(event: ClipboardEvent): void {
@@ -41,7 +90,7 @@ function document_on_paste(event: ClipboardEvent): void {
 function window_on_resize(): void {}
 
 function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
-  console.log(
+  console.info(
     'Gamepad connected at index %d: %s. %d buttons, %d axes.',
     event.gamepad.index,
     event.gamepad.id,
@@ -51,10 +100,10 @@ function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
 }
 
 function window_on_gamepaddisconnected(event: any /* GamepadEvent */): void {
-  console.log('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
+  console.info('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
 }
 
-function canvas_on_blur(event: FocusEvent): void {
+function canvas_on_blur(_event: FocusEvent): void {
   const io = ImGui.GetIO();
   io.KeyCtrl = false;
   io.KeyShift = false;
@@ -66,7 +115,6 @@ function canvas_on_blur(event: FocusEvent): void {
   for (let i = 0; i < io.MouseDown.length; ++i) {
     io.MouseDown[i] = false;
   }
-  console.log('canvas_on_blur');
 }
 
 const key_code_to_index: Record<string, number> = {
@@ -95,18 +143,17 @@ const key_code_to_index: Record<string, number> = {
 };
 
 export function canvas_on_keydown(event: KeyboardEvent): boolean {
+  const io = ImGui.GetIO();
+  io.KeyCtrl = event.ctrlKey;
+  io.KeyShift = event.shiftKey;
+  io.KeyAlt = event.altKey;
+  io.KeySuper = event.metaKey;
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    //console.log(event.type, event.key, event.code, key_index);
-    const io = ImGui.GetIO();
-    io.KeyCtrl = event.ctrlKey;
-    io.KeyShift = event.shiftKey;
-    io.KeyAlt = event.altKey;
-    io.KeySuper = event.metaKey;
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = true;
     // forward to the keypress event
-    if (key_index == 9 || io.WantCaptureKeyboard || io.WantTextInput) {
+    if (key_index == 9 || wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
       return true;
     }
   }
@@ -114,17 +161,16 @@ export function canvas_on_keydown(event: KeyboardEvent): boolean {
 }
 
 export function canvas_on_keyup(event: KeyboardEvent): boolean {
+  const io = ImGui.GetIO();
+  io.KeyCtrl = event.ctrlKey;
+  io.KeyShift = event.shiftKey;
+  io.KeyAlt = event.altKey;
+  io.KeySuper = event.metaKey;
   const key_index = key_code_to_index[event.code];
   if (key_index) {
-    //console.log(event.type, event.key, event.code, key_index);
-    const io = ImGui.GetIO();
-    io.KeyCtrl = event.ctrlKey;
-    io.KeyShift = event.shiftKey;
-    io.KeyAlt = event.altKey;
-    io.KeySuper = event.metaKey;
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
     io.KeysDown[key_index] = false;
-    if (io.WantCaptureKeyboard || io.WantTextInput || key_index == 9) {
+    if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput || key_index == 9) {
       return true;
     }
   }
@@ -132,10 +178,9 @@ export function canvas_on_keyup(event: KeyboardEvent): boolean {
 }
 
 export function canvas_on_keypress(event: KeyboardEvent): boolean {
-  //console.log(event);
   const io = ImGui.GetIO();
   io.AddInputCharacter(event.charCode);
-  if (io.WantCaptureKeyboard || io.WantTextInput) {
+  if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
     return true;
   }
   return false;
@@ -158,12 +203,20 @@ function canvas_on_pointermove(event: PointerEvent): boolean {
 // 2: Secondary button pressed, usually the right button
 // 3: Fourth button, typically the Browser Back button
 // 4: Fifth button, typically the Browser Forward button
-const mouse_button_map: number[] = [0, 2, 1, 3, 4];
+const mouse_button_map: number[] = [
+  ImGui.MouseButton.Left,
+  ImGui.MouseButton.Middle,
+  ImGui.MouseButton.Right,
+  3,
+  4
+];
 
 export function any_pointerdown(): boolean {
   const io = ImGui.GetIO();
   for (let i = 0; i < io.MouseDown.length; i++) {
-    if (io.MouseDown[i]) return true;
+    if (io.MouseDown[i]) {
+      return true;
+    }
   }
   return false;
 }
@@ -172,14 +225,14 @@ function canvas_on_pointerdown(event: PointerEvent): boolean {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
-  io.MouseDown[mouse_button_map[event.button]] = true;
+  io.MouseDown[mouseButtonToImGui(event.button)] = true;
   if (io.WantCaptureMouse) {
     return true;
   }
   return false;
 }
 
-function canvas_on_contextmenu(event: Event): boolean {
+function canvas_on_contextmenu(_event: Event): boolean {
   const io = ImGui.GetIO();
   if (io.WantCaptureMouse) {
     return true;
@@ -309,12 +362,12 @@ export function injectTouchEvent(ev: TouchEvent) {
 /*
 function canvas_on_contextlost(e:Event):void {
     e.preventDefault();
-    console.log("canvas_on_contextlost");
+    console.info("canvas_on_contextlost");
     is_contextlost=true;
 }
 
 function canvas_on_contextrestored(e:Event):void {
-    console.log("canvas_on_contextrestored");
+    console.info("canvas_on_contextrestored");
     is_contextlost=false;
 }
 */
@@ -343,23 +396,9 @@ export function Init(device: AbstractDevice): void {
 
   io.SetClipboardTextFn = (user_data: any, text: string): void => {
     clipboard_text = text;
-    // console.log(`set clipboard_text: "${clipboard_text}"`);
-    if (typeof navigator !== 'undefined' && typeof (navigator as any).clipboard !== 'undefined') {
-      // console.log(`clipboard.writeText: "${clipboard_text}"`);
-      (navigator as any).clipboard.writeText(clipboard_text).then((): void => {
-        // console.log(`clipboard.writeText: "${clipboard_text}" done.`);
-      });
-    }
+    navigator.clipboard.writeText(clipboard_text);
   };
-  io.GetClipboardTextFn = (user_data: any): string => {
-    // if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard !== "undefined") {
-    //     console.log(`clipboard.readText: "${clipboard_text}"`);
-    //     (navigator as any).clipboard.readText().then((text: string): void => {
-    //         clipboard_text = text;
-    //         console.log(`clipboard.readText: "${clipboard_text}" done.`);
-    //     });
-    // }
-    // console.log(`get clipboard_text: "${clipboard_text}"`);
+  io.GetClipboardTextFn = (_user_data: any): string => {
     return clipboard_text;
   };
   io.ClipboardUserData = null;
@@ -372,6 +411,7 @@ export function Init(device: AbstractDevice): void {
 
   renderer = new Renderer(device);
   glyphManager = new GlyphManager(device, 1024, 1024, 1);
+  dom_input = new Input(device.canvas);
 
   window_on_resize();
   renderer.device.canvas.style.touchAction = 'none'; // Disable browser handling of all panning and zooming gestures.
@@ -419,6 +459,7 @@ export function NewFrame(time: number): void {
   }
 
   const viewport = renderer.device.getViewport();
+  const canvas = renderer.device.canvas;
   const w: number = viewport.width;
   const h: number = viewport.height;
   const display_w: number = w * renderer.device.getScale();
@@ -430,11 +471,13 @@ export function NewFrame(time: number): void {
 
   const dt: number = prev_time === 0 ? 0 : time - prev_time;
   prev_time = time;
-  io.DeltaTime = dt / 1000;
+  io.DeltaTime = Math.max(0.001, dt / 1000);
 
+  /*
   if (io.WantSetMousePos) {
     console.log('TODO: MousePos', io.MousePos.x, io.MousePos.y);
   }
+  */
 
   if (typeof document !== 'undefined') {
     if (io.MouseDrawCursor) {
@@ -442,35 +485,37 @@ export function NewFrame(time: number): void {
     } else {
       switch (ImGui.GetMouseCursor()) {
         case ImGui.MouseCursor.None:
-          document.body.style.cursor = 'none';
+          canvas.style.cursor = 'none';
           break;
-        default:
         case ImGui.MouseCursor.Arrow:
-          document.body.style.cursor = 'default';
+          canvas.style.cursor = 'default';
           break;
         case ImGui.MouseCursor.TextInput:
-          document.body.style.cursor = 'text';
+          canvas.style.cursor = 'text';
           break; // When hovering over InputText, etc.
         case ImGui.MouseCursor.ResizeAll:
-          document.body.style.cursor = 'all-scroll';
+          canvas.style.cursor = 'all-scroll';
           break; // Unused
         case ImGui.MouseCursor.ResizeNS:
-          document.body.style.cursor = 'ns-resize';
+          canvas.style.cursor = 'ns-resize';
           break; // When hovering over an horizontal border
         case ImGui.MouseCursor.ResizeEW:
-          document.body.style.cursor = 'ew-resize';
+          canvas.style.cursor = 'ew-resize';
           break; // When hovering over a vertical border or a column
         case ImGui.MouseCursor.ResizeNESW:
-          document.body.style.cursor = 'nesw-resize';
+          canvas.style.cursor = 'nesw-resize';
           break; // When hovering over the bottom-left corner of a window
         case ImGui.MouseCursor.ResizeNWSE:
-          document.body.style.cursor = 'nwse-resize';
+          canvas.style.cursor = 'nwse-resize';
           break; // When hovering over the bottom-right corner of a window
         case ImGui.MouseCursor.Hand:
-          document.body.style.cursor = 'move';
+          canvas.style.cursor = 'pointer';
           break;
         case ImGui.MouseCursor.NotAllowed:
-          document.body.style.cursor = 'not-allowed';
+          canvas.style.cursor = 'not-allowed';
+          break;
+        default:
+          canvas.style.cursor = 'default';
           break;
       }
     }
@@ -503,7 +548,9 @@ export function NewFrame(time: number): void {
         if (!gamepad) {
           return;
         }
-        if (buttons_count > BUTTON_NO && gamepad.buttons[BUTTON_NO].pressed) io.NavInputs[NAV_NO] = 1.0;
+        if (buttons_count > BUTTON_NO && gamepad.buttons[BUTTON_NO].pressed) {
+          io.NavInputs[NAV_NO] = 1.0;
+        }
       };
       const MAP_ANALOG = function MAP_ANALOG(NAV_NO: number, AXIS_NO: number, V0: number, V1: number): void {
         if (!gamepad) {
@@ -511,8 +558,12 @@ export function NewFrame(time: number): void {
         }
         let v: number = axes_count > AXIS_NO ? gamepad.axes[AXIS_NO] : V0;
         v = (v - V0) / (V1 - V0);
-        if (v > 1.0) v = 1.0;
-        if (io.NavInputs[NAV_NO] < v) io.NavInputs[NAV_NO] = v;
+        if (v > 1.0) {
+          v = 1.0;
+        }
+        if (io.NavInputs[NAV_NO] < v) {
+          io.NavInputs[NAV_NO] = v;
+        }
       };
       // TODO: map input based on vendor and product id
       // https://developer.mozilla.org/en-US/docs/Web/API/Gamepad/id
@@ -612,9 +663,41 @@ function toRgba(col:number):string
 }
 */
 
-export let dom_font: Font = null;
+let charCodeMap: Record<number, string> = null;
 
-async function font_update(io: ImGui.IO) {
+const glyphFontMap: Record<number, DeviceFont> = {};
+
+/** @internal */
+export function addCustomGlyph(charCode: number, font: DeviceFont) {
+  glyphFontMap[charCode] = font;
+}
+
+/** @internal */
+export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
+  const font = ImGui.GetFont();
+  const fontName = font.FontSize + 'px ' + font.FontName;
+  let deviceFont = fonts[fontName];
+  if (!deviceFont) {
+    deviceFont = new DeviceFont(fontName, renderer.device.getScale());
+    fonts[fontName] = deviceFont;
+  }
+  let x = 0;
+  let y = 0;
+  if (text) {
+    for (const ch of text) {
+      const glyphInfo = glyphManager.getGlyphInfo(ch, deviceFont);
+      x += glyphInfo.width;
+      y = Math.max(glyphInfo.height);
+    }
+  }
+  out = out ?? new ImGui.ImVec2();
+  out.x = x;
+  out.y = y;
+  return out;
+}
+
+/** @internal */
+export function font_update(io: ImGui.IO) {
   io.Fonts.Fonts.forEach((font) => {
     const fontName = font.FontSize + 'px ' + font.FontName;
     let deviceFont = fonts[fontName];
@@ -624,12 +707,26 @@ async function font_update(io: ImGui.IO) {
     }
     let glyph = font.GlyphToCreate;
     while (glyph) {
-      const glyphInfo = glyphManager.getGlyphInfo(String.fromCharCode(glyph.Char), deviceFont);
+      const charCode = charCodeMap?.[glyph.Char] ?? glyph.Char;
+      let char: string;
+      let glyphInfo: AtlasInfo;
+      let f: DeviceFont = null;
+      if (typeof charCode === 'number') {
+        f = glyphFontMap[charCode];
+        char = String.fromCodePoint(charCode);
+      } else {
+        char = charCode;
+      }
+      if (f) {
+        glyphInfo = glyphManager.getGlyphInfo(char, f);
+      } else {
+        glyphInfo = glyphManager.getGlyphInfo(char, deviceFont);
+      }
       glyph.X0 = 0;
       glyph.X1 = glyphInfo.width;
       glyph.Y0 = 0;
       glyph.Y1 = glyphInfo.height;
-      glyph.AdvanceX = glyphInfo.width + (glyph.Char < 256 ? font.SpaceX[0] : font.SpaceX[1]);
+      glyph.AdvanceX = glyphInfo.width;
       glyph.U0 = glyphInfo.uMin;
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
@@ -673,8 +770,9 @@ function scroll_update(io: ImGui.IO) {
           scroll.y -= scroll_acc.y;
           scroll_acc.y *= 0.8;
         }
-        if (scroll.y < 0) scroll.y = 0;
-        else if (scroll.y > hoveredWin.ScrollMax.y) {
+        if (scroll.y < 0) {
+          scroll.y = 0;
+        } else if (scroll.y > hoveredWin.ScrollMax.y) {
           scroll.y = hoveredWin.ScrollMax.y;
         }
         hoveredWin.Scroll = scroll;
@@ -684,8 +782,9 @@ function scroll_update(io: ImGui.IO) {
           scroll.x -= io.MouseDelta.x;
           scroll_acc.x = io.MouseDelta.x;
         }
-        if (scroll.x < 0) scroll.x = 0;
-        else if (scroll.x > hoveredWin.ScrollMax.x) {
+        if (scroll.x < 0) {
+          scroll.x = 0;
+        } else if (scroll.x > hoveredWin.ScrollMax.x) {
           scroll.x = hoveredWin.ScrollMax.x;
         }
         hoveredWin.Scroll = scroll;
@@ -694,16 +793,13 @@ function scroll_update(io: ImGui.IO) {
   }
 }
 
-let dom_input: Input.Input;
-function input_text_update(io: ImGui.IO): void {
+let dom_input: Input;
+function input_text_update(_io: ImGui.IO): void {
   const activeId = ImGui.GetActiveId();
   const inpId = ImGui.GetInputTextId();
   if (!activeId || activeId != inpId) {
     dom_input?.blur();
   } else {
-    if (!dom_input) {
-      dom_input = new Input.Input();
-    }
     dom_input.focus();
   }
 }
@@ -797,7 +893,7 @@ export function CreateFontsTexture(): void {
     });
     // Upload texture to graphics system
     g_FontTexture = renderer.device.createTexture2D('rgba8unorm', width, height, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     g_FontTexture.update(rgba8, 0, 0, width, height);
     //gl && gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -808,14 +904,20 @@ export function CreateFontsTexture(): void {
   }
 }
 
+/** @internal */
+export function getCharCodeMap() {
+  return charCodeMap ?? {};
+}
+
+/** @internal */
+export function setCharCodeMap(map: Record<number, string>) {
+  charCodeMap = map;
+}
+
 export function DestroyFontsTexture(): void {
   const io = ImGui.GetIO();
   io.Fonts.TexID?.dispose();
   io.Fonts.TexID = null;
-  if (dom_font) {
-    dom_font.Destroy();
-    dom_font = null;
-  }
 }
 
 export function CreateDeviceObjects(): void {
@@ -826,6 +928,17 @@ export function DestroyDeviceObjects(): void {
   DestroyFontsTexture();
 }
 
+export function captureKeyboard(capture: boolean) {
+  wantKeyboard = !!capture;
+}
+
+export function mouseButtonToImGui(button: number) {
+  return mouse_button_map[button] ?? -1;
+}
+
+export function mouseButtonFromImGui(button: ImGui.MouseButton) {
+  return mouse_button_map.indexOf(button);
+}
 export interface ITextureParam {
   internalFormat?: number;
   srcFormat?: number;
@@ -840,7 +953,7 @@ export class Texture {
   public _width = 1;
   public _height = 1;
 
-  constructor(param?: ITextureParam) {}
+  constructor(_param?: ITextureParam) {}
   public Destroy(): void {
     if (this._texture) {
       this._texture.dispose();
@@ -848,7 +961,7 @@ export class Texture {
     }
   }
   public Update(
-    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array | Uint16Array,
+    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
     param?: any
   ): void {
     let w, h;
@@ -878,7 +991,7 @@ export class Texture {
     if (!this._texture || this._texture.width !== w || this._texture.height !== h) {
       this._texture?.dispose();
       this._texture = renderer.device.createTexture2D('rgba8unorm', w, h, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       this._width = w;
       this._height = h;
@@ -897,7 +1010,7 @@ export class TextureCache {
   public constructor() {}
 
   public Destroy(): void {
-    Object.entries(this.cache).forEach(([key, value]) => {
+    Object.entries(this.cache).forEach(([_key, value]) => {
       value.Destroy();
     });
     this.cache = {};

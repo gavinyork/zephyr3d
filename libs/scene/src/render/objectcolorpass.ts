@@ -16,14 +16,14 @@ export class ObjectColorPass extends RenderPass {
     super(RENDER_PASS_TYPE_OBJECT_COLOR);
   }
   /** @internal */
-  protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return 'ocp';
+  protected _getGlobalBindGroupHash(_ctx: DrawContext) {
+    return '';
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
-      ctx.applyFog = null;
+      ctx.fogFlags = 0;
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.picking = true;
@@ -31,7 +31,7 @@ export class ObjectColorPass extends RenderPass {
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx.camera, ctx.flip, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       for (const list of [items.opaque, items.transmission, items.transparent, items.transmission_trans]) {
         if (list) {

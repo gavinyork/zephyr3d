@@ -18,7 +18,7 @@ export class CommandQueueImmediate {
   protected _computePass: WebGPUComputePass;
   private _bufferUploads: Map<WebGPUBuffer, number>;
   private _textureUploads: Map<WebGPUBaseTexture, number>;
-  private _device: WebGPUDevice;
+  private readonly _device: WebGPUDevice;
   private _drawcallCounter: number;
   constructor(device: WebGPUDevice) {
     this._device = device;
@@ -45,7 +45,7 @@ export class CommandQueueImmediate {
       bufferUploads.forEach((_, buffer) => buffer.beginSyncChanges(uploadCommandEncoder));
       textureUploads.forEach((_, tex) => {
         tex.beginSyncChanges(uploadCommandEncoder);
-        if (tex.isMipmapDirty()) {
+        if (!tex.disposed && tex.isMipmapDirty()) {
           WebGPUMipmapGenerator.generateMipmap(this._device, tex, uploadCommandEncoder);
         }
       });

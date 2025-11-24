@@ -22,6 +22,8 @@ import {
 import * as errors from './errors';
 import type { PBGlobalScope } from './programbuilder';
 import type { PBShaderExp } from './base';
+import { getCurrentProgramBuilder } from './misc';
+import { ASSERT } from '@zephyr3d/base';
 
 const BuiltinInputStructNameVS = 'zVSInput';
 const BuiltinOutputStructNameVS = 'zVSOutput';
@@ -60,7 +62,7 @@ export enum ShaderPrecisionType {
 }
 
 /** @internal */
-export function getBuiltinParamName(shaderType: ShaderType) {
+export function getBuiltinParamName(shaderType: ShaderType): string {
   switch (shaderType) {
     case ShaderType.Vertex:
       return BuiltinParamNameVS;
@@ -74,7 +76,7 @@ export function getBuiltinParamName(shaderType: ShaderType) {
 }
 
 /** @internal */
-export function getBuiltinInputStructInstanceName(shaderType: ShaderType) {
+export function getBuiltinInputStructInstanceName(shaderType: ShaderType): string {
   switch (shaderType) {
     case ShaderType.Vertex:
       return BuiltinInputStructInstanceNameVS;
@@ -88,7 +90,7 @@ export function getBuiltinInputStructInstanceName(shaderType: ShaderType) {
 }
 
 /** @internal */
-export function getBuiltinOutputStructInstanceName(shaderType: ShaderType) {
+export function getBuiltinOutputStructInstanceName(shaderType: ShaderType): string {
   switch (shaderType) {
     case ShaderType.Vertex:
       return BuiltinOutputStructInstanceNameVS;
@@ -102,7 +104,7 @@ export function getBuiltinOutputStructInstanceName(shaderType: ShaderType) {
 }
 
 /** @internal */
-export function getBuiltinInputStructName(shaderType: ShaderType) {
+export function getBuiltinInputStructName(shaderType: ShaderType): string {
   switch (shaderType) {
     case ShaderType.Vertex:
       return BuiltinInputStructNameVS;
@@ -116,7 +118,7 @@ export function getBuiltinInputStructName(shaderType: ShaderType) {
 }
 
 /** @internal */
-export function getBuiltinOutputStructName(shaderType: ShaderType) {
+export function getBuiltinOutputStructName(shaderType: ShaderType): string {
   switch (shaderType) {
     case ShaderType.Vertex:
       return BuiltinOutputStructNameVS;
@@ -397,16 +399,16 @@ export class ShaderAST {
   getType(): PBTypeInfo {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(_indent: string, _ctx: ASTContext): string {
     return '';
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return this.constructor.name;
   }
 }
@@ -571,8 +573,8 @@ export class ASTGlobalScope extends ASTScope {
       ctx.type === ShaderType.Vertex
         ? [BuiltinInputStructNameVS, BuiltinOutputStructNameVS]
         : ctx.type === ShaderType.Fragment
-        ? [BuiltinInputStructNameFS, BuiltinOutputStructNameFS]
-        : [BuiltinInputStructNameCS];
+          ? [BuiltinInputStructNameFS, BuiltinOutputStructNameFS]
+          : [BuiltinInputStructNameCS];
     const usedBuiltins: string[] = [];
     for (const k of ctx.builtins) {
       usedBuiltins.push(builtinVariables.webgpu[k].name);
@@ -626,7 +628,7 @@ export class ASTPrimitive extends ASTExpression {
   isConstExp(): boolean {
     return this.constExp;
   }
-  markWritable() {
+  markWritable(): void {
     this.writable = true;
     this.constExp = false;
     if (this.ref) {
@@ -658,10 +660,10 @@ export class ASTPrimitive extends ASTExpression {
   getType(): PBTypeInfo {
     return this.value.$typeinfo;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     return this.name;
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     return this.name;
   }
   toWGSL(indent: string, ctx: ASTContext): string {
@@ -675,7 +677,7 @@ export class ASTPrimitive extends ASTExpression {
       return this.name;
     }
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return this.name;
   }
 }
@@ -837,7 +839,7 @@ export class ASTLValueDeclare extends ASTLValue {
   isReference(): boolean {
     return true;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     let prefix = '';
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -855,7 +857,7 @@ export class ASTLValueDeclare extends ASTLValue {
       return `${prefix}${this.getType().toTypeName('webgl', this.value.name)}`;
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     let prefix = '';
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -873,7 +875,7 @@ export class ASTLValueDeclare extends ASTLValue {
       return `${prefix}${this.getType().toTypeName('webgl2', this.value.name)}`;
     }
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(_indent: string, _ctx: ASTContext): string {
     let prefix: string;
     const builtin = false;
     switch (this.value.value.$declareType) {
@@ -920,11 +922,13 @@ export class ASTShaderExpConstructor extends ASTExpression {
   args: (number | boolean | ASTExpression)[];
   /** @internal */
   constExp: boolean;
+  /** @internal */
+  convertedArgs: { name: string; args: ASTExpression[] };
   constructor(type: PBTypeInfo, args: (number | boolean | ASTExpression)[]) {
     super();
     this.type = type;
     this.args = args;
-    this.constExp = true;
+    this.convertedArgs = null;
     for (const arg of args) {
       if (arg === null || arg === undefined) {
         throw new Error('invalid constructor argument');
@@ -934,11 +938,22 @@ export class ASTShaderExpConstructor extends ASTExpression {
       }
       this.constExp &&= !(arg instanceof ASTExpression) || arg.isConstExp();
     }
+    const deviceType = getCurrentProgramBuilder().getDevice().type;
+    const overloads = this.type.getConstructorOverloads(deviceType);
+    for (const overload of overloads) {
+      this.convertedArgs = convertArgs(this.args, overload);
+      if (this.convertedArgs) {
+        break;
+      }
+    }
+    if (!this.convertedArgs) {
+      throw new Error(`no matching overload function found for type ${this.type.toTypeName(deviceType)}`);
+    }
   }
   getType(): PBTypeInfo {
     return this.type;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
@@ -949,56 +964,18 @@ export class ASTShaderExpConstructor extends ASTExpression {
     return null;
   }
   toWebGL(indent: string, ctx: ASTContext): string {
-    console.assert(!this.type.isArrayType(), 'array constructor not supported in webgl1 device');
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgl')}' is not constructible`
-    );
-    const overloads = this.type.getConstructorOverloads('webgl');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWebGL(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
-    }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl')}`);
+    const c = this.convertedArgs.args.map((arg) => unbracket(arg.toWebGL(indent, ctx))).join(',');
+    return `${this.convertedArgs.name}(${c})`;
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgl2')}' is not constructible`,
-      true
-    );
-    const overloads = this.type.getConstructorOverloads('webgl2');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWebGL2(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
-    }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgl2')}`);
+    const c = this.convertedArgs.args.map((arg) => unbracket(arg.toWebGL2(indent, ctx))).join(',');
+    return `${this.convertedArgs.name}(${c})`;
   }
   toWGSL(indent: string, ctx: ASTContext): string {
-    /*
-    console.assert(
-      this.type.isConstructible(),
-      `type '${this.type.toTypeName('webgpu')}' is not constructible`,
-      true
-    );
-    */
-    const overloads = this.type.getConstructorOverloads('webgpu');
-    for (const overload of overloads) {
-      const convertedArgs = convertArgs(this.args, overload);
-      if (convertedArgs) {
-        const c = convertedArgs.args.map((arg) => unbracket(arg.toWGSL(indent, ctx))).join(',');
-        return `${convertedArgs.name}(${c})`;
-      }
-    }
-    throw new Error(`no matching overload function found for type ${this.type.toTypeName('webgpu')}`);
+    const c = this.convertedArgs.args.map((arg) => unbracket(arg.toWGSL(indent, ctx))).join(',');
+    return `${this.convertedArgs.name}(${c})`;
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return 'constructor';
   }
 }
@@ -1037,7 +1014,7 @@ export class ASTScalar extends ASTExpression {
   getType(): PBTypeInfo {
     return this.type;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
@@ -1047,21 +1024,7 @@ export class ASTScalar extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
-    switch (this.type.primitiveType) {
-      case PBPrimitiveType.F32:
-        return toFixed(this.value as number);
-      case PBPrimitiveType.I32:
-        return toInt(this.value as number);
-      case PBPrimitiveType.U32:
-        return toUint(this.value as number);
-      case PBPrimitiveType.BOOL:
-        return String(!!this.value);
-      default:
-        throw new Error('Invalid scalar type');
-    }
-  }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
@@ -1075,7 +1038,7 @@ export class ASTScalar extends ASTExpression {
         throw new Error('Invalid scalar type');
     }
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
@@ -1089,7 +1052,21 @@ export class ASTScalar extends ASTExpression {
         throw new Error('Invalid scalar type');
     }
   }
-  toString(deviceType: string): string {
+  toWGSL(_indent: string, _ctx: ASTContext): string {
+    switch (this.type.primitiveType) {
+      case PBPrimitiveType.F32:
+        return toFixed(this.value as number);
+      case PBPrimitiveType.I32:
+        return toInt(this.value as number);
+      case PBPrimitiveType.U32:
+        return `${toUint(this.value as number)}u`;
+      case PBPrimitiveType.BOOL:
+        return String(!!this.value);
+      default:
+        throw new Error('Invalid scalar type');
+    }
+  }
+  toString(_deviceType: string): string {
     return `${this.value}`;
   }
 }
@@ -1120,7 +1097,7 @@ export class ASTHash extends ASTExpression {
   isConstExp(): boolean {
     return this.source.isConstExp();
   }
-  markWritable() {
+  markWritable(): void {
     this.source.markWritable();
   }
   isWritable(): boolean {
@@ -1129,15 +1106,21 @@ export class ASTHash extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return this.source.getAddressSpace();
   }
-  toWebGL(indent: string, ctx: ASTContext) {
-    return `${this.source.toWebGL(indent, ctx)}.${this.field}`;
+  toWebGL(indent: string, ctx: ASTContext): string {
+    return this.source instanceof ASTScalar
+      ? `(${this.source.toWebGL(indent, ctx)}).${this.field}`
+      : `${this.source.toWebGL(indent, ctx)}.${this.field}`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
-    return `${this.source.toWebGL2(indent, ctx)}.${this.field}`;
+  toWebGL2(indent: string, ctx: ASTContext): string {
+    return this.source instanceof ASTScalar
+      ? `(${this.source.toWebGL(indent, ctx)}).${this.field}`
+      : `${this.source.toWebGL(indent, ctx)}.${this.field}`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     const source = this.source.isPointer() ? new ASTReferenceOf(this.source) : this.source;
-    return `${source.toWGSL(indent, ctx)}.${this.field}`;
+    return source instanceof ASTScalar
+      ? `(${source.toWGSL(indent, ctx)}).${this.field}`
+      : `${source.toWGSL(indent, ctx)}.${this.field}`;
   }
   toString(deviceType: string): string {
     const source = this.source.isPointer() ? new ASTReferenceOf(this.source) : this.source;
@@ -1162,7 +1145,7 @@ export class ASTCast extends ASTExpression {
   getType(): PBTypeInfo {
     return this.castType;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
@@ -1172,21 +1155,21 @@ export class ASTCast extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     if (!this.castType.isCompatibleType(this.sourceValue.getType())) {
       return `${this.castType.toTypeName('webgl')}(${unbracket(this.sourceValue.toWebGL(indent, ctx))})`;
     } else {
       return this.sourceValue.toWebGL(indent, ctx);
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     if (!this.castType.isCompatibleType(this.sourceValue.getType())) {
       return `${this.castType.toTypeName('webgl2')}(${unbracket(this.sourceValue.toWebGL2(indent, ctx))})`;
     } else {
       return this.sourceValue.toWebGL2(indent, ctx);
     }
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     if (!this.castType.isCompatibleType(this.sourceValue.getType())) {
       return `${this.castType.toTypeName('webgpu')}(${unbracket(this.sourceValue.toWGSL(indent, ctx))})`;
     } else {
@@ -1206,7 +1189,7 @@ export class ASTAddressOf extends ASTExpression {
   type: PBTypeInfo;
   constructor(value: ASTExpression) {
     super();
-    console.assert(value.isReference(), 'no pointer type for non-reference values', true);
+    ASSERT(value.isReference(), 'no pointer type for non-reference values');
     this.value = value;
     this.type = new PBPointerTypeInfo(value.getType(), value.getAddressSpace());
   }
@@ -1216,7 +1199,7 @@ export class ASTAddressOf extends ASTExpression {
   isConstExp(): boolean {
     return false;
   }
-  markWritable() {
+  markWritable(): void {
     const addressSpace = this.value.getAddressSpace();
     if (addressSpace === PBAddressSpace.UNIFORM) {
       throw new errors.PBASTError(this.value, 'uniforms are not writable');
@@ -1229,13 +1212,13 @@ export class ASTAddressOf extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return this.value.getAddressSpace();
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     throw new Error('GLSL does not support pointer type');
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(_indent: string, _ctx: ASTContext): string {
     throw new Error('GLSL does not support pointer type');
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     const ast = this.value instanceof ASTFunctionParameter ? this.value.paramAST : this.value;
     return ast instanceof ASTReferenceOf ? ast.value.toWGSL(indent, ctx) : `(&${ast.toWGSL(indent, ctx)})`;
   }
@@ -1263,7 +1246,7 @@ export class ASTReferenceOf extends ASTExpression {
   isReference(): boolean {
     return true;
   }
-  markWritable() {
+  markWritable(): void {
     this.value.markWritable();
   }
   isWritable(): boolean {
@@ -1281,7 +1264,7 @@ export class ASTReferenceOf extends ASTExpression {
   toWebGL2(indent: string, ctx: ASTContext): string {
     return this.value.toWebGL2(indent, ctx);
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     return this.value.getType().isPointerType()
       ? `(*${this.value.toWGSL(indent, ctx)})`
       : this.value.toWGSL(indent, ctx);
@@ -1311,7 +1294,7 @@ export class ASTUnaryFunc extends ASTExpression {
   getType(): PBTypeInfo {
     return this.type;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
@@ -1321,13 +1304,13 @@ export class ASTUnaryFunc extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return `${this.op}${this.value.toWebGL(indent, ctx)}`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return `${this.op}${this.value.toWebGL2(indent, ctx)}`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     const value = this.value.isPointer() ? new ASTReferenceOf(this.value) : this.value;
     return `${this.op}${value.toWGSL(indent, ctx)}`;
   }
@@ -1363,7 +1346,7 @@ export class ASTBinaryFunc extends ASTExpression {
   getType(): PBTypeInfo {
     return this.type;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
@@ -1373,13 +1356,13 @@ export class ASTBinaryFunc extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return `(${this.left.toWebGL(indent, ctx)} ${this.op} ${this.right.toWebGL(indent, ctx)})`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return `(${this.left.toWebGL2(indent, ctx)} ${this.op} ${this.right.toWebGL2(indent, ctx)})`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     const left = this.left.isPointer() ? new ASTReferenceOf(this.left) : this.left;
     const right = this.right.isPointer() ? new ASTReferenceOf(this.right) : this.right;
     return `(${left.toWGSL(indent, ctx)} ${this.op} ${right.toWGSL(indent, ctx)})`;
@@ -1417,7 +1400,7 @@ export class ASTArrayIndex extends ASTExpression {
   isReference(): boolean {
     return this.source.isReference();
   }
-  markWritable() {
+  markWritable(): void {
     this.source.markWritable();
   }
   isWritable(): boolean {
@@ -1429,13 +1412,13 @@ export class ASTArrayIndex extends ASTExpression {
   getAddressSpace(): PBAddressSpace {
     return this.source.getAddressSpace();
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return `${this.source.toWebGL(indent, ctx)}[${unbracket(this.index.toWebGL(indent, ctx))}]`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return `${this.source.toWebGL2(indent, ctx)}[${unbracket(this.index.toWebGL2(indent, ctx))}]`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     return `${this.source.toWGSL(indent, ctx)}[${unbracket(this.index.toWGSL(indent, ctx))}]`;
   }
   toString(deviceType: string): string {
@@ -1457,13 +1440,13 @@ export class ASTTouch extends ShaderAST {
     }
     this.value = value;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return `${indent}${this.value.toWebGL('', ctx)};\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return `${indent}${this.value.toWebGL2('', ctx)};\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     if (!this.value.getType().isVoidType()) {
       return `${indent}_ = ${this.value.toWGSL('', ctx)};\n`;
     } else {
@@ -1573,26 +1556,26 @@ export class ASTSelect extends ASTExpression {
   isConstExp(): boolean {
     return false;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return `${indent}(${this.condition.toWebGL('', ctx)} ? ${this.first.toWebGL(
       '',
       ctx
     )} : ${this.second.toWebGL('', ctx)})`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return `${indent}(${this.condition.toWebGL2('', ctx)} ? ${this.first.toWebGL2(
       '',
       ctx
     )} : ${this.second.toWebGL2('', ctx)})`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     return `${indent}select(${this.second.toWGSL('', ctx)}, ${this.first.toWGSL(
       '',
       ctx
@@ -1632,11 +1615,25 @@ export class ASTAssignment extends ShaderAST {
     if (this.rvalue instanceof ASTCallFunction) {
       this.rvalue.isStatement = false;
     }
+    const ltype = this.lvalue.getType();
+    const valueTypeLeft = ltype.isPointerType() ? ltype.pointerType : ltype;
+    const rtype = this.checkScalarType(this.rvalue, valueTypeLeft);
+    const rvalueIsPtr = rtype && rtype.isPointerType();
+    const valueTypeRight = rvalueIsPtr ? (rtype as PBPointerTypeInfo).pointerType : rtype;
+    if (!valueTypeLeft.isCompatibleType(valueTypeRight)) {
+      throw new errors.PBTypeCastError(
+        this.rvalue instanceof ASTExpression
+          ? this.rvalue.toString(rtype.isPointerType() ? 'webgpu' : 'webgl')
+          : `${this.rvalue}`,
+        rtype,
+        ltype
+      );
+    }
   }
   getType(): PBTypeInfo {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     let rhs: string = null;
     const ltype = this.lvalue.getType();
     const rtype = this.checkScalarType(this.rvalue, ltype);
@@ -1660,7 +1657,7 @@ export class ASTAssignment extends ShaderAST {
     }
     return `${indent}${this.lvalue.toWebGL(indent, ctx)} = ${rhs};\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     let rhs: string = null;
     const ltype = this.lvalue.getType();
     const rtype = this.checkScalarType(this.rvalue, ltype);
@@ -1684,7 +1681,7 @@ export class ASTAssignment extends ShaderAST {
     }
     return `${indent}${this.lvalue.toWebGL2(indent, ctx)} = ${rhs};\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     const ltype = this.lvalue.getType();
     const [valueTypeLeft, lvalueIsPtr] = ltype.isPointerType() ? [ltype.pointerType, true] : [ltype, false];
     const rtype = this.checkScalarType(this.rvalue, valueTypeLeft);
@@ -1758,39 +1755,39 @@ export class ASTAssignment extends ShaderAST {
 
 /** @internal */
 export class ASTDiscard extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext): string {
     return `${indent}discard;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext): string {
     return `${indent}discard;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext): string {
     return `${indent}discard;\n`;
   }
 }
 
 /** @internal */
 export class ASTBreak extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext): string {
     return `${indent}break;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext): string {
     return `${indent}break;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext): string {
     return `${indent}break;\n`;
   }
 }
 
 /** @internal */
 export class ASTContinue extends ShaderAST {
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, _ctx: ASTContext): string {
     return `${indent}continue;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, _ctx: ASTContext): string {
     return `${indent}continue;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, _ctx: ASTContext): string {
     return `${indent}continue;\n`;
   }
 }
@@ -1806,17 +1803,17 @@ export class ASTReturn extends ShaderAST {
       this.value.isStatement = false;
     }
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     return this.value
       ? `${indent}return ${unbracket(this.value.toWebGL(indent, ctx))};\n`
       : `${indent}return;\n`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     return this.value
       ? `${indent}return ${unbracket(this.value.toWebGL2(indent, ctx))};\n`
       : `${indent}return;\n`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     return this.value
       ? `${indent}return ${unbracket(this.value.toWGSL(indent, ctx))};\n`
       : `${indent}return;\n`;
@@ -1892,14 +1889,14 @@ export class ASTCallFunction extends ASTExpression {
   isConstExp(): boolean {
     return false;
   }
-  markWritable() {}
+  markWritable(): void {}
   isWritable(): boolean {
     return false;
   }
   getAddressSpace(): PBAddressSpace {
     return null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     if (this.name === 'dFdx' || this.name === 'dFdy' || this.name === 'fwidth') {
       ctx.extensions.add('GL_OES_standard_derivatives');
     } else if (
@@ -1915,11 +1912,11 @@ export class ASTCallFunction extends ASTExpression {
     const args = this.args.map((arg) => unbracket(arg.toWebGL(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     const args = this.args.map((arg) => unbracket(arg.toWebGL2(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     let thisArgs = this.args;
     if (this.func) {
       let argsNew: ASTExpression[];
@@ -1945,7 +1942,7 @@ export class ASTCallFunction extends ASTExpression {
     const args = thisArgs.map((arg) => unbracket(arg.toWGSL(indent, ctx)));
     return `${this.isStatement ? indent : ''}${this.name}(${args.join(',')})${this.isStatement ? ';\n' : ''}`;
   }
-  toString(deviceType: string): string {
+  toString(_deviceType: string): string {
     return `${this.name}(...)`;
   }
 }
@@ -2145,7 +2142,7 @@ export class ASTFunction extends ASTScope {
     this.isMainFunc = isMainFunc;
     this.returnType = type ? type.returnType : null;
   }
-  toWebGL(indent: string, ctx: ASTContext) {
+  toWebGL(indent: string, ctx: ASTContext): string {
     if (!this.isBuiltin) {
       let str = '';
       const p: string[] = [];
@@ -2172,7 +2169,7 @@ export class ASTFunction extends ASTScope {
       return '';
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext) {
+  toWebGL2(indent: string, ctx: ASTContext): string {
     if (!this.isBuiltin) {
       let str = '';
       const p: string[] = [];
@@ -2199,7 +2196,7 @@ export class ASTFunction extends ASTScope {
       return '';
     }
   }
-  toWGSL(indent: string, ctx: ASTContext) {
+  toWGSL(indent: string, ctx: ASTContext): string {
     if (!this.isBuiltin) {
       let str = '';
       const p: string[] = [...this.builtins];
@@ -2311,12 +2308,15 @@ export class ASTRange extends ASTScope {
   end: ASTExpression;
   /** @internal */
   open: boolean;
-  constructor(init: ASTPrimitive, start: ASTExpression, end: ASTExpression, open: boolean) {
+  /** @internal */
+  reverse: boolean;
+  constructor(init: ASTPrimitive, start: ASTExpression, end: ASTExpression, open: boolean, reverse: boolean) {
     super();
     this.init = init;
     this.start = start;
     this.end = end;
     this.open = open;
+    this.reverse = reverse;
     this.statements = [];
     if (this.start instanceof ASTCallFunction) {
       this.start.isStatement = false;
@@ -2329,8 +2329,10 @@ export class ASTRange extends ASTScope {
     const init = this.init.getType().toTypeName('webgl', this.init.name);
     const start = unbracket(this.start.toWebGL(indent, ctx));
     const end = unbracket(this.end.toWebGL(indent, ctx));
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}++) {\n`;
+    const comp = this.open ? (this.reverse ? '>' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}${
+      this.reverse ? '--' : '++'
+    }) {\n`;
     str += super.toWebGL(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;
@@ -2339,8 +2341,10 @@ export class ASTRange extends ASTScope {
     const init = this.init.getType().toTypeName('webgl2', this.init.name);
     const start = unbracket(this.start.toWebGL2(indent, ctx));
     const end = unbracket(this.end.toWebGL2(indent, ctx));
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}++) {\n`;
+    const comp = this.open ? (this.reverse ? '>' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name}${
+      this.reverse ? '--' : '++'
+    }) {\n`;
     str += super.toWebGL2(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;
@@ -2350,8 +2354,10 @@ export class ASTRange extends ASTScope {
     const start = unbracket(this.start.toWGSL(indent, ctx));
     const end = unbracket(this.end.toWGSL(indent, ctx));
     const incr = new ASTScalar(1, this.init.getType() as PBPrimitiveTypeInfo).toWGSL(indent, ctx);
-    const comp = this.open ? '<' : '<=';
-    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name} = ${this.init.name} + ${incr}) {\n`;
+    const comp = this.open ? (this.reverse ? '> ' : '<') : this.reverse ? '>=' : '<=';
+    let str = `${indent}for (${init} = ${start}; ${this.init.name} ${comp} ${end}; ${this.init.name} = ${
+      this.init.name
+    } ${this.reverse ? '-' : '+'} ${incr}) {\n`;
     str += super.toWGSL(indent + '  ', ctx);
     str += `${indent}}\n`;
     return str;
@@ -2369,7 +2375,7 @@ export class ASTDoWhile extends ASTScope {
       this.condition.isStatement = false;
     }
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(_indent: string, _ctx: ASTContext): string {
     throw new Error(`No do-while() loop support for WebGL1.0 device`);
   }
   toWebGL2(indent: string, ctx: ASTContext): string {
@@ -2445,7 +2451,7 @@ export class ASTStructDefine extends ShaderAST {
   getType(): PBStructTypeInfo {
     return this.type;
   }
-  toWebGL(indent: string, ctx: ASTContext): string {
+  toWebGL(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       for (const arg of this.type.structMembers) {
@@ -2457,7 +2463,7 @@ export class ASTStructDefine extends ShaderAST {
       return '';
     }
   }
-  toWebGL2(indent: string, ctx: ASTContext): string {
+  toWebGL2(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       for (const arg of this.type.structMembers) {
@@ -2469,7 +2475,7 @@ export class ASTStructDefine extends ShaderAST {
       return '';
     }
   }
-  toWGSL(indent: string, ctx: ASTContext): string {
+  toWGSL(indent: string, _ctx: ASTContext): string {
     if (!this.builtin) {
       let str = `${indent}struct ${this.type.structName} {\n`;
       str += this.type.structMembers

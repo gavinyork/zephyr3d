@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, IEventTarget } from '@zephyr3d/base';
+import { type Vector4, type TypedArray, type IEventTarget, Observable } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
 import type {
@@ -46,7 +46,6 @@ import {
 } from './gpuobject';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo } from './builder';
 import { ProgramBuilder } from './builder';
-import { DeviceResizeEvent, DeviceGPUObjectAddedEvent, DeviceGPUObjectRemovedEvent } from './base_types';
 import type {
   DataType,
   PrimitiveType,
@@ -88,7 +87,7 @@ type DeviceState = {
  * Base class for rendering device
  * @public
  */
-export abstract class BaseDevice {
+export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _canvas: HTMLCanvasElement;
   protected _canvasClientWidth: number;
   protected _canvasClientHeight: number;
@@ -106,11 +105,13 @@ export abstract class BaseDevice {
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
-  protected _pool: Pool;
+  protected _poolMap: Map<string | symbol, Pool>;
+  protected _defaultPoolKey: symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
-  private _stateStack: DeviceState[];
+  private readonly _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
+    super();
     this._backend = backend;
     this._gpuObjectList = {
       textures: [],
@@ -150,7 +151,10 @@ export abstract class BaseDevice {
     this._fpsCounter = { time: 0, frame: 0 };
     this._stateStack = [];
     this._beginFrameCounter = 0;
-    this._pool = new Pool(this);
+    this._poolMap = new Map();
+    this._defaultPoolKey = Symbol('defaultPool');
+    this._poolMap.set(this._defaultPoolKey, new Pool(this, this._defaultPoolKey));
+    this._temporalFramebuffer = false;
     this._temporalFramebuffer = false;
     this._vSync = true;
     this._registerEventHandlers();
@@ -185,11 +189,6 @@ export abstract class BaseDevice {
     height: number,
     options?: TextureCreationOptions
   ): Texture2D;
-  abstract createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D;
   abstract createTexture2DFromImage(
     element: TextureImageElement,
     sRGB: boolean,
@@ -200,10 +199,6 @@ export abstract class BaseDevice {
     width: number,
     height: number,
     depth: number,
-    options?: TextureCreationOptions
-  ): Texture2DArray;
-  abstract createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
     options?: TextureCreationOptions
   ): Texture2DArray;
   abstract createTexture2DArrayFromImages(
@@ -223,11 +218,6 @@ export abstract class BaseDevice {
     size: number,
     options?: TextureCreationOptions
   ): TextureCube;
-  abstract createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube;
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
@@ -244,7 +234,10 @@ export abstract class BaseDevice {
     dstOffset: number,
     bytes: number
   );
-  abstract createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer;
+  abstract createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer;
   abstract createStructuredBuffer(
     structureType: PBStructTypeInfo,
     options: BufferCreationOptions,
@@ -292,9 +285,9 @@ export abstract class BaseDevice {
   ): void;
   abstract beginCapture(): void;
   abstract endCapture(): RenderBundle;
-  abstract executeRenderBundle(renderBundle: RenderBundle);
   abstract looseContext(): void;
   abstract restoreContext(): void;
+  protected abstract _executeRenderBundle(renderBundle: RenderBundle): number;
   protected abstract _draw(primitiveType: PrimitiveType, first: number, count: number): void;
   protected abstract _drawInstanced(
     primitiveType: PrimitiveType,
@@ -332,13 +325,24 @@ export abstract class BaseDevice {
     this._vSync = !!val;
   }
   get pool(): Pool {
-    return this._pool;
+    return this._poolMap.get(this._defaultPoolKey);
   }
   get runLoopFunction(): (device: AbstractDevice) => void {
     return this._runLoopFunc;
   }
   get programBuilder(): ProgramBuilder {
     return this._programBuilder;
+  }
+  poolExists(key: string | symbol): boolean {
+    return this._poolMap.has(key);
+  }
+  getPool(key: string | symbol): Pool {
+    let pool = this._poolMap.get(key);
+    if (!pool) {
+      pool = new Pool(this, key);
+      this._poolMap.set(key, pool);
+    }
+    return pool;
   }
   setFont(fontName: string) {
     DrawText.setFont(this, fontName);
@@ -347,37 +351,20 @@ export abstract class BaseDevice {
     DrawText.drawText(this, text, color, x, y);
   }
   setFramebuffer(rt: FrameBuffer);
-  setFramebuffer(
-    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
-    depth?: BaseTexture,
-    sampleCount?: number
-  );
-  setFramebuffer(
-    colorOrRT:
-      | (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[]
-      | FrameBuffer,
-    depth?: BaseTexture,
-    sampleCount?: number
-  ) {
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
+  setFramebuffer(colorOrRT: BaseTexture[] | FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
     let newRT: FrameBuffer = null;
     let temporal = false;
     if (!Array.isArray(colorOrRT)) {
       newRT = colorOrRT ?? null;
     } else {
-      const colorAttachments = colorOrRT.map((val) => (val as any).texture ?? val) as BaseTexture[];
-      newRT = this._pool.createTemporalFramebuffer(false, colorAttachments, depth, sampleCount, true);
-      for (let i = 0; i < colorOrRT.length; i++) {
-        const rt = colorOrRT[i];
-        newRT.setColorAttachmentMipLevel(i, (rt as any).texture ? (rt as any).miplevel ?? 0 : 0);
-        newRT.setColorAttachmentLayer(i, (rt as any).texture ? (rt as any).face ?? 0 : 0);
-        newRT.setColorAttachmentCubeFace(i, (rt as any).texture ? (rt as any).layer ?? 0 : 0);
-      }
+      newRT = this.pool.fetchTemporalFramebuffer(false, 0, 0, colorOrRT, depth, true, sampleCount);
       temporal = true;
     }
     const currentRT = this.getFramebuffer();
     if (currentRT !== newRT) {
       if (this._temporalFramebuffer) {
-        this._pool.releaseFrameBuffer(currentRT);
+        this.pool.releaseFrameBuffer(currentRT);
       }
       this._temporalFramebuffer = temporal;
       this._setFramebuffer(newRT);
@@ -388,22 +375,17 @@ export abstract class BaseDevice {
       if (remove) {
         this.removeGPUObject(obj);
       }
-      if (!obj.disposed) {
-        if (this.isContextLost()) {
-          obj.destroy();
-        } else {
-          this._disposeObjectList.push(obj);
-        }
+      if (this.isContextLost()) {
+        obj.destroy();
+      } else {
+        this._disposeObjectList.push(obj);
       }
-      obj.dispatchEvent(null, 'disposed');
     }
   }
-  async restoreObject(obj: GPUObject) {
+  restoreObject(obj: GPUObject) {
     if (obj && obj.disposed && !this.isContextLost()) {
-      await obj.restore();
-      if (obj.restoreHandler) {
-        await obj.restoreHandler(obj);
-      }
+      obj.restore();
+      obj.restoreHandler?.(obj);
     }
   }
   enableGPUTimeRecording(enable: boolean) {
@@ -424,7 +406,7 @@ export abstract class BaseDevice {
     this._beginFrameCounter++;
     this._beginFrameTime = this._cpuTimer.now();
     this.updateFrameInfo();
-    this._pool.autoRelease();
+    this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
   }
   endFrame(): void {
@@ -432,6 +414,7 @@ export abstract class BaseDevice {
       this._beginFrameCounter--;
       if (this._beginFrameCounter === 0) {
         this._endFrameTime = this._cpuTimer.now();
+        this._frameInfo.frameCounter++;
         this.onEndFrame();
       }
     }
@@ -449,7 +432,7 @@ export abstract class BaseDevice {
     options?: BufferCreationOptions
   ): StructuredBuffer {
     if (options && options.usage && options.usage !== 'vertex') {
-      console.error(`createVertexBuffer() failed: options.usage must be 'vertex' or not set`);
+      console.error(`createInterleavedVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
     }
     let size = 0;
@@ -512,6 +495,9 @@ export abstract class BaseDevice {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
   }
+  executeRenderBundle(renderBundle: RenderBundle) {
+    this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
+  }
   compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {
     this._frameInfo.computeCalls++;
     this._compute(workgroupCountX, workgroupCountY, workgroupCountZ);
@@ -520,6 +506,22 @@ export abstract class BaseDevice {
     if (f) {
       this._frameInfo.nextFrameCall.push(f);
     }
+  }
+  async runNextFrameAsync(f: () => void | Promise<void>): Promise<void> {
+    return new Promise((resolve) => {
+      if (f) {
+        this._frameInfo.nextFrameCall.push(() => {
+          const p = f();
+          if (p instanceof Promise) {
+            p.then(() => resolve());
+          } else {
+            resolve();
+          }
+        });
+      } else {
+        resolve();
+      }
+    });
   }
   exitLoop() {
     if (this._runningLoop !== null) {
@@ -624,7 +626,7 @@ export abstract class BaseDevice {
     const list = this.getGPUObjectList(obj);
     if (list && list.indexOf(obj) < 0) {
       list.push(obj);
-      this.dispatchEvent(new DeviceGPUObjectAddedEvent(obj));
+      this.dispatchEvent('gpuobject_added', obj);
     }
   }
   removeGPUObject(obj: GPUObject) {
@@ -633,7 +635,7 @@ export abstract class BaseDevice {
       const index = list.indexOf(obj);
       if (index >= 0) {
         list.splice(index, 1);
-        this.dispatchEvent(new DeviceGPUObjectRemovedEvent(obj));
+        this.dispatchEvent('gpuobject_removed', obj);
       }
     }
   }
@@ -650,14 +652,14 @@ export abstract class BaseDevice {
     ) {
       this._canvasClientWidth = this._canvas.clientWidth;
       this._canvasClientHeight = this._canvas.clientHeight;
-      this.dispatchEvent(new DeviceResizeEvent(this._canvasClientWidth, this._canvasClientHeight));
+      this.dispatchEvent('resize', this._canvasClientWidth, this._canvasClientHeight);
     }
   }
   private _registerEventHandlers() {
     const canvas: HTMLCanvasElement = this._canvas;
     const that = this;
     if (window.ResizeObserver) {
-      new window.ResizeObserver((entries) => {
+      new window.ResizeObserver(() => {
         that._onresize();
       }).observe(canvas, {});
     } else {
@@ -674,7 +676,6 @@ export abstract class BaseDevice {
     }
   }
   private updateFrameInfo() {
-    this._frameInfo.frameCounter++;
     this._frameInfo.drawCalls = 0;
     this._frameInfo.computeCalls = 0;
     const now = this._beginFrameTime;
@@ -757,8 +758,7 @@ export abstract class BaseDevice {
       this._disposeObjectList = [];
     }
   }
-  protected async reloadAll(): Promise<void> {
-    const promises: Promise<void>[] = [];
+  protected reloadAll(): void {
     for (const list of [
       this._gpuObjectList.buffers,
       this._gpuObjectList.textures,
@@ -770,17 +770,18 @@ export abstract class BaseDevice {
     ]) {
       // obj.reload() may change the list, so make a copy first
       for (const obj of list.slice()) {
-        promises.push(obj.reload());
+        obj.reload();
       }
     }
-    Promise.all(promises);
     return;
   }
   protected parseTextureOptions(options?: TextureCreationOptions): number {
-    const noMipmapFlag =
-      options?.samplerOptions?.mipFilter === 'none' ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
+    const noMipmapFlag = options?.mipmapping === false ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
     const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
     const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
+    if (noMipmapFlag && options?.samplerOptions) {
+      options.samplerOptions.mipFilter = 'none';
+    }
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
   protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number {
@@ -806,12 +807,20 @@ export abstract class BaseDevice {
         usageFlag = GPUResourceUsageFlags.BF_WRITE;
         options.managed = false;
         break;
+      case 'pack-pixel':
+        usageFlag = GPUResourceUsageFlags.BF_PACK_PIXEL;
+        options.managed = false;
+        break;
+      case 'unpack-pixel':
+        usageFlag = GPUResourceUsageFlags.BF_UNPACK_PIXEL;
+        options.managed = false;
+        break;
       default:
         usageFlag = 0;
         break;
     }
-    const storageFlag = options?.storage ?? false ? GPUResourceUsageFlags.BF_STORAGE : 0;
-    const dynamicFlag = options?.dynamic ?? false ? GPUResourceUsageFlags.DYNAMIC : 0;
+    const storageFlag = (options?.storage ?? false) ? GPUResourceUsageFlags.BF_STORAGE : 0;
+    const dynamicFlag = (options?.dynamic ?? false) ? GPUResourceUsageFlags.DYNAMIC : 0;
     const managedFlag = dynamicFlag === 0 && (options?.managed ?? true) ? GPUResourceUsageFlags.MANAGED : 0;
     return usageFlag | storageFlag | dynamicFlag | managedFlag;
   }

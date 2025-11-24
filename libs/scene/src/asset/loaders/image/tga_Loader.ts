@@ -1,33 +1,37 @@
 import { AbstractTextureLoader } from '../loader';
-import { Application } from '../../../app';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { AssetManager } from '../../assetmanager';
+import type { TypedArray } from '@zephyr3d/base';
+import { getDevice } from '../../../app/api';
 
 /**
  * TGA image loader
  * @internal
  */
 export class TGALoader extends AbstractTextureLoader {
-  supportExtension(ext: string): boolean {
-    return ext === '.tga';
-  }
   supportMIMEType(mimeType: string): boolean {
     return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }
-  private parseTGA(content: ArrayBuffer, sRGB: boolean, noMipmap: boolean, texture: BaseTexture) {
-    const dataView = new DataView(content);
+  private parseTGA(
+    content: ArrayBuffer | TypedArray,
+    sRGB: boolean,
+    noMipmap: boolean,
+    texture: BaseTexture
+  ) {
+    const arrayBuffer = content instanceof ArrayBuffer ? content : content.buffer;
+    const offset = content instanceof ArrayBuffer ? 0 : content.byteOffset;
+    const dataView = new DataView(arrayBuffer, offset);
     const p: number[] = [0, 0, 0, 0];
-    do {
+    parse: {
       let skip = 0;
       const idLength = dataView.getUint8(0);
       skip += idLength;
       const colorMapType = dataView.getUint8(1);
       if (colorMapType !== 0 && colorMapType !== 1) {
-        break;
+        break parse;
       }
       const dataTypeCode = dataView.getUint8(2);
       if (dataTypeCode !== 2 && dataTypeCode !== 10) {
-        break;
+        break parse;
       }
       const colorMapLength = dataView.getUint16(5, true);
       skip += colorMapLength * colorMapType;
@@ -35,7 +39,7 @@ export class TGALoader extends AbstractTextureLoader {
       const height = dataView.getUint16(14, true);
       const bpp = dataView.getUint8(16);
       if (bpp !== 16 && bpp !== 24 && bpp !== 32) {
-        break;
+        break parse;
       }
       let dataOffset = 18 + skip;
       const bytesPerPixel = bpp / 8;
@@ -74,20 +78,15 @@ export class TGALoader extends AbstractTextureLoader {
       }
       const opt: TextureCreationOptions = { texture };
       if (noMipmap) {
-        opt.samplerOptions = { mipFilter: 'none' };
+        opt.mipmapping = false;
       }
-      const tex = Application.instance.device.createTexture2D(
-        sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm',
-        width,
-        height,
-        opt
-      );
+      const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
       tex.update(pixels, 0, 0, width, height);
       return tex;
-    } while (false);
+    }
     throw new Error(`Unsupported TGA file format`);
   }
-  private mergeBytes(dest: Uint8Array, offset: number, pixel: number[], numBytes: number) {
+  private mergeBytes(dest: Uint8Array<ArrayBuffer>, offset: number, pixel: number[], numBytes: number) {
     if (numBytes === 4) {
       dest[offset + 0] = pixel[2];
       dest[offset + 1] = pixel[1];
@@ -106,15 +105,13 @@ export class TGALoader extends AbstractTextureLoader {
     }
   }
   async load(
-    assetManager: AssetManager,
-    filename: string,
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
   ): Promise<BaseTexture> {
-    return new Promise<BaseTexture>((resolve, reject) => {
+    return new Promise<BaseTexture>((resolve) => {
       resolve(this.parseTGA(data, srgb, samplerOptions?.mipFilter === 'none', texture));
     });
   }

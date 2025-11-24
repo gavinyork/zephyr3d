@@ -8,10 +8,10 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import { OIT } from './oit';
+import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { Vector4 } from '@zephyr3d/base';
+import { Disposable, Vector4 } from '@zephyr3d/base';
 
 /**
  * Weighted-blended OIT renderer.
@@ -21,15 +21,13 @@ import { Vector4 } from '@zephyr3d/base';
  *
  * @public
  */
-export class WeightedBlendedOIT extends OIT {
+export class WeightedBlendedOIT extends Disposable implements OIT {
   /** Type name of WeightedBlendedOIT */
   public static readonly type = 'wb';
   private static _compositeProgram: GPUProgram;
   private static _compositeBindGroup: BindGroup;
   private static _compositeRenderStates: RenderStateSet;
-  /**
-   * Creates an instance of WeightedBlendedOIT class.
-   */
+
   constructor() {
     super();
   }
@@ -42,25 +40,25 @@ export class WeightedBlendedOIT extends OIT {
   /**
    * {@inheritDoc OIT.supportDevice}
    */
-  supportDevice(deviceType: string): boolean {
+  supportDevice(_deviceType: string): boolean {
     return true;
   }
   /**
-   * {@inheritDoc OIT.dispose}
+   * {@inheritDoc OIT.wantsPremultipliedAlpha}
    */
-  dispose() {
-    return;
+  wantsPremultipliedAlpha() {
+    return false;
   }
   /**
    * {@inheritDoc OIT.begin}
    */
-  begin(ctx: DrawContext): number {
+  begin(_ctx: DrawContext): number {
     return 1;
   }
   /**
    * {@inheritDoc OIT.end}
    */
-  end(ctx: DrawContext) {
+  end(_ctx: DrawContext) {
     return;
   }
   /**
@@ -74,7 +72,7 @@ export class WeightedBlendedOIT extends OIT {
   /**
    * {@inheritDoc OIT.beginPass}
    */
-  beginPass(ctx: DrawContext, pass: number): boolean {
+  beginPass(ctx: DrawContext, _pass: number): boolean {
     const device = ctx.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
     device.pushDeviceStates();
@@ -85,7 +83,7 @@ export class WeightedBlendedOIT extends OIT {
   /**
    * {@inheritDoc OIT.endPass}
    */
-  endPass(ctx: DrawContext, pass: number) {
+  endPass(ctx: DrawContext, _pass: number) {
     const device = ctx.device;
     const accumBuffer = device.getFramebuffer();
     device.popDeviceStates();
@@ -101,7 +99,7 @@ export class WeightedBlendedOIT extends OIT {
   /**
    * {@inheritDoc OIT.applyUniforms}
    */
-  applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
+  applyUniforms(_ctx: DrawContext, _bindGroup: BindGroup) {
     return;
   }
   /**
@@ -201,6 +199,7 @@ export class WeightedBlendedOIT extends OIT {
           });
         }
       });
+      this._compositeProgram.name = '@WBOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates

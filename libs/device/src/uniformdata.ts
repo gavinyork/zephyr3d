@@ -51,7 +51,7 @@ export class StructuredBufferData {
    * @param name - Name of the member
    * @param value - Value to set
    */
-  set(name: string, value: StructuredValue) {
+  set(name: string, value: StructuredValue): void {
     if (value !== undefined) {
       const view = this._uniformMap[name];
       if (view) {
@@ -61,7 +61,11 @@ export class StructuredBufferData {
           } else if ((value as any)?._v) {
             view.set((value as any)._v);
           } else if (typeof (value as any)?.length === 'number') {
-            view.set(value as any);
+            view.set(
+              (value as TypedArray).length > view.length
+                ? (value as TypedArray).subarray(0, view.length)
+                : (value as TypedArray)
+            );
           } else {
             throw new Error('invalid uniform value');
           }
@@ -93,7 +97,7 @@ export class StructuredBufferData {
     }
   }
   /** @internal */
-  private setStruct(name: string, value: any) {
+  private setStruct(name: string, value: any): void {
     for (const k in value) {
       this.set(`${name}.${k}`, value[k]);
     }

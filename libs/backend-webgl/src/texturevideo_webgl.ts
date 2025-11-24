@@ -40,24 +40,24 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     // Does nothing
   }
   readPixels(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    faceOrLayer: number,
-    mipLevel: number,
-    buffer: TypedArray
+    _x: number,
+    _y: number,
+    _w: number,
+    _h: number,
+    _faceOrLayer: number,
+    _mipLevel: number,
+    _buffer: TypedArray
   ): Promise<void> {
     throw new Error(`Video texture does not support readPixels()`);
   }
   readPixelsToBuffer(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    faceOrLayer: number,
-    mipLevel: number,
-    buffer: GPUDataBuffer<unknown>
+    _x: number,
+    _y: number,
+    _w: number,
+    _h: number,
+    _faceOrLayer: number,
+    _mipLevel: number,
+    _buffer: GPUDataBuffer<unknown>
   ): void {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }

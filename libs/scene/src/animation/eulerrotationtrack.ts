@@ -9,37 +9,83 @@ const tmpVec3 = new Vector3();
  * Euler angle rotation animation track
  * @public
  */
-export class EulerRotationTrack extends AnimationTrack<Quaternion> {
-  private _state: Quaternion;
+export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
+  private readonly _state: Quaternion;
+  private _interpolator: Interpolator;
+  /**
+   * Create an instance of EulerRotationTrack
+   */
+  constructor();
+  /**
+   * Create an instance of EulerRotationTrack from keyframe values
+   * @param interpolator - Interpolator object that contains the keyframe values
+   * @param embedded - Whether this track be an embedded track
+   */
+  constructor(interpolator: Interpolator, embedded?: boolean);
   /**
    * Create an instance of EulerRotationTrack from keyframe values
    * @param mode - The interpolation mode of keyframes
    * @param keyFrames - Keyframe values
+   * @param embedded - Whether this track be an embedded track
    */
-  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[]) {
-    const inputs = new Float32Array(keyFrames.map((val) => val.time));
-    const outputs = new Float32Array(keyFrames.length * 3);
-    for (let i = 0; i < keyFrames.length; i++) {
-      outputs[i * 3 + 0] = keyFrames[i].value.x;
-      outputs[i * 3 + 1] = keyFrames[i].value.y;
-      outputs[i * 3 + 2] = keyFrames[i].value.z;
+  constructor(mode: InterpolationMode, keyFrames: { time: number; value: Vector3 }[], embedded?: boolean);
+  constructor(
+    modeOrInterpolator?: Interpolator | InterpolationMode,
+    keyFramesOrEmbedded?: { time: number; value: Vector3 }[] | boolean,
+    embedded?: boolean
+  ) {
+    if (modeOrInterpolator === undefined) {
+      super(false);
+      this._interpolator = null;
+    } else if (modeOrInterpolator instanceof Interpolator) {
+      if (modeOrInterpolator.target !== 'vec3') {
+        throw new Error(`EulerRotationTrack(): interpolator target must be 'vec3'`);
+      }
+      super((keyFramesOrEmbedded as boolean) ?? false);
+      this._interpolator = modeOrInterpolator;
+    } else {
+      const keyFrames = keyFramesOrEmbedded as { time: number; value: Vector3 }[];
+      const inputs = new Float32Array(keyFrames.map((val) => val.time));
+      const outputs = new Float32Array(keyFrames.length * 3);
+      for (let i = 0; i < keyFrames.length; i++) {
+        outputs[i * 3 + 0] = keyFrames[i].value.x;
+        outputs[i * 3 + 1] = keyFrames[i].value.y;
+        outputs[i * 3 + 2] = keyFrames[i].value.z;
+      }
+      super(embedded ?? false);
+      this._interpolator = new Interpolator(modeOrInterpolator, 'vec3', inputs, outputs);
     }
-    const interpolator = new Interpolator(mode, 'vec3', inputs, outputs);
-    super(interpolator);
     this._state = new Quaternion();
   }
-  calculateState(currentTime: number): Quaternion {
+  get interpolator() {
+    return this._interpolator;
+  }
+  set interpolator(interp: Interpolator) {
+    if (interp && interp.target !== 'vec3') {
+      throw new Error(`EulerRotationTrack(): interpolator target must be 'vec3'`);
+    }
+    this._interpolator = interp ?? null;
+  }
+  /** {@inheritDoc AnimationTrack.calculateState} */
+  calculateState(target: object, currentTime: number): Quaternion {
     this._interpolator.interpolate(currentTime, tmpVec3);
-    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z, 'ZYX');
+    this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z);
     return this._state;
   }
+  /** {@inheritDoc AnimationTrack.applyState} */
   applyState(node: SceneNode, state: Quaternion) {
     node.rotation.set(state);
   }
+  /** {@inheritDoc AnimationTrack.mixState} */
   mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
     return Quaternion.slerp(a, b, t);
   }
+  /** {@inheritDoc AnimationTrack.getBlendId} */
   getBlendId(): unknown {
     return 'node-rotation';
+  }
+  /** {@inheritDoc AnimationTrack.getDuration} */
+  getDuration(): number {
+    return this._interpolator.maxTime;
   }
 }

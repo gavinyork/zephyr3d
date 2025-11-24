@@ -22,9 +22,9 @@ export class AABB {
   /** Clip to the back side */
   static readonly ClipBack = 1 << BoxSide.BACK;
   /** @internal */
-  private _minPoint: Vector3;
+  private readonly _minPoint: Vector3;
   /** @internal */
-  private _maxPoint: Vector3;
+  private readonly _maxPoint: Vector3;
   /** Construct an AABB with zero size at zero point. */
   constructor();
   /**
@@ -46,38 +46,38 @@ export class AABB {
       this._minPoint = new Vector3(arg0);
       this._maxPoint = new Vector3(arg1);
     } else {
-      this._minPoint = new Vector3(0, 0, 0);
-      this._maxPoint = new Vector3(0, 0, 0);
+      this._minPoint = new Vector3(-1, -1, -1);
+      this._maxPoint = new Vector3(1, 1, 1);
     }
   }
   /** Get the min point of the AABB. */
-  get minPoint() {
+  get minPoint(): Vector3 {
     return this._minPoint;
   }
   set minPoint(p: Vector3) {
     this._minPoint.set(p);
   }
   /** Get the max point of the AABB. */
-  get maxPoint() {
+  get maxPoint(): Vector3 {
     return this._maxPoint;
   }
   set maxPoint(p: Vector3) {
     this._maxPoint.set(p);
   }
   /** Get half size of the AABB. */
-  get extents() {
+  get extents(): Vector3 {
     return Vector3.sub(this._maxPoint, this._minPoint).scaleBy(0.5);
   }
   /** Get center point of the AABB. */
-  get center() {
+  get center(): Vector3 {
     return Vector3.add(this._maxPoint, this._minPoint).scaleBy(0.5);
   }
   /** Get size of the AABB. */
-  get size() {
+  get size(): Vector3 {
     return Vector3.sub(this._maxPoint, this._minPoint);
   }
   /** Get the diagonal length of the AABB. */
-  get diagonalLength() {
+  get diagonalLength(): number {
     return Vector3.sub(this._maxPoint, this._minPoint).magnitude;
   }
   /**
@@ -103,42 +103,63 @@ export class AABB {
    * @param matrix - The transform matrix.
    * @returns self
    */
-  inplaceTransform(matrix: Matrix4x4) {
-    return AABB.transform(this, matrix, this);
+  inplaceTransform(matrix: Matrix4x4): this {
+    AABB.transform(this, matrix, this);
+    return this;
   }
-  /** Invalidate the min/max point so that we can start extending the AABB. */
-  beginExtend() {
+  /**
+   * Invalidate the min/max point so that we can start extending the AABB.
+   * @returns self
+   **/
+  beginExtend(): this {
     this._minPoint.setXYZ(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
     this._maxPoint.setXYZ(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    return this;
   }
   /**
    * Extend the AABB so that it can contain specified point.
    * @param v - The point used to extend the AABB.
+   * @returns self
    */
-  extend(v: Vector3) {
+  extend(v: Vector3): this {
     this._minPoint.inplaceMin(v);
     this._maxPoint.inplaceMax(v);
+    return this;
   }
   /**
    * Extend the AABB so that it can contain specified point.
    * @param x - The x coordinate of the point.
    * @param y - The y coordinate of the point.
    * @param z - The z coordinate of the point.
+   * @returns self
    */
-  extend3(x: number, y: number, z: number) {
-    if (x < this._minPoint.x) this._minPoint.x = x;
-    if (x > this._maxPoint.x) this._maxPoint.x = x;
-    if (y < this._minPoint.y) this._minPoint.y = y;
-    if (y > this._maxPoint.y) this._maxPoint.y = y;
-    if (z < this._minPoint.z) this._minPoint.z = z;
-    if (z > this._maxPoint.z) this._maxPoint.z = z;
+  extend3(x: number, y: number, z: number): this {
+    if (x < this._minPoint.x) {
+      this._minPoint.x = x;
+    }
+    if (x > this._maxPoint.x) {
+      this._maxPoint.x = x;
+    }
+    if (y < this._minPoint.y) {
+      this._minPoint.y = y;
+    }
+    if (y > this._maxPoint.y) {
+      this._maxPoint.y = y;
+    }
+    if (z < this._minPoint.z) {
+      this._minPoint.z = z;
+    }
+    if (z > this._maxPoint.z) {
+      this._maxPoint.z = z;
+    }
+    return this;
   }
   /**
    * Merge the AABB with another AABB.
    * @param other - The AABB to be merged with.
    * @returns self
    */
-  union(other: AABB) {
+  union(other: AABB): this {
     if (other && other.isValid()) {
       this.extend(other._minPoint);
       this.extend(other._maxPoint);
@@ -162,7 +183,7 @@ export class AABB {
    * @param epsl - The epsilon for comparison.
    * @returns true if the comparison error is less than epsl, otherwise false.
    */
-  equalsTo(other: AABB, epsl?: number) {
+  equalsTo(other: AABB, epsl?: number): boolean {
     return this._minPoint.equalsTo(other._minPoint, epsl) && this._maxPoint.equalsTo(other._maxPoint, epsl);
   }
   /**

@@ -1,11 +1,16 @@
 import { Quaternion } from './vector';
-import type { TypedArray } from '../utils';
 
 /**
  * The interpolation mode
  * @public
  */
-export type InterpolationMode = 'unknown' | 'step' | 'linear' | 'cubicspline';
+export type InterpolationMode = 'step' | 'linear' | 'cubicspline' | 'cubicspline-natural';
+
+/**
+ * Type of input/output values
+ * @public
+ */
+export type InterpolateData = Float32Array<ArrayBuffer> | number[];
 
 /**
  * Target of interpolation
@@ -38,9 +43,9 @@ export class Interpolator {
   /** @internal */
   private _prevT: number;
   /** @internal */
-  private _inputs: TypedArray;
+  private _inputs: InterpolateData;
   /** @internal */
-  private _outputs: TypedArray;
+  private _outputs: InterpolateData;
   /** @internal */
   private _mode: InterpolationMode;
   /** @internal */
@@ -48,7 +53,12 @@ export class Interpolator {
   /** @internal */
   private _stride: number;
   /** @internal */
-  private _maxTime: number;
+  private readonly _maxTime: number;
+  /** @internal */
+  private _a: number[];
+  /** @internal */
+  private _h: number[];
+
   /**
    * Interpolation target to stride
    * @param target - The interpolation target
@@ -65,7 +75,12 @@ export class Interpolator {
    * @param outputs - Vector or scalars representing the properties to be interpolated
    * @param stride - Stride of outputs
    */
-  constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: TypedArray, outputs: TypedArray) {
+  constructor(
+    mode: InterpolationMode,
+    target: InterpolationTarget,
+    inputs: InterpolateData,
+    outputs: InterpolateData
+  ) {
     this._prevKey = 0;
     this._prevT = 0;
     this._inputs = inputs;
@@ -74,14 +89,28 @@ export class Interpolator {
     this._target = target;
     this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
+    this._a = null;
+    this._h = null;
   }
   /** Gets the interpolation mode */
   get mode(): InterpolationMode {
     return this._mode;
   }
+  set mode(val: InterpolationMode) {
+    if (val !== this._mode) {
+      this._mode = val;
+      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+    }
+  }
   /** Gets the interpolation target */
   get target(): InterpolationTarget {
     return this._target;
+  }
+  set target(val: InterpolationTarget) {
+    if (val !== this._target) {
+      this._target = val;
+      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+    }
   }
   /** stride */
   get stride(): number {
@@ -90,9 +119,27 @@ export class Interpolator {
   get maxTime(): number {
     return this._maxTime;
   }
-  /** @internal */
-  private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
-    return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
+  /** inputs */
+  get inputs(): InterpolateData {
+    return this._inputs;
+  }
+  set inputs(val: InterpolateData) {
+    if (val !== this._inputs) {
+      this._inputs = val;
+      this._a = null;
+      this._h = null;
+    }
+  }
+  /** outputs */
+  get outputs(): InterpolateData {
+    return this._outputs;
+  }
+  set outputs(val: InterpolateData) {
+    if (val !== this._outputs) {
+      this._outputs = val;
+      this._a = null;
+      this._h = null;
+    }
   }
   /**
    * Calculates the interpolated value at a given time
@@ -101,10 +148,11 @@ export class Interpolator {
    * @param result - The calculated interpolation value
    * @returns The calcuated interpolation value
    */
-  interpolate(t: number, result: Float32Array): Float32Array {
+  interpolate<T extends InterpolateData>(t: number, result: T): T {
     if (t === undefined) {
       return undefined;
     }
+    const ot = t;
     const input = this._inputs;
     const output = this._outputs;
     if (output.length === this._stride) {
@@ -113,7 +161,7 @@ export class Interpolator {
       }
       return result;
     }
-    t = numberClamp(t % this._maxTime, input[0], input[input.length - 1]);
+    t = numberClamp(t, input[0], input[input.length - 1]);
     if (this._prevT > t) {
       this._prevKey = 0;
     }
@@ -132,11 +180,16 @@ export class Interpolator {
       if (this._mode === 'cubicspline') {
         this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, result);
         return result;
+      } else if (this._mode === 'cubicspline-natural') {
+        this.cubicSplineNatural(this._prevKey, nextKey, ot, tn, result);
       } else if (this._mode === 'linear') {
         this.getQuat(this._prevKey, tmpQuat1);
         this.getQuat(nextKey, tmpQuat2);
         this.slerpQuat(tmpQuat1, tmpQuat2, tn, tmpQuat3);
-        result.set(tmpQuat3);
+        result[0] = tmpQuat3.x;
+        result[1] = tmpQuat3.y;
+        result[2] = tmpQuat3.z;
+        result[3] = tmpQuat3.w;
         return result;
       } /* if (this._mode === 'step) */ else {
         return this.getQuat(this._prevKey, result);
@@ -147,13 +200,15 @@ export class Interpolator {
         return this.step(this._prevKey, result);
       case 'cubicspline':
         return this.cubicSpline(this._prevKey, nextKey, keyDelta, tn, result);
+      case 'cubicspline-natural':
+        return this.cubicSplineNatural(this._prevKey, nextKey, ot, tn, result);
       case 'linear':
       default:
         return this.linear(this._prevKey, nextKey, tn, result);
     }
   }
   /** @internal */
-  private getQuat(index: number, result: Float32Array): Float32Array {
+  private getQuat<T extends InterpolateData>(index: number, result: T): T {
     result[0] = this._outputs[4 * index];
     result[1] = this._outputs[4 * index + 1];
     result[2] = this._outputs[4 * index + 2];
@@ -161,14 +216,14 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private step(prevKey: number, result: Float32Array): Float32Array {
+  private step<T extends InterpolateData>(prevKey: number, result: T): T {
     for (let i = 0; i < this._stride; i++) {
       result[i] = this._outputs[prevKey * this._stride + i];
     }
     return result;
   }
   /** @internal */
-  private linear(prevKey: number, nextKey: number, t: number, result: Float32Array): Float32Array {
+  private linear<T extends InterpolateData>(prevKey: number, nextKey: number, t: number, result: T): T {
     for (let i = 0; i < this._stride; i++) {
       result[i] =
         this._outputs[prevKey * this._stride + i] * (1 - t) + this._outputs[nextKey * this._stride + i] * t;
@@ -176,13 +231,13 @@ export class Interpolator {
     return result;
   }
   /** @internal */
-  private cubicSpline(
+  private cubicSpline<T extends InterpolateData>(
     prevKey: number,
     nextKey: number,
     keyDelta: number,
     t: number,
-    result: Float32Array
-  ): Float32Array {
+    result: T
+  ): T {
     const prevIndex = prevKey * this._stride * 3;
     const nextIndex = nextKey * this._stride * 3;
     const A = 0;
@@ -202,5 +257,100 @@ export class Interpolator {
         (tCub - tSq) * a;
     }
     return result;
+  }
+  /** @internal */
+  private cubicSplineNatural<T extends InterpolateData>(
+    prevKey: number,
+    nextKey: number,
+    t: number,
+    tn: number,
+    result: T
+  ): T {
+    if (this._inputs.length === 2) {
+      return this.linear(prevKey, nextKey, tn, result);
+    }
+    if (!this._a) {
+      this._prepareCubicSplineNatural();
+    }
+    const seg = Math.min(Math.max(this._getSegment(t), 0), this._inputs.length - 2) + 1;
+    const t1 = t - this._inputs[seg - 1];
+    const t2 = this._h[seg] - t1;
+    for (let i = 0; i < this._stride; i++) {
+      result[i] =
+        (((-this._a[(seg - 1) * this._stride + i] / 6) * (t2 + this._h[seg]) * t1 +
+          this._outputs[(seg - 1) * this._stride + i]) *
+          t2 +
+          ((-this._a[seg * this._stride + i] / 6) * (t1 + this._h[seg]) * t2 +
+            this._outputs[seg * this._stride + i]) *
+            t1) /
+        this._h[seg];
+    }
+    return result;
+  }
+  private _prepareCubicSplineNatural(): void {
+    const nk = this._inputs.length;
+    const sub = new Array<number>(nk - 1);
+    const diag = new Array<number>(nk - 1);
+    const sup = new Array<number>(nk - 1);
+    this._h = new Array<number>(nk);
+    this._a = new Array<number>(nk * this._stride);
+    for (let i = 0; i < this._stride; i++) {
+      this._a[i] = 0;
+      this._a[nk * this._stride - 1 - i] = 0;
+    }
+    for (let i = 1; i < nk; ++i) {
+      this._h[i] = this._inputs[i] - this._inputs[i - 1];
+    }
+    for (let i = 1; i < nk - 1; ++i) {
+      diag[i] = (this._h[i] + this._h[i + 1]) / 3;
+      sup[i] = this._h[i + 1] / 6.0;
+      sub[i] = this._h[i] / 6;
+      for (let j = 0; j < this._stride; j++) {
+        const k = i * this._stride + j;
+        this._a[k] =
+          (this._outputs[k + this._stride] - this._outputs[k]) / this._h[i + 1] -
+          (this._outputs[k] - this._outputs[k - this._stride]) / this._h[i];
+      }
+    }
+    this.solveTridiag(sub, diag, sup);
+  }
+  private solveTridiag(sub: number[], diag: number[], sup: number[]): void {
+    const n = this._inputs.length - 2;
+    for (let i = 2; i <= n; ++i) {
+      sub[i] /= diag[i - 1];
+      diag[i] -= sub[i] * sup[i - 1];
+      this._a[i] -= this._a[i - 1] * sub[i];
+    }
+    for (let i = 0; i < this._stride; i++) {
+      this._a[n * this._stride + i] /= diag[n];
+    }
+    for (let i = n - 1; i >= 1; --i) {
+      for (let j = 0; j < this._stride; j++) {
+        const k = i * this._stride + j;
+        this._a[k] = (this._a[k] - this._a[k + this._stride] * sup[i]) / diag[i];
+      }
+    }
+  }
+  private _getSegment(x: number): number {
+    if (x < this._inputs[0]) {
+      return -1;
+    }
+    if (x >= this._inputs[this._inputs.length - 1]) {
+      return this._inputs.length;
+    }
+    let result = 0;
+    for (; result < this._inputs.length - 1; ++result) {
+      if (x < this._inputs[result + 1]) {
+        break;
+      }
+    }
+    if (result == this._inputs.length) {
+      result = this._inputs.length - 1;
+    }
+    return result;
+  }
+  /** @internal */
+  private slerpQuat(q1: Quaternion, q2: Quaternion, t: number, result: Quaternion): Quaternion {
+    return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
   }
 }

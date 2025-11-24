@@ -32,6 +32,8 @@ export class VertexData {
   private _indexBuffer: IndexBuffer;
   /** @internal */
   private _drawOffset: number;
+  /** @internal */
+  private _numVertices: number;
   constructor() {
     this._vertexBuffers = [];
     for (let i = 0; i < MAX_VERTEX_ATTRIBUTES; i++) {
@@ -39,6 +41,7 @@ export class VertexData {
     }
     this._indexBuffer = null;
     this._drawOffset = 0;
+    this._numVertices = 0;
   }
   /**
    * Creates a new instance of VertexData by copying from this object
@@ -49,23 +52,29 @@ export class VertexData {
     newVertexData._vertexBuffers = this._vertexBuffers.slice();
     newVertexData._indexBuffer = this._indexBuffer;
     newVertexData._drawOffset = this._drawOffset;
+    newVertexData.calcNumVertices();
     return newVertexData;
   }
   /** Vertex buffer information list */
-  get vertexBuffers() {
+  get vertexBuffers(): VertexBufferInfo[] {
     return this._vertexBuffers;
   }
   /** Index buffer */
-  get indexBuffer() {
+  get indexBuffer(): IndexBuffer {
     return this._indexBuffer;
+  }
+  /** Number of vertices */
+  get numVertices() {
+    return this._numVertices;
   }
   /** Draw offset */
   getDrawOffset(): number {
     return this._drawOffset;
   }
-  setDrawOffset(offset: number) {
+  setDrawOffset(offset: number): void {
     if (offset !== this._drawOffset) {
       this._drawOffset = offset;
+      this.calcNumVertices();
     }
   }
   /**
@@ -98,7 +107,10 @@ export class VertexData {
    * @returns The buffer that was set
    */
   setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): StructuredBuffer {
-    if (!buffer || !(buffer.usage & GPUResourceUsageFlags.BF_VERTEX)) {
+    if (!buffer) {
+      return null;
+    }
+    if (!(buffer.usage & GPUResourceUsageFlags.BF_VERTEX)) {
       throw new Error('setVertexBuffer() failed: buffer is null or buffer has not Vertex usage flag');
     }
     stepMode = stepMode || 'vertex';
@@ -131,6 +143,9 @@ export class VertexData {
         removed = true;
       }
     }
+    if (removed) {
+      this.calcNumVertices();
+    }
     return removed;
   }
   /**
@@ -143,6 +158,19 @@ export class VertexData {
       this._indexBuffer = buffer || null;
     }
     return buffer;
+  }
+  /** @internal */
+  private calcNumVertices() {
+    this._numVertices = 0;
+    for (let i = 0; i < MAX_VERTEX_ATTRIBUTES; i++) {
+      const info = this._vertexBuffers[i];
+      if (info && info.stepMode !== 'instance') {
+        const n = Math.floor(info.buffer.byteLength / info.stride);
+        if (n > this._numVertices) {
+          this._numVertices = n;
+        }
+      }
+    }
   }
   /** @internal */
   private internalSetVertexBuffer(
@@ -166,6 +194,7 @@ export class VertexData {
         drawOffset: 0,
         stepMode: stepMode
       };
+      this.calcNumVertices();
       return buffer;
     }
     return null;

@@ -22,7 +22,6 @@ export abstract class ShadowImpl {
   abstract resourceDirty(): boolean;
   abstract doUpdateResources(shadowMapParams: ShadowMapParams);
   abstract getShaderHash(): string;
-  abstract releaseTemporalResources(shadowMapParams: ShadowMapParams);
   abstract computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,

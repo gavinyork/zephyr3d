@@ -3,13 +3,35 @@ const tmpFloatArray = new Float32Array(tmpArrayBuffer);
 const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
 
 /**
+ * Convert a degree value to radian value.
+ * @param degree - The degree value to be converted.
+ * @returns The radian value.
+ *
+ * @public
+ */
+export function degree2radian(degree: number): number {
+  return (degree * Math.PI) / 180;
+}
+
+/**
+ * Convert a radian value to degree value.
+ * @param radian - The radian value to be converted.
+ * @returns The degree value.
+ *
+ * @public
+ */
+export function radian2degree(radian: number): number {
+  return (radian * 180) / Math.PI;
+}
+
+/**
  * Convert a number to 32 bit float value
  * @param val - The number to be converted
  * @returns 32bit float value
  *
  * @public
  */
-export function toFloat(val: number) {
+export function toFloat(val: number): number {
   tmpFloatArray[0] = val;
   return tmpFloatArray[0];
 }
@@ -22,7 +44,7 @@ export function toFloat(val: number) {
  *
  * @public
  */
-export function isPowerOf2(value: number) {
+export function isPowerOf2(value: number): boolean {
   return value % 1 === 0 && value >= 0 && (value & (value - 1)) === 0;
 }
 
@@ -34,15 +56,18 @@ export function isPowerOf2(value: number) {
  *
  * @public
  */
-export function nextPowerOf2(value: number) {
+export function nextPowerOf2(value: number): number {
+  if (value <= 0) {
+    return 1;
+  }
   value--;
   value |= value >> 1;
   value |= value >> 2;
   value |= value >> 4;
   value |= value >> 8;
   value |= value >> 16;
-  value++;
-  return value;
+  value |= value >> 32;
+  return value + 1;
 }
 
 /**
@@ -231,7 +256,7 @@ export function packFloat3(a: number, b: number, c: number): number {
  *
  * @public
  */
-export function unpackFloat3<T extends number[] | Float32Array>(pk: number, result: T): void {
+export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T): void {
   /*
   result[0] = halfToFloat((pk & 0x7ff) << 4);
   result[1] = halfToFloat((pk & 0x3ff800) >> 7);

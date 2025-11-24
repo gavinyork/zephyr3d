@@ -1,23 +1,12 @@
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import type {
-  BaseTexture,
-  BindGroup,
-  FrameBuffer,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D
-} from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import {
-  sampleLinearDepth,
-  screenSpaceRayTracing_HiZ,
-  screenSpaceRayTracing_Linear2D,
-  SSR_calcJitter
-} from '../shaders/ssr';
+import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D, SSR_calcJitter } from '../shaders/ssr';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
+import { ShaderHelper } from '../material';
 
 /**
  * SSR post effect
@@ -27,52 +16,24 @@ import { BilateralBlurBlitter } from '../blitter/bilateralblur';
  *
  * @internal
  */
-export class SSR extends AbstractPostEffect<'SSR'> {
-  static readonly className = 'SSR' as const;
+export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
   private static _combineProgram: GPUProgram = undefined;
-  private static _renderStateZTestGreater: RenderStateSet = null;
-  private static _renderStateZTestEqual: RenderStateSet = null;
   private static _blurBlitterH: BilateralBlurBlitter = null;
   private static _blurBlitterV: BilateralBlurBlitter = null;
-  private static _weights = [
-    0.1847392078702266, 0.16595854345772326, 0.12031364177766891, 0.07038755277896766, 0.03322925565155569,
-    0.012657819729901945, 0.0038903040680094217, 0.0009646503390864025, 0.00019297087402915717,
-    0.000031139936308099136, 0.000004053309048174758, 4.255228059965837e-7, 3.602517634249573e-8,
-    2.4592560765896795e-9, 1.3534945386863618e-10, 0
-  ];
-
-  private _roughnessTex: Texture2D;
-  private _normalTex: Texture2D;
   private _bindgroups: Record<string, BindGroup>;
   private _resolveBindGroup: Record<string, BindGroup>;
   private _combineBindGroup: BindGroup;
-
-  private _debugFrameBuffer: Record<string, FrameBuffer>;
   /**
    * Creates an instance of SSR post effect
    */
   constructor() {
     super();
-    this._opaque = true;
+    this._layer = PostEffectLayer.opaque;
     this._bindgroups = {};
     this._resolveBindGroup = {};
     this._combineBindGroup = null;
-    this._roughnessTex = null;
-    this._debugFrameBuffer = {};
-  }
-  get roughnessTexture() {
-    return this._roughnessTex;
-  }
-  set roughnessTexture(tex: Texture2D) {
-    this._roughnessTex = tex;
-  }
-  get normalTexture() {
-    return this._normalTex;
-  }
-  set normalTexture(tex: Texture2D) {
-    this._normalTex = tex;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture(): boolean {
@@ -123,7 +84,8 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     const linearSampler = fetchSampler('clamp_linear');
     this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     this._combineBindGroup.setTexture('reflectanceTex', reflectanceTex, linearSampler);
-    this._combineBindGroup.setTexture('roughnessTex', this._roughnessTex, linearSampler);
+    this._combineBindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, linearSampler);
+    this._combineBindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     this._combineBindGroup.setValue(
       'targetSize',
       new Vector4(
@@ -137,7 +99,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     this._combineBindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, this._combineBindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** @internal */
   resolve(
@@ -162,9 +124,10 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     const linearSampler = fetchSampler('clamp_linear');
     bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     bindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
-    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
+    bindGroup.setTexture('normalTex', ctx.SSRNormalTexture, nearestSampler);
     bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
+    bindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue(
       'targetSize',
@@ -185,7 +148,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** @internal */
   intersect(
@@ -218,8 +181,8 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         ctx.env.light.envLight.updateBindGroup(bindGroup);
       }
     }
-    bindGroup.setTexture('roughnessTex', this._roughnessTex, nearestSampler);
-    bindGroup.setTexture('normalTex', this._normalTex, nearestSampler);
+    bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
+    bindGroup.setTexture('normalTex', ctx.SSRNormalTexture, nearestSampler);
     bindGroup.setTexture('depthTex', sceneDepthTexture, nearestSampler);
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
@@ -257,28 +220,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     bindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(this._getZTestGreaterRenderState(ctx));
-  }
-  /** @internal */
-  debugTexture(tex: BaseTexture, label: string) {
-    let fb = this._debugFrameBuffer[label];
-    if (!fb || fb.getWidth() !== tex.width || fb.getHeight() !== tex.height) {
-      fb?.getColorAttachments()[0]?.dispose();
-      fb?.dispose();
-      fb = tex.device.createFrameBuffer(
-        [
-          tex.device.createTexture2D(tex.format, tex.width, tex.height, {
-            samplerOptions: {
-              mipFilter: 'none'
-            }
-          })
-        ],
-        null
-      );
-      fb.getColorAttachments()[0].name = label ?? 'SSR_Debug';
-      this._debugFrameBuffer[label] = fb;
-    }
-    copyTexture(tex, fb, fetchSampler('clamp_nearest_nomip'));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
@@ -288,8 +230,9 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       inputColorTexture,
       device.getFramebuffer(),
       fetchSampler('clamp_nearest_nomip'),
-      this._getZTestEqualRenderState(ctx)
+      AbstractPostEffect.getDefaultRenderState(ctx, 'eq')
     );
+
     const intersectFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
       inputColorTexture.width,
@@ -327,7 +270,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
       const stdDev = ctx.camera.ssrBlurStdDev;
       const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
-      blitterH.renderStates = this._getZTestGreaterRenderState(ctx);
+      blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
       this.blurPass(
         ctx,
         blitterH,
@@ -341,7 +284,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         pingpongFramebuffer[1]
       );
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
-      blitterV.renderStates = this._getZTestGreaterRenderState(ctx);
+      blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
       this.blurPass(
         ctx,
         blitterV,
@@ -367,26 +310,8 @@ export class SSR extends AbstractPostEffect<'SSR'> {
     device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
   }
   /** @internal */
-  private _getZTestGreaterRenderState(ctx: DrawContext): RenderStateSet {
-    if (!SSR._renderStateZTestGreater) {
-      SSR._renderStateZTestGreater = ctx.device.createRenderStateSet();
-      SSR._renderStateZTestGreater.useRasterizerState().setCullMode('none');
-      SSR._renderStateZTestGreater.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
-    }
-    return SSR._renderStateZTestGreater;
-  }
-  /** @internal */
-  private _getZTestEqualRenderState(ctx: DrawContext): RenderStateSet {
-    if (!SSR._renderStateZTestEqual) {
-      SSR._renderStateZTestEqual = ctx.device.createRenderStateSet();
-      SSR._renderStateZTestEqual.useRasterizerState().setCullMode('none');
-      SSR._renderStateZTestEqual.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('eq');
-    }
-    return SSR._renderStateZTestEqual;
-  }
-  /** @internal */
   private _createCombineProgrm(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -404,6 +329,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         this.reflectanceTex = pb.tex2D().uniform(0);
         this.roughnessTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
+        this.ssrMaxRoughness = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func(
@@ -421,11 +347,15 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         );
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
-          this.$l.reflectance = pb.textureSampleLevel(this.reflectanceTex, this.screenUV, 0).rgb;
           this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
-          this.combined = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
-          this.$outputs.outColor = pb.vec4(this.combined, 1);
+          this.$l.combined = pb.vec3();
+          this.$if(pb.greaterThanEqual(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
+            this.combined = this.sceneColor;
+          }).$else(function () {
+            this.$l.reflectance = pb.textureSampleLevel(this.reflectanceTex, this.screenUV, 0).rgb;
+            this.combined = this.resolveSample(this.sceneColor, this.reflectance, this.roughnessInfo);
+          });
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.combined, 1);
           }).$else(function () {
@@ -434,10 +364,12 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         });
       }
     });
+    program.name = '@SSR_Combine';
+    return program;
   }
   /** @internal */
   private _createResolveProgram(ctx: DrawContext): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -464,13 +396,14 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         this.viewMatrix = pb.mat4().uniform(0);
         this.invViewMatrix = pb.mat4().uniform(0);
         this.invProjMatrix = pb.mat4().uniform(0);
+        this.ssrMaxRoughness = pb.float().uniform(0);
         if (ctx.env.light.envLight) {
           this.envLightStrength = pb.float().uniform(0);
           ctx.env.light.envLight.initShaderBindings(pb);
         }
         this.$outputs.outColor = pb.vec4();
         pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-          this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+          this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
           this.$l.nonLinearDepth = pb.div(
             pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
             pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -536,8 +469,11 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         );
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
-          this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$if(pb.greaterThanEqual(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
+            pb.discard();
+          });
+          this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
           this.$l.reflectance = pb.vec3();
           this.$if(pb.greaterThan(this.intersectSample.w, 0), function () {
             this.$l.indirectIntersectSample = pb.textureSampleLevel(
@@ -588,10 +524,12 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         });
       }
     });
+    program.name = '@SSR_Resolve';
+    return program;
   }
   /** @internal */
   private _createIntersectProgram(ctx: DrawContext, blur: boolean): GPUProgram {
-    return ctx.device.buildRenderProgram({
+    const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -636,7 +574,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
-          this.$l.linearDepth = sampleLinearDepth(this, this.depthTex, this.uv, 0);
+          this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
           this.$l.nonLinearDepth = pb.div(
             pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
             pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
@@ -651,13 +589,16 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         });
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
+          this.$l.roughnessValue = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
+          this.$l.roughness = this.roughnessValue.a;
+          this.$if(pb.greaterThanEqual(this.roughness, this.ssrMaxRoughness), function () {
+            pb.discard();
+          });
           if (!blur) {
             this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           }
-          this.$l.roughnessValue = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
           this.$l.pos = this.getPosition(this.screenUV, this.invProjMatrix);
           this.$l.linearDepth = this.pos.w;
-          this.$l.roughness = this.roughnessValue.a;
           this.$l.color = pb.vec3(0);
           this.$l.a = pb.float();
           this.$if(pb.greaterThanEqual(this.linearDepth, 1), function () {
@@ -677,42 +618,39 @@ export class SSR extends AbstractPostEffect<'SSR'> {
               pb.reflect(this.viewVec, this.viewNormal),
               SSR_calcJitter(this, this.viewPos, this.roughness)
             );
-            this.$l.hitInfo = pb.vec4(0);
-            this.$if(pb.lessThan(this.roughness, this.ssrMaxRoughness), function () {
-              this.hitInfo = ctx.HiZTexture
-                ? screenSpaceRayTracing_HiZ(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    this.cameraNearFar,
-                    this.depthMipLevels,
-                    this.ssrParams.y,
-                    this.ssrParams.z,
-                    this.targetSize,
-                    this.hizTex,
-                    this.normalTex
-                  )
-                : screenSpaceRayTracing_Linear2D(
-                    this,
-                    this.viewPos,
-                    this.reflectVec,
-                    this.viewMatrix,
-                    this.projMatrix,
-                    this.invProjMatrix,
-                    this.cameraNearFar,
-                    this.ssrParams.x,
-                    this.ssrParams.y,
-                    this.ssrParams.z,
-                    this.ssrStride,
-                    this.targetSize,
-                    this.depthTex,
-                    this.normalTex,
-                    !!ctx.primaryCamera.ssrCalcThickness
-                  );
-            });
+            this.$l.hitInfo = ctx.HiZTexture
+              ? screenSpaceRayTracing_HiZ(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar,
+                  this.depthMipLevels,
+                  this.ssrParams.y,
+                  this.ssrParams.z,
+                  this.targetSize,
+                  this.hizTex,
+                  this.normalTex
+                )
+              : screenSpaceRayTracing_Linear2D(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  this.viewMatrix,
+                  this.projMatrix,
+                  this.invProjMatrix,
+                  this.cameraNearFar,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.ssrParams.z,
+                  this.ssrStride,
+                  this.targetSize,
+                  this.depthTex,
+                  this.normalTex,
+                  !!ctx.primaryCamera.ssrCalcThickness
+                );
             if (blur) {
               this.blurRadius = pb.float(0);
               this.$if(pb.greaterThan(this.roughness, 0.001), function () {
@@ -763,5 +701,7 @@ export class SSR extends AbstractPostEffect<'SSR'> {
         });
       }
     });
+    program.name = blur ? '@SSR_Intersect_Blur' : '@SSR_Intersect';
+    return program;
   }
 }

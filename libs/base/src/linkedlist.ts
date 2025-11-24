@@ -6,9 +6,9 @@ export class ListIterator<T = unknown> {
   /** @internal */
   private _node: ListNodeImpl;
   /** @internal */
-  private _reverse: boolean;
+  private readonly _reverse: boolean;
   /** @internal */
-  private _dl: List<T>;
+  private readonly _dl: List<T>;
   /** @internal */
   constructor(dl: List<T>, node: ListNodeImpl, reverse: boolean) {
     this._dl = dl;
@@ -30,7 +30,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns self
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -47,7 +46,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns the new iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -63,7 +61,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns self
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -80,7 +77,6 @@ export class ListIterator<T = unknown> {
    *
    * @returns the new iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is not valid
    *
    * @public
@@ -92,7 +88,7 @@ export class ListIterator<T = unknown> {
     return new ListIterator<T>(this._dl, this._reverse ? this._node.next : this._node.prev, this._reverse);
   }
   /** @internal */
-  get node() {
+  get node(): ListNodeImpl {
     return this._node;
   }
   /** @internal */
@@ -106,7 +102,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  get reversed() {
+  get reversed(): boolean {
     return this._reverse;
   }
   /**
@@ -116,18 +112,17 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  get list() {
+  get list(): List<T> {
     return this._dl;
   }
   /**
    * Gets the data associated with the iterator
    *
-   * @throws Error
    * The exception is thrown if the iterator is invalid
    *
    * @public
    */
-  get data() {
+  get data(): T {
     if (!this.valid()) {
       throw new Error('ListIterator.data: iterator is invalid');
     }
@@ -149,7 +144,7 @@ export class ListIterator<T = unknown> {
  */
 export class List<T = unknown> {
   /** @internal */
-  private _head: ListNodeImpl;
+  private readonly _head: ListNodeImpl;
   /** @internal */
   private _length: number;
   constructor() {
@@ -240,7 +235,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  forEach(callback: (data: T) => void) {
+  forEach(callback: (data: T) => void): void {
     if (callback) {
       for (let it = this.begin(); it.valid(); it.next()) {
         callback(it.data);
@@ -253,7 +248,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  forEachReverse(callback: (data: T) => void) {
+  forEachReverse(callback: (data: T) => void): void {
     if (callback) {
       for (let it = this.rbegin(); it.valid(); it.next()) {
         callback(it.data);
@@ -264,7 +259,6 @@ export class List<T = unknown> {
    * Gets the data associated to the first element in the linked list
    * @returns The data associated to the first element in the linked list
    *
-   * @throws Error
    * The exception is thrown if the list is empty
    *
    * @public
@@ -279,7 +273,6 @@ export class List<T = unknown> {
    * Gets the data associated to the last element in the linked list
    * @returns The data associated to the last element in the linked list
    *
-   * @throws Error
    * The exception is thrown if the list is empty
    *
    * @public
@@ -327,7 +320,7 @@ export class List<T = unknown> {
     return new ListIterator(this, this._head, true);
   }
   /** @internal */
-  private _remove(node: ListNodeImpl) {
+  private _remove(node: ListNodeImpl): void {
     node.prev.next = node.next;
     node.next.prev = node.prev;
     node.prev = undefined;

@@ -1,32 +1,36 @@
-import type { AbstractDevice, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
+import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
+import { copyTexture, fetchSampler } from '../utility/misc';
+import { Disposable } from '@zephyr3d/base';
+
+/**
+ * Rendering layer of post processing effects
+ * @public
+ *
+ */
+export enum PostEffectLayer {
+  opaque = 0,
+  transparent = 1,
+  end = 2
+}
 
 /**
  * Base class for any type of post effect
  * @public
  */
-export abstract class AbstractPostEffect<ClassName extends string> {
-  static readonly className: string;
-  protected _outputTexture: Texture2D;
-  protected _quadVertexLayout: VertexLayout;
-  protected _quadRenderStateSet: RenderStateSet;
+export class AbstractPostEffect extends Disposable {
+  private static _defaultRenderStates: { CompareFunc?: RenderStateSet } = {};
   protected _enabled: boolean;
-  protected _opaque: boolean;
+  protected _layer: PostEffectLayer;
   /**
    * Creates an instance of a post effect
    * @param name - Name of the post effect
    */
   constructor() {
-    this._outputTexture = null;
-    this._quadVertexLayout = null;
-    this._quadRenderStateSet = null;
+    super();
     this._enabled = true;
-    this._opaque = false;
-  }
-  /** Gets class name of this instance */
-  getClassName(): ClassName {
-    return (this.constructor as any).className as ClassName;
+    this._layer = PostEffectLayer.end;
   }
   /** Whether this post effect is enabled */
   get enabled(): boolean {
@@ -36,8 +40,8 @@ export abstract class AbstractPostEffect<ClassName extends string> {
     this._enabled = !!val;
   }
   /** Whether this post effect will be rendered at opaque phase */
-  get opaque(): boolean {
-    return this._opaque;
+  get layer(): PostEffectLayer {
+    return this._layer;
   }
   /**
    * Check if the post effect should be rendered upside down.
@@ -51,12 +55,16 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    * Checks whether this post effect requires the linear depth texture
    * @returns true if the linear depth texture is required.
    */
-  abstract requireLinearDepthTexture(ctx: DrawContext): boolean;
+  requireLinearDepthTexture(_ctx: DrawContext): boolean {
+    return false;
+  }
   /**
    * Checks whether this post effect requires the scene depth buffer
    * @returns true if the scene depth buffer is required.
    */
-  abstract requireDepthAttachment(ctx: DrawContext): boolean;
+  requireDepthAttachment(_ctx: DrawContext): boolean {
+    return false;
+  }
   /**
    * Apply the post effect
    * @param camera - Camera used the render the scene
@@ -67,19 +75,34 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    * @remarks
    * The frame buffer of the post effect is already set when apply() is called.
    */
-  abstract apply(
+  apply(
     ctx: DrawContext,
     inputColorTexture: Texture2D,
     sceneDepthTexture: Texture2D,
     srgbOutput: boolean
-  ): void;
+  ): void {
+    this.passThrough(ctx, inputColorTexture, srgbOutput);
+  }
   /**
-   * Disposes the post effect.
+   *
+   * @param ctx - Draw context
+   * @param inputColorTexture - Input color texture
+   * @param srgbOutput - Whether the result should be gamma corrected
    */
-  dispose() {
-    this._quadVertexLayout?.dispose();
-    this._quadVertexLayout = null;
-    this._quadRenderStateSet = null;
+  protected passThrough(
+    ctx: DrawContext,
+    inputColorTexture: Texture2D,
+    srgbOutput: boolean,
+    renderStates?: RenderStateSet
+  ) {
+    copyTexture(
+      inputColorTexture,
+      ctx.device.getFramebuffer(),
+      fetchSampler('clamp_nearest_nomip'),
+      renderStates,
+      0,
+      srgbOutput
+    );
   }
   /**
    * Draws a fullscreen quad
@@ -87,20 +110,6 @@ export abstract class AbstractPostEffect<ClassName extends string> {
    */
   protected drawFullscreenQuad(renderStateSet?: RenderStateSet) {
     drawFullscreenQuad(renderStateSet);
-    /*
-    const device = Application.instance.device;
-    if (!this._quadVertexLayout) {
-      this._quadVertexLayout = this.createVertexLayout(device);
-    }
-    if (!this._quadRenderStateSet) {
-      this._quadRenderStateSet = this.createRenderStates(device);
-    }
-    const lastRenderState = device.getRenderStates();
-    device.setVertexLayout(this._quadVertexLayout);
-    device.setRenderStates(renderStateSet ?? this._quadRenderStateSet);
-    device.draw('triangle-strip', 0, 4);
-    device.setRenderStates(lastRenderState);
-    */
   }
   /** @internal */
   protected createVertexLayout(device: AbstractDevice): VertexLayout {
@@ -112,11 +121,32 @@ export abstract class AbstractPostEffect<ClassName extends string> {
       ]
     });
   }
+  protected onDispose() {
+    super.onDispose();
+    this.destroy();
+  }
   /** @internal */
   protected createRenderStates(device: AbstractDevice): RenderStateSet {
     const renderStates = device.createRenderStateSet();
     renderStates.useRasterizerState().setCullMode('none');
     renderStates.useDepthState().enableTest(false).enableWrite(false);
     return renderStates;
+  }
+  /** @internal */
+  protected destroy() {}
+  /** @internal */
+  static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
+    let renderState = this._defaultRenderStates[compareFunc];
+    if (!renderState) {
+      renderState = ctx.device.createRenderStateSet();
+      renderState.useRasterizerState().setCullMode('none');
+      renderState
+        .useDepthState()
+        .enableTest(compareFunc !== 'always')
+        .enableWrite(false)
+        .setCompareFunc(compareFunc);
+      this._defaultRenderStates[compareFunc] = renderState;
+    }
+    return renderState;
   }
 }

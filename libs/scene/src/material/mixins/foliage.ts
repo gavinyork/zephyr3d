@@ -25,10 +25,10 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
   if ((BaseCls as any).foliageMixed) {
     return BaseCls as T & { new (...args: any[]): IMixinFoliage };
   }
-  return class extends BaseCls {
+  return class extends (BaseCls as typeof MeshMaterial) {
     static foliageMixed = true;
-    constructor(...args: any[]) {
-      super(...args);
+    constructor() {
+      super();
       this.cullMode = 'none';
     }
     calculateFoliageAlbedo(
@@ -49,7 +49,7 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
       pb.func(funcNameCalcFoliageAlbedo, [pb.vec4('albedo'), pb.vec2('coord')], function () {
         this.$l.a = pb.mul(
           this.albedo.a,
-          pb.add(1, pb.mul(pb.max(0, scope[funcNameCalcMipLevel](this.coord)), 0.25))
+          pb.add(1, pb.mul(pb.max(0, scope[funcNameCalcMipLevel](this.coord)), 0.5))
         );
         if (that.alphaToCoverage) {
           this.a = pb.add(pb.div(pb.sub(this.a, 0.4), pb.max(pb.fwidth(this.albedo.a), 0.0001)), 0.5);

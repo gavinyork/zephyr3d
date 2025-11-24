@@ -1,4 +1,4 @@
-import type { AbstractDevice } from '@zephyr3d/device';
+import type { AbstractDevice, Font } from '@zephyr3d/device';
 import * as ImGui from './imgui';
 import * as ImGui_Impl from './imgui_impl';
 
@@ -7,6 +7,8 @@ import * as ImGui_Impl from './imgui_impl';
  * @public
  */
 export { ImGui };
+
+let inFrame = false;
 
 /**
  * Initialize the ImGUI bindings
@@ -19,16 +21,28 @@ export { ImGui };
 export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number) {
   await ImGui.default();
   ImGui.CHECKVERSION();
-  console.log('ImGui.CreateContext() VERSION=', ImGui.VERSION);
+  console.info('ImGui.CreateContext() VERSION=', ImGui.VERSION);
 
   ImGui.CreateContext();
   ImGui.StyleColorsDark();
   const io: ImGui.IO = ImGui.GetIO();
+
+  io.ConfigWindowsResizeFromEdges = true;
+  io.ConfigDragClickToInputText = true;
+  io.BackendFlags |= ImGui.BackendFlags.HasMouseCursors;
   const font = io.Fonts.AddFontDefault();
 
-  font.FontName = fontFamily || 'arial';
-  font.FontSize = fontSize || 16;
+  font.FontName = fontFamily || `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
+  font.FontSize = fontSize || 12;
   ImGui_Impl.Init(device);
+}
+
+/**
+ * Whether a frame is currently rendering
+ * @public
+ */
+export function imGuiInFrame(): boolean {
+  return inFrame;
 }
 
 /**
@@ -36,6 +50,10 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
  * @public
  */
 export function imGuiNewFrame() {
+  if (inFrame) {
+    throw new Error('imGuiNewFrame() failed: alreay in a frame');
+  }
+  inFrame = true;
   ImGui_Impl.NewFrame(Date.now());
   ImGui.NewFrame();
 }
@@ -45,6 +63,10 @@ export function imGuiNewFrame() {
  * @public
  */
 export function imGuiEndFrame() {
+  if (!inFrame) {
+    throw new Error('imGuiEndFrame() failed: not in a frame');
+  }
+  inFrame = false;
   ImGui.EndFrame();
   ImGui.Render();
   ImGui_Impl.RenderDrawData(ImGui.GetDrawData());
@@ -68,4 +90,56 @@ export function imGuiInjectEvent(ev: Event, type?: string) {
   } else {
     return false;
   }
+}
+
+/**
+ * Set special text glyph font
+ * @param charCode - char code of glyph
+ * @param font - Web font
+ * @public
+ */
+export function imGuiSetFontGlyph(charCode: number, font: Font) {
+  ImGui_Impl.addCustomGlyph(charCode, font);
+}
+
+/**
+ * Calculate text size
+ * @param text - text to calculated
+ * @remarks
+ * The function ensures all glyphs in text been created
+ *
+ * @public
+ */
+export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
+  return ImGui_Impl.calcTextSize(text, out);
+}
+
+/**
+ * Get char code map, for emoji conversion
+ * @returns char code map
+ *
+ * @public
+ */
+export function imGuiGetCharCodeMap() {
+  return ImGui_Impl.getCharCodeMap();
+}
+
+/**
+ * Sets char code map, for emoji conversion
+ * @param map - Char code map to set
+ *
+ * @public
+ */
+export function imGuiSetCharCodeMap(map: Record<number, string>) {
+  ImGui_Impl.setCharCodeMap(map);
+}
+
+/**
+ * Manual set keyboard capture
+ * @param capture - Whether keyboard should be captured by ImGUI
+ *
+ * @public
+ */
+export function imGuiWantCaptureKeyboard(capture: boolean) {
+  ImGui_Impl.captureKeyboard(capture);
 }

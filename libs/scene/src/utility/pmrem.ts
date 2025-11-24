@@ -1,6 +1,15 @@
-import { Vector2, Vector3 } from '@zephyr3d/base';
-import type { BindGroup, GPUProgram, RenderStateSet, TextureCube, VertexLayout } from '@zephyr3d/device';
-import { Application } from '../app';
+import { Vector3 } from '@zephyr3d/base';
+import type {
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  TextureCube,
+  TextureSampler,
+  VertexLayout
+} from '@zephyr3d/device';
+import { getDevice } from '../app/api';
+import { fetchSampler } from './misc';
 
 // reference: https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
 
@@ -26,7 +35,7 @@ const faceDirections = [
 ];
 
 function init() {
-  const device = Application.instance.device;
+  const device = getDevice();
   const vertices = new Float32Array([1, 1, -1, 1, -1, -1, 1, -1]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
   vertexLayout = device.createVertexLayout({
@@ -43,7 +52,7 @@ function init() {
 }
 
 function getProgramInfo(type: DistributionType, numSamples: number) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const hash = `${type}:${numSamples}`;
   let ret = programs[hash];
   if (!ret) {
@@ -55,7 +64,7 @@ function getProgramInfo(type: DistributionType, numSamples: number) {
 }
 
 function createPMREMProgram(type: DistributionType, numSamples: number): GPUProgram {
-  const device = Application.instance.device;
+  const device = getDevice();
   const pb = device;
   return pb.buildRenderProgram({
     vertex(pb) {
@@ -78,7 +87,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
       if (type === 'ggx') {
         this.alphaG = pb.float().uniform(0);
       }
-      this.vFilteringInfo = pb.vec2().uniform(0);
+      this.vFilteringInfo = pb.vec3().uniform(0);
       this.hdrScale = pb.float().uniform(0);
       this.inputTexture = pb.texCube().uniform(0);
       this.NUM_SAMPLES_FLOAT = pb.float(numSamples);
@@ -149,7 +158,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
             )
           );
         });
-        pb.func('irradiance', [pb.vec3('direction'), pb.vec2('vFilteringInfo')], function () {
+        pb.func('irradiance', [pb.vec3('direction'), pb.vec3('vFilteringInfo')], function () {
           this.$l.n = pb.normalize(this.direction);
           this.$l.result = pb.vec3(0);
           this.$l.tangent = pb.vec3();
@@ -163,6 +172,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
           this.$l.tbn = pb.mat3(this.tangent, this.bitangent, this.n);
           this.$l.maxLevel = this.vFilteringInfo.y;
           this.$l.dim0 = this.vFilteringInfo.x;
+          this.$l.colorScale = this.vFilteringInfo.z;
           this.$l.omegaP = pb.div(4 * Math.PI, pb.mul(this.dim0, this.dim0, 6));
           this.$for(pb.int('i'), 0, numSamples, function () {
             this.$l.Xi = this.hammersley2d(this.i, numSamples);
@@ -182,7 +192,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
               this.result = pb.add(this.result, this.c);
             });
           });
-          this.result = pb.mul(this.result, this.NUM_SAMPLES_FLOAT_INVERSED);
+          this.result = pb.mul(this.result, this.NUM_SAMPLES_FLOAT_INVERSED, this.colorScale);
           this.$return(this.result);
         });
       }
@@ -214,7 +224,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
         );
         pb.func(
           'radiance',
-          [pb.float('alphaG'), pb.vec3('direction'), pb.vec2('vFilteringInfo')],
+          [pb.float('alphaG'), pb.vec3('direction'), pb.vec3('vFilteringInfo')],
           function () {
             this.$l.n = pb.normalize(this.direction);
             this.$if(pb.equal(this.alphaG, 0), function () {
@@ -288,12 +298,13 @@ function doPrefilterCubemap(
   roughness: number,
   miplevel: number,
   srcTexture: TextureCube,
-  dstTexture: TextureCube,
-  filteringInfo: Vector2,
+  sampler: TextureSampler,
+  dstFramebuffer: FrameBuffer,
+  filteringInfo: Vector3,
   numSamples: number
 ): void {
-  const device = Application.instance.device;
-  const framebuffer = device.createFrameBuffer([dstTexture], null);
+  const device = getDevice();
+  const framebuffer = dstFramebuffer;
   framebuffer.setColorAttachmentMipLevel(0, miplevel);
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
   const { program, bindgroup } = getProgramInfo(type, numSamples);
@@ -329,28 +340,48 @@ function doPrefilterCubemap(
 export function prefilterCubemap(
   tex: TextureCube,
   type: DistributionType,
-  destTex: TextureCube,
-  numSamples?: number
+  destTexture: TextureCube | FrameBuffer,
+  numSamples?: number,
+  radianceSource?: boolean
 ): void {
   if (!tex || !tex.isTextureCube()) {
     console.error('prefilterCubemap(): source texture must be cube texture');
     return;
   }
-  const device = Application.instance.device;
+  const device = getDevice();
   if (!vertexLayout) {
     init();
   }
   device.pushDeviceStates();
+  radianceSource = radianceSource ?? true;
   const rs = device.getRenderStates();
   const srcTex = tex;
   const width = tex.width;
   const mipmapsCount = tex.mipLevelCount;
-  const filteringInfo = new Vector2(width, mipmapsCount);
+  const filteringInfo = new Vector3(width, mipmapsCount, radianceSource ? 1 : Math.PI);
+  const fb = destTexture.isFramebuffer() ? destTexture : device.createFrameBuffer([destTexture], null);
+  const attachMiplevel = fb.getColorAttachmentMipLevel(0);
+  const generateMipmap = fb.getColorAttachmentGenerateMipmaps(0);
+  const destTex = fb.getColorAttachments()[0];
   const mips = type === 'ggx' ? destTex.mipLevelCount : 1;
   for (let i = 0; i < mips; i++) {
     const alpha = i === 0 ? 0 : Math.pow(2, i) / width;
-    doPrefilterCubemap(type, alpha, i, srcTex, destTex, filteringInfo, numSamples ?? 64);
+    doPrefilterCubemap(
+      type,
+      alpha,
+      i,
+      srcTex,
+      fetchSampler(type === 'ggx' ? 'clamp_nearest_nomip' : 'clamp_linear'),
+      fb,
+      filteringInfo,
+      numSamples ?? 64
+    );
   }
   device.popDeviceStates();
   device.setRenderStates(rs);
+  fb.setColorAttachmentMipLevel(0, attachMiplevel);
+  fb.setColorAttachmentGenerateMipmaps(0, generateMipmap);
+  if (!destTexture.isFramebuffer()) {
+    fb.dispose();
+  }
 }

@@ -1,7 +1,7 @@
-import { Vector3 } from '@zephyr3d/base';
-import { BoundingBox } from '../utility/bounding_volume';
+import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
+import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for torus shape
@@ -42,7 +42,15 @@ Triangle(n, m) = (VIndex(n, m), VIndex(n+1, m), VIndex(n+1, m+1), VIndex(n, m), 
  *
  * @public
  */
-export class TorusShape extends Shape<TorusCreationOptions> {
+export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<TorusShape> {
+  static _defaultOptions = {
+    ...Shape._defaultOptions,
+    numSlices: 40,
+    numSegments: 16,
+    outerRadius: 1,
+    innerRadius: 0.3,
+    radialDetail: 20
+  };
   /**
    * Creates an instance of torus shape
    * @param options - The creation options
@@ -50,75 +58,97 @@ export class TorusShape extends Shape<TorusCreationOptions> {
   constructor(options?: TorusCreationOptions) {
     super(options);
   }
-  /** @internal */
-  protected createDefaultOptions() {
-    const options = super.createDefaultOptions();
-    options.numSlices = 40;
-    options.numSegments = 16;
-    options.outerRadius = 10;
-    options.innerRadius = 3;
-    options.radialDetail = 20;
-    return options;
+  clone(): TorusShape {
+    return new TorusShape(this._options);
   }
-  /** @internal */
-  protected _createArrays(vertices: number[], normals: number[], uvs: number[], indices: number[]) {
-    this.primitiveType = 'triangle-list';
-    const N = this._options.numSlices;
-    const M = this._options.numSegments;
-    const OR = this._options.outerRadius;
-    const IR = this._options.innerRadius;
+  /** type of the shape */
+  get type(): string {
+    return 'Torus';
+  }
+  /**
+   * Generates the data for the torus shape
+   * @param vertices - vertex positions
+   * @param normals - vertex normals
+   * @param uvs - vertex uvs
+   * @param indices - vertex indices
+   */
+  static generateData(
+    options: TorusCreationOptions,
+    vertices: number[],
+    normals: number[],
+    tangents: number[],
+    uvs: number[],
+    indices: number[],
+    bbox?: AABB,
+    indexOffset?: number,
+    vertexCallback?: (index: number, x: number, y: number, z: number) => void
+  ): PrimitiveType {
+    options = Object.assign({}, this._defaultOptions, options ?? {});
+    indexOffset = indexOffset ?? 0;
+    const start = vertices.length;
+    const N = options.numSlices;
+    const M = options.numSegments;
+    const OR = options.outerRadius;
+    const IR = options.innerRadius;
     for (let n = 0; n <= N; n++) {
       const alpha = ((n % N) / N) * Math.PI * 2;
-      const cx = OR * Math.cos(alpha);
+      const cosA = Math.cos(alpha);
+      const sinA = Math.sin(alpha);
+      const cx = OR * cosA;
       const cy = 0;
-      const cz = OR * Math.sin(alpha);
+      const cz = OR * sinA;
       for (let m = 0; m <= M; m++) {
         const theta = ((m % M) / M) * Math.PI * 2;
-        const idx = n * (M + 1) + m;
-        const t = 1 + (IR * Math.cos(theta)) / OR;
-        const s = IR * Math.sin(theta);
-        vertices[idx * 3 + 0] = cx * t;
-        vertices[idx * 3 + 1] = cy * t + s;
-        vertices[idx * 3 + 2] = cz * t;
-        const nx = vertices[idx * 3 + 0] - cx;
-        const ny = vertices[idx * 3 + 1] - cy;
-        const nz = vertices[idx * 3 + 2] - cz;
-        const mag = Math.sqrt(nx * nx + ny * ny + nz * nz);
-        normals[idx * 3 + 0] = nx / mag;
-        normals[idx * 3 + 1] = ny / mag;
-        normals[idx * 3 + 2] = nz / mag;
-        uvs[idx * 2 + 0] = m / M;
-        uvs[idx * 2 + 1] = n / N;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        const t = 1 + (IR * cosT) / OR;
+        const s = IR * sinT;
+        const x = cx * t;
+        const y = cy * t + s;
+        const z = cz * t;
+        vertices.push(x, y, z);
+        if (normals) {
+          const nx = x - cx;
+          const ny = y - cy;
+          const nz = z - cz;
+          const mag = Math.hypot(nx, ny, nz);
+          normals.push(nx / mag, ny / mag, nz / mag);
+        }
+        if (uvs) {
+          uvs.push(m / M, n / N);
+        }
+        if (tangents) {
+          const tx = -sinT * cosA;
+          const ty = cosT;
+          const tz = -sinT * sinA;
+          tangents.push(tx, ty, tz, 1.0);
+        }
       }
     }
     for (let n = 0; n < N; n++) {
       for (let m = 0; m < M; m++) {
-        indices.push(n * (M + 1) + m);
-        indices.push((n + 1) * (M + 1) + m + 1);
-        indices.push((n + 1) * (M + 1) + m);
-        indices.push(n * (M + 1) + m);
-        indices.push(n * (M + 1) + m + 1);
-        indices.push((n + 1) * (M + 1) + m + 1);
+        indices.push(n * (M + 1) + m + indexOffset);
+        indices.push((n + 1) * (M + 1) + m + 1 + indexOffset);
+        indices.push((n + 1) * (M + 1) + m + indexOffset);
+        indices.push(n * (M + 1) + m + indexOffset);
+        indices.push(n * (M + 1) + m + 1 + indexOffset);
+        indices.push((n + 1) * (M + 1) + m + 1 + indexOffset);
       }
     }
-  }
-  /** @internal */
-  protected _create(): boolean {
-    const vertices: number[] = [];
-    const indices: number[] = [];
-    const normals: number[] = [];
-    const uvs: number[] = [];
-    this._createArrays(vertices, normals, uvs, indices);
-    this.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-    this.createAndSetVertexBuffer('normal_f32x3', new Float32Array(normals));
-    this.createAndSetVertexBuffer('tex0_f32x2', new Float32Array(uvs));
-    this.createAndSetIndexBuffer(new Uint16Array(indices));
-    const radiusX = this._options.outerRadius + this._options.innerRadius;
-    const radiusY = this._options.innerRadius;
-    this.setBoundingVolume(
-      new BoundingBox(new Vector3(-radiusX, -radiusY, -radiusX), new Vector3(radiusX, radiusY, radiusX))
-    );
-    this.indexCount = indices.length;
-    return true;
+    Shape._transform(options.transform, vertices, normals, start);
+    if (bbox || vertexCallback) {
+      for (let i = start; i < vertices.length - 2; i += 3) {
+        if (bbox) {
+          bbox.minPoint.x = Math.min(bbox.minPoint.x, vertices[i]);
+          bbox.minPoint.y = Math.min(bbox.minPoint.y, vertices[i + 1]);
+          bbox.minPoint.z = Math.min(bbox.minPoint.z, vertices[i + 2]);
+          bbox.maxPoint.x = Math.max(bbox.maxPoint.x, vertices[i]);
+          bbox.maxPoint.y = Math.max(bbox.maxPoint.y, vertices[i + 1]);
+          bbox.maxPoint.z = Math.max(bbox.maxPoint.z, vertices[i + 2]);
+        }
+        vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
+      }
+    }
+    return 'triangle-list';
   }
 }

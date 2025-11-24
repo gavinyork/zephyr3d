@@ -169,17 +169,16 @@ export interface TextureFormatInfoWebGL extends TextureFormatInfo {
   glFormat: number;
   glInternalFormat: number;
   glType: number[];
-  filterable: boolean;
-  renderable: boolean;
-  compressed: boolean;
 }
 
 export class WebGLFramebufferCaps implements FramebufferCaps {
-  private _isWebGL2: boolean;
-  private _extDrawBuffers: WEBGL_draw_buffers;
-  private _extFloatBlending: EXT_float_blend;
+  private readonly _isWebGL2: boolean;
+  private readonly _extDrawBuffers: WEBGL_draw_buffers;
+  private readonly _extFloatBlending: EXT_float_blend;
+  private readonly _extRenderMipmap: OES_fbo_render_mipmap;
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
+  supportRenderMipmap: boolean;
   supportMultisampledFramebuffer: boolean;
   supportFloatBlending: boolean;
   supportDepth32float: boolean;
@@ -188,6 +187,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
     this._isWebGL2 = isWebGL2(gl);
     this._extDrawBuffers = this._isWebGL2 ? null : gl.getExtension('WEBGL_draw_buffers');
     this._extFloatBlending = gl.getExtension('EXT_float_blend');
+    this._extRenderMipmap = this._isWebGL2 ? null : gl.getExtension('OES_fbo_render_mipmap');
     this.maxDrawBuffers =
       this._isWebGL2 || this._extDrawBuffers
         ? Math.min(
@@ -196,6 +196,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
           )
         : 1;
     this.maxColorAttachmentBytesPerSample = this.maxDrawBuffers * 16;
+    this.supportRenderMipmap = isWebGL2(gl) || !!this._extRenderMipmap;
     this.supportMultisampledFramebuffer = isWebGL2(gl);
     this.supportFloatBlending = !!this._extFloatBlending;
     this.supportDepth32float = this._isWebGL2;
@@ -204,9 +205,9 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
 }
 
 export class WebGLMiscCaps implements MiscCaps {
-  private _isWebGL2: boolean;
-  private _extIndexUint32: OES_element_index_uint;
-  private _extBlendMinMax: EXT_blend_minmax;
+  private readonly _isWebGL2: boolean;
+  private readonly _extIndexUint32: OES_element_index_uint;
+  private readonly _extBlendMinMax: EXT_blend_minmax;
   supportOversizedViewport: boolean;
   supportBlendMinMax: boolean;
   support32BitIndex: boolean;
@@ -232,9 +233,9 @@ export class WebGLMiscCaps implements MiscCaps {
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {
-  private _extFragDepth: EXT_frag_depth;
-  private _extStandardDerivatives: OES_standard_derivatives;
-  private _extShaderTextureLod: EXT_shader_texture_lod;
+  private readonly _extFragDepth: EXT_frag_depth;
+  private readonly _extStandardDerivatives: OES_standard_derivatives;
+  private readonly _extShaderTextureLod: EXT_shader_texture_lod;
   supportFragmentDepth: boolean;
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
@@ -273,20 +274,20 @@ export class WebGLShaderCaps implements ShaderCaps {
   }
 }
 export class WebGLTextureCaps implements TextureCaps {
-  private _isWebGL2: boolean;
-  private _extS3TC: WEBGL_compressed_texture_s3tc;
-  private _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
-  private _extBPTC: EXT_texture_compression_bptc;
-  private _extRGTC: EXT_texture_compression_rgtc;
-  private _extASTC: WEBGL_compressed_texture_astc;
-  private _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
-  private _extDepthTexture: WEBGL_depth_texture;
-  private _extSRGB: EXT_sRGB;
-  private _extTextureFloat: OES_texture_float;
-  private _extTextureFloatLinear: OES_texture_float_linear;
-  private _extTextureHalfFloat: OES_texture_half_float;
-  private _extTextureHalfFloatLinear: OES_texture_half_float_linear;
-  private _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
+  private readonly _isWebGL2: boolean;
+  private readonly _extS3TC: WEBGL_compressed_texture_s3tc;
+  private readonly _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
+  private readonly _extBPTC: EXT_texture_compression_bptc;
+  private readonly _extRGTC: EXT_texture_compression_rgtc;
+  private readonly _extASTC: WEBGL_compressed_texture_astc;
+  private readonly _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
+  private readonly _extDepthTexture: WEBGL_depth_texture;
+  private readonly _extSRGB: EXT_sRGB;
+  private readonly _extTextureFloat: OES_texture_float;
+  private readonly _extTextureFloatLinear: OES_texture_float_linear;
+  private readonly _extTextureHalfFloat: OES_texture_half_float;
+  private readonly _extTextureHalfFloatLinear: OES_texture_half_float_linear;
+  private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
   npo2Mipmapping: boolean;
@@ -387,7 +388,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE, gl.UNSIGNED_SHORT_4_4_4_4, gl.UNSIGNED_SHORT_5_5_5_1],
         filterable: true,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       }
     } as Record<TextureFormat, TextureFormatInfoWebGL>;
     if (this.supportASTC) {
@@ -407,13 +411,17 @@ export class WebGLTextureCaps implements TextureCaps {
         '12x10',
         '12x12'
       ]) {
+        const [w, h] = k.split('x').map((val) => Number(val));
         this._textureFormatInfos[`astc-${k}`] = {
           glFormat: gl.NONE,
           glInternalFormat: this._extASTC[`COMPRESSED_RGBA_ASTC_${k}_KHR`],
           glType: [gl.NONE],
           filterable: true,
           renderable: false,
-          compressed: true
+          compressed: true,
+          size: 16,
+          blockWidth: w,
+          blockHeight: h
         };
         this._textureFormatInfos[`astc-${k}-srgb`] = {
           glFormat: gl.NONE,
@@ -421,7 +429,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [gl.NONE],
           filterable: true,
           renderable: false,
-          compressed: true
+          compressed: true,
+          size: 16,
+          blockWidth: w,
+          blockHeight: h
         };
       }
     }
@@ -432,7 +443,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 8,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['dxt3'] = {
         glFormat: gl.NONE,
@@ -440,7 +454,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['dxt5'] = {
         glFormat: gl.NONE,
@@ -448,7 +465,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
     }
     if (this.supportS3TCSRGB) {
@@ -458,7 +478,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 8,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['dxt3-srgb'] = {
         glFormat: gl.NONE,
@@ -466,7 +489,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['dxt5-srgb'] = {
         glFormat: gl.NONE,
@@ -474,7 +500,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
     }
     if (this.supportRGTC) {
@@ -484,7 +513,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 8,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc4-signed'] = {
         glFormat: gl.NONE,
@@ -492,7 +524,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 8,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc5'] = {
         glFormat: gl.NONE,
@@ -500,7 +535,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc5-signed'] = {
         glFormat: gl.NONE,
@@ -508,7 +546,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
     }
     if (this.supportBPTC) {
@@ -518,7 +559,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc6h-signed'] = {
         glFormat: gl.NONE,
@@ -526,7 +570,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc7'] = {
         glFormat: gl.NONE,
@@ -534,7 +581,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
       this._textureFormatInfos['bc7-srgb'] = {
         glFormat: gl.NONE,
@@ -542,7 +592,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.NONE],
         filterable: true,
         renderable: false,
-        compressed: true
+        compressed: true,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
       };
     }
     if (isWebGL2(gl)) {
@@ -552,7 +605,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: true,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 1
       };
       this._textureFormatInfos['r8snorm'] = {
         glFormat: gl.RED,
@@ -560,7 +616,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: true,
         renderable: false,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 1
       };
       this._textureFormatInfos['r16f'] = {
         glFormat: gl.RED,
@@ -568,7 +627,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.HALF_FLOAT, gl.FLOAT],
         filterable: this.supportLinearHalfFloatTexture,
         renderable: this.supportHalfFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['r32f'] = {
         glFormat: gl.RED,
@@ -576,7 +638,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.FLOAT],
         filterable: this.supportLinearFloatTexture,
         renderable: this.supportFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['r8ui'] = {
         glFormat: gl.RED_INTEGER,
@@ -584,7 +649,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 1
       };
       this._textureFormatInfos['r8i'] = {
         glFormat: gl.RED_INTEGER,
@@ -592,7 +660,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 1
       };
       this._textureFormatInfos['r16ui'] = {
         glFormat: gl.RED_INTEGER,
@@ -600,7 +671,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['r16i'] = {
         glFormat: gl.RED_INTEGER,
@@ -608,7 +682,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['r32ui'] = {
         glFormat: gl.RED_INTEGER,
@@ -616,7 +693,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['r32i'] = {
         glFormat: gl.RED_INTEGER,
@@ -624,7 +704,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rg8unorm'] = {
         glFormat: gl.RG,
@@ -632,7 +715,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: true,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['rg8snorm'] = {
         glFormat: gl.RG,
@@ -640,7 +726,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: true,
         renderable: false,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['rg16f'] = {
         glFormat: gl.RG,
@@ -648,7 +737,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.HALF_FLOAT, gl.FLOAT],
         filterable: this.supportLinearHalfFloatTexture,
         renderable: this.supportHalfFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rg32f'] = {
         glFormat: gl.RG,
@@ -656,7 +748,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.FLOAT],
         filterable: this.supportLinearFloatTexture,
         renderable: this.supportFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rg8ui'] = {
         glFormat: gl.RG,
@@ -664,7 +759,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['rg8i'] = {
         glFormat: gl.RG,
@@ -672,7 +770,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['rg16ui'] = {
         glFormat: gl.RG,
@@ -680,7 +781,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rg16i'] = {
         glFormat: gl.RG,
@@ -688,7 +792,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rg32ui'] = {
         glFormat: gl.RG,
@@ -696,7 +803,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rg32i'] = {
         glFormat: gl.RG,
@@ -704,7 +814,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rgba8unorm-srgb'] = {
         glFormat: gl.RGBA,
@@ -712,7 +825,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: true,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rgba8snorm'] = {
         glFormat: gl.RGBA,
@@ -720,7 +836,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: true,
         renderable: false,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rgba16f'] = {
         glFormat: gl.RGBA,
@@ -728,7 +847,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.HALF_FLOAT, gl.FLOAT],
         filterable: this.supportLinearHalfFloatTexture,
         renderable: this.supportHalfFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rgba32f'] = {
         glFormat: gl.RGBA,
@@ -736,7 +858,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.FLOAT],
         filterable: this.supportLinearFloatTexture,
         renderable: this.supportFloatColorBuffer,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 16
       };
       this._textureFormatInfos['rgba8ui'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -744,7 +869,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rgba8i'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -752,7 +880,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.BYTE],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['rgba16ui'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -760,7 +891,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rgba16i'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -768,7 +902,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.SHORT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
       this._textureFormatInfos['rgba32ui'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -776,7 +913,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 16
       };
       this._textureFormatInfos['rgba32i'] = {
         glFormat: gl.RGBA_INTEGER,
@@ -784,7 +924,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 16
       };
       this._textureFormatInfos['rg11b10uf'] = {
         glFormat: gl.RGB,
@@ -792,7 +935,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT_10F_11F_11F_REV],
         filterable: true,
         renderable: false,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['d16'] = {
         glFormat: gl.DEPTH_COMPONENT,
@@ -800,7 +946,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_SHORT, gl.UNSIGNED_INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 2
       };
       this._textureFormatInfos['d24'] = {
         glFormat: gl.DEPTH_COMPONENT,
@@ -808,7 +957,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['d32f'] = {
         glFormat: gl.DEPTH_COMPONENT,
@@ -816,7 +968,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.FLOAT],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['d24s8'] = {
         glFormat: gl.DEPTH_STENCIL,
@@ -824,7 +979,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.UNSIGNED_INT_24_8],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 4
       };
       this._textureFormatInfos['d32fs8'] = {
         glFormat: gl.DEPTH_STENCIL,
@@ -832,7 +990,10 @@ export class WebGLTextureCaps implements TextureCaps {
         glType: [gl.FLOAT_32_UNSIGNED_INT_24_8_REV],
         filterable: false,
         renderable: true,
-        compressed: false
+        compressed: false,
+        blockWidth: 1,
+        blockHeight: 1,
+        size: 8
       };
     } else {
       if (this.supportFloatTexture) {
@@ -842,7 +1003,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [gl.FLOAT, gl.UNSIGNED_BYTE, gl.UNSIGNED_SHORT_4_4_4_4, gl.UNSIGNED_SHORT_5_5_5_1],
           filterable: this.supportLinearFloatTexture,
           renderable: this.supportFloatColorBuffer,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 16
         };
       }
       if (this.supportHalfFloatTexture) {
@@ -857,7 +1021,10 @@ export class WebGLTextureCaps implements TextureCaps {
           ],
           filterable: this.supportLinearHalfFloatTexture,
           renderable: this.supportHalfFloatColorBuffer,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 8
         };
       }
       if (this.supportSRGBTexture) {
@@ -867,7 +1034,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [gl.UNSIGNED_BYTE],
           filterable: true,
           renderable: false,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 4
         };
       }
       if (this.supportDepthTexture) {
@@ -877,7 +1047,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [gl.UNSIGNED_SHORT],
           filterable: false,
           renderable: true,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 2
         };
         this._textureFormatInfos['d24'] = {
           glFormat: gl.DEPTH_COMPONENT,
@@ -885,7 +1058,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [gl.UNSIGNED_INT],
           filterable: false,
           renderable: true,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 4
         };
         this._textureFormatInfos['d24s8'] = {
           glFormat: gl.DEPTH_STENCIL,
@@ -893,7 +1069,10 @@ export class WebGLTextureCaps implements TextureCaps {
           glType: [this._extDepthTexture.UNSIGNED_INT_24_8_WEBGL],
           filterable: false,
           renderable: true,
-          compressed: false
+          compressed: false,
+          blockWidth: 1,
+          blockHeight: 1,
+          size: 4
         };
       }
     }

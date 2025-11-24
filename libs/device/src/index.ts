@@ -15,6 +15,7 @@ export * from './vertexdata';
 export * from './render_states';
 export * from './gpuobject';
 export * from './device';
+export * from './pool';
 export * from './builder';
 export * from './helpers';
 export * from './timer';

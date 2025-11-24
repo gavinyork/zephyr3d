@@ -9,10 +9,11 @@ import type {
   PBShaderExp,
   RenderStateSet
 } from '@zephyr3d/device';
-import { OIT } from './oit';
+import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
+import { Disposable } from '@zephyr3d/base';
 
 /**
  * per-pixel linked list OIT renderer using ABuffer.
@@ -22,10 +23,11 @@ import { ShaderHelper } from '../material';
  *
  * @public
  */
-export class ABufferOIT extends OIT {
+export class ABufferOIT extends Disposable implements OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
-  private static MAX_FRAGMENT_LAYERS = 75;
+  public static readonly usePremultipliedAlpha = true;
+  private static readonly MAX_FRAGMENT_LAYERS = 75;
   private static _compositeProgram: GPUProgram = null;
   private static _compositeBindGroup: BindGroup = null;
   private static _compositeRenderStates: RenderStateSet = null;
@@ -34,10 +36,10 @@ export class ABufferOIT extends OIT {
   private _headStagingBuffer: GPUDataBuffer;
   private _headBuffer: GPUDataBuffer;
   private _scissorOffsetBuffer: GPUDataBuffer;
-  private _numLayers: number;
-  private _screenSize: Uint32Array;
+  private readonly _numLayers: number;
+  private _screenSize: Uint32Array<ArrayBuffer>;
   private _hash: string;
-  private _debug: boolean;
+  private readonly _debug: boolean;
   private _scissorSlices: number;
   private _scissorHeight: number;
   private _currentPass: number;
@@ -75,19 +77,10 @@ export class ABufferOIT extends OIT {
     return deviceType === 'webgpu';
   }
   /**
-   * {@inheritDoc OIT.dispose}
+   * {@inheritDoc OIT.wantsPremultipliedAlpha}
    */
-  dispose() {
-    this._nodeBuffer?.dispose();
-    this._nodeBuffer = null;
-    this._headStagingBuffer?.dispose();
-    this._headStagingBuffer = null;
-    this._headBuffer?.dispose();
-    this._headBuffer = null;
-    this._scissorOffsetBuffer?.dispose();
-    this._scissorOffsetBuffer = null;
-    this._hash = null;
-    this._savedScissor = null;
+  wantsPremultipliedAlpha() {
+    return ABufferOIT.usePremultipliedAlpha;
   }
   /**
    * {@inheritDoc OIT.begin}
@@ -275,7 +268,7 @@ export class ABufferOIT extends OIT {
           this.Z_AB_nodeOffset,
           pb.uvec4(this.Z_AB_color, this.Z_AB_colorScale, this.Z_AB_depth, this.Z_AB_oldHead)
         );
-        pb.discard;
+        pb.discard();
       });
     });
     return true;
@@ -355,11 +348,15 @@ export class ABufferOIT extends OIT {
               });
               // under operator blending
               this.$l.c0 = this.unpackColor(this.fragmentArray[0]);
-              this.$l.c_dst = pb.mul(this.c0.rgb, this.c0.a);
+              this.$l.c_dst = ABufferOIT.usePremultipliedAlpha ? this.c0.rgb : pb.mul(this.c0.rgb, this.c0.a);
               this.$l.a_dst = pb.sub(1, this.c0.a);
               this.$for(pb.uint('i'), 1, this.fragmentArrayLen, function () {
                 this.$l.c = this.unpackColor(this.fragmentArray.at(this.i));
-                this.c_dst = pb.add(pb.mul(this.c.rgb, this.c.a, this.a_dst), this.c_dst);
+                if (ABufferOIT.usePremultipliedAlpha) {
+                  this.c_dst = pb.add(this.c_dst, pb.mul(this.c.rgb, this.a_dst));
+                } else {
+                  this.c_dst = pb.add(this.c_dst, pb.mul(this.c.rgb, this.c.a, this.a_dst));
+                }
                 this.a_dst = pb.mul(this.a_dst, pb.sub(1, this.c.a));
               });
               this.$outputs.outColor = pb.vec4(this.c_dst, this.a_dst);
@@ -367,6 +364,7 @@ export class ABufferOIT extends OIT {
           });
         }
       });
+      this._compositeProgram.name = '@ABufferOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();
       this._compositeRenderStates
@@ -385,5 +383,18 @@ export class ABufferOIT extends OIT {
       stencilStates.setReadMask(0xff);
     }
     return this._compositeProgram;
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._nodeBuffer?.dispose();
+    this._nodeBuffer = null;
+    this._headStagingBuffer?.dispose();
+    this._headStagingBuffer = null;
+    this._headBuffer?.dispose();
+    this._headBuffer = null;
+    this._scissorOffsetBuffer?.dispose();
+    this._scissorOffsetBuffer = null;
+    this._hash = null;
+    this._savedScissor = null;
   }
 }

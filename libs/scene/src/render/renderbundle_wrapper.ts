@@ -1,16 +1,26 @@
 import type { RenderBundle } from '@zephyr3d/device';
-import { Application } from '../app';
 import type { Material } from '../material';
 import type { Drawable } from './drawable';
+import type { Primitive } from './primitive';
+import { Disposable } from '@zephyr3d/base';
+import { getDevice } from '../app/api';
 
-export class RenderBundleWrapper {
+export class RenderBundleWrapper extends Disposable {
   private _renderBundles: Record<string, RenderBundle>;
-  private _disposed: boolean;
-  private static _drawableContainer: WeakMap<Drawable, { wrapper: RenderBundleWrapper; hashes: string[] }[]> =
-    new WeakMap();
-  private static _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
+  private static readonly _drawableContainer: WeakMap<
+    Drawable,
+    { wrapper: RenderBundleWrapper; hashes: string[] }[]
+  > = new WeakMap();
+  private static readonly _materialContainer: WeakMap<Material, Set<Drawable>> = new WeakMap();
+  private static readonly _primitiveContainer: WeakMap<Primitive, Set<Drawable>> = new WeakMap();
   /** @internal */
-  static addDrawable(drawable: Drawable, material: Material, wrapper: RenderBundleWrapper, hash: string) {
+  static addDrawable(
+    drawable: Drawable,
+    material: Material,
+    primitive: Primitive,
+    wrapper: RenderBundleWrapper,
+    hash: string
+  ) {
     let renderBundles = this._drawableContainer.get(drawable);
     if (!renderBundles) {
       renderBundles = [];
@@ -32,6 +42,14 @@ export class RenderBundleWrapper {
       }
       ownDrawables.add(drawable);
     }
+    if (primitive) {
+      let ownDrawables = this._primitiveContainer.get(primitive);
+      if (!ownDrawables) {
+        ownDrawables = new Set();
+        this._primitiveContainer.set(primitive, ownDrawables);
+      }
+      ownDrawables.add(drawable);
+    }
   }
   /** @internal */
   static drawableChanged(drawable: Drawable) {
@@ -50,6 +68,35 @@ export class RenderBundleWrapper {
     }
   }
   /** @internal */
+  static primitiveChanged(primitive: Primitive) {
+    const ownDrawables = this._primitiveContainer.get(primitive);
+    if (ownDrawables) {
+      for (const drawable of ownDrawables) {
+        this.drawableChanged(drawable);
+      }
+    }
+  }
+  /** @internal */
+  static primitiveAttached(primitive: Primitive, drawable: Drawable) {
+    if (this._drawableContainer.has(drawable)) {
+      const ownDrawables = this._primitiveContainer.get(primitive);
+      if (!ownDrawables) {
+        this._primitiveContainer.set(primitive, new Set([drawable]));
+      } else {
+        ownDrawables.add(drawable);
+      }
+      this.drawableChanged(drawable);
+    }
+  }
+  /** @internal */
+  static primitiveDetached(primitive: Primitive, drawable: Drawable) {
+    const ownDrawables = this._primitiveContainer.get(primitive);
+    if (ownDrawables && ownDrawables.has(drawable)) {
+      ownDrawables.delete(drawable);
+      this.drawableChanged(drawable);
+    }
+  }
+  /** @internal */
   static materialChanged(material: Material) {
     const ownDrawables = this._materialContainer.get(material);
     if (ownDrawables) {
@@ -59,10 +106,25 @@ export class RenderBundleWrapper {
     }
   }
   /** @internal */
-  static materialAttached(material: Material, drawable: Drawable) {
+  static materialUniformsChanged(material: Material) {
     const ownDrawables = this._materialContainer.get(material);
-    if (ownDrawables && !ownDrawables.has(drawable)) {
-      ownDrawables.add(drawable);
+    if (ownDrawables) {
+      for (const drawable of ownDrawables) {
+        if (drawable.isBatchable()) {
+          drawable.applyMaterialUniformsAll();
+        }
+      }
+    }
+  }
+  /** @internal */
+  static materialAttached(material: Material, drawable: Drawable) {
+    if (this._drawableContainer.has(drawable)) {
+      const ownDrawables = this._materialContainer.get(material);
+      if (!ownDrawables) {
+        this._materialContainer.set(material, new Set([drawable]));
+      } else {
+        ownDrawables.add(drawable);
+      }
       this.drawableChanged(drawable);
     }
   }
@@ -75,26 +137,23 @@ export class RenderBundleWrapper {
     }
   }
   constructor() {
+    super();
     this._renderBundles = {};
-    this._disposed = false;
-  }
-  get disposed() {
-    return this._disposed;
   }
   getRenderBundle(hash: string) {
     return this._renderBundles[hash] ?? null;
   }
   beginRenderBundle() {
-    Application.instance.device.beginCapture();
+    getDevice().beginCapture();
   }
   endRenderBundle(hash: string) {
-    this._renderBundles[hash] = Application.instance.device.endCapture();
+    this._renderBundles[hash] = getDevice().endCapture();
   }
   invalidate(hash: string) {
     this._renderBundles[hash] = undefined;
   }
-  dispose() {
+  protected onDispose() {
+    super.onDispose();
     this._renderBundles = {};
-    this._disposed = true;
   }
 }

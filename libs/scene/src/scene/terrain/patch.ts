@@ -1,31 +1,37 @@
-import { Vector3, Vector4, applyMixins } from '@zephyr3d/base';
+import { Disposable, Vector3, Vector4, applyMixins } from '@zephyr3d/base';
 import { BoundingBox } from '../../utility/bounding_volume';
 import { Primitive } from '../../render/primitive';
-import { Application } from '../../app';
-import type { GPUDataBuffer, Texture2D } from '@zephyr3d/device';
-import type { BatchDrawable, Drawable, DrawContext, PickTarget } from '../../render/drawable';
-import type { XForm } from '../xform';
+import type { Texture2D } from '@zephyr3d/device';
+import type {
+  BatchDrawable,
+  Drawable,
+  DrawContext,
+  MorphData,
+  MorphInfo,
+  PickTarget
+} from '../../render/drawable';
 import type { Camera } from '../../camera/camera';
 import type { Quadtree } from './quadtree';
 import type { Terrain } from './terrain';
-import { QUEUE_OPAQUE, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
+import { QUEUE_OPAQUE } from '../../values';
 import { mixinDrawable } from '../../render/drawable_mixin';
 import type { MeshMaterial } from '../../material';
+import type { SceneNode } from '..';
 
 /** @internal */
-export class TerrainPatchBase {
+export class TerrainPatchBase extends Disposable {
   protected _terrain: Terrain;
   constructor(terrain: Terrain) {
+    super();
     this._terrain = terrain;
   }
-  getXForm(): XForm<XForm<any>> {
+  getNode(): SceneNode {
     return this._terrain;
   }
 }
 /** @internal */
 export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) implements Drawable {
   private _geometry: Primitive;
-  private _geometryLines: Primitive;
   private _quadtree: Quadtree;
   private _mipLevel: number;
   private _offsetX: number;
@@ -39,7 +45,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   constructor(terrain: Terrain) {
     super(terrain);
     this._geometry = null;
-    this._geometryLines = null;
     this._mipLevel = 0;
     this._offsetX = 0;
     this._offsetZ = 0;
@@ -79,7 +84,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     this._step = step;
     this._parent = parent;
     this._geometry = baseVertices ? new Primitive() : null;
-    this._geometryLines = baseVertices ? new Primitive() : null;
     this._maxError = baseVertices ? this.computeMaxError() : 0;
     if (baseVertices) {
       const scaleX = this._quadtree.getScaleX();
@@ -105,23 +109,18 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     }
     return true;
   }
-  getInstanceColor(): Vector4 {
-    return this._terrain.getInstanceColor();
-  }
   getPickTarget(): PickTarget {
     return { node: this._terrain };
   }
   getMaterial(): MeshMaterial {
     return this._terrain.material;
   }
+  getPrimitive(): Primitive {
+    return this._geometry;
+  }
   draw(ctx: DrawContext) {
-    const isShadowMapPass = ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
-    const primitive =
-      this._quadtree.getTerrain().wireframe && !isShadowMapPass
-        ? this.getGeometryWireframe()
-        : this.getGeometry();
     this.bind(ctx);
-    this._terrain.material.draw(primitive, ctx);
+    this._terrain.material.draw(this._geometry, ctx);
   }
   setupCamera(viewportH: number, tanHalfFovy: number, maxPixelError: number): void {
     if (maxPixelError > 0 && tanHalfFovy > 0) {
@@ -136,10 +135,10 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   getBoneMatrices(): Texture2D<unknown> {
     return null;
   }
-  getMorphData(): Texture2D {
+  getMorphData(): MorphData {
     return null;
   }
-  getMorphInfo(): GPUDataBuffer {
+  getMorphInfo(): MorphInfo {
     return null;
   }
   getSortDistance(camera: Camera): number {
@@ -152,6 +151,9 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
     return false;
   }
   needSceneColor(): boolean {
+    return false;
+  }
+  needSceneDepth(): boolean {
     return false;
   }
   isBatchable(): this is BatchDrawable {
@@ -226,20 +228,12 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
       t = setNormalAndHeight(heights, normals, t, x, z, w, -skirtLength);
     }
     t = setNormalAndHeight(heights, normals, t, x - this._step, z, w, -skirtLength);
-    const heightArray = Application.instance.device.createVertexBuffer('position_f32x3', heights);
-    const normalArray = Application.instance.device.createVertexBuffer('normal_f32x3', normals);
-    this._geometry.setVertexBuffer(heightArray);
-    this._geometry.setVertexBuffer(normalArray);
+    this._geometry.createAndSetVertexBuffer('position_f32x3', heights);
+    this._geometry.createAndSetVertexBuffer('normal_f32x3', normals);
     this._geometry.setIndexBuffer(this._quadtree.getIndices());
     this._geometry.indexStart = 0;
     this._geometry.indexCount = this._quadtree.getIndices().length;
     this._geometry.primitiveType = 'triangle-strip';
-    this._geometryLines.setVertexBuffer(heightArray);
-    this._geometryLines.setVertexBuffer(normalArray);
-    this._geometryLines.setIndexBuffer(this._quadtree.getIndicesWireframe());
-    this._geometryLines.indexStart = 0;
-    this._geometryLines.indexCount = this._quadtree.getIndicesWireframe().length;
-    this._geometryLines.primitiveType = 'line-list';
   }
   getOffsetScale(): Vector4 {
     if (!this._offsetScale) {
@@ -277,9 +271,6 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   getGeometry(): Primitive {
     return this._geometry;
-  }
-  getGeometryWireframe(): Primitive {
-    return this._geometryLines;
   }
   getHeight(x: number, z: number): number {
     const startX = this._offsetX + this._step * Math.floor((x - this._offsetX) / this._step);
@@ -388,16 +379,16 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   sqrDistanceToPoint(point: Vector3) {
     const bbox = this.getBoundingBox();
-    const radius = Math.sqrt(bbox.extents.x * bbox.extents.x + bbox.extents.z * bbox.extents.z);
+    const radius = Math.hypot(bbox.extents.x, bbox.extents.z);
     const dx = point.x - bbox.center.x;
     const dz = point.z - bbox.center.z;
-    const s = Math.max(0, Math.sqrt(dx * dx + dz * dz) - radius);
+    const s = Math.max(0, Math.hypot(dx, dz) - radius);
     const t =
       point.y > bbox.maxPoint.y
         ? point.y - bbox.maxPoint.y
         : point.y < bbox.minPoint.y
-        ? bbox.minPoint.y - point.y
-        : 0;
+          ? bbox.minPoint.y - point.y
+          : 0;
     return s * s + t * t;
   }
   sqrDistancePointToTriangle(P: Vector3, t0: Vector3, t1: Vector3, t2: Vector3): number {
@@ -588,5 +579,9 @@ export class TerrainPatch extends applyMixins(TerrainPatchBase, mixinDrawable) i
   }
   isDummy(): boolean {
     return !this._geometry && !!this._quadtree;
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._geometry?.dispose();
   }
 }

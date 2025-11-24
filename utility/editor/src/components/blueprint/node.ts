@@ -1,0 +1,272 @@
+import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
+import type { NodeEditor } from './nodeeditor';
+import type { IGraphNode } from '@zephyr3d/scene';
+
+export type GraphNodeInput = { id: number; name: string; type: string; value?: any };
+export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
+
+const SLOT_HEIGHT = 25;
+const NODE_PADDING_BOTTOM = 8;
+const NODE_PADDING_LEFT = 8;
+const NODE_PADDING_RIGHT = 8;
+const NODE_SPACING = 20;
+const SLOT_MARGIN = 5;
+const SLOT_RADIUS = 6;
+
+export class GNode {
+  private _id: number;
+  private _position: ImGui.ImVec2;
+  private _titleRect: ImGui.ImVec2;
+  private _titleBg: number;
+  private _errorTitleBg: number;
+  private _titleTextColor: number;
+  private _textColor: number;
+  private _bodyBg: number;
+  private _bodyBorderColor: number;
+  private _bodyBorderColorSel: number;
+  private _errorBorderColor: ImGui.ImVec4;
+  private _inputCircleColor: number;
+  private _outputCircleColor: number;
+  private _size: ImGui.ImVec2;
+  private _selected: boolean;
+  private _hovered: boolean;
+  private _locked: boolean;
+  private _editor: NodeEditor;
+  private _impl: IGraphNode;
+  private _title: string;
+
+  constructor(editor: NodeEditor, position: ImGui.ImVec2, impl: IGraphNode) {
+    this._id = editor.nextNodeId();
+    this._editor = editor;
+    this._impl = impl;
+    this._position = position ? new ImGui.ImVec2(position.x, position.y) : null;
+    this._selected = false;
+    this._hovered = false;
+    this._locked = false;
+    this._size = null;
+    this._title = '';
+    this._titleRect = null;
+    this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
+    this._errorTitleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.0, 0.0, 1.0));
+    this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
+    this._errorBorderColor = new ImGui.ImVec4(1, 0.2, 0.2, 1);
+    this._titleTextColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
+    this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
+    this._bodyBorderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
+    this._bodyBorderColorSel = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0));
+    this._inputCircleColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.4, 0.4, 0.8, 1.0));
+    this._outputCircleColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.8, 0.4, 0.4, 1.0));
+    this._impl.on('changed', this.changed, this);
+  }
+  toString() {
+    return this._impl.toString();
+  }
+  changed() {
+    this._size = null;
+  }
+  get id() {
+    return this._id;
+  }
+  set id(val: number) {
+    this._id = val;
+  }
+  get size() {
+    if (!this._size) {
+      this.calculateSize();
+    }
+    return this._size;
+  }
+  get titleBg() {
+    return this._titleBg;
+  }
+  set titleBg(col: number) {
+    this._titleBg = col;
+  }
+  get titleTextCol() {
+    return this._titleTextColor;
+  }
+  set titleTextCol(col: number) {
+    this._titleTextColor = col;
+  }
+  get titleRect() {
+    if (!this._titleRect) {
+      this.calculateSize();
+    }
+    return this._titleRect;
+  }
+  get position() {
+    if (!this._position && this._editor.canvasSize) {
+      const canvasSize = this._editor.canvasSize;
+      const size = this.size;
+      const x = Math.max(10, (canvasSize.x - size.x) >> 1);
+      const y = Math.max(10, (canvasSize.y - size.y) >> 1);
+      this._position = new ImGui.ImVec2(x, y);
+    }
+    return this._position;
+  }
+  get inputs() {
+    return this._impl.inputs;
+  }
+  get outputs() {
+    return this._impl.outputs;
+  }
+  get selected() {
+    return this._selected;
+  }
+  set selected(val: boolean) {
+    this._selected = val;
+  }
+  get hovered() {
+    return this._hovered;
+  }
+  set hovered(val: boolean) {
+    this._hovered = val;
+  }
+  get locked() {
+    return this._locked;
+  }
+  set locked(val: boolean) {
+    this._locked = val;
+  }
+  get title() {
+    return this._title;
+  }
+  set title(val: string) {
+    this._title = val;
+  }
+  get impl() {
+    return this._impl;
+  }
+  getSlotPosition(slotId: number, isOutput: boolean): ImGui.ImVec2 {
+    const slots = isOutput ? this.outputs : this.inputs;
+    const slotIndex = slots.findIndex((slot) => slot.id === slotId);
+
+    if (slotIndex === -1) {
+      return new ImGui.ImVec2(0, 0);
+    }
+
+    const slotY =
+      this.position.y + this.titleRect.y + NODE_PADDING_BOTTOM + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
+    const slotX = isOutput
+      ? this.position.x + this.size.x - NODE_PADDING_RIGHT - SLOT_MARGIN - SLOT_RADIUS
+      : this.position.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
+
+    return new ImGui.ImVec2(slotX, slotY);
+  }
+  calculateSize() {
+    let maxInputWidth = 0;
+    let maxOutputWidth = 0;
+    this._titleRect = imGuiCalcTextSize(this.toString());
+    this._titleRect.x += 2 * 10;
+    this._titleRect.y += 2 * 6;
+    for (const input of this.inputs) {
+      const size = imGuiCalcTextSize(input.name ?? 'M').x + 2 * (SLOT_RADIUS + SLOT_MARGIN);
+      maxInputWidth = Math.max(size, maxInputWidth);
+    }
+    for (const output of this.outputs) {
+      const size = imGuiCalcTextSize(output.name ?? 'M').x + 2 * (SLOT_RADIUS + SLOT_MARGIN);
+      maxOutputWidth = Math.max(size, maxOutputWidth);
+    }
+    const minWidth = Math.max(
+      maxInputWidth + maxOutputWidth + NODE_PADDING_LEFT + NODE_PADDING_RIGHT + NODE_SPACING,
+      this._titleRect.x
+    );
+    const minHeight =
+      this._titleRect.y +
+      NODE_PADDING_BOTTOM * 2 +
+      Math.max(this.inputs.length, this.outputs.length) * SLOT_HEIGHT;
+    this._size = new ImGui.ImVec2(minWidth, minHeight);
+  }
+  draw(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2) {
+    const nodeScreenPos = this._editor.worldToCanvas(this.position);
+    const nodePos = new ImGui.ImVec2(canvasPos.x + nodeScreenPos.x, canvasPos.y + nodeScreenPos.y);
+
+    const nodeSize = new ImGui.ImVec2(
+      this.size.x * this._editor.canvasScale,
+      this.size.y * this._editor.canvasScale
+    );
+
+    const nodeRounding = 6.0;
+    const baseBorderThickness = 1.0;
+
+    const errorMsg = this._impl.error;
+    const hasError = !!errorMsg;
+
+    const bodyBorderColorNormal = this._bodyBorderColor;
+    const bodyBorderColorSel = this._bodyBorderColorSel;
+
+    const nodeRectMin = nodePos;
+    const nodeRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
+
+    const titleHeight = this.titleRect.y * this._editor.canvasScale;
+    const titleRectMin = nodePos;
+    const titleRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + titleHeight);
+
+    drawList.AddRectFilled(nodeRectMin, nodeRectMax, this._bodyBg, nodeRounding, 15);
+
+    const titleBg = hasError ? this._errorTitleBg : this._titleBg;
+    drawList.AddRectFilled(titleRectMin, titleRectMax, titleBg, nodeRounding, 3);
+
+    if (hasError) {
+      const t = ImGui.GetTime();
+      this._errorBorderColor.w = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 4.0));
+      const col = ImGui.ColorConvertFloat4ToU32(this._errorBorderColor);
+      drawList.AddRect(nodeRectMin, nodeRectMax, col, nodeRounding, 15, baseBorderThickness);
+    } else {
+      const bodyBorderColor = this.selected ? bodyBorderColorSel : bodyBorderColorNormal;
+      drawList.AddRect(nodeRectMin, nodeRectMax, bodyBorderColor, nodeRounding, 15, baseBorderThickness);
+    }
+
+    const titlePaddingX = 10 * this._editor.canvasScale;
+    const titlePaddingY = 6 * this._editor.canvasScale;
+    const titlePos = new ImGui.ImVec2(nodePos.x + titlePaddingX, nodePos.y + titlePaddingY);
+    drawList.AddText(titlePos, this._titleTextColor, this._title || this.toString());
+
+    for (let i = 0; i < this.inputs.length; i++) {
+      const input = this.inputs[i];
+      const slotPos = this.getSlotPosition(input.id, false);
+      const slotScreenPos = this._editor.worldToCanvas(slotPos);
+      const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
+
+      drawList.AddCircleFilled(
+        slotDrawPos,
+        4 /*SLOT_RADIUS*/ * this._editor.canvasScale,
+        this._inputCircleColor
+      );
+
+      const labelPos = new ImGui.ImVec2(
+        slotDrawPos.x + SLOT_MARGIN + SLOT_RADIUS,
+        slotDrawPos.y - SLOT_RADIUS
+      );
+      drawList.AddText(labelPos, this._textColor, input.name);
+    }
+
+    for (let i = 0; i < this.outputs.length; i++) {
+      const output = this.outputs[i];
+      const slotPos = this.getSlotPosition(output.id, true);
+      const slotScreenPos = this._editor.worldToCanvas(slotPos);
+      const slotDrawPos = new ImGui.ImVec2(canvasPos.x + slotScreenPos.x, canvasPos.y + slotScreenPos.y);
+
+      drawList.AddCircleFilled(
+        slotDrawPos,
+        4 /*SLOT_RADIUS*/ * this._editor.canvasScale,
+        this._outputCircleColor
+      );
+
+      const textSize = imGuiCalcTextSize(output.name);
+      const labelPos = new ImGui.ImVec2(
+        slotDrawPos.x - textSize.x - SLOT_RADIUS - SLOT_MARGIN,
+        slotDrawPos.y - SLOT_RADIUS
+      );
+      drawList.AddText(labelPos, this._textColor, output.name);
+    }
+
+    if (hasError && this._hovered) {
+      ImGui.BeginTooltip();
+      ImGui.TextColored(new ImGui.ImVec4(1.0, 0.4, 0.4, 1.0), 'Error');
+      ImGui.Separator();
+      ImGui.TextUnformatted(errorMsg!);
+      ImGui.EndTooltip();
+    }
+  }
+}

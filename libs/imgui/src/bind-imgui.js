@@ -1167,11 +1167,11 @@ var Module = (() => {
         if (chr > 0xff) {
           assert(
             false,
-            `Character code ${chr} (${String.fromCharCode(chr)}) at offset ${i} not in 0x00-0xFF.`
+            `Character code ${chr} (${String.fromCodePoint(chr)}) at offset ${i} not in 0x00-0xFF.`
           );
           chr &= 0xff;
         }
-        ret.push(String.fromCharCode(chr));
+        ret.push(String.fromCodePoint(chr));
       }
       return ret.join('');
     }
@@ -1259,12 +1259,12 @@ var Module = (() => {
         // https://tools.ietf.org/html/rfc3629
         var u0 = heapOrArray[idx++];
         if (!(u0 & 0x80)) {
-          str += String.fromCharCode(u0);
+          str += String.fromCodePoint(u0);
           continue;
         }
         var u1 = heapOrArray[idx++] & 63;
         if ((u0 & 0xe0) == 0xc0) {
-          str += String.fromCharCode(((u0 & 31) << 6) | u1);
+          str += String.fromCodePoint(((u0 & 31) << 6) | u1);
           continue;
         }
         var u2 = heapOrArray[idx++] & 63;
@@ -1281,10 +1281,10 @@ var Module = (() => {
         }
 
         if (u0 < 0x10000) {
-          str += String.fromCharCode(u0);
+          str += String.fromCodePoint(u0);
         } else {
           var ch = u0 - 0x10000;
-          str += String.fromCharCode(0xd800 | (ch >> 10), 0xdc00 | (ch & 0x3ff));
+          str += String.fromCodePoint(0xd800 | (ch >> 10), 0xdc00 | (ch & 0x3ff));
         }
       }
       return str;
@@ -1462,7 +1462,7 @@ var Module = (() => {
     function embind_init_charCodes() {
       var codes = new Array(256);
       for (var i = 0; i < 256; ++i) {
-        codes[i] = String.fromCharCode(i);
+        codes[i] = String.fromCodePoint(i);
       }
       embind_charCodes = codes;
     }
@@ -1490,7 +1490,7 @@ var Module = (() => {
         return '_unknown';
       }
       name = name.replace(/[^a-zA-Z0-9_]/g, '$');
-      var f = name.charCodeAt(0);
+      var f = name.codePointAt(0);
       if (f >= char_0 && f <= char_9) {
         return `_${name}`;
       }
@@ -3200,9 +3200,9 @@ var Module = (() => {
         // For UTF8 byte structure, see http://en.wikipedia.org/wiki/UTF-8#Description
         // and https://www.ietf.org/rfc/rfc2279.txt
         // and https://tools.ietf.org/html/rfc3629
-        var u = str.charCodeAt(i); // possibly a lead surrogate
+        var u = str.codePointAt(i); // possibly a lead surrogate
         if (u >= 0xd800 && u <= 0xdfff) {
-          var u1 = str.charCodeAt(++i);
+          var u1 = str.codePointAt(++i);
           u = (0x10000 + ((u & 0x3ff) << 10)) | (u1 & 0x3ff);
         }
         if (u <= 0x7f) {
@@ -3250,7 +3250,7 @@ var Module = (() => {
         // unit, not a Unicode code point of the character! So decode
         // UTF16->UTF32->UTF8.
         // See http://unicode.org/faq/utf_bom.html#utf16-3
-        var c = str.charCodeAt(i); // possibly a lead surrogate
+        var c = str.codePointAt(i); // possibly a lead surrogate
         if (c <= 0x7f) {
           len++;
         } else if (c <= 0x7ff) {
@@ -3289,7 +3289,7 @@ var Module = (() => {
                 if (str === undefined) {
                   str = stringSegment;
                 } else {
-                  str += String.fromCharCode(0);
+                  str += String.fromCodePoint(0);
                   str += stringSegment;
                 }
                 decodeStartPtr = currentBytePtr + 1;
@@ -3298,7 +3298,7 @@ var Module = (() => {
           } else {
             var a = new Array(length);
             for (var i = 0; i < length; ++i) {
-              a[i] = String.fromCharCode(HEAPU8[payload + i]);
+              a[i] = String.fromCodePoint(HEAPU8[payload + i]);
             }
             str = a.join('');
           }
@@ -3340,7 +3340,7 @@ var Module = (() => {
           } else {
             if (valueIsOfTypeString) {
               for (var i = 0; i < length; ++i) {
-                var charCode = value.charCodeAt(i);
+                var charCode = value.codePointAt(i);
                 if (charCode > 255) {
                   _free(ptr);
                   throwBindingError('String has UTF-16 code units that do not fit in 8 bits');
@@ -3393,9 +3393,9 @@ var Module = (() => {
       for (var i = 0; !(i >= maxBytesToRead / 2); ++i) {
         var codeUnit = HEAP16[(ptr + i * 2) >> 1];
         if (codeUnit == 0) break;
-        // fromCharCode constructs a character from a UTF-16 code unit, so we can
+        // fromCodePoint constructs a character from a UTF-16 code unit, so we can
         // pass the UTF16 string right through.
-        str += String.fromCharCode(codeUnit);
+        str += String.fromCodePoint(codeUnit);
       }
 
       return str;
@@ -3417,7 +3417,7 @@ var Module = (() => {
       var numCharsToWrite = maxBytesToWrite < str.length * 2 ? maxBytesToWrite / 2 : str.length;
       for (var i = 0; i < numCharsToWrite; ++i) {
         // charCodeAt returns a UTF-16 encoded code unit, so it can be directly written to the HEAP.
-        var codeUnit = str.charCodeAt(i); // possibly a lead surrogate
+        var codeUnit = str.codePointAt(i); // possibly a lead surrogate
         HEAP16[outPtr >> 1] = codeUnit;
         outPtr += 2;
       }
@@ -3441,13 +3441,13 @@ var Module = (() => {
         var utf32 = HEAP32[(ptr + i * 4) >> 2];
         if (utf32 == 0) break;
         ++i;
-        // Gotcha: fromCharCode constructs a character from a UTF-16 encoded code (pair), not from a Unicode code point! So encode the code point to UTF-16 for constructing.
+        // Gotcha: fromCodePoint constructs a character from a UTF-16 encoded code (pair), not from a Unicode code point! So encode the code point to UTF-16 for constructing.
         // See http://unicode.org/faq/utf_bom.html#utf16-3
         if (utf32 >= 0x10000) {
           var ch = utf32 - 0x10000;
-          str += String.fromCharCode(0xd800 | (ch >> 10), 0xdc00 | (ch & 0x3ff));
+          str += String.fromCodePoint(0xd800 | (ch >> 10), 0xdc00 | (ch & 0x3ff));
         } else {
-          str += String.fromCharCode(utf32);
+          str += String.fromCodePoint(utf32);
         }
       }
       return str;
@@ -3469,9 +3469,9 @@ var Module = (() => {
       for (var i = 0; i < str.length; ++i) {
         // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code unit, not a Unicode code point of the character! We must decode the string to UTF-32 to the heap.
         // See http://unicode.org/faq/utf_bom.html#utf16-3
-        var codeUnit = str.charCodeAt(i); // possibly a lead surrogate
+        var codeUnit = str.codePointAt(i); // possibly a lead surrogate
         if (codeUnit >= 0xd800 && codeUnit <= 0xdfff) {
-          var trailSurrogate = str.charCodeAt(++i);
+          var trailSurrogate = str.codePointAt(++i);
           codeUnit = (0x10000 + ((codeUnit & 0x3ff) << 10)) | (trailSurrogate & 0x3ff);
         }
         HEAP32[outPtr >> 2] = codeUnit;
@@ -3488,7 +3488,7 @@ var Module = (() => {
       for (var i = 0; i < str.length; ++i) {
         // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code unit, not a Unicode code point of the character! We must decode the string to UTF-32 to the heap.
         // See http://unicode.org/faq/utf_bom.html#utf16-3
-        var codeUnit = str.charCodeAt(i);
+        var codeUnit = str.codePointAt(i);
         if (codeUnit >= 0xd800 && codeUnit <= 0xdfff) ++i; // possibly a lead surrogate, so skip over the tail surrogate.
         len += 4;
       }
@@ -3529,7 +3529,7 @@ var Module = (() => {
               if (str === undefined) {
                 str = stringSegment;
               } else {
-                str += String.fromCharCode(0);
+                str += String.fromCodePoint(0);
                 str += stringSegment;
               }
               decodeStartPtr = currentBytePtr + charSize;
@@ -3949,13 +3949,13 @@ var Module = (() => {
               chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
               chr3 = ((enc3 & 3) << 6) | enc4;
 
-              output = output + String.fromCharCode(chr1);
+              output = output + String.fromCodePoint(chr1);
 
               if (enc3 !== 64) {
-                output = output + String.fromCharCode(chr2);
+                output = output + String.fromCodePoint(chr2);
               }
               if (enc4 !== 64) {
-                output = output + String.fromCharCode(chr3);
+                output = output + String.fromCodePoint(chr3);
               }
             } while (i < input.length);
             return output;
@@ -3968,10 +3968,10 @@ var Module = (() => {
         var decoded = decodeBase64(s);
         var bytes = new Uint8Array(decoded.length);
         for (var i = 0; i < decoded.length; ++i) {
-          bytes[i] = decoded.charCodeAt(i);
+          bytes[i] = decoded.codePointAt(i);
         }
         return bytes;
-      } catch (_) {
+      } catch {
         throw new Error('Converting base64 string to bytes failed.');
       }
     }

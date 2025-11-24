@@ -10,6 +10,12 @@ const IDENT_MATRIX3x3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 const IDENT_MATRIX4x4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
 /**
+ * Euler angle order type
+ * @public
+ */
+export type EulerAngleOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';
+
+/**
  * Base class for vector and matrix types.
  *
  * @public
@@ -21,7 +27,7 @@ export class VectorBase extends Float32Array {
    * @param epsilon - The minimal error allowd.
    * @returns true if close enough, otherwise false.
    */
-  equalsTo(other: Float32Array, epsl?: number): boolean {
+  equalsTo(other: Float32Array<ArrayBuffer>, epsl?: number): boolean {
     if (!other || this.length !== other.length) {
       return false;
     }
@@ -64,7 +70,7 @@ export class VectorBase extends Float32Array {
    * @param minValue - Minimum value of any component of the vector
    * @param maxValue - Maximum value of any component of the vector
    */
-  setRandom(minValue: number, maxValue: number) {
+  setRandom(minValue: number, maxValue: number): void {
     for (let i = 0; i < this.length; i++) {
       this[i] = minValue + (maxValue - minValue) * Math.random();
     }
@@ -91,7 +97,7 @@ export class Vector2 extends VectorBase {
    * Creates a new Vector2 initialized with values in a Float32Array.
    * @param array - Float32Array object that contains the x, y values.
    */
-  constructor(array: Float32Array);
+  constructor(array: Float32Array<ArrayBuffer>);
   /**
    * Creates a new Vector2 placed on a given ArrayBuffer object.
    * @param buffer - The array buffer object.
@@ -102,7 +108,7 @@ export class Vector2 extends VectorBase {
    * Creates a new Vector2 filled with zero values.
    */
   constructor();
-  constructor(arg0?: number | number[] | Float32Array | ArrayBuffer, arg1?: number) {
+  constructor(arg0?: number | number[] | Float32Array<ArrayBuffer> | ArrayBuffer, arg1?: number) {
     if (arg0 instanceof ArrayBuffer && typeof arg1 === 'number') {
       super(arg0, arg1, 2);
     } else {
@@ -126,25 +132,25 @@ export class Vector2 extends VectorBase {
     return new Vector2(this);
   }
   /** Get the x component value. */
-  get x() {
+  get x(): number {
     return this[0];
   }
   set x(v: number) {
     this[0] = v;
   }
   /** Get the y component value. */
-  get y() {
+  get y(): number {
     return this[1];
   }
   set y(v: number) {
     this[1] = v;
   }
   /** Get the length of the vector. */
-  get magnitude() {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1]);
+  get magnitude(): number {
+    return Math.hypot(this[0], this[1]);
   }
   /** Get the squared length of the vector. */
-  get magnitudeSq() {
+  get magnitudeSq(): number {
     return this[0] * this[0] + this[1] * this[1];
   }
   /**
@@ -153,7 +159,7 @@ export class Vector2 extends VectorBase {
    * @param y - The y component value.
    * @returns self
    */
-  setXY(x: number, y: number) {
+  setXY(x: number, y: number): this {
     this[0] = x;
     this[1] = y;
     return this;
@@ -164,8 +170,8 @@ export class Vector2 extends VectorBase {
    * @param y - The y component value.
    * @returns self
    */
-  setAndNormalize(x: number, y: number) {
-    const mag = Math.sqrt(x * x + y * y);
+  setAndNormalize(x: number, y: number): this {
+    const mag = Math.hypot(x, y);
     return this.setXY(x / mag, y / mag);
   }
   /**
@@ -173,70 +179,90 @@ export class Vector2 extends VectorBase {
    * @param other - The vector that will be subtract.
    * @returns self
    */
-  subBy(other: Vector2) {
-    return Vector2.sub(this, other, this);
+  subBy(other: Vector2): this {
+    Vector2.sub(this, other, this);
+    return this;
   }
   /**
    * Add a vector to this vector.
    * @param other - The vector that will be added.
    * @returns self
    */
-  addBy(other: Vector2) {
-    return Vector2.add(this, other, this);
+  addBy(other: Vector2): this {
+    Vector2.add(this, other, this);
+    return this;
+  }
+  /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector2, t0: number, t1: number): this {
+    Vector2.combine(this, other, t0, t1, this);
+    return this;
   }
   /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
    */
-  mulBy(other: Vector2) {
-    return Vector2.mul(this, other, this);
+  mulBy(other: Vector2): this {
+    Vector2.mul(this, other, this);
+    return this;
   }
   /**
    * Divide this vector by a vector.
    * @param other - The vector that will be divide by.
    * @returns self
    */
-  divBy(other: Vector2) {
-    return Vector2.div(this, other, this);
+  divBy(other: Vector2): this {
+    Vector2.div(this, other, this);
+    return this;
   }
   /**
    * Scale this vector by a scalar number.
    * @param f - amount to scale this vector by.
    * @returns self
    */
-  scaleBy(f: number) {
-    return Vector2.scale(this, f, this);
+  scaleBy(f: number): this {
+    Vector2.scale(this, f, this);
+    return this;
   }
   /**
    * Normalize this vector inplace.
    * @returns self
    */
-  inplaceNormalize() {
-    return Vector2.normalize(this, this);
+  inplaceNormalize(): this {
+    Vector2.normalize(this, this);
+    return this;
   }
   /**
    * Inverse this vector inplace.
    * @returns self
    */
-  inplaceInverse() {
-    return Vector2.inverse(this, this);
+  inplaceInverse(): this {
+    Vector2.inverse(this, this);
+    return this;
   }
   /**
    * Set the component values to the minimum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMin(other: Vector2) {
-    return Vector2.min(this, other, this);
+  inplaceMin(other: Vector2): this {
+    Vector2.min(this, other, this);
+    return this;
   }
   /**
    * Set the component values to the maximum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMax(other: Vector2) {
-    return Vector2.max(this, other, this);
+  inplaceMax(other: Vector2): this {
+    Vector2.max(this, other, this);
+    return this;
   }
   /**
    * Creates a new Vector2 initialized with zero values.
@@ -287,7 +313,7 @@ export class Vector2 extends VectorBase {
    * @returns distance between v1 and v2
    */
   static distance(v1: Vector2, v2: Vector2): number {
-    return Math.sqrt(this.distanceSq(v1, v2));
+    return Math.hypot(v1.x - v2.x, v1.y - v2.y);
   }
   /**
    * Calculates the squared distance between two Vector2's.
@@ -345,6 +371,20 @@ export class Vector2 extends VectorBase {
   static add(a: Vector2, b: Vector2, result?: Vector2): Vector2 {
     const x = a.x + b.x;
     const y = a.y + b.y;
+    return (result || new Vector2()).setXY(x, y);
+  }
+  /**
+   * Combine two Vector2's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector2, b: Vector2, t0: number, t1: number, result?: Vector2): Vector2 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
     return (result || new Vector2()).setXY(x, y);
   }
   /**
@@ -446,36 +486,36 @@ export class ObservableVector2 extends Vector2 {
   /** @internal */
   private _callback: () => void;
   /** The callback function which will be executed when the value changed */
-  get callback() {
+  get callback(): () => void {
     return this._callback;
   }
-  set callback(cb) {
+  set callback(cb: () => void) {
     this._callback = cb;
   }
   /**
    * {@inheritDoc Vector2.x}
    */
-  get x() {
+  get x(): number {
     return super.x;
   }
   set x(val: number) {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector2.y}
    */
-  get y() {
+  get y(): number {
     return super.y;
   }
   set y(val: number) {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -486,7 +526,7 @@ export class ObservableVector2 extends Vector2 {
     y = toFloat(y);
     if (x !== super.x || y !== super.y) {
       super.setXY(x, y);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -495,7 +535,7 @@ export class ObservableVector2 extends Vector2 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -503,15 +543,15 @@ export class ObservableVector2 extends Vector2 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -519,14 +559,14 @@ export class ObservableVector2 extends Vector2 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -551,7 +591,7 @@ export class Vector3 extends VectorBase {
    * Creates a new Vector3 initialized with values in a Float32Array.
    * @param array - Float32Array object that contains the x, y, z values.
    */
-  constructor(array: Float32Array);
+  constructor(array: Float32Array<ArrayBuffer>);
   /**
    * Creates a new Vector3 placed on a given ArrayBuffer object.
    * @param buffer - The array buffer object.
@@ -562,7 +602,11 @@ export class Vector3 extends VectorBase {
    * Creates a new Vector3 filled with zero values.
    */
   constructor();
-  constructor(arg0?: number | number[] | Float32Array | ArrayBuffer, arg1?: number, arg2?: number) {
+  constructor(
+    arg0?: number | number[] | Float32Array<ArrayBuffer> | ArrayBuffer,
+    arg1?: number,
+    arg2?: number
+  ) {
     if (arg0 instanceof ArrayBuffer && typeof arg1 === 'number') {
       super(arg0, arg1, 3);
     } else {
@@ -588,21 +632,21 @@ export class Vector3 extends VectorBase {
     return new Vector3(this);
   }
   /** Get the x component value. */
-  get x() {
+  get x(): number {
     return this[0];
   }
   set x(v: number) {
     this[0] = v;
   }
   /** Get the y component value. */
-  get y() {
+  get y(): number {
     return this[1];
   }
   set y(v: number) {
     this[1] = v;
   }
   /** Get the z component value. */
-  get z() {
+  get z(): number {
     return this[2];
   }
   set z(v: number) {
@@ -610,7 +654,7 @@ export class Vector3 extends VectorBase {
   }
   /** Get the length of the vector. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2]);
+    return Math.hypot(this[0], this[1], this[2]);
   }
   /** Get the squared length of the vector. */
   get magnitudeSq(): number {
@@ -630,7 +674,7 @@ export class Vector3 extends VectorBase {
    * @param z - The z component value.
    * @returns self
    */
-  setXYZ(x: number, y: number, z: number): Vector3 {
+  setXYZ(x: number, y: number, z: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -643,8 +687,8 @@ export class Vector3 extends VectorBase {
    * @param z - The z component value.
    * @returns self
    */
-  setAndNormalize(x: number, y: number, z: number): Vector3 {
-    const mag = Math.sqrt(x * x + y * y + z * z);
+  setAndNormalize(x: number, y: number, z: number): this {
+    const mag = Math.hypot(x, y, z);
     return this.setXYZ(x / mag, y / mag, z / mag);
   }
   /**
@@ -652,70 +696,90 @@ export class Vector3 extends VectorBase {
    * @param other - The vector that will be subtract.
    * @returns self
    */
-  subBy(other: Vector3): Vector3 {
-    return Vector3.sub(this, other, this);
+  subBy(other: Vector3): this {
+    Vector3.sub(this, other, this);
+    return this;
   }
   /**
    * Add a vector to this vector.
    * @param other - The vector that will be added.
    * @returns self
    */
-  addBy(other: Vector3): Vector3 {
-    return Vector3.add(this, other, this);
+  addBy(other: Vector3): this {
+    Vector3.add(this, other, this);
+    return this;
+  }
+  /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector3, t0: number, t1: number): this {
+    Vector3.combine(this, other, t0, t1, this);
+    return this;
   }
   /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
    */
-  mulBy(other: Vector3): Vector3 {
-    return Vector3.mul(this, other, this);
+  mulBy(other: Vector3): this {
+    Vector3.mul(this, other, this);
+    return this;
   }
   /**
    * Divide this vector by a vector.
    * @param other - The vector that will be divide by.
    * @returns self
    */
-  divBy(other: Vector3): Vector3 {
-    return Vector3.div(this, other, this);
+  divBy(other: Vector3): this {
+    Vector3.div(this, other, this);
+    return this;
   }
   /**
    * Scale this vector by a scalar number.
    * @param f - amount to scale this vector by.
    * @returns self
    */
-  scaleBy(f: number): Vector3 {
-    return Vector3.scale(this, f, this);
+  scaleBy(f: number): this {
+    Vector3.scale(this, f, this);
+    return this;
   }
   /**
    * Normalize this vector inplace.
    * @returns self
    */
-  inplaceNormalize() {
-    return Vector3.normalize(this, this);
+  inplaceNormalize(): this {
+    Vector3.normalize(this, this);
+    return this;
   }
   /**
    * Inverse this vector inplace.
    * @returns self
    */
-  inplaceInverse() {
-    return Vector3.inverse(this, this);
+  inplaceInverse(): this {
+    Vector3.inverse(this, this);
+    return this;
   }
   /**
    * Set the component values to the minimum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMin(other: Vector3) {
-    return Vector3.min(this, other, this);
+  inplaceMin(other: Vector3): this {
+    Vector3.min(this, other, this);
+    return this;
   }
   /**
    * Set the component values to the maximum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMax(other: Vector3) {
-    return Vector3.max(this, other, this);
+  inplaceMax(other: Vector3): this {
+    Vector3.max(this, other, this);
+    return this;
   }
   /**
    * Creates a new Vector3 initialized with zero values.
@@ -780,7 +844,7 @@ export class Vector3 extends VectorBase {
    * @returns distance between v1 and v2
    */
   static distance(v1: Vector3, v2: Vector3): number {
-    return Math.sqrt(this.distanceSq(v1, v2));
+    return Math.hypot(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
   }
   /**
    * Calculates the squared distance between two Vector3's.
@@ -843,6 +907,21 @@ export class Vector3 extends VectorBase {
     const x = a.x + b.x;
     const y = a.y + b.y;
     const z = a.z + b.z;
+    return (result || new Vector3()).setXYZ(x, y, z);
+  }
+  /**
+   * Combine two Vector3's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector3, b: Vector3, t0: number, t1: number, result?: Vector3): Vector3 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
+    const z = a.z * t0 + b.z * t1;
     return (result || new Vector3()).setXYZ(x, y, z);
   }
   /**
@@ -953,49 +1032,49 @@ export class ObservableVector3 extends Vector3 {
   /** @internal */
   private _callback: () => void;
   /** The callback function which will be executed when the value changed */
-  get callback() {
+  get callback(): () => void {
     return this._callback;
   }
-  set callback(cb) {
+  set callback(cb: () => void) {
     this._callback = cb;
   }
   /**
    * {@inheritDoc Vector3.x}
    */
-  get x() {
+  get x(): number {
     return super.x;
   }
   set x(val: number) {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector3.y}
    */
-  get y() {
+  get y(): number {
     return super.y;
   }
   set y(val: number) {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector3.z}
    */
-  get z() {
+  get z(): number {
     return super.z;
   }
   set z(val: number) {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1007,7 +1086,7 @@ export class ObservableVector3 extends Vector3 {
     z = toFloat(z);
     if (x !== super.x || y !== super.y || z !== super.z) {
       super.setXYZ(x, y, z);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -1016,7 +1095,7 @@ export class ObservableVector3 extends Vector3 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1024,15 +1103,15 @@ export class ObservableVector3 extends Vector3 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1040,14 +1119,14 @@ export class ObservableVector3 extends Vector3 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -1122,28 +1201,28 @@ export class Vector4 extends VectorBase {
     return new Vector4(this);
   }
   /** Get the x component value. */
-  get x() {
+  get x(): number {
     return this[0];
   }
   set x(v: number) {
     this[0] = v;
   }
   /** Get the y component value. */
-  get y() {
+  get y(): number {
     return this[1];
   }
   set y(v: number) {
     this[1] = v;
   }
   /** Get the z component value. */
-  get z() {
+  get z(): number {
     return this[2];
   }
   set z(v: number) {
     this[2] = v;
   }
   /** Get the w component value. */
-  get w() {
+  get w(): number {
     return this[3];
   }
   set w(v: number) {
@@ -1151,7 +1230,7 @@ export class Vector4 extends VectorBase {
   }
   /** Get the length of the vector. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2] + this[3] * this[3]);
+    return Math.hypot(this[0], this[1], this[2], this[3]);
   }
   /** Get the squared length of the vector. */
   get magnitudeSq(): number {
@@ -1179,7 +1258,7 @@ export class Vector4 extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setXYZW(x: number, y: number, z: number, w: number): Vector4 {
+  setXYZW(x: number, y: number, z: number, w: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -1194,8 +1273,8 @@ export class Vector4 extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setAndNormalize(x: number, y: number, z: number, w: number): Vector4 {
-    const mag = Math.sqrt(x * x + y * y + z * z + w * w);
+  setAndNormalize(x: number, y: number, z: number, w: number): this {
+    const mag = Math.hypot(x, y, z, w);
     return this.setXYZW(x / mag, y / mag, z / mag, w / mag);
   }
   /**
@@ -1203,70 +1282,90 @@ export class Vector4 extends VectorBase {
    * @param other - The vector that will be subtract.
    * @returns self
    */
-  subBy(other: Vector4): Vector4 {
-    return Vector4.sub(this, other, this);
+  subBy(other: Vector4): this {
+    Vector4.sub(this, other, this);
+    return this;
   }
   /**
    * Add a vector to this vector.
    * @param other - The vector that will be added.
    * @returns self
    */
-  addBy(other: Vector4): Vector4 {
-    return Vector4.add(this, other, this);
+  addBy(other: Vector4): this {
+    Vector4.add(this, other, this);
+    return this;
+  }
+  /**
+   * Combine a vector to this vector.
+   * @param other - The vector that will be added.
+   * @param t0 - Scale factor for this vector
+   * @param t1 - Scale factor for other vector
+   * @returns self
+   */
+  combineBy(other: Vector4, t0: number, t1: number): this {
+    Vector4.combine(this, other, t0, t1, this);
+    return this;
   }
   /**
    * Multiply this vector by a vector.
    * @param other - The vector that will be multiplied by.
    * @returns self
    */
-  mulBy(other: Vector4): Vector4 {
-    return Vector4.mul(this, other, this);
+  mulBy(other: Vector4): this {
+    Vector4.mul(this, other, this);
+    return this;
   }
   /**
    * Divide this vector by a vector.
    * @param other - The vector that will be divide by.
    * @returns self
    */
-  divBy(other: Vector4): Vector4 {
-    return Vector4.div(this, other, this);
+  divBy(other: Vector4): this {
+    Vector4.div(this, other, this);
+    return this;
   }
   /**
    * Scale this vector by a scalar number.
    * @param f - amount to scale this vector by.
    * @returns self
    */
-  scaleBy(f: number): Vector4 {
-    return Vector4.scale(this, f, this);
+  scaleBy(f: number): this {
+    Vector4.scale(this, f, this);
+    return this;
   }
   /**
    * Normalize this vector inplace.
    * @returns self
    */
-  inplaceNormalize(): Vector4 {
-    return Vector4.normalize(this, this);
+  inplaceNormalize(): this {
+    Vector4.normalize(this, this);
+    return this;
   }
   /**
    * Inverse this vector inplace.
    * @returns self
    */
-  inplaceInverse(): Vector4 {
-    return Vector4.inverse(this, this);
+  inplaceInverse(): this {
+    Vector4.inverse(this, this);
+    return this;
   }
   /**
    * Set the component values to the minimum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMin(other: Vector4) {
-    return Vector4.min(this, other, this);
+  inplaceMin(other: Vector4): this {
+    Vector4.min(this, other, this);
+    return this;
   }
   /**
    * Set the component values to the maximum of this vector and another vector.
    * @param other - The vector that to be compared with.
    * @returns self
    */
-  inplaceMax(other: Vector4) {
-    return Vector4.max(this, other, this);
+  inplaceMax(other: Vector4): this {
+    Vector4.max(this, other, this);
+    return this;
   }
   /**
    * Creates a new Vector4 initialized with zero values.
@@ -1394,6 +1493,22 @@ export class Vector4 extends VectorBase {
     return (result || new Vector4()).setXYZW(x, y, z, w);
   }
   /**
+   * Combine two Vector4's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t0 - Scale factor for the first operand
+   * @param t1 - Scale factor for the second operand
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static combine(a: Vector4, b: Vector4, t0: number, t1: number, result?: Vector4): Vector4 {
+    const x = a.x * t0 + b.x * t1;
+    const y = a.y * t0 + b.y * t1;
+    const z = a.z * t0 + b.z * t1;
+    const w = a.w * t0 + b.w * t1;
+    return (result || new Vector4()).setXYZW(x, y, z, w);
+  }
+  /**
    * Multiply two Vector4's.
    * @param a - The first operand.
    * @param b - The second operand.
@@ -1495,62 +1610,62 @@ export class ObservableVector4 extends Vector4 {
   /** @internal */
   private _callback: () => void;
   /** The callback function which will be executed when the value changed */
-  get callback() {
+  get callback(): () => void {
     return this._callback;
   }
-  set callback(cb) {
+  set callback(cb: () => void) {
     this._callback = cb;
   }
   /**
    * {@inheritDoc Vector4.x}
    */
-  get x() {
+  get x(): number {
     return super.x;
   }
   set x(val: number) {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector4.y}
    */
-  get y() {
+  get y(): number {
     return super.y;
   }
   set y(val: number) {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector4.z}
    */
-  get z() {
+  get z(): number {
     return super.z;
   }
   set z(val: number) {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Vector4.w}
    */
-  get w() {
+  get w(): number {
     return super.w;
   }
   set w(val: number) {
     val = toFloat(val);
     if (val !== super.w) {
       super.w = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -1563,7 +1678,7 @@ export class ObservableVector4 extends Vector4 {
     w = toFloat(w);
     if (x !== super.x || y !== super.y || z !== super.z || w !== super.w) {
       super.setXYZW(x, y, z, w);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -1572,7 +1687,7 @@ export class ObservableVector4 extends Vector4 {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1580,15 +1695,15 @@ export class ObservableVector4 extends Vector4 {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -1596,14 +1711,14 @@ export class ObservableVector4 extends Vector4 {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -1685,28 +1800,28 @@ export class Quaternion extends VectorBase {
     return new Quaternion(this);
   }
   /** Get the x component value. */
-  get x() {
+  get x(): number {
     return this[0];
   }
   set x(v: number) {
     this[0] = v;
   }
   /** Get the y component value. */
-  get y() {
+  get y(): number {
     return this[1];
   }
   set y(v: number) {
     this[1] = v;
   }
   /** Get the z component value. */
-  get z() {
+  get z(): number {
     return this[2];
   }
   set z(v: number) {
     this[2] = v;
   }
   /** Get the w component value. */
-  get w() {
+  get w(): number {
     return this[3];
   }
   set w(v: number) {
@@ -1720,7 +1835,7 @@ export class Quaternion extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setXYZW(x: number, y: number, z: number, w: number): Quaternion {
+  setXYZW(x: number, y: number, z: number, w: number): this {
     this[0] = x;
     this[1] = y;
     this[2] = z;
@@ -1732,8 +1847,9 @@ export class Quaternion extends VectorBase {
    * @param f - amount to scale this quaternion by.
    * @returns self
    */
-  scaleBy(f: number): Quaternion {
-    return Quaternion.scale(this, f, this);
+  scaleBy(f: number): this {
+    Quaternion.scale(this, f, this);
+    return this;
   }
   /**
    * Set component values and then normalize the quaternion.
@@ -1743,51 +1859,56 @@ export class Quaternion extends VectorBase {
    * @param w - The w component value.
    * @returns self
    */
-  setAndNormalize(x: number, y: number, z: number, w: number): Quaternion {
-    const mag = Math.sqrt(x * x + y * y + z * z + w * w);
+  setAndNormalize(x: number, y: number, z: number, w: number): this {
+    const mag = Math.hypot(x, y, z, w);
     return this.setXYZW(x / mag, y / mag, z / mag, w / mag);
   }
   /** Get the length of the quaternion. */
   get magnitude(): number {
-    return Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2] + this[3] * this[3]);
+    return Math.hypot(this[0], this[1], this[2], this[3]);
   }
   /** Get the squared length of the quaternion. */
   get magnitudeSq(): number {
     return this[0] * this[0] + this[1] * this[1] + this[2] * this[2] + this[3] * this[3];
   }
   /** Make this quaternion an identity quaternion */
-  identity(): Quaternion {
-    return Quaternion.identity(this);
+  identity(): this {
+    Quaternion.identity(this);
+    return this;
   }
   /**
    * Normalize this quaternion inplace.
    * @returns self
    */
-  inplaceNormalize(): Quaternion {
-    return Quaternion.normalize(this, this);
+  inplaceNormalize(): this {
+    Quaternion.normalize(this, this);
+    return this;
   }
   /**
    * Calculates the conjugate of this quaternion inplace.
    * @returns self
    */
-  inplaceConjugate(): Quaternion {
-    return Quaternion.conjugate(this, this);
+  inplaceConjugate(): this {
+    Quaternion.conjugate(this, this);
+    return this;
   }
   /**
    * Multiply this quaternion by another quaternion at the right side inplace.
    * @param other - The quaternion that to be multiplied by.
    * @returns self
    */
-  multiplyRight(other: Quaternion) {
-    return Quaternion.multiply(this, other, this);
+  multiplyRight(other: Quaternion): this {
+    Quaternion.multiply(this, other, this);
+    return this;
   }
   /**
    * Multiply this quaternion by another quaternion at the left side inplace.
    * @param other - The quaternion that to be multiplied by.
    * @returns self
    */
-  multiplyLeft(other: Quaternion) {
-    return Quaternion.multiply(other, this, this);
+  multiplyLeft(other: Quaternion): this {
+    Quaternion.multiply(other, this, this);
+    return this;
   }
   /**
    * Make a quaternion used to rotate a unit vector to another inplace.
@@ -1795,8 +1916,9 @@ export class Quaternion extends VectorBase {
    * @param to - The destination unit vector.
    * @returns self
    */
-  unitVectorToUnitVector(from: Vector3, to: Vector3) {
-    return Quaternion.unitVectorToUnitVector(from, to, this);
+  unitVectorToUnitVector(from: Vector3, to: Vector3): this {
+    Quaternion.unitVectorToUnitVector(from, to, this);
+    return this;
   }
   /**
    * Calculates the quaternion from an euler angle in specific order inplace.
@@ -1806,8 +1928,9 @@ export class Quaternion extends VectorBase {
    * @param order - Intrinsic order for conversion.
    * @returns self
    */
-  fromEulerAngle(x: number, y: number, z: number, order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY') {
-    return Quaternion.fromEulerAngle(x, y, z, order, this);
+  fromEulerAngle(x: number, y: number, z: number, order: EulerAngleOrder = 'ZYX'): this {
+    Quaternion.fromEulerAngle(x, y, z, order, this);
+    return this;
   }
   /**
    * Calculates the quaternion from the given angle and rotation axis inplace.
@@ -1815,8 +1938,9 @@ export class Quaternion extends VectorBase {
    * @param angle - The rotate angle.
    * @returns self
    */
-  fromAxisAngle(axis: Vector3, angle: number) {
-    return Quaternion.fromAxisAngle(axis, angle, this);
+  fromAxisAngle(axis: Vector3, angle: number): this {
+    Quaternion.fromAxisAngle(axis, angle, this);
+    return this;
   }
   /**
    * Calculates the rotation axis and angle for this quaternion
@@ -1842,21 +1966,22 @@ export class Quaternion extends VectorBase {
     angles = angles ?? new Vector3();
     const t0 = 2 * (this.w * this.x + this.y * this.z);
     const t1 = 1 - 2 * (this.x * this.x + this.y * this.y);
-    const roll = Math.atan2(t0, t1);
+    const pitch = Math.atan2(t0, t1);
     const t2 = Math.max(-1, Math.min(1, 2 * (this.w * this.y - this.z * this.x)));
-    const pitch = Math.asin(t2);
+    const yaw = Math.asin(t2);
     const t3 = 2 * (this.w * this.z + this.x * this.y);
     const t4 = 1 - 2 * (this.y * this.y + this.z * this.z);
-    const yaw = Math.atan2(t3, t4);
-    return angles.setXYZ(roll, pitch, yaw);
+    const roll = Math.atan2(t3, t4);
+    return angles.setXYZ(pitch, yaw, roll);
   }
   /**
    * Calculates the quaternion from a rotation matrix inplace.
    * @param matrix - The rotation matrix.
    * @returns self
    */
-  fromRotationMatrix(matrix: Matrix3x3 | Matrix4x4) {
-    return Quaternion.fromRotationMatrix(matrix, this);
+  fromRotationMatrix(matrix: Matrix3x3 | Matrix4x4): this {
+    Quaternion.fromRotationMatrix(matrix, this);
+    return this;
   }
   /**
    * Convert this quaternion to a 3x3 rotation matrix.
@@ -1880,6 +2005,13 @@ export class Quaternion extends VectorBase {
   toMatrix4x4(matrix?: Matrix4x4): Matrix4x4 {
     const m = matrix || Matrix4x4.identity();
     this.toMatrix(m);
+    m.m03 = 0;
+    m.m13 = 0;
+    m.m23 = 0;
+    m.m30 = 0;
+    m.m31 = 0;
+    m.m32 = 0;
+    m.m33 = 1;
     return m;
   }
   /**
@@ -2127,7 +2259,7 @@ export class Quaternion extends VectorBase {
     a: number,
     b: number,
     c: number,
-    order: 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY',
+    order: EulerAngleOrder = 'ZYX',
     result?: Quaternion
   ): Quaternion {
     result = result || new Quaternion();
@@ -2243,7 +2375,7 @@ export class Quaternion extends VectorBase {
     return result;
   }
   /** @internal */
-  private toMatrix(matrix: Matrix3x3 | Matrix4x4) {
+  private toMatrix(matrix: Matrix3x3 | Matrix4x4): void {
     const xx = this.x * this.x;
     const yy = this.y * this.y;
     const zz = this.z * this.z;
@@ -2273,62 +2405,62 @@ export class ObservableQuaternion extends Quaternion {
   /** @internal */
   private _callback: () => void;
   /** The callback function which will be executed when the value changed */
-  get callback() {
+  get callback(): () => void {
     return this._callback;
   }
-  set callback(cb) {
+  set callback(cb: () => void) {
     this._callback = cb;
   }
   /**
    * {@inheritDoc Quaternion.x}
    */
-  get x() {
+  get x(): number {
     return super.x;
   }
   set x(val: number) {
     val = toFloat(val);
     if (val !== super.x) {
       super.x = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Quaternion.y}
    */
-  get y() {
+  get y(): number {
     return super.y;
   }
   set y(val: number) {
     val = toFloat(val);
     if (val !== super.y) {
       super.y = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Quaternion.z}
    */
-  get z() {
+  get z(): number {
     return super.z;
   }
   set z(val: number) {
     val = toFloat(val);
     if (val !== super.z) {
       super.z = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
    * {@inheritDoc Quaternion.w}
    */
-  get w() {
+  get w(): number {
     return super.w;
   }
   set w(val: number) {
     val = toFloat(val);
     if (val !== super.w) {
       super.w = val;
-      this._callback && this._callback();
+      this._callback?.();
     }
   }
   /**
@@ -2341,7 +2473,7 @@ export class ObservableQuaternion extends Quaternion {
     w = toFloat(w);
     if (x !== super.x || y !== super.y || z !== super.z || w !== super.w) {
       super.setXYZW(x, y, z, w);
-      this._callback && this._callback();
+      this._callback?.();
     }
     return this;
   }
@@ -2350,7 +2482,7 @@ export class ObservableQuaternion extends Quaternion {
    */
   copyWithin(target: number, start: number, end?: number): this {
     super.copyWithin(target, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -2358,15 +2490,15 @@ export class ObservableQuaternion extends Quaternion {
    */
   fill(value: number, start?: number, end?: number): this {
     super.fill(value, start, end);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
    * Inherited from Float32Array.reverse
    */
-  reverse(): Float32Array {
+  reverse(): this {
     super.reverse();
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
   /**
@@ -2374,14 +2506,14 @@ export class ObservableQuaternion extends Quaternion {
    */
   set(array: ArrayLike<number>, offset?: number): void {
     super.set(array, offset);
-    this._callback && this._callback();
+    this._callback?.();
   }
   /**
    * Inherited from Float32Array.sort
    */
   sort(compareFn?: (a: number, b: number) => number): this {
     super.sort(compareFn);
-    this._callback && this._callback();
+    this._callback?.();
     return this;
   }
 }
@@ -2494,63 +2626,63 @@ export class Matrix3x3 extends VectorBase {
     return new Matrix3x3(this);
   }
   /** Get the element at row 0, column 0 */
-  get m00() {
+  get m00(): number {
     return this[0];
   }
   set m00(v: number) {
     this[0] = v;
   }
   /** Get the element at row 0, column 1 */
-  get m10() {
+  get m10(): number {
     return this[1];
   }
   set m10(v: number) {
     this[1] = v;
   }
   /** Get the element at row 0, column 2 */
-  get m20() {
+  get m20(): number {
     return this[2];
   }
   set m20(v: number) {
     this[2] = v;
   }
   /** Get the element at row 1, column 0 */
-  get m01() {
+  get m01(): number {
     return this[3];
   }
   set m01(v: number) {
     this[3] = v;
   }
   /** Get the element at row 1, column 1 */
-  get m11() {
+  get m11(): number {
     return this[4];
   }
   set m11(v: number) {
     this[4] = v;
   }
   /** Get the element at row 1, column 2 */
-  get m21() {
+  get m21(): number {
     return this[5];
   }
   set m21(v: number) {
     this[5] = v;
   }
   /** Get the element at row 2, column 0 */
-  get m02() {
+  get m02(): number {
     return this[6];
   }
   set m02(v: number) {
     this[6] = v;
   }
   /** Get the element at row 2, column 1 */
-  get m12() {
+  get m12(): number {
     return this[7];
   }
   set m12(v: number) {
     this[7] = v;
   }
   /** Get the element at row 2, column 2 */
-  get m22() {
+  get m22(): number {
     return this[8];
   }
   set m22(v: number) {
@@ -2571,7 +2703,7 @@ export class Matrix3x3 extends VectorBase {
    * @param v - The values to be set
    * @returns - self
    */
-  setRow(row: number, v: Vector3) {
+  setRow(row: number, v: Vector3): this {
     this[row * 3] = v.x;
     this[row * 3 + 1] = v.y;
     this[row * 3 + 2] = v.z;
@@ -2585,7 +2717,7 @@ export class Matrix3x3 extends VectorBase {
    * @param z - The third value of the row to be set
    * @returns - self
    */
-  setRowXYZ(row: number, x: number, y: number, z: number) {
+  setRowXYZ(row: number, x: number, y: number, z: number): this {
     this[row * 3] = x;
     this[row * 3 + 1] = y;
     this[row * 3 + 2] = z;
@@ -2606,7 +2738,7 @@ export class Matrix3x3 extends VectorBase {
    * @param v - The values to be set.
    * @returns self
    */
-  setCol(col: number, v: Vector3) {
+  setCol(col: number, v: Vector3): this {
     this[col] = v.x;
     this[3 + col] = v.y;
     this[6 + col] = v.z;
@@ -2620,7 +2752,7 @@ export class Matrix3x3 extends VectorBase {
    * @param z - The third value of the column to be set.
    * @returns self
    */
-  setColXYZ(col: number, x: number, y: number, z: number) {
+  setColXYZ(col: number, x: number, y: number, z: number): this {
     this[col] = x;
     this[3 + col] = y;
     this[6 + col] = z;
@@ -2631,9 +2763,9 @@ export class Matrix3x3 extends VectorBase {
    * @param a - The first operand.
    * @param b - The second operand.
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
-   * @returns The output matrix
+   * @returns The result matrix
    */
-  static add(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3) {
+  static add(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3): Matrix3x3 {
     result = result || new Matrix3x3();
     for (let i = 0; i < 9; i++) {
       result[i] = a[i] + b[i];
@@ -2645,9 +2777,9 @@ export class Matrix3x3 extends VectorBase {
    * @param a - The first operand.
    * @param b - The second operand.
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
-   * @returns
+   * @returns The result matrix
    */
-  static sub(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3) {
+  static sub(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3): Matrix3x3 {
     result = result || new Matrix3x3();
     for (let i = 0; i < 9; i++) {
       result[i] = a[i] - b[i];
@@ -2661,7 +2793,7 @@ export class Matrix3x3 extends VectorBase {
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
    * @returns The output matrix
    */
-  static mul(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3) {
+  static mul(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3): Matrix3x3 {
     result = result || new Matrix3x3();
     for (let i = 0; i < 9; i++) {
       result[i] = a[i] * b[i];
@@ -2673,9 +2805,9 @@ export class Matrix3x3 extends VectorBase {
    * @param a - The first operand.
    * @param b - The second operand.
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
-   * @returns The output matrix
+   * @returns The result matrix
    */
-  static div(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3) {
+  static div(a: Matrix3x3, b: Matrix3x3, result?: Matrix3x3): Matrix3x3 {
     result = result || new Matrix3x3();
     for (let i = 0; i < 9; i++) {
       result[i] = a[i] / b[i];
@@ -2687,9 +2819,9 @@ export class Matrix3x3 extends VectorBase {
    * @param a - The matrix to be scaled.
    * @param f - The scalar number.
    * @param result - The output matrix (can be the same as a), if not specified, a new matrix will be created.
-   * @returns The output matrix
+   * @returns The result matrix
    */
-  static scale(a: Matrix3x3, f: number, result?: Matrix3x3) {
+  static scale(a: Matrix3x3, f: number, result?: Matrix3x3): Matrix3x3 {
     result = result || new Matrix3x3();
     for (let i = 0; i < 9; i++) {
       result[i] = a[i] * f;
@@ -2838,7 +2970,7 @@ export class Matrix3x3 extends VectorBase {
     let x = axis.x;
     let y = axis.y;
     let z = axis.z;
-    const n = Math.sqrt(x * x + y * y + z * z);
+    const n = Math.hypot(x, y, z);
     x /= n;
     y /= n;
     z /= n;
@@ -2904,61 +3036,69 @@ export class Matrix3x3 extends VectorBase {
    * @param other - The matrix that will be subtract.
    * @returns self
    */
-  subBy(other: Matrix3x3) {
-    return Matrix3x3.sub(this, other, this);
+  subBy(other: Matrix3x3): this {
+    Matrix3x3.sub(this, other, this);
+    return this;
   }
   /**
    * Add a matrix to this matrix component-wise.
    * @param other - The matrix that will be added.
    * @returns self
    */
-  addBy(other: Matrix3x3) {
-    return Matrix3x3.add(this, other, this);
+  addBy(other: Matrix3x3): this {
+    Matrix3x3.add(this, other, this);
+    return this;
   }
   /**
    * Multiplies this matrix by a matrix component-wise.
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  mulBy(other: Matrix3x3) {
-    return Matrix3x3.mul(this, other, this);
+  mulBy(other: Matrix3x3): this {
+    Matrix3x3.mul(this, other, this);
+    return this;
   }
   /**
    * Divide this matrix by a matrix component-wise.
    * @param other - The matrix that will be divide by.
    * @returns self
    */
-  divBy(other: Matrix3x3) {
-    return Matrix3x3.div(this, other, this);
+  divBy(other: Matrix3x3): this {
+    Matrix3x3.div(this, other, this);
+    return this;
   }
   /**
    * Scale this matrix by a scalar number component-wise.
    * @param f - amount to scale this matrix by.
    * @returns self
    */
-  scaleBy(f: number) {
-    return Matrix3x3.scale(this, f, this);
+  scaleBy(f: number): this {
+    Matrix3x3.scale(this, f, this);
+    return this;
   }
   /**
    * Make this matrix identity.
    * @returns self
    */
-  identity() {
-    return Matrix3x3.identity(this);
+  identity(): this {
+    Matrix3x3.identity(this);
+    return this;
   }
   /**
    * Calculate the inverse of this matrix inplace.
    * @returns self
    */
-  inplaceInvert() {
-    return Matrix3x3.invert(this, this);
+  inplaceInvert(): this {
+    Matrix3x3.invert(this, this);
+    return this;
   }
   /**
    * Calculate the transpose of this matrix inplace.
    * @returns self
    */
-  transpose() {
-    return Matrix3x3.transpose(this, this);
+  transpose(): this {
+    Matrix3x3.transpose(this, this);
+    return this;
   }
   /**
    * Post-multiply by a matrix inplace.
@@ -2969,8 +3109,9 @@ export class Matrix3x3 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyRight(other: Matrix3x3) {
-    return Matrix3x3.multiply(this, other, this);
+  multiplyRight(other: Matrix3x3): this {
+    Matrix3x3.multiply(this, other, this);
+    return this;
   }
   /**
    * Pre-multiply by a matrix inplace.
@@ -2981,32 +3122,36 @@ export class Matrix3x3 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyLeft(other: Matrix3x3) {
-    return Matrix3x3.multiply(other, this, this);
+  multiplyLeft(other: Matrix3x3): this {
+    Matrix3x3.multiply(other, this, this);
+    return this;
   }
   /**
    * Calculates a rotation around x axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationX(angle: number) {
-    return Matrix3x3.rotationX(angle, this);
+  rotationX(angle: number): this {
+    Matrix3x3.rotationX(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around y axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationY(angle: number) {
-    return Matrix3x3.rotationY(angle, this);
+  rotationY(angle: number): this {
+    Matrix3x3.rotationY(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around z axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationZ(angle: number) {
-    return Matrix3x3.rotationZ(angle, this);
+  rotationZ(angle: number): this {
+    Matrix3x3.rotationZ(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around a given axis.
@@ -3014,8 +3159,9 @@ export class Matrix3x3 extends VectorBase {
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotation(axis: Vector3, angle: number) {
-    return Matrix3x3.rotation(axis, angle, this);
+  rotation(axis: Vector3, angle: number): this {
+    Matrix3x3.rotation(axis, angle, this);
+    return this;
   }
   /**
    * Transform a vector by this matrix.
@@ -3157,13 +3303,6 @@ export class Matrix4x4 extends VectorBase {
         this[15] = arg15;
       } else if (arg0 instanceof Quaternion) {
         arg0.toMatrix4x4(this);
-        this.m03 = 0;
-        this.m13 = 0;
-        this.m23 = 0;
-        this.m30 = 0;
-        this.m31 = 0;
-        this.m32 = 0;
-        this.m33 = 1;
       } else if (arg0 instanceof Matrix3x3) {
         this.m00 = arg0.m00;
         this.m01 = arg0.m01;
@@ -3198,112 +3337,112 @@ export class Matrix4x4 extends VectorBase {
     return new Matrix4x4(this);
   }
   /** Get the element at row 0, column 0 */
-  get m00() {
+  get m00(): number {
     return this[0];
   }
   set m00(v: number) {
     this[0] = v;
   }
   /** Get the element at row 0, column 1 */
-  get m10() {
+  get m10(): number {
     return this[1];
   }
   set m10(v: number) {
     this[1] = v;
   }
   /** Get the element at row 0, column 2 */
-  get m20() {
+  get m20(): number {
     return this[2];
   }
   set m20(v: number) {
     this[2] = v;
   }
   /** Get the element at row 0, column 3 */
-  get m30() {
+  get m30(): number {
     return this[3];
   }
   set m30(v: number) {
     this[3] = v;
   }
   /** Get the element at row 1, column 0 */
-  get m01() {
+  get m01(): number {
     return this[4];
   }
   set m01(v: number) {
     this[4] = v;
   }
   /** Get the element at row 1, column 1 */
-  get m11() {
+  get m11(): number {
     return this[5];
   }
   set m11(v: number) {
     this[5] = v;
   }
   /** Get the element at row 1, column 2 */
-  get m21() {
+  get m21(): number {
     return this[6];
   }
   set m21(v: number) {
     this[6] = v;
   }
   /** Get the element at row 1, column 3 */
-  get m31() {
+  get m31(): number {
     return this[7];
   }
   set m31(v: number) {
     this[7] = v;
   }
   /** Get the element at row 2, column 0 */
-  get m02() {
+  get m02(): number {
     return this[8];
   }
   set m02(v: number) {
     this[8] = v;
   }
   /** Get the element at row 2, column 1 */
-  get m12() {
+  get m12(): number {
     return this[9];
   }
   set m12(v: number) {
     this[9] = v;
   }
   /** Get the element at row 2, column 2 */
-  get m22() {
+  get m22(): number {
     return this[10];
   }
   set m22(v: number) {
     this[10] = v;
   }
   /** Get the element at row 2, column 3 */
-  get m32() {
+  get m32(): number {
     return this[11];
   }
   set m32(v: number) {
     this[11] = v;
   }
   /** Get the element at row 3, column 0 */
-  get m03() {
+  get m03(): number {
     return this[12];
   }
   set m03(v: number) {
     this[12] = v;
   }
   /** Get the element at row 3, column 1 */
-  get m13() {
+  get m13(): number {
     return this[13];
   }
   set m13(v: number) {
     this[13] = v;
   }
   /** Get the element at row 3, column 2 */
-  get m23() {
+  get m23(): number {
     return this[14];
   }
   set m23(v: number) {
     this[14] = v;
   }
   /** Get the element at row 3, column 3 */
-  get m33() {
+  get m33(): number {
     return this[15];
   }
   set m33(v: number) {
@@ -3329,7 +3468,7 @@ export class Matrix4x4 extends VectorBase {
    * @param v - The values to be set
    * @returns - self
    */
-  setRow(row: number, v: Vector4) {
+  setRow(row: number, v: Vector4): this {
     this[row * 4] = v.x;
     this[row * 4 + 1] = v.y;
     this[row * 4 + 2] = v.z;
@@ -3345,7 +3484,7 @@ export class Matrix4x4 extends VectorBase {
    * @param w - The fourth value of the row to be set
    * @returns - self
    */
-  setRowXYZW(row: number, x: number, y: number, z: number, w: number) {
+  setRowXYZW(row: number, x: number, y: number, z: number, w: number): this {
     this[row * 4] = x;
     this[row * 4 + 1] = y;
     this[row * 4 + 2] = z;
@@ -3367,7 +3506,7 @@ export class Matrix4x4 extends VectorBase {
    * @param v - The values to be set.
    * @returns self
    */
-  setCol(col: number, v: Vector4) {
+  setCol(col: number, v: Vector4): this {
     this[col] = v.x;
     this[4 + col] = v.y;
     this[8 + col] = v.z;
@@ -3383,7 +3522,7 @@ export class Matrix4x4 extends VectorBase {
    * @param w - The fourth value of the column to be set.
    * @returns self
    */
-  setColXYZW(col: number, x: number, y: number, z: number, w: number) {
+  setColXYZW(col: number, x: number, y: number, z: number, w: number): this {
     this[col] = x;
     this[4 + col] = y;
     this[8 + col] = z;
@@ -3397,7 +3536,7 @@ export class Matrix4x4 extends VectorBase {
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
    * @returns The output matrix
    */
-  static add(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4) {
+  static add(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
     for (let i = 0; i < 16; i++) {
       result[i] = a[i] + b[i];
@@ -3411,7 +3550,7 @@ export class Matrix4x4 extends VectorBase {
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
    * @returns
    */
-  static sub(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4) {
+  static sub(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
     for (let i = 0; i < 16; i++) {
       result[i] = a[i] - b[i];
@@ -3425,7 +3564,7 @@ export class Matrix4x4 extends VectorBase {
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
    * @returns The output matrix
    */
-  static mul(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4) {
+  static mul(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
     for (let i = 0; i < 16; i++) {
       result[i] = a[i] * b[i];
@@ -3439,7 +3578,7 @@ export class Matrix4x4 extends VectorBase {
    * @param result - The output matrix (can be the same as a or b), if not specified, a new matrix will be created.
    * @returns The output matrix
    */
-  static div(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4) {
+  static div(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
     for (let i = 0; i < 16; i++) {
       result[i] = a[i] / b[i];
@@ -3453,7 +3592,7 @@ export class Matrix4x4 extends VectorBase {
    * @param result - The output matrix (can be the same as a), if not specified, a new matrix will be created.
    * @returns The output matrix
    */
-  static scale(a: Matrix4x4, f: number, result?: Matrix4x4) {
+  static scale(a: Matrix4x4, f: number, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
     for (let i = 0; i < 16; i++) {
       result[i] = a[i] * f;
@@ -3988,7 +4127,7 @@ export class Matrix4x4 extends VectorBase {
     let x = axis.x;
     let y = axis.y;
     let z = axis.z;
-    const n = Math.sqrt(x * x + y * y + z * z);
+    const n = Math.hypot(x, y, z);
     x /= n;
     y /= n;
     z /= n;
@@ -4016,6 +4155,22 @@ export class Matrix4x4 extends VectorBase {
     result[15] = 1;
 
     return result;
+  }
+  /**
+   * Compose matrix from rotation, translation and scale components.
+   * @param scale - The input scale vector.
+   * @param rotation - The input rotation matrix or quaternion.
+   * @param translation - The input translation vector.
+   * @returns The composed matrix
+   */
+  static compose(
+    scale: Vector3,
+    rotation: Quaternion | Matrix3x3 | Matrix4x4,
+    translation: Vector3,
+    result?: Matrix4x4
+  ): Matrix4x4 {
+    result = result ?? new Matrix4x4();
+    return result.scaling(scale).rotateLeft(rotation).translateLeft(translation);
   }
   /**
    * Creates a look-at matrix.
@@ -4324,38 +4479,22 @@ export class Matrix4x4 extends VectorBase {
    */
   static scaleLeft(m: Matrix4x4, s: Vector3, result?: Matrix4x4): Matrix4x4 {
     result = result || new Matrix4x4();
-    if (result !== m) {
-      result[0] = m[0] * s.x;
-      result[1] = m[1] * s.y;
-      result[2] = m[2] * s.z;
-      result[3] = m[3];
-      result[4] = m[4] * s.x;
-      result[5] = m[5] * s.y;
-      result[6] = m[6] * s.z;
-      result[7] = m[7];
-      result[8] = m[8] * s.x;
-      result[9] = m[9] * s.y;
-      result[10] = m[10] * s.z;
-      result[11] = m[11];
-      result[12] = m[12] * s.x;
-      result[13] = m[13] * s.y;
-      result[14] = m[14] * s.z;
-      result[15] = m[15];
-    } else {
-      result[0] *= s.x;
-      result[1] *= s.y;
-      result[2] *= s.z;
-      result[4] *= s.x;
-      result[5] *= s.y;
-      result[6] *= s.z;
-      result[8] *= s.x;
-      result[9] *= s.y;
-      result[10] *= s.z;
-      result[12] *= s.x;
-      result[13] *= s.y;
-      result[14] *= s.z;
-    }
-
+    result[0] = m[0] * s.x;
+    result[1] = m[1] * s.y;
+    result[2] = m[2] * s.z;
+    result[3] = m[3];
+    result[4] = m[4] * s.x;
+    result[5] = m[5] * s.y;
+    result[6] = m[6] * s.z;
+    result[7] = m[7];
+    result[8] = m[8] * s.x;
+    result[9] = m[9] * s.y;
+    result[10] = m[10] * s.z;
+    result[11] = m[11];
+    result[12] = m[12] * s.x;
+    result[13] = m[13] * s.y;
+    result[14] = m[14] * s.z;
+    result[15] = m[15];
     return result;
   }
   /**
@@ -4480,47 +4619,53 @@ export class Matrix4x4 extends VectorBase {
    * @param other - The matrix that will be subtract.
    * @returns self
    */
-  subBy(other: Matrix4x4) {
-    return Matrix4x4.sub(this, other, this);
+  subBy(other: Matrix4x4): this {
+    Matrix4x4.sub(this, other, this);
+    return this;
   }
   /**
    * Add a matrix to this matrix component-wise.
    * @param other - The matrix that will be added.
    * @returns self
    */
-  addBy(other: Matrix4x4) {
-    return Matrix4x4.add(this, other, this);
+  addBy(other: Matrix4x4): this {
+    Matrix4x4.add(this, other, this);
+    return this;
   }
   /**
    * Multiplies this matrix by a matrix component-wise.
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  mulBy(other: Matrix4x4) {
-    return Matrix4x4.mul(this, other, this);
+  mulBy(other: Matrix4x4): this {
+    Matrix4x4.mul(this, other, this);
+    return this;
   }
   /**
    * Divide this matrix by a matrix component-wise.
    * @param other - The matrix that will be divide by.
    * @returns self
    */
-  divBy(other: Matrix4x4) {
-    return Matrix4x4.div(this, other, this);
+  divBy(other: Matrix4x4): this {
+    Matrix4x4.div(this, other, this);
+    return this;
   }
   /**
    * Scale this matrix by a scalar number component-wise.
    * @param f - amount to scale this matrix by.
    * @returns self
    */
-  scaleBy(f: number) {
-    return Matrix4x4.scale(this, f, this);
+  scaleBy(f: number): this {
+    Matrix4x4.scale(this, f, this);
+    return this;
   }
   /**
    * Make this matrix identity.
    * @returns self
    */
-  identity() {
-    return Matrix4x4.identity(this);
+  identity(): this {
+    Matrix4x4.identity(this);
+    return this;
   }
   /**
    * Calculates a right-handed perspective projection matrix inplace.
@@ -4530,8 +4675,9 @@ export class Matrix4x4 extends VectorBase {
    * @param zfar - The far clip plane.
    * @returns self
    */
-  perspective(fovY: number, aspect: number, znear: number, zfar: number) {
-    return Matrix4x4.perspective(fovY, aspect, znear, zfar, this);
+  perspective(fovY: number, aspect: number, znear: number, zfar: number): this {
+    Matrix4x4.perspective(fovY, aspect, znear, zfar, this);
+    return this;
   }
   /**
    * Calculates a perspective projection matrix from a frustum inplace.
@@ -4543,8 +4689,9 @@ export class Matrix4x4 extends VectorBase {
    * @param zfar - Far bound of the frustum.
    * @returns self
    */
-  frustum(left: number, right: number, bottom: number, top: number, znear: number, zfar: number) {
-    return Matrix4x4.frustum(left, right, bottom, top, znear, zfar, this);
+  frustum(left: number, right: number, bottom: number, top: number, znear: number, zfar: number): this {
+    Matrix4x4.frustum(left, right, bottom, top, znear, zfar, this);
+    return this;
   }
   /**
    * Calculates an orthogonal projection matrix inplace.
@@ -4556,8 +4703,9 @@ export class Matrix4x4 extends VectorBase {
    * @param far - Far bound of the frustum.
    * @returns self
    */
-  ortho(left: number, right: number, bottom: number, top: number, near: number, far: number) {
-    return Matrix4x4.ortho(left, right, bottom, top, near, far, this);
+  ortho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+    Matrix4x4.ortho(left, right, bottom, top, near, far, this);
+    return this;
   }
   /**
    * Check if this matrix is orthogonal projection matrix.
@@ -4719,8 +4867,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The left clip plane
    */
   getLeftPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (-1 - this[12]) / this[0];
+    if (this.isPerspective()) {
+      return ((this[8] - 1) * this.getNearPlane()) / this[0];
+    } else {
+      return (-1 - this[12]) / this[0];
+    }
   }
   /**
    * Get the right clip plane.
@@ -4731,8 +4882,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The right clip plane
    */
   getRightPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (1 - this[12]) / this[0];
+    if (this.isPerspective()) {
+      return ((this[8] + 1) * this.getNearPlane()) / this[0];
+    } else {
+      return (1 - this[12]) / this[0];
+    }
   }
   /**
    * Get the top clip plane.
@@ -4743,8 +4897,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The top clip plane
    */
   getTopPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (1 - this[13]) / this[5];
+    if (this.isPerspective()) {
+      return ((this[9] + 1) * this.getNearPlane()) / this[5];
+    } else {
+      return (1 - this[13]) / this[5];
+    }
   }
   /**
    * Get the bottom clip plane.
@@ -4755,8 +4912,11 @@ export class Matrix4x4 extends VectorBase {
    * @returns The bottom clip plane
    */
   getBottomPlane(): number {
-    // assum this is an orthogonal projection matrix
-    return (-1 - this[13]) / this[5];
+    if (this.isPerspective()) {
+      return ((this[9] - 1) * this.getNearPlane()) / this[5];
+    } else {
+      return (-1 - this[13]) / this[5];
+    }
   }
   /**
    * Set the near clip plane and far clip plane.
@@ -4782,37 +4942,42 @@ export class Matrix4x4 extends VectorBase {
    * @param t - The translate vector.
    * @returns self
    */
-  translation(t: Vector3) {
-    return Matrix4x4.translation(t, this);
+  translation(t: Vector3): this {
+    Matrix4x4.translation(t, this);
+    return this;
   }
   /**
    * Calculates a scale matrix inplace.
    * @param s - The scale vector.
    * @returns self
    */
-  scaling(s: Vector3) {
-    return Matrix4x4.scaling(s, this);
+  scaling(s: Vector3): this {
+    Matrix4x4.scaling(s, this);
+    return this;
   }
   /**
    * Invert this matrix inplace.
    * @returns self
    */
-  inplaceInvert() {
-    return Matrix4x4.invert(this, this);
+  inplaceInvert(): this {
+    Matrix4x4.invert(this, this);
+    return this;
   }
   /**
    * Invert this matrix inplace, assuming this matrix presents an affine transformation.
    * @returns self
    */
-  inplaceInvertAffine() {
-    return Matrix4x4.invertAffine(this, this);
+  inplaceInvertAffine(): this {
+    Matrix4x4.invertAffine(this, this);
+    return this;
   }
   /**
    * Calculates the transpose of this matrix inplace.
    * @returns self
    */
-  transpose() {
-    return Matrix4x4.transpose(this, this);
+  transpose(): this {
+    Matrix4x4.transpose(this, this);
+    return this;
   }
   /**
    * Post-multiply by a matrix inplace.
@@ -4823,8 +4988,9 @@ export class Matrix4x4 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyRight(other: Matrix4x4) {
-    return Matrix4x4.multiply(this, other, this);
+  multiplyRight(other: Matrix4x4): this {
+    Matrix4x4.multiply(this, other, this);
+    return this;
   }
   /**
    * Post-multiply by a matrix inplace, assuming both matrices present affine transformations.
@@ -4835,8 +5001,9 @@ export class Matrix4x4 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyRightAffine(other: Matrix4x4) {
-    return Matrix4x4.multiplyAffine(this, other, this);
+  multiplyRightAffine(other: Matrix4x4): this {
+    Matrix4x4.multiplyAffine(this, other, this);
+    return this;
   }
   /**
    * Pre-multiply by a matrix inplace.
@@ -4847,8 +5014,9 @@ export class Matrix4x4 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyLeft(other: Matrix4x4) {
-    return Matrix4x4.multiply(other, this, this);
+  multiplyLeft(other: Matrix4x4): this {
+    Matrix4x4.multiply(other, this, this);
+    return this;
   }
   /**
    * Pre-multiply by a matrix inplace, assuming both matrices present affine transformations.
@@ -4859,32 +5027,36 @@ export class Matrix4x4 extends VectorBase {
    * @param other - The matrix that will be multiplied by.
    * @returns self
    */
-  multiplyLeftAffine(other: Matrix4x4) {
-    return Matrix4x4.multiplyAffine(other, this, this);
+  multiplyLeftAffine(other: Matrix4x4): this {
+    Matrix4x4.multiplyAffine(other, this, this);
+    return this;
   }
   /**
    * Calculates a rotation around x axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationX(angle: number) {
-    return Matrix4x4.rotationX(angle, this);
+  rotationX(angle: number): this {
+    Matrix4x4.rotationX(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around y axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationY(angle: number) {
-    return Matrix4x4.rotationY(angle, this);
+  rotationY(angle: number): this {
+    Matrix4x4.rotationY(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around z axis inplace.
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotationZ(angle: number) {
-    return Matrix4x4.rotationZ(angle, this);
+  rotationZ(angle: number): this {
+    Matrix4x4.rotationZ(angle, this);
+    return this;
   }
   /**
    * Calculates a rotation around a given axis inplace.
@@ -4892,8 +5064,9 @@ export class Matrix4x4 extends VectorBase {
    * @param angle - The rotate angle in radians.
    * @returns self
    */
-  rotation(axis: Vector3, angle: number) {
-    return Matrix4x4.rotation(axis, angle, this);
+  rotation(axis: Vector3, angle: number): this {
+    Matrix4x4.rotation(axis, angle, this);
+    return this;
   }
   /**
    * Post-translate by a vector inplace.
@@ -4904,8 +5077,9 @@ export class Matrix4x4 extends VectorBase {
    * @param t - The translate vector.
    * @returns self
    */
-  translateRight(t: Vector3) {
-    return Matrix4x4.translateRight(this, t, this);
+  translateRight(t: Vector3): this {
+    Matrix4x4.translateRight(this, t, this);
+    return this;
   }
   /**
    * Pre-translate by a vector inplace.
@@ -4916,8 +5090,9 @@ export class Matrix4x4 extends VectorBase {
    * @param t - The translate vector.
    * @returns self
    */
-  translateLeft(t: Vector3) {
-    return Matrix4x4.translateLeft(this, t, this);
+  translateLeft(t: Vector3): this {
+    Matrix4x4.translateLeft(this, t, this);
+    return this;
   }
   /**
    * Post-scale by a vector inplace.
@@ -4928,8 +5103,9 @@ export class Matrix4x4 extends VectorBase {
    * @param s - The scale vector.
    * @returns self
    */
-  scaleRight(s: Vector3) {
-    return Matrix4x4.scaleRight(this, s, this);
+  scaleRight(s: Vector3): this {
+    Matrix4x4.scaleRight(this, s, this);
+    return this;
   }
   /**
    * Pre-scale by a vector inplace.
@@ -4940,8 +5116,9 @@ export class Matrix4x4 extends VectorBase {
    * @param s - The scale vector.
    * @returns self
    */
-  scaleLeft(s: Vector3) {
-    return Matrix4x4.scaleLeft(this, s, this);
+  scaleLeft(s: Vector3): this {
+    Matrix4x4.scaleLeft(this, s, this);
+    return this;
   }
   /**
    * Post-rotate by a rotation matrix or quaternion inplace.
@@ -4952,8 +5129,9 @@ export class Matrix4x4 extends VectorBase {
    * @param r - The rotation matrix or quaternion.
    * @returns self
    */
-  rotateRight(r: Matrix3x3 | Matrix4x4 | Quaternion) {
-    return Matrix4x4.rotateRight(this, r, this);
+  rotateRight(r: Matrix3x3 | Matrix4x4 | Quaternion): this {
+    Matrix4x4.rotateRight(this, r, this);
+    return this;
   }
   /**
    * Pre-rotate by a rotation matrix or quaternion inplace.
@@ -4964,8 +5142,9 @@ export class Matrix4x4 extends VectorBase {
    * @param r - The rotation matrix or quaternion.
    * @returns self
    */
-  rotateLeft(r: Matrix3x3 | Matrix4x4 | Quaternion) {
-    return Matrix4x4.rotateLeft(this, r, this);
+  rotateLeft(r: Matrix3x3 | Matrix4x4 | Quaternion): this {
+    Matrix4x4.rotateLeft(this, r, this);
+    return this;
   }
   /**
    * Calculates a look-at matrix inplace.
@@ -4974,8 +5153,9 @@ export class Matrix4x4 extends VectorBase {
    * @param up - The up vector.
    * @returns self
    */
-  lookAt(eye: Vector3, target: Vector3, up: Vector3) {
-    return Matrix4x4.lookAt(eye, target, up, this);
+  lookAt(eye: Vector3, target: Vector3, up: Vector3): this {
+    Matrix4x4.lookAt(eye, target, up, this);
+    return this;
   }
   /**
    * Transform a point by this matrix.
@@ -4990,6 +5170,21 @@ export class Matrix4x4 extends VectorBase {
       this[1] * point[0] + this[5] * point[1] + this[9] * point[2] + this[13],
       this[2] * point[0] + this[6] * point[1] + this[10] * point[2] + this[14],
       this[3] * point[0] + this[7] * point[1] + this[11] * point[2] + this[15]
+    );
+  }
+  /**
+   * Transform a point by this matrix to homogeneous space.
+   * @param point - The point to be transformed.
+   * @param result - The output vector, if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  transformPointH(point: Vector3, result?: Vector3): Vector3 {
+    result = result || new Vector3();
+    const w = this[3] * point[0] + this[7] * point[1] + this[11] * point[2] + this[15];
+    return result.setXYZ(
+      (this[0] * point[0] + this[4] * point[1] + this[8] * point[2] + this[12]) / w,
+      (this[1] * point[0] + this[5] * point[1] + this[9] * point[2] + this[13]) / w,
+      (this[2] * point[0] + this[6] * point[1] + this[10] * point[2] + this[14]) / w
     );
   }
   /**
@@ -5083,7 +5278,7 @@ export class Matrix4x4 extends VectorBase {
    * Calculates the determinant of this matrix.
    * @returns The determinant
    */
-  det() {
+  det(): number {
     const m00 = this[0],
       m01 = this[1],
       m02 = this[2],
@@ -5113,20 +5308,31 @@ export class Matrix4x4 extends VectorBase {
     return m00 * cofact_00 + m01 * cofact_01 + m02 * cofact_02 + m03 * cofact_03;
   }
   /**
+   * Compose matrix from rotation, translation and scale components.
+   * @param scale - The input scale vector.
+   * @param rotation - The input rotation matrix or quaternion.
+   * @param translation - The input translation vector.
+   * @returns self
+   */
+  compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3): this {
+    Matrix4x4.compose(scale, rotation, translation, this);
+    return this;
+  }
+  /**
    * Decompose this matrix into its rotation, translation and scale components.
    * @param scale - The output scale vector.
    * @param rotation - The output rotation matrix or quaternion.
    * @param translation - The output translation vector.
    * @returns self
    */
-  decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, translation?: Vector3) {
+  decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, translation?: Vector3): this {
     if (translation) {
       translation.setXYZ(this[12], this[13], this[14]);
     }
     const sign = this.det() <= 0 ? -1 : 1;
-    const sx = Math.sqrt(this[0] * this[0] + this[1] * this[1] + this[2] * this[2]);
-    const sy = Math.sqrt(this[4] * this[4] + this[5] * this[5] + this[6] * this[6]) * sign;
-    const sz = Math.sqrt(this[8] * this[8] + this[9] * this[9] + this[10] * this[10]);
+    const sx = Math.hypot(this[0], this[1], this[2]);
+    const sy = Math.hypot(this[4], this[5], this[6]) * sign;
+    const sz = Math.hypot(this[8], this[9], this[10]);
     if (scale) {
       scale.setXYZ(sx, sy, sz);
     }
@@ -5179,10 +5385,10 @@ export class Matrix4x4 extends VectorBase {
    * @param up - The output up vector.
    * @returns self
    */
-  decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3) {
-    eye && eye.setXYZ(this[12], this[13], this[14]);
-    up && up.setXYZ(this[4], this[5], this[6]);
-    target && target.setXYZ(this[12] - this[8], this[13] - this[9], this[14] - this[10]);
+  decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3): this {
+    eye?.setXYZ(this[12], this[13], this[14]);
+    up?.setXYZ(this[4], this[5], this[6]);
+    target?.setXYZ(this[12] - this[8], this[13] - this[9], this[14] - this[10]);
     return this;
   }
   /** @internal */

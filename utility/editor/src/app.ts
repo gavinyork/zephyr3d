@@ -1,0 +1,123 @@
+import { Application, getDevice, getEngine, getInput } from '@zephyr3d/scene';
+import { imGuiInit } from '@zephyr3d/imgui';
+import { Editor } from './core/editor';
+import { initLeakDetector } from './helpers/leakdetector';
+import { initEmojiMapping } from './helpers/emoji';
+import type { ProjectSettings } from './core/services/project';
+import { ProjectService } from './core/services/project';
+import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
+import type { DeviceBackend } from '@zephyr3d/device';
+
+const searchParams = new URL(window.location.href).searchParams;
+const project = searchParams.get('project');
+let rhiList: string[] = [];
+let settings: ProjectSettings = null;
+if (project) {
+  const setFavicon = (href: string, options: { rels?: string[]; type: string; sizes?: string }) => {
+    const { rels = ['icon', 'shortcut icon', 'apple-touch-icon'], type, sizes } = options;
+    const head = document.head || document.getElementsByTagName('head')[0];
+    const url = href;
+    rels.forEach((rel) => {
+      [...document.querySelectorAll(`link[rel="${rel}"]`)].forEach((el) => el.parentNode.removeChild(el));
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = url;
+      if (type) {
+        link.type = type;
+      }
+      if (sizes) {
+        link.sizes = sizes;
+      }
+      head.appendChild(link);
+    });
+  };
+
+  const remote = !!Number(searchParams.get('remote'));
+  if (remote) {
+    await ProjectService.openRemoteProject(project, new GenericHtmlDirectoryReader());
+  } else {
+    await ProjectService.openProject(project);
+  }
+  const info = await ProjectService.getCurrentProjectInfo();
+  settings = await ProjectService.getCurrentProjectSettings();
+  rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
+  document.title = settings.title ?? info.name;
+  if (settings.favicon) {
+    const content = (await ProjectService.VFS.readFile(settings.favicon, {
+      encoding: 'binary'
+    })) as ArrayBuffer;
+    const type = ProjectService.VFS.guessMIMEType(settings.favicon);
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    setFavicon(url, { type });
+  }
+} else {
+  const deviceType = searchParams.get('device');
+  if (deviceType) {
+    rhiList = [deviceType];
+  } else {
+    rhiList = ['webgpu', 'webgl2', 'webgl'];
+  }
+}
+let backend: DeviceBackend = null;
+if (rhiList.includes('webgpu')) {
+  backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
+  if (!backend.supported()) {
+    backend = null;
+  }
+}
+if (!backend && rhiList.includes('webgl2')) {
+  backend = (await import('@zephyr3d/backend-webgl')).backendWebGL2;
+  if (!backend.supported()) {
+    backend = null;
+  }
+}
+if (!backend && rhiList.includes('webgl')) {
+  backend = (await import('@zephyr3d/backend-webgl')).backendWebGL1;
+  if (!backend.supported()) {
+    backend = null;
+  }
+}
+if (!backend) {
+  throw new Error('No supported rendering device found');
+}
+
+const editorApp = new Application({
+  backend,
+  canvas: document.querySelector('#canvas'),
+  runtimeOptions: {
+    VFS: ProjectService.VFS,
+    scriptsRoot: '/assets',
+    editorMode: true,
+    enabled: !!project
+  }
+});
+
+editorApp.ready().then(async () => {
+  if (!project) {
+    await initLeakDetector();
+    const device = getDevice();
+    await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
+    initEmojiMapping();
+    const editor = new Editor();
+    await editor.init();
+    editor.registerModules();
+    getInput().use(editor.handleEvent.bind(editor));
+
+    document.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+    });
+
+    editorApp.on('resize', (width, height) => {
+      editor.resize(width, height);
+    });
+
+    editorApp.on('tick', () => {
+      editor.update(device.frameInfo.elapsedFrame);
+      editor.render();
+    });
+  } else {
+    // start engine
+    getEngine().startup(settings.startupScene, settings.splashScreen, settings.startupScript);
+  }
+  editorApp.run();
+});

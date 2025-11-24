@@ -1,6 +1,6 @@
 import type { AABB } from '@zephyr3d/base';
-import { PRNG, Vector2, Vector4 } from '@zephyr3d/base';
-import { WaveGenerator } from './wavegenerator';
+import { Disposable, PRNG, Vector2, Vector4 } from '@zephyr3d/base';
+import type { WaveGenerator } from './wavegenerator';
 import type {
   AbstractDevice,
   BindGroup,
@@ -16,7 +16,6 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import { Primitive } from './primitive';
-import { Application } from '../app';
 import {
   createProgramFFT2H,
   createProgramFFT2V,
@@ -25,6 +24,7 @@ import {
   createProgramPostFFT2
 } from '../shaders';
 import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 type OceanFieldCascade = {
   /** The size of simulated patch of field. (in meters) */
@@ -137,46 +137,47 @@ const THREAD_GROUP_SIZE = 16;
  * This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
  * @public
  */
-export class FFTWaveGenerator extends WaveGenerator {
+export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   private static _globals: Globales = null;
-  private _useComputeShader: boolean;
-  private _h0BindGroup: BindGroup;
-  private _hkBindGroup: BindGroup;
-  private _hkBindGroup2: BindGroup;
-  private _hkBindGroup4: BindGroup;
-  private _fft2hBindGroup: BindGroup;
-  private _fft2vBindGroup: BindGroup;
-  private _fft2hBindGroup2Used: BindGroup[][];
-  private _fft2hBindGroup2Free: BindGroup[][];
-  private _fft2hBindGroup4Used: BindGroup[][];
-  private _fft2hBindGroup4Free: BindGroup[][];
-  private _fft2vBindGroup2Used: BindGroup[][];
-  private _fft2vBindGroup2Free: BindGroup[][];
-  private _fft2vBindGroup4Used: BindGroup[][];
-  private _fft2vBindGroup4Free: BindGroup[][];
-  private _postfft2BindGroup: BindGroup;
-  private _postfft2BindGroup2: BindGroup;
-  private _postfft2BindGroup4: BindGroup;
-  private _updateRenderStates: RenderStateSet;
+  private readonly _useComputeShader: boolean;
+  private readonly _h0BindGroup: BindGroup;
+  private readonly _hkBindGroup: BindGroup;
+  private readonly _hkBindGroup2: BindGroup;
+  private readonly _hkBindGroup4: BindGroup;
+  private readonly _fft2hBindGroup: BindGroup;
+  private readonly _fft2vBindGroup: BindGroup;
+  private readonly _fft2hBindGroup2Used: BindGroup[][];
+  private readonly _fft2hBindGroup2Free: BindGroup[][];
+  private readonly _fft2hBindGroup4Used: BindGroup[][];
+  private readonly _fft2hBindGroup4Free: BindGroup[][];
+  private readonly _fft2vBindGroup2Used: BindGroup[][];
+  private readonly _fft2vBindGroup2Free: BindGroup[][];
+  private readonly _fft2vBindGroup4Used: BindGroup[][];
+  private readonly _fft2vBindGroup4Free: BindGroup[][];
+  private readonly _postfft2BindGroup: BindGroup;
+  private readonly _postfft2BindGroup2: BindGroup;
+  private readonly _postfft2BindGroup4: BindGroup;
+  private readonly _updateRenderStates: RenderStateSet;
   private _sizes: Vector4;
   private _croppinesses: Vector4;
-  private _params: OceanFieldBuildParams;
+  private readonly _params: OceanFieldBuildParams;
   private _instanceData: WaterInstanceData;
   private _ifftTextures: Texture2D[] | Texture2DArray;
-  private _cascades: Vector4[];
+  private readonly _cascades: Vector4[];
   private _paramsChanged: boolean;
+  private _version: number;
   private _resolutionChanged: boolean;
-  private _textureFormat: TextureFormat;
-  private _h0TextureFormat: TextureFormat;
-  private _dataTextureFormat: TextureFormat;
-  private _renderMode: number;
+  private readonly _textureFormat: TextureFormat;
+  private readonly _h0TextureFormat: TextureFormat;
+  private readonly _dataTextureFormat: TextureFormat;
+  private readonly _renderMode: number;
   /**
    * Create a new instance of the FFTWaveGenerator class.
    * @param params - Ocean field build parameters. If not provided, default parameters will be used.
    */
   constructor(params?: OceanFieldBuildParams) {
     super();
-    const device = Application.instance.device;
+    const device = getDevice();
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
     const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
       ? device.getDeviceCaps().framebufferCaps.maxDrawBuffers
@@ -224,7 +225,7 @@ export class FFTWaveGenerator extends WaveGenerator {
           postfft2Program4:
             this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 4) : null
         },
-        quad: FFTWaveGenerator.createQuad(device),
+        quad: FFTWaveGenerator.createQuad(),
         noiseTextures: new Map(),
         butterflyTextures: new Map()
       };
@@ -268,11 +269,18 @@ export class FFTWaveGenerator extends WaveGenerator {
       this._sizes = new Vector4();
       this._croppinesses = new Vector4();
       this._cascades = [new Vector4(), new Vector4(), new Vector4(), new Vector4()];
-      this._updateRenderStates = Application.instance.device.createRenderStateSet();
+      this._updateRenderStates = getDevice().createRenderStateSet();
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
-      this._paramsChanged = true;
+      this._version = 0;
+      this.paramsChanged();
     }
+  }
+  get version() {
+    return this._version;
+  }
+  clone(): this {
+    return new FFTWaveGenerator(this._params) as this;
   }
   /*
   get params() {
@@ -287,6 +295,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   */
   private paramsChanged() {
     this._paramsChanged = true;
+    this._version++;
   }
   /** Gets the wave alighment */
   get alignment(): number {
@@ -314,14 +323,20 @@ export class FFTWaveGenerator extends WaveGenerator {
     return this._params.foamParams.x;
   }
   set foamWidth(val: number) {
-    this._params.foamParams.x = val;
+    if (val !== this._params.foamParams.x) {
+      this._params.foamParams.x = val;
+      this.paramsChanged();
+    }
   }
   /** Gets the foam contrast */
   get foamContrast(): number {
     return this._params.foamParams.y;
   }
   set foamContrast(val: number) {
-    this._params.foamParams.y = val;
+    if (val !== this._params.foamParams.y) {
+      this._params.foamParams.y = val;
+      this.paramsChanged();
+    }
   }
   /** Gets the wave length for the specified cascade */
   getWaveLength(cascade: number) {
@@ -369,28 +384,26 @@ export class FFTWaveGenerator extends WaveGenerator {
     }
   }
   /** @internal */
-  private static createQuad(device: AbstractDevice): Primitive {
+  private static createQuad(): Primitive {
     const vertexData = new Float32Array([
       -1, -1, 0, 0.0, 0.0, 1, -1, 0, 1.0, 0.0, 1, 1, 0, 1.0, 1.0, -1, 1, 0, 0.0, 1.0
     ]);
     const indexData = new Uint32Array([0, 1, 2, 0, 2, 3]);
     const prim = new Primitive();
-    const vb = device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertexData);
-    const ib = device.createIndexBuffer(indexData);
-    prim.setVertexBuffer(vb);
-    prim.setIndexBuffer(ib);
+    prim.createAndSetVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertexData);
+    prim.createAndSetIndexBuffer(indexData);
     prim.primitiveType = 'triangle-list';
     prim.indexStart = 0;
-    prim.indexCount = ib.length;
+    prim.indexCount = indexData.length;
     return prim;
   }
   /** @internal */
   private getButterflyTexture(size: number) {
-    const device = Application.instance.device;
+    const device = getDevice();
     let tex = FFTWaveGenerator._globals.butterflyTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D('rgba32f', Math.log2(size), size, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       tex.name = `butterfly${size}`;
       tex.update(this.createButterflyTexture(size), 0, 0, tex.width, tex.height);
@@ -400,7 +413,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private generateInitialSpectrum(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     device.setProgram(FFTWaveGenerator._globals.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
@@ -438,11 +451,11 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private getNoiseTexture(size: number, randomSeed: number): Texture2D {
-    const device = Application.instance.device;
+    const device = getDevice();
     let tex = FFTWaveGenerator._globals.noiseTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
-        samplerOptions: { mipFilter: 'none' }
+        mipmapping: false
       });
       tex.name = `noiseTex${size}`;
       tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);
@@ -469,7 +482,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     return parseInt(v.toString(2).padStart(width, '0').split('').reverse().join(''), 2);
   }
   /** @internal */
-  private createButterflyTexture(size: number): Float32Array {
+  private createButterflyTexture(size: number): Float32Array<ArrayBuffer> {
     const width = Math.log2(size);
     const height = size;
     const texture = new Float32Array(width * height * 4);
@@ -509,7 +522,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   /** @internal */
   private getInstanceData(): WaterInstanceData {
     if (!this._instanceData) {
-      const device = Application.instance.device;
+      const device = getDevice();
       const h0Textures = this.createNTextures(
         device,
         this._h0TextureFormat,
@@ -607,7 +620,8 @@ export class FFTWaveGenerator extends WaveGenerator {
         addressU: 'repeat',
         addressV: 'repeat'
       },
-      writable: !!this._useComputeShader
+      writable: !!this._useComputeShader,
+      mipmapping: false
     };
     if (this._useComputeShader) {
       const tex = device.createTexture2DArray(format, size, size, num, options);
@@ -623,7 +637,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.update} */
   update(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     device.pushDeviceStates();
     device.setRenderStates(this._updateRenderStates);
     if (this._resolutionChanged) {
@@ -648,6 +662,10 @@ export class FFTWaveGenerator extends WaveGenerator {
       this.postIfft2TwoPass();
     }
     device.popDeviceStates();
+  }
+  /** {@inheritDoc WaveGenerator.needUpdate} */
+  needUpdate() {
+    return true;
   }
   /** @internal */
   private disposeNTextures(texture: Texture2D[] | Texture2DArray) {
@@ -683,7 +701,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private generateSpectrum(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.hkProgram);
@@ -715,7 +733,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private generateSpectrumTwoPass(time: number): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.hkProgram4);
@@ -751,7 +769,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private ifft2(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     const phases = Math.log2(this._params.resolution);
@@ -897,7 +915,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private ifft2TwoPass(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     const phases = Math.log2(this._params.resolution);
@@ -1023,7 +1041,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private postIfft2(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals.programs.postfft2Program);
@@ -1056,7 +1074,7 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** @internal */
   private postIfft2TwoPass(): void {
-    const device = Application.instance.device;
+    const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setFramebuffer(instanceData.postIfft2Framebuffer4);
@@ -1089,22 +1107,22 @@ export class FFTWaveGenerator extends WaveGenerator {
     FFTWaveGenerator._globals.quad.draw();
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
     const pb = scope.$builder;
-    scope.sizes = pb.vec4().uniform(0);
-    scope.croppinesses = pb.vec4().uniform(0);
+    scope.sizes = pb.vec4().uniform(uniformGroup);
+    scope.croppinesses = pb.vec4().uniform(uniformGroup);
     if (this._useComputeShader) {
-      scope.dataTexture = pb.tex2DArray().uniform(0);
+      scope.dataTexture = pb.tex2DArray().uniform(uniformGroup);
     } else {
-      scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz1 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(0);
-      scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(0);
-      scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(0);
+      scope.dx_hy_dz_dxdz0 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz0 = pb.tex2D().uniform(uniformGroup);
+      scope.dx_hy_dz_dxdz1 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz1 = pb.tex2D().uniform(uniformGroup);
+      scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(uniformGroup);
+      scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(uniformGroup);
     }
     if (pb.shaderKind === 'fragment') {
-      scope.foamParams = pb.vec2().uniform(0);
+      scope.foamParams = pb.vec2().uniform(uniformGroup);
     }
   }
   /** {@inheritDoc WaveGenerator.calcVertexPositionAndNormal} */
@@ -1159,7 +1177,7 @@ export class FFTWaveGenerator extends WaveGenerator {
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -1280,10 +1298,6 @@ export class FFTWaveGenerator extends WaveGenerator {
     bindGroup.setValue('sizes', this._sizes);
     bindGroup.setValue('croppinesses', this._croppinesses);
   }
-  /** {@inheritDoc WaveGenerator.dispose} */
-  dispose() {
-    this.disposeInstanceData();
-  }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     const disturb = Math.max(Math.abs(this.wind.x), Math.abs(this.wind.y), 2);
@@ -1292,6 +1306,10 @@ export class FFTWaveGenerator extends WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.getHash} */
   getHash(): string {
-    return '';
+    return 'FFTWaveGenerator';
+  }
+  protected onDispose() {
+    super.onDispose();
+    this.disposeInstanceData();
   }
 }

@@ -133,6 +133,30 @@ export function perlinNoise3D(
   freqX: number,
   freqY: number,
   freqZ: number
-) {
+): number {
   return interpolateNoise3(x * freqX, y * freqY, z * freqZ) * amp;
+}
+
+/**
+ * Generates an array of jitters using the Halton sequence.
+ * @param length - The length of the array to generate.
+ * @returns An array of jitters, range [-0.5, 0.5].
+ * @public
+ */
+export function halton23(length: number): [number, number][] {
+  function halton(base: number, index: number): number {
+    let result = 0;
+    let f = 1;
+    while (index > 0) {
+      f /= base;
+      result += f * (index % base);
+      index = Math.floor(index / base);
+    }
+    return result;
+  }
+  const jitters: [number, number][] = [];
+  for (let i = 1; i <= length; i++) {
+    jitters.push([halton(2, i) - 0.5, halton(3, i) - 0.5]);
+  }
+  return jitters;
 }

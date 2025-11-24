@@ -4,10 +4,10 @@ import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowESM } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
-import { Application } from '../app';
 import { LIGHT_TYPE_POINT } from '../values';
-import { ShadowMapper, type ShadowMapParams, type ShadowMapType, type ShadowMode } from './shadowmapper';
+import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
+import { getDevice } from '../app/api';
 
 type ESMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -132,7 +132,7 @@ export class ESM extends ShadowImpl {
   getType(): ShadowMode {
     return 'esm';
   }
-  getShadowMapBorder(shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
@@ -142,6 +142,51 @@ export class ESM extends ShadowImpl {
         ? implData.blurFramebuffer2.getColorAttachments()[0]
         : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
     ) as ShadowMapType;
+  }
+  /** @internal */
+  fetchTemporalFramebuffer(
+    autoRelease: boolean,
+    lightType: number,
+    numCascades: number,
+    width: number,
+    height: number,
+    colorFormat: TextureFormat,
+    depthFormat: TextureFormat,
+    mipmapping?: boolean
+  ) {
+    const device = getDevice();
+    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const colorAttachments = colorFormat
+      ? useTextureArray
+        ? [
+            device.pool.fetchTemporalTexture2DArray(
+              false,
+              colorFormat,
+              width,
+              height,
+              numCascades,
+              mipmapping
+            )
+          ]
+        : lightType === LIGHT_TYPE_POINT
+          ? [device.pool.fetchTemporalTextureCube(false, colorFormat, width, mipmapping)]
+          : [device.pool.fetchTemporalTexture2D(false, colorFormat, width, height, mipmapping)]
+      : null;
+    const depthAttachment = depthFormat
+      ? useTextureArray
+        ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
+        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+          ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
+          : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
+      : null;
+    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
+    if (colorAttachments) {
+      device.pool.releaseTexture(colorAttachments[0]);
+    }
+    if (depthAttachment) {
+      device.pool.releaseTexture(depthAttachment);
+    }
+    return fb;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const implData: ESMImplData = {
@@ -154,7 +199,7 @@ export class ESM extends ShadowImpl {
     const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
-        blurFramebuffer: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -164,7 +209,7 @@ export class ESM extends ShadowImpl {
           null,
           false
         ),
-        blurFramebuffer2: ShadowMapper.fetchTemporalFramebuffer(
+        blurFramebuffer2: this.fetchTemporalFramebuffer(
           true,
           shadowMapParams.lightType,
           shadowMapParams.numShadowCascades,
@@ -175,6 +220,8 @@ export class ESM extends ShadowImpl {
           true
         )
       };
+    } else {
+      shadowMapParams.implData = null;
     }
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
     shadowMapParams.shadowMapSampler = shadowMapParams.shadowMap?.getDefaultSampler(false) ?? null;
@@ -198,9 +245,6 @@ export class ESM extends ShadowImpl {
       );
     }
   }
-  releaseTemporalResources(shadowMapParams: ShadowMapParams) {
-    return;
-  }
   getDepthScale(): number {
     return this._depthScale;
   }
@@ -210,19 +254,19 @@ export class ESM extends ShadowImpl {
   getShaderHash(): string {
     return '';
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
-    const device = Application.instance.device;
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
+    const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? device.type === 'webgl'
         ? 'rgba16f'
         : 'r16f'
       : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-      ? device.type === 'webgl'
-        ? 'rgba32f'
-        : 'r32f'
-      : 'rgba8unorm';
+        ? device.type === 'webgl'
+          ? 'rgba32f'
+          : 'r32f'
+        : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return 'd24s8';
   }
   computeShadowMapDepth(
@@ -317,7 +361,7 @@ export class ESM extends ShadowImpl {
     });
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
   }
-  useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
     return false;
   }
 }

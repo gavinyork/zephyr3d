@@ -7,7 +7,8 @@ import type {
   TextureSampler,
   TextureType,
   TextureFormat,
-  GPUDataBuffer
+  GPUDataBuffer,
+  FrameBuffer
 } from '@zephyr3d/device';
 import {
   isCompressedTextureFormat,
@@ -39,6 +40,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   protected _mipLevelCount: number;
   protected _samplerOptions: SamplerOptions;
   protected _webgl1fallback: boolean;
+  protected _readFrameBuffers: FrameBuffer[][];
   constructor(device: WebGLDevice, target?: TextureType) {
     super(device);
     this._target = target || '2d';
@@ -51,6 +53,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     this._mipLevelCount = 0;
     this._samplerOptions = null;
     this._webgl1fallback = false;
+    this._readFrameBuffers = [];
   }
   get target() {
     return this._target;
@@ -100,10 +103,20 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       this._device.invalidateBindingTextures();
       this._object = null;
       this._device.updateVideoMemoryCost(-this._memCost);
+      for (const x of this._readFrameBuffers) {
+        if (x) {
+          for (const fb of x) {
+            if (fb) {
+              fb.dispose();
+            }
+          }
+        }
+      }
+      this._readFrameBuffers = [];
       this._memCost = 0;
     }
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.init();
     }
@@ -139,6 +152,26 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
         ? this._getSamplerOptions(params, shadow)
         : this._samplerOptions
     );
+  }
+  protected _getFramebufferForRead(faceOrLevel: number, mipLevel: number) {
+    let faceFramebuffers = this._readFrameBuffers[faceOrLevel];
+    if (!faceFramebuffers) {
+      faceFramebuffers = [];
+      this._readFrameBuffers[faceOrLevel] = faceFramebuffers;
+    }
+    let framebuffer = faceFramebuffers[mipLevel];
+    if (!framebuffer) {
+      framebuffer = this._device.createFrameBuffer([this], null);
+      if (this.isTextureCube()) {
+        framebuffer.setColorAttachmentCubeFace(0, faceOrLevel);
+      } else if (this.isTexture2DArray() || this.isTexture3D()) {
+        framebuffer.setColorAttachmentLayer(0, faceOrLevel);
+      }
+      framebuffer.setColorAttachmentMipLevel(0, mipLevel);
+      framebuffer.setColorAttachmentGenerateMipmaps(0, false);
+      faceFramebuffers[mipLevel] = framebuffer;
+    }
+    return framebuffer;
   }
   abstract generateMipmaps(): void;
   abstract init(): void;

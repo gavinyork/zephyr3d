@@ -2,6 +2,7 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../assetmanager';
 import type { SharedModel } from '../model';
 import type { DecoderModule } from 'draco3d';
+import type { TypedArray, VFS } from '@zephyr3d/base';
 
 /**
  * Base interface for any kind loaders
@@ -52,12 +53,6 @@ export class LoaderBase {
  */
 export abstract class AbstractTextureLoader extends LoaderBase {
   /**
-   * Tests whether the loader supports loading a texture with given file extension.
-   * @param ext - The file extension to test
-   * @returns true if it supports
-   */
-  abstract supportExtension(ext: string): boolean;
-  /**
    * Tests whether the loader supports loading a texture with given MIME type.
    * @param mimeType - The MIME type to test
    * @returns true if it supports
@@ -75,10 +70,8 @@ export abstract class AbstractTextureLoader extends LoaderBase {
    * @returns The loaded texture
    */
   abstract load(
-    assetManager: AssetManager,
-    url: string,
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
@@ -90,12 +83,6 @@ export abstract class AbstractTextureLoader extends LoaderBase {
  * @public
  */
 export abstract class AbstractModelLoader extends LoaderBase {
-  /**
-   * Tests whether the loader supports loading a model with given file extension.
-   * @param ext - The file extension to test
-   * @returns true if it supports
-   */
-  abstract supportExtension(ext: string): boolean;
   /**
    * Tests whether the loader supports loading a model with given MIME type.
    * @param mimeType - The MIME type to test
@@ -115,6 +102,7 @@ export abstract class AbstractModelLoader extends LoaderBase {
     url: string,
     mimeType: string,
     data: Blob,
-    dracoDecoderModule?: DecoderModule
+    dracoDecoderModule?: DecoderModule,
+    VFSs?: VFS[]
   ): Promise<SharedModel>;
 }

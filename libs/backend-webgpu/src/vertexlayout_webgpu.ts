@@ -5,9 +5,16 @@ import type {
   IndexBuffer,
   VertexSemantic,
   VertexLayoutOptions,
-  VertexBufferInfo
+  VertexBufferInfo,
+  GPUDataBuffer
 } from '@zephyr3d/device';
-import { VertexData } from '@zephyr3d/device';
+import {
+  getVertexAttribFormat,
+  getVertexAttribName,
+  PBPrimitiveType,
+  PBPrimitiveTypeInfo,
+  VertexData
+} from '@zephyr3d/device';
 import { vertexFormatToHash } from './constants_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
@@ -15,8 +22,9 @@ import type { WebGPUDevice } from './device';
 
 export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexLayout<unknown> {
   private static _hashCounter = 0;
-  private _vertexData: VertexData;
-  private _hash: string;
+  private static _defaultBuffers: StructuredBuffer[] = [];
+  private readonly _vertexData: VertexData;
+  private readonly _hash: string;
   private _layouts: {
     [hash: string]: { layoutHash: string; buffers: VertexBufferInfo[] };
   };
@@ -35,7 +43,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
   destroy() {
     this._object = null;
   }
-  async restore(): Promise<void> {
+  restore(): void {
     this._object = {};
   }
   setDrawOffset(buffer: StructuredBuffer, byteOffset: number) {
@@ -68,7 +76,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
   }
   getLayouts(attributes: string): {
     layoutHash: string;
-    buffers: VertexBufferInfo[];
+    buffers: { buffer: GPUDataBuffer; drawOffset: number }[];
   } {
     if (!attributes) {
       return null;
@@ -80,6 +88,23 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
     }
     return layout;
   }
+  private getDefaultBuffer(attrib: number, numVertices: number): StructuredBuffer {
+    let buffer = WebGPUVertexLayout._defaultBuffers[0];
+    if (buffer) {
+      const n = Math.floor((buffer.byteLength / 4) * 4);
+      if (n < numVertices) {
+        buffer = null;
+      }
+    }
+    if (!buffer) {
+      buffer = this._device.createVertexBuffer(
+        getVertexAttribFormat(getVertexAttribName(attrib), 'f32', 4),
+        new Float32Array(numVertices * 4)
+      );
+      WebGPUVertexLayout._defaultBuffers.unshift(buffer);
+    }
+    return buffer;
+  }
   private calcHash(attribHash: string): {
     layoutHash: string;
     buffers: VertexBufferInfo[];
@@ -90,11 +115,19 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
     const attributes = attribHash.split(':').map((val) => Number(val));
     for (let idx = 0; idx < attributes.length; idx++) {
       const attrib = attributes[idx];
-      const bufferInfo = vertexBuffers[attrib];
-      const buffer = bufferInfo?.buffer;
+      let bufferInfo = vertexBuffers[attrib];
+      let buffer = bufferInfo?.buffer;
       if (!buffer) {
-        console.log(`ERROR: No vertex buffer set for location ${idx}`);
-        continue;
+        console.warn(`No vertex buffer set for location <${getVertexAttribName(attrib)}>`);
+        buffer = this.getDefaultBuffer(attrib, this._vertexData.numVertices);
+        bufferInfo = {
+          buffer,
+          offset: 0,
+          drawOffset: 0,
+          type: new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
+          stride: 4 * 4,
+          stepMode: 'vertex'
+        };
       }
       const gpuFormat = WebGPUStructuredBuffer.getGPUVertexFormat(bufferInfo.type);
       if (!gpuFormat) {

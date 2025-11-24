@@ -1,20 +1,20 @@
-import { Vector4 } from '@zephyr3d/base';
+import { Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
-import { Application } from '../app';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import type { AbstractDevice, BindGroup } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
+import type { BindGroup } from '@zephyr3d/device';
+import { getDevice } from '../app/api';
 
 /**
  * Base class for any kind of render passes
  * @public
  */
-export abstract class RenderPass {
+export abstract class RenderPass extends Disposable {
   /** @internal */
   protected _type: number;
   /** @internal */
@@ -30,6 +30,7 @@ export abstract class RenderPass {
    * @param type - Render pass type
    */
   constructor(type: number) {
+    super();
     this._type = type;
     this._clearColor = new Vector4(0, 0, 0, 1);
     this._clearDepth = 1;
@@ -95,12 +96,6 @@ export abstract class RenderPass {
     }
     return bindGroup;
   }
-  /**
-   * Disposes the render pass
-   */
-  dispose() {
-    this._globalBindGroups = {};
-  }
   /** @internal */
   getGlobalBindGroupHash(ctx: DrawContext) {
     return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx)}`;
@@ -139,25 +134,11 @@ export abstract class RenderPass {
       } else {
         ctx.scene.rootNode.traverse(cullVisitor);
       }
-      return renderQueue.end(cullCamera);
+      renderQueue.end(cullCamera);
+      ctx.sunLight = renderQueue.sunLight;
+      return renderQueue;
     }
     return null;
-  }
-  /** @internal */
-  protected drawItem(
-    device: AbstractDevice,
-    item: RenderQueueItem,
-    ctx: DrawContext,
-    reverseWinding: boolean
-  ) {
-    const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-    if (reverse) {
-      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-    }
-    item.drawable.draw(ctx);
-    if (reverse) {
-      device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-    }
   }
   /** @internal */
   private internalDrawItemList(
@@ -179,14 +160,20 @@ export abstract class RenderPass {
     }
     for (const item of items) {
       ctx.instanceData = item.instanceData;
-      const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
+      const reverse = reverseWinding !== item.drawable.getNode().worldMatrixDet < 0;
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
       if (recording) {
-        RenderBundleWrapper.addDrawable(item.drawable, item.drawable.getMaterial(), renderBundle, hash);
+        RenderBundleWrapper.addDrawable(
+          item.drawable,
+          item.drawable.getMaterial()?.coreMaterial,
+          item.drawable.getPrimitive(),
+          renderBundle,
+          hash
+        );
       }
-      item.drawable.draw(ctx);
+      item.drawable.draw(ctx, recording ? undefined : hash);
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
@@ -261,25 +248,21 @@ export abstract class RenderPass {
           reverseWinding,
           hash
         );
-        /*
-        for (const item of itemList.instanceItemList) {
-          ctx.instanceData = item.instanceData;
-          const reverse = reverseWinding !== item.drawable.getXForm().worldMatrixDet < 0;
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-          item.drawable.draw(ctx);
-          if (reverse) {
-            device.reverseVertexWindingOrder(!device.isWindingOrderReversed());
-          }
-        }
-        */
       }
     }
     ctx.renderQueue = null;
   }
+  /**
+   * Disposes the render pass
+   */
+  protected onDispose() {
+    super.onDispose();
+    this._globalBindGroups = {};
+  }
   /** @internal */
   private clearFramebuffer() {
-    Application.instance.device.clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+    if (this._clearColor || this._clearDepth || this._clearStencil) {
+      getDevice().clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+    }
   }
 }

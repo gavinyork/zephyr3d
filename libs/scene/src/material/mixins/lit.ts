@@ -23,6 +23,7 @@ export type IMixinLight = {
   normalMapMode: 'tangent-space' | 'object-space';
   doubleSidedLighting: boolean;
   needCalculateEnvLight(): boolean;
+  getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp;
   getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
   getEnvLightRadiance(
     scope: PBInsideFunctionScope,
@@ -106,6 +107,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       this._normalScale = 1;
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);
     }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.normalScale = other.normalScale;
+      this.normalMapMode = other.normalMapMode;
+      this.doubleSidedLighting = other.doubleSidedLighting;
+    }
     get normalScale(): number {
       return this._normalScale;
     }
@@ -184,10 +191,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
           this,
           this.worldPos,
@@ -216,6 +223,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       });
       return pb.getGlobalScope()[funcName](...args);
+    }
+    /**
+     * Normal scale uniform
+     * @return Normal scale uniform
+     */
+    getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp {
+      return scope.zNormalScale;
     }
     /**
      * Calculate the normal vector for current fragment
@@ -248,10 +262,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
           this,
           this.worldPos,
@@ -312,10 +326,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       pb.func(funcName, params, function () {
         const posW = this.worldPos;
         this.$l.uv = that.normalTexture
-          ? that.getNormalTexCoord(this) ?? pb.vec2(0)
+          ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
           : that.albedoTexture
-          ? that.getAlbedoTexCoord(this) ?? pb.vec2(0)
-          : pb.vec2(0);
+            ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
+            : pb.vec2(0);
         this.$l.TBN = pb.mat3();
         if (!worldNormal) {
           this.$l.uv_dx = pb.dpdx(pb.vec3(this.uv, 0));
@@ -579,9 +593,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         return;
       }
       if (that.drawContext.currentShadowLight) {
-        const posRange = ShaderHelper.getGlobalUniforms(scope).light.positionAndRange;
-        const dirCutoff = ShaderHelper.getGlobalUniforms(scope).light.directionAndCutoff;
-        const colorIntensity = ShaderHelper.getGlobalUniforms(scope).light.diffuseAndIntensity;
+        const posRange = scope.light.positionAndRange;
+        const dirCutoff = scope.light.directionAndCutoff;
+        const colorIntensity = scope.light.diffuseAndIntensity;
         scope.$scope(function () {
           const lightType = scope.$choice(
             pb.lessThan(posRange.w, 0),
@@ -599,7 +613,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.mul(this.cluster.y, countParams.x),
             pb.mul(this.cluster.z, countParams.x, countParams.y)
           );
-          this.$l.texSize = ShaderHelper.getGlobalUniforms(scope).light.lightIndexTexSize;
+          this.$l.texSize = scope.light.lightIndexTexSize;
           if (pb.getDevice().type === 'webgl') {
             this.$l.texCoordX = pb.div(
               pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5),

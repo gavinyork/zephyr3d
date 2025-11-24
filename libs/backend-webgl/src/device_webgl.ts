@@ -1,5 +1,5 @@
 import type { Vector4, TypedArray } from '@zephyr3d/base';
-import { makeEventTarget } from '@zephyr3d/base';
+import { makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
   FrameBufferOptions,
@@ -55,9 +55,6 @@ import {
   getTextureFormatBlockSize,
   isCompressedTextureFormat,
   hasDepthChannel,
-  DeviceLostEvent,
-  DeviceRestoreEvent,
-  DeviceResizeEvent,
   BaseDevice,
   PBPrimitiveType,
   PBPrimitiveTypeInfo
@@ -150,13 +147,13 @@ const tempInt32Array = new Int32Array(4);
 const tempUint32Array = new Uint32Array(4);
 
 export class WebGLDevice extends BaseDevice {
-  private _context: WebGLContext;
-  private _isWebGL2: boolean;
-  private _msaaSampleCount: number;
-  private _loseContextExtension: WEBGL_lose_context;
+  private readonly _context: WebGLContext;
+  private readonly _isWebGL2: boolean;
+  private readonly _msaaSampleCount: number;
+  private readonly _loseContextExtension: WEBGL_lose_context;
   private _contextLost: boolean;
   private _isRendering: boolean;
-  private _dpr: number;
+  private readonly _dpr: number;
   private _reverseWindingOrder: boolean;
   private _deviceCaps: DeviceCaps;
   private _vaoExt: VertexArrayObjectEXT;
@@ -176,7 +173,14 @@ export class WebGLDevice extends BaseDevice {
   private _deviceUniformBufferOffsets: number[];
   private _bindTextures: Record<number, WebGLTexture[]>;
   private _bindSamplers: WebGLSampler[];
-  private _adapterInfo: { vendor: string; renderer: string; version: string };
+  private _readFormats: Record<
+    string,
+    {
+      format: number;
+      type: number;
+    }
+  >;
+  private readonly _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend);
     this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
@@ -222,6 +226,7 @@ export class WebGLDevice extends BaseDevice {
     this._samplerCache = new SamplerCache(this);
     this._textureSamplerMap = new WeakMap();
     this._loseContextExtension = this._context.getExtension('WEBGL_lose_context');
+    this._readFormats = {};
     this.canvas.addEventListener(
       'webglcontextlost',
       (evt) => {
@@ -233,7 +238,7 @@ export class WebGLDevice extends BaseDevice {
     );
     this.canvas.addEventListener(
       'webglcontextrestored',
-      (evt) => {
+      () => {
         this._contextLost = false;
         this.handleContextRestored();
       },
@@ -319,16 +324,8 @@ export class WebGLDevice extends BaseDevice {
     } else if (texture && sampler && this._textureSamplerMap.get(texture) !== sampler) {
       const fallback = texture.isWebGL1Fallback;
       this._textureSamplerMap.set(texture, sampler);
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_WRAP_S,
-        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
-      );
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_WRAP_T,
-        textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
-      );
+      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_S, textureWrappingMap[sampler.addressModeU]);
+      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_T, textureWrappingMap[sampler.addressModeV]);
       gl.texParameteri(target, WebGLEnum.TEXTURE_MAG_FILTER, textureMagFilterToWebGL(sampler.magFilter));
       gl.texParameteri(
         target,
@@ -366,7 +363,7 @@ export class WebGLDevice extends BaseDevice {
   }
   async initContext() {
     this.initContextState();
-    this.on('resize', (evt) => {
+    this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
       if (width !== this.canvas.width || height !== this.canvas.height) {
@@ -376,7 +373,7 @@ export class WebGLDevice extends BaseDevice {
         this.setScissor(this._currentScissorRect);
       }
     });
-    this.dispatchEvent(new DeviceResizeEvent(this.canvas.clientWidth, this.canvas.clientHeight));
+    this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
     const gl = this._context;
@@ -389,7 +386,7 @@ export class WebGLDevice extends BaseDevice {
         if (depthFlag || stencilFlag) {
           const depthAttachment = gl._currentFramebuffer.getDepthAttachment();
           if (depthAttachment) {
-            gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth || 1, clearStencil || 0);
+            gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth ?? 1, clearStencil ?? 0);
           }
         }
         if (colorFlag) {
@@ -415,12 +412,19 @@ export class WebGLDevice extends BaseDevice {
           }
         }
       } else {
-        colorFlag && gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        depthFlag && gl.clearDepth(clearDepth);
-        stencilFlag && gl.clearStencil(clearStencil);
+        if (colorFlag) {
+          gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        }
+        if (depthFlag) {
+          gl.clearDepth(clearDepth);
+        }
+        if (stencilFlag) {
+          gl.clearStencil(clearStencil);
+        }
         gl.clear(colorFlag | depthFlag | stencilFlag);
       }
       (gl._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
+      (gl._currentFramebuffer as WebGLFrameBuffer)?.invalidateMipmaps();
     }
   }
   // factory
@@ -460,18 +464,22 @@ export class WebGLDevice extends BaseDevice {
     if (data.isCubemap) {
       const tex = new WebGLTextureCube(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isVolume) {
       const tex = new WebGLTexture3D(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else if (data.isArray) {
       const tex = new WebGLTexture2DArray(this);
       tex.createWithMipmapData(data, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     } else {
       const tex = new WebGLTexture2D(this);
       tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
+      tex.samplerOptions = options?.samplerOptions ?? null;
       return tex as unknown as T;
     }
   }
@@ -487,20 +495,6 @@ export class WebGLDevice extends BaseDevice {
       return null;
     }
     tex.createEmpty(format, width, height, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): Texture2D {
-    const tex = (options?.texture as WebGLTexture2D) ?? new WebGLTexture2D(this);
-    if (!tex.isTexture2D()) {
-      console.error('createTexture2DFromMipmapData() failed: options.texture must be 2d texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
@@ -617,33 +611,6 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createCubeTextureFromMipmapData(
-    data: TextureMipmapData,
-    sRGB: boolean,
-    options?: TextureCreationOptions
-  ): TextureCube {
-    const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTextureCube(this);
-    if (!tex.isTextureCube()) {
-      console.error('createCubeTextureFromMipmapData() failed: options.texture must be cube texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, sRGB, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
-  createTexture2DArrayFromMipmapData(
-    data: TextureMipmapData,
-    options?: TextureCreationOptions
-  ): Texture2DArray {
-    const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTexture2DArray(this);
-    if (!tex.isTexture2DArray()) {
-      console.error('createTexture2DArrayFromMipmapData() failed: options.texture must be 2d array texture');
-      return null;
-    }
-    tex.createWithMipmapData(data, this.parseTextureOptions(options));
-    tex.samplerOptions = options?.samplerOptions ?? null;
-    return tex;
-  }
   createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo {
     const tex = new WebGLTextureVideo(this, el);
     tex.samplerOptions = samplerOptions ?? null;
@@ -746,7 +713,10 @@ export class WebGLDevice extends BaseDevice {
     gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object);
     gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
   }
-  createIndexBuffer(data: Uint16Array | Uint32Array, options?: BufferCreationOptions): IndexBuffer {
+  createIndexBuffer(
+    data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+    options?: BufferCreationOptions
+  ): IndexBuffer {
     return new WebGLIndexBuffer(this, data, this.parseBufferOptions(options, 'index'));
   }
   createStructuredBuffer(
@@ -885,13 +855,22 @@ export class WebGLDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb ? fb.getColorAttachments()[index] : null;
     const format = colorAttachment ? colorAttachment.format : 'rgba8unorm';
-    let glFormat: number = WebGLEnum.NONE;
-    let glType: number = WebGLEnum.NONE;
+    let formatInfo = this._readFormats[format];
+    if (!formatInfo) {
+      formatInfo = {
+        format: this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_FORMAT),
+        type: this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_TYPE)
+      };
+      this._readFormats[format] = formatInfo;
+    }
+    const glFormat = formatInfo.format;
+    const glType = formatInfo.type;
     const pixelSize = getTextureFormatBlockSize(format);
-    glFormat = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_FORMAT);
-    glType = this.context.getParameter(WebGLEnum.IMPLEMENTATION_COLOR_READ_TYPE);
     if (
-      (glFormat !== WebGLEnum.RGBA || (glType !== WebGLEnum.UNSIGNED_BYTE && glType !== WebGLEnum.FLOAT)) &&
+      (glFormat !== WebGLEnum.RGBA ||
+        (glType !== WebGLEnum.UNSIGNED_BYTE &&
+          glType !== WebGLEnum.FLOAT &&
+          glType !== WebGLEnum.HALF_FLOAT)) &&
       !isWebGL2(this.context)
     ) {
       throw new Error(`readPixels() failed: invalid format: ${format}`);
@@ -902,12 +881,12 @@ export class WebGLDevice extends BaseDevice {
     }
     if (isWebGL2(this.context)) {
       const stagingBuffer = this.createBuffer(byteSize, {
-        usage: 'read',
+        usage: 'pack-pixel',
         managed: false
       });
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object);
       this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
-      this.flush();
+      //this.flush();
       this.context.readPixels(x, y, w, h, glFormat, glType, 0);
       this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
       const data = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
@@ -954,7 +933,6 @@ export class WebGLDevice extends BaseDevice {
     }
     this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, buffer.object);
     this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
-    this.flush();
     this.context.readPixels(x, y, w, h, glFormat, glType, 0);
     this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
   }
@@ -969,7 +947,7 @@ export class WebGLDevice extends BaseDevice {
       this._loseContextExtension?.restoreContext();
       const err = this.getError();
       if (err) {
-        console.log(err);
+        console.error(err);
       }
     }
   }
@@ -987,7 +965,7 @@ export class WebGLDevice extends BaseDevice {
     this._captureRenderBundle = null;
     return result;
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
+  protected _executeRenderBundle(renderBundle: RenderBundle): number {
     for (const drawcall of renderBundle as WebGLRenderBundle) {
       this.setProgram(drawcall.program);
       this.setVertexLayout(drawcall.vertexLayout);
@@ -1001,6 +979,7 @@ export class WebGLDevice extends BaseDevice {
         this.drawInstanced(drawcall.primitiveType, drawcall.first, drawcall.count, drawcall.numInstances);
       }
     }
+    return (renderBundle as WebGLRenderBundle).length;
   }
   /** @internal */
   protected _setFramebuffer(rt: FrameBuffer): void {
@@ -1105,11 +1084,16 @@ export class WebGLDevice extends BaseDevice {
         if (!this._currentProgram.use()) {
           return;
         }
-        for (let i = 0; i < this._currentBindGroups.length; i++) {
+        for (let i = 0; i < this._currentProgram.bindGroupLayouts.length; i++) {
           const bindGroup = this._currentBindGroups[i];
           if (bindGroup) {
             const offsets = this._currentBindGroupOffsets[i];
             bindGroup.apply(this._currentProgram, offsets);
+          } else {
+            console.error(
+              `Missing bind group (${i}) when drawing with program '${this._currentProgram.name}'`
+            );
+            return;
           }
         }
       }
@@ -1213,14 +1197,12 @@ export class WebGLDevice extends BaseDevice {
   /** @internal */
   private handleContextLost() {
     this._isRendering = this.isRendering;
-    this.exitLoop();
-    console.log('handle context lost');
     this.invalidateAll();
-    this.dispatchEvent(new DeviceLostEvent());
+    this.dispatchEvent('devicelost');
   }
   /** @internal */
   private handleContextRestored() {
-    console.log('handle context restored');
+    console.info('handle context restored');
     this.initContextState();
     this._textureSamplerMap = new WeakMap();
     this._currentProgram = null;
@@ -1233,10 +1215,8 @@ export class WebGLDevice extends BaseDevice {
     this._samplerCache = new SamplerCache(this);
     if (this._isRendering) {
       this._isRendering = false;
-      this.reloadAll().then(() => {
-        this.dispatchEvent(new DeviceRestoreEvent());
-        this.runLoop(this.runLoopFunction);
-      });
+      this.reloadAll();
+      this.dispatchEvent('devicerestored');
     }
   }
   /** @internal */
@@ -1270,7 +1250,9 @@ export class WebGLDevice extends BaseDevice {
   }
   /** @internal */
   clearErrors() {
-    while (this._context.getError());
+    while (this._context.getError()) {
+      // eat errors
+    }
   }
   /** @internal */
   getCurrentSamplerForTexture(tex: BaseTexture) {
@@ -1292,7 +1274,7 @@ export class WebGLDevice extends BaseDevice {
 
 let webGL1Supported = null;
 let webGL2Supported = null;
-const factory = makeEventTarget(WebGLDevice)<DeviceEventMap>();
+const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
   backend: DeviceBackend,

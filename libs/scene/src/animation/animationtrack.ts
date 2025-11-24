@@ -1,62 +1,137 @@
-import type { Interpolator } from '@zephyr3d/base';
-import type { SceneNode } from '../scene';
 import type { AnimationClip } from './animation';
 
 /**
- * Base class for any kind of animation track
+ * Base class for animation tracks.
+ *
+ * A track produces time-varying state for a specific target and defines how to:
+ * - Compute state at a given time (`calculateState`)
+ * - Apply that state to a target (`applyState`)
+ * - Blend between two states (`mixState`)
+ * - Report its blend compatibility (`getBlendId`)
+ * - Report its intrinsic duration (`getDuration`)
+ *
+ * Generic:
+ * - `StateType` is the shape of the computed/applied state (e.g., number, vector, pose).
+ *
  * @public
  */
 export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
-  protected _interpolator: Interpolator;
+  protected _name: string;
+  /** @internal */
+  protected _embedded: boolean;
   /** @internal */
   protected _animation: AnimationClip;
+  /** @internal */
+  protected _target: string;
+  /** @internal */
+  protected _jointIndex: number;
   /**
-   * Creates a new animation track
-   * @param interpolator - Interpolator for the track
+   * Construct a new animation track.
+   *
+   * @param embedded - Whether this track is embedded/owned inline by its container. Default false.
    */
-  constructor(interpolator: Interpolator) {
-    this._interpolator = interpolator;
+  constructor(embedded?: boolean) {
+    this._name = 'noname';
+    this._embedded = !!embedded;
+    this._target = '';
+    this._jointIndex = -1;
   }
-  /** Gets the interpolator of the track */
-  get interpolator(): Interpolator {
-    return this._interpolator;
+  /**
+   * Human-readable name of the track.
+   */
+  get name() {
+    return this._name;
   }
-  /** Animation this track belongs to */
+  set name(val: string) {
+    this._name = val;
+  }
+  /**
+   * Whether this track is embedded (owned inline by a resource/container).
+   */
+  get embedded(): boolean {
+    return this._embedded;
+  }
+  /**
+   * The `AnimationClip` that owns this track.
+   */
   get animation(): AnimationClip {
     return this._animation;
   }
   set animation(ani: AnimationClip) {
     this._animation = ani;
   }
-  /** Stops playing the track and rewind to the first frame */
-  reset(node: SceneNode) {}
   /**
-   * Calculates current animation state
-   * @param currentTime - At which time the animation state should be calculated.
-   * @returns State object
+   * Logical target identifier for this track (optional metadata).
+   *
+   * This does not affect application; it can be used by tooling or higher-level
+   * systems to label/group tracks.
    */
-  abstract calculateState(currentTime: number): StateType;
+  get target() {
+    return this._target;
+  }
+  set target(val: string) {
+    this._target = val;
+  }
   /**
-   * Applys animation state to node
-   * @param node - The scene node to which the state will be applied
-   * @param state - The animation state
+   * Joint index if this track controls a joint, otherwise -1
    */
-  abstract applyState(node: SceneNode, state: StateType);
+  get jointIndex() {
+    return this._jointIndex;
+  }
+  set jointIndex(index: number) {
+    this._jointIndex = index;
+  }
   /**
-   * Mixes two animation state according to specific weight value
-   * @param a - The first state object
-   * @param b - The second state object
-   * @param t - The weight value
-   * @returns The mixed state object
+   * Reset the track to its initial state for the given target.
+   *
+   * Intended to stop playback and rewind the target to the first frame or default state.
+   *
+   * @param _target - The animated object to reset.
+   */
+  reset(_target: object) {}
+  /**
+   * Compute the animation state at the specified time.
+   *
+   * Implementations should be pure with respect to inputs: given the same `target` and
+   * `currentTime`, return the same `StateType`.
+   *
+   * @param target - The animated object (used to resolve current baseline if needed).
+   * @param currentTime - Time cursor in seconds within the track's timeline.
+   * @returns The computed state at `currentTime`.
+   */
+  abstract calculateState(target: object, currentTime: number): StateType;
+  /**
+   * Apply a previously computed animation state to the target.
+   *
+   * @param target - The animated object to modify.
+   * @param state - The state to apply.
+   */
+  abstract applyState(target: object, state: StateType);
+  /**
+   * Blend two states into a new state using a weight.
+   *
+   * @param a - First state.
+   * @param b - Second state.
+   * @param t - Blend weight in \[0, 1\], where 0 yields `a` and 1 yields `b`.
+   * @returns The blended state.
    */
   abstract mixState(a: StateType, b: StateType, t: number): StateType;
   /**
-   * Get the blend ID
-   * @returns Blend ID
+   * Get the blend identifier for this track.
    *
-   * @remarks
-   * Two tracks which have same blend ID can be blended together
+   * Tracks with the same blend ID are considered compatible for blending on the
+   * same target channel/property.
+   *
+   * @returns An identifier used to group compatible tracks for blending.
    */
   abstract getBlendId(): unknown;
+  /**
+   * Get the intrinsic duration of this track in seconds.
+   *
+   * Used by clips to determine overall clip duration and looping behavior.
+   *
+   * @returns Track duration (seconds).
+   */
+  abstract getDuration(): number;
 }

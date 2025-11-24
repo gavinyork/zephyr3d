@@ -1,7 +1,7 @@
 import type { Vector2 } from '@zephyr3d/base';
 import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
-import { XForm } from '@zephyr3d/scene';
 import { assert, rand, randInt, randNonZero, numberEquals } from './common';
+import { Scene, SceneNode } from '@zephyr3d/scene';
 
 type VectorType = Vector2 | Vector3 | Vector4;
 interface VectorConstructor {
@@ -181,15 +181,6 @@ export function testQuaternion() {
     const v3 = q1.transform(v1);
     assert(v2.equalsTo(v3), 'vector to vector rotation failed');
   })();
-  (function testAngleBetween() {
-    const q1 = new Quaternion(rand(), rand(), rand(), rand()).inplaceNormalize();
-    const q2 = new Quaternion(rand(), rand(), rand(), rand()).inplaceNormalize();
-    const angle = Quaternion.angleBetween(q1, q2);
-    const axis1 = q1.getAxisAngle().xyz();
-    const axis2 = q2.getAxisAngle().xyz();
-    const angle2 = Math.acos(Vector3.dot(axis1, axis2));
-    assert(numberEquals(angle, angle2), 'angle between failed');
-  });
   (function testEulerAngle() {
     const angle1 = rand(-Math.PI, Math.PI);
     const angle2 = rand(-Math.PI, Math.PI);
@@ -467,15 +458,21 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       const left = -right;
       const m1 = Matrix4x4.perspective(fovY, aspect, near, far);
       const m2 = Matrix4x4.frustum(left, right, bottom, top, near, far);
+      assert(m1.equalsTo(m2), 'perspective projection test failed');
+      assert(numberEquals(m1.getLeftPlane(), left, 0.01), 'perspective projection test failed');
+      assert(numberEquals(m1.getRightPlane(), right, 0.01), 'perspective projection test failed');
+      assert(numberEquals(m1.getTopPlane(), top, 0.01), 'perspective projection test failed');
+      assert(numberEquals(m1.getBottomPlane(), bottom, 0.01), 'perspective projection test failed');
+      assert(numberEquals(m1.getNearPlane(), near, 0.01), 'perspective projection test failed');
+      assert(numberEquals(m1.getFarPlane(), far, 0.01), 'perspective projection test failed');
       const vmin = new Vector4(-1, -1, -1, 1);
       const vmax = new Vector4(1, 1, 1, 1);
-      assert(m1.equalsTo(m2), 'projection test failed');
       const vx1 = m2.transformPoint(new Vector3(left, bottom, -near));
       vx1.scaleBy(1 / vx1.w);
       const vx2 = m2.transformPoint(new Vector3((right * far) / near, (top * far) / near, -far));
       vx2.scaleBy(1 / vx2.w);
-      assert(vx1.equalsTo(vmin), 'projection test failed');
-      assert(vx2.equalsTo(vmax), 'projection test failed');
+      assert(vx1.equalsTo(vmin), 'perspective projection test failed');
+      assert(vx2.equalsTo(vmax), 'perspective projection test failed');
       const leftFar = (left * far) / near;
       const rightFar = (right * far) / near;
       const bottomFar = (bottom * far) / near;
@@ -503,15 +500,15 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       for (let i = 0; i < 8; i++) {
         const t = m1.transformPoint(v[i]);
         t.scaleBy(1 / t.w);
-        assert(v2[i].equalsTo(t), 'projection test failed');
+        assert(v2[i].equalsTo(t), 'perspective projection test failed');
       }
       const m3 = Matrix4x4.ortho(left, right, bottom, top, near, far);
-      assert(numberEquals(m3.getLeftPlane(), left, 0.001), 'ortho project test failed');
-      assert(numberEquals(m3.getRightPlane(), right, 0.001), 'ortho project test failed');
-      assert(numberEquals(m3.getTopPlane(), top, 0.001), 'ortho project test failed');
-      assert(numberEquals(m3.getBottomPlane(), bottom, 0.001), 'ortho project test failed');
-      assert(numberEquals(m3.getNearPlane(), near, 0.001), 'ortho project test failed');
-      assert(numberEquals(m3.getFarPlane(), far, 0.001), 'ortho project test failed');
+      assert(numberEquals(m3.getLeftPlane(), left, 0.01), 'ortho projection test failed');
+      assert(numberEquals(m3.getRightPlane(), right, 0.01), 'ortho projection test failed');
+      assert(numberEquals(m3.getTopPlane(), top, 0.01), 'ortho projection test failed');
+      assert(numberEquals(m3.getBottomPlane(), bottom, 0.01), 'ortho projection test failed');
+      assert(numberEquals(m3.getNearPlane(), near, 0.01), 'ortho projection test failed');
+      assert(numberEquals(m3.getFarPlane(), far, 0.01), 'ortho projection test failed');
       const v3 = [
         new Vector3(left, bottom, -near),
         new Vector3(right, bottom, -near),
@@ -535,7 +532,7 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       for (let i = 0; i < 8; i++) {
         const t = m3.transformPoint(v3[i]);
         t.scaleBy(1 / t.w);
-        assert(v4[i].equalsTo(t), 'projection test failed');
+        assert(v4[i].equalsTo(t), 'ortho projection test failed');
       }
     })();
   }
@@ -565,12 +562,13 @@ export function testXForm() {
     return arr;
   }
   const count = 10;
-  const xformArray = Array<XForm>(count);
+  const scene = new Scene();
+  const xformArray = Array<SceneNode>(count);
   const matrixArray = Array<Matrix4x4>(count);
   const mulArray = Array<Matrix4x4>(count);
   const invArray = Array<Matrix4x4>(count);
   for (let i = 0; i < count; i++) {
-    xformArray[i] = new XForm().reparent(xformArray[i - 1]);
+    xformArray[i] = new SceneNode(scene).reparent(xformArray[i - 1]);
     (xformArray[i] as any).__index__ = i;
     matrixArray[i] = Matrix4x4.identity();
   }

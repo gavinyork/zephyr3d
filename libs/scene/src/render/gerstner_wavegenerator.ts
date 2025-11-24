@@ -1,49 +1,88 @@
-import type { AABB } from '@zephyr3d/base';
-import { WaveGenerator } from './wavegenerator';
-import type {
-  AbstractDevice,
-  BindGroup,
-  PBGlobalScope,
-  PBInsideFunctionScope,
-  PBShaderExp
-} from '@zephyr3d/device';
-
-const MAX_NUM_WAVES = 64;
+import { Disposable, type AABB } from '@zephyr3d/base';
+import type { WaveGenerator } from './wavegenerator';
+import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import { ShaderHelper } from '../material';
+import { MAX_GERSTNER_WAVE_COUNT } from '../values';
 
 /**
  * Gerstner wave generator.
  * @public
  */
-export class GerstnerWaveGenerator extends WaveGenerator {
-  private _currentTime: number;
-  private _waveParams: Float32Array;
+export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
+  private _version: number;
+  private _waveParams: Float32Array<ArrayBuffer>;
   private _numWaves: number;
   /**
    * Creates a new Gerstner wave generator.
    */
   constructor() {
     super();
-    this._currentTime = 0;
-    this._waveParams = new Float32Array(8 * MAX_NUM_WAVES);
+    this._waveParams = new Float32Array(8 * MAX_GERSTNER_WAVE_COUNT);
     this.randomWave(0);
     this.randomWave(1);
     this.randomWave(2);
     this.randomWave(3);
     this._numWaves = 4;
+    this._version = 0;
+  }
+  /** @internal */
+  static randomWaveData(array: Float32Array, offset: number) {
+    array[offset + 0] = Math.random() * Math.PI * 2;
+    array[offset + 1] = Math.random() * 0.5 + 0.5;
+    array[offset + 2] = Math.random() * 0.1;
+    array[offset + 3] = Math.random() * 10;
+    array[offset + 4] = Math.random() * 100 - 50;
+    array[offset + 5] = 0;
+    array[offset + 6] = Math.random() * 100 - 50;
+    array[offset + 7] = 0;
+  }
+  /** @internal */
+  setRaw(data: Float32Array, index: number) {
+    this._waveParams.set(data, index * 8);
+  }
+  clone(): this {
+    const other = new GerstnerWaveGenerator();
+    other.numWaves = this.numWaves;
+    other._waveParams.set(this._waveParams);
+    return other as this;
+  }
+  get version() {
+    return this._version;
   }
   /** Gets the number of waves. */
   get numWaves(): number {
     return this._numWaves;
   }
   set numWaves(val: number) {
-    if (!Number.isInteger(val) || val <= 0 || val > MAX_NUM_WAVES) {
+    if (!Number.isInteger(val) || val <= 0 || val > MAX_GERSTNER_WAVE_COUNT) {
       console.error(`Invalid wave number: ${val}`);
       return;
     }
-    for (let i = this._numWaves; i < val; i++) {
-      this.randomWave(i);
+    if (val !== this._numWaves) {
+      for (let i = this._numWaves; i < val; i++) {
+        this.randomWave(i);
+      }
+      this._numWaves = val;
+      this._version++;
     }
-    this._numWaves = val;
+  }
+  /** Delete wave at index */
+  deleteWave(index: number) {
+    for (let i = index; i < this._numWaves - 1; i++) {
+      for (let j = 0; j < 8; j++) {
+        this._waveParams[i * 8 + j] = this._waveParams[(i + 1) * 8 + j];
+      }
+    }
+    this._numWaves--;
+  }
+  /** Delete wave at index */
+  insertWave(index: number) {
+    for (let i = index; i < this._numWaves - 1; i++) {
+      for (let j = 0; j < 8; j++) {
+        this._waveParams[(i + 1) * 8 + j] = this._waveParams[i * 8 + j];
+      }
+    }
+    this._numWaves++;
   }
   /**
    * Sets the angle of the wave direction in radians.
@@ -51,8 +90,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param angle - angle of the wave direction in radians.
    */
   setWaveDirection(waveIndex: number, angle: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 0] = angle;
+      this._version++;
     }
   }
   /**
@@ -61,7 +101,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns Angle of the wave direction in radians.
    */
   getWaveDirection(waveIndex: number): number {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 0] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 0] : 0;
   }
   /**
    * Sets the steepness of the wave.
@@ -69,8 +109,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param steepness - Steepness of the wave.
    */
   setWaveSteepness(waveIndex: number, steepness: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 1] = steepness;
+      this._version++;
     }
   }
   /**
@@ -79,7 +120,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns Steepness of the wave.
    */
   getWaveSteepness(waveIndex: number): number {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 1] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 1] : 0;
   }
   /**
    * Sets the amplitude of the wave.
@@ -87,8 +128,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param val - Amplitude of the wave.
    */
   setWaveAmplitude(waveIndex: number, val: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 2] = val;
+      this._version++;
     }
   }
   /**
@@ -97,7 +139,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns Amplitude of the wave.
    */
   getWaveAmplitude(waveIndex: number) {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 2] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 2] : 0;
   }
   /**
    * Sets the length of the wave.
@@ -105,8 +147,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param val - Length of the wave.
    */
   setWaveLength(waveIndex: number, val: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 3] = val;
+      this._version++;
     }
   }
   /**
@@ -115,7 +158,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns Length of the wave.
    */
   getWaveLength(waveIndex: number) {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 3] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 3] : 0;
   }
   /**
    * Query if the wave is an omni-directional wave.
@@ -123,7 +166,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns true if the wave is an omni-directional wave, false otherwise.
    */
   isOmniWave(waveIndex: number): boolean {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 7] !== 0 : false;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 7] !== 0 : false;
   }
   /**
    * Sets whether the wave is an omni-directional wave.
@@ -131,8 +174,9 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param isOmni - true if the wave is an omni-directional wave, false otherwise.
    */
   setOmniWave(waveIndex: number, isOmni: boolean) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 7] = isOmni ? 1 : 0;
+      this._version++;
     }
   }
   /**
@@ -141,7 +185,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns X coordinate of the wave origin if it is an omni-directional wave, 0 otherwise.
    */
   getOriginX(waveIndex: number) {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 4] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 4] : 0;
   }
   /**
    * Gets the Z coordinate of the wave origin if it is an omni-directional wave.
@@ -149,7 +193,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @returns Z coordinate of the wave origin if it is an omni-directional wave, 0 otherwise.
    */
   getOriginZ(waveIndex: number) {
-    return waveIndex < MAX_NUM_WAVES ? this._waveParams[waveIndex * 8 + 6] : 0;
+    return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 6] : 0;
   }
   /**
    * Sets the X and Z coordinates of the wave origin if it is an omni-directional wave.
@@ -158,25 +202,21 @@ export class GerstnerWaveGenerator extends WaveGenerator {
    * @param z - Z coordinate of the wave origin
    */
   setOrigin(waveIndex: number, x: number, z: number) {
-    if (waveIndex < MAX_NUM_WAVES) {
+    if (waveIndex < MAX_GERSTNER_WAVE_COUNT) {
       this._waveParams[waveIndex * 8 + 4] = x;
       this._waveParams[waveIndex * 8 + 6] = z;
+      this._version++;
     }
   }
   /** @internal */
-  private randomWave(i: number) {
-    this._waveParams[i * 8 + 0] = Math.random() * Math.PI * 2;
-    this._waveParams[i * 8 + 1] = Math.random() * 0.5 + 0.5;
-    this._waveParams[i * 8 + 2] = Math.random() * 0.1;
-    this._waveParams[i * 8 + 3] = Math.random() * 10;
-    this._waveParams[i * 8 + 4] = Math.random() * 100 - 50;
-    this._waveParams[i * 8 + 5] = 0;
-    this._waveParams[i * 8 + 6] = Math.random() * 100 - 50;
-    this._waveParams[i * 8 + 7] = 0;
+  randomWave(i: number) {
+    GerstnerWaveGenerator.randomWaveData(this._waveParams, i * 8);
   }
   /** {@inheritDoc WaveGenerator.update} */
-  update(timeInSeconds: number): void {
-    this._currentTime = timeInSeconds;
+  update(): void {}
+  /** {@inheritDoc WaveGenerator.needUpdate} */
+  needUpdate() {
+    return false;
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
@@ -208,31 +248,23 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
     const pb = scope.$builder;
-    scope.time = pb.float().uniform(0);
-    scope.numWaves = pb.float().uniform(0);
-    scope.waveParams = pb.vec4[MAX_NUM_WAVES * 2]().uniform(0);
+    scope.numWaves = pb.float().uniform(uniformGroup);
+    scope.waveParams = pb.vec4[MAX_GERSTNER_WAVE_COUNT * 2]().uniform(uniformGroup);
   }
   /** @internal */
   private gerstnerWave(
     scope: PBInsideFunctionScope,
     waveParam: PBShaderExp,
     omniParam: PBShaderExp,
-    time: PBShaderExp,
     inPos: PBShaderExp,
     outNormal: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     pb.func(
       'gerstnerWave',
-      [
-        pb.vec4('waveParam'),
-        pb.vec4('omniParam'),
-        pb.float('time'),
-        pb.vec3('inPos'),
-        pb.vec3('outNormal').out()
-      ],
+      [pb.vec4('waveParam'), pb.vec4('omniParam'), pb.vec3('inPos'), pb.vec3('outNormal').out()],
       function () {
         this.$l.amplitude = pb.max(this.waveParam.z, 0.01);
         this.$l.wavelength = this.waveParam.w;
@@ -247,7 +279,10 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         this.$l.omniWaveInput = pb.mul(pb.sub(this.inPos.xz, this.omniPos), this.omni);
         this.$l.windDir = pb.normalize(pb.add(this.dirWaveInput, this.omniWaveInput));
         this.$l.dir = pb.dot(this.windDir, pb.sub(this.inPos.xz, pb.mul(this.omniPos, this.omni)));
-        this.$l.calc = pb.sub(pb.mul(this.dir, this.w), pb.mul(this.wSpeed, this.time));
+        this.$l.calc = pb.sub(
+          pb.mul(this.dir, this.w),
+          pb.mul(this.wSpeed, ShaderHelper.getElapsedTime(this))
+        );
         this.$l.cosCalc = pb.cos(this.calc);
         this.$l.sinCalc = pb.sin(this.calc);
         this.$l.waveXZ = pb.mul(this.windDir.xy, this.qi, this.amplitude, this.cosCalc);
@@ -262,7 +297,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         this.$return(pb.mul(this.wave, pb.clamp(pb.mul(this.amplitude, 10000), 0, 1)));
       }
     );
-    return scope.gerstnerWave(waveParam, omniParam, time, inPos, outNormal);
+    return scope.gerstnerWave(waveParam, omniParam, inPos, outNormal);
   }
   /** @internal */
   private calcNormalAndPos(
@@ -282,7 +317,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
         this.$for(
           pb.float('i'),
           0,
-          pb.getDevice().type === 'webgl' ? MAX_NUM_WAVES : this.numWaves,
+          pb.getDevice().type === 'webgl' ? MAX_GERSTNER_WAVE_COUNT : this.numWaves,
           function () {
             if (pb.getDevice().type === 'webgl') {
               this.$if(pb.greaterThanEqual(this.i, this.numWaves), function () {
@@ -294,7 +329,6 @@ export class GerstnerWaveGenerator extends WaveGenerator {
               this,
               this.waveParams.at(pb.mul(this.i, 2)),
               this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
-              this.time,
               this.inPos,
               this.waveNormal
             );
@@ -317,7 +351,6 @@ export class GerstnerWaveGenerator extends WaveGenerator {
   }
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
   applyWaterBindGroup(bindGroup: BindGroup): void {
-    bindGroup.setValue('time', this._currentTime);
     bindGroup.setValue('numWaves', this._numWaves);
     bindGroup.setValue('waveParams', this._waveParams);
   }
@@ -326,9 +359,7 @@ export class GerstnerWaveGenerator extends WaveGenerator {
     return true;
   }
   /** {@inheritDoc WaveGenerator.getHash} */
-  getHash(device: AbstractDevice): string {
-    return '';
+  getHash(): string {
+    return 'GerstnerWaveGenerator';
   }
-  /** {@inheritDoc WaveGenerator.dispose} */
-  dispose(): void {}
 }

@@ -1,92 +1,171 @@
 import type { DecoderModule } from 'draco3d';
-import { isPowerOf2, nextPowerOf2, HttpRequest } from '@zephyr3d/base';
-import type { AssetHierarchyNode, AssetSkeleton, AssetSubMeshData, SharedModel } from './model';
+import type { HttpRequest, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
+import {
+  isPowerOf2,
+  nextPowerOf2,
+  DWeakRef,
+  DRef,
+  base64ToUint8Array,
+  Vector3,
+  ASSERT,
+  VFSError,
+  Vector4
+} from '@zephyr3d/base';
+import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
 import { HDRLoader } from './loaders/hdr/hdr';
-import { SceneNode } from '../scene/scene_node';
-import { Mesh } from '../scene/mesh';
-import { RotationTrack, ScaleTrack, Skeleton, TranslationTrack } from '../animation';
-import { AnimationClip } from '../animation/animation';
+import type { SceneNode } from '../scene/scene_node';
 import { CopyBlitter } from '../blitter';
-import { getSheenLutLoader, getTestCubemapLoader } from './builtin';
-import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT, BUILTIN_ASSET_TEST_CUBEMAP, MAX_MORPH_TARGETS } from '../values';
-import { Application } from '../app';
-import { AnimationSet } from '../animation/animationset';
-import type { BaseTexture, Texture2D, GPUObject, SamplerOptions } from '@zephyr3d/device';
+import { getSheenLutLoader } from './builtin';
+import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
+import type { AnimationSet } from '../animation/animationset';
+import type {
+  BaseTexture,
+  PrimitiveType,
+  SamplerOptions,
+  TextureAddressMode,
+  TextureFilterMode,
+  VertexAttribFormat,
+  VertexSemantic
+} from '@zephyr3d/device';
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
-import { MorphTargetTrack } from '../animation/morphtrack';
-import { processMorphData } from '../animation/morphtarget';
+import { getDevice, getEngine } from '../app/api';
+import { Material, PBRBluePrintMaterial } from '../material';
+import type {
+  BlueprintDAG,
+  BluePrintUniformTexture,
+  BluePrintUniformValue,
+  GraphStructure,
+  IGraphNode,
+  NodeConnection,
+  ResourceManager
+} from '../utility';
+import { BoundingBox } from '../utility/bounding_volume';
+import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import type { Skeleton } from '../animation';
+import { Primitive } from '../render';
 
 /**
- * Options for texture fetching
+ * Options for texture fetching.
+ *
+ * Controls how a texture is loaded, converted, and optionally uploaded into an existing texture object.
+ *
+ * @typeParam T - Texture type to be returned, extending BaseTexture.
  * @public
- **/
+ */
 export type TextureFetchOptions<T extends BaseTexture> = {
+  /**
+   * Explicit MIME type hint. If omitted, the type is inferred from file extension via VFS.
+   */
   mimeType?: string;
+  /**
+   * If true, load the image as linear data. If false or omitted, load as sRGB (when supported).
+   *
+   * Note: For WebGL targets, non-power-of-two or sRGB textures may be repacked based on constraints.
+   */
   linearColorSpace?: boolean;
+  /**
+   * Optional target texture to upload into. If provided, loader data will be copied/blitted
+   * into this texture instead of creating a new one.
+   */
   texture?: T;
+  /**
+   * Optional sampler options for the loaded texture. May be used by loaders for mip generation
+   * or by blit paths when repacking textures on constrained backends.
+   */
   samplerOptions?: SamplerOptions;
 };
 
 /**
- * Options for model fetching
+ * Options for model fetching.
+ *
+ * Provides decoding and instancing hints used by supported model loaders.
  * @public
- **/
+ */
 export type ModelFetchOptions = {
-  /** MIME type of the model, if not specified, model type will be determined by file extension */
+  /**
+   * Explicit MIME type hint for the model. If omitted, inferred from file extension via VFS.
+   */
   mimeType?: string;
-  /** Draco module */
+  /**
+   * Optional Draco decoder module for compressed geometry decoding.
+   */
   dracoDecoderModule?: DecoderModule;
-  /** True if the model need to be rendered instanced, the default value is false */
+  /**
+   * If true, the created scene node may be prepared for instanced rendering (engine-dependent).
+   * Default is false.
+   */
   enableInstancing?: boolean;
-  /** PostProcess loading function for the mesh  */
+  /**
+   * Optional post-process callback applied to the loaded SharedModel before creating nodes.
+   * Use this to remap materials, merge meshes, or apply custom data transforms.
+   */
   postProcess?: (model: SharedModel) => SharedModel;
 };
 
 /**
- * Data structure returned by AssetManager.fetchModel()
+ * Data structure returned by AssetManager.fetchModel().
+ *
+ * Bundles the created scene node group and an optional animation set if present in the asset.
  * @public
  */
 export type ModelInfo = {
-  /** Mesh group */
+  /**
+   * The root scene node of the loaded model (may contain child hierarchy).
+   */
   group: SceneNode;
-  /** Animation set, null if no animation */
+  /**
+   * The animation set associated with the model or null if none.
+   */
   animationSet: AnimationSet;
 };
 
 /**
- * The asset manager
+ * Centralized asset manager for loading and caching resources.
+ *
+ * Responsibilities:
+ * - Abstracts resource loading via VFS (text/json/binary).
+ * - Dispatches texture/model loading to registered loaders by MIME type.
+ * - Caches results and uses weak references to allow GPU resources to be GC'd when unused.
+ * - Harmonizes cross-backend constraints (e.g., WebGL non-power-of-two rules and sRGB handling).
+ * - Provides access to built-in textures with device-restore handlers.
+ *
+ * Threading/async model:
+ * - All I/O is async; repeated calls are coalesced via internal promise caches keyed by URL or hash.
+ *
  * @public
  */
 export class AssetManager {
   /** @internal */
-  static _builtinTextures: {
-    [name: string]: Promise<BaseTexture>;
+  private static _builtinTextures: {
+    [name: string]: BaseTexture;
   } = {};
   /** @internal */
-  static _builtinTextureLoaders: {
-    [name: string]: (assetManager: AssetManager, texture?: BaseTexture) => Promise<BaseTexture>;
+  private static _builtinTextureLoaders: {
+    [name: string]: (assetManager: AssetManager, texture?: BaseTexture) => BaseTexture;
   } = {
-    [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64),
-    [BUILTIN_ASSET_TEST_CUBEMAP]: getTestCubemapLoader()
+    [BUILTIN_ASSET_TEXTURE_SHEEN_LUT]: getSheenLutLoader(64)
   };
   /** @internal */
-  private _httpRequest: HttpRequest;
+  private static readonly _textureLoaders: AbstractTextureLoader[] = [
+    new WebImageLoader(),
+    new DDSLoader(),
+    new HDRLoader(),
+    new TGALoader()
+  ];
   /** @internal */
-  private _textureLoaders: AbstractTextureLoader[];
-  /** @internal */
-  private _modelLoaders: AbstractModelLoader[];
+  private static readonly _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
   /** @internal */
   private _textures: {
-    [hash: string]: Promise<BaseTexture>;
+    [hash: string]: Promise<BaseTexture> | DWeakRef<BaseTexture>;
   };
   /** @internal */
   private _models: {
-    [url: string]: Promise<SharedModel>;
+    [url: string]: Promise<SharedModel> | DWeakRef<SharedModel>;
   };
   /** @internal */
   private _binaryDatas: {
@@ -96,179 +175,354 @@ export class AssetManager {
   private _textDatas: {
     [url: string]: Promise<string>;
   };
+  /** @internal */
+  private _bluePrints: {
+    [url: string]: Promise<Record<string, MaterialBlueprintIR>>;
+  };
+  /** @internal */
+  private _materials: {
+    [url: string]: Promise<Material> | DWeakRef<Material>;
+  };
+  /** @internal */
+  private _primitives: {
+    [url: string]: Promise<Primitive> | DWeakRef<Primitive>;
+  };
+  /** @internal */
+  private _skeletons: {
+    [url: string]: Promise<Skeleton> | DWeakRef<Skeleton>;
+  };
+  /** @internal */
+  private _jsonDatas: {
+    [url: string]: Promise<any>;
+  };
+  /** @internal */
+  private readonly _resourceManager: ResourceManager;
   /**
    * Creates an instance of AssetManager
    */
-  constructor() {
-    this._httpRequest = new HttpRequest();
-    this._textureLoaders = [new WebImageLoader(), new DDSLoader(), new HDRLoader(), new TGALoader()];
-    this._modelLoaders = [new GLTFLoader()];
+  constructor(resourceManager?: ResourceManager) {
+    this._resourceManager = resourceManager ?? getEngine().resourceManager;
     this._textures = {};
     this._models = {};
+    this._materials = {};
+    this._primitives = {};
+    this._bluePrints = {};
     this._binaryDatas = {};
     this._textDatas = {};
+    this._jsonDatas = {};
   }
   /**
-   * HttpRequest instance of the asset manager
+   * VFS used to read resources (files, URLs, virtual mounts).
    */
-  get httpRequest(): HttpRequest {
-    return this._httpRequest;
+  get vfs() {
+    return this._resourceManager.VFS;
   }
   /**
-   * Removes all cached assets
+   * Clear cached references and promises.
+   *
+   * - Disposes any DWeakRef holders maintained by this manager.
+   * - Empties internal maps for textures, models, and raw data (text/json/binary).
+   * - Does not forcibly dispose GPU resources; it only clears references so they can be GC'd
+   *   if no other owners are holding them.
    */
   clearCache() {
-    this._textures = {};
-    this._models = {};
-    this._binaryDatas = {};
-    this._textDatas = {};
-  }
-  /**
-   * Remove and dispose all cached assets
-   */
-  purgeCache() {
-    for (const k in this._textures) {
-      this._textures[k].then((tex) => tex?.dispose()).catch((err) => {});
+    for (const k in Object.keys(this._textures)) {
+      const v = this._textures[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
     }
     this._textures = {};
+    for (const k in Object.keys(this._models)) {
+      const v = this._models[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
     this._models = {};
+    for (const k in Object.keys(this._materials)) {
+      const v = this._materials[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._materials = {};
+    for (const k in Object.keys(this._primitives)) {
+      const v = this._primitives[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._primitives = {};
+    for (const k in Object.keys(this._skeletons)) {
+      const v = this._skeletons[k];
+      if (v instanceof DWeakRef) {
+        v.dispose();
+      }
+    }
+    this._skeletons = {};
     this._binaryDatas = {};
     this._textDatas = {};
+    this._jsonDatas = {};
   }
   /**
-   * Adds a texture loader to the asset manager
+   * Register a texture loader (highest priority first).
    *
-   * @remarks
-   * TODO: this should be a static method
+   * Note: This is a static registry shared by all AssetManager instances.
    *
-   * @param loader - The texture loader to be added
+   * @param loader - A concrete texture loader implementation.
    */
-  addTextureLoader(loader: AbstractTextureLoader): void {
+  static addTextureLoader(loader: AbstractTextureLoader): void {
     if (loader) {
       this._textureLoaders.unshift(loader);
     }
   }
   /**
-   * Adds a model loader to the asset manager
+   * Register a model loader (highest priority first).
    *
-   * @remarks
-   * TODO: this should be a static method
+   * Note: This is a static registry shared by all AssetManager instances.
    *
-   * @param loader - The model loader to be added
+   * @param loader - A concrete model loader implementation.
    */
-  addModelLoader(loader: AbstractModelLoader) {
+  static addModelLoader(loader: AbstractModelLoader) {
     if (loader) {
       this._modelLoaders.unshift(loader);
     }
   }
   /**
-   * Fetches a text resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param postProcess - A function that will be involved when the text data was loaded.
+   * Fetch a UTF-8 text resource via VFS.
    *
-   * @remarks
-   * If a text data has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the text loaded previously.
-   * To load the same text with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Results are cached per resolved URL (via HttpRequest.urlResolver if provided; otherwise the raw URL).
+   * - If cached, any provided postProcess is ignored for subsequent calls; create a separate AssetManager
+   *   if you need different post-processing of the same URL.
    *
-   * @returns The fetched text
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the loaded text.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) text.
    */
-  async fetchTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
-    let P = this._textDatas[url];
+  async fetchTextData(
+    url: string,
+    postProcess?: (text: string) => string,
+    httpRequest?: HttpRequest,
+    VFSs?: VFS[]
+  ): Promise<string> {
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._textDatas[hash];
     if (!P) {
-      P = this.loadTextData(url, postProcess);
-      this._textDatas[url] = P;
+      P = this.loadTextData(url, postProcess, VFSs);
+      this._textDatas[hash] = P;
     }
     return P;
   }
   /**
-   * Fetches a binary resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param postProcess - A function that will be involved when the binary data was loaded.
+   * Fetch a JSON resource via VFS.
    *
-   * @remarks
-   * If a binary data has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the data loaded previously.
-   * To load the same data with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Parses as JSON after text load.
+   * - Cached per resolved URL. Post-process is applied only on the first load for a given cache key.
    *
-   * @returns Binary data as ArrayBuffer
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the parsed JSON object.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) JSON value.
    */
-  async fetchBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
-    let P = this._binaryDatas[url];
+  async fetchJsonData<T = any>(
+    url: string,
+    postProcess?: (json: T) => T,
+    httpRequest?: HttpRequest,
+    VFSs?: VFS[]
+  ): Promise<T> {
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._jsonDatas[hash];
     if (!P) {
-      P = this.loadBinaryData(url, postProcess);
-      this._binaryDatas[url] = P;
+      P = this.loadJsonData(url, postProcess, VFSs);
+      this._jsonDatas[hash] = P;
     }
     return P;
   }
   /**
-   * Fetches a texture resource from a given URL
-   * @param url - The URL from where to fetch the resource
-   * @param options - Options for texture fetching
-   * @returns The fetched texture
+   * Fetch a binary resource via VFS.
+   *
+   * - Cached per resolved URL. Post-process is applied only on first load for a given key.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the loaded ArrayBuffer.
+   * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @returns A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
    */
-  async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
+  async fetchBinaryData(
+    url: string,
+    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    httpRequest?: HttpRequest,
+    VFSs?: VFS[]
+  ): Promise<ArrayBuffer> {
+    const hash = httpRequest?.urlResolver?.(url) ?? url;
+    let P = this._binaryDatas[hash];
+    if (!P) {
+      P = this.loadBinaryData(url, postProcess, VFSs);
+      this._binaryDatas[hash] = P;
+    }
+    return P;
+  }
+  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>> {
+    const hash = url;
+    let P = this._bluePrints[hash];
+    if (!P) {
+      P = this.loadBluePrint(url, VFSs);
+      this._bluePrints[hash] = P;
+    }
+    return P;
+  }
+  /**
+   * Fetch a material resource.
+   *
+   * @typeParam T - Expected concrete material type.
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded material.
+   */
+  async fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T> {
+    const hash = url;
+    let P = this._materials[hash] as Promise<T> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+      return P.get();
+    } else if (!P || P instanceof DWeakRef) {
+      P = this.loadMaterial<T>(url, false, VFSs);
+      this._materials[hash] = P;
+    }
+    const material = await P;
+    if (this._materials[hash] instanceof Promise) {
+      this._materials[hash] = new DWeakRef<Material>(material);
+    }
+    return material;
+  }
+  /**
+   * Fetch a primitive resource.
+   *
+   * @typeParam T - Expected concrete primitive type.
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded primitive.
+   */
+  async fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+    const hash = url;
+    let P = this._primitives[hash] as Promise<T> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+      return P.get();
+    } else if (!P || P instanceof DWeakRef) {
+      P = this.loadPrimitive<T>(url, VFSs);
+      this._primitives[hash] = P;
+    }
+    const primitive = await P;
+    if (this._primitives[hash] instanceof Promise) {
+      this._primitives[hash] = new DWeakRef<Primitive>(primitive);
+    }
+    return primitive;
+  }
+  /**
+   * Fetch a texture resource via registered loaders.
+   *
+   * - Chooses loader by explicit MIME type or by VFS file extension inference.
+   * - Deduplicates in-flight requests and caches ready textures.
+   * - If `options.texture` is provided, the asset will be uploaded/blitted into that texture.
+   * - On WebGL backends, enforces constraints by repacking non-power-of-two or sRGB textures.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param url - Resource URL or VFS path.
+   * @param options - Texture fetching options (color space, sampler, target texture).
+   * @param httpRequest - Optional HttpRequest (not used for binary read but may supply URL resolver for hashing).
+   * @returns A promise that resolves to the loaded texture.
+   */
+  async fetchTexture<T extends BaseTexture>(
+    url: string,
+    options?: TextureFetchOptions<T>,
+    VFSs?: VFS[]
+  ): Promise<T> {
     if (options?.texture) {
       return this.loadTexture(
         url,
         options.mimeType ?? null,
         !options.linearColorSpace,
         options.samplerOptions,
-        options.texture
+        options.texture,
+        VFSs
       ) as Promise<T>;
     } else {
       const hash = this.getHash('2d', url, options);
-      let P = this._textures[hash];
-      if (!P) {
+      let P = this._textures[hash] as Promise<T> | DWeakRef<T>;
+      if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+        return P.get();
+      } else if (!P || P instanceof DWeakRef) {
         P = this.loadTexture(
           url,
           options?.mimeType ?? null,
           !options?.linearColorSpace,
-          options?.samplerOptions
-        );
+          options?.samplerOptions,
+          null,
+          VFSs
+        ) as Promise<T>;
         this._textures[hash] = P;
-      } else {
-        const tex = await P;
-        if (tex.disposed) {
-          await tex.reload();
-          return tex as T;
-        }
       }
-      return P as Promise<T>;
+      const tex: T = await P;
+      if (this._textures[hash] instanceof Promise) {
+        this._textures[hash] = new DWeakRef<T>(tex);
+      }
+      return tex;
     }
-  }
-  /** @internal */
-  async fetchModelData(scene: Scene, url: string, options?: ModelFetchOptions): Promise<SharedModel> {
-    let P = this._models[url];
-    if (!P) {
-      P = this.loadModel(url, options);
-      this._models[url] = P;
-    }
-    return P;
   }
   /**
-   * Fetches a model resource from a given URL and adds it to a scene
-   * @param scene - The scene to which the model node belongs
-   * @param url - The URL from where to fetch the resource
-   * @param options - Options for model fetching
+   * Fetch a model resource via registered model loaders (data only).
    *
-   * @remarks
-   * If a model has already been loaded, the function will ignore the
-   * postProcess parameter and directly return the model loaded previously.
-   * To load the same model with different postProcess parameters,
-   * use different AssetManager instances separately.
+   * - Returns a SharedModel which can create scene nodes in any Scene.
+   * - Uses DWeakRef to cache and allow model data to be reclaimed if unused.
    *
-   * @returns The created model node
+   * @param url - Model URL or VFS path.
+   * @param options - Model loader options (MIME override, Draco, instancing hint, post-process).
+   * @returns A promise that resolves to the SharedModel.
+   * @internal
    */
-  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions): Promise<ModelInfo> {
-    const sharedModel = await this.fetchModelData(scene, url, options);
-    return this.createSceneNode(scene, sharedModel, !!options?.enableInstancing);
+  async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+    const hash = url;
+    let P = this._models[hash];
+    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
+      return P.get();
+    } else if (!P || P instanceof DWeakRef) {
+      P = this.loadModel(url, options, VFSs);
+      this._models[hash] = P;
+    }
+    const sharedModel = await P;
+    if (this._models[hash] instanceof Promise) {
+      this._models[hash] = new DWeakRef<SharedModel>(sharedModel);
+    }
+    return sharedModel;
   }
-  /** @internal */
-  async loadTextData(url: string, postProcess?: (text: string) => string): Promise<string> {
-    let text = await this._httpRequest.requestText(url);
+  /**
+   * Fetch a model resource and instantiate it under a scene.
+   *
+   * - Loads or retrieves a cached SharedModel, then creates a SceneNode hierarchy.
+   * - Returns both the created group node and any associated AnimationSet.
+   *
+   * @param scene - Scene into which the model node will be created.
+   * @param url - Model URL or VFS path.
+   * @param options - Model loader options and instancing hint.
+   * @param httpRequest - Optional HttpRequest (unused for binary read; present for API symmetry).
+   * @returns A promise with the created node group and animation set info.
+   */
+  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<ModelInfo> {
+    const sharedModel = await this.fetchModelData(url, options, VFSs);
+    const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
+    return { group: node, animationSet: node.animationSet };
+  }
+  /**
+   * Load a text resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchTextData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the text.
+   * @returns A promise that resolves to the loaded (and optionally processed) text.
+   * @internal
+   */
+  async loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]): Promise<string> {
+    let text = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
     if (postProcess) {
       try {
         text = postProcess(text);
@@ -278,90 +532,496 @@ export class AssetManager {
     }
     return text;
   }
-  /** @internal */
-  async loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer): Promise<ArrayBuffer> {
-    let data = await this._httpRequest.requestArrayBuffer(url);
+  /**
+   * Load a JSON resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchJsonData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the parsed JSON.
+   * @returns A promise that resolves to the loaded (and optionally processed) JSON.
+   * @internal
+   */
+  async loadJsonData(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<string> {
+    let json = JSON.parse((await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string);
+
     if (postProcess) {
       try {
-        data = postProcess(data);
+        json = postProcess(json);
       } catch (err) {
-        throw new Error(`Load binary data post process failed: ${err}`);
+        throw new Error(`Load json data post process failed: ${err}`);
       }
     }
-    return data;
+    return json;
   }
-  /** @internal */
+  /**
+   * Load a binary resource via VFS and optionally post-process it.
+   *
+   * - Does not use or modify the internal cache; use fetchBinaryData for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @param postProcess - Optional transformation applied to the ArrayBuffer.
+   * @returns A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
+   * @internal
+   */
+  async loadBinaryData(
+    url: string,
+    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    VFSs?: VFS[]
+  ): Promise<ArrayBuffer> {
+    try {
+      let data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
+      if (postProcess) {
+        data = postProcess(data);
+      }
+      return data;
+    } catch (err) {
+      console.error(`Load binary data failed: ${err}`);
+      return null;
+    }
+  }
+  async loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+    try {
+      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+      const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(
+        content.type === 'Primitive' || content.type === 'Default',
+        `Unsupported primitive type: ${content.type}`
+      );
+      if (content.type === 'Primitive') {
+        const data = content.data as {
+          vertices: Record<VertexSemantic, { format: VertexAttribFormat; data: string }>;
+          indices: string;
+          indexType: 'u16' | 'u32';
+          indexCount: number;
+          type: PrimitiveType;
+          boxMin: number[];
+          boxMax: number[];
+        };
+        const primitive = new Primitive();
+        for (const k in data.vertices) {
+          const v = data.vertices[k as VertexSemantic];
+          const vertexData = base64ToUint8Array(v.data);
+          primitive.createAndSetVertexBuffer(v.format, vertexData);
+        }
+        if (data.indices) {
+          const indexData = base64ToUint8Array(data.indices);
+          const indices =
+            data.indexType === 'u16'
+              ? new Uint16Array(indexData.buffer)
+              : data.indexType === 'u32'
+                ? new Uint32Array(indexData.buffer)
+                : null;
+          if (!indices) {
+            console.error(`Invalid index type in primitive data: ${data.indexType}`);
+            return null;
+          }
+          primitive.createAndSetIndexBuffer(indices);
+        }
+        primitive.primitiveType = data.type;
+        primitive.indexCount = data.indexCount;
+        primitive.setBoundingVolume(
+          new BoundingBox(
+            new Vector3(data.boxMin[0], data.boxMin[1], data.boxMin[2]),
+            new Vector3(data.boxMax[0], data.boxMax[1], data.boxMax[2])
+          )
+        );
+        return primitive as T;
+      } else {
+        const obj = await this._resourceManager.deserializeObject<T>(null, content.data);
+        if (!(obj instanceof Primitive)) {
+          if (typeof (obj as any).dispose === 'function') {
+            (obj as any).dispose();
+          }
+          return null;
+        }
+        return obj;
+      }
+    } catch (err) {
+      console.error(`Load primitive failed: ${err}`);
+      return null;
+    }
+  }
+  async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
+    const promises: Promise<Material>[] = [];
+    const paths: string[] = [];
+    for (const k of Object.keys(this._materials)) {
+      const m = this._materials[k];
+      if (m instanceof Promise) {
+        promises.push(m);
+        paths.push(k);
+      } else if (m instanceof DWeakRef && !!m.get()) {
+        promises.push(Promise.resolve(m.get()));
+        paths.push(k);
+      }
+    }
+    const materials = await Promise.all(promises);
+    for (let i = 0; i < materials.length; i++) {
+      const m = materials[i];
+      if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
+        const data = await this.loadBluePrintMaterialData(paths[i], true);
+        m.fragmentIR = data.irFragment;
+        m.vertexIR = data.irVertex;
+        m.uniformValues = data.uniformValues;
+        m.uniformTextures = data.uniformTextures;
+      }
+    }
+  }
+  private async loadBluePrintMaterialData(url: string, reload: boolean, VFSs?: VFS[]) {
+    try {
+      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+      const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(content.type === 'PBRBluePrintMaterial', `Unsupported material type: ${content.type}`);
+      const ir = reload
+        ? await this.loadBluePrint(content.data.IR as string, VFSs)
+        : await this.fetchBluePrint(content.data.IR as string, VFSs);
+      const uniformValues: BluePrintUniformValue[] = (
+        content.data.uniformValues as BluePrintUniformValue[]
+      ).map((v) => ({
+        ...v,
+        finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
+      }));
+      const uniformTextures: BluePrintUniformTexture[] = [];
+      const textures = content.data.uniformTextures as BluePrintUniformTexture[];
+      for (const v of textures) {
+        const tex = await this.fetchTexture(
+          v.texture,
+          {
+            linearColorSpace: !v.sRGB
+          },
+          VFSs
+        );
+        uniformTextures.push({
+          ...v,
+          finalTexture: new DRef(tex),
+          finalSampler: getDevice().createSampler({
+            addressU: v.wrapS as TextureAddressMode,
+            addressV: v.wrapT as TextureAddressMode,
+            minFilter: v.minFilter as TextureFilterMode,
+            magFilter: v.magFilter as TextureFilterMode,
+            mipFilter: v.mipFilter as TextureFilterMode
+          }),
+          params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
+        });
+      }
+      return {
+        irFragment: ir['fragment'],
+        irVertex: ir['vertex'],
+        uniformValues,
+        uniformTextures
+      };
+    } catch (err) {
+      console.error(`Load material failed: ${err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Load a material.
+   *
+   * - Does not use or modify the internal cache; use fetchMaterial for cached loads.
+   *
+   * @param url - Resource URL or VFS path.
+   * @returns A promise that resolves to the loaded material.
+   * @internal
+   */
+  async loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T> {
+    try {
+      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+      const content = JSON.parse(data) as { type: string; data: any };
+      ASSERT(
+        content.type === 'PBRBluePrintMaterial' || content.type === 'Default',
+        `Unsupported material type: ${content.type}`
+      );
+      if (content.type === 'PBRBluePrintMaterial') {
+        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
+        return new PBRBluePrintMaterial(
+          data.irFragment,
+          data.irVertex,
+          data.uniformValues,
+          data.uniformTextures
+        ) as unknown as T;
+      } else {
+        const obj = await this._resourceManager.deserializeObject<T>(null, content.data);
+        if (!(obj instanceof Material)) {
+          if (typeof (obj as any).dispose === 'function') {
+            (obj as any).dispose();
+          }
+          return null;
+        }
+        return obj;
+      }
+    } catch (err) {
+      console.error(`Load material failed: ${err}`);
+      return null;
+    }
+  }
+  private rebuildGraphStructure(
+    nodes: Record<number, IGraphNode>,
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): GraphStructure {
+    const gs: GraphStructure = {
+      outgoing: {},
+      incoming: {}
+    };
+    // Initialize adjacency lists
+    for (const nodeId in nodes) {
+      gs.outgoing[nodeId] = [];
+      gs.incoming[nodeId] = [];
+    }
+    // Fill with links
+    for (const link of links) {
+      const outConnection: NodeConnection = {
+        targetNodeId: link.endNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      const inConnection: NodeConnection = {
+        targetNodeId: link.startNodeId,
+        startSlotId: link.startSlotId,
+        endSlotId: link.endSlotId
+      };
+
+      gs.outgoing[link.startNodeId]?.push(outConnection);
+      gs.incoming[link.endNodeId]?.push(inConnection);
+    }
+    return gs;
+  }
+  private collectReachableBackward(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): Set<number> {
+    const reachable = new Set<number>();
+    const q: number[] = [];
+
+    for (const r of roots) {
+      if (nodes[r]) {
+        reachable.add(r);
+        q.push(r);
+      }
+    }
+    while (q.length > 0) {
+      const u = q.shift()!;
+      const ins = gs.incoming[u] || [];
+      for (const conn of ins) {
+        const v = conn.targetNodeId; // 前驱
+        if (!reachable.has(v)) {
+          reachable.add(v);
+          q.push(v);
+        }
+      }
+    }
+    return reachable;
+  }
+  private getReverseTopologicalOrderFromRoots(
+    gs: GraphStructure,
+    nodes: Record<number, IGraphNode>,
+    roots: number[]
+  ): {
+    order: number[];
+    levels: number[][];
+  } {
+    if (!roots || roots.length === 0) {
+      return { order: [], levels: [] };
+    }
+    const sub = this.collectReachableBackward(gs, nodes, roots);
+    if (sub.size === 0) {
+      return { order: [], levels: [] };
+    }
+    const outDegree = new Map<number, number>();
+    for (const id of sub) {
+      const outs = (gs.outgoing[id] || []).filter((c) => sub.has(c.targetNodeId));
+      outDegree.set(id, outs.length);
+    }
+    let currentLevel = Array.from(outDegree.entries())
+      .filter(([, deg]) => deg === 0)
+      .map(([id]) => id);
+    const result: number[] = [];
+    const levels: number[][] = [];
+    while (currentLevel.length > 0) {
+      levels.push([...currentLevel]);
+      result.push(...currentLevel);
+      const nextLevel: number[] = [];
+      for (const u of currentLevel) {
+        const ins = gs.incoming[u] || [];
+        for (const conn of ins) {
+          const v = conn.targetNodeId; // 前驱
+          if (!sub.has(v)) {
+            continue;
+          }
+          const deg = outDegree.get(v)! - 1;
+          outDegree.set(v, deg);
+          if (deg === 0) {
+            nextLevel.push(v);
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+    if (result.length !== sub.size) {
+      console.warn('Subgraph contains cycles (from given roots).');
+      return null;
+    }
+    return { order: result, levels };
+  }
+  createBluePrintDAG(
+    nodeMap: Record<number, IGraphNode>,
+    roots: number[],
+    links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
+  ): BlueprintDAG {
+    const gs = this.rebuildGraphStructure(nodeMap, links);
+    for (const k in gs.incoming) {
+      const node = nodeMap[k];
+      for (const conn of gs.incoming[k]) {
+        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        input.inputNode = nodeMap[conn.targetNodeId];
+        input.inputId = conn.startSlotId;
+      }
+    }
+    return {
+      graph: gs,
+      nodeMap,
+      roots,
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+    };
+  }
+  async loadBluePrint(path: string, VFSs?: VFS[]) {
+    try {
+      const content = (await this.readFileFromVFSs(path, { encoding: 'utf8' }, VFSs)) as string;
+      const bp = JSON.parse(content) as {
+        type: string;
+        state: Record<
+          string,
+          {
+            nodes: {
+              id: number;
+              locked: boolean;
+              node: object;
+            }[];
+            links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+          }
+        >;
+      };
+      ASSERT(
+        bp.type === 'PBRMaterial' || bp.type === 'MaterialFunction',
+        `Unsupported blueprint type: ${bp.type}`
+      );
+      const states = bp.state;
+      const result: Record<string, MaterialBlueprintIR> = {};
+      for (const k of Object.keys(states)) {
+        const roots: number[] = [];
+        const nodeMap: Record<number, IGraphNode> = {};
+        const state = states[k];
+        for (const node of state.nodes) {
+          const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
+          nodeMap[node.id] = impl;
+          if (impl.outputs.length === 0) {
+            roots.push(node.id);
+          }
+        }
+        const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
+        result[k] = new MaterialBlueprintIR(dag, path);
+      }
+      return result;
+    } catch (err) {
+      const msg = `Load material failed: ${err}`;
+      console.error(msg);
+      return null;
+    }
+  }
+  /**
+   * Load a texture directly from an ArrayBuffer or typed array.
+   *
+   * - Chooses an appropriate loader based on the provided MIME type.
+   * - Can upload into an existing texture if `texture` is specified.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param arrayBuffer - Raw texture data buffer.
+   * @param mimeType - MIME type of the texture (must be supported by a registered loader).
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options passed to the loader path.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   */
+  async loadTextureFromBuffer<T extends BaseTexture>(
+    arrayBuffer: ArrayBuffer | TypedArray,
+    mimeType: string,
+    srgb?: boolean,
+    samplerOptions?: SamplerOptions,
+    texture?: BaseTexture
+  ): Promise<T> {
+    for (const loader of AssetManager._textureLoaders) {
+      if (!loader.supportMIMEType(mimeType)) {
+        continue;
+      }
+      const tex = await this.doLoadTexture(loader, mimeType, arrayBuffer, !!srgb, samplerOptions, texture);
+      return tex as T;
+    }
+    throw new Error(`Can not find loader for MIME type '${mimeType}'`);
+  }
+  /**
+   * Load a texture via VFS by URL and MIME type.
+   *
+   * - Uses the first loader that supports the inferred or provided MIME type.
+   * - On WebGL, may repack textures (resample to power-of-two, convert formats) to meet backend constraints.
+   * - If `texture` is provided, the source is blitted into it, possibly resizing or changing sampling accordingly.
+   *
+   * @param url - Texture URL or VFS path.
+   * @param mimeType - Optional explicit MIME type; otherwise inferred by VFS.
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options for loader or blit path.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   * @internal
+   */
   async loadTexture(
     url: string,
     mimeType?: string,
     srgb?: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
+    texture?: BaseTexture,
+    VFSs?: VFS[]
   ): Promise<BaseTexture> {
-    const data = await this._httpRequest.requestArrayBuffer(url);
-    let ext = '';
-    let filename = '';
-    const dataUriMatchResult = url.match(/^data:([^;]+)/);
-    if (dataUriMatchResult) {
-      mimeType = mimeType || dataUriMatchResult[1];
-    } else {
-      filename = new URL(url, new URL(location.href).origin).pathname
-        .split('/')
-        .filter((val) => !!val)
-        .slice(-1)[0];
-      const p = filename ? filename.lastIndexOf('.') : -1;
-      ext = p >= 0 ? filename.substring(p).toLowerCase() : null;
-      if (!mimeType) {
-        if (ext === '.jpg' || ext === '.jpeg') {
-          mimeType = 'image/jpg';
-        } else if (ext === '.png') {
-          mimeType = 'image/png';
-        }
-      }
-    }
-    for (const loader of this._textureLoaders) {
-      if ((!ext || !loader.supportExtension(ext)) && (!mimeType || !loader.supportMIMEType(mimeType))) {
+    const data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
+    mimeType = mimeType ?? this.vfs.guessMIMEType(url);
+    for (const loader of AssetManager._textureLoaders) {
+      if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
-      const tex = await this.doLoadTexture(loader, filename, mimeType, data, !!srgb, samplerOptions, texture);
-      tex.name = filename;
-      if (url.match(/^blob:/)) {
-        tex.restoreHandler = async (tex: GPUObject) => {
-          await this.doLoadTexture(
-            loader,
-            filename,
-            mimeType,
-            data,
-            !!srgb,
-            samplerOptions,
-            tex as BaseTexture
-          );
-        };
-      } else {
-        const so = samplerOptions ? null : { ...samplerOptions };
-        tex.restoreHandler = async (tex: GPUObject) => {
-          await this.loadTexture(url, mimeType, srgb, so, tex as BaseTexture);
-        };
-      }
+      const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
+      tex.name = this.vfs.basename(url);
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
   }
-  /** @internal */
+  /**
+   * Internal routine that executes the texture load using a specific loader and applies
+   * backend-specific compatibility steps (e.g., WebGL NPOT/sRGB rules).
+   *
+   * @param loader - Concrete loader to use for decoding/creation.
+   * @param mimeType - Texture MIME type.
+   * @param data - Raw binary data.
+   * @param srgb - If true, treat image as sRGB; otherwise linear.
+   * @param samplerOptions - Optional sampler options.
+   * @param texture - Optional destination texture to populate.
+   * @returns A promise that resolves to the created or populated texture.
+   * @internal
+   */
   async doLoadTexture(
     loader: AbstractTextureLoader,
-    url: string,
     mimeType: string,
-    data: ArrayBuffer,
+    data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
   ): Promise<BaseTexture> {
-    const device = Application.instance.device;
+    const device = getDevice();
     if (device.type !== 'webgl') {
-      return await loader.load(this, url, mimeType, data, srgb, samplerOptions, texture);
+      return await loader.load(mimeType, data, srgb, samplerOptions, texture);
     } else {
-      let tex = await loader.load(this, url, mimeType, data, srgb, samplerOptions);
+      let tex = await loader.load(mimeType, data, srgb, samplerOptions);
       if (texture) {
         const magFilter = tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
         const minFilter = magFilter;
@@ -406,17 +1066,25 @@ export class AssetManager {
       return tex;
     }
   }
-  /** @internal */
-  async loadModel(url: string, options?: ModelFetchOptions): Promise<SharedModel> {
-    const data = await this.httpRequest.requestBlob(url);
-    const filename = new URL(url, new URL(location.href).origin).pathname
-      .split('/')
-      .filter((val) => !!val)
-      .slice(-1)[0];
-    const p = filename ? filename.lastIndexOf('.') : -1;
-    const ext = p >= 0 ? filename.substring(p) : null;
-    for (const loader of this._modelLoaders) {
-      if (!loader.supportExtension(ext) && !loader.supportMIMEType(options?.mimeType || data.type)) {
+  /**
+   * Load a model via registered model loaders.
+   *
+   * - Selects loader by MIME type (explicit or inferred).
+   * - Optionally applies a post-process transform to the SharedModel.
+   * - Sets the model's name from the source filename for convenience.
+   *
+   * @param url - Model URL or VFS path.
+   * @param options - Model load options (MIME override, Draco module, post-process hook).
+   * @returns A promise that resolves to the loaded SharedModel.
+   * @internal
+   */
+  async loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+    const arrayBuffer = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
+    const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
+    const data = new Blob([arrayBuffer], { type: mimeType });
+    const filename = this.vfs.basename(url);
+    for (const loader of AssetManager._modelLoaders) {
+      if (!loader.supportMIMEType(mimeType)) {
         continue;
       }
       let model = await loader.load(
@@ -424,7 +1092,8 @@ export class AssetManager {
         url,
         options?.mimeType || data.type,
         data,
-        options?.dracoDecoderModule
+        options?.dracoDecoderModule,
+        VFSs
       );
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
@@ -442,173 +1111,103 @@ export class AssetManager {
     throw new Error(`Can not find loader for asset ${url}`);
   }
   /**
-   * Fetches a built-in texture
-   * @param name - Name of the built-in texture
-   * @returns The built-in texture
+   * Fetch a built-in texture synchronously by name.
+   *
+   * - If this built-in was not created yet, the registered loader is invoked.
+   * - Registers a device restore handler so the texture can be re-initialized after device loss.
+   * - If an existing texture is provided, the loader uploads into it.
+   *
+   * @typeParam T - Expected concrete texture type.
+   * @param name - Built-in texture identifier.
+   * @param texture - Optional destination texture to populate.
+   * @returns The built-in texture (created or populated).
    */
-  async fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: BaseTexture): Promise<T> {
+  fetchBuiltinTexture<T extends BaseTexture>(name: string, texture?: T): T {
     const loader = AssetManager._builtinTextureLoaders[name];
     if (!loader) {
       throw new Error(`Unknown builtin texture name: ${name}`);
     }
     if (texture) {
-      return loader(this, texture) as Promise<T>;
+      return loader(this, texture) as T;
     } else {
-      let P = AssetManager._builtinTextures[name];
-      if (!P) {
-        P = loader(this);
-        AssetManager._builtinTextures[name] = P;
+      texture = AssetManager._builtinTextures[name] as T;
+      if (!texture) {
+        texture = loader(this) as T;
+        AssetManager._builtinTextures[name] = texture;
       }
-      const tex = await P;
-      tex.restoreHandler = async (tex) => {
-        await loader(this, tex as Texture2D);
+      texture.restoreHandler = (tex) => {
+        loader(this, tex as BaseTexture);
       };
-      return tex as T;
+      return texture;
     }
-  }
-  /** @internal */
-  private createSceneNode(
-    scene: Scene,
-    model: SharedModel,
-    instancing: boolean
-  ): { group: SceneNode; animationSet: AnimationSet } {
-    const group = new SceneNode(scene);
-    group.name = model.name;
-    let animationSet = new AnimationSet(scene, group);
-    for (let i = 0; i < model.scenes.length; i++) {
-      const assetScene = model.scenes[i];
-      const skeletonMeshMap: Map<
-        AssetSkeleton,
-        { mesh: Mesh[]; bounding: AssetSubMeshData[]; skeleton?: Skeleton }
-      > = new Map();
-      const nodeMap: Map<AssetHierarchyNode, SceneNode> = new Map();
-      for (let k = 0; k < assetScene.rootNodes.length; k++) {
-        this.setAssetNodeToSceneNode(
-          scene,
-          group,
-          model,
-          assetScene.rootNodes[k],
-          skeletonMeshMap,
-          nodeMap,
-          instancing
-        );
-      }
-      for (const animationData of model.animations) {
-        const animation = new AnimationClip(animationData.name);
-        for (const track of animationData.tracks) {
-          if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new TranslationTrack(track.interpolator));
-          } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new ScaleTrack(track.interpolator));
-          } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new RotationTrack(track.interpolator));
-          } else if (track.type === 'weights') {
-            for (const m of track.node.mesh.subMeshes) {
-              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
-                console.error(
-                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
-                );
-              } else {
-                const morphTrack = new MorphTargetTrack(track, m);
-                animation.addTrack(m.mesh, morphTrack);
-              }
-            }
-          } else {
-            console.error(`Invalid animation track type: ${track.type}`);
-          }
-        }
-        if (animation.tracks.size === 0) {
-          continue;
-        }
-        animationSet.add(animation);
-        for (const sk of animationData.skeletons) {
-          const nodes = skeletonMeshMap.get(sk);
-          if (nodes) {
-            if (!nodes.skeleton) {
-              nodes.skeleton = new Skeleton(
-                sk.joints.map((val) => nodeMap.get(val)),
-                sk.inverseBindMatrices,
-                sk.bindPoseMatrices,
-                nodes.mesh,
-                nodes.bounding
-              );
-            }
-            animation.addSkeleton(nodes.skeleton);
-          }
-        }
-      }
-    }
-    if (animationSet.numAnimations === 0) {
-      animationSet.dispose();
-      animationSet = null;
-    }
-    return { group, animationSet };
   }
   /**
-   * Sets the loader for a given builtin-texture
-   * @param name - Name of the builtin texture
-   * @param loader - Loader for the builtin texture
+   * Override or unregister the loader for a named built-in texture.
+   *
+   * - Passing a valid loader function sets/overrides the creation path.
+   * - Passing `undefined` removes the loader mapping for the given name.
+   *
+   * @param name - Built-in texture identifier.
+   * @param loader - Factory that creates the built-in texture using the provided AssetManager.
    */
-  static setBuiltinTextureLoader(
-    name: string,
-    loader: (assetManager: AssetManager) => Promise<BaseTexture>
-  ): void {
+  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {
       this._builtinTextureLoaders[name] = undefined;
     }
   }
-  /** @internal */
-  private setAssetNodeToSceneNode(
-    scene: Scene,
-    parent: SceneNode,
-    model: SharedModel,
-    assetNode: AssetHierarchyNode,
-    skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
-    nodeMap: Map<AssetHierarchyNode, SceneNode>,
-    instancing: boolean
-  ) {
-    const node: SceneNode = new SceneNode(scene);
-    nodeMap.set(assetNode, node);
-    node.name = `${assetNode.name}`;
-    node.position.set(assetNode.position);
-    node.rotation.set(assetNode.rotation);
-    node.scale.set(assetNode.scaling);
-    if (assetNode.mesh) {
-      const meshData = assetNode.mesh;
-      const skeleton = assetNode.skeleton;
-      for (const subMesh of meshData.subMeshes) {
-        for (const instance of assetNode.instances) {
-          const meshNode = new Mesh(scene);
-          meshNode.position = instance.t;
-          meshNode.scale = instance.s;
-          meshNode.rotation = instance.r;
-          meshNode.name = subMesh.name;
-          meshNode.clipTestEnabled = true;
-          meshNode.showState = 'inherit';
-          meshNode.primitive = subMesh.primitive;
-          meshNode.material = instancing ? subMesh.material.createInstance() : subMesh.material;
-          meshNode.reparent(node);
-          subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights);
-          if (skeleton) {
-            if (!skeletonMeshMap.has(skeleton)) {
-              skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
-            } else {
-              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
-              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
-            }
-          }
-        }
-      }
-    }
-    node.reparent(parent);
-    for (const child of assetNode.children) {
-      this.setAssetNodeToSceneNode(scene, node, model, child, skeletonMeshMap, nodeMap, instancing);
-    }
-  }
+  /**
+   * Compute a cache key for texture requests.
+   *
+   * Includes texture type tag, URL, and color space choice to avoid cross-color-space cache collisions.
+   *
+   * @typeParam T - Texture type parameter (not used for runtime behavior; helps preserve generic intent).
+   * @param type - Logical texture type tag (e.g., '2d', 'cube').
+   * @param url - Resource URL or VFS path.
+   * @param options - Texture fetch options to incorporate into the key.
+   * @returns A string cache key combining type, URL, and color space choice.
+   * @internal
+   */
   private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {
     return `${type}:${url}:${!options?.linearColorSpace}`;
+  }
+  /**
+   * Try reading from file from a list of VFSs
+   *
+   * @param path - File path
+   * @param options - Read options
+   * @param vfsList - VFS list
+   * @returns File content
+   *
+   * @internal
+   */
+  async readFileFromVFSs(path: string, options: ReadOptions, vfsList?: VFS[]) {
+    vfsList = vfsList ?? [this.vfs];
+    for (const vfs of vfsList) {
+      if (!(await vfs.exists(path))) {
+        continue;
+      }
+      const stat = await vfs.stat(path);
+      if (!stat || !stat.isFile) {
+        continue;
+      }
+      return await vfs.readFile(path, options);
+    }
+    throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
+  }
+  /**
+   * Write file to a list of VFSs
+   *
+   * @param path - File path
+   * @param data - Data to write
+   * @param options - Write options
+   * @param vfsList - Which VFSs will be written to
+   */
+  async writeFileToVFSs(path: string, data: ArrayBuffer | string, options: WriteOptions, vfsList?: VFS[]) {
+    vfsList = vfsList ?? [this.vfs];
+    for (const vfs of vfsList) {
+      await vfs.writeFile(path, data, options);
+    }
   }
 }

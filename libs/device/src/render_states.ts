@@ -166,6 +166,10 @@ export interface DepthState {
   writeEnabled: boolean;
   /** The comparison function for depth testing */
   compareFunc: CompareFunc;
+  /** Depth bias */
+  depthBias: number;
+  /** Slope scaled depth bias */
+  depthBiasSlopeScale: number;
   /**
    * Enable or disable depth testing
    * @param b - true if enable
@@ -184,6 +188,16 @@ export interface DepthState {
    * @returns self
    */
   setCompareFunc(func: CompareFunc): this;
+  /**
+   * Sets the depth bias
+   * @param value - Value of the depth bias
+   */
+  setDepthBias(value: number): this;
+  /**
+   * Sets the slope scaled depth bias
+   * @param value - Value of the slope scaled depth bias
+   */
+  setDepthBiasSlopeScale(value: number): this;
 }
 
 /**

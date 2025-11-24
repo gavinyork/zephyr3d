@@ -28,13 +28,17 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
     return BaseCls as T & { new (...args: any[]): IMixinAlbedoColor };
   }
   const S = applyMaterialMixins(BaseCls, mixinTextureProps('albedo'));
-  const ALBEDO_COLOR_UNIFORM = S.defineInstanceUniform('albedoColor', 'vec4');
+  const ALBEDO_COLOR_UNIFORM = S.defineInstanceUniform('albedoColor', 'rgba', 'AlbedoColor');
   return class extends S {
     static albedoColorMixed = true;
-    private _albedoColor: Vector4;
+    private readonly _albedoColor: Vector4;
     constructor() {
       super();
       this._albedoColor = Vector4.one();
+    }
+    copyFrom(other: this): void {
+      super.copyFrom(other);
+      this.albedoColor = other.albedoColor;
     }
     /** Albedo color */
     get albedoColor(): Vector4 {

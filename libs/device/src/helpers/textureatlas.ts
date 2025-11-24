@@ -42,7 +42,7 @@ export class TextureAtlasManager {
   /** @internal */
   protected _atlasInfoMap: Record<string, AtlasInfo>;
   /** @internal */
-  protected _atlasRestoreHandler: (tex: BaseTexture) => Promise<void>;
+  protected _atlasRestoreHandler: (tex: BaseTexture) => void;
   /**
    * Creates a new texture atlas manager instance
    * @param device - The render device
@@ -72,10 +72,10 @@ export class TextureAtlasManager {
    * The texture restore handler callback function
    * This callback function will be called whenever the device has been restored
    */
-  get atlasTextureRestoreHandler(): (tex: BaseTexture) => Promise<void> {
+  get atlasTextureRestoreHandler(): (tex: BaseTexture) => void {
     return this._atlasRestoreHandler;
   }
-  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => Promise<void>) {
+  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void) {
     this._atlasRestoreHandler = f;
   }
   /**
@@ -104,7 +104,7 @@ export class TextureAtlasManager {
   /**
    * Removes all created atlases
    */
-  clear() {
+  clear(): void {
     this._packer.clear();
     for (const tex of this._atlasList) {
       tex.dispose();
@@ -181,12 +181,12 @@ export class TextureAtlasManager {
   /** @internal */
   protected _createAtlasTexture(): Texture2D {
     const tex = this._device.createTexture2D('rgba8unorm', this._binWidth, this._binHeight, {
-      samplerOptions: { mipFilter: 'none' }
+      mipmapping: false
     });
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
-    tex.restoreHandler = async () => {
+    tex.restoreHandler = () => {
       tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
-      this._atlasRestoreHandler && (await this._atlasRestoreHandler(tex));
+      this._atlasRestoreHandler?.(tex);
     };
     return tex;
   }
@@ -200,7 +200,7 @@ export class TextureAtlasManager {
     h: number,
     xOffset: number,
     yOffset: number
-  ) {
+  ): void {
     let textureAtlas: Texture2D = null;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
@@ -211,7 +211,12 @@ export class TextureAtlasManager {
     textureAtlas.updateFromElement(ctx.canvas, x, y, xOffset, yOffset, w, h);
   }
   /** @internal */
-  private _updateAtlasTexture(atlasIndex: number, bitmap: ImageData | ImageBitmap, x: number, y: number) {
+  private _updateAtlasTexture(
+    atlasIndex: number,
+    bitmap: ImageData | ImageBitmap,
+    x: number,
+    y: number
+  ): void {
     let textureAtlas: Texture2D = null;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();

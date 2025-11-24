@@ -8,13 +8,13 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import { isFloatTextureFormat } from '@zephyr3d/device';
-import { AbstractPostEffect } from './posteffect';
+import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
 import type { DrawContext } from '../render';
-import { copyTexture, fetchSampler } from '../utility/misc';
+import { fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
@@ -65,33 +65,30 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
  * The Scalable Ambient Obscurance (SAO) post effect
  * @public
  */
-export class SAO extends AbstractPostEffect<'SAO'> {
-  static readonly className = 'SAO' as const;
+export class SAO extends AbstractPostEffect {
   private static _program: GPUProgram = null;
   private static _programPacked: GPUProgram = null;
   private static _renderState: RenderStateSet = null;
   private static _renderStateBlend: RenderStateSet = null;
-  private _bindgroup: BindGroup;
-  private _bindgroupPacked: BindGroup;
+  private static _bindgroup: BindGroup = null;
+  private static _bindgroupPacked: BindGroup = null;
   private _saoScale: number;
   private _saoBias: number;
   private _saoIntensity: number;
   private _saoRadius: number;
   private _saoMinResolution: number;
-  private _saoRandomSeed: number;
+  private readonly _saoRandomSeed: number;
   private _saoBlurDepthCutoff: number;
-  private _blitterH: DepthLimitAOBlurBlitter;
-  private _blitterV: DepthLimitAOBlurBlitter;
+  private readonly _blitterH: DepthLimitAOBlurBlitter;
+  private readonly _blitterV: DepthLimitAOBlurBlitter;
   private _supported: boolean;
   /**
    * Creates an instance of SAO post effect
    */
   constructor() {
     super();
-    this._bindgroup = null;
-    this._bindgroupPacked = null;
     this._supported = true;
-    this._opaque = true;
+    this._layer = PostEffectLayer.opaque;
     this._saoScale = 10;
     this._saoBias = 1;
     this._saoIntensity = 0.025;
@@ -178,14 +175,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     const device = ctx.device;
     const viewport = device.getViewport();
     this._prepare(device, inputColorTexture);
-    copyTexture(
-      inputColorTexture,
-      device.getFramebuffer(),
-      fetchSampler('clamp_nearest_nomip'),
-      null,
-      0,
-      srgbOutput
-    );
+    this.passThrough(ctx, inputColorTexture, srgbOutput);
     if (!this._supported) {
       return;
     }
@@ -199,7 +189,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
     device.pushDeviceStates();
     device.setFramebuffer([fbao], depth);
     device.clearFrameBuffer(packed ? new Vector4(0, 0, 0, 1) : new Vector4(1, 0, 0, 1), null, null);
-    const bindgroup = packed ? this._bindgroupPacked : this._bindgroup;
+    const bindgroup = packed ? SAO._bindgroupPacked : SAO._bindgroup;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     bindgroup.setTexture('depthTex', sceneDepthTexture);
     bindgroup.setValue('scale', this._saoScale);
@@ -242,11 +232,11 @@ export class SAO extends AbstractPostEffect<'SAO'> {
       (!texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer)
       ? 'rgba8unorm'
       : texCaps.supportHalfFloatColorBuffer
-      ? 'r16f'
-      : 'r32f';
+        ? 'r16f'
+        : 'r32f';
   }
   /** @internal */
-  private _prepare(device: AbstractDevice, srcTexture: Texture2D) {
+  private _prepare(device: AbstractDevice, _srcTexture: Texture2D) {
     const fb = device.getFramebuffer();
     const isFloatFramebuffer = fb && isFloatTextureFormat(fb.getColorAttachments()[0].format);
     this._supported = !isFloatFramebuffer || device.getDeviceCaps().framebufferCaps.supportFloatBlending;
@@ -265,7 +255,7 @@ export class SAO extends AbstractPostEffect<'SAO'> {
           .setBlendFuncAlpha('zero', 'one');
       }
       function createProgram(packed: boolean) {
-        return device.buildRenderProgram({
+        const program = device.buildRenderProgram({
           vertex(pb) {
             this.flip = pb.int().uniform(0);
             this.$inputs.pos = pb.vec2().attrib('position');
@@ -389,21 +379,15 @@ export class SAO extends AbstractPostEffect<'SAO'> {
             });
           }
         });
+        program.name = packed ? '@SAO_Packed' : '@SAO';
+        return program;
       }
       if (!SAO._program) {
         SAO._program = createProgram(false);
         SAO._programPacked = createProgram(true);
-      }
-      if (!this._bindgroup) {
-        this._bindgroup = device.createBindGroup(SAO._program.bindGroupLayouts[0]);
-        this._bindgroupPacked = device.createBindGroup(SAO._programPacked.bindGroupLayouts[0]);
+        SAO._bindgroup = device.createBindGroup(SAO._program.bindGroupLayouts[0]);
+        SAO._bindgroupPacked = device.createBindGroup(SAO._programPacked.bindGroupLayouts[0]);
       }
     }
-  }
-  /** {@inheritDoc AbstractPostEffect.dispose} */
-  dispose(): void {
-    super.dispose();
-    this._bindgroup?.dispose();
-    this._bindgroup = null;
   }
 }

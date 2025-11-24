@@ -28,7 +28,7 @@ export class PBValueOutOfRange extends PBError {
     super();
     this.value = value;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `value out of range: ${this.value}`;
   }
 }
@@ -67,7 +67,7 @@ export class PBParamLengthError extends PBError {
     super();
     this.func = func;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `wrong argument count for function '${this.func}'`;
   }
 }
@@ -81,7 +81,7 @@ export class PBParamTypeError extends PBError {
     this.func = func;
     this.param = param || null;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `parameter type error for function '${this.func}': ${this.param}`;
   }
 }
@@ -97,7 +97,7 @@ export class PBParamValueError extends PBError {
     this.param = param || null;
     this.reason = reason || null;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `invalid parameter value for function '${this.func}'${this.param ? ': ' + this.param : ''}${
       this.reason ? ': ' + this.reason : ''
     }}`;
@@ -111,7 +111,7 @@ export class PBOverloadingMatchError extends PBError {
     super();
     this.func = func;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `No matched overloading found for function '${this.func}'`;
   }
 }
@@ -145,7 +145,7 @@ export class PBUndeclaredIdentifier extends PBError {
   constructor(identifier: string) {
     super(`undeclared identifier: ${identifier}`);
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return this.message;
   }
 }
@@ -169,7 +169,7 @@ export class PBNonScopedFunctionCall extends PBError {
     super();
     this.funcName = funcName;
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `function call must be made inside a function scope: ${this.funcName}()`;
   }
 }
@@ -193,7 +193,7 @@ export class PBInternalError extends PBError {
   constructor(desc: string) {
     super(desc);
   }
-  getMessage(deviceType: string): string {
+  getMessage(_deviceType: string): string {
     return `Internal error: ${this.message}`;
   }
 }

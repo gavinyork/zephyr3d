@@ -85,7 +85,7 @@ export class Ray {
    * @param origin - The ray origin point.
    * @param directionNormalized - The normalized direction vector.
    */
-  set(origin: Vector3, directionNormalized: Vector3) {
+  set(origin: Vector3, directionNormalized: Vector3): void {
     this._origin.set(origin);
     this._direction.set(directionNormalized);
     this.prepare();
@@ -98,11 +98,16 @@ export class Ray {
    */
   transform(matrix: Matrix4x4, other?: Ray): Ray {
     if (other) {
+      matrix.transformPointAffine(Vector3.add(this._origin, this._direction), other._direction);
+      matrix.transformPointAffine(this._origin, other._origin);
+      other._direction.subBy(other._origin).inplaceNormalize();
+      /*
       matrix.transformPointAffine(this._origin, other._origin);
       matrix
         .transformPointAffine(Vector3.add(this._origin, this._direction), other._direction)
         .subBy(other._origin)
         .inplaceNormalize();
+      */
       other.prepare();
     } else {
       const origin = matrix.transformPointAffine(this._origin);
@@ -113,6 +118,122 @@ export class Ray {
       other = new Ray(origin, direction);
     }
     return other;
+  }
+  intersectionTestCircle(
+    center: Vector3,
+    normal: Vector3,
+    radius: number,
+    epsl: number
+  ): { dist: number; epsl: number } | null {
+    // 数值容差
+    const deltaParallel = 1e-1; // 接近平行阈值
+    const deltaZero = 1e-12; // 避免除零用的小阈值
+
+    const O = this.origin;
+    const D = this.direction; // 假定已归一化
+    const C = center;
+    const N = normal; // 假定已归一化
+    const R = radius;
+
+    // 基础量
+    const w = Vector3.sub(O, C);
+    const a = Vector3.dot(D, N); // 射线方向与法线的夹角余弦
+    const b = Vector3.dot(w, N); // 起点到平面的有符号距离
+    /*
+    // 将点 P 投影到平面 (N, 过 C)
+    const projectPointToPlane = (P: Vector3) => {
+      const h = Vector3.dot(Vector3.sub(P, C), N);
+      return Vector3.sub(P, Vector3.scale(N, h));
+    };
+*/
+    // 已在平面内的点 Q 到圆周的平面内距离
+    const closestOnCircleInPlane = (Q: Vector3) => {
+      const u = Vector3.sub(Q, C);
+      const d = u.magnitude; // 长度
+      if (d < deltaZero) {
+        // Q 在圆心：最近距离等于半径
+        return R;
+      } else {
+        return Math.abs(d - R);
+      }
+    };
+
+    // 近似平行/共面处理：更稳健
+    if (Math.abs(a) < deltaParallel) {
+      const distance = this.intersectionTestSphere(center, radius + Math.abs(epsl));
+      if (!distance) {
+        return null;
+      }
+      let t = epsl;
+      let d = -1;
+      for (const dist of distance) {
+        const distPlane = Vector3.dot(Vector3.sub(Vector3.add(O, Vector3.scale(D, dist)), center), N);
+        if (Math.abs(distPlane) < t) {
+          d = dist;
+          t = Math.abs(distPlane);
+        }
+      }
+      if (d >= 0) {
+        return { dist: d, epsl: t };
+      }
+    }
+
+    // 一般情况：用平面交点
+    const tp = -b / a;
+    if (tp >= 0) {
+      // 前方交平面：直接在交点上测平面内到圆周距离
+      const P = Vector3.add(O, Vector3.scale(D, tp));
+      const dCircle = closestOnCircleInPlane(P);
+      return dCircle <= epsl ? { dist: tp, epsl: dCircle } : null;
+    }
+
+    return null;
+    /*
+    // 平面在射线后方：最近点是 O（t=0），组合空间距离
+    const distPlane = Math.abs(b);
+    if (distPlane > epsl) {
+      return null;
+    }
+
+    const Q = projectPointToPlane(O);
+    const dCircle = closestOnCircleInPlane(Q);
+    const distance = Math.hypot(distPlane, dCircle);
+    return distance <= epsl ? distance : null;
+    */
+  }
+  /**
+   * Do a ray sphere intersection test
+   * @param radius - Sphere radius
+   * @returns Distance from origin to the intersected point if the ray intersects with the sphere, otherwise null
+   */
+  intersectionTestSphere(center: Vector3, radius: number): number[] | null {
+    const O = Vector3.sub(this._origin, center);
+    const a = Vector3.dot(this._direction, this._direction);
+    const b = 2 * Vector3.dot(O, this._direction);
+    const c = Vector3.dot(O, O) - radius * radius;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) {
+      return null;
+    }
+    const s = Math.sqrt(discriminant);
+    let t1 = (-b - s) / (2 * a);
+    let t2 = (-b + s) / (2 * a);
+    if (t1 > t2) {
+      const t = t1;
+      t1 = t2;
+      t2 = t;
+    }
+    if (t1 >= 0 || t2 >= 0) {
+      const result: number[] = [];
+      if (t1 >= 0) {
+        result.push(t1);
+      }
+      if (t2 >= 0) {
+        result.push(t2);
+      }
+      return result;
+    }
+    return null;
   }
   /**
    * Do a ray triangle intersection test.
@@ -219,8 +340,9 @@ export class Ray {
       this._kbyj * y0 - z0 + this._c_yz < 0 ||
       this._kbyi * x0 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x1 + this._c_zx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -258,8 +380,9 @@ export class Ray {
       this._kbyj * y1 - z1 + this._c_yz > 0 ||
       this._kbyi * x0 - z1 + this._c_xz > 0 ||
       this._ibyk * z0 - x1 + this._c_zx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -297,8 +420,9 @@ export class Ray {
       this._kbyj * y1 - z0 + this._c_yz < 0 ||
       this._kbyi * x0 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x1 + this._c_zx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -336,8 +460,9 @@ export class Ray {
       this._kbyj * y0 - z1 + this._c_yz > 0 ||
       this._kbyi * x1 - z1 + this._c_xz > 0 ||
       this._ibyk * z0 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -375,8 +500,9 @@ export class Ray {
       this._kbyj * y0 - z0 + this._c_yz < 0 ||
       this._kbyi * x1 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -387,9 +513,13 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t1 = (bbox.maxPoint.y - this._origin.y) * this._ij;
-    if (t1 > t) t = t1;
+    if (t1 > t) {
+      t = t1;
+    }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
     return t;
   }
   /** @internal */
@@ -410,8 +540,9 @@ export class Ray {
       this._kbyj * y1 - z1 + this._c_yz > 0 ||
       this._kbyi * x1 - z1 + this._c_xz > 0 ||
       this._ibyk * z0 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -422,9 +553,13 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
-    if (t1 > t) t = t1;
+    if (t1 > t) {
+      t = t1;
+    }
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -446,8 +581,9 @@ export class Ray {
       this._kbyj * y1 - z0 + this._c_yz < 0 ||
       this._kbyi * x1 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -458,9 +594,13 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
-    if (t1 > t) t = t1;
+    if (t1 > t) {
+      t = t1;
+    }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -479,8 +619,9 @@ export class Ray {
       this._origin.z < z0 ||
       this._jbyk * z0 - y1 + this._c_zy > 0 ||
       this._kbyj * y0 - z1 + this._c_yz > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -492,7 +633,9 @@ export class Ray {
 
     let t = (bbox.maxPoint.y - this._origin.y) * this._ij;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -511,8 +654,9 @@ export class Ray {
       this._origin.z > z1 ||
       this._jbyk * z1 - y1 + this._c_zy > 0 ||
       this._kbyj * y0 - z0 + this._c_yz < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -524,7 +668,9 @@ export class Ray {
 
     let t = (bbox.maxPoint.y - this._origin.y) * this._ij;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -543,8 +689,9 @@ export class Ray {
       this._origin.z < z0 ||
       this._jbyk * z0 - y0 + this._c_zy < 0 ||
       this._kbyj * y1 - z1 + this._c_yz > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -555,7 +702,9 @@ export class Ray {
     }
     let t = (bbox.minPoint.y - this._origin.y) * this._ij;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -574,8 +723,9 @@ export class Ray {
       this._origin.z > z1 ||
       this._jbyk * z1 - y0 + this._c_zy < 0 ||
       this._kbyj * y1 - z0 + this._c_yz < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -587,7 +737,9 @@ export class Ray {
 
     let t = (bbox.minPoint.y - this._origin.y) * this._ij;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -606,8 +758,9 @@ export class Ray {
       this._origin.z < z0 ||
       this._kbyi * x0 - z1 + this._c_xz > 0 ||
       this._ibyk * z0 - x1 + this._c_zx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -618,7 +771,9 @@ export class Ray {
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -637,8 +792,9 @@ export class Ray {
       this._origin.z > z1 ||
       this._kbyi * x0 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x1 + this._c_zx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -649,7 +805,9 @@ export class Ray {
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -668,8 +826,9 @@ export class Ray {
       this._origin.z < z0 ||
       this._kbyi * x1 - z1 + this._c_xz > 0 ||
       this._ibyk * z0 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -680,7 +839,9 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -699,8 +860,9 @@ export class Ray {
       this._origin.z > z1 ||
       this._kbyi * x1 - z0 + this._c_xz < 0 ||
       this._ibyk * z1 - x0 + this._c_zx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -711,7 +873,9 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -730,8 +894,9 @@ export class Ray {
       this._origin.y < y0 ||
       this._jbyi * x0 - y1 + this._c_xy > 0 ||
       this._ibyj * y0 - x1 + this._c_yx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -742,7 +907,9 @@ export class Ray {
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.maxPoint.y - this._origin.y) * this._ij;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -761,8 +928,9 @@ export class Ray {
       this._origin.y > y1 ||
       this._jbyi * x0 - y0 + this._c_xy < 0 ||
       this._ibyj * y1 - x1 + this._c_yx > 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -774,7 +942,9 @@ export class Ray {
 
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.minPoint.y - this._origin.y) * this._ij;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -793,8 +963,9 @@ export class Ray {
       this._origin.y < y0 ||
       this._jbyi * x1 - y1 + this._c_xy > 0 ||
       this._ibyj * y0 - x0 + this._c_yx < 0
-    )
+    ) {
       return false;
+    }
     return true;
   }
   /** @internal */
@@ -804,7 +975,9 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.maxPoint.y - this._origin.y) * this._ij;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -823,8 +996,9 @@ export class Ray {
       this._origin.y > y1 ||
       this._jbyi * x1 - y0 + this._c_xy < 0 ||
       this._ibyj * y1 - x0 + this._c_yx < 0
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -835,7 +1009,9 @@ export class Ray {
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
     const t2 = (bbox.minPoint.y - this._origin.y) * this._ij;
-    if (t2 > t) t = t2;
+    if (t2 > t) {
+      t = t2;
+    }
 
     return t;
   }
@@ -853,8 +1029,9 @@ export class Ray {
       this._origin.y > y1 ||
       this._origin.z < z0 ||
       this._origin.z > z1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -881,8 +1058,9 @@ export class Ray {
       this._origin.y > y1 ||
       this._origin.z < z0 ||
       this._origin.z > z1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -910,8 +1088,9 @@ export class Ray {
       this._origin.x > x1 ||
       this._origin.z < z0 ||
       this._origin.z > z1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -939,8 +1118,9 @@ export class Ray {
       this._origin.x > x1 ||
       this._origin.z < z0 ||
       this._origin.z > z1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -968,8 +1148,9 @@ export class Ray {
       this._origin.x > x1 ||
       this._origin.y < y0 ||
       this._origin.y > y1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -997,8 +1178,9 @@ export class Ray {
       this._origin.x > x1 ||
       this._origin.y < y0 ||
       this._origin.y > y1
-    )
+    ) {
       return false;
+    }
 
     return true;
   }
@@ -1013,7 +1195,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  prepare() {
+  prepare(): void {
     const x = this._origin.x;
     const y = this._origin.y;
     const z = this._origin.z;

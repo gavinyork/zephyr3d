@@ -112,7 +112,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.loadEmpty(format, size, 0);
     }
   }
-  readPixels(
+  async readPixels(
     x: number,
     y: number,
     w: number,
@@ -125,19 +125,12 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
     if (!this.device.isContextLost() && !this.disposed) {
-      return new Promise<void>((resolve) => {
-        const fb = this._device.createFrameBuffer([this], null);
-        fb.setColorAttachmentCubeFace(0, face);
-        fb.setColorAttachmentMipLevel(0, mipLevel);
-        fb.setColorAttachmentGenerateMipmaps(0, false);
-        this._device.pushDeviceStates();
-        this._device.setFramebuffer(fb);
-        this._device.readPixels(0, x, y, w, h, buffer).then(() => {
-          fb.dispose();
-          resolve();
-        });
-        this._device.popDeviceStates();
-      });
+      const fb = this._getFramebufferForRead(face, mipLevel);
+      this._device.pushDeviceStates();
+      this._device.setFramebuffer(fb);
+      const result = this._device.readPixels(0, x, y, w, h, buffer);
+      this._device.popDeviceStates();
+      return result;
     }
   }
   readPixelsToBuffer(
@@ -192,6 +185,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.generateMipmaps();
     }
   }
+  /*
   private loadImages(images: HTMLImageElement[], format: TextureFormat): void {
     const width = images[0].width;
     const height = images[0].height;
@@ -235,6 +229,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       }
     }
   }
+  */
   private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     const width = levels.width;
@@ -250,12 +245,11 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     if (!this._device.isContextLost()) {
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
-      //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
       (this.device as WebGLDevice).clearErrors();
       for (let face = 0; face < 6; face++) {
         const faceTarget = cubeMapFaceMap[face];
         if (this._mipLevelCount > 1 && levels.mipDatas[face].length !== this._mipLevelCount) {
-          console.log(`invalid texture data`);
+          console.error(`invalid texture data`);
           return;
         }
         for (let i = 0; i < this._mipLevelCount; i++) {

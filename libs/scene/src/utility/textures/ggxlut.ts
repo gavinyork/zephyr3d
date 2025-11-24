@@ -1,5 +1,5 @@
 import type { Texture2D } from '@zephyr3d/device';
-import { Application } from '../../app';
+import { getDevice } from '../../app/api';
 
 const ggxLut: Map<number, Texture2D> = new Map();
 export function getGGXLUT(size: number): Texture2D {
@@ -11,7 +11,7 @@ export function getGGXLUT(size: number): Texture2D {
   return lut;
 }
 function createGGXLUT(size: number) {
-  const device = Application.instance.device;
+  const device = getDevice();
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -216,6 +216,7 @@ function createGGXLUT(size: number) {
       });
     }
   });
+  program.name = '@GGXLUT_Generation';
   const vertexLayout = device.createVertexLayout({
     vertexBuffers: [
       { buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }
@@ -224,7 +225,7 @@ function createGGXLUT(size: number) {
   const rs = device.createRenderStateSet();
   rs.useRasterizerState().setCullMode('none');
   rs.useDepthState().enableTest(false).enableWrite(false);
-  const tex = device.createTexture2D('rgba8unorm', size, size, { samplerOptions: { mipFilter: 'none' } });
+  const tex = device.createTexture2D('rgba8unorm', size, size, { mipmapping: false });
   tex.name = 'GGXLUT';
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();

@@ -15,10 +15,12 @@
     "experimentalDecorators": false,
     "emitDecoratorMetadata": false,
     "sourceMap": true,
+    "inlineSourceMap": false,
     "stripInternal": false,
     "keyofStringsOnly": false,
     "rootDir": "./src",
     "declaration": true,
+    "declarationMap": true,
     "importHelpers": false,
     "typeRoots": ["./node_modules/@types"]
   },

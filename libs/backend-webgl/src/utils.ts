@@ -5,12 +5,11 @@
 import { WebGLEnum } from './webgl_enum';
 
 export function isWebGL2(gl: WebGLRenderingContext | WebGL2RenderingContext): gl is WebGL2RenderingContext {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return !!(gl && (gl as any).texStorage2D);
 }
 
 export class WebGLError extends Error {
-  private static errorToString: Record<number, string> = {
+  private static readonly errorToString: Record<number, string> = {
     [WebGLEnum.NO_ERROR]: 'NO_ERROR',
     [WebGLEnum.INVALID_ENUM]: 'INVALID_ENUM',
     [WebGLEnum.INVALID_VALUE]: 'INVALID_VALUE',

@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA } from '../shaders';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 
 /**
  * Gaussian blur blitter
@@ -129,8 +129,8 @@ export class GaussianBlurBlitter extends Blitter {
             ? pb.vec3(1, 0, 0)
             : pb.vec3(0, 1, 0)
           : this._phase === 'horizonal'
-          ? pb.vec2(1, 0)
-          : pb.vec2(0, 1);
+            ? pb.vec2(1, 0)
+            : pb.vec2(0, 1);
       scope.numBlurPixelsPerSide = pb.float((this._kernelSize + 1) / 2);
     }
   }
@@ -208,8 +208,8 @@ export class GaussianBlurBlitter extends Blitter {
       this.$if(this.test1, function () {
         this.d1 = that.readTexel(scope, type, srcTex, this.uv1, srcLayer, sampleType);
       });
-      (this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i))),
-        (this.$l.d2 = pb.vec4());
+      this.$l.uv2 = pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i));
+      this.$l.d2 = pb.vec4();
       if (that._depthTex) {
         this.$l.depth2 = this.getLinearDepth(this.uv2);
         this.$l.test2 = pb.lessThan(pb.abs(pb.sub(this.depth2, this.centerDepth)), this.depthCutoff);

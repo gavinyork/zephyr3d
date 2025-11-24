@@ -1,25 +1,28 @@
-import type { Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
+  FrameBuffer,
+  GPUDataBuffer,
   PBInsideFunctionScope,
   PBShaderExp,
   ProgramBuilder,
   TextureCube
 } from '@zephyr3d/device';
-import { Application } from '../app';
+import { fetchSampler } from '../utility/misc';
+import { getDevice } from '../app/api';
 
 /**
  * Environment light type
  * @public
  */
-export type EnvLightType = 'ibl' | 'ibl-sh' | 'hemisphere' | 'constant' | 'none';
+export type EnvLightType = 'ibl' | 'hemisphere' | 'constant' | 'none';
 
 /**
  * Base class for any kind of environment light
  * @public
  */
-export abstract class EnvironmentLighting {
+export abstract class EnvironmentLighting extends Disposable {
   /**
    * The environment light type
    */
@@ -75,61 +78,61 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = 'zIBLIrradianceSH';
   /** @internal */
-  private _radianceMap: TextureCube;
+  public static readonly UNIFORM_NAME_IBL_IRRADIANCE_WINDOW = 'zIBLIrradianceWindow';
   /** @internal */
-  private _irradianceSH: Float32Array;
+  private readonly _radianceMap: DRef<TextureCube>;
+  /** @internal */
+  private readonly _irradianceSH: DRef<GPUDataBuffer>;
+  /** @internal */
+  private readonly _irradianceSHFB: DRef<FrameBuffer>;
+  /** @internal */
+  private _irraidanceWindow: Vector3;
   /**
    * Creates an instance of EnvIBL
    * @param radianceMap - The radiance map
    * @param irradianceSH - The irradiance SH
    */
-  constructor(radianceMap?: TextureCube, irradianceSH?: (Vector4 | Vector3)[] | Float32Array) {
+  constructor(radianceMap?: TextureCube, irradianceSH?: GPUDataBuffer, irradianceSHFB?: FrameBuffer) {
     super();
-    this._radianceMap = radianceMap || null;
-    if (!irradianceSH) {
-      this._irradianceSH = null;
-    } else {
-      this._irradianceSH = new Float32Array(9 * 4);
-      if (irradianceSH instanceof Float32Array) {
-        if (irradianceSH.length !== 9 * 4) {
-          throw new Error(`3rd order SH coefficients expected`);
-        }
-        this._irradianceSH.set(irradianceSH);
-      } else {
-        if (irradianceSH.length !== 9) {
-          throw new Error(`3rd order SH coefficients expected`);
-        }
-        for (let i = 0; i < 9; i++) {
-          this._irradianceSH[i * 4 + 0] = irradianceSH[i].x;
-          this._irradianceSH[i * 4 + 1] = irradianceSH[i].y;
-          this._irradianceSH[i * 4 + 2] = irradianceSH[i].z;
-        }
-      }
-    }
+    this._radianceMap = new DRef(radianceMap || null);
+    this._irradianceSH = new DRef(irradianceSH || null);
+    this._irradianceSHFB = new DRef(irradianceSHFB || null);
+    this._irraidanceWindow = new Vector3();
   }
   /**
    * {@inheritDoc EnvironmentLighting.getType}
    * @override
    */
   getType(): EnvLightType {
-    return 'ibl-sh';
+    return 'ibl';
   }
   /** The radiance map */
   get radianceMap(): TextureCube {
-    return this._radianceMap;
+    return this._radianceMap.get();
   }
   set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex;
+    this._radianceMap.set(tex);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSH(): Float32Array {
-    return this._irradianceSH;
+  get irradianceSH(): GPUDataBuffer {
+    return this._irradianceSH.get();
   }
-  set irradianceSH(value: Float32Array) {
-    if (value && value.length < 36) {
-      throw new Error(`3rd order SH coefficients expected`);
-    }
-    this._irradianceSH = value;
+  set irradianceSH(value: GPUDataBuffer) {
+    this._irradianceSH.set(value);
+  }
+  /** The irradiance sh coeffecients */
+  get irradianceSHFB(): FrameBuffer {
+    return this._irradianceSHFB.get();
+  }
+  set irradianceSHFB(value: FrameBuffer) {
+    this._irradianceSHFB.set(value);
+  }
+  /** The irradiance sh window */
+  get irradianceWindow(): Vector3 {
+    return this._irraidanceWindow;
+  }
+  set irradianceWindow(val: Vector3) {
+    this._irraidanceWindow = val;
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
@@ -137,12 +140,20 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   initShaderBindings(pb: ProgramBuilder): void {
     if (pb.shaderKind === 'fragment') {
-      if (this._radianceMap) {
+      if (this.radianceMap) {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (this._irradianceSH) {
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniform(0);
+      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
+        if (this.irradianceSHFB) {
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.tex2D().uniform(0);
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+        }
+      } else {
+        if (this.irradianceSH) {
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+        }
       }
     }
   }
@@ -151,12 +162,24 @@ export class EnvShIBL extends EnvironmentLighting {
    * @override
    */
   updateBindGroup(bg: BindGroup): void {
-    if (this._radianceMap) {
-      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this._radianceMap.mipLevelCount - 1);
-      bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this._radianceMap);
+    if (this.radianceMap) {
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
+      bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (this._irradianceSH) {
-      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this._irradianceSH);
+    if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
+      if (this.irradianceSHFB) {
+        bg.setTexture(
+          EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH,
+          this.irradianceSHFB.getColorAttachments()[0],
+          fetchSampler('clamp_nearest_nomip')
+        );
+        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+      }
+    } else {
+      if (this.irradianceSH) {
+        bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
+        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+      }
     }
   }
   /**
@@ -165,13 +188,13 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
+    return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
       ? pb.textureSampleLevel(
-          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
+          scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
           refl,
-          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
+          pb.mul(roughness, scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
         ).rgb
-      : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
+      : pb.textureSample(scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
@@ -207,39 +230,125 @@ export class EnvShIBL extends EnvironmentLighting {
       this.$return(pb.mul(pb.sub(pb.mul(this.v.x, this.v.x), pb.mul(this.v.y, this.v.y)), 0.5462742153));
     });
     pb.func('Z_sh_eval', [pb.vec3('v')], function () {
-      this.$l.c = pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz, this.Z_sh_Y0(this.v));
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v))
-      );
-      this.c = pb.add(
-        this.c,
-        pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v))
-      );
+      this.$l.window = this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW];
+      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
+        this.$l.c = pb.mul(
+          pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 0.5 / 3), 0)
+            .rgb,
+          this.Z_sh_Y0(this.v),
+          this.window.x
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 0.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y1(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 0.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y2(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y3(this.v),
+            this.window.y
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y4(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 1.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y5(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y6(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(1.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y7(this.v),
+            this.window.z
+          )
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(
+            pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(2.5 / 3, 2.5 / 3), 0)
+              .rgb,
+            this.Z_sh_Y8(this.v),
+            this.window.z
+          )
+        );
+      } else {
+        this.$l.c = pb.mul(
+          this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][0].xyz,
+          this.Z_sh_Y0(this.v),
+          this.window.x
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][1].xyz, this.Z_sh_Y1(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][2].xyz, this.Z_sh_Y2(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][3].xyz, this.Z_sh_Y3(this.v), this.window.y)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][4].xyz, this.Z_sh_Y4(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][5].xyz, this.Z_sh_Y5(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][6].xyz, this.Z_sh_Y6(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][7].xyz, this.Z_sh_Y7(this.v), this.window.z)
+        );
+        this.c = pb.add(
+          this.c,
+          pb.mul(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH][8].xyz, this.Z_sh_Y8(this.v), this.window.z)
+        );
+      }
       this.$return(this.c);
     });
     return pb.getGlobalScope().Z_sh_eval(normal);
@@ -258,117 +367,15 @@ export class EnvShIBL extends EnvironmentLighting {
   hasIrradiance(): boolean {
     return !!this._irradianceSH;
   }
-}
-
-/**
- * IBL based environment lighting
- * @public
- */
-export class EnvIBL extends EnvironmentLighting {
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP = 'zIBLRadianceMap';
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD = 'zIBLRadianceMapMaxLOD';
-  /** @internal */
-  public static readonly UNIFORM_NAME_IBL_IRRADIANCE_MAP = 'zIBLIrradianceMap';
-  /** @internal */
-  private _radianceMap: TextureCube;
-  /** @internal */
-  private _irradianceMap: TextureCube;
   /**
-   * Creates an instance of EnvIBL
-   * @param radianceMap - The radiance map
-   * @param irradianceMap - The irradiance map
-   */
-  constructor(radianceMap?: TextureCube, irradianceMap?: TextureCube) {
-    super();
-    this._radianceMap = radianceMap || null;
-    this._irradianceMap = irradianceMap || null;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getType}
+   * Disposes the object and releases all GPU resources
    * @override
    */
-  getType(): EnvLightType {
-    return 'ibl';
-  }
-  /** The radiance map */
-  get radianceMap(): TextureCube {
-    return this._radianceMap;
-  }
-  set radianceMap(tex: TextureCube) {
-    this._radianceMap = tex;
-  }
-  /** The irradiance map */
-  get irradianceMap(): TextureCube {
-    return this._irradianceMap;
-  }
-  set irradianceMap(tex: TextureCube) {
-    this._irradianceMap = tex;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.initShaderBindings}
-   * @override
-   */
-  initShaderBindings(pb: ProgramBuilder): void {
-    if (pb.shaderKind === 'fragment') {
-      if (this._radianceMap) {
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
-      }
-      if (this._irradianceMap) {
-        pb.getGlobalScope()[EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP] = pb.texCube().uniform(0);
-      }
-    }
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.updateBindGroup}
-   * @override
-   */
-  updateBindGroup(bg: BindGroup): void {
-    if (this._radianceMap) {
-      bg.setValue(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this._radianceMap.mipLevelCount - 1);
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this._radianceMap);
-    }
-    if (this._irradianceMap) {
-      bg.setTexture(EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP, this._irradianceMap);
-    }
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getRadiance}
-   * @override
-   */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    return Application.instance.device.getDeviceCaps().shaderCaps.supportShaderTextureLod
-      ? pb.textureSampleLevel(
-          scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
-          refl,
-          pb.mul(roughness, scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
-        ).rgb
-      : pb.textureSample(scope[EnvIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.getIrradiance}
-   * @override
-   */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    return pb.textureSampleLevel(scope[EnvIBL.UNIFORM_NAME_IBL_IRRADIANCE_MAP], normal, 0).rgb;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.hasRadiance}
-   * @override
-   */
-  hasRadiance(): boolean {
-    return !!this._radianceMap;
-  }
-  /**
-   * {@inheritDoc EnvironmentLighting.hasIrradiance}
-   * @override
-   */
-  hasIrradiance(): boolean {
-    return !!this._irradianceMap;
+  protected onDispose() {
+    super.onDispose();
+    this._radianceMap.dispose();
+    this._irradianceSH.dispose();
+    this._irradianceSHFB.dispose();
   }
 }
 
@@ -380,7 +387,7 @@ export class EnvConstantAmbient extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_CONSTANT_AMBIENT = 'zConstantAmbient';
   /** @internal */
-  private _ambientColor: Vector4;
+  private readonly _ambientColor: Vector4;
   /**
    * Creates an instance of EnvConstantAmbient
    * @param ambientColor - The ambient color
@@ -425,14 +432,14 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
     return null;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+  getIrradiance(scope: PBInsideFunctionScope, _normal: PBShaderExp): PBShaderExp {
     return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb;
   }
   /**
@@ -461,9 +468,9 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_AMBIENT_DOWN = 'zHemisphericAmbientDown';
   /** @internal */
-  private _ambientUp: Vector4;
+  private readonly _ambientUp: Vector4;
   /** @internal */
-  private _ambientDown: Vector4;
+  private readonly _ambientDown: Vector4;
   /**
    * Creates an instance of EnvConstantAmbient
    * @param ambientUp - The upside ambient color
@@ -521,7 +528,7 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(refl.y, 0.5), 0.5);
     return pb.mix(

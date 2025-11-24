@@ -1,6 +1,27 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 /**
+ * Generate random float value from a float
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash11';
+  pb.func(funcName, [pb.float('p')], function () {
+    this.$l.x = pb.fract(pb.mul(this.p, 0.1031));
+    this.x = pb.mul(this.x, pb.add(this.x, 33.33));
+    this.x = pb.mul(this.x, pb.add(this.x, this.x));
+    this.$return(pb.fract(this.x));
+  });
+  return scope[funcName](p);
+}
+
+/**
  * Generate random float value from a vec2
  *
  * @param scope - Current shader scope
@@ -9,12 +30,200 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  *
  * @public
  */
-export function hash(scope: PBInsideFunctionScope, p: PBShaderExp) {
+export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
   const pb = scope.$builder;
-  const funcName = 'Z_hashf';
+  const funcName = 'Z_hash21';
   pb.func(funcName, [pb.vec2('p')], function () {
-    this.h = pb.dot(this.p, pb.vec2(12.9898, 78.233));
-    this.$return(pb.fract(pb.mul(pb.sin(this.h), 43758.5453123)));
+    this.$l.p3 = pb.fract(pb.mul(this.p.xyx, 0.1031));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random float value from a vec3
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash31';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(this.p, 0.1031));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.zyx, pb.vec3(31.32))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec2 value from a float
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec2 value
+ *
+ * @public
+ */
+export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash12';
+  pb.func(funcName, [pb.float('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(pb.vec3(0.1031, 0.103, 0.0973), this.p));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec2 value from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec2 value
+ *
+ * @public
+ */
+export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash22';
+  pb.func(funcName, [pb.vec2('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(this.p.xyx, pb.vec3(0.1031, 0.103, 0.0973)));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec2 value from a vec3
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec2 value
+ *
+ * @public
+ */
+export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash32';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(this.p, pb.vec3(0.1031, 0.103, 0.0973)));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec3 value from a float
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec3 value
+ *
+ * @public
+ */
+export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash13';
+  pb.func(funcName, [pb.float('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(pb.vec3(0.1031, 0.103, 0.0973), this.p));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec3 value from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec3 value
+ *
+ * @public
+ */
+export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash23';
+  pb.func(funcName, [pb.vec2('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(pb.vec3(0.1031, 0.103, 0.0973), this.p.xyx));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate random vec3 value from a vec3
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random vec3 value
+ *
+ * @public
+ */
+export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_hash33';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.p3 = pb.fract(pb.mul(pb.vec3(0.1031, 0.103, 0.0973), this.p));
+    this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
+    this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate uniform distributed white noise from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function whiteNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_whiteNoise';
+  pb.func(funcName, [pb.vec2('p')], function () {
+    this.$return(pb.fract(pb.mul(pb.sin(pb.dot(this.p, pb.vec2(12.9898, 78.233))), 43758.5453)));
+  });
+  return scope[funcName](p);
+}
+
+/**
+ * Generate value noise from a vec2
+ *
+ * @param scope - Current shader scope
+ * @param p - random seed
+ * @returns random float value
+ *
+ * @public
+ */
+export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'Z_valueNoise';
+  pb.func(funcName, [pb.vec2('p')], function () {
+    this.$l.i = pb.floor(this.p);
+    this.$l.f = pb.fract(this.p);
+    this.f = pb.mul(this.f, this.f, pb.sub(pb.vec2(3), pb.mul(this.f, 2)));
+    this.$l.c0 = this.i;
+    this.$l.c1 = pb.add(this.i, pb.vec2(1, 0));
+    this.$l.c2 = pb.add(this.i, pb.vec2(0, 1));
+    this.$l.c3 = pb.add(this.i, pb.vec2(1));
+    this.$l.r0 = whiteNoise(this, this.c0);
+    this.$l.r1 = whiteNoise(this, this.c1);
+    this.$l.r2 = whiteNoise(this, this.c2);
+    this.$l.r3 = whiteNoise(this, this.c3);
+    this.$return(pb.mix(pb.mix(this.r0, this.r1, this.f.x), pb.mix(this.r2, this.r3, this.f.x), this.f.y));
   });
   return scope[funcName](p);
 }
@@ -32,7 +241,7 @@ export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShad
   const pb = scope.$builder;
   const funcName = 'Z_gradient2f';
   pb.func(funcName, [pb.vec2('p'), pb.float('t')], function () {
-    this.$l.rand = hash(this, this.p);
+    this.$l.rand = hash21(this, this.p);
     this.$l.angle = pb.mul(pb.add(this.t, Math.PI * 2), this.rand);
     this.$return(pb.vec2(pb.cos(this.angle), pb.sin(this.angle)));
   });
@@ -103,7 +312,6 @@ export function worleyNoise(
   const funcNameHash = 'Z_worleyHash';
   // https://www.shadertoy.com/view/4sc3z2
   pb.func(funcNameHash, [pb.vec3('p')], function () {
-    /* eslint-disable no-constant-condition */
     if (1) {
       this.$l.mod3 = pb.vec3(0.1031, 0.11369, 0.13787);
       this.$l.p3 = pb.fract(pb.mul(this.p, this.mod3));
@@ -143,7 +351,7 @@ export function worleyNoise(
       this.$for(pb.int('y'), -1, 2, function () {
         this.$for(pb.int('z'), -1, 2, function () {
           this.$l.offset = pb.vec3(pb.float(this.x), pb.float(this.y), pb.float(this.z));
-          /* eslint-disable no-constant-condition */
+
           if (1 /* tilable */) {
             this.$l.h = pb.add(
               pb.mul(this[funcNameHash](pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq))), 0.4),

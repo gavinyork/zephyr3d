@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
@@ -15,19 +14,9 @@ import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
 import type { WebGLDevice } from './device_webgl';
+import type { TypedArrayConstructor } from '@zephyr3d/base';
 
-type TypedArray = Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array;
-type TypedArrayConstructor<T extends TypedArray = any> = {
-  new (): T;
-  new (size: number): T;
-  new (elements: number[]): T;
-  new (buffer: ArrayBuffer): T;
-  new (buffer: ArrayBuffer, byteOffset: number): T;
-  new (buffer: ArrayBuffer, byteOffset: number, length: number): T;
-  BYTES_PER_ELEMENT: number;
-};
-
-type UniformBlockArray = Int32Array | Uint32Array | Float32Array;
+type UniformBlockArray = Int32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Float32Array<ArrayBuffer>;
 export interface AttributeSetter {
   (value: WebGLGPUBuffer | number | Iterable<number>, offset?: number, stride?: number): void;
   location: number;
@@ -56,18 +45,18 @@ interface ProgramBlockInfo {
   index: number;
   used: boolean;
   size: number;
-  uniformIndices: Uint32Array;
+  uniformIndices: Uint32Array<ArrayBuffer>;
 }
 
 export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPUProgram<WebGLProgram> {
-  private _vs: string;
-  private _fs: string;
+  private readonly _vs: string;
+  private readonly _fs: string;
   private _unitCounter: number;
   private _uniformSetters: Record<string, UniformSetter>;
   private _uniformInfo: ProgramUniformInfo[];
   private _blockInfo: Record<string, ProgramBlockInfo>;
-  private _bindGroupLayouts: BindGroupLayout[];
-  private _vertexAttributes: number[];
+  private readonly _bindGroupLayouts: BindGroupLayout[];
+  private readonly _vertexAttributes: number[];
   private _error: string;
   private _vertexShader: WebGLShader;
   private _fragmentShader: WebGLShader;
@@ -183,7 +172,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this._fragmentShader = null;
     }
   }
-  async restore() {
+  restore() {
     if (!this._object && !this._device.isContextLost()) {
       this.load();
     }
@@ -343,6 +332,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_2D_ARRAY:
       case WebGLEnum.SAMPLER_2D_ARRAY_SHADOW:
@@ -354,6 +344,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_2D_ARRAY, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_CUBE:
       case WebGLEnum.SAMPLER_CUBE_SHADOW:
@@ -365,6 +356,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           gl.uniform1i(loc, unit);
           return this.getSamplerSetter(loc, WebGLEnum.TEXTURE_CUBE_MAP, unit);
         }
+        /* falls through */
       }
       case WebGLEnum.SAMPLER_3D:
       case WebGLEnum.INT_SAMPLER_3D:
@@ -450,7 +442,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           this._object,
           i,
           WebGLEnum.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES
-        ) as Uint32Array;
+        ) as Uint32Array<ArrayBuffer>;
         this._blockInfo[name] = { index, used, size, uniformIndices };
         gl.uniformBlockBinding(this._object, index, index);
       }

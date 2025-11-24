@@ -30,13 +30,17 @@ const genMatrixTypeList = [
   typeinfo.typeMat4
 ];
 
-function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+function matchFunctionOverloadings(
+  pb: ProgramBuilder,
+  name: string,
+  ...args: ExpValueType[]
+): [ASTFunction, ASTExpression[]] {
   const bit =
     pb.getDevice().type === 'webgl'
       ? MASK_WEBGL1
       : pb.getDevice().type === 'webgl2'
-      ? MASK_WEBGL2
-      : MASK_WEBGPU;
+        ? MASK_WEBGL2
+        : MASK_WEBGPU;
   const overloadings = builtinFunctionsAll?.[name].overloads
     .filter((val) => !!(val[1] & bit))
     .map((val) => val[0]);
@@ -50,7 +54,7 @@ function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: Ex
   }
   return matchResult;
 }
-function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]) {
+function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]): PBShaderExp {
   return pb.$callFunction(matchResult[0].name, matchResult[1], matchResult[0]);
 }
 function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]): PBShaderExp {
@@ -456,6 +460,24 @@ const builtinFunctionsAll = {
       ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 1, [1, 1, 1]),
       ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2, 2])
     ]
+  },
+  saturate: {
+    overloads: [],
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (args.length !== 1) {
+        throw new PBParamLengthError('saturate');
+      }
+      if (!(args[0] instanceof PBShaderExp)) {
+        throw new PBParamValueError('saturate', 'x');
+      }
+      const argType = args[0].$ast.getType();
+      if (!argType.isPrimitiveType() || (!argType.isScalarType() && !argType.isVectorType())) {
+        throw new PBParamTypeError('saturate', 'x');
+      }
+      const a = argType.isScalarType() ? 0 : pb[`vec${argType.cols}`](0);
+      const b = argType.isScalarType() ? 1 : pb[`vec${argType.cols}`](1);
+      return pb.clamp(args[0], a, b);
+    }
   },
   mix: {
     overloads: [
