@@ -2,14 +2,12 @@
 
 <div align="center">
 
-<img
-    src="https://cdn.zephyr3d.org/doc/assets/images/logo_i.svg#gh-dark-mode-only" alt="zephyr3d logo"
-    style="display: block; width: 300px; margin: auto; margin-bottom: 0"
-/>
-<img
-    src="https://cdn.zephyr3d.org/doc/assets/images/logo.svg#gh-light-mode-only" alt="zephyr3d logo"
-    style="display: block; width: 300px; margin: auto; margin-bottom: 0"
-/>
+<p align="center">
+  <img src="https://cdn.zephyr3d.org/doc/assets/images/logo_i.svg#gh-dark-mode-only" alt="zephyr3d logo" width="300">
+</p>
+<p align="center">
+  <img src="https://cdn.zephyr3d.org/doc/assets/images/logo.svg#gh-light-mode-only" alt="zephyr3d logo" width="300">
+</p>
 
 > A modern TypeScript-based WebGL & WebGPU rendering engine  
 
