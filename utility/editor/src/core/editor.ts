@@ -506,7 +506,7 @@ export class Editor {
       await DlgMessage.messageBox('Error', `Cannot read remote project at <${url}>`);
       return;
     }
-    const loading = new DlgMessageBoxEx('Loading project, please wait...');
+    const loading = new DlgMessageBoxEx('zephyr3d', 'Loading project, please wait...', []);
     loading.showModal();
     try {
       const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
