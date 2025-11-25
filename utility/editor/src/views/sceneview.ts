@@ -651,7 +651,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           const projectId = this.controller.editor.currentProject.uuid;
           const url = new URL(window.location.href);
           url.searchParams.append('project', projectId);
-          url.searchParams.append('remote', ProjectService.VFS instanceof HttpFS ? '1' : '0');
+          if (ProjectService.VFS instanceof HttpFS) {
+            url.searchParams.append('remote', '');
+          }
           const a = document.createElement('a');
           a.href = url.href;
           a.target = '_blank';

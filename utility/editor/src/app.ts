@@ -10,9 +10,11 @@ import type { DeviceBackend } from '@zephyr3d/device';
 
 const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
+const open = searchParams.get('open') !== null;
+const remote = searchParams.get('remote') !== null;
 let rhiList: string[] = [];
 let settings: ProjectSettings = null;
-if (project) {
+if (project && !open) {
   const setFavicon = (href: string, options: { rels?: string[]; type: string; sizes?: string }) => {
     const { rels = ['icon', 'shortcut icon', 'apple-touch-icon'], type, sizes } = options;
     const head = document.head || document.getElementsByTagName('head')[0];
@@ -32,7 +34,6 @@ if (project) {
     });
   };
 
-  const remote = !!Number(searchParams.get('remote'));
   if (remote) {
     await ProjectService.openRemoteProject(project, new GenericHtmlDirectoryReader());
   } else {
@@ -93,7 +94,7 @@ const editorApp = new Application({
 });
 
 editorApp.ready().then(async () => {
-  if (!project) {
+  if (open || !project) {
     await initLeakDetector();
     const device = getDevice();
     await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
@@ -115,6 +116,14 @@ editorApp.ready().then(async () => {
       editor.update(device.frameInfo.elapsedFrame);
       editor.render();
     });
+
+    if (project) {
+      if (remote) {
+        await editor.openRemoteProject(project);
+      } else {
+        await editor.openProject(project);
+      }
+    }
   } else {
     // start engine
     getEngine().startup(settings.startupScene, settings.splashScreen, settings.startupScript);

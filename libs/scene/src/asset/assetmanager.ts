@@ -1185,14 +1185,9 @@ export class AssetManager {
   async readFileFromVFSs(path: string, options: ReadOptions, vfsList?: VFS[]) {
     vfsList = vfsList ?? [this.vfs];
     for (const vfs of vfsList) {
-      if (!(await vfs.exists(path))) {
-        continue;
-      }
-      const stat = await vfs.stat(path);
-      if (!stat || !stat.isFile) {
-        continue;
-      }
-      return await vfs.readFile(path, options);
+      try {
+        return await vfs.readFile(path, options);
+      } catch {}
     }
     throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
   }
