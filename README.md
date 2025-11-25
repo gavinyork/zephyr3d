@@ -2,8 +2,7 @@
 
 <div align="center">
 
-  ![](https://cdn.zephyr3d.org/doc/assets/images/logo_i-300.svg#gh-dark-mode-only)
-  ![](https://cdn.zephyr3d.org/doc/assets/images/logo-300.svg#gh-light-mode-only)
+  ![](https://cdn.zephyr3d.org/doc/assets/images/logo_theme.svg)
 
 > A modern TypeScript-based WebGL & WebGPU rendering engine  
 
