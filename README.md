@@ -9,7 +9,7 @@
 
 > A modern TypeScript-based WebGL & WebGPU rendering engine  
 
-[User Manual](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/)
+[User Manual](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Demos](https://zephyr3d.org/en/demos.html) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/)
 
 [![CI](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@zephyr3d/scene?color=%235865f2)](https://www.npmjs.com/package/@zephyr3d/scene)
