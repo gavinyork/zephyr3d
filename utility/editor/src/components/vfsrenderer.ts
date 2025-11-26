@@ -1159,48 +1159,42 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       return null;
     }
 
-    const dirExists = await this._vfs.exists(path);
-    if (!dirExists) {
-      return null;
-    }
+    try {
+      const info: DirectoryInfo = {
+        files: [],
+        subDir: [],
+        parent: null,
+        open: false,
+        path
+      };
 
-    const stats = await this._vfs.stat(path);
-    if (!stats) {
-      return null;
-    }
+      const content: FileMetadata[] =
+        this._fileFilter?.length > 0
+          ? await this._vfs.glob(this._fileFilter, { cwd: path, recursive: false, includeDirs: true })
+          : await this._vfs.readDirectory(path, {
+              includeHidden: true,
+              recursive: false
+            });
 
-    const info: DirectoryInfo = {
-      files: [],
-      subDir: [],
-      parent: null,
-      open: false,
-      path
-    };
-
-    const content: FileMetadata[] =
-      this._fileFilter?.length > 0
-        ? await this._vfs.glob(this._fileFilter, { cwd: path, recursive: false, includeDirs: true })
-        : await this._vfs.readDirectory(path, {
-            includeHidden: true,
-            recursive: false
+      for (const entry of content) {
+        if (entry.type === 'directory') {
+          const dirInfo = await this.loadDirectoryInfo(entry.path);
+          if (dirInfo) {
+            info.subDir.push(dirInfo);
+            dirInfo.parent = info;
+          }
+        } else if (entry.type === 'file') {
+          info.files.push({
+            meta: entry,
+            parent: info
           });
-
-    for (const entry of content) {
-      if (entry.type === 'directory') {
-        const dirInfo = await this.loadDirectoryInfo(entry.path);
-        if (dirInfo) {
-          info.subDir.push(dirInfo);
-          dirInfo.parent = info;
         }
-      } else if (entry.type === 'file') {
-        info.files.push({
-          meta: entry,
-          parent: info
-        });
       }
-    }
 
-    return info;
+      return info;
+    } catch {
+      return null;
+    }
   }
 
   async handleDragEvent(ev: DragEvent) {
