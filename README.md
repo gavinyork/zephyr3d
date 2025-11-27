@@ -18,7 +18,7 @@
 
 ## Overview
 
-**Zephyr3D** is a next-generation, TypeScript-based 3D rendering engine for browsers — offering unified WebGL/WebGPU rendering, programmable shader generation, and a full Web-based visual editor.  
+**Zephyr3D** is a next-generation, TypeScript-based 3D rendering engine for browsers — offering unified WebGL/WebGPU rendering, programmable shader generation, and a full web-based visual editor.  
 
 > Lightweight · Modular · Developer-friendly · Visual creation empowered by code.
 
@@ -28,7 +28,7 @@
 
 - Unified RHI — Seamlessly switch WebGL/WebGPU backends  
 - TypeScript architecture — Safe, modular, IDE‑friendly  
-- Scene System — PBR, IBL, Shadows, PostProcess  
+- Scene System — PBR, IBL, shadows, post-processing
 - Built‑in Visual Editor — Scene authoring & scripting  
 - Shader Builder — Generate GLSL/WGSL on the fly  
 - Lightweight modules & npm‑ready  
@@ -103,7 +103,7 @@ app.ready().then(() => {
   const mat = new LambertMaterial();
   mat.albedoColor = new Vector4(0.9, 0.1, 0.1, 1);
   new Mesh(scene, new SphereShape(), mat);
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
   scene.mainCamera.lookAt(new Vector3(0,0,4), Vector3.zero(), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController({ center: Vector3.zero() });
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
@@ -119,6 +119,23 @@ app.ready().then(() => {
 **Under Active Development**  
 Zephyr3D is currently in early development and continuously evolving.  
 Perfect for experiments, Web rendering research, and custom toolchains.  
+
+---
+
+## Support
+
+Zephyr3D is developed and maintained in my free time.
+If this engine, the editor, or any related tools or posts have helped you, you can support my work here:
+
+Ko‑fi: https://ko-fi.com/gavinyork2024
+
+Your support helps cover hosting, testing tools, and gives me more focused time to:
+
+- Build new engine features and improve performance
+- Maintain documentation and examples
+- Explore experimental rendering ideas and tooling
+
+Thank you for any kind of support — even just trying Zephyr3D and giving feedback is greatly appreciated.
 
 ---
 
