@@ -319,7 +319,6 @@ export class AssetHierarchyNode extends NamedObject {
   private _mesh: AssetMeshData;
   private _skeleton: AssetSkeleton;
   private _attachToSkeleton: Set<AssetSkeleton>;
-  private _meshAttached: boolean;
   private _matrix: Matrix4x4;
   private _worldMatrix: Matrix4x4;
   private _weights: number[];
@@ -340,7 +339,6 @@ export class AssetHierarchyNode extends NamedObject {
     this._mesh = null;
     this._skeleton = null;
     this._attachToSkeleton = null;
-    this._meshAttached = false;
     this._matrix = null;
     this._weights = null;
     this._worldMatrix = null;
@@ -365,7 +363,6 @@ export class AssetHierarchyNode extends NamedObject {
   }
   set mesh(data: AssetMeshData) {
     this._mesh = data;
-    this.setMeshAttached();
   }
   /** instances */
   get instances(): { t: Vector3; s: Vector3; r: Quaternion }[] {
@@ -406,10 +403,6 @@ export class AssetHierarchyNode extends NamedObject {
   set scaling(val: Vector3) {
     this._scaling = val;
   }
-  /** true if the node is parent of a mesh node */
-  get meshAttached(): boolean {
-    return this._meshAttached;
-  }
   /** Children of the node */
   get children(): AssetHierarchyNode[] {
     return this._children;
@@ -438,9 +431,6 @@ export class AssetHierarchyNode extends NamedObject {
     }
     this._children.push(child);
     child._parent = this;
-    if (child.meshAttached) {
-      this.setMeshAttached();
-    }
   }
   /**
    * Removes a child of this node
@@ -464,11 +454,6 @@ export class AssetHierarchyNode extends NamedObject {
       this._attachToSkeleton = new Set();
     }
     this._attachToSkeleton.add(skeleton);
-  }
-  /** @internal */
-  private setMeshAttached() {
-    this._meshAttached = true;
-    this._parent?.setMeshAttached();
   }
 }
 
