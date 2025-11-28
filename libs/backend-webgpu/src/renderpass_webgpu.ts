@@ -87,8 +87,8 @@ export class WebGPURenderPass {
       this._currentViewport = {
         x: 0,
         y: 0,
-        width: this._device.deviceToScreen(this._device.drawingBufferWidth),
-        height: this._device.deviceToScreen(this._device.drawingBufferHeight),
+        width: this._device.deviceXToScreen(this._device.drawingBufferWidth),
+        height: this._device.deviceYToScreen(this._device.drawingBufferHeight),
         default: true
       };
     } else {
@@ -104,10 +104,10 @@ export class WebGPURenderPass {
         this._currentViewport = Object.assign({ default: false }, vp);
       }
     }
-    const vx = this._device.screenToDevice(this._currentViewport.x);
-    const vy = this._device.screenToDevice(this._currentViewport.y);
-    const vw = this._device.screenToDevice(this._currentViewport.width);
-    const vh = this._device.screenToDevice(this._currentViewport.height);
+    const vx = this._device.screenXToDevice(this._currentViewport.x);
+    const vy = this._device.screenYToDevice(this._currentViewport.y);
+    const vw = this._device.screenXToDevice(this._currentViewport.width);
+    const vh = this._device.screenYToDevice(this._currentViewport.height);
     /*
     if (vx < 0 || vy < 0 || vw > this._device.drawingBufferWidth || vh > this._device.drawingBufferHeight) {
       console.error(
@@ -123,8 +123,8 @@ export class WebGPURenderPass {
     return Object.assign({}, this._currentViewport);
   }
   setScissor(scissor?: number[] | DeviceViewport) {
-    const backBufferWidth = this._device.deviceToScreen(this._device.drawingBufferWidth);
-    const backBufferHeight = this._device.deviceToScreen(this._device.drawingBufferHeight);
+    const backBufferWidth = this._device.deviceXToScreen(this._device.drawingBufferWidth);
+    const backBufferHeight = this._device.deviceYToScreen(this._device.drawingBufferHeight);
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
       this._currentScissor = {
         x: 0,
@@ -146,10 +146,10 @@ export class WebGPURenderPass {
         this._currentScissor = Object.assign({ default: false }, scissor);
       }
     }
-    let vx = this._device.screenToDevice(this._currentScissor.x);
-    let vy = this._device.screenToDevice(this._currentScissor.y);
-    let vw = this._device.screenToDevice(this._currentScissor.width);
-    let vh = this._device.screenToDevice(this._currentScissor.height);
+    let vx = this._device.screenXToDevice(this._currentScissor.x);
+    let vy = this._device.screenYToDevice(this._currentScissor.y);
+    let vw = this._device.screenXToDevice(this._currentScissor.width);
+    let vh = this._device.screenYToDevice(this._currentScissor.height);
     // Clip scissor region to screen
     if (vx < 0) {
       vw += vx;
@@ -159,8 +159,8 @@ export class WebGPURenderPass {
       vh += vy;
       vy = 0;
     }
-    vw = Math.min(this._device.screenToDevice(backBufferWidth) - vx, vw);
-    vh = Math.min(this._device.screenToDevice(backBufferHeight) - vy, vh);
+    vw = Math.min(this._device.screenXToDevice(backBufferWidth) - vx, vw);
+    vh = Math.min(this._device.screenYToDevice(backBufferHeight) - vy, vh);
     if (vw < 0 || vh < 0) {
       vx = 0;
       vy = 0;

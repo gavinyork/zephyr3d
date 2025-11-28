@@ -53,7 +53,8 @@ export class DrawText {
    * @param name - The font name
    */
   static setFont(device: AbstractDevice, name: string): void {
-    this.font = Font.fetchFont(name, device.getScale()) || Font.fetchFont('12px arial', device.getScale());
+    const scale = device.getScaleY();
+    this.font = Font.fetchFont(name, scale) || Font.fetchFont('12px arial', scale);
   }
   /**
    * Draw text onto the screen
@@ -159,7 +160,7 @@ export class DrawText {
   private static prepareDrawText(device: AbstractDevice): void {
     if (!this.prepared) {
       this.prepared = true;
-      this.font = this.font || Font.fetchFont('16px arial', device.getScale());
+      this.font = this.font || Font.fetchFont('16px arial', device.getScaleY());
       this.glyphManager = new GlyphManager(device, 1024, 1024, 1);
       this.vertexCache = new Float32Array(this.GLYPH_COUNT * 16);
       this.textVertexBuffer = device.createInterleavedVertexBuffer(

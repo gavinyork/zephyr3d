@@ -25,11 +25,14 @@ export class GlyphManager extends TextureAtlasManager {
     };
   }
   /**
-   * Gets the atlas information for given character
+   * Gets the size for given character
    * @param char - The character
    * @param font - Font of the character
-   * @returns Atlas information for the glyph
+   * @returns [width, height]
    */
+  getGlyphSize(char: string, font: Font): [number, number] {
+    return this._getGlyphSize(char, font);
+  }
   getGlyphInfo(char: string, font: Font): AtlasInfo {
     if (!char || !font) {
       return null;
@@ -97,6 +100,23 @@ export class GlyphManager extends TextureAtlasManager {
     }
     w = Math.round(w * (font.maxHeight / font.maxHeightScaled));
     return w;
+  }
+  /** @internal */
+  private _getGlyphSize(char: string, font: Font): [number, number] {
+    if (!font) {
+      return null;
+    }
+    FontCanvas.font = font.fontNameScaled;
+    const metric = FontCanvas.context.measureText(char);
+    let w = metric.width;
+    if (w === 0) {
+      return null;
+    }
+    if (typeof metric.actualBoundingBoxRight === 'number') {
+      w = Math.floor(Math.max(w, metric.actualBoundingBoxRight) + 0.8);
+    }
+    const h = font.maxHeightScaled;
+    return [w, h];
   }
   /** @internal */
   private _getGlyphBitmap(

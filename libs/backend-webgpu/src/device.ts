@@ -85,7 +85,6 @@ type WebGPURenderBundle = {
 
 export class WebGPUDevice extends BaseDevice {
   private _context: GPUCanvasContext;
-  private readonly _dpr: number;
   private _device: GPUDevice;
   private _adapter: GPUAdapter;
   private _deviceCaps: DeviceCaps;
@@ -115,8 +114,7 @@ export class WebGPUDevice extends BaseDevice {
   private _captureRenderBundle: WebGPURenderBundle;
   private _adapterInfo: any;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
-    super(cvs, backend);
-    this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
+    super(cvs, backend, options?.dpr);
     this._device = null;
     this._adapter = null;
     this._context = null;
@@ -200,9 +198,6 @@ export class WebGPUDevice extends BaseDevice {
   get emptyBindGroup(): GPUBindGroup {
     return this._emptyBindGroup;
   }
-  getScale(): number {
-    return this._dpr;
-  }
   getAdapterInfo() {
     return this._adapterInfo;
   }
@@ -274,6 +269,8 @@ export class WebGPUDevice extends BaseDevice {
     this.setViewport(null);
     this.setScissor(null);
 
+    await this.initResizer();
+    /*
     this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
@@ -286,6 +283,20 @@ export class WebGPUDevice extends BaseDevice {
       }
     });
     this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
+    */
+  }
+  protected _handleResize(
+    _cssWidth: number,
+    _cssHeight: number,
+    deviceWidth: number,
+    deviceHeight: number
+  ): void {
+    console.log('Handle resize:', deviceWidth, deviceHeight);
+    this.canvas.width = deviceWidth;
+    this.canvas.height = deviceHeight;
+    this.createDefaultRenderAttachments();
+    this.setViewport(null);
+    this.setScissor(null);
   }
   nextFrame(callback: () => void): number {
     this._commandQueue.finish().then(callback);

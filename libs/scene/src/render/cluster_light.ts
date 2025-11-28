@@ -352,8 +352,8 @@ export class ClusteredLight {
       this.createRenderState(device);
     }
     const viewport = device.getViewport();
-    const vw = device.screenToDevice(viewport.width);
-    const vh = device.screenToDevice(viewport.height);
+    const vw = device.screenXToDevice(viewport.width);
+    const vh = device.screenYToDevice(viewport.height);
     const scale = this._tileCountZ / Math.log2(camera.getFarPlane() / camera.getNearPlane());
     const bias = -(
       (this._tileCountZ * Math.log2(camera.getNearPlane())) /

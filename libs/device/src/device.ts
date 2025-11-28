@@ -83,11 +83,143 @@ type DeviceState = {
   bindGroups: [BindGroup, Iterable<number>][];
 };
 
+type ResizeCallback = (
+  cssWidth: number,
+  cssHeight: number,
+  deviceWidth: number,
+  deviceHeight: number
+) => void;
+
+class ResizeHandler {
+  private readonly _canvas: HTMLCanvasElement;
+  private readonly _dpr: number;
+  private _cssWidth: number;
+  private _cssHeight: number;
+  private _deviceWidth: number;
+  private _deviceHeight: number;
+
+  private _resizeObserver: ResizeObserver;
+  private _mutationObserver: MutationObserver;
+  private _onResizeCallback: ResizeCallback;
+
+  constructor(canvas: HTMLCanvasElement, onResize: ResizeCallback, dpr: number) {
+    this._canvas = canvas;
+    this._dpr = dpr;
+    this._cssWidth = 0;
+    this._cssHeight = 0;
+    this._deviceWidth = 0;
+    this._deviceHeight = 0;
+    this._onResizeCallback = onResize;
+  }
+
+  init() {
+    const canvas = this._canvas;
+    if (window.ResizeObserver) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        this._handleResizeEntry(entry);
+      });
+      try {
+        (this._resizeObserver as any).observe(canvas, { box: 'device-pixel-content-box' });
+      } catch {
+        this._resizeObserver.observe(canvas);
+      }
+    } else {
+      if (window.MutationObserver) {
+        this._mutationObserver = new MutationObserver((mutations) => {
+          if (mutations.length > 0) {
+            this._handleLegacyResize();
+          }
+        });
+        this._mutationObserver.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+      }
+      window.addEventListener('resize', this._handleLegacyResize);
+      this._handleLegacyResize();
+    }
+  }
+
+  private _handleResizeEntry(_entry: ResizeObserverEntry) {
+    // CSS pixel
+    const cssWidth = this._canvas.clientWidth;
+    const cssHeight = this._canvas.clientHeight;
+
+    // Device pixel
+    /*
+    let deviceWidth: number;
+    let deviceHeight: number;
+
+    const dpBox = (entry as any).devicePixelContentBoxSize?.[0];
+    if (dpBox) {
+      deviceWidth = dpBox.inlineSize;
+      deviceHeight = dpBox.blockSize;
+    } else {
+      deviceWidth = Math.round(cssWidth * this._dpr);
+      deviceHeight = Math.round(cssHeight * this._dpr);
+    }
+    */
+    const deviceWidth = cssWidth * this._dpr;
+    const deviceHeight = cssHeight * this._dpr;
+
+    if (
+      cssWidth === this._cssWidth &&
+      cssHeight === this._cssHeight &&
+      deviceWidth === this._deviceWidth &&
+      deviceHeight === this._deviceHeight
+    ) {
+      return;
+    }
+
+    this._cssWidth = cssWidth;
+    this._cssHeight = cssHeight;
+    this._deviceWidth = deviceWidth;
+    this._deviceHeight = deviceHeight;
+
+    this._onResizeCallback(cssWidth, cssHeight, deviceWidth, deviceHeight);
+  }
+
+  private _handleLegacyResize = () => {
+    const cssWidth = this._canvas.clientWidth;
+    const cssHeight = this._canvas.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const deviceWidth = Math.round(cssWidth * dpr);
+    const deviceHeight = Math.round(cssHeight * dpr);
+
+    if (
+      cssWidth === this._cssWidth &&
+      cssHeight === this._cssHeight &&
+      deviceWidth === this._deviceWidth &&
+      deviceHeight === this._deviceHeight
+    ) {
+      return;
+    }
+
+    this._cssWidth = cssWidth;
+    this._cssHeight = cssHeight;
+    this._deviceWidth = deviceWidth;
+    this._deviceHeight = deviceHeight;
+
+    this._onResizeCallback(cssWidth, cssHeight, deviceWidth, deviceHeight);
+  };
+
+  public dispose() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = undefined;
+    }
+    if (this._mutationObserver) {
+      this._mutationObserver.disconnect();
+      this._mutationObserver = undefined;
+    }
+    window.removeEventListener('resize', this._handleLegacyResize);
+  }
+}
+
 /**
  * Base class for rendering device
  * @public
  */
 export abstract class BaseDevice extends Observable<DeviceEventMap> {
+  protected _dpr: number;
   protected _canvas: HTMLCanvasElement;
   protected _canvasClientWidth: number;
   protected _canvasClientHeight: number;
@@ -109,9 +241,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _defaultPoolKey: symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
+  private readonly _resizer: ResizeHandler;
   private readonly _stateStack: DeviceState[];
-  constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
+  constructor(cvs: HTMLCanvasElement, backend: DeviceBackend, dpr?: number) {
     super();
+    this._dpr = dpr ?? window.devicePixelRatio ?? 1;
     this._backend = backend;
     this._gpuObjectList = {
       textures: [],
@@ -157,12 +291,24 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._temporalFramebuffer = false;
     this._temporalFramebuffer = false;
     this._vSync = true;
-    this._registerEventHandlers();
+    //this._registerEventHandlers();
+    this._resizer = new ResizeHandler(
+      this._canvas,
+      (cssWidth, cssHeight, deviceWidth, deviceHeight) => {
+        this.dispatchEvent('resize', cssWidth, cssHeight, deviceWidth, deviceHeight);
+      },
+      this._dpr
+    );
+  }
+  getScaleX(): number {
+    return this._canvas.width / this._canvas.clientWidth;
+  }
+  getScaleY(): number {
+    return this._canvas.height / this._canvas.clientHeight;
   }
   abstract getAdapterInfo(): any;
   abstract getFrameBufferSampleCount(): number;
   abstract isContextLost(): boolean;
-  abstract getScale(): number;
   abstract getDrawingBufferWidth(): number;
   abstract getDrawingBufferHeight(): number;
   abstract getBackBufferWidth(): number;
@@ -610,11 +756,17 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return null;
   }
-  screenToDevice(val: number): number {
-    return this.getFramebuffer() ? val : Math.round(val * this.getScale());
+  screenXToDevice(val: number): number {
+    return this.getFramebuffer() ? val : Math.round(val * this.getScaleX());
   }
-  deviceToScreen(val: number): number {
-    return this.getFramebuffer() ? val : Math.round(val / this.getScale());
+  deviceXToScreen(val: number): number {
+    return this.getFramebuffer() ? val : Math.round(val / this.getScaleX());
+  }
+  screenYToDevice(val: number): number {
+    return this.getFramebuffer() ? val : Math.round(val * this.getScaleY());
+  }
+  deviceYToScreen(val: number): number {
+    return this.getFramebuffer() ? val : Math.round(val / this.getScaleY());
   }
   buildRenderProgram(options: PBRenderOptions): GPUProgram {
     return this._programBuilder.buildRenderProgram(options);
@@ -645,6 +797,31 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
   protected abstract _setFramebuffer(fb: FrameBuffer);
+  protected abstract _handleResize(
+    cssWidth: number,
+    cssHeight: number,
+    deviceWidth: number,
+    deviceHeight: number
+  ): void;
+  protected async initResizer() {
+    return new Promise<void>((resolve) => {
+      this.once(
+        'resize',
+        (cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number) => {
+          this._handleResize(cssWidth, cssHeight, deviceWidth, deviceHeight);
+          this.on(
+            'resize',
+            (cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number) => {
+              this._handleResize(cssWidth, cssHeight, deviceWidth, deviceHeight);
+            }
+          );
+          resolve();
+        }
+      );
+      this._resizer.init();
+    });
+  }
+  /*
   private _onresize() {
     if (
       this._canvasClientWidth !== this._canvas.clientWidth ||
@@ -675,6 +852,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       });
     }
   }
+  */
   private updateFrameInfo() {
     this._frameInfo.drawCalls = 0;
     this._frameInfo.computeCalls = 0;

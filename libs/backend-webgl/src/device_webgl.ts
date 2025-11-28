@@ -153,7 +153,6 @@ export class WebGLDevice extends BaseDevice {
   private readonly _loseContextExtension: WEBGL_lose_context;
   private _contextLost: boolean;
   private _isRendering: boolean;
-  private readonly _dpr: number;
   private _reverseWindingOrder: boolean;
   private _deviceCaps: DeviceCaps;
   private _vaoExt: VertexArrayObjectEXT;
@@ -182,8 +181,7 @@ export class WebGLDevice extends BaseDevice {
   >;
   private readonly _adapterInfo: { vendor: string; renderer: string; version: string };
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
-    super(cvs, backend);
-    this._dpr = Math.max(1, Math.floor(options?.dpr ?? window.devicePixelRatio));
+    super(cvs, backend, options?.dpr);
     this._isRendering = false;
     this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
@@ -268,9 +266,6 @@ export class WebGLDevice extends BaseDevice {
   }
   get clientHeight() {
     return this.canvas.clientHeight;
-  }
-  getScale(): number {
-    return this._dpr;
   }
   isContextLost(): boolean {
     return this._contextLost;
@@ -363,6 +358,8 @@ export class WebGLDevice extends BaseDevice {
   }
   async initContext() {
     this.initContextState();
+    await this.initResizer();
+    /*
     this.on('resize', () => {
       const width = Math.max(1, Math.round(this.canvas.clientWidth * this._dpr));
       const height = Math.max(1, Math.round(this.canvas.clientHeight * this._dpr));
@@ -374,6 +371,18 @@ export class WebGLDevice extends BaseDevice {
       }
     });
     this.dispatchEvent('resize', this.canvas.clientWidth, this.canvas.clientHeight);
+    */
+  }
+  protected _handleResize(
+    _cssWidth: number,
+    _cssHeight: number,
+    deviceWidth: number,
+    deviceHeight: number
+  ): void {
+    this.canvas.width = deviceWidth;
+    this.canvas.height = deviceHeight;
+    this.setViewport(this._currentViewport);
+    this.setScissor(this._currentScissorRect);
   }
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
     const gl = this._context;
@@ -752,8 +761,8 @@ export class WebGLDevice extends BaseDevice {
       this._currentViewport = {
         x: 0,
         y: 0,
-        width: this.deviceToScreen(this.drawingBufferWidth),
-        height: this.deviceToScreen(this.drawingBufferHeight),
+        width: this.deviceXToScreen(this.drawingBufferWidth),
+        height: this.deviceYToScreen(this.drawingBufferHeight),
         default: true
       };
     } else {
@@ -770,10 +779,10 @@ export class WebGLDevice extends BaseDevice {
       }
     }
     this._context.viewport(
-      this.screenToDevice(this._currentViewport.x),
-      this.screenToDevice(this._currentViewport.y),
-      this.screenToDevice(this._currentViewport.width),
-      this.screenToDevice(this._currentViewport.height)
+      this.screenXToDevice(this._currentViewport.x),
+      this.screenYToDevice(this._currentViewport.y),
+      this.screenXToDevice(this._currentViewport.width),
+      this.screenYToDevice(this._currentViewport.height)
     );
   }
   getViewport(): DeviceViewport {
@@ -784,8 +793,8 @@ export class WebGLDevice extends BaseDevice {
       this._currentScissorRect = {
         x: 0,
         y: 0,
-        width: this.deviceToScreen(this.drawingBufferWidth),
-        height: this.deviceToScreen(this.drawingBufferHeight),
+        width: this.deviceXToScreen(this.drawingBufferWidth),
+        height: this.deviceYToScreen(this.drawingBufferHeight),
         default: true
       };
     } else {
@@ -802,10 +811,10 @@ export class WebGLDevice extends BaseDevice {
       }
     }
     this._context.scissor(
-      this.screenToDevice(this._currentScissorRect.x),
-      this.screenToDevice(this._currentScissorRect.y),
-      this.screenToDevice(this._currentScissorRect.width),
-      this.screenToDevice(this._currentScissorRect.height)
+      this.screenXToDevice(this._currentScissorRect.x),
+      this.screenYToDevice(this._currentScissorRect.y),
+      this.screenXToDevice(this._currentScissorRect.width),
+      this.screenYToDevice(this._currentScissorRect.height)
     );
   }
   getScissor(): DeviceViewport {

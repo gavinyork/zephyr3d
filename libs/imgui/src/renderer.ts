@@ -1,4 +1,5 @@
 import type { ColorRGBA } from '@zephyr3d/base';
+import { Vector2 } from '@zephyr3d/base';
 import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
@@ -26,6 +27,10 @@ export class Renderer extends Disposable {
   private _drawPosition: number;
   /** @internal */
   private _indexPosition: number;
+  /** @internal */
+  private _mvpMatrix: Matrix4x4;
+  /** @internal */
+  private _deviceSize: Vector2;
   /** @internal */
   private readonly _program: GPUProgram;
   /** @internal */
@@ -57,6 +62,8 @@ export class Renderer extends Disposable {
     this._device = device;
     this._projectionMatrix = new Matrix4x4();
     this._flipMatrix = new Matrix4x4();
+    this._mvpMatrix = new Matrix4x4();
+    this._deviceSize = new Vector2();
     this._program = this.createProgram(false);
     this._programTexture = this.createProgram(true);
     this._bindGroup = this._device.createBindGroup(this._program.bindGroupLayouts[0]);
@@ -103,22 +110,6 @@ export class Renderer extends Disposable {
   /** @internal */
   getCanvas(): HTMLCanvasElement {
     return this._device.canvas;
-  }
-  /** @internal */
-  getDrawingBufferWidth(): number {
-    return this._device.deviceToScreen(this._device.getDrawingBufferWidth());
-  }
-  /** @internal */
-  getDrawingBufferHeight(): number {
-    return this._device.deviceToScreen(this._device.getDrawingBufferHeight());
-  }
-  /** @internal */
-  screenToDevice(val: number): number {
-    return this._device.screenToDevice(val);
-  }
-  /** @internal */
-  deviceToScreen(val: number): number {
-    return this._device.deviceToScreen(val);
   }
   /** @internal */
   createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
@@ -239,14 +230,19 @@ export class Renderer extends Disposable {
   }
   /** @internal */
   beginRender() {
-    const vp = this._device.getViewport();
+    const width = this._device.getDrawingBufferWidth();
+    const height = this._device.getDrawingBufferHeight();
     //this._device.setViewport();
     //this._device.setScissor();
-    this._projectionMatrix.ortho(0, vp.width, 0, vp.height, -1, 1);
-    this._flipMatrix = Matrix4x4.translation(new Vector3(0, vp.height, 0)).scaleRight(new Vector3(1, -1, 1));
-    const mvpMatrix = Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix);
-    this._bindGroup.setValue('mvpMatrix', mvpMatrix);
-    this._bindGroupTexture.setValue('mvpMatrix', mvpMatrix);
+    this._projectionMatrix.ortho(0, width, 0, height, -1, 1);
+    this._flipMatrix = Matrix4x4.translation(new Vector3(0, height, 0)).scaleRight(new Vector3(1, -1, 1));
+    Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix, this._mvpMatrix);
+    this._deviceSize.x = this._device.getScaleX();
+    this._deviceSize.y = this._device.getScaleY();
+    this._bindGroup.setValue('mvpMatrix', this._mvpMatrix);
+    this._bindGroup.setValue('deviceSize', this._deviceSize);
+    this._bindGroupTexture.setValue('mvpMatrix', this._mvpMatrix);
+    this._bindGroupTexture.setValue('deviceSize', this._deviceSize);
     if (this._clearBeforeRender) {
       this._device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
     }
@@ -281,8 +277,12 @@ export class Renderer extends Disposable {
           this.$outputs.outUV = pb.vec2();
         }
         this.mvpMatrix = pb.mat4().uniform(0);
+        this.deviceSize = pb.vec2().uniform(0);
         pb.main(function () {
-          this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 0, 1));
+          this.$l.$builtins.position = pb.mul(
+            this.mvpMatrix,
+            pb.vec4(pb.mul(this.$inputs.pos, this.deviceSize), 0, 1)
+          );
           this.$outputs.outDiffuse = this.$inputs.diffuse;
           if (diffuseMap) {
             this.$outputs.outUV = this.$inputs.uv;

@@ -91,8 +91,8 @@ export class ABufferOIT extends Disposable implements OIT {
     const ubAlignment = (ABufferOIT._ubAlignment =
       device.getDeviceCaps().shaderCaps.uniformBufferOffsetAlignment);
     const viewport = device.getViewport();
-    const screenWidth = device.screenToDevice(viewport.width);
-    const screenHeight = device.screenToDevice(Math.max(viewport.height, 1));
+    const screenWidth = device.screenXToDevice(viewport.width);
+    const screenHeight = device.screenYToDevice(Math.max(viewport.height, 1));
     if (screenWidth !== this._screenSize[0] || screenHeight !== this._screenSize[1]) {
       // Resize buffers if viewport was changed
       this._screenSize[0] = screenWidth;
@@ -163,9 +163,9 @@ export class ABufferOIT extends Disposable implements OIT {
       Math.min((pass + 1) * this._scissorHeight, this._screenSize[1]) - pass * this._scissorHeight;
     device.setScissor([
       0,
-      device.deviceToScreen(this._screenSize[1] - scissorY - scissorH),
-      device.deviceToScreen(this._screenSize[0]),
-      device.deviceToScreen(scissorH)
+      device.deviceYToScreen(this._screenSize[1] - scissorY - scissorH),
+      device.deviceXToScreen(this._screenSize[0]),
+      device.deviceYToScreen(scissorH)
     ]);
     device.copyBuffer(this._headStagingBuffer, this._headBuffer, 0, 0, this._headStagingBuffer.byteLength);
     // Update render hash

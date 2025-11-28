@@ -205,9 +205,9 @@ export class Editor {
       await ProjectService.saveCurrentProjectSettings(settings);
     }
   }
-  async init() {
+  async init(fontSize: number) {
     //await Database.init();
-    await FontGlyph.loadFontGlyphs('zef-16px');
+    await FontGlyph.loadFontGlyphs('zef-16px', fontSize);
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);

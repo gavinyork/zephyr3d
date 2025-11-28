@@ -1,5 +1,4 @@
 import { Font } from '@zephyr3d/device';
-import { getDevice } from '@zephyr3d/scene';
 import { imGuiSetFontGlyph } from '@zephyr3d/imgui';
 
 type FontConfig = {
@@ -10,14 +9,14 @@ type FontConfig = {
 export class FontGlyph {
   static glyphs: { [name: string]: string } = {};
   static allGlyphs: string = '';
-  static async loadFontGlyphs(name: string) {
+  static async loadFontGlyphs(name: string, fontSize: number) {
     try {
       const config = (await (await fetch(`fonts/${name}.json`)).json()) as FontConfig;
       const fontData = await (await fetch(`fonts/${name}.woff2`)).arrayBuffer();
       const font = new FontFace(config.name, fontData);
       const loadedFont = await font.load();
       document.fonts.add(loadedFont);
-      const deviceFont = new Font(`12px ${config.name}`, getDevice().getScale());
+      const deviceFont = new Font(`${fontSize}px ${config.name}`, 1);
       for (const glyph of config.glyphs) {
         imGuiSetFontGlyph(glyph.code, deviceFont);
         //console.log(`==> ${glyph.css}`);

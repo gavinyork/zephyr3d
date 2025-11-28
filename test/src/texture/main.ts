@@ -42,8 +42,8 @@ textureApp.ready().then(async () => {
   const device = textureApp.device;
   const assetManager = new AssetManager();
   function getSubViewport(index: number) {
-    const width = (device.deviceToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
-    const height = (device.deviceToScreen(device.getDrawingBufferHeight()) / 2) >> 0;
+    const width = (device.deviceXToScreen(device.getDrawingBufferWidth()) / 3) >> 0;
+    const height = (device.deviceYToScreen(device.getDrawingBufferHeight()) / 2) >> 0;
     return [(index % 3) * width, ((index / 3) >> 0) * height, width, height];
   }
   const case2d = new TestTexture2D(assetManager);

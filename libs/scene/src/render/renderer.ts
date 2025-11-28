@@ -94,13 +94,13 @@ export class SceneRenderer {
     scene.frameUpdatePerCamera(camera);
     if (camera && !device.isContextLost()) {
       const defaultViewport = !camera.viewport && !camera.scissor;
-      const renderX = camera.viewport ? device.screenToDevice(camera.viewport[0]) : 0;
-      const renderY = camera.viewport ? device.screenToDevice(camera.viewport[1]) : 0;
+      const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
+      const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
       const renderWidth = camera.viewport
-        ? device.screenToDevice(camera.viewport[2])
+        ? device.screenXToDevice(camera.viewport[2])
         : device.getDrawingBufferWidth();
       const renderHeight = camera.viewport
-        ? device.screenToDevice(camera.viewport[3])
+        ? device.screenYToDevice(camera.viewport[3])
         : device.getDrawingBufferHeight();
       if (renderWidth <= 0 || renderHeight <= 0) {
         camera.getPickResultResolveFunc()?.(null);

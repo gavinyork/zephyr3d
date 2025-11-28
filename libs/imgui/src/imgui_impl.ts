@@ -10,7 +10,9 @@ let prev_time = 0;
 let g_FontTexture: Texture2D = null;
 let glyphManager: GlyphManager = null;
 let wantKeyboard = false;
+let fontSizeGlyph = 0;
 const fonts: Record<string, DeviceFont> = {};
+const glyphFonts: Record<string, DeviceFont> = {};
 
 export class Input {
   public _dom_input: HTMLInputElement;
@@ -372,7 +374,7 @@ function canvas_on_contextrestored(e:Event):void {
 }
 */
 
-export function Init(device: AbstractDevice): void {
+export function Init(device: AbstractDevice, glyphSize): void {
   const io = ImGui.GetIO();
 
   if (typeof window !== 'undefined') {
@@ -409,6 +411,7 @@ export function Init(device: AbstractDevice): void {
     window.addEventListener('gamepaddisconnected', window_on_gamepaddisconnected);
   }
 
+  fontSizeGlyph = glyphSize;
   renderer = new Renderer(device);
   glyphManager = new GlyphManager(device, 1024, 1024, 1);
   dom_input = new Input(device.canvas);
@@ -462,8 +465,8 @@ export function NewFrame(time: number): void {
   const canvas = renderer.device.canvas;
   const w: number = viewport.width;
   const h: number = viewport.height;
-  const display_w: number = w * renderer.device.getScale();
-  const display_h: number = h * renderer.device.getScale();
+  const display_w: number = renderer.device.screenXToDevice(w);
+  const display_h: number = renderer.device.screenYToDevice(h);
   io.DisplaySize.x = w;
   io.DisplaySize.y = h;
   io.DisplayFramebufferScale.x = w > 0 ? display_w / w : 0;
@@ -678,16 +681,16 @@ export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
   const fontName = font.FontSize + 'px ' + font.FontName;
   let deviceFont = fonts[fontName];
   if (!deviceFont) {
-    deviceFont = new DeviceFont(fontName, renderer.device.getScale());
+    deviceFont = new DeviceFont(fontName, 1);
     fonts[fontName] = deviceFont;
   }
   let x = 0;
   let y = 0;
   if (text) {
     for (const ch of text) {
-      const glyphInfo = glyphManager.getGlyphInfo(ch, deviceFont);
-      x += glyphInfo.width;
-      y = Math.max(glyphInfo.height);
+      const glyphSize = glyphManager.getGlyphSize(ch, deviceFont);
+      x += glyphSize[0];
+      y = Math.max(glyphSize[1]);
     }
   }
   out = out ?? new ImGui.ImVec2();
@@ -699,11 +702,12 @@ export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
 /** @internal */
 export function font_update(io: ImGui.IO) {
   io.Fonts.Fonts.forEach((font) => {
-    const fontName = font.FontSize + 'px ' + font.FontName;
-    let deviceFont = fonts[fontName];
+    const fontName = fontSizeGlyph + 'px ' + font.FontName;
+    const scale = font.FontSize / fontSizeGlyph;
+    let deviceFont = glyphFonts[fontName];
     if (!deviceFont) {
-      deviceFont = new DeviceFont(fontName, renderer.device.getScale());
-      fonts[fontName] = deviceFont;
+      deviceFont = new DeviceFont(fontName, 1);
+      glyphFonts[fontName] = deviceFont;
     }
     let glyph = font.GlyphToCreate;
     while (glyph) {
@@ -723,10 +727,10 @@ export function font_update(io: ImGui.IO) {
         glyphInfo = glyphManager.getGlyphInfo(char, deviceFont);
       }
       glyph.X0 = 0;
-      glyph.X1 = glyphInfo.width;
+      glyph.X1 = Math.ceil(glyphInfo.width * scale);
       glyph.Y0 = 0;
-      glyph.Y1 = glyphInfo.height;
-      glyph.AdvanceX = glyphInfo.width;
+      glyph.Y1 = Math.ceil(glyphInfo.height * scale);
+      glyph.AdvanceX = Math.ceil(glyphInfo.width * scale);
       glyph.U0 = glyphInfo.uMin;
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
@@ -851,10 +855,10 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
         if (clip_rect.x < fb_width && clip_rect.y < fb_height && clip_rect.z >= 0.0 && clip_rect.w >= 0.0) {
           // Apply scissor/clipping rectangle
           // renderer.device.setScissor([clip_rect.x, fb_height - clip_rect.w, clip_rect.z - clip_rect.x, clip_rect.w - clip_rect.y]);
-          const scissorX = renderer.device.deviceToScreen(clip_rect.x);
-          const scissorY = renderer.device.deviceToScreen(fb_height - clip_rect.w);
-          const scissorW = renderer.device.deviceToScreen(clip_rect.z - clip_rect.x);
-          const scissorH = renderer.device.deviceToScreen(clip_rect.w - clip_rect.y);
+          const scissorX = renderer.device.deviceXToScreen(clip_rect.x);
+          const scissorY = renderer.device.deviceYToScreen(fb_height - clip_rect.w);
+          const scissorW = renderer.device.deviceXToScreen(clip_rect.z - clip_rect.x);
+          const scissorH = renderer.device.deviceYToScreen(clip_rect.w - clip_rect.y);
           renderer.stream(vx, ixU16, indexOffset, draw_cmd.ElemCount, draw_cmd.TextureId, [
             scissorX,
             scissorY,

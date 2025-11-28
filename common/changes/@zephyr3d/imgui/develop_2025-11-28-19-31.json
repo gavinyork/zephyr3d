@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/imgui",
+      "comment": "Fix font rendering issue with non-integer DPR",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/imgui"
+}

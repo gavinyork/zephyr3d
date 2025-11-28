@@ -2350,7 +2350,7 @@ export interface DeviceOptions {
  * @public
  */
 export type DeviceEventMap = {
-  resize: [width: number, height: number];
+  resize: [cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number];
   devicelost: [];
   devicerestored: [];
   gpuobject_added: [obj: GPUObject];
@@ -2398,8 +2398,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */
   isContextLost(): boolean;
-  /** Get the value of device pixel ratio */
-  getScale(): number;
+  /** Get the value of device pixel ratio in X axis */
+  getScaleX(): number;
+  /** Get the value of device pixel ratio in Y axis */
+  getScaleY(): number;
   /** Get the width of current frame buffer */
   getDrawingBufferWidth(): number;
   /** Get the height of current frame buffer */
@@ -2899,23 +2901,41 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   getGPUObjectById(uid: number): GPUObject;
   /**
-   * Calculates the actual position of current frame buffer from screen position.
+   * Calculates the actual position of current frame buffer from screen position in X axis.
    *
    * @remarks
    * If current frame buffer is the back buffer, the value will be scaled by the device pixel ratio.
    *
    * @param val - The screen position in pixels
    */
-  screenToDevice(val: number): number;
+  screenXToDevice(val: number): number;
   /**
-   * Calculates the screen position from position of current frame buffer.
+   * Calculates the screen position from position of current frame buffer in X axis.
    *
    * @remarks
    * If current frame buffer is the back buffer, the value will be divided by the device pixel ratio.
    *
    * @param val - The position of current frame buffer in pixels
    */
-  deviceToScreen(val: number): number;
+  deviceXToScreen(val: number): number;
+  /**
+   * Calculates the actual position of current frame buffer from screen position in Y axis.
+   *
+   * @remarks
+   * If current frame buffer is the back buffer, the value will be scaled by the device pixel ratio.
+   *
+   * @param val - The screen position in pixels
+   */
+  screenYToDevice(val: number): number;
+  /**
+   * Calculates the screen position from position of current frame buffer in Y axis.
+   *
+   * @remarks
+   * If current frame buffer is the back buffer, the value will be divided by the device pixel ratio.
+   *
+   * @param val - The position of current frame buffer in pixels
+   */
+  deviceYToScreen(val: number): number;
   /** Builds render program */
   buildRenderProgram(options: PBRenderOptions): GPUProgram;
   /** Builds compute program */

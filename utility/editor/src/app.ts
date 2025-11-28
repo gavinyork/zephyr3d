@@ -97,10 +97,16 @@ editorApp.ready().then(async () => {
   if (open || !project) {
     await initLeakDetector();
     const device = getDevice();
-    await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12);
+    let fontSize: number;
+    if (device.getScaleY() > 1) {
+      fontSize = 24;
+    } else {
+      fontSize = 12;
+    }
+    await imGuiInit(device, `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`, 12, fontSize);
     initEmojiMapping();
     const editor = new Editor();
-    await editor.init();
+    await editor.init(fontSize);
     editor.registerModules();
     getInput().use(editor.handleEvent.bind(editor));
 
