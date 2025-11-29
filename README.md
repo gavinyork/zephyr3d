@@ -18,7 +18,11 @@
 
 ## Overview
 
-**Zephyr3D** is a next-generation, TypeScript-based 3D rendering engine for browsers — offering unified WebGL/WebGPU rendering, programmable shader generation, and a full web-based visual editor.  
+**Zephyr3D** is a TypeScript-based 3D rendering engine for the web, with
+
+ - unified WebGL/WebGPU backends
+ - a code‑generated shader system (JS/TS → GLSL/WGSL)
+ - and a full web-based visual editor.  
 
 > Lightweight · Modular · Developer-friendly · Visual creation empowered by code.
 
@@ -26,12 +30,72 @@
 
 ## Core Features
 
-- Unified RHI — Seamlessly switch WebGL/WebGPU backends  
-- TypeScript architecture — Safe, modular, IDE‑friendly  
-- Scene System — PBR, IBL, shadows, post-processing
-- Built‑in Visual Editor — Scene authoring & scripting  
-- Shader Builder — Generate GLSL/WGSL on the fly  
-- Lightweight modules & npm‑ready  
+- **Unified WebGL / WebGPU backend (RHI)**  
+  One rendering abstraction layer, multiple backends. Switch between WebGL, WebGL2 and WebGPU without rewriting your scene code.
+
+- **JS/TS‑based shader builder**  
+  Build shaders in TypeScript/JavaScript and generate backend‑specific GLSL/WGSL plus WebGPU bind group layouts from a single source.
+
+- **Modern scene rendering**  
+  PBR, image‑based lighting, clustered lighting, shadow maps, terrain, FFT‑based water, post‑processing, and more.
+
+- **TypeScript‑first architecture**  
+  Strong typing, modular packages, and IDE‑friendly APIs for engine and tool development.
+
+- **Web‑based visual editor**  
+  Scene, material, terrain editors and TypeScript scripting — all running directly in the browser.
+
+- **NPM‑ready, modular packages**  
+  Use the parts you need: base math, device/RHI, backends, scene layer, or the full editor.
+
+## JS/TS‑based Shader Builder
+
+Instead of hand‑writing raw GLSL/WGSL strings, Zephyr3D lets you **define shaders in JavaScript/TypeScript** and generates backend‑specific code for you.
+
+A single JS program:
+
+```ts  
+const program = device.buildRenderProgram({  
+  vertex(pb) {  
+    this.$inputs.pos = pb.vec3().attrib('position');  
+    this.$inputs.uv  = pb.vec2().attrib('texCoord0');  
+    this.$outputs.uv = pb.vec2();  
+
+    this.xform = pb.defineStruct([pb.mat4('mvpMatrix')])().uniform(0);  
+
+    pb.main(function () {  
+      this.$builtins.position =  
+        pb.mul(this.xform.mvpMatrix, pb.vec4(this.$inputs.pos, 1));  
+      this.$outputs.uv = this.$inputs.uv;  
+    });  
+  },  
+
+  fragment(pb) {  
+    this.$outputs.color = pb.vec4();  
+    this.tex = pb.tex2D().uniform(0);  
+
+    pb.main(function () {  
+      this.$outputs.color = pb.textureSample(this.tex, this.$inputs.uv);  
+    });  
+  }  
+});
+```
+
+From this single source, Zephyr3D generates:
+
+- WebGL 1 GLSL (attributes/varyings, classic uniforms)
+- WebGL 2 GLSL (UBOs with layout(std140), explicit outputs)
+- WebGPU WGSL shaders
+- Matching WebGPU bind group layouts (textures, samplers, uniform buffers with computed layouts)
+
+So you:
+
+- write shader logic once in JS/TS
+- get correct GLSL/WGSL for each backend
+- keep bindings and shader code in sync automatically
+- avoid maintaining N slightly different shader variants
+
+For more advanced examples, see the [User Manual](https://zephyr3d.org/doc/)
 
 ---
 
@@ -61,7 +125,7 @@
 | Layer | Description |
 |-------|--------------|
 | **Base** | Math / VFS / Events / SmartPtr |
-| **Device (RHI)** | Abstract graphics API layer |
+| **Device (RHI)** | Abstract graphics API layer + shader builder / resource binding |
 | **Backend-WebGL / WebGPU** | Platform‑specific rendering backends |
 | **Scene** | Scene system, materials, animation, post FX |
 | **Editor** | Browser-native editor built atop Scene layer |
@@ -116,9 +180,14 @@ app.ready().then(() => {
 
 ## Status
 
-**Under Active Development**  
-Zephyr3D is currently in early development and continuously evolving.  
-Perfect for experiments, Web rendering research, and custom toolchains.  
+**Actively developed**  
+
+Zephyr3D is used for my own experiments, demos and tools, and is under active development.
+APIs may still change, but it is already suitable for:
+
+- graphics / Web rendering experiments
+- learning engine and rendering architecture
+- building custom tools and in‑house editors
 
 ---
 
