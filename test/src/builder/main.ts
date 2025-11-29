@@ -75,19 +75,25 @@ pb.main(function(){
   const devices: Record<string, AbstractDevice> = {};
   if (backendWebGL1.supported()) {
     const cvs = document.createElement('canvas');
-    cvs.style.display = 'none';
+    cvs.style.width = '1px';
+    cvs.style.height = '1px';
+    //cvs.style.display = 'none';
     document.body.append(cvs);
     devices.webgl = await backendWebGL1.createDevice(cvs);
   }
   if (backendWebGL2.supported()) {
     const cvs = document.createElement('canvas');
-    cvs.style.display = 'none';
+    cvs.style.width = '1px';
+    cvs.style.height = '1px';
+    //cvs.style.display = 'none';
     document.body.append(cvs);
     devices.webgl2 = await backendWebGL2.createDevice(cvs);
   }
   if (backendWebGPU.supported()) {
     const cvs = document.createElement('canvas');
-    cvs.style.display = 'none';
+    cvs.style.width = '1px';
+    cvs.style.height = '1px';
+    //cvs.style.display = 'none';
     document.body.append(cvs);
     devices.webgpu = await backendWebGPU.createDevice(cvs);
   }
