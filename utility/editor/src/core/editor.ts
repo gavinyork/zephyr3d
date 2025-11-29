@@ -560,6 +560,13 @@ export class Editor {
   }
   async buildProject() {
     const settings = await ProjectService.getCurrentProjectSettings();
+    if (!settings.startupScene && !settings.startupScript) {
+      await DlgMessage.messageBox(
+        'Error',
+        'Please set startup scene or startup script in <Project Settings>'
+      );
+      return;
+    }
     const srcIndexTS = generateIndexTS(settings);
     const srcVFS = new MemoryFS();
     const distVFS = new MemoryFS();

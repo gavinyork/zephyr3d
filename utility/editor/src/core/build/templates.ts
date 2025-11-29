@@ -103,7 +103,7 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  getEngine().startup('${settings.startupScene}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
+  getEngine().startup('${settings.startupScene ?? ''}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
   application.run();
 });
 `;
@@ -148,7 +148,7 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  getEngine().startup(settings.startupScene, settings.splashScreen, settings.startupScript);
+  getEngine().startup(settings.startupScene ?? '', settings.splashScreen, settings.startupScript);
   application.run();
 });
 `;
