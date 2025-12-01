@@ -82,3 +82,5 @@
     - [实时预览](zh-cn/editor/preview.md)
     - [构建与部署](zh-cn/editor/build-deploy.md)
 
+  - 其它
+    - [FAQ](zh-cn/editor/faq.md)
