@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { Vector3, Vector4, DWeakRef } from '@zephyr3d/base';
+import { Vector3, Vector4, DWeakRef, AABB } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -200,7 +200,25 @@ export class PunctualLight extends BaseLight {
    * @returns self
    */
   setCastShadow(b: boolean): this {
-    this._castShadow = b;
+    if (this._castShadow !== !!b) {
+      this._castShadow = !!b;
+      if (!this.shadow.shadowRegion && this.isDirectionLight()) {
+        const aabb = new AABB();
+        aabb.beginExtend();
+        this.scene.rootNode.iterate((child) => {
+          if (child.isMesh() || child.isTerrain() || child.isClipmapTerrain()) {
+            if (child.castShadow) {
+              const bbox = child.getWorldBoundingVolume().toAABB();
+              aabb.extend(bbox.minPoint);
+              aabb.extend(bbox.maxPoint);
+            }
+          }
+        });
+        if (aabb.isValid()) {
+          this.shadow.shadowRegion = aabb;
+        }
+      }
+    }
     return this;
   }
   /** The shadow mapper for this light */
