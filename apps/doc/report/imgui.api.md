@@ -29,7 +29,7 @@ export function imGuiGetCharCodeMap(): Record<number, string>;
 export function imGuiInFrame(): boolean;
 
 // @public
-export function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number): Promise<void>;
+export function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number, fontSizeGlyph?: number): Promise<void>;
 
 // @public
 export function imGuiInjectEvent(ev: Event, type?: string): boolean;

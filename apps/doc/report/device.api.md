@@ -50,7 +50,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
     createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
     createVertexLayout(options: VertexLayoutOptions): VertexLayout;
-    deviceToScreen(val: number): number;
+    deviceXToScreen(val: number): number;
+    deviceYToScreen(val: number): number;
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
     drawText(text: string, x: number, y: number, color: string): any;
@@ -74,7 +75,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     getPool(key: string | symbol): Pool;
     getProgram(): GPUProgram;
     getRenderStates(): RenderStateSet;
-    getScale(): number;
+    getScaleX(): number;
+    getScaleY(): number;
     getScissor(): DeviceViewport;
     getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number): VertexAttribFormat;
     getVertexLayout(): VertexLayout;
@@ -95,7 +97,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     runLoopFunction: (device: AbstractDevice) => void;
     runNextFrame(f: () => void): void;
     runNextFrameAsync(f: () => void): Promise<void>;
-    screenToDevice(val: number): number;
+    screenXToDevice(val: number): number;
+    screenYToDevice(val: number): number;
     setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
     setFont(fontName: string): any;
     setFramebuffer(rt: FrameBuffer): any;
@@ -151,7 +154,7 @@ export interface BaseCreationOptions {
 
 // @public
 export abstract class BaseDevice extends Observable<DeviceEventMap> {
-    constructor(cvs: HTMLCanvasElement, backend: DeviceBackend);
+    constructor(cvs: HTMLCanvasElement, backend: DeviceBackend, dpr?: number);
     // (undocumented)
     addGPUObject(obj: GPUObject): void;
     // (undocumented)
@@ -247,11 +250,15 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _defaultPoolKey: symbol;
     // (undocumented)
-    deviceToScreen(val: number): number;
+    deviceXToScreen(val: number): number;
+    // (undocumented)
+    deviceYToScreen(val: number): number;
     // (undocumented)
     disposeObject(obj: GPUObject, remove?: boolean): void;
     // (undocumented)
     protected _disposeObjectList: GPUObject[];
+    // (undocumented)
+    protected _dpr: number;
     // (undocumented)
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     // (undocumented)
@@ -316,7 +323,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     abstract getRenderStates(): RenderStateSet;
     // (undocumented)
-    abstract getScale(): number;
+    getScaleX(): number;
+    // (undocumented)
+    getScaleY(): number;
     // (undocumented)
     abstract getScissor(): DeviceViewport;
     // (undocumented)
@@ -332,7 +341,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _gpuTimer: ITimer;
     // (undocumented)
+    protected abstract _handleResize(cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number): void;
+    // (undocumented)
     abstract initContext(): Promise<void>;
+    // (undocumented)
+    protected initResizer(): Promise<void>;
     // (undocumented)
     protected invalidateAll(): void;
     // (undocumented)
@@ -394,7 +407,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _runningLoop: number;
     // (undocumented)
-    screenToDevice(val: number): number;
+    screenXToDevice(val: number): number;
+    // (undocumented)
+    screenYToDevice(val: number): number;
     // (undocumented)
     abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
     // (undocumented)
@@ -650,7 +665,7 @@ export interface DeviceCaps {
 
 // @public
 export type DeviceEventMap = {
-    resize: [width: number, height: number];
+    resize: [cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number];
     devicelost: [];
     devicerestored: [];
     gpuobject_added: [obj: GPUObject];
@@ -859,7 +874,9 @@ export class GlyphManager extends TextureAtlasManager {
     constructor(device: AbstractDevice, binWidth: number, binHeight: number, border: number);
     clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font): number;
     getCharWidth(char: string, font: Font): number;
+    // (undocumented)
     getGlyphInfo(char: string, font: Font): AtlasInfo;
+    getGlyphSize(char: string, font: Font): [number, number];
     measureStringWidth(str: string, charMargin: number, font: Font): number;
 }
 
