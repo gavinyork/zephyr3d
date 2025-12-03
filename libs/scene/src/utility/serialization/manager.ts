@@ -129,7 +129,13 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
-  SwizzleNode
+  SwizzleNode,
+  CompComparisonNode,
+  AnyConditionNode,
+  AllConditionNode,
+  SelectionNode,
+  EqualNode,
+  NotEqualNode
 } from '../blueprint/common/math';
 import {
   BillboardMatrixNode,
@@ -282,6 +288,12 @@ export class ResourceManager {
         ConstantTextureCubeNode.getSerializationCls(),
         MakeVectorNode.getSerializationCls(),
         SwizzleNode.getSerializationCls(),
+        EqualNode.getSerializationCls(),
+        NotEqualNode.getSerializationCls(),
+        CompComparisonNode.getSerializationCls(),
+        AnyConditionNode.getSerializationCls(),
+        AllConditionNode.getSerializationCls(),
+        SelectionNode.getSerializationCls(),
         Degrees2RadiansNode.getSerializationCls(),
         Radians2DegreesNode.getSerializationCls(),
         SinNode.getSerializationCls(),

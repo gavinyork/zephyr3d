@@ -55,7 +55,13 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
-  SwizzleNode
+  SwizzleNode,
+  CompComparisonNode,
+  AnyConditionNode,
+  AllConditionNode,
+  SelectionNode,
+  EqualNode,
+  NotEqualNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -71,6 +77,30 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Swizzle',
           create: () => new SwizzleNode()
+        },
+        {
+          name: 'Equal',
+          create: () => new EqualNode()
+        },
+        {
+          name: 'NotEqual',
+          create: () => new NotEqualNode()
+        },
+        {
+          name: 'Comparison',
+          create: () => new CompComparisonNode()
+        },
+        {
+          name: 'Any',
+          create: () => new AnyConditionNode()
+        },
+        {
+          name: 'All',
+          create: () => new AllConditionNode()
+        },
+        {
+          name: 'Select',
+          create: () => new SelectionNode()
         },
         {
           name: 'Transform',

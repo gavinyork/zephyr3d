@@ -1,5 +1,25 @@
 import { Observable, type IEventTarget } from '@zephyr3d/base';
 
+/** @internal */
+export function getNodeTypeComponents(type: string) {
+  switch (type) {
+    case 'float':
+    case 'bool':
+      return 1;
+    case 'vec2':
+    case 'bvec2':
+      return 2;
+    case 'vec3':
+    case 'bvec3':
+      return 3;
+    case 'vec4':
+    case 'bvec4':
+      return 4;
+    default:
+      return 0;
+  }
+}
+
 /**
  * Represents a connection between two nodes
  *
@@ -486,6 +506,15 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
       const input = this._inputs[i];
       if (input.required && !input.inputNode) {
         return `Missing required argument: input[${i}]`;
+      }
+      if (input.inputNode) {
+        const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+        if (!type) {
+          return `Cannot determine type of argument ${i}`;
+        }
+        if (!this._inputs[i].type.includes(type)) {
+          return `Invalid input type ${type} for argument ${i}`;
+        }
       }
     }
     return '';

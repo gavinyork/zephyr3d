@@ -19,6 +19,7 @@ import type { GenericConstructor, DRef } from '@zephyr3d/base';
 import type { Vector4 } from '@zephyr3d/base';
 import { ASSERT } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
+import type { ComparisonMode } from '../common/math';
 import {
   GenericMathNode,
   PerlinNoise2DNode,
@@ -28,7 +29,11 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
-  SwizzleNode
+  SwizzleNode,
+  CompComparisonNode,
+  AnyConditionNode,
+  AllConditionNode,
+  SelectionNode
 } from '../common/math';
 import {
   BillboardMatrixNode,
@@ -638,6 +643,148 @@ class IRCallFunc extends IRExpression {
   }
 }
 
+class IRSelection extends IRExpression {
+  readonly a: IRExpression;
+  readonly b: IRExpression;
+  readonly cond: IRExpression;
+  tmpName: string;
+  constructor(a: IRExpression, b: IRExpression, cond: IRExpression) {
+    super();
+    this.a = a.addRef();
+    this.b = b.addRef();
+    this.cond = cond.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const a = this.a.create(pb);
+    const b = this.b.create(pb);
+    const c = this.cond.create(pb);
+    const exp = pb.select(a, b, typeof c === 'number' ? c !== 0 : c);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRAny extends IRExpression {
+  readonly src: IRExpression;
+  tmpName: string;
+  constructor(src: IRExpression) {
+    super();
+    this.src = src.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const src = this.src.create(pb) as PBShaderExp;
+    const exp = pb.any(src);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRAll extends IRExpression {
+  readonly src: IRExpression;
+  tmpName: string;
+  constructor(src: IRExpression) {
+    super();
+    this.src = src.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const src = this.src.create(pb) as PBShaderExp;
+    const exp = pb.all(src);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRComparison extends IRExpression {
+  readonly a: IRExpression;
+  readonly b: IRExpression;
+  readonly mode: ComparisonMode;
+  tmpName: string;
+  constructor(a: IRExpression, b: IRExpression, mode: ComparisonMode) {
+    super();
+    this.a = a.addRef();
+    this.b = b.addRef();
+    this.mode = mode;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const a = this.a.create(pb) as PBShaderExp;
+    const b = this.b.create(pb) as PBShaderExp;
+    let exp: PBShaderExp;
+    switch (this.mode) {
+      case 'eq':
+        exp = pb.compEqual(a, b);
+        break;
+      case 'ne':
+        exp = pb.compNotEqual(a, b);
+        break;
+      case 'lt':
+        exp = pb.lessThan(a, b);
+        break;
+      case 'le':
+        exp = pb.lessThanEqual(a, b);
+        break;
+      case 'gt':
+        exp = pb.greaterThan(a, b);
+        break;
+      case 'ge':
+        exp = pb.greaterThanEqual(a, b);
+        break;
+      default:
+        throw new Error(`Invalid comparison mode: ${this.mode}`);
+    }
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
 /**
  * IR expression for vector component swizzling
  *
@@ -1198,6 +1345,14 @@ export class MaterialBlueprintIR {
       expr = this.makeVector(node, output);
     } else if (node instanceof SwizzleNode) {
       expr = this.swizzle(node, output);
+    } else if (node instanceof CompComparisonNode) {
+      expr = this.comparison(node, output);
+    } else if (node instanceof AnyConditionNode) {
+      expr = this.any(node, output);
+    } else if (node instanceof AllConditionNode) {
+      expr = this.all(node, output);
+    } else if (node instanceof SelectionNode) {
+      expr = this.selection(node, output);
     } else if (node instanceof ResolveVertexPositionNode) {
       expr = this.resolveVertexPosition(node, output);
     } else if (node instanceof ResolveVertexNormalNode) {
@@ -1351,6 +1506,46 @@ export class MaterialBlueprintIR {
       IRSwizzle,
       this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType),
       node.swizzle
+    );
+  }
+  /** Converts a comparison node to IR */
+  private comparison(node: CompComparisonNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRComparison,
+      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType),
+      this.ir(node.inputs[1].inputNode, node.inputs[1].inputId, node.inputs[1].originType),
+      node.mode
+    );
+  }
+  /** Converts an any-condition node to IR */
+  private any(node: AnyConditionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRAny,
+      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType)
+    );
+  }
+  /** Converts an all-condition node to IR */
+  private all(node: AllConditionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRAll,
+      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType)
+    );
+  }
+  /** Converts a selection node to IR */
+  private selection(node: SelectionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRSelection,
+      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType),
+      this.ir(node.inputs[1].inputNode, node.inputs[1].inputId, node.inputs[1].originType),
+      this.ir(node.inputs[2].inputNode, node.inputs[2].inputId, node.inputs[2].originType)
     );
   }
   /** Converts a Transform node to IR */

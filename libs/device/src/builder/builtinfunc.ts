@@ -859,10 +859,37 @@ const builtinFunctionsAll = {
       ...genType('select', MASK_WEBGPU, 1, [1, 1, 3], true),
       ...genType('select', MASK_WEBGPU, 2, [2, 2, 3], true),
       ...genType('select', MASK_WEBGPU, 3, [3, 3, 3], true),
-      ...genType('mix', MASK_WEBGL2, 0, [0, 0, 3]),
-      ...genType('mix', MASK_WEBGL2, 1, [1, 1, 3]),
-      ...genType('mix', MASK_WEBGL2, 2, [2, 2, 3])
-    ]
+      ...genType('mix', MASK_WEBGL, 0, [0, 0, 3]),
+      ...genType('mix', MASK_WEBGL, 1, [1, 1, 3]),
+      ...genType('mix', MASK_WEBGL, 2, [2, 2, 3])
+    ],
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (pb.getDevice().type === 'webgl') {
+        const cond = args[2];
+        let newCond: number | PBShaderExp;
+        if (typeof cond === 'boolean') {
+          newCond = cond ? 1 : 0;
+        } else if (typeof cond === 'number') {
+          newCond = cond;
+        } else if (cond instanceof PBShaderExp) {
+          const type = cond.$ast.getType();
+          if (type.typeId === typeinfo.typeBool.typeId) {
+            newCond = pb.float(cond);
+          } else if (type.typeId === typeinfo.typeBVec2.typeId) {
+            newCond = pb.vec2(cond);
+          } else if (type.typeId === typeinfo.typeBVec3.typeId) {
+            newCond = pb.vec3(cond);
+          } else if (type.typeId === typeinfo.typeBVec4.typeId) {
+            newCond = pb.vec4(cond);
+          }
+          return callBuiltin(pb, 'mix', args[0], args[1], newCond);
+        } else {
+          throw new PBParamValueError('select', 'cond');
+        }
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
   },
   floatBitsToInt: {
     overloads: genType('floatBitsToInt', MASK_WEBGL2, 1, [0]),

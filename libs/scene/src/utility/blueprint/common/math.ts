@@ -1,5 +1,5 @@
 import type { SerializableClass } from '../../serialization';
-import { BaseGraphNode } from '../node';
+import { BaseGraphNode, getNodeTypeComponents } from '../node';
 
 /**
  * Vector constructor node
@@ -267,9 +267,6 @@ export class SwizzleNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    if (!this._inputs[0].inputNode) {
-      return `Missing argument \`${name}\``;
-    }
     const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
     if (!type) {
       return `Cannot determine type of argument \`${name}\``;
@@ -304,7 +301,7 @@ export class SwizzleNode extends BaseGraphNode {
    *
    */
   protected getType() {
-    const err = super.validate();
+    const err = this.validate();
     if (err) {
       return '';
     }
@@ -337,6 +334,352 @@ export class SwizzleNode extends BaseGraphNode {
       return '';
     }
     return this._swizzle.length === 1 ? 'float' : `vec${this._swizzle.length}`;
+  }
+}
+
+/**
+ * Comparison mode
+ * @public
+ **/
+export type ComparisonMode = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge';
+
+/**
+ * Vector comparison node
+ *
+ * @public
+ */
+export class CompComparisonNode extends BaseGraphNode {
+  private _mode: ComparisonMode;
+  /**
+   * Creates a new swizzle node
+   */
+  constructor() {
+    super();
+    this._mode = 'eq';
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 2,
+        name: '',
+        type: ['vec2', 'vec3', 'vec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /** Swizzle */
+  get mode() {
+    return this._mode;
+  }
+  set mode(val: ComparisonMode) {
+    this._mode = val;
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Swizzle'
+   */
+  toString(): string {
+    return 'Comparison';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: CompComparisonNode,
+      name: 'CompComparisonNode',
+      getProps() {
+        return [
+          {
+            name: 'mode',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['Equal', 'NotEqual', 'LessThan', 'LessThanEqual', 'GreaterThan', 'GreaterThanEqual'],
+                values: ['eq', 'ne', 'lt', 'le', 'gt', 'ge']
+              }
+            },
+            get(this: CompComparisonNode, value) {
+              value.str[0] = this.mode;
+            },
+            set(this: CompComparisonNode, value) {
+              this.mode = value.str[0] as ComparisonMode;
+            }
+          }
+        ];
+      }
+    };
+  }
+  /**
+   * Validates the node state and input types
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    if (type0 !== type1) {
+      return 'Input arguments must be the same type';
+    }
+    return '';
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bvec2', 'bvec3', 'bvec4', or empty string if invalid
+   *
+   */
+  protected getType() {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    return `bvec${getNodeTypeComponents(type)}`;
+  }
+}
+
+/**
+ * Any condition node
+ *
+ * @public
+ */
+export class AnyConditionNode extends BaseGraphNode {
+  /**
+   * Creates a new any-condition node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Any'
+   */
+  toString(): string {
+    return 'Any';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: AnyConditionNode,
+      name: 'AnyConditionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    return this.validate() ? '' : 'bool';
+  }
+}
+
+/**
+ * All condition node
+ *
+ * @public
+ */
+export class AllConditionNode extends BaseGraphNode {
+  /**
+   * Creates a new all-condition node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'All'
+   */
+  toString(): string {
+    return 'All';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: AllConditionNode,
+      name: 'AllConditionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    return this.validate() ? '' : 'bool';
+  }
+}
+
+/**
+ * Selection node
+ *
+ * @public
+ */
+export class SelectionNode extends BaseGraphNode {
+  /**
+   * Creates a new selection node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'a',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'b',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 3,
+        name: 'condition',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Selection'
+   */
+  toString(): string {
+    return 'Selection';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SelectionNode,
+      name: 'SelectionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state and input types
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    if (type0 !== type1) {
+      return 'Input arguments 0-1 must be the same type';
+    }
+    const type2 = this._inputs[2].inputNode.getOutputType(this._inputs[2].inputId);
+    const n = getNodeTypeComponents(type2);
+    if (n > 1 && n !== getNodeTypeComponents(type0)) {
+      return 'Invalid type of argument 2';
+    }
+    return '';
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    return this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
   }
 }
 
@@ -489,7 +832,7 @@ export class TransformNode extends BaseGraphNode {
    * - mat * mat = mat (same dimension)
    */
   protected getType() {
-    const err = super.validate();
+    const err = this.validate();
     if (err) {
       return '';
     }
@@ -1917,6 +2260,45 @@ export class DistanceNode extends GenericMathNode {
   }
 }
 
+/**
+ * Equal test across two scalar or vectors
+ *
+ * @public
+ */
+export class EqualNode extends GenericMathNode {
+  constructor() {
+    super('equal', 2, 'bool', ['float', 'vec2', 'vec3', 'vec4']);
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: EqualNode,
+      name: 'EqualNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Not-Equal test across two scalar or vectors
+ *
+ * @public
+ */
+export class NotEqualNode extends GenericMathNode {
+  constructor() {
+    super('notEqual', 2, 'bool', ['float', 'vec2', 'vec3', 'vec4']);
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: NotEqualNode,
+      name: 'NotEqualNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
 /**
  * Calculates the dot product of two vectors
  *
