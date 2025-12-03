@@ -10,6 +10,10 @@ import type {
 import { PBShaderExp } from '@zephyr3d/device';
 import type { BaseGraphNode, BlueprintDAG, IGraphNode } from '../node';
 import {
+  ConstantBooleanNode,
+  ConstantBVec2Node,
+  ConstantBVec3Node,
+  ConstantBVec4Node,
   ConstantScalarNode,
   ConstantVec2Node,
   ConstantVec3Node,
@@ -172,7 +176,7 @@ abstract class IRExpression {
    * This is the core method that translates the IR to actual shader code.
    * Must be implemented by all concrete expression types.
    */
-  abstract create(pb: ProgramBuilder): number | PBShaderExp;
+  abstract create(pb: ProgramBuilder): number | boolean | PBShaderExp;
   /** Gets the array of output expressions */
   get outputs() {
     return this._outputs;
@@ -243,19 +247,6 @@ abstract class IRExpression {
 /**
  * IR expression for a constant scalar (float) value
  *
- * @remarks
- * Represents either a literal constant or a uniform parameter.
- * If a parameter name is provided, generates a uniform; otherwise, uses a literal.
- *
- * @example
- * ```typescript
- * // Literal constant
- * const literal = new IRConstantf(1.5, '');
- *
- * // Uniform parameter
- * const uniform = new IRConstantf(1.0, 'u_roughness');
- * ```
- *
  * @public
  */
 class IRConstantf extends IRExpression {
@@ -311,20 +302,35 @@ class IRConstantf extends IRExpression {
 }
 
 /**
+ * IR expression for a constant scalar (boolean) value
+ *
+ * @public
+ */
+class IRConstantb extends IRExpression {
+  /** The constant boolean value */
+  readonly value: boolean;
+  /**
+   * Creates a constant boolean expression
+   *
+   * @param value - The boolean value
+   */
+  constructor(value: boolean) {
+    super();
+    this.value = value;
+  }
+  /**
+   * Generates shader code for this constant
+   *
+   * @returns The literal boolean value
+   *
+   */
+  create() {
+    return this.value;
+  }
+}
+
+/**
  * IR expression for a constant vector value
- *
- * @remarks
- * Represents vec2, vec3, or vec4 constants.
- * Can be either literals or uniform parameters.
- *
- * @example
- * ```typescript
- * // Literal vec3
- * const color = new IRConstantfv([1.0, 0.0, 0.0], '');
- *
- * // Uniform vec2
- * const param = new IRConstantfv([0.5, 0.5], 'u_offset');
- * ```
  *
  * @public
  */
@@ -381,6 +387,36 @@ class IRConstantfv extends IRExpression {
           value: this.value
         }
       : null;
+  }
+}
+
+/**
+ * IR expression for a constant boolean vector value
+ *
+ * @public
+ */
+class IRConstantbv extends IRExpression {
+  /** The constant vector value as an array of booleans */
+  readonly value: boolean[];
+
+  /**
+   * Creates a constant boolean vector expression
+   *
+   * @param value - The vector value as an array (length 2-4)
+   */
+  constructor(value: boolean[]) {
+    super();
+    this.value = value;
+  }
+  /**
+   * Generates shader code for this constant vector
+   *
+   * @param pb - The program builder
+   *
+   * @returns A boolean vector constructor expression
+   */
+  create(pb: ProgramBuilder): PBShaderExp {
+    return pb[`bvec${this.value.length}`](...this.value);
   }
 }
 
@@ -448,7 +484,9 @@ class IRFunc extends IRExpression {
   /** Array of parameters (can be expressions or literal numbers) */
   readonly params: (number | IRExpression)[];
   /** The function name (e.g., 'add', 'mul', 'sin', 'vec3') */
-  readonly func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp);
+  readonly func:
+    | string
+    | ((pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => PBShaderExp);
   /** Cached temporary variable name if expression is referenced multiple times */
   private tmpName: string;
   /**
@@ -462,7 +500,7 @@ class IRFunc extends IRExpression {
    */
   constructor(
     params: (number | IRExpression)[],
-    func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp)
+    func: string | ((pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => PBShaderExp)
   ) {
     super();
     this.params = params.map((param) => (param instanceof IRExpression ? param.addRef() : param));
@@ -544,7 +582,7 @@ class IRFunctionOutput extends IRExpression {
    * @remarks
    * If referenced multiple times, stores result in a temporary variable.
    */
-  create(pb: ProgramBuilder): PBShaderExp | number {
+  create(pb: ProgramBuilder): PBShaderExp | number | boolean {
     if (this.tmpName) {
       return pb.getCurrentScope()[this.tmpName];
     }
@@ -662,8 +700,8 @@ class IRSelection extends IRExpression {
     if (this.tmpName) {
       return pb.getCurrentScope()[this.tmpName];
     }
-    const a = this.a.create(pb);
-    const b = this.b.create(pb);
+    const a = this.a.create(pb) as number | PBShaderExp;
+    const b = this.b.create(pb) as number | PBShaderExp;
     const c = this.cond.create(pb);
     const exp = pb.select(a, b, typeof c === 'number' ? c !== 0 : c);
     if (this._ref === 1) {
@@ -1282,14 +1320,14 @@ export class MaterialBlueprintIR {
    * });
    * ```
    */
-  create(pb: ProgramBuilder): { name: string; exp: PBShaderExp | number }[] {
+  create(pb: ProgramBuilder): { name: string; exp: PBShaderExp | number | boolean }[] {
     if (!this._outputs) {
       return null;
     }
     for (const expr of this._expressions) {
       expr.reset();
     }
-    const outputs: { name: string; exp: PBShaderExp | number }[] = [];
+    const outputs: { name: string; exp: PBShaderExp | number | boolean }[] = [];
     for (const output of this._outputs) {
       outputs.push({ name: output.name, exp: output.expr.create(pb) });
     }
@@ -1337,6 +1375,14 @@ export class MaterialBlueprintIR {
       node instanceof ConstantVec4Node
     ) {
       expr = this.constantfv(node, output);
+    } else if (node instanceof ConstantBooleanNode) {
+      expr = this.constantb(node, output);
+    } else if (
+      node instanceof ConstantBVec2Node ||
+      node instanceof ConstantBVec3Node ||
+      node instanceof ConstantBVec4Node
+    ) {
+      expr = this.constantbv(node, output);
     } else if (node instanceof BaseTextureNode) {
       expr = this.constantTexture(node, output);
     } else if (node instanceof TextureSampleNode) {
@@ -1751,9 +1797,9 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash11(scope, seed)
           : type === 'vec2'
@@ -1775,9 +1821,9 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash12(scope, seed)
           : type === 'vec2'
@@ -1799,9 +1845,9 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash13(scope, seed)
           : type === 'vec2'
@@ -1823,7 +1869,7 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
           this.$l.t = pb.float(0);
           let freq = 1;
@@ -1854,7 +1900,7 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         pb.func('Z_perlinNoise2dDir', [pb.vec2('uv')], function () {
           this.$l.p = pb.mod(this.uv, pb.vec2(289));
           this.$l.x = pb.add(pb.mod(pb.mul(pb.add(pb.mul(this.p.x, 34), 1), this.p.x), 289), this.p.y);
@@ -1927,6 +1973,23 @@ export class MaterialBlueprintIR {
       node.paramName,
       `vec${value.length}`
     );
+  }
+  /** Converts a scalar boolean constant node to IR */
+  private constantb(node: ConstantBooleanNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRConstantb, node.x);
+  }
+  /** Converts a boolean vector constant node to IR */
+  private constantbv(
+    node: ConstantBVec2Node | ConstantBVec3Node | ConstantBVec4Node,
+    output: number
+  ): IRExpression {
+    const value =
+      node instanceof ConstantBVec2Node
+        ? [node.x, node.y]
+        : node instanceof ConstantBVec3Node
+          ? [node.x, node.y, node.z]
+          : [node.x, node.y, node.z, node.w];
+    return this.getOrCreateIRExpression(node, output, IRConstantbv, value);
   }
   /** Converts a texture constant node to IR */
   private constantTexture(node: BaseTextureNode, output: number): IRConstantTexture {

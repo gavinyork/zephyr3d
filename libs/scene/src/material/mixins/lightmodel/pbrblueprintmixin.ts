@@ -236,11 +236,14 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         const outputs = ir.create(pb);
         this.zCommonData.albedo = pb.vec4(
           (that.getOutput(outputs, 'BaseColor') as PBShaderExp)?.rgb ?? pb.vec3(1),
-          that.getOutput(outputs, 'Opacity') ?? 1
+          (that.getOutput(outputs, 'Opacity') as number | PBShaderExp) ?? 1
         );
         this.zCommonData.metallic = that.getOutput(outputs, 'Metallic') ?? 0;
         this.zCommonData.roughness = that.getOutput(outputs, 'Roughness')
-          ? pb.mul(that.getOutput(outputs, 'Roughness'), ShaderHelper.getCameraRoughnessFactor(scope))
+          ? pb.mul(
+              that.getOutput(outputs, 'Roughness') as number | PBShaderExp,
+              ShaderHelper.getCameraRoughnessFactor(scope)
+            )
           : ShaderHelper.getCameraRoughnessFactor(scope);
         this.zCommonData.specular = that.getOutput(outputs, 'Specular') ?? pb.vec3(1);
         this.zCommonData.emissive = that.getOutput(outputs, 'Emissive') ?? pb.vec3(0);
@@ -261,7 +264,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         this.zCommonData.TBN = pb.mat3(this.t, this.b, this.ng);
         if (that.getOutput(outputs, 'Normal')) {
           this.zCommonData.normal = pb.normalize(
-            pb.mul(this.zCommonData.TBN, that.getOutput(outputs, 'Normal'))
+            pb.mul(this.zCommonData.TBN, that.getOutput(outputs, 'Normal') as number | PBShaderExp)
           );
         } else {
           this.zCommonData.normal = this.ng;
@@ -276,7 +279,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     private getOutput(
       outputs: {
         name: string;
-        exp: number | PBShaderExp;
+        exp: number | boolean | PBShaderExp;
       }[],
       name: string
     ) {

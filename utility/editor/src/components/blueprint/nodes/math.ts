@@ -61,7 +61,9 @@ import {
   AllConditionNode,
   SelectionNode,
   EqualNode,
-  NotEqualNode
+  NotEqualNode,
+  LogicallyAndNode,
+  LogicallyOrNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -77,6 +79,14 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Swizzle',
           create: () => new SwizzleNode()
+        },
+        {
+          name: 'LogicallyAnd',
+          create: () => new LogicallyAndNode()
+        },
+        {
+          name: 'LogicallyOr',
+          create: () => new LogicallyOrNode()
         },
         {
           name: 'Equal',

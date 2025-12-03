@@ -2261,6 +2261,46 @@ export class DistanceNode extends GenericMathNode {
 }
 
 /**
+ * Logically and
+ *
+ * @public
+ */
+export class LogicallyAndNode extends GenericMathNode {
+  constructor() {
+    super('and', 2, 'bool', ['bool']);
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: LogicallyAndNode,
+      name: 'LogicallyAndNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Logically or
+ *
+ * @public
+ */
+export class LogicallyOrNode extends GenericMathNode {
+  constructor() {
+    super('or', 2, 'bool', ['bool']);
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: LogicallyOrNode,
+      name: 'LogicallyOrNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
  * Equal test across two scalar or vectors
  *
  * @public

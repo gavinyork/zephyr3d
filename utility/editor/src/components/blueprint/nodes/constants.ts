@@ -1,4 +1,8 @@
 import {
+  ConstantBooleanNode,
+  ConstantBVec2Node,
+  ConstantBVec3Node,
+  ConstantBVec4Node,
   ConstantScalarNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
@@ -28,6 +32,22 @@ export function getConstantNodeCategories(): NodeCategory[] {
         {
           name: 'Vec4',
           create: () => new ConstantVec4Node()
+        },
+        {
+          name: 'Boolean',
+          create: () => new ConstantBooleanNode()
+        },
+        {
+          name: 'BooleanVec2',
+          create: () => new ConstantBVec2Node()
+        },
+        {
+          name: 'BooleanVec3',
+          create: () => new ConstantBVec3Node()
+        },
+        {
+          name: 'BooleanVec4',
+          create: () => new ConstantBVec4Node()
         },
         {
           name: 'Texture2D',

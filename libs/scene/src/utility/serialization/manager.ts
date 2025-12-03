@@ -60,6 +60,10 @@ import {
   getJSONArrayClass
 } from './json';
 import {
+  ConstantBooleanNode,
+  ConstantBVec2Node,
+  ConstantBVec3Node,
+  ConstantBVec4Node,
   ConstantScalarNode,
   ConstantVec2Node,
   ConstantVec3Node,
@@ -135,7 +139,9 @@ import {
   AllConditionNode,
   SelectionNode,
   EqualNode,
-  NotEqualNode
+  NotEqualNode,
+  LogicallyAndNode,
+  LogicallyOrNode
 } from '../blueprint/common/math';
 import {
   BillboardMatrixNode,
@@ -283,6 +289,10 @@ export class ResourceManager {
         ConstantVec2Node.getSerializationCls(),
         ConstantVec3Node.getSerializationCls(),
         ConstantVec4Node.getSerializationCls(),
+        ConstantBooleanNode.getSerializationCls(),
+        ConstantBVec2Node.getSerializationCls(),
+        ConstantBVec3Node.getSerializationCls(),
+        ConstantBVec4Node.getSerializationCls(),
         ConstantTexture2DNode.getSerializationCls(),
         ConstantTexture2DArrayNode.getSerializationCls(),
         ConstantTextureCubeNode.getSerializationCls(),
@@ -290,6 +300,8 @@ export class ResourceManager {
         SwizzleNode.getSerializationCls(),
         EqualNode.getSerializationCls(),
         NotEqualNode.getSerializationCls(),
+        LogicallyAndNode.getSerializationCls(),
+        LogicallyOrNode.getSerializationCls(),
         CompComparisonNode.getSerializationCls(),
         AnyConditionNode.getSerializationCls(),
         AllConditionNode.getSerializationCls(),

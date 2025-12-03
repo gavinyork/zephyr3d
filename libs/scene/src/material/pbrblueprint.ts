@@ -234,7 +234,7 @@ export class PBRBluePrintMaterial
   private getOutput(
     outputs: {
       name: string;
-      exp: number | PBShaderExp;
+      exp: number | boolean | PBShaderExp;
     }[],
     name: string
   ) {
