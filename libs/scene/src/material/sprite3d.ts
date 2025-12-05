@@ -1,8 +1,10 @@
 import { MeshMaterial } from './meshmaterial';
-import type { PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags } from '../values';
 import type { Clonable } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
+import type { DrawContext } from '../render';
 
 /**
  * Lambert material
@@ -10,8 +12,19 @@ import type { Clonable } from '@zephyr3d/base';
  */
 export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
   static UVINFO = this.defineInstanceUniform('uvinfo', 'vec4');
+  private _uvinfo: Vector4;
   constructor() {
     super();
+    this._uvinfo = new Vector4(0, 0, 1, 1);
+  }
+  get uvinfo(): Vector4 {
+    return this._uvinfo;
+  }
+  set uvinfo(value: Vector4) {
+    if (!value.equalsTo(this.uvinfo)) {
+      this._uvinfo.set(value);
+      this.uniformChanged();
+    }
   }
   clone(): Sprite3DMaterial {
     const other = new Sprite3DMaterial();
@@ -71,6 +84,12 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.color);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
+    }
+  }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    super.applyUniformValues(bindGroup, ctx, pass);
+    if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
+      bindGroup.setValue('uvinfo', this._uvinfo);
     }
   }
 }
