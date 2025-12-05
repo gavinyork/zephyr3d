@@ -23,21 +23,21 @@ function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
 }
 
-function getBackend(): DeviceBackend {
+async function getBackend(): Promise<DeviceBackend> {
   const type = getQueryString('dev');
   if (type === 'webgpu') {
-    if (backendWebGPU.supported()) {
+    if (await backendWebGPU.supported()) {
       return backendWebGPU;
     } else {
       console.warn('No WebGPU support, fall back to WebGL2');
     }
   }
-  return backendWebGL2.supported() ? backendWebGL2 : backendWebGL1;
+  return (await backendWebGL2.supported()) ? backendWebGL2 : backendWebGL1;
 }
 
 const showUI = !!getQueryString('ui');
 const instancingApp = new Application({
-  backend: getBackend(),
+  backend: await getBackend(),
   canvas: document.querySelector('#canvas')
 });
 

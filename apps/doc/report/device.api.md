@@ -650,7 +650,7 @@ export interface DeviceBackend {
     // (undocumented)
     createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice>;
     // (undocumented)
-    supported(): boolean;
+    supported(): Promise<boolean>;
     // (undocumented)
     typeName(): string;
 }

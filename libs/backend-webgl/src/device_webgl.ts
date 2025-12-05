@@ -1281,8 +1281,8 @@ export class WebGLDevice extends BaseDevice {
   }
 }
 
-let webGL1Supported = null;
-let webGL2Supported = null;
+let webGL1Supported: boolean = null;
+let webGL2Supported: boolean = null;
 const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
@@ -1307,7 +1307,7 @@ export const backend1: DeviceBackend = {
   typeName() {
     return 'webgl';
   },
-  supported() {
+  async supported() {
     if (webGL1Supported === null) {
       const cvs = document.createElement('canvas');
       const gl = cvs.getContext('webgl');
@@ -1327,7 +1327,7 @@ export const backend2: DeviceBackend = {
   typeName() {
     return 'webgl2';
   },
-  supported() {
+  async supported() {
     if (webGL2Supported === null) {
       const cvs = document.createElement('canvas');
       const gl = cvs.getContext('webgl2');

@@ -67,7 +67,7 @@ let backend: DeviceBackend = null;
 ${
   rhiList.includes('webgpu')
     ? `backend = backend || (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
-if (!backend.supported()) {
+if (!(await backend.supported())) {
   backend = null;
 }
 `
@@ -76,7 +76,7 @@ if (!backend.supported()) {
 ${
   rhiList.includes('webgl2')
     ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-if (!backend.supported()) {
+if (!(await backend.supported())) {
   backend = null;
 }
 `
@@ -85,7 +85,7 @@ if (!backend.supported()) {
 ${
   rhiList.includes('webgl')
     ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL1;
-if (!backend.supported()) {
+if (!(await backend.supported())) {
   backend = null;
 }
 `
@@ -119,19 +119,19 @@ const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
 let backend: DeviceBackend = null;
 if (rhiList.includes('webgpu')) {
   backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }
 if (!backend && rhiList.includes('webgl2')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }
 if (!backend && rhiList.includes('webgl')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL1;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }

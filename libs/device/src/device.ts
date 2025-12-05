@@ -68,7 +68,7 @@ import { Pool } from './pool';
  */
 export interface DeviceBackend {
   typeName(): string;
-  supported(): boolean;
+  supported(): Promise<boolean>;
   createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice>;
 }
 

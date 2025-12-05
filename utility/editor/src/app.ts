@@ -62,19 +62,19 @@ if (project && !open) {
 let backend: DeviceBackend = null;
 if (rhiList.includes('webgpu')) {
   backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }
 if (!backend && rhiList.includes('webgl2')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }
 if (!backend && rhiList.includes('webgl')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL1;
-  if (!backend.supported()) {
+  if (!(await backend.supported())) {
     backend = null;
   }
 }

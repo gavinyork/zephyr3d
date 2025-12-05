@@ -2,7 +2,7 @@ import { Vector4 } from '@zephyr3d/base';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 (async function () {
-  if (!backendWebGPU.supported()) {
+  if (!(await backendWebGPU.supported())) {
     alert('Error: Browser does not support WebGPU.');
     return;
   }

@@ -158,6 +158,14 @@ export function aerialPerspective(scope: PBInsideFunctionScope, f2UV: PBShaderEx
 export function aerialPerspectiveLut(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp, f3VoxelDim: PBShaderExp, texTransmittanceLut: PBShaderExp, texMultiScatteringLut: PBShaderExp): any;
 
 // @public
+export class AllConditionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): "" | "bool";
+    toString(): string;
+}
+
+// @public
 export class AnimationClip extends Disposable {
     constructor(name: string, animationSet: AnimationSet, embedded?: boolean);
     addSkeleton(skeletonId: string): void;
@@ -244,6 +252,14 @@ export abstract class AnimationTrack<StateType = unknown> {
     set target(val: string);
     // @internal (undocumented)
     protected _target: string;
+}
+
+// @public
+export class AnyConditionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): "" | "bool";
+    toString(): string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "appInstance" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1660,6 +1676,20 @@ export class CompAddNode extends GenericMathNode {
 }
 
 // @public
+export type ComparisonMode = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge';
+
+// @public
+export class CompComparisonNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get mode(): ComparisonMode;
+    set mode(val: ComparisonMode);
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export class CompDivNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -1710,6 +1740,62 @@ export class CompSubNode extends GenericMathNode {
     constructor();
     // (undocumented)
     static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class ConstantBooleanNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+    get x(): boolean;
+    set x(val: boolean);
+}
+
+// @public
+export class ConstantBVec2Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+    get x(): boolean;
+    set x(val: boolean);
+    get y(): boolean;
+    set y(val: boolean);
+}
+
+// @public
+export class ConstantBVec3Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+    get x(): boolean;
+    set x(val: boolean);
+    get y(): boolean;
+    set y(val: boolean);
+    get z(): boolean;
+    set z(val: boolean);
+}
+
+// @public
+export class ConstantBVec4Node extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(id: number): string;
+    toString(): string;
+    protected validate(): string;
+    get w(): boolean;
+    set w(val: boolean);
+    get x(): boolean;
+    set x(val: boolean);
+    get y(): boolean;
+    set y(val: boolean);
+    get z(): boolean;
+    set z(val: boolean);
 }
 
 // @public
@@ -2368,6 +2454,13 @@ export class EnvShIBL extends EnvironmentLighting {
     updateBindGroup(bg: BindGroup): void;
 }
 
+// @public
+export class EqualNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
 // Warning: (ae-forgotten-export) The symbol "ShadowImpl" needs to be exported by the entry point index.d.ts
 // Warning: (ae-internal-missing-underscore) The name "ESM" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -2857,6 +2950,11 @@ export function getMultiScattering(scope: PBInsideFunctionScope, stParams: PBSha
 //
 // @internal (undocumented)
 export function getMultiScatteringLut(): Texture2D<unknown>;
+
+// Warning: (ae-internal-missing-underscore) The name "getNodeTypeComponents" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export function getNodeTypeComponents(type: string): 0 | 3 | 2 | 1 | 4;
 
 // Warning: (ae-internal-missing-underscore) The name "getOrthoCameraClass" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -3626,6 +3724,20 @@ export class Log2Node extends GenericMathNode {
 }
 
 // @public
+export class LogicallyAndNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class LogicallyOrNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
 export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 
 // @public
@@ -3705,7 +3817,7 @@ export class MaterialBlueprintIR {
     compile(): boolean;
     create(pb: ProgramBuilder): {
         name: string;
-        exp: PBShaderExp | number;
+        exp: PBShaderExp | number | boolean;
     }[];
     get DAG(): BlueprintDAG;
     set DAG(dag: BlueprintDAG);
@@ -4216,6 +4328,13 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
 
 // @public
 export class NormalizeNode extends GenericMathNode {
+    constructor();
+    // (undocumented)
+    static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class NotEqualNode extends GenericMathNode {
     constructor();
     // (undocumented)
     static getSerializationCls(): SerializableClass;
@@ -5769,6 +5888,15 @@ export class ScriptRegistry {
 }
 
 // @public
+export class SelectionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export type SerializableClass = {
     ctor: GenericConstructor;
     parent?: GenericConstructor;
@@ -7247,7 +7375,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:15161:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:15175:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

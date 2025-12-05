@@ -18,7 +18,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 // 用于创建设备的画布
 const canvas = document.querySelector('#canvas');
 // 如果系统支持，创建设备
-if (backendWebGPU.supported()) {
+if (await backendWebGPU.supported()) {
   const device = await backendWebGPU.createDevice(canvas);
   //
   if (!device) {

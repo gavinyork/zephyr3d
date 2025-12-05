@@ -73,7 +73,7 @@ pb.main(function(){
   const fsgenerated = document.querySelector<HTMLTextAreaElement>('#fragmentshader-generated');
   const bg = document.querySelector<HTMLTextAreaElement>('#bindgroups');
   const devices: Record<string, AbstractDevice> = {};
-  if (backendWebGL1.supported()) {
+  if (await backendWebGL1.supported()) {
     const cvs = document.createElement('canvas');
     cvs.style.width = '1px';
     cvs.style.height = '1px';
@@ -81,7 +81,7 @@ pb.main(function(){
     document.body.append(cvs);
     devices.webgl = await backendWebGL1.createDevice(cvs);
   }
-  if (backendWebGL2.supported()) {
+  if (await backendWebGL2.supported()) {
     const cvs = document.createElement('canvas');
     cvs.style.width = '1px';
     cvs.style.height = '1px';
@@ -89,7 +89,7 @@ pb.main(function(){
     document.body.append(cvs);
     devices.webgl2 = await backendWebGL2.createDevice(cvs);
   }
-  if (backendWebGPU.supported()) {
+  if (await backendWebGPU.supported()) {
     const cvs = document.createElement('canvas');
     cvs.style.width = '1px';
     cvs.style.height = '1px';
