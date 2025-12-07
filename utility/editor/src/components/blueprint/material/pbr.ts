@@ -137,7 +137,7 @@ export class PBRMaterialEditor extends GraphEditor {
     return this._previewScene.get().mainCamera.handleEvent(ev, type);
   }
   get saved() {
-    return this._version === (this._isBlueprint ? this.getNodeEditor('fragment').version : 0);
+    return this._version === 0;
   }
   async save(path: string) {
     if (path) {
@@ -195,7 +195,6 @@ export class PBRMaterialEditor extends GraphEditor {
           console.error(msg);
           Dialog.messageBox('Error', msg);
         }
-        this._version = this.getNodeEditor('fragment').version;
         await getEngine().resourceManager.reloadBluePrintMaterials();
       } else {
         try {
@@ -209,9 +208,9 @@ export class PBRMaterialEditor extends GraphEditor {
           console.error(msg);
           Dialog.messageBox('Error', msg);
         }
-        this._version = 0;
         await getEngine().resourceManager.reloadBluePrintMaterials();
       }
+      this._version = 0;
     }
   }
   getUniforms() {
@@ -325,7 +324,7 @@ export class PBRMaterialEditor extends GraphEditor {
           await vertexEditor.loadState(blueprintState.vertex);
         }
         await this.applyPreviewMaterial();
-        this._version = fragEditor.version;
+        this._version = 0;
       }
     } catch (err) {
       const msg = `Load material failed: ${err}`;
@@ -564,6 +563,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   protected onPropChanged(_obj: object, _prop: PropertyAccessor): void {
     this.applyPreviewMaterial();
+    this._version = -1;
   }
   protected onSelectionChanged(object: IGraphNode): void {
     if (!object) {
@@ -595,10 +595,9 @@ export class PBRMaterialEditor extends GraphEditor {
     }
   }
   private graphChanged() {
+    this._version = -1;
     if (this._isBlueprint) {
       this.applyPreviewMaterial();
-    } else {
-      this._version = 1;
     }
   }
   private dragdropFrag(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
