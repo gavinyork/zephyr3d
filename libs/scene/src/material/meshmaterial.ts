@@ -598,7 +598,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns True if lighting affects this material; otherwise false.
    */
   supportLighting(): boolean {
-    return true;
+    return false;
   }
   /**
    * Update render states per pass and draw context.
