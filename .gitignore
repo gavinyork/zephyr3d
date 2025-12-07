@@ -116,3 +116,6 @@ common/temp/
 # site tmp cache
 .buildcache.json
 .buildcache.tmp.json
+
+# VSCodeCounter
+.VSCodeCounter

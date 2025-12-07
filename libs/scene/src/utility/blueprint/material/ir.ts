@@ -1165,18 +1165,6 @@ export interface MaterialBlueprintIRBehaviors {
  * 3. Track uniforms and behaviors
  * 4. Generate optimized shader code from the IR
  *
- * @example
- * ```typescript
- * const ir = new MaterialBlueprintIR(dag, materialHash);
- * if (ir.ok) {
- *   // Generate shader code
- *   const outputs = ir.create(programBuilder);
- *
- *   // Apply uniforms at runtime
- *   for (const uniform of ir.uniformValues) {
- *     material.setUniform(uniform.name, uniform.value);
- *   }
- * }
  * ```
  *
  * @public
