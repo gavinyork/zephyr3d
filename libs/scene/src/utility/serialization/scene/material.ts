@@ -8,6 +8,7 @@ import {
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
+  Sprite3DBlueprintMaterial,
   UnlitMaterial
 } from '../../../material';
 import type { PropertyAccessor, SerializableClass } from '../types';
@@ -730,6 +731,11 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
 /** @internal */
 export function getPBRBluePrintMaterialClass(): SerializableClass[] {
   return [getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)];
+}
+
+/** @internal */
+export function getSprite3DBlueprintMaterialClass(): SerializableClass[] {
+  return [getMeshMaterialInstanceUniformsClass(Sprite3DBlueprintMaterial)];
 }
 
 /** @internal */

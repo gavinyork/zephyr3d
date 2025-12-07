@@ -1,5 +1,5 @@
 import { MeshMaterial } from './meshmaterial';
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags } from '../values';
 import type { Clonable } from '@zephyr3d/base';
@@ -7,7 +7,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
 
 /**
- * Lambert material
+ * Sprite3D material
  * @public
  */
 export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
@@ -141,9 +141,8 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
-    const pb = scope.$builder;
     if (this.needFragmentColor()) {
-      scope.$l.color = pb.vec4(scope.$inputs.uv, 0, 1);
+      scope.$l.color = this.calcFragmentColor(scope);
       this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.color);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
@@ -155,5 +154,8 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       bindGroup.setValue('uvinfo', this._uvinfo);
       bindGroup.setValue('sizeAnchor', this._sizeAnchor);
     }
+  }
+  protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.$builder.vec4(scope.$inputs.uv, 0, 1);
   }
 }

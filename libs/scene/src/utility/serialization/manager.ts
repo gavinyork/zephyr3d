@@ -19,7 +19,8 @@ import {
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
   getPBRBluePrintMaterialClass,
-  getSprite3DMaterialClass
+  getSprite3DMaterialClass,
+  getSprite3DBlueprintMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -275,6 +276,7 @@ export class ResourceManager {
         getSceneClass(this),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
+        ...getSprite3DBlueprintMaterialClass(),
         ...getUnlitMaterialClass(this),
         ...getLambertMaterialClass(this),
         ...getBlinnMaterialClass(this),
