@@ -13,7 +13,7 @@ import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
-import type { ParticleSystem } from '../scene';
+import type { ParticleSystem, Sprite3D } from '../scene';
 import type { Water } from '../scene/water';
 
 /**
@@ -101,6 +101,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitOctreeNode(target);
     } else if (target.isMesh()) {
       return this.visitMesh(target);
+    } else if (target.isSprite3D()) {
+      return this.visitSprite3D(target);
     } else if (target.isWater()) {
       return this.visitWater(target);
     } else if (target.isParticleSystem()) {
@@ -168,6 +170,16 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitParticleSystem(node: ParticleSystem) {
+    if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
+      }
+    }
+    return false;
+  }
+  visitSprite3D(node: Sprite3D) {
     if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {

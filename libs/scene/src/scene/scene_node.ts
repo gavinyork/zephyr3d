@@ -18,6 +18,7 @@ import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
 import { getEngine } from '../app/api';
+import type { Sprite3D } from './sprite3d';
 
 /**
  * Iteration callback used by traversal helpers.
@@ -526,6 +527,10 @@ export class SceneNode
   }
   /** Type guard: true if this node is a mesh. */
   isMesh(): this is Mesh {
+    return false;
+  }
+  /** Type guard: true if this node is a sprite3d */
+  isSprite3D(): this is Sprite3D {
     return false;
   }
   /** Type guard: true if this node is a water node. */

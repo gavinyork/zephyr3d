@@ -14,7 +14,8 @@ import type { PropertyAccessor, SerializableClass } from '../types';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
-import { getMeshMaterialInstanceUniformsClass } from './mesh';
+import { getMeshMaterialInstanceUniformsClass } from './common';
+import { Sprite3DMaterial } from '../../../material/sprite3d';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
@@ -618,6 +619,21 @@ export function getMeshMaterialClass(): SerializableClass[] {
       }
     },
     getMeshMaterialInstanceUniformsClass(MeshMaterial)
+  ];
+}
+
+/** @internal */
+export function getSprite3DMaterialClass(_manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: Sprite3DMaterial,
+      name: 'Sprite3DMaterial',
+      parent: MeshMaterial,
+      getProps() {
+        return [];
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(Sprite3DMaterial)
   ];
 }
 

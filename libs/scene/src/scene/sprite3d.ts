@@ -1,4 +1,5 @@
-import { applyMixins, DRef } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
+import { applyMixins, DRef, Vector2, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import type { RenderPass, BatchDrawable, DrawContext, PickTarget, MorphInfo } from '../render';
@@ -22,7 +23,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /** @internal */
   private static _primitive: DRef<Primitive> = new DRef();
   /** @internal */
-  private readonly _material: DRef<MeshMaterial>;
+  private readonly _material: DRef<Sprite3DMaterial>;
   /** @internal */
   protected _instanceHash: string;
   /** @internal */
@@ -35,6 +36,8 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   protected _useRenderBundle: boolean;
   /** @internal */
   protected _materialChangeTag: number;
+  /** @internal */
+  protected _anchor: Vector2;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -45,9 +48,10 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     this._instanceHash = null;
     this._pickTarget = { node: this };
     this._batchable = getDevice().type !== 'webgl';
+    this._anchor = new Vector2(0.5, 0.5);
     this.material = material ?? Sprite3D._getDefaultMaterial();
     this._renderBundle = {};
-    this._useRenderBundle = true;
+    this._useRenderBundle = false;
     this._materialChangeTag = null;
   }
   /**
@@ -82,14 +86,42 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     return this._material.get();
   }
   set material(m: MeshMaterial) {
-    if (this._material.get() !== m) {
+    if (this._material.get() !== m && m instanceof Sprite3DMaterial) {
       this._material.set(m);
       if (m) {
+        m.setSize(Math.abs(this.scale.x), Math.abs(this.scale.y));
+        m.setAnchor(this._anchor.x, this._anchor.y);
         RenderBundleWrapper.materialAttached(m.coreMaterial, this);
       }
       this._instanceHash = m ? `${this.constructor.name}:${this._scene?.id ?? 0}:${m.instanceId}` : null;
       RenderBundleWrapper.drawableChanged(this);
       this._materialChangeTag = null;
+    }
+  }
+  get anchorX(): number {
+    return this._anchor.x;
+  }
+  set anchorX(value: number) {
+    if (this._anchor.x !== value) {
+      this._anchor.x = value;
+      this.invalidateWorldBoundingVolume(false);
+      const material = this._material.get();
+      if (material) {
+        material.anchorX = this._anchor.x;
+      }
+    }
+  }
+  get anchorY(): number {
+    return this._anchor.y;
+  }
+  set anchorY(value: number) {
+    if (this._anchor.y !== value) {
+      this._anchor.y = value;
+      this.invalidateWorldBoundingVolume(false);
+      const material = this._material.get();
+      if (material) {
+        material.anchorY = this._anchor.y;
+      }
     }
   }
   /**
@@ -174,7 +206,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     let primitive = Sprite3D._primitive.get();
     if (!primitive) {
       primitive = new Primitive();
-      primitive.createAndSetVertexBuffer('position_f32', new Float32Array([1, 2, 3, 4]));
+      primitive.createAndSetVertexBuffer('position_f32', new Float32Array([0, 1, 2, 3]));
       primitive.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
       primitive.primitiveType = 'triangle-strip';
       Sprite3D._primitive.set(primitive);
@@ -194,9 +226,49 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     // mesh transform should be ignored when skinned
     return this;
   }
-  /** @internal */
+  /**
+   * {@inheritDoc SceneNode.computeBoundingVolume}
+   */
   computeBoundingVolume(): BoundingVolume {
-    return new BoundingBox();
+    return null;
+  }
+  /**
+   * {@inheritDoc SceneNode.computeWorldBoundingVolume}
+   */
+  computeWorldBoundingVolume(): BoundingVolume {
+    const p = this.worldMatrix.transformPointAffine(Vector3.zero());
+    const mat = this._material?.get();
+    if (mat) {
+      const boundingBox = new BoundingBox();
+      const cx = Math.max(Math.abs(this._anchor.x), Math.abs(1 - this._anchor.x)) * Math.abs(this.scale.x);
+      const cy = Math.max(Math.abs(this._anchor.y), Math.abs(1 - this._anchor.y)) * Math.abs(this.scale.y);
+      const size = Math.max(cx, cy);
+      boundingBox.minPoint.setXYZ(p.x - size, p.y - size, p.z - size);
+      boundingBox.maxPoint.setXYZ(p.x + size, p.y + size, p.z + size);
+      return boundingBox;
+    }
+    return null;
+  }
+  calculateLocalTransform(outMatrix: Matrix4x4): void {
+    outMatrix.translation(this._position);
+  }
+  calculateWorldTransform(outMatrix: Matrix4x4): void {
+    outMatrix.set(this.localMatrix);
+    if (this.parent) {
+      outMatrix.m03 += this.parent.worldMatrix.m03;
+      outMatrix.m13 += this.parent.worldMatrix.m13;
+      outMatrix.m23 += this.parent.worldMatrix.m23;
+    }
+  }
+  isSprite3D(): this is Sprite3D {
+    return true;
+  }
+  protected _onTransformChanged(invalidateLocal: boolean): void {
+    super._onTransformChanged(invalidateLocal);
+    const material = this._material?.get();
+    if (material) {
+      material.setSize(Math.abs(this.scale.x), Math.abs(this.scale.y));
+    }
   }
   /** Disposes the mesh node */
   protected onDispose() {

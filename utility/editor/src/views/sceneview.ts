@@ -22,7 +22,8 @@ import {
   PerspectiveCamera,
   OrthoCamera,
   getDevice,
-  getEngine
+  getEngine,
+  Sprite3D
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
@@ -270,6 +271,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   action: () => this.handleAddShape('/assets/@builtins/primitives/tetrahedron.zmsh')
                 }
               ]
+            },
+            {
+              label: 'Sprite3D',
+              action: () => this.handleAddNode(Sprite3D, 'Add Sprite3D')
             },
             {
               label: 'Light',

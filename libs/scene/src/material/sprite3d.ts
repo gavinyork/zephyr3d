@@ -12,10 +12,14 @@ import type { DrawContext } from '../render';
  */
 export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
   static UVINFO = this.defineInstanceUniform('uvinfo', 'vec4');
+  static SIZEANCHOR = this.defineInstanceUniform('sizeAnchor', 'vec4');
   private _uvinfo: Vector4;
+  private _sizeAnchor: Vector4;
   constructor() {
     super();
     this._uvinfo = new Vector4(0, 0, 1, 1);
+    this._sizeAnchor = new Vector4(1, 1, 0.5, 0.5);
+    this.cullMode = 'none';
   }
   get uvinfo(): Vector4 {
     return this._uvinfo;
@@ -24,6 +28,57 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     if (!value.equalsTo(this.uvinfo)) {
       this._uvinfo.set(value);
       this.uniformChanged();
+    }
+  }
+  get sizeAnchor(): Vector4 {
+    return this._sizeAnchor;
+  }
+  set sizeAnchor(value: Vector4) {
+    if (!value.equalsTo(this.sizeAnchor)) {
+      this._sizeAnchor.set(value);
+      this.uniformChanged();
+    }
+  }
+  get width(): number {
+    return this._sizeAnchor.x;
+  }
+  set width(value: number) {
+    if (this.width !== value) {
+      this.sizeAnchor = new Vector4(value, this._sizeAnchor.y, this._sizeAnchor.z, this._sizeAnchor.w);
+    }
+  }
+  get height(): number {
+    return this._sizeAnchor.y;
+  }
+  set height(value: number) {
+    if (this.height !== value) {
+      this.sizeAnchor = new Vector4(this._sizeAnchor.x, value, this._sizeAnchor.z, this._sizeAnchor.w);
+    }
+  }
+  setSize(width: number, height: number): void {
+    if (this.width !== width || this.height !== height) {
+      this.sizeAnchor = new Vector4(width, height, this._sizeAnchor.z, this._sizeAnchor.w);
+    }
+  }
+  get anchorX(): number {
+    return this._sizeAnchor.z;
+  }
+  set anchorX(value: number) {
+    if (this.anchorX !== value) {
+      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, value, this._sizeAnchor.w);
+    }
+  }
+  get anchorY(): number {
+    return this._sizeAnchor.w;
+  }
+  set anchorY(value: number) {
+    if (this.anchorY !== value) {
+      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, this._sizeAnchor.z, value);
+    }
+  }
+  setAnchor(anchorX: number, anchorY: number): void {
+    if (this.anchorX !== anchorX || this.anchorY !== anchorY) {
+      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, anchorX, anchorY);
     }
   }
   clone(): Sprite3DMaterial {
@@ -37,8 +92,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     scope.$inputs.vertexId = pb.float().attrib('position');
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
       scope.$l.uvinfo = this.getInstancedUniform(scope, Sprite3DMaterial.UVINFO);
+      scope.$l.sizeAnchor = this.getInstancedUniform(scope, Sprite3DMaterial.SIZEANCHOR);
     } else {
       scope.uvinfo = pb.vec4().uniform(2);
+      scope.sizeAnchor = pb.vec4().uniform(2);
     }
     scope.$l.worldPos = ShaderHelper.getWorldMatrix(scope)[3].xyz;
     const viewMatrix = ShaderHelper.getViewMatrix(scope);
@@ -50,26 +107,32 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     );
     scope.$l.right = pb.normalize(pb.cross(scope.axis, scope.forward));
     scope.$l.up = pb.normalize(pb.cross(scope.forward, scope.right));
-    scope.$l.pos = pb.vec2();
+    scope.$l.v = pb.vec2();
+    scope.$l.anchor = scope.sizeAnchor.zw;
     scope.$l.uv = pb.vec2();
     scope
       .$if(pb.equal(scope.$inputs.vertexId, 0), function () {
-        scope.pos = pb.vec2(-0.5, -0.5);
+        scope.v = pb.neg(scope.anchor);
         scope.uv = scope.uvinfo.xy;
       })
       .$elseif(pb.equal(scope.$inputs.vertexId, 1), function () {
-        scope.pos = pb.vec2(0.5, -0.5);
-        scope.uv = scope.uvinfo.xw;
-      })
-      .$elseif(pb.equal(scope.$inputs.vertexId, 2), function () {
-        scope.pos = pb.vec2(-0.5, 0.5);
+        scope.v = pb.sub(pb.vec2(1, 0), scope.anchor);
         scope.uv = scope.uvinfo.zy;
       })
+      .$elseif(pb.equal(scope.$inputs.vertexId, 2), function () {
+        scope.v = pb.sub(pb.vec2(0, 1), scope.anchor);
+        scope.uv = scope.uvinfo.xw;
+      })
       .$else(function () {
-        scope.pos = pb.vec2(0.5, 0.5);
+        scope.v = pb.sub(pb.vec2(1), scope.anchor);
         scope.uv = scope.uvinfo.zw;
       });
-    scope.$outputs.worldPos = pb.add(pb.mul(scope.right, scope.pos.x), pb.mul(scope.up, scope.pos.y));
+    scope.v = pb.mul(scope.v, scope.sizeAnchor.xy);
+    scope.$outputs.worldPos = pb.add(
+      scope.worldPos,
+      pb.mul(scope.right, scope.v.x),
+      pb.mul(scope.up, scope.v.y)
+    );
     scope.$outputs.uv = scope.uv;
     ShaderHelper.setClipSpacePosition(
       scope,
@@ -80,7 +143,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
-      scope.$l.color = pb.vec3(scope.$inputs.uv, 0);
+      scope.$l.color = pb.vec4(scope.$inputs.uv, 0, 1);
       this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.color);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
@@ -90,6 +153,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     super.applyUniformValues(bindGroup, ctx, pass);
     if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
       bindGroup.setValue('uvinfo', this._uvinfo);
+      bindGroup.setValue('sizeAnchor', this._sizeAnchor);
     }
   }
 }

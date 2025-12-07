@@ -18,7 +18,8 @@ import {
   getPBRMetallicRoughnessMaterialClass,
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
-  getPBRBluePrintMaterialClass
+  getPBRBluePrintMaterialClass,
+  getSprite3DMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -169,6 +170,7 @@ import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '.
 import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
+import { getSprite3DClass } from './scene/sprite';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -256,6 +258,7 @@ export class ResourceManager {
         getSceneNodeClass(this),
         getGraphNodeClass(),
         getMeshClass(),
+        getSprite3DClass(),
         getWaterClass(this),
         getTerrainClass(this),
         getFFTWaveGeneratorClass(),
@@ -278,6 +281,7 @@ export class ResourceManager {
         ...getPBRMetallicRoughnessMaterialClass(this),
         ...getPBRSpecularGlossinessMaterialClass(this),
         ...getParticleMaterialClass(this),
+        ...getSprite3DMaterialClass(this),
         getBoxShapeClass(),
         getBoxFrameShapeClass(),
         getSphereShapeClass(),

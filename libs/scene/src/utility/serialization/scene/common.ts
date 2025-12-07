@@ -5,11 +5,83 @@ import type {
   TextureCube,
   TextureSampler
 } from '@zephyr3d/device';
-import type { PropertyAccessor } from '../types';
-import type { Material } from '../../../material';
-import { Matrix4x4, Vector3 } from '@zephyr3d/base';
+import type { PropertyAccessor, SerializableClass } from '../types';
+import type { Material, MeshMaterial } from '../../../material';
+import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
-import { getDevice } from '../../../app/api';
+import { getDevice, getEngine } from '../../../app/api';
+
+/** @internal */
+export const meshInstanceClsMap: Map<
+  {
+    new (...args: any[]): MeshMaterial;
+  },
+  { C: { new (m: MeshMaterial) }; S: SerializableClass }
+> = new Map();
+
+/** @internal */
+export function getMeshMaterialInstanceUniformsClass(cls: {
+  new (...args: any[]): MeshMaterial;
+}): SerializableClass {
+  let info = meshInstanceClsMap.get(cls);
+  if (!info) {
+    class C {
+      materialId: string;
+      constructor(public material: MeshMaterial) {
+        this.materialId = getEngine().resourceManager.getAssetId(material.coreMaterial) ?? '';
+      }
+    }
+    const S: SerializableClass = {
+      ctor: C,
+      name: `${cls.name}InstanceUniforms`,
+      async createFunc(_ctx, init) {
+        const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
+        return { obj: new C(material.createInstance()) };
+      },
+      getInitParams(obj: C) {
+        return obj.materialId;
+      },
+      getProps() {
+        return (cls as typeof MeshMaterial).INSTANCE_UNIFORMS.filter((u) => !!u.name).map((u) => ({
+          name: u.name,
+          type: u.type,
+          get(this: C, value) {
+            const val = this.material[u.prop];
+            if (u.type === 'float') {
+              value.num[0] = val;
+            } else if (u.type === 'vec2') {
+              value.num[0] = val.x;
+              value.num[1] = val.y;
+            } else if (u.type === 'vec3' || u.type === 'rgb') {
+              value.num[0] = val.x;
+              value.num[1] = val.y;
+              value.num[2] = val.z;
+            } else if (u.type === 'vec4' || u.type === 'rgba') {
+              value.num[0] = val.x;
+              value.num[1] = val.y;
+              value.num[2] = val.z;
+              value.num[3] = val.w;
+            }
+          },
+          set(this: C, value) {
+            if (u.type === 'float') {
+              this.material[u.prop] = value.num[0];
+            } else if (u.type === 'vec2') {
+              this.material[u.prop] = new Vector2(value.num[0], value.num[1]);
+            } else if (u.type === 'vec3' || u.type === 'rgb') {
+              this.material[u.prop] = new Vector3(value.num[0], value.num[1], value.num[2]);
+            } else if (u.type === 'vec4' || u.type === 'rgba') {
+              this.material[u.prop] = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            }
+          }
+        }));
+      }
+    };
+    info = { C, S };
+    meshInstanceClsMap.set(cls, info);
+  }
+  return info.S;
+}
 
 export function getTextureProps<T extends Material>(
   manager: ResourceManager,
