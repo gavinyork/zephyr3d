@@ -291,7 +291,6 @@ export class WebGPUDevice extends BaseDevice {
     deviceWidth: number,
     deviceHeight: number
   ): void {
-    console.log('Handle resize:', deviceWidth, deviceHeight);
     this.canvas.width = deviceWidth;
     this.canvas.height = deviceHeight;
     this.createDefaultRenderAttachments();
