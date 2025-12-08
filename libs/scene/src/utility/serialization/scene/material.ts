@@ -433,6 +433,20 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
   return [
     ...getUnlitMaterialProps(manager),
     {
+      name: 'doubleSidedLighting',
+      type: 'bool',
+      default: false,
+      isValid(this: LitPropTypes) {
+        return !this.$isInstance && this.cullMode !== 'back';
+      },
+      get(this: LitPropTypes, value) {
+        value.bool[0] = this.doubleSidedLighting;
+      },
+      set(this: LitPropTypes, value) {
+        this.doubleSidedLighting = value.bool[0];
+      }
+    },
+    {
       name: 'vertexNormal',
       type: 'bool',
       default: true,
@@ -736,7 +750,22 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
       parent: MeshMaterial,
       name: 'PBRBluePrintMaterial',
       getProps() {
-        return [];
+        return [
+          {
+            name: 'doubleSidedLighting',
+            type: 'bool',
+            default: false,
+            isValid(this: LitPropTypes) {
+              return !this.$isInstance && this.cullMode !== 'back';
+            },
+            get(this: LitPropTypes, value) {
+              value.bool[0] = this.doubleSidedLighting;
+            },
+            set(this: LitPropTypes, value) {
+              this.doubleSidedLighting = value.bool[0];
+            }
+          }
+        ];
       }
     },
     getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)

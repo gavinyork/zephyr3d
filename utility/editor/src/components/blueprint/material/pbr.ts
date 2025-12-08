@@ -1,5 +1,4 @@
 import type {
-  BlendMode,
   BlueprintDAG,
   BluePrintUniformTexture,
   BluePrintUniformValue,
@@ -9,7 +8,6 @@ import type {
   IControllerWheelEvent,
   IGraphNode,
   MeshMaterial,
-  PropertyAccessor,
   SceneNode
 } from '@zephyr3d/scene';
 import {
@@ -61,8 +59,6 @@ export class PBRMaterialEditor extends GraphEditor {
   private _previewTex: DRef<Texture2D>;
   private _blitter: CopyBlitter;
   private _version: number;
-  private _blendMode: BlendMode;
-  private _doubleSided: boolean;
   private _outputName: string;
   private _blueprintPath: string;
   private _type: EditorType;
@@ -79,8 +75,6 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewTex = new DRef();
     this._blitter = new CopyBlitter();
     this._blitter.srgbOut = true;
-    this._blendMode = 'none';
-    this._doubleSided = false;
     this._blueprintPath = '';
     this.setType(type);
     this.propEditor.on('object_property_changed', this.graphChanged, this);
@@ -102,8 +96,6 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewScene.dispose();
     this._defaultMaterial.dispose();
     this._editMaterial.dispose();
-    this._blendMode = 'none';
-    this._doubleSided = false;
     this.propEditor.off('object_property_changed', this.graphChanged, this);
     if (this._type !== 'none') {
       const scene = new Scene();
@@ -124,8 +116,6 @@ export class PBRMaterialEditor extends GraphEditor {
         this._defaultMaterial.set(defaultMat);
         const previewMesh = new Sprite3D(this._previewScene.get(), defaultMat);
         this._previewMesh.set(previewMesh);
-        this._blendMode = 'none';
-        this._doubleSided = true;
       } else {
         const sphere = new SphereShape({ radius: 4, horizonalDetail: 50, verticalDetail: 50 });
         const defaultMat = new UnlitMaterial();
@@ -134,8 +124,6 @@ export class PBRMaterialEditor extends GraphEditor {
         this._defaultMaterial = new DRef(defaultMat);
         const previewMesh = new Mesh(this._previewScene.get(), sphere, this._defaultMaterial.get());
         this._previewMesh = new DRef(previewMesh);
-        this._blendMode = 'none';
-        this._doubleSided = false;
       }
       this.propEditor.on('object_property_changed', this.graphChanged, this);
     }
@@ -219,6 +207,7 @@ export class PBRMaterialEditor extends GraphEditor {
         const uniforms = this.getUniforms();
         const content: {
           type: string;
+          props: any;
           data: {
             IR: string;
             uniformValues: BluePrintUniformValue[];
@@ -226,6 +215,7 @@ export class PBRMaterialEditor extends GraphEditor {
           };
         } = {
           type: this._type === 'pbr' ? 'PBRBluePrintMaterial' : 'Sprite3DBluePrintMaterial',
+          props: await getEngine().resourceManager.serializeObjectProps(this._editMaterial.get()),
           data: {
             IR: bpPath,
             uniformValues: uniforms.uniformValues,
@@ -385,6 +375,7 @@ export class PBRMaterialEditor extends GraphEditor {
           }
         }
         await this.applyPreviewMaterial();
+        this.propEditor.object = this._editMaterial.get();
         this._version = 0;
       }
     } catch (err) {
@@ -622,21 +613,21 @@ export class PBRMaterialEditor extends GraphEditor {
         this._type === 'pbr'
           ? new PBRBluePrintMaterial(irFrag, irVert, uniforms.uniformValues, uniforms.uniformTextures)
           : new Sprite3DBlueprintMaterial(irFrag, uniforms.uniformValues, uniforms.uniformTextures);
-      newMaterial.blendMode = this._blendMode;
-      newMaterial.cullMode = this._doubleSided ? 'none' : 'back';
       if (this._type === 'pbr') {
-        (newMaterial as PBRBluePrintMaterial).doubleSidedLighting = !!this._doubleSided;
+        (newMaterial as PBRBluePrintMaterial).doubleSidedLighting =
+          (newMaterial as PBRBluePrintMaterial).cullMode !== 'back';
       }
       this._editMaterial.set(newMaterial);
       (this._previewMesh.get() as Mesh | Sprite3D).material = newMaterial;
     }
   }
-  protected onPropChanged(_obj: object, _prop: PropertyAccessor): void {
-    this.applyPreviewMaterial();
-    this._version = -1;
+  protected onPropChanged(): void {
+    this.graphChanged();
   }
   protected onSelectionChanged(object: IGraphNode): void {
     if (!object) {
+      this.propEditor.object = this._editMaterial.get();
+      /*
       this.propEditor.root.addRawProperty(
         'BlendMode',
         'string',
@@ -662,11 +653,16 @@ export class PBRMaterialEditor extends GraphEditor {
           this.onPropChanged(null, null);
         }
       );
+      */
     }
   }
   private graphChanged() {
     this._version = -1;
-    if (this._type !== 'default' && this._type !== 'none') {
+    if (
+      this._type !== 'default' &&
+      this._type !== 'none' &&
+      this.propEditor.object !== this._editMaterial.get()
+    ) {
       this.applyPreviewMaterial();
     }
   }
