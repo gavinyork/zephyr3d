@@ -42,7 +42,7 @@ import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
 import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
-import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
@@ -50,7 +50,7 @@ import type { NodeEditor, NodeEditorState } from '../nodeeditor';
 
 let wasDragging = false;
 
-type EditorType = 'default' | 'pbr' | 'sprite3d' | 'none';
+export type EditorType = 'default' | 'pbr' | 'sprite3d' | 'none';
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
@@ -69,7 +69,7 @@ export class PBRMaterialEditor extends GraphEditor {
   constructor(label: string, outputName: string, type: EditorType = 'none') {
     super(label, []);
     this._outputName = outputName;
-    this._type = type;
+    this._type = 'none';
     this._version = 0;
     this._previewScene = new DRef();
     this._previewMesh = new DRef();
@@ -82,7 +82,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this._blendMode = 'none';
     this._doubleSided = false;
     this._blueprintPath = '';
-    this.initPreview();
+    this.setType(type);
     this.propEditor.on('object_property_changed', this.graphChanged, this);
   }
   //protected create
@@ -92,29 +92,31 @@ export class PBRMaterialEditor extends GraphEditor {
   get vertexEditor() {
     return this.getNodeEditor('vertex');
   }
-  initPreview() {
-    if (this._type === 'none') {
-      this._previewMesh.get()?.remove();
-      this._previewMesh.dispose();
-      this._previewScene.dispose();
-      this._defaultMaterial.dispose();
-      this._editMaterial.dispose();
-      this._blendMode = 'none';
-      this._doubleSided = false;
-    } else {
-      if (!this._previewScene.get()) {
-        const scene = new Scene();
-        scene.env.light.type = 'ibl';
-        const camera = new PerspectiveCamera(scene);
-        camera.fovY = Math.PI / 3;
-        camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
-        camera.controller = new OrbitCameraController();
-        const light = new DirectionalLight(scene);
-        light.intensity = 10;
-        light.sunLight = true;
-        light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-        this._previewScene.set(scene);
-      }
+  setType(type: EditorType) {
+    if (type === this._type) {
+      return;
+    }
+    this._type = type;
+    this._previewMesh.get()?.remove();
+    this._previewMesh.dispose();
+    this._previewScene.dispose();
+    this._defaultMaterial.dispose();
+    this._editMaterial.dispose();
+    this._blendMode = 'none';
+    this._doubleSided = false;
+    this.propEditor.off('object_property_changed', this.graphChanged, this);
+    if (this._type !== 'none') {
+      const scene = new Scene();
+      scene.env.light.type = 'ibl';
+      const camera = new PerspectiveCamera(scene);
+      camera.fovY = Math.PI / 3;
+      camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
+      camera.controller = new OrbitCameraController();
+      const light = new DirectionalLight(scene);
+      light.intensity = 10;
+      light.sunLight = true;
+      light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+      this._previewScene.set(scene);
       this._previewMesh.get()?.remove();
       this._previewMesh.dispose();
       if (this._type === 'sprite3d') {
@@ -135,6 +137,7 @@ export class PBRMaterialEditor extends GraphEditor {
         this._blendMode = 'none';
         this._doubleSided = false;
       }
+      this.propEditor.on('object_property_changed', this.graphChanged, this);
     }
   }
   open() {
@@ -327,7 +330,6 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async load(path: string) {
     let blueprintState: { fragment: NodeEditorState; vertex?: NodeEditorState } = null;
-    this._type = 'none';
     try {
       if (path) {
         const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
@@ -340,18 +342,18 @@ export class PBRMaterialEditor extends GraphEditor {
           const blueprintData = JSON.parse(blueprintContent);
           if (data.type === 'PBRBluePrintMaterial') {
             ASSERT(blueprintData.type === 'PBRMaterial', 'Invalid PBR Material BluePrint');
-            this._type = 'pbr';
+            this.setType('pbr');
           } else if (data.type === 'Sprite3DBluePrintMaterial') {
             ASSERT(blueprintData.type === 'Sprite3DMaterial', 'Invalid Sprite3D Material BluePrint');
-            this._type = 'sprite3d';
+            this.setType('sprite3d');
           }
           blueprintState = blueprintData.state;
         } else {
+          this.setType('default');
           const material = await getEngine().resourceManager.deserializeObject<MeshMaterial>(null, data.data);
           this._editMaterial.set(material);
           (this._previewMesh.get() as Mesh).material = material;
           this.propEditor.object = material;
-          this._type = 'default';
         }
       }
       if (this._type !== 'default' && this._type !== 'none') {
@@ -608,6 +610,13 @@ export class PBRMaterialEditor extends GraphEditor {
         });
         u.finalTexture?.dispose();
         u.finalTexture = new DRef(tex);
+        u.finalSampler = getDevice().createSampler({
+          addressU: u.wrapS as TextureAddressMode,
+          addressV: u.wrapT as TextureAddressMode,
+          minFilter: u.minFilter as TextureFilterMode,
+          magFilter: u.magFilter as TextureFilterMode,
+          mipFilter: u.mipFilter as TextureFilterMode
+        });
       }
       const newMaterial =
         this._type === 'pbr'

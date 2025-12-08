@@ -34,7 +34,7 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material, PBRBluePrintMaterial } from '../material';
+import { Material, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '../material';
 import type {
   BlueprintDAG,
   BluePrintUniformTexture,
@@ -671,7 +671,10 @@ export class AssetManager {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; data: any };
-      ASSERT(content.type === 'PBRBluePrintMaterial', `Unsupported material type: ${content.type}`);
+      ASSERT(
+        content.type === 'PBRBluePrintMaterial' || content.type === 'Sprite3DBluePrintMaterial',
+        `Unsupported material type: ${content.type}`
+      );
       const ir = reload
         ? await this.loadBluePrint(content.data.IR as string, VFSs)
         : await this.fetchBluePrint(content.data.IR as string, VFSs);
@@ -730,7 +733,9 @@ export class AssetManager {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; data: any };
       ASSERT(
-        content.type === 'PBRBluePrintMaterial' || content.type === 'Default',
+        content.type === 'PBRBluePrintMaterial' ||
+          content.type === 'Sprite3DBluePrintMaterial' ||
+          content.type === 'Default',
         `Unsupported material type: ${content.type}`
       );
       if (content.type === 'PBRBluePrintMaterial') {
@@ -738,6 +743,13 @@ export class AssetManager {
         return new PBRBluePrintMaterial(
           data.irFragment,
           data.irVertex,
+          data.uniformValues,
+          data.uniformTextures
+        ) as unknown as T;
+      } else if (content.type === 'Sprite3DBluePrintMaterial') {
+        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
+        return new Sprite3DBlueprintMaterial(
+          data.irFragment,
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
@@ -905,7 +917,7 @@ export class AssetManager {
         >;
       };
       ASSERT(
-        bp.type === 'PBRMaterial' || bp.type === 'MaterialFunction',
+        bp.type === 'PBRMaterial' || bp.type === 'Sprite3DMaterial' || bp.type === 'MaterialFunction',
         `Unsupported blueprint type: ${bp.type}`
       );
       const states = bp.state;

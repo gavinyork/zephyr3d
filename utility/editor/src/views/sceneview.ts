@@ -67,6 +67,7 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
+import type { EditorType } from '../components/blueprint/material/pbr';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -1324,8 +1325,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       });
     }
   }
-  private editMaterial(label: string, name: string, path: string) {
-    Dialog.editMaterial(label, name, path, 800, 600);
+  private editMaterial(label: string, name: string, type: EditorType, path: string) {
+    Dialog.editMaterial(label, name, type, path, 800, 600);
   }
   private editMaterialFunction(path: string) {
     Dialog.editMaterialFunction(path, path, 800, 600);

@@ -16,6 +16,7 @@ import type { ImGui } from '@zephyr3d/imgui';
 import { DlgPBRMaterialEditor } from './materialeditor';
 import { DlgImport } from './importdlg';
 import { DlgMaterialFunctionEditor } from './materialfunceditor';
+import type { EditorType } from '../../components/blueprint/material/pbr';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -48,11 +49,12 @@ export class Dialog {
   public static async editMaterial(
     title: string,
     outputName: string,
+    type: EditorType,
     path: string,
     width?: number,
     height?: number
   ) {
-    return DlgPBRMaterialEditor.editPBRMaterial(title, outputName, path, width, height);
+    return DlgPBRMaterialEditor.editPBRMaterial(title, outputName, type, path, width, height);
   }
   public static async editMaterialFunction(title: string, path: string, width?: number, height?: number) {
     return DlgMaterialFunctionEditor.editMaterialFunction(title, path, width, height);

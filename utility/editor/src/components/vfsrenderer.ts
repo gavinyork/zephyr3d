@@ -20,6 +20,7 @@ import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import { getEngine } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
+import type { EditorType } from './blueprint/material/pbr';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -228,14 +229,24 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
             });
           }
           ImGui.Separator();
-          if (ImGui.MenuItem('Material...')) {
-            this.renderer.createNewFile('Create Material', 'Material Name', (path) => {
-              if (!path.toLowerCase().endsWith('.zmtl')) {
-                path = `${path}.zmtl`;
+          if (ImGui.BeginMenu('Material')) {
+            const materialTypes: Partial<Record<EditorType, string>> = {
+              pbr: 'PBR Material',
+              sprite3d: 'Sprite3D Material'
+            };
+            for (const type in materialTypes) {
+              const title = materialTypes[type as EditorType];
+              if (ImGui.MenuItem(`${title}...`)) {
+                this.renderer.createNewFile(`Create ${title}`, 'Material Name', (path) => {
+                  if (!path.toLowerCase().endsWith('.zmtl')) {
+                    path = `${path}.zmtl`;
+                  }
+                  const name = path.slice(0, -5);
+                  eventBus.dispatchEvent('edit_material', name, name, type as EditorType, path);
+                });
               }
-              const name = path.slice(0, -5);
-              eventBus.dispatchEvent('edit_material', name, name, path);
-            });
+            }
+            ImGui.EndMenu();
           }
           ImGui.Separator();
           if (ImGui.MenuItem('Material function...')) {
@@ -756,7 +767,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
         const name = this._vfs.basename(file.meta.path).slice(0, -5);
-        eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
+        eventBus.dispatchEvent('edit_material', name, name, 'none', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
       } else {

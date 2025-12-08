@@ -89,8 +89,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     if (this._material.get() !== m && m instanceof Sprite3DMaterial) {
       this._material.set(m);
       if (m) {
-        m.setSize(Math.abs(this.scale.x), Math.abs(this.scale.y));
-        m.setAnchor(this._anchor.x, this._anchor.y);
+        m.anchor = this._anchor;
         RenderBundleWrapper.materialAttached(m.coreMaterial, this);
       }
       this._instanceHash = m ? `${this.constructor.name}:${this._scene?.id ?? 0}:${m.instanceId}` : null;
@@ -250,7 +249,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     return null;
   }
   calculateLocalTransform(outMatrix: Matrix4x4): void {
-    outMatrix.translation(this._position);
+    outMatrix.scaling(this.scale).translateLeft(this._position);
   }
   calculateWorldTransform(outMatrix: Matrix4x4): void {
     outMatrix.set(this.localMatrix);
@@ -262,13 +261,6 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   }
   isSprite3D(): this is Sprite3D {
     return true;
-  }
-  protected _onTransformChanged(invalidateLocal: boolean): void {
-    super._onTransformChanged(invalidateLocal);
-    const material = this._material?.get();
-    if (material) {
-      material.setSize(Math.abs(this.scale.x), Math.abs(this.scale.y));
-    }
   }
   /** Disposes the mesh node */
   protected onDispose() {

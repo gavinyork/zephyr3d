@@ -90,8 +90,12 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
   }
   protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
-    const outputs = this._irFrag.create(pb);
-    return this.getOutput(outputs, 'Color') as PBShaderExp;
+    const that = this;
+    pb.func('zCalcSpriteColor', [pb.vec3('zWorldPos'), pb.vec2('zVertexUV')], function () {
+      const outputs = that._irFrag.create(pb);
+      this.$return(that.getOutput(outputs, 'Color') as PBShaderExp);
+    });
+    return scope.zCalcSpriteColor(scope.$inputs.zWorldPos, scope.$inputs.zVertexUV);
   }
   protected _createHash(): string {
     return this._irFrag.hash;

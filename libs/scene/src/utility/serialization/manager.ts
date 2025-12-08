@@ -1083,7 +1083,7 @@ export class ResourceManager {
     }
     return v;
   }
-  private async deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object) {
+  async deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object) {
     const props = (this.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
     let currentPhase: number = undefined;
     const promises: Promise<void>[] = [];
@@ -1182,7 +1182,7 @@ export class ResourceManager {
       await Promise.all(promises);
     }
   }
-  private async serializeObjectProps<T extends object>(
+  async serializeObjectProps<T extends object>(
     obj: T,
     cls: SerializableClass,
     json: object,

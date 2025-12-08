@@ -3,7 +3,7 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags } from '../values';
 import type { Clonable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector4, Vector2 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
 
 /**
@@ -12,13 +12,13 @@ import type { DrawContext } from '../render';
  */
 export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
   static UVINFO = this.defineInstanceUniform('uvinfo', 'vec4');
-  static SIZEANCHOR = this.defineInstanceUniform('sizeAnchor', 'vec4');
+  static ANCHOR = this.defineInstanceUniform('anchor', 'vec2');
   private _uvinfo: Vector4;
-  private _sizeAnchor: Vector4;
+  private _anchor: Vector2;
   constructor() {
     super();
     this._uvinfo = new Vector4(0, 0, 1, 1);
-    this._sizeAnchor = new Vector4(1, 1, 0.5, 0.5);
+    this._anchor = new Vector2(0.5, 0.5);
     this.cullMode = 'none';
   }
   get uvinfo(): Vector4 {
@@ -30,55 +30,34 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.uniformChanged();
     }
   }
-  get sizeAnchor(): Vector4 {
-    return this._sizeAnchor;
+  get anchor(): Vector2 {
+    return this._anchor;
   }
-  set sizeAnchor(value: Vector4) {
-    if (!value.equalsTo(this.sizeAnchor)) {
-      this._sizeAnchor.set(value);
+  set anchor(value: Vector2) {
+    if (!value.equalsTo(this._anchor)) {
+      this._anchor.setXY(value.x, value.y);
       this.uniformChanged();
     }
   }
-  get width(): number {
-    return this._sizeAnchor.x;
-  }
-  set width(value: number) {
-    if (this.width !== value) {
-      this.sizeAnchor = new Vector4(value, this._sizeAnchor.y, this._sizeAnchor.z, this._sizeAnchor.w);
-    }
-  }
-  get height(): number {
-    return this._sizeAnchor.y;
-  }
-  set height(value: number) {
-    if (this.height !== value) {
-      this.sizeAnchor = new Vector4(this._sizeAnchor.x, value, this._sizeAnchor.z, this._sizeAnchor.w);
-    }
-  }
-  setSize(width: number, height: number): void {
-    if (this.width !== width || this.height !== height) {
-      this.sizeAnchor = new Vector4(width, height, this._sizeAnchor.z, this._sizeAnchor.w);
-    }
-  }
   get anchorX(): number {
-    return this._sizeAnchor.z;
+    return this._anchor.x;
   }
   set anchorX(value: number) {
-    if (this.anchorX !== value) {
-      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, value, this._sizeAnchor.w);
+    if (this._anchor.x !== value) {
+      this.anchor = new Vector2(value, this._anchor.y);
     }
   }
   get anchorY(): number {
-    return this._sizeAnchor.w;
+    return this._anchor.y;
   }
   set anchorY(value: number) {
-    if (this.anchorY !== value) {
-      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, this._sizeAnchor.z, value);
+    if (this._anchor.y !== value) {
+      this.anchor = new Vector2(this._anchor.x, value);
     }
   }
   setAnchor(anchorX: number, anchorY: number): void {
-    if (this.anchorX !== anchorX || this.anchorY !== anchorY) {
-      this.sizeAnchor = new Vector4(this._sizeAnchor.x, this._sizeAnchor.y, anchorX, anchorY);
+    if (this._anchor.x !== anchorX || this._anchor.y !== anchorY) {
+      this.anchor = new Vector2(anchorX, anchorY);
     }
   }
   clone(): Sprite3DMaterial {
@@ -86,18 +65,29 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     other.copyFrom(this);
     return other;
   }
+  copyFrom(other: this): void {
+    super.copyFrom(other);
+    this.uvinfo = other.uvinfo;
+    this.anchor = other.anchor;
+  }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.vertexId = pb.float().attrib('position');
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
       scope.$l.uvinfo = this.getInstancedUniform(scope, Sprite3DMaterial.UVINFO);
-      scope.$l.sizeAnchor = this.getInstancedUniform(scope, Sprite3DMaterial.SIZEANCHOR);
+      scope.$l.anchor = this.getInstancedUniform(scope, Sprite3DMaterial.ANCHOR);
     } else {
       scope.uvinfo = pb.vec4().uniform(2);
-      scope.sizeAnchor = pb.vec4().uniform(2);
+      scope.anchor = pb.vec2().uniform(2);
     }
     scope.$l.worldPos = ShaderHelper.getWorldMatrix(scope)[3].xyz;
+    scope.$l.width = pb.sqrt(
+      pb.dot(ShaderHelper.getWorldMatrix(scope)[0].xyz, ShaderHelper.getWorldMatrix(scope)[0].xyz)
+    );
+    scope.$l.height = pb.sqrt(
+      pb.dot(ShaderHelper.getWorldMatrix(scope)[1].xyz, ShaderHelper.getWorldMatrix(scope)[1].xyz)
+    );
     const viewMatrix = ShaderHelper.getViewMatrix(scope);
     scope.$l.forward = pb.vec3(viewMatrix[0].z, viewMatrix[1].z, viewMatrix[2].z);
     scope.$l.axis = scope.$choice(
@@ -108,54 +98,53 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     scope.$l.right = pb.normalize(pb.cross(scope.axis, scope.forward));
     scope.$l.up = pb.normalize(pb.cross(scope.forward, scope.right));
     scope.$l.v = pb.vec2();
-    scope.$l.anchor = scope.sizeAnchor.zw;
     scope.$l.uv = pb.vec2();
     scope
       .$if(pb.equal(scope.$inputs.vertexId, 0), function () {
         scope.v = pb.neg(scope.anchor);
-        scope.uv = scope.uvinfo.xy;
+        scope.uv = pb.vec2(scope.uvinfo.x, pb.sub(1, scope.uvinfo.y));
       })
       .$elseif(pb.equal(scope.$inputs.vertexId, 1), function () {
         scope.v = pb.sub(pb.vec2(1, 0), scope.anchor);
-        scope.uv = scope.uvinfo.zy;
+        scope.uv = pb.vec2(scope.uvinfo.z, pb.sub(1, scope.uvinfo.y));
       })
       .$elseif(pb.equal(scope.$inputs.vertexId, 2), function () {
         scope.v = pb.sub(pb.vec2(0, 1), scope.anchor);
-        scope.uv = scope.uvinfo.xw;
+        scope.uv = pb.vec2(scope.uvinfo.x, pb.sub(1, scope.uvinfo.w));
       })
       .$else(function () {
         scope.v = pb.sub(pb.vec2(1), scope.anchor);
-        scope.uv = scope.uvinfo.zw;
+        scope.uv = pb.vec2(scope.uvinfo.z, pb.sub(1, scope.uvinfo.w));
       });
-    scope.v = pb.mul(scope.v, scope.sizeAnchor.xy);
-    scope.$outputs.worldPos = pb.add(
+    scope.v = pb.mul(scope.v, pb.vec2(scope.width, scope.height));
+    scope.$outputs.zWorldPos = pb.add(
       scope.worldPos,
       pb.mul(scope.right, scope.v.x),
       pb.mul(scope.up, scope.v.y)
     );
-    scope.$outputs.uv = scope.uv;
+    scope.$outputs.zVertexUV = scope.uv;
     ShaderHelper.setClipSpacePosition(
       scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.zWorldPos, 1))
     );
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     if (this.needFragmentColor()) {
       scope.$l.color = this.calcFragmentColor(scope);
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.color);
+      this.outputFragmentColor(scope, scope.$inputs.zWorldPos, scope.color);
     } else {
-      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
+      this.outputFragmentColor(scope, scope.$inputs.zWorldPos, null);
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
       bindGroup.setValue('uvinfo', this._uvinfo);
-      bindGroup.setValue('sizeAnchor', this._sizeAnchor);
+      bindGroup.setValue('anchor', this._anchor);
     }
   }
   protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
-    return scope.$builder.vec4(scope.$inputs.uv, 0, 1);
+    return scope.$builder.vec4(scope.$inputs.zVertexUV, 0, 1);
   }
 }
