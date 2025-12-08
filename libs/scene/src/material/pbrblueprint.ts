@@ -32,16 +32,16 @@ export class PBRBluePrintMaterial
    * Creates an instance of PBRMetallicRoughnessMaterial class
    */
   constructor(
-    irFrag: MaterialBlueprintIR,
-    irVertex: MaterialBlueprintIR,
-    uniformValues: BluePrintUniformValue[],
-    uniformTextures: BluePrintUniformTexture[]
+    irFrag?: MaterialBlueprintIR,
+    irVertex?: MaterialBlueprintIR,
+    uniformValues?: BluePrintUniformValue[],
+    uniformTextures?: BluePrintUniformTexture[]
   ) {
     super();
     this._irFrag = irFrag ?? new MaterialBlueprintIR(null, '');
     this._irVertex = irVertex ?? new MaterialBlueprintIR(null, '');
-    this._uniformValues = uniformValues;
-    this._uniformTextures = uniformTextures;
+    this._uniformValues = uniformValues ?? [];
+    this._uniformTextures = uniformTextures ?? [];
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irVertex.behaviors.useVertexUV);
   }
@@ -49,7 +49,7 @@ export class PBRBluePrintMaterial
     return this._irFrag;
   }
   set fragmentIR(ir: MaterialBlueprintIR) {
-    if (ir !== this._irFrag) {
+    if (ir && ir !== this._irFrag) {
       this._irFrag = ir;
       this.clearCache();
       this.optionChanged(true);
@@ -59,8 +59,10 @@ export class PBRBluePrintMaterial
     return this._irVertex;
   }
   set vertexIR(ir: MaterialBlueprintIR) {
-    if (ir !== this._irVertex) {
+    if (ir && ir !== this._irVertex) {
       this._irVertex = ir;
+      this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
+      this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irVertex.behaviors.useVertexUV);
       this.clearCache();
       this.optionChanged(true);
     }
@@ -70,7 +72,7 @@ export class PBRBluePrintMaterial
     return this._uniformValues;
   }
   set uniformValues(val: BluePrintUniformValue[]) {
-    this._uniformValues = val;
+    this._uniformValues = (val ?? []).map((v) => ({ ...v }));
     this.uniformChanged();
   }
   /** @internal */

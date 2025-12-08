@@ -630,10 +630,37 @@ export class ResourceManager {
       json.Init = initParams;
     }
     if (flags.saveProps) {
-      while (info) {
-        await this.serializeObjectProps(obj, info, json.Object, asyncTasks);
-        info = this.getClassByConstructor(info.parent);
+      await this.serializeObjectProps(obj, json.Object, asyncTasks, info);
+    }
+    return json;
+  }
+  /**
+   * Serialize object properties into a JSON structure.
+   *
+   * @param obj - The target object to serialize.
+   * @param json - The JSON structure to populate.
+   * @param asyncTasks - Optional list to collect async tasks for embedded asset export.
+   * @param info - Optional serialization metadata for the object's class.
+   * @returns A Promise that resolves when serialization is complete.
+   */
+  async serializeObjectProps(
+    obj: any,
+    json?: any,
+    asyncTasks?: Promise<unknown>[],
+    info?: SerializableClass
+  ) {
+    if (!info) {
+      const cls = this.getClasses();
+      const index = cls.findIndex((val) => val.ctor === obj.constructor);
+      if (index < 0) {
+        throw new Error('Serialize object properties failed: Cannot found serialization meta data');
       }
+      info = cls[index];
+    }
+    json = json ?? {};
+    while (info) {
+      await this.serializeObjectPropsForCls(obj, info, json, asyncTasks);
+      info = this.getClassByConstructor(info.parent);
     }
     return json;
   }
@@ -677,12 +704,30 @@ export class ResourceManager {
     }
     const obj = p instanceof Promise ? await p : p;
     if (loadProps) {
-      while (info) {
-        await this.deserializeObjectProps(obj, info, json);
-        info = this.getClassByConstructor(info.parent);
-      }
+      await this.deserializeObjectProps(obj, json, info);
     }
     return obj;
+  }
+  /**
+   * Deserialize object properties from JSON into an existing object instance.
+   *
+   * @param obj - The target object to populate.
+   * @param json - The JSON structure containing serialized properties.
+   * @param info - Optional serialization metadata for the object's class.
+   */
+  async deserializeObjectProps(obj: any, json: any, info?: SerializableClass) {
+    if (!info) {
+      const cls = this.getClasses();
+      const index = cls.findIndex((val) => val.ctor === obj.constructor);
+      if (index < 0) {
+        throw new Error('Deserialize object properties failed: Cannot found serialization meta data');
+      }
+      info = cls[index];
+    }
+    while (info) {
+      await this.deserializeObjectPropsForCls(obj, info, json);
+      info = this.getClassByConstructor(info.parent);
+    }
   }
   /**
    * Load a model by ID and track the allocation for reverse lookup.
@@ -1083,7 +1128,7 @@ export class ResourceManager {
     }
     return v;
   }
-  async deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object) {
+  private async deserializeObjectPropsForCls<T extends object>(obj: T, cls: SerializableClass, json: object) {
     const props = (this.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
     let currentPhase: number = undefined;
     const promises: Promise<void>[] = [];
@@ -1182,7 +1227,7 @@ export class ResourceManager {
       await Promise.all(promises);
     }
   }
-  async serializeObjectProps<T extends object>(
+  private async serializeObjectPropsForCls<T extends object>(
     obj: T,
     cls: SerializableClass,
     json: object,

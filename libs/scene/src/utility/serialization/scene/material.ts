@@ -730,12 +730,32 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
 
 /** @internal */
 export function getPBRBluePrintMaterialClass(): SerializableClass[] {
-  return [getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)];
+  return [
+    {
+      ctor: PBRBluePrintMaterial,
+      parent: MeshMaterial,
+      name: 'PBRBluePrintMaterial',
+      getProps() {
+        return [];
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)
+  ];
 }
 
 /** @internal */
 export function getSprite3DBlueprintMaterialClass(): SerializableClass[] {
-  return [getMeshMaterialInstanceUniformsClass(Sprite3DBlueprintMaterial)];
+  return [
+    {
+      ctor: Sprite3DBlueprintMaterial,
+      parent: MeshMaterial,
+      name: 'Sprite3DBlueprintMaterial',
+      getProps() {
+        return [];
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(Sprite3DBlueprintMaterial)
+  ];
 }
 
 /** @internal */

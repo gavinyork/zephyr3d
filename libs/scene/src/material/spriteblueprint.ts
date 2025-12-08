@@ -16,20 +16,20 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    * Creates an instance of Sprite3DBlueprintMaterial class
    */
   constructor(
-    irFrag: MaterialBlueprintIR,
-    uniformValues: BluePrintUniformValue[],
-    uniformTextures: BluePrintUniformTexture[]
+    irFrag?: MaterialBlueprintIR,
+    uniformValues?: BluePrintUniformValue[],
+    uniformTextures?: BluePrintUniformTexture[]
   ) {
     super();
     this._irFrag = irFrag ?? new MaterialBlueprintIR(null, '');
-    this._uniformValues = uniformValues;
-    this._uniformTextures = uniformTextures;
+    this._uniformValues = uniformValues ?? [];
+    this._uniformTextures = uniformTextures ?? [];
   }
   get fragmentIR() {
     return this._irFrag;
   }
   set fragmentIR(ir: MaterialBlueprintIR) {
-    if (ir !== this._irFrag) {
+    if (ir && ir !== this._irFrag) {
       this._irFrag = ir;
       this.clearCache();
       this.optionChanged(true);
@@ -40,7 +40,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     return this._uniformValues;
   }
   set uniformValues(val: BluePrintUniformValue[]) {
-    this._uniformValues = val;
+    this._uniformValues = (val ?? []).map((v) => ({ ...v }));
     this.uniformChanged();
   }
   /** @internal */
@@ -48,6 +48,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     return this._uniformTextures;
   }
   set uniformTextures(val: BluePrintUniformTexture[]) {
+    val = val ?? [];
     if (val !== this._uniformTextures) {
       const newUniforms = val.map((v) => ({
         finalTexture: new DRef(v.finalTexture.get()),
