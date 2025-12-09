@@ -320,6 +320,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async load(path: string) {
     let blueprintState: { fragment: NodeEditorState; vertex?: NodeEditorState } = null;
+    let props: any = null;
     try {
       if (path) {
         const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
@@ -338,6 +339,7 @@ export class PBRMaterialEditor extends GraphEditor {
             this.setType('sprite3d');
           }
           blueprintState = blueprintData.state;
+          props = data.props;
         } else {
           this.setType('default');
           const material = await getEngine().resourceManager.deserializeObject<MeshMaterial>(null, data.data);
@@ -374,7 +376,7 @@ export class PBRMaterialEditor extends GraphEditor {
             await this.vertexEditor.loadState(blueprintState.vertex);
           }
         }
-        await this.applyPreviewMaterial();
+        await this.applyPreviewMaterial(props);
         this.propEditor.object = this._editMaterial.get();
         this._version = 0;
       }
@@ -540,7 +542,7 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     camera.updateController();
   }
-  private async applyPreviewMaterial() {
+  private async applyPreviewMaterial(props?: any) {
     if (this._type === 'default' || this._type === 'none') {
       return;
     }
@@ -609,16 +611,28 @@ export class PBRMaterialEditor extends GraphEditor {
           mipFilter: u.mipFilter as TextureFilterMode
         });
       }
-      const newMaterial =
-        this._type === 'pbr'
-          ? new PBRBluePrintMaterial(irFrag, irVert, uniforms.uniformValues, uniforms.uniformTextures)
-          : new Sprite3DBlueprintMaterial(irFrag, uniforms.uniformValues, uniforms.uniformTextures);
-      if (this._type === 'pbr') {
-        (newMaterial as PBRBluePrintMaterial).doubleSidedLighting =
-          (newMaterial as PBRBluePrintMaterial).cullMode !== 'back';
+      if (
+        (this._type === 'pbr' && !(this._editMaterial.get() instanceof PBRBluePrintMaterial)) ||
+        (this._type === 'sprite3d' && !(this._editMaterial.get() instanceof Sprite3DBlueprintMaterial))
+      ) {
+        this._editMaterial.set(
+          this._type === 'pbr'
+            ? new PBRBluePrintMaterial(irFrag, irVert, uniforms.uniformValues, uniforms.uniformTextures)
+            : new Sprite3DBlueprintMaterial(irFrag, uniforms.uniformValues, uniforms.uniformTextures)
+        );
+        (this._previewMesh.get() as Mesh | Sprite3D).material = this._editMaterial.get();
+      } else {
+        const m = this._editMaterial.get() as PBRBluePrintMaterial | Sprite3DBlueprintMaterial;
+        m.fragmentIR = irFrag;
+        if (m instanceof PBRBluePrintMaterial) {
+          m.vertexIR = irVert;
+        }
+        m.uniformValues = uniforms.uniformValues;
+        m.uniformTextures = uniforms.uniformTextures;
       }
-      this._editMaterial.set(newMaterial);
-      (this._previewMesh.get() as Mesh | Sprite3D).material = newMaterial;
+      if (props) {
+        await getEngine().resourceManager.deserializeObjectProps(this._editMaterial.get(), props);
+      }
     }
   }
   protected onPropChanged(): void {

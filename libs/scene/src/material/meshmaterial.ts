@@ -79,6 +79,7 @@ export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
 
 let FEATURE_ALPHATEST = 0;
 let FEATURE_ALPHABLEND = 0;
+let FEATURE_CULLMODE = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 let FEATURE_DISABLE_TAA = 0;
 
@@ -188,6 +189,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this._ctx = null;
     this._materialPass = -1;
     this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
+    this.useFeature(FEATURE_CULLMODE, this._cullMode);
   }
   /**
    * Create a shallow clone of this material.
@@ -562,7 +564,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return this._cullMode;
   }
   set cullMode(val: FaceMode) {
-    this._cullMode = val;
+    if (this._cullMode !== val) {
+      this._cullMode = val;
+      this.useFeature(FEATURE_CULLMODE, this._cullMode);
+    }
   }
   /**
    * Material opacity in [0, 1].
@@ -1038,5 +1043,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
 }
 FEATURE_ALPHATEST = MeshMaterial.defineFeature();
 FEATURE_ALPHABLEND = MeshMaterial.defineFeature();
+FEATURE_CULLMODE = MeshMaterial.defineFeature();
 FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
 FEATURE_DISABLE_TAA = MeshMaterial.defineFeature();

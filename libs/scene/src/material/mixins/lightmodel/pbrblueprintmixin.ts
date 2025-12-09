@@ -261,7 +261,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         this.$l.t_ = pb.normalize(this.tangent);
         this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
         this.$l.b = pb.cross(this.ng, this.t);
-        if (that.doubleSidedLighting) {
+        if (that.doubleSidedLighting && that.cullMode !== 'back') {
           this.$if(pb.not(this.$builtins.frontFacing), function () {
             this.t = pb.mul(this.t, -1);
             this.b = pb.mul(this.b, -1);

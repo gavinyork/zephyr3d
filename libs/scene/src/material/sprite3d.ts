@@ -30,6 +30,9 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.uniformChanged();
     }
   }
+  setUVInfo(uvx0: number, uvy0: number, uvx1: number, uvy1: number): void {
+    this.uvinfo = new Vector4(uvx0, uvy0, uvx1, uvy1);
+  }
   get anchor(): Vector2 {
     return this._anchor;
   }

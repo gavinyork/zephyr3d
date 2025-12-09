@@ -123,6 +123,22 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
       }
     }
   }
+  get uvTopLeft(): Vector2 {
+    const uvinfo = this._material.get().uvinfo;
+    return new Vector2(uvinfo.x, uvinfo.y);
+  }
+  set uvTopLeft(value: Vector2) {
+    const uvinfo = this._material.get().uvinfo;
+    this._material.get().setUVInfo(value.x, value.y, uvinfo.z, uvinfo.w);
+  }
+  get uvBottomRight(): Vector2 {
+    const uvinfo = this._material.get().uvinfo;
+    return new Vector2(uvinfo.z, uvinfo.w);
+  }
+  set uvBottomRight(value: Vector2) {
+    const uvinfo = this._material.get().uvinfo;
+    this._material.get().setUVInfo(uvinfo.x, uvinfo.y, value.x, value.y);
+  }
   /**
    * {@inheritDoc Drawable.getMorphData}
    */

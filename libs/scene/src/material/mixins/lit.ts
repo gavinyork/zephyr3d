@@ -348,7 +348,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.ng = pb.normalize(pb.cross(pb.dpdx(posW), pb.dpdy(posW)));
           this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
           this.$l.b = pb.cross(this.ng, this.t);
-          if (that.doubleSidedLighting) {
+          if (that.doubleSidedLighting && that.cullMode !== 'back') {
             this.$if(pb.not(this.$builtins.frontFacing), function () {
               this.t = pb.mul(this.t, -1);
               this.b = pb.mul(this.b, -1);
@@ -373,7 +373,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.ng = pb.normalize(this.worldNormal);
           this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
           this.$l.b = pb.cross(this.ng, this.t);
-          if (that.doubleSidedLighting) {
+          if (that.doubleSidedLighting && that.cullMode !== 'back') {
             this.$if(pb.not(this.$builtins.frontFacing), function () {
               this.t = pb.mul(this.t, -1);
               this.b = pb.mul(this.b, -1);
@@ -385,7 +385,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.ng = pb.normalize(this.worldNormal);
           this.$l.t = pb.normalize(this.worldTangent);
           this.$l.b = pb.normalize(this.worldBinormal);
-          if (that.doubleSidedLighting) {
+          if (that.doubleSidedLighting && that.cullMode !== 'back') {
             this.$if(pb.not(this.$builtins.frontFacing), function () {
               this.t = pb.mul(this.t, -1);
               this.b = pb.mul(this.b, -1);

@@ -5,6 +5,7 @@ import type { SerializableClass } from '../types';
 import { meshInstanceClsMap } from './common';
 import { Sprite3D } from '../../../scene/sprite3d';
 import { Sprite3DMaterial } from '../../../material/sprite3d';
+import { Vector2 } from '@zephyr3d/base';
 
 /** @internal */
 export function getSprite3DClass(): SerializableClass {
@@ -34,6 +35,32 @@ export function getSprite3DClass(): SerializableClass {
           }
         },
         {
+          name: 'UVTopLeft',
+          type: 'vec2',
+          default: [0, 0],
+          get(this: Sprite3D, value) {
+            const lt = this.uvTopLeft;
+            value.num[0] = lt.x;
+            value.num[1] = lt.y;
+          },
+          set(this: Sprite3D, value) {
+            this.uvTopLeft = new Vector2(value.num[0], value.num[1]);
+          }
+        },
+        {
+          name: 'UVBottomRight',
+          type: 'vec2',
+          default: [1, 1],
+          get(this: Sprite3D, value) {
+            const rb = this.uvBottomRight;
+            value.num[0] = rb.x;
+            value.num[1] = rb.y;
+          },
+          set(this: Sprite3D, value) {
+            this.uvBottomRight = new Vector2(value.num[0], value.num[1]);
+          }
+        },
+        {
           name: 'Material',
           type: 'object',
           options: {
@@ -56,19 +83,6 @@ export function getSprite3DClass(): SerializableClass {
                 );
               }
             }
-          }
-        },
-        {
-          name: 'MaterialObject',
-          type: 'object',
-          isPersistent() {
-            return false;
-          },
-          options: {
-            objectTypes: [Sprite3DMaterial]
-          },
-          get(this: Sprite3D, value) {
-            value.object[0] = this.material ?? null;
           }
         },
         {

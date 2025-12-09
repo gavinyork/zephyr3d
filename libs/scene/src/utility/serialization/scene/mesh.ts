@@ -213,19 +213,6 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
-          name: 'MaterialObject',
-          type: 'object',
-          isPersistent() {
-            return false;
-          },
-          options: {
-            objectTypes: [MeshMaterial]
-          },
-          get(this: Mesh, value) {
-            value.object[0] = this.material ?? null;
-          }
-        },
-        {
           name: 'Geometry Instance',
           type: 'bool',
           get(this: Mesh, value) {

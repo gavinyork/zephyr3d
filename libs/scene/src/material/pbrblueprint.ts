@@ -219,7 +219,7 @@ export class PBRBluePrintMaterial
     }
   }
   protected _createHash(): string {
-    return `${this._irFrag.hash}:${this._irVertex.hash}`;
+    return `${super._createHash()}:${this._irFrag.hash}:${this._irVertex.hash}`;
   }
   protected createProgram(ctx: DrawContext, pass: number) {
     const program = super.createProgram(ctx, pass);

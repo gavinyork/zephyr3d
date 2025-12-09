@@ -731,16 +731,17 @@ export class AssetManager {
   async loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
-      const content = JSON.parse(data) as { type: string; data: any };
+      const content = JSON.parse(data) as { type: string; props: any; data: any };
       ASSERT(
         content.type === 'PBRBluePrintMaterial' ||
           content.type === 'Sprite3DBluePrintMaterial' ||
           content.type === 'Default',
         `Unsupported material type: ${content.type}`
       );
+      let mat: T;
       if (content.type === 'PBRBluePrintMaterial') {
         const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
-        return new PBRBluePrintMaterial(
+        mat = new PBRBluePrintMaterial(
           data.irFragment,
           data.irVertex,
           data.uniformValues,
@@ -748,7 +749,7 @@ export class AssetManager {
         ) as unknown as T;
       } else if (content.type === 'Sprite3DBluePrintMaterial') {
         const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
-        return new Sprite3DBlueprintMaterial(
+        mat = new Sprite3DBlueprintMaterial(
           data.irFragment,
           data.uniformValues,
           data.uniformTextures
@@ -763,6 +764,10 @@ export class AssetManager {
         }
         return obj;
       }
+      if (mat && content.props) {
+        await this._resourceManager.deserializeObjectProps(mat, content.props);
+      }
+      return mat;
     } catch (err) {
       console.error(`Load material failed: ${err}`);
       return null;
