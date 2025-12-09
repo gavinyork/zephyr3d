@@ -15,6 +15,7 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../material';
+import { StandardSprite3DMaterial } from '../material/sprite3d_std';
 
 /**
  * Interface for objects that can be rendered.
@@ -256,7 +257,8 @@ export class Engine {
       '/materials/lambert.zmtl': LambertMaterial,
       '/materials/blinnphong.zmtl': BlinnMaterial,
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
-      '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial
+      '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
+      '/materials/sprite3d_std.zmtl': StandardSprite3DMaterial
     } as const;
     for (const key of Object.keys(shapeClsMap)) {
       const obj = new shapeClsMap[key]();

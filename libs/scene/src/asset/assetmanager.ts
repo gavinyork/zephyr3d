@@ -37,6 +37,7 @@ import { getDevice, getEngine } from '../app/api';
 import { Material, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '../material';
 import type {
   BlueprintDAG,
+  BluePrintEditorState,
   BluePrintUniformTexture,
   BluePrintUniformValue,
   GraphStructure,
@@ -667,25 +668,43 @@ export class AssetManager {
       }
     }
   }
-  private async loadBluePrintMaterialData(url: string, reload: boolean, VFSs?: VFS[]) {
+  private async loadBluePrintMaterialData(
+    url:
+      | string
+      | { IR: string; uniformValues: BluePrintUniformValue[]; uniformTextures: BluePrintUniformTexture[] },
+    reload: boolean,
+    VFSs?: VFS[]
+  ) {
     try {
-      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
-      const content = JSON.parse(data) as { type: string; data: any };
-      ASSERT(
-        content.type === 'PBRBluePrintMaterial' || content.type === 'Sprite3DBluePrintMaterial',
-        `Unsupported material type: ${content.type}`
-      );
+      let irData: {
+        IR: string;
+        uniformValues: BluePrintUniformValue[];
+        uniformTextures: BluePrintUniformTexture[];
+      };
+      if (typeof url === 'string') {
+        const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+        const content = JSON.parse(data) as { type: string; data: any };
+        ASSERT(
+          content.type === 'PBRBluePrintMaterial' || content.type === 'Sprite3DBluePrintMaterial',
+          `Unsupported material type: ${content.type}`
+        );
+        irData = content.data as {
+          IR: string;
+          uniformValues: BluePrintUniformValue[];
+          uniformTextures: BluePrintUniformTexture[];
+        };
+      } else {
+        irData = url;
+      }
       const ir = reload
-        ? await this.loadBluePrint(content.data.IR as string, VFSs)
-        : await this.fetchBluePrint(content.data.IR as string, VFSs);
-      const uniformValues: BluePrintUniformValue[] = (
-        content.data.uniformValues as BluePrintUniformValue[]
-      ).map((v) => ({
+        ? await this.loadBluePrint(irData.IR, VFSs)
+        : await this.fetchBluePrint(irData.IR, VFSs);
+      const uniformValues: BluePrintUniformValue[] = irData.uniformValues.map((v) => ({
         ...v,
         finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
       }));
       const uniformTextures: BluePrintUniformTexture[] = [];
-      const textures = content.data.uniformTextures as BluePrintUniformTexture[];
+      const textures = irData.uniformTextures;
       for (const v of textures) {
         const tex = await this.fetchTexture(
           v.texture,
@@ -740,7 +759,15 @@ export class AssetManager {
       );
       let mat: T;
       if (content.type === 'PBRBluePrintMaterial') {
-        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
+        const data = await this.loadBluePrintMaterialData(
+          content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          },
+          reload,
+          VFSs
+        );
         mat = new PBRBluePrintMaterial(
           data.irFragment,
           data.irVertex,
@@ -748,7 +775,15 @@ export class AssetManager {
           data.uniformTextures
         ) as unknown as T;
       } else if (content.type === 'Sprite3DBluePrintMaterial') {
-        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
+        const data = await this.loadBluePrintMaterialData(
+          content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          },
+          reload,
+          VFSs
+        );
         mat = new Sprite3DBlueprintMaterial(
           data.irFragment,
           data.uniformValues,
@@ -909,17 +944,7 @@ export class AssetManager {
       const content = (await this.readFileFromVFSs(path, { encoding: 'utf8' }, VFSs)) as string;
       const bp = JSON.parse(content) as {
         type: string;
-        state: Record<
-          string,
-          {
-            nodes: {
-              id: number;
-              locked: boolean;
-              node: object;
-            }[];
-            links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-          }
-        >;
+        state: Record<string, BluePrintEditorState>;
       };
       ASSERT(
         bp.type === 'PBRMaterial' || bp.type === 'Sprite3DMaterial' || bp.type === 'MaterialFunction',

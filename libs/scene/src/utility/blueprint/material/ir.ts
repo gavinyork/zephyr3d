@@ -138,6 +138,15 @@ export interface BluePrintUniformTexture extends IRUniformTexture {
   params?: Vector4;
 }
 
+export interface BluePrintEditorState {
+  nodes: {
+    id: number;
+    locked: boolean;
+    node: object;
+  }[];
+  links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
+}
+
 /**
  * Abstract base class for intermediate representation expressions
  *

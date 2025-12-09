@@ -14,6 +14,7 @@ import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import { Sprite3DMaterial } from '../material/sprite3d';
+import { StandardSprite3DMaterial } from '../material/sprite3d_std';
 
 /**
  * Mesh node
@@ -290,7 +291,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /** @internal */
   private static _getDefaultMaterial(): Sprite3DMaterial {
     if (!this._defaultMaterial) {
-      this._defaultMaterial = new Sprite3DMaterial();
+      this._defaultMaterial = new StandardSprite3DMaterial();
     }
     return this._defaultMaterial;
   }

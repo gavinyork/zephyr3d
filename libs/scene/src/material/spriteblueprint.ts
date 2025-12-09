@@ -1,5 +1,6 @@
 import { DRef, Vector4 } from '@zephyr3d/base';
-import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility';
+import { type BluePrintUniformTexture, type BluePrintUniformValue } from '../utility/blueprint/material/ir';
+import { Sprite3DBlockNode } from '../utility/blueprint/material/pbr';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import { Sprite3DMaterial } from './sprite3d';
 import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
@@ -21,7 +22,17 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     uniformTextures?: BluePrintUniformTexture[]
   ) {
     super();
-    this._irFrag = irFrag ?? new MaterialBlueprintIR(null, '');
+    this._irFrag =
+      irFrag ??
+      new MaterialBlueprintIR(
+        {
+          nodeMap: { '1': new Sprite3DBlockNode() },
+          roots: [1],
+          order: [1],
+          graph: { incoming: {}, outgoing: {} }
+        },
+        ''
+      );
     this._uniformValues = uniformValues ?? [];
     this._uniformTextures = uniformTextures ?? [];
   }

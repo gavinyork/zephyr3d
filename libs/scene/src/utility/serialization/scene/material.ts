@@ -17,6 +17,7 @@ import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
 import { getMeshMaterialInstanceUniformsClass } from './common';
 import { Sprite3DMaterial } from '../../../material/sprite3d';
+import { StandardSprite3DMaterial } from '../../../material/sprite3d_std';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
@@ -649,6 +650,69 @@ export function getSprite3DMaterialClass(_manager: ResourceManager): Serializabl
       }
     },
     getMeshMaterialInstanceUniformsClass(Sprite3DMaterial)
+  ];
+}
+
+/** @internal */
+export function getStandardSprite3DMaterialClass(manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: StandardSprite3DMaterial,
+      name: 'StandardSprite3DMaterial',
+      parent: Sprite3DMaterial,
+      getProps() {
+        return [
+          {
+            name: 'SpriteTexture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(value) {
+              value.str[0] = manager.getAssetId(this.spriteTexture) ?? '';
+            },
+            async set(value) {
+              if (!value) {
+                this.spriteTexture = null;
+              } else {
+                if (value.str[0]) {
+                  const assetId = value.str[0];
+                  let tex: Texture2D;
+                  try {
+                    tex = await manager.fetchTexture<Texture2D>(assetId, {
+                      linearColorSpace: false
+                    });
+                  } catch (err) {
+                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                    tex = null;
+                  }
+                  if (tex?.isTexture2D()) {
+                    this.spriteTexture = tex;
+                  } else {
+                    console.error('Invalid texture type');
+                  }
+                }
+              }
+            },
+            isValid() {
+              return !this.$isInstance;
+            }
+          }
+        ];
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(StandardSprite3DMaterial)
   ];
 }
 

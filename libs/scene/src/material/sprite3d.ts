@@ -84,6 +84,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       scope.uvinfo = pb.vec4().uniform(2);
       scope.anchor = pb.vec2().uniform(2);
     }
+    this.internalSetupUniforms(scope);
     scope.$l.worldPos = ShaderHelper.getWorldMatrix(scope)[3].xyz;
     scope.$l.width = pb.sqrt(
       pb.dot(ShaderHelper.getWorldMatrix(scope)[0].xyz, ShaderHelper.getWorldMatrix(scope)[0].xyz)
@@ -133,6 +134,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
+    this.internalSetupUniforms(scope);
     if (this.needFragmentColor()) {
       scope.$l.color = this.calcFragmentColor(scope);
       this.outputFragmentColor(scope, scope.$inputs.zWorldPos, scope.color);
@@ -146,7 +148,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       bindGroup.setValue('uvinfo', this._uvinfo);
       bindGroup.setValue('anchor', this._anchor);
     }
+    this.internalApplyUniforms(bindGroup, ctx, pass);
   }
+  protected internalSetupUniforms(_scope: PBInsideFunctionScope) {}
+  protected internalApplyUniforms(_bindGroup: BindGroup, _ctx: DrawContext, _pass: number) {}
   protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$builder.vec4(scope.$inputs.zVertexUV, 0, 1);
   }

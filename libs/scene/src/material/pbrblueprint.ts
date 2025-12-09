@@ -7,6 +7,7 @@ import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import type { DrawContext } from '../render/drawable';
+import { PBRBlockNode, VertexBlockNode } from '../utility/blueprint/material/pbr';
 
 /**
  * PBRBluePrintMaterial class
@@ -38,8 +39,28 @@ export class PBRBluePrintMaterial
     uniformTextures?: BluePrintUniformTexture[]
   ) {
     super();
-    this._irFrag = irFrag ?? new MaterialBlueprintIR(null, '');
-    this._irVertex = irVertex ?? new MaterialBlueprintIR(null, '');
+    this._irFrag =
+      irFrag ??
+      new MaterialBlueprintIR(
+        {
+          nodeMap: { '1': new PBRBlockNode() },
+          roots: [1],
+          order: [1],
+          graph: { incoming: {}, outgoing: {} }
+        },
+        ''
+      );
+    this._irVertex =
+      irVertex ??
+      new MaterialBlueprintIR(
+        {
+          nodeMap: { '1': new VertexBlockNode() },
+          roots: [1],
+          order: [1],
+          graph: { incoming: {}, outgoing: {} }
+        },
+        ''
+      );
     this._uniformValues = uniformValues ?? [];
     this._uniformTextures = uniformTextures ?? [];
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
