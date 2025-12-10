@@ -31,7 +31,11 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
           order: [1],
           graph: { incoming: {}, outgoing: {} }
         },
-        ''
+        '',
+        {
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'Sprite3DBlockNode', Object: '' } }],
+          links: []
+        }
       );
     this._uniformValues = uniformValues ?? [];
     this._uniformTextures = uniformTextures ?? [];

@@ -448,6 +448,24 @@ export function IS_INSTANCE_OF<T extends GenericConstructor>(
 }
 
 /**
+ * Check if a constructor is a subclass of another constructor.
+ * @param derived - The derived constructor.
+ * @param base - The base constructor.
+ * @returns True if the derived is a subclass of the base, false otherwise.
+ * @public
+ */
+export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends B>(
+  derived: new (...args: any[]) => any,
+  base: B
+): derived is D {
+  return !!(
+    base &&
+    derived &&
+    (derived === (base as any) || base.prototype.isPrototypeOf(derived.prototype))
+  );
+}
+
+/**
  * parse a css color value to RGBA color type.
  * @param input - The css color value.
  * @returns The RGBA color value.

@@ -1,4 +1,4 @@
-import type { Interpolator, VFS } from '@zephyr3d/base';
+import type { GenericConstructor, Interpolator, VFS } from '@zephyr3d/base';
 import { DlgCurveEditor } from './curveeditordlg';
 import { DlgMessage } from './messagedlg';
 import { DlgPromptName } from './promptnamedlg';
@@ -16,7 +16,7 @@ import type { ImGui } from '@zephyr3d/imgui';
 import { DlgPBRMaterialEditor } from './materialeditor';
 import { DlgImport } from './importdlg';
 import { DlgMaterialFunctionEditor } from './materialfunceditor';
-import type { EditorType } from '../../components/blueprint/material/pbr';
+import type { MeshMaterial } from '@zephyr3d/scene';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -49,7 +49,7 @@ export class Dialog {
   public static async editMaterial(
     title: string,
     outputName: string,
-    type: EditorType,
+    type: GenericConstructor<MeshMaterial>,
     path: string,
     width?: number,
     height?: number

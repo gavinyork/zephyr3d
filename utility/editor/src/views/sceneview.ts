@@ -30,7 +30,7 @@ import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, GenericConstructor } from '@zephyr3d/base';
 import { DRef, HttpFS } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
@@ -67,7 +67,6 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
-import type { EditorType } from '../components/blueprint/material/pbr';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -1325,7 +1324,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       });
     }
   }
-  private editMaterial(label: string, name: string, type: EditorType, path: string) {
+  private editMaterial(label: string, name: string, type: GenericConstructor<MeshMaterial>, path: string) {
     Dialog.editMaterial(label, name, type, path, 800, 600);
   }
   private editMaterialFunction(path: string) {

@@ -1,6 +1,6 @@
 import { base64ToUint8Array, uint8ArrayToBase64, Vector3 } from '@zephyr3d/base';
 import { getEngine } from '../../../app/api';
-import { MeshMaterial } from '../../../material/meshmaterial';
+import type { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, Mesh, type SceneNode } from '../../../scene';
 import type { SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';

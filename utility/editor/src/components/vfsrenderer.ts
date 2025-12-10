@@ -1,4 +1,4 @@
-import type { FileMetadata, VFS } from '@zephyr3d/base';
+import type { FileMetadata, GenericConstructor, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
@@ -18,9 +18,9 @@ import { DlgImport } from '../views/dlg/importdlg';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
-import { getEngine } from '@zephyr3d/scene';
+import type { MeshMaterial } from '@zephyr3d/scene';
+import { getEngine, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
-import type { EditorType } from './blueprint/material/pbr';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -230,19 +230,22 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           }
           ImGui.Separator();
           if (ImGui.BeginMenu('Material')) {
-            const materialTypes: Partial<Record<EditorType, string>> = {
-              pbr: 'PBR Material',
-              sprite3d: 'Sprite3D Material'
-            };
-            for (const type in materialTypes) {
-              const title = materialTypes[type as EditorType];
+            const materialTypes: Map<GenericConstructor<MeshMaterial>, string> = new Map<
+              GenericConstructor<MeshMaterial>,
+              string
+            >([
+              [PBRBluePrintMaterial, 'PBR Material'],
+              [Sprite3DBlueprintMaterial, 'Sprite3D Material']
+            ]);
+            for (const entry of materialTypes) {
+              const title = entry[1];
               if (ImGui.MenuItem(`${title}...`)) {
                 this.renderer.createNewFile(`Create ${title}`, 'Material Name', (path) => {
                   if (!path.toLowerCase().endsWith('.zmtl')) {
                     path = `${path}.zmtl`;
                   }
                   const name = path.slice(0, -5);
-                  eventBus.dispatchEvent('edit_material', name, name, type as EditorType, path);
+                  eventBus.dispatchEvent('edit_material', name, name, entry[0], path);
                 });
               }
             }
@@ -767,7 +770,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
         const name = this._vfs.basename(file.meta.path).slice(0, -5);
-        eventBus.dispatchEvent('edit_material', name, name, 'none', file.meta.path);
+        eventBus.dispatchEvent('edit_material', name, name, null, file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
       } else {

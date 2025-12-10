@@ -12,16 +12,14 @@ const SLOT_RADIUS = 6;
 export type NodeEditorState = {
   nodes: {
     id: number;
-    position: number[];
+    position?: number[];
     title: string;
-    titleBg: number;
-    titleTextCol: number;
     locked: boolean;
     node: object;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-  canvasOffset: number[];
-  canvasScale: number;
+  canvasOffset?: number[];
+  canvasScale?: number;
 };
 
 interface GraphLink {
@@ -277,8 +275,6 @@ export class NodeEditor extends Observable<{
         id: node.id,
         position: node.position ? [node.position.x, node.position.y] : null,
         title: node.title,
-        titleBg: node.titleBg,
-        titleTextCol: node.titleTextCol,
         locked: node.locked,
         node: impl
       };
@@ -313,9 +309,11 @@ export class NodeEditor extends Observable<{
       );
       n.id = node.id;
       n.title = node.title;
-      n.titleBg = node.titleBg;
-      n.titleTextCol = node.titleTextCol;
       n.locked = node.locked;
+      if (n.locked) {
+        n.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+        n.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+      }
       this.addNode(n);
       if (n.id > maxId) {
         maxId = n.id;
@@ -327,9 +325,9 @@ export class NodeEditor extends Observable<{
       this.addLink(link.startNodeId, link.startSlotId, link.endNodeId, link.endSlotId);
     }
     // apply canvas states
-    this.canvasOffset.x = state.canvasOffset[0];
-    this.canvasOffset.y = state.canvasOffset[1];
-    this.canvasScale = state.canvasScale;
+    this.canvasOffset.x = state.canvasOffset ? state.canvasOffset[0] : 0;
+    this.canvasOffset.y = state.canvasOffset ? state.canvasOffset[1] : 0;
+    this.canvasScale = state.canvasScale ?? 1;
     //
     this.emitChange = emit;
     this.invalidateStructure();

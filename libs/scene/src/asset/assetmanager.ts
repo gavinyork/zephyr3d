@@ -964,7 +964,7 @@ export class AssetManager {
           }
         }
         const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
-        result[k] = new MaterialBlueprintIR(dag, path);
+        result[k] = new MaterialBlueprintIR(dag, path, state);
       }
       return result;
     } catch (err) {

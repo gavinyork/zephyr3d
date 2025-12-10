@@ -143,6 +143,7 @@ export interface BluePrintEditorState {
     id: number;
     locked: boolean;
     node: object;
+    title: string;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
 }
@@ -1183,6 +1184,8 @@ export class MaterialBlueprintIR {
   private _dag: BlueprintDAG;
   /** Unique hash identifying this material configuration */
   private _hash: string;
+  /** Editor state snapshot at time of compilation */
+  private _editorState: BluePrintEditorState;
   /** Array of all IR expressions in the graph */
   private _expressions: IRExpression[];
   /** Map from graph node to IR expression index */
@@ -1200,12 +1203,13 @@ export class MaterialBlueprintIR {
    *
    * @param dag - The material node graph DAG
    * @param hash - Unique identifier for this material
+   * @param editorState - Editor state snapshot
    *
    * @remarks
    * Automatically compiles the DAG during construction.
    * Check the `ok` property to verify successful compilation.
    */
-  constructor(dag: BlueprintDAG, hash: string) {
+  constructor(dag: BlueprintDAG, hash: string, editorState: BluePrintEditorState) {
     this._dag = dag ?? {
       nodeMap: {},
       roots: [],
@@ -1216,6 +1220,7 @@ export class MaterialBlueprintIR {
       order: []
     };
     this._hash = hash;
+    this._editorState = editorState;
     this.compile();
   }
   /**
@@ -1229,6 +1234,10 @@ export class MaterialBlueprintIR {
   /** Gets the unique hash for this material */
   get hash() {
     return this._hash;
+  }
+  /** Gets the editor state snapshot */
+  get editorState() {
+    return this._editorState;
   }
   /** Gets the behavior flags indicating shader requirements */
   get behaviors() {

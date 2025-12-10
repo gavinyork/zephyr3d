@@ -48,7 +48,11 @@ export class PBRBluePrintMaterial
           order: [1],
           graph: { incoming: {}, outgoing: {} }
         },
-        ''
+        '',
+        {
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'PBRBlockNode', Object: '' } }],
+          links: []
+        }
       );
     this._irVertex =
       irVertex ??
@@ -59,7 +63,11 @@ export class PBRBluePrintMaterial
           order: [1],
           graph: { incoming: {}, outgoing: {} }
         },
-        ''
+        '',
+        {
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'VertexBlockNode', Object: '' } }],
+          links: []
+        }
       );
     this._uniformValues = uniformValues ?? [];
     this._uniformTextures = uniformTextures ?? [];

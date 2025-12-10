@@ -47,10 +47,10 @@ export class GNode {
     this._title = '';
     this._titleRect = null;
     this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
+    this._titleTextColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._errorTitleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.35, 0.0, 0.0, 1.0));
     this._bodyBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 0.85));
     this._errorBorderColor = new ImGui.ImVec4(1, 0.2, 0.2, 1);
-    this._titleTextColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._textColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text)); // new ImGui.ImVec4(1.0, 1.0, 1.0, 1.0);
     this._bodyBorderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.6, 0.6, 0.6, 1.0));
     this._bodyBorderColorSel = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1.0, 1.0, 0.0, 1.0));
@@ -127,6 +127,13 @@ export class GNode {
   }
   set locked(val: boolean) {
     this._locked = val;
+    if (this._locked) {
+      this._titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+      this._titleTextColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+    } else {
+      this._titleBg = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Button));
+      this._titleTextColor = ImGui.ColorConvertFloat4ToU32(ImGui.GetStyleColorVec4(ImGui.Col.Text));
+    }
   }
   get title() {
     return this._title;

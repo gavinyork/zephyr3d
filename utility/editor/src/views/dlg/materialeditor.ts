@@ -1,22 +1,32 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
-import type { EditorType } from '../../components/blueprint/material/pbr';
 import { PBRMaterialEditor } from '../../components/blueprint/material/pbr';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { ProjectService } from '../../core/services/project';
+import type { GenericConstructor } from '@zephyr3d/base';
+import type { MeshMaterial } from '@zephyr3d/scene';
 
 export class DlgPBRMaterialEditor extends DialogRenderer<void> {
   private readonly editor: PBRMaterialEditor;
   private path: string;
-  constructor(id: string, width: number, height: number, outputName: string, type: EditorType, path: string) {
+  private type: GenericConstructor<MeshMaterial>;
+  constructor(
+    id: string,
+    width: number,
+    height: number,
+    outputName: string,
+    type: GenericConstructor<MeshMaterial>,
+    path: string
+  ) {
     super(id, width, height, false, false, false, false);
     this.path = path;
-    this.editor = new PBRMaterialEditor(id, outputName, type);
+    this.type = type;
+    this.editor = new PBRMaterialEditor(id, outputName);
   }
   public static async editPBRMaterial(
     title: string,
     outptuName: string,
-    type: EditorType,
+    type: GenericConstructor<MeshMaterial>,
     path: string,
     width?: number,
     height?: number
@@ -34,10 +44,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     if (exists) {
       const stat = await ProjectService.VFS.stat(this.path);
       if (stat.isFile) {
-        await this.editor.load(this.path);
+        await this.editor.init(this.path);
       }
     } else {
-      await this.editor.load('');
+      await this.editor.init(this.path, this.type);
     }
     super.show();
     this.editor.open();
