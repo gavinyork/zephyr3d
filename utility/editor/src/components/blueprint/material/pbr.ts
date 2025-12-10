@@ -60,6 +60,13 @@ export class PBRMaterialEditor extends GraphEditor {
   private _irChanged: boolean;
   private _outputName: string;
   private _blueprintPath: string;
+  private _savedState: {
+    props: any;
+    irFrag: MaterialBlueprintIR;
+    irVert: MaterialBlueprintIR;
+    uniformValues: BluePrintUniformValue[];
+    uniformTextures: BluePrintUniformTexture[];
+  };
   constructor(label: string, outputName: string) {
     super(label, []);
     this._outputName = outputName;
@@ -74,6 +81,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this._blitter = new CopyBlitter();
     this._blitter.srgbOut = true;
     this._blueprintPath = '';
+    this._savedState = null;
     this.propEditor.on('object_property_changed', this.graphChanged, this);
   }
   //protected create
@@ -132,6 +140,12 @@ export class PBRMaterialEditor extends GraphEditor {
     this.fragmentEditor?.off('dragdrop', this.dragdropFrag, this);
     this.vertexEditor?.off('changed', this.graphChanged, this);
     this.vertexEditor?.off('dragdrop', this.dragdropFrag, this);
+    if (this._savedState?.uniformTextures) {
+      for (const u of this._savedState.uniformTextures) {
+        u.finalTexture?.dispose();
+      }
+    }
+    this._savedState = null;
   }
   getNodeCategory(): NodeCategory[] {
     return [
@@ -152,6 +166,50 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   get saved() {
     return this._version === 0;
+  }
+  async getSavedState(mat: MeshMaterial) {
+    return {
+      props: await getEngine().resourceManager.serializeObjectProps(mat),
+      irFrag:
+        mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial
+          ? mat.fragmentIR
+          : null,
+      irVert: mat instanceof PBRBluePrintMaterial ? mat.vertexIR : null,
+      uniformValues:
+        mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial
+          ? (mat.uniformValues?.map((u) => {
+              return {
+                name: u.name,
+                type: u.type,
+                value: u.value?.slice() ?? null,
+                inFragmentShader: u.inFragmentShader,
+                inVertexShader: u.inVertexShader,
+                finalValue: typeof u.finalValue === 'number' ? u.finalValue : (u.finalValue?.slice() ?? null)
+              };
+            }) ?? null)
+          : null,
+      uniformTextures:
+        mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial
+          ? (mat.uniformTextures?.map((u) => {
+              return {
+                name: u.name,
+                params: u.params?.clone() ?? null,
+                sRGB: u.sRGB,
+                texture: u.texture,
+                type: u.type,
+                wrapS: u.wrapS,
+                wrapT: u.wrapT,
+                minFilter: u.minFilter,
+                magFilter: u.magFilter,
+                mipFilter: u.mipFilter,
+                inFragmentShader: u.inFragmentShader,
+                inVertexShader: u.inVertexShader,
+                finalTexture: u.finalTexture ? new DRef(u.finalTexture.get()) : null,
+                finalSampler: u.finalSampler
+              };
+            }) ?? null)
+          : null
+    };
   }
   async save(path: string) {
     if (path) {
@@ -181,6 +239,7 @@ export class PBRMaterialEditor extends GraphEditor {
               create: true
             }
           );
+          getEngine().resourceManager.invalidateBluePrint(bpPath);
         } catch (err) {
           const msg = `Save BluePrint failed: ${err}`;
           console.error(msg);
@@ -235,6 +294,7 @@ export class PBRMaterialEditor extends GraphEditor {
         await getEngine().resourceManager.reloadBluePrintMaterials();
       }
       this._version = 0;
+      this._savedState = await this.getSavedState(mat);
     }
   }
   getUniforms(fragmentIR: MaterialBlueprintIR, vertexIR?: MaterialBlueprintIR) {
@@ -303,9 +363,27 @@ export class PBRMaterialEditor extends GraphEditor {
       uniformTextures
     };
   }
+  async restoreState() {
+    const mat = this._editMaterial.get();
+    if (mat && this._savedState) {
+      await getEngine().resourceManager.deserializeObjectProps(mat, this._savedState.props);
+      if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
+        if (this._savedState.irFrag) {
+          mat.fragmentIR = this._savedState.irFrag;
+        }
+        if (mat instanceof PBRBluePrintMaterial && this._savedState.irVert) {
+          mat.vertexIR = this._savedState.irVert;
+        }
+        mat.uniformValues = this._savedState.uniformValues ?? [];
+        mat.uniformTextures = this._savedState.uniformTextures ?? [];
+      }
+    }
+  }
   async init(path: string, type?: GenericConstructor<MeshMaterial>) {
     const mat = type ? new type() : await getEngine().resourceManager.fetchMaterial(path);
     this._editMaterial.set(mat);
+    this._savedState = await this.getSavedState(mat);
+    this.readonly = !type && getEngine().VFS.isParentOf('/assets/@builtins', path);
     if (type) {
       if (mat instanceof PBRBluePrintMaterial) {
         mat.fragmentIR.editorState.nodes[0].title = this._outputName;
@@ -366,7 +444,18 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
+      if (this.readonly) {
+        ImGui.BeginChild(
+          '##GraphAreaMask',
+          ImGui.GetContentRegionAvail(),
+          false,
+          ImGui.WindowFlags.NoMouseInputs
+        );
+      }
       super.renderNodeEditor();
+      if (this.readonly) {
+        ImGui.EndChild();
+      }
     } else {
       const v = ImGui.GetContentRegionAvail();
       this.renderPreviewScene(v);
@@ -375,8 +464,7 @@ export class PBRMaterialEditor extends GraphEditor {
   protected renderRightPanel() {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
-      const v = new ImGui.ImVec2();
-      ImGui.GetContentRegionAvail(v);
+      const v = ImGui.GetContentRegionAvail();
       v.y >>= 1;
       if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
         super.renderRightPanel();
@@ -496,7 +584,7 @@ export class PBRMaterialEditor extends GraphEditor {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
       const irFrag = await this.createIR(this.fragmentEditor);
-      const irVert = await this.createIR(this.vertexEditor);
+      const irVert = this.vertexEditor ? await this.createIR(this.vertexEditor) : null;
       if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
         (this._previewMesh.get() as Mesh | Sprite3D).material = this._defaultMaterial.get();
       } else {

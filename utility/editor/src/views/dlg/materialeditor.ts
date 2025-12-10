@@ -84,7 +84,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
               this.close();
             });
           } else if (value === 'No') {
-            this.close();
+            // Restore material state
+            this.editor.restoreState().then(() => {
+              this.close();
+            });
           }
         });
       } else {

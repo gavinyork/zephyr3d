@@ -114,7 +114,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     return scope.zCalcSpriteColor(scope.$inputs.zWorldPos, scope.$inputs.zVertexUV);
   }
   protected _createHash(): string {
-    return this._irFrag.hash;
+    return `${super._createHash()}:${this._irFrag.hash}`;
   }
   protected createProgram(ctx: DrawContext, pass: number) {
     const program = super.createProgram(ctx, pass);

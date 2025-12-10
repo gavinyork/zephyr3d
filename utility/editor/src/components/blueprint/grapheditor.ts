@@ -14,6 +14,7 @@ export class GraphEditor
   private _propGrid: PropertyEditor;
   private _nodeEditor: Record<string, NodeEditor>;
   private _activeTab: string;
+  private _readonly: boolean;
   protected _label: string;
   constructor(label: string, tabs: string[]) {
     super();
@@ -26,6 +27,7 @@ export class GraphEditor
         this._nodeEditor[tab] = new NodeEditor(this);
       }
     }
+    this._readonly = false;
     this._label = label ?? 'Graph Editor';
     this._propGrid.on('object_property_changed', this.onPropChanged, this);
   }
@@ -34,6 +36,12 @@ export class GraphEditor
   }
   get propEditor() {
     return this._propGrid;
+  }
+  get readonly() {
+    return this._readonly;
+  }
+  set readonly(val: boolean) {
+    this._readonly = val;
   }
   addTab(label: string) {
     this._nodeEditor[label] = new NodeEditor(this);
@@ -63,7 +71,12 @@ export class GraphEditor
     this._rightPanel.left = width - this._rightPanel.width;
     this._rightPanel.top = cursorPos.y;
     this._rightPanel.height = height;
-    if (this._rightPanel.beginChild('##NodeProperies')) {
+    if (
+      this._rightPanel.beginChild(
+        '##NodeProperies',
+        this._readonly ? ImGui.WindowFlags.NoMouseInputs : undefined
+      )
+    ) {
       this.renderRightPanel();
     }
     this._rightPanel.endChild();

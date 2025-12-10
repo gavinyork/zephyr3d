@@ -52,7 +52,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     this._anchor = new Vector2(0.5, 0.5);
     this.material = material ?? Sprite3D._getDefaultMaterial();
     this._renderBundle = {};
-    this._useRenderBundle = false;
+    this._useRenderBundle = true;
     this._materialChangeTag = null;
   }
   /**

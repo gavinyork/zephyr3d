@@ -812,6 +812,13 @@ export class ResourceManager {
     await this._assetManager.reloadBluePrintMaterials(filter);
   }
   /**
+   * Mark specific blue print as changed
+   * @param path - BluePrint file path
+   */
+  invalidateBluePrint(path: string) {
+    this._assetManager.invalidateBluePrint(path);
+  }
+  /**
    * Load a primitive by ID and track the allocation for reverse lookup.
    *
    * @param id - Primitive identifier or path.

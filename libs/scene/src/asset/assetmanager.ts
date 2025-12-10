@@ -939,6 +939,9 @@ export class AssetManager {
       order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
     };
   }
+  invalidateBluePrint(path: string) {
+    delete this._bluePrints[path];
+  }
   async loadBluePrint(path: string, VFSs?: VFS[]) {
     try {
       const content = (await this.readFileFromVFSs(path, { encoding: 'utf8' }, VFSs)) as string;

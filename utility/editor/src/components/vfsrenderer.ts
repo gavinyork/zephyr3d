@@ -769,7 +769,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
-        const name = this._vfs.basename(file.meta.path).slice(0, -5);
+        let name = this._vfs.basename(file.meta.path).slice(0, -5);
+        if (this._vfs.isParentOf('/assets/@builtins', file.meta.path)) {
+          name = `${name} (read-only)`;
+        }
         eventBus.dispatchEvent('edit_material', name, name, null, file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
