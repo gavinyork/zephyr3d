@@ -665,7 +665,7 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
           {
             name: 'SpriteTexture',
             type: 'object',
-            default: null,
+            default: '',
             options: {
               mimeTypes: [
                 'image/jpeg',
@@ -683,25 +683,23 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
               value.str[0] = manager.getAssetId(this.spriteTexture) ?? '';
             },
             async set(value) {
-              if (!value) {
+              if (!value || !value.str[0]) {
                 this.spriteTexture = null;
               } else {
-                if (value.str[0]) {
-                  const assetId = value.str[0];
-                  let tex: Texture2D;
-                  try {
-                    tex = await manager.fetchTexture<Texture2D>(assetId, {
-                      linearColorSpace: false
-                    });
-                  } catch (err) {
-                    console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                    tex = null;
-                  }
-                  if (tex?.isTexture2D()) {
-                    this.spriteTexture = tex;
-                  } else {
-                    console.error('Invalid texture type');
-                  }
+                const assetId = value.str[0];
+                let tex: Texture2D;
+                try {
+                  tex = await manager.fetchTexture<Texture2D>(assetId, {
+                    linearColorSpace: false
+                  });
+                } catch (err) {
+                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  tex = null;
+                }
+                if (tex?.isTexture2D()) {
+                  this.spriteTexture = tex;
+                } else {
+                  console.error('Invalid texture type');
                 }
               }
             },
@@ -728,7 +726,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
           {
             name: 'AlphaMap',
             type: 'object',
-            default: null,
+            default: '',
             options: {
               mimeTypes: [
                 'image/jpeg',
@@ -746,7 +744,9 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
               value.str[0] = manager.getAssetId(this.alphaMap) ?? '';
             },
             async set(this: ParticleMaterial, value) {
-              if (value.str[0]) {
+              if (!value || !value.str[0]) {
+                this.alphaMap = null;
+              } else {
                 const assetId = value.str[0];
                 let tex: Texture2D;
                 try {
@@ -765,7 +765,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
           {
             name: 'RampMap',
             type: 'object',
-            default: null,
+            default: '',
             options: {
               mimeTypes: [
                 'image/jpeg',
@@ -783,7 +783,9 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
               value.str[0] = manager.getAssetId(this.rampMap) ?? '';
             },
             async set(this: ParticleMaterial, value) {
-              if (value.str[0]) {
+              if (!value || !value.str[0]) {
+                this.rampMap = null;
+              } else {
                 const assetId = value.str[0];
                 let tex: Texture2D;
                 try {
