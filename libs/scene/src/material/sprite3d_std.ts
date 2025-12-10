@@ -24,6 +24,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
     if (tex !== this._texture.get()) {
       this._texture.set(tex);
       this.useFeature(StandardSprite3DMaterial.FEATURE_SPRITE_TEXTURE, !!tex);
+      this.uniformChanged();
     }
   }
   clone(): StandardSprite3DMaterial {

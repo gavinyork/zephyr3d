@@ -8,10 +8,15 @@ import type {
   IControllerWheelEvent,
   IGraphNode,
   MeshMaterial,
-  SceneNode,
-  MaterialBlueprintIR
+  SceneNode
 } from '@zephyr3d/scene';
-import { CopyBlitter, Sprite3D, Sprite3DBlueprintMaterial, Sprite3DMaterial } from '@zephyr3d/scene';
+import {
+  CopyBlitter,
+  MaterialBlueprintIR,
+  Sprite3D,
+  Sprite3DBlueprintMaterial,
+  Sprite3DMaterial
+} from '@zephyr3d/scene';
 import {
   DirectionalLight,
   FunctionCallNode,
@@ -33,7 +38,7 @@ import { getMathNodeCategories } from '../nodes/math';
 import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
 import type { GenericConstructor } from '@zephyr3d/base';
-import { ASSERT, DRef, guessMimeType, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer, Texture2D, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 import { getInputNodeCategories } from './inputs';
@@ -52,12 +57,14 @@ export class PBRMaterialEditor extends GraphEditor {
   private _previewTex: DRef<Texture2D>;
   private _blitter: CopyBlitter;
   private _version: number;
+  private _irChanged: boolean;
   private _outputName: string;
   private _blueprintPath: string;
   constructor(label: string, outputName: string) {
     super(label, []);
     this._outputName = outputName;
     this._version = 0;
+    this._irChanged = false;
     this._previewScene = new DRef();
     this._previewMesh = new DRef();
     this._defaultMaterial = new DRef();
@@ -298,6 +305,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async init(path: string, type?: GenericConstructor<MeshMaterial>) {
     const mat = type ? new type() : await getEngine().resourceManager.fetchMaterial(path);
+    this._editMaterial.set(mat);
     if (type) {
       if (mat instanceof PBRBluePrintMaterial) {
         mat.fragmentIR.editorState.nodes[0].title = this._outputName;
@@ -319,6 +327,26 @@ export class PBRMaterialEditor extends GraphEditor {
       }
     }
     this.initPreview(mat);
+    this.propEditor.object = mat;
+  }
+  async createIR(editor: NodeEditor) {
+    const state = await editor.saveState();
+    const dag = this.createDAG(editor);
+    for (const [, v] of editor.nodes) {
+      v.impl.reset();
+    }
+    for (const i of dag.order) {
+      const node = editor.nodes.get(i);
+      node.impl.check();
+      if (node.impl.error) {
+        return null;
+      }
+    }
+    const ir = new MaterialBlueprintIR(dag, randomUUID(), state);
+    if (!ir.ok) {
+      return null;
+    }
+    return ir;
   }
   createDAG(editor: NodeEditor): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};
@@ -332,6 +360,10 @@ export class PBRMaterialEditor extends GraphEditor {
     return getEngine().resourceManager.createBluePrintDAG(nodeMap, roots, editor.links);
   }
   renderNodeEditor() {
+    if (this._irChanged) {
+      this._irChanged = false;
+      this.applyPreviewMaterial();
+    }
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
       super.renderNodeEditor();
@@ -460,11 +492,11 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     camera.updateController();
   }
-  private async applyPreviewMaterial(props?: any) {
+  private async applyPreviewMaterial() {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
-      const irFrag = mat.fragmentIR;
-      const irVert = mat instanceof PBRBluePrintMaterial ? mat.vertexIR : null;
+      const irFrag = await this.createIR(this.fragmentEditor);
+      const irVert = await this.createIR(this.vertexEditor);
       if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
         (this._previewMesh.get() as Mesh | Sprite3D).material = this._defaultMaterial.get();
       } else {
@@ -512,9 +544,7 @@ export class PBRMaterialEditor extends GraphEditor {
         }
         mat.uniformValues = uniforms.uniformValues;
         mat.uniformTextures = uniforms.uniformTextures;
-        if (props) {
-          await getEngine().resourceManager.deserializeObjectProps(this._editMaterial.get(), props);
-        }
+        (this._previewMesh.get() as Mesh | Sprite3D).material = mat;
       }
     }
   }
@@ -556,11 +586,8 @@ export class PBRMaterialEditor extends GraphEditor {
   private graphChanged() {
     this._version = -1;
     const mat = this._editMaterial.get();
-    if (
-      (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) &&
-      this.propEditor.object !== this._editMaterial.get()
-    ) {
-      this.applyPreviewMaterial();
+    if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
+      this._irChanged = true;
     }
   }
   private dragdropFrag(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
