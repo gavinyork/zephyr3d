@@ -138,6 +138,11 @@ export interface BluePrintUniformTexture extends IRUniformTexture {
   params?: Vector4;
 }
 
+/**
+ * Editor state of a blueprint
+ *
+ * @public
+ */
 export interface BluePrintEditorState {
   nodes: {
     id: number;
@@ -1174,8 +1179,6 @@ export interface MaterialBlueprintIRBehaviors {
  * 2. Build an IR expression tree
  * 3. Track uniforms and behaviors
  * 4. Generate optimized shader code from the IR
- *
- * ```
  *
  * @public
  */

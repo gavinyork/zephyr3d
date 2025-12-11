@@ -7,7 +7,18 @@ import { Vector4, Vector2 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
 
 /**
- * Sprite3D material
+ * Sprite3D material base class.
+ *
+ * @remarks
+ * This material renders a camera-facing quad (billboard) in 3D space,
+ * using UV information and an anchor point to control how the sprite
+ * is positioned and textured.
+ *
+ * Derived classes can override {@link Sprite3DMaterial.internalSetupUniforms},
+ * {@link Sprite3DMaterial.internalApplyUniforms} and
+ * {@link Sprite3DMaterial.calcFragmentColor} to provide custom
+ * uniforms and shading logic (e.g. sampling a texture).
+ *
  * @public
  */
 export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
@@ -15,12 +26,26 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   static ANCHOR = this.defineInstanceUniform('anchor', 'vec2');
   private _uvinfo: Vector4;
   private _anchor: Vector2;
+  /**
+   * Creates a new {@link Sprite3DMaterial} instance.
+   *
+   * @remarks
+   * - Default UV rectangle is the full texture [0, 0, 1, 1].
+   * - Default anchor is the center [0.5, 0.5].
+   * - Face culling is disabled (`cullMode = 'none'`) so the sprite
+   *   is visible from both sides.
+   */
   constructor() {
     super();
     this._uvinfo = new Vector4(0, 0, 1, 1);
     this._anchor = new Vector2(0.5, 0.5);
     this.cullMode = 'none';
   }
+  /**
+   * Gets the UV rectangle of the sprite in the texture.
+   *
+   * @returns A Vector4 storing \([u0, v0, u1, v1]\).
+   */
   get uvinfo(): Vector4 {
     return this._uvinfo;
   }
@@ -30,9 +55,22 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.uniformChanged();
     }
   }
+  /**
+   * Convenience method to set the UV rectangle via individual components.
+   *
+   * @param uvx0 - Left (U) coordinate.
+   * @param uvy0 - Bottom (V) coordinate.
+   * @param uvx1 - Right (U) coordinate.
+   * @param uvy1 - Top (V) coordinate.
+   */
   setUVInfo(uvx0: number, uvy0: number, uvx1: number, uvy1: number): void {
     this.uvinfo = new Vector4(uvx0, uvy0, uvx1, uvy1);
   }
+  /**
+   * Gets the sprite anchor point in normalized quad space.
+   *
+   * @returns The current anchor as a Vector2.
+   */
   get anchor(): Vector2 {
     return this._anchor;
   }
@@ -42,6 +80,9 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.uniformChanged();
     }
   }
+  /**
+   * Gets the X component of the sprite anchor.
+   */
   get anchorX(): number {
     return this._anchor.x;
   }
@@ -50,6 +91,9 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.anchor = new Vector2(value, this._anchor.y);
     }
   }
+  /**
+   * Gets the Y component of the sprite anchor.
+   */
   get anchorY(): number {
     return this._anchor.y;
   }
@@ -58,21 +102,52 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.anchor = new Vector2(this._anchor.x, value);
     }
   }
+  /**
+   * Convenience method to set both anchor components at once.
+   *
+   * @param anchorX - X coordinate of the anchor.
+   * @param anchorY - Y coordinate of the anchor.
+   */
   setAnchor(anchorX: number, anchorY: number): void {
     if (this._anchor.x !== anchorX || this._anchor.y !== anchorY) {
       this.anchor = new Vector2(anchorX, anchorY);
     }
   }
+  /**
+   * Creates a deep copy of this material.
+   *
+   * @returns A new {@link Sprite3DMaterial} instance with the same properties.
+   */
   clone(): Sprite3DMaterial {
     const other = new Sprite3DMaterial();
     other.copyFrom(this);
     return other;
   }
+  /**
+   * Copies all relevant state from another {@link Sprite3DMaterial}.
+   *
+   * @param other - The source material to copy from.
+   */
   copyFrom(other: this): void {
     super.copyFrom(other);
     this.uvinfo = other.uvinfo;
     this.anchor = other.anchor;
   }
+  /**
+   * Builds the vertex shader for this material.
+   *
+   * @remarks
+   * This method:
+   * - Calls the base implementation.
+   * - Computes per-vertex positions for a camera-facing quad (billboard)
+   *   based on the sprite's world transform, size, and anchor.
+   * - Selects the correct UV coordinates for each quad corner using
+   *   the `vertexId` attribute.
+   * - Outputs world-space position (`zWorldPos`) and UVs (`zVertexUV`)
+   *   for use in the fragment shader.
+   *
+   * @param scope - The current programmable builder function scope.
+   */
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
@@ -132,6 +207,20 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.zWorldPos, 1))
     );
   }
+  /**
+   * Builds the fragment shader for this material.
+   *
+   * @remarks
+   * This method:
+   * - Calls the base implementation.
+   * - Invokes {@link Sprite3DMaterial.internalSetupUniforms} for
+   *   fragment-stage specific uniform declarations.
+   * - Computes fragment color by calling {@link Sprite3DMaterial.calcFragmentColor}
+   *   if fragment color is needed.
+   * - Outputs the final fragment color via {@link MeshMaterial.outputFragmentColor}.
+   *
+   * @param scope - The current programmable builder function scope.
+   */
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     this.internalSetupUniforms(scope);
@@ -142,6 +231,24 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
       this.outputFragmentColor(scope, scope.$inputs.zWorldPos, null);
     }
   }
+  /**
+   * Applies runtime uniform values to the given bind group before drawing.
+   *
+   * @remarks
+   * This binds:
+   * - UV information (`uvinfo`)
+   * - Anchor (`anchor`)
+   *
+   * for non-instanced rendering. For instanced rendering, these values
+   * are expected to be provided as per-instance uniforms instead.
+   *
+   * It also calls {@link Sprite3DMaterial.internalApplyUniforms} to allow
+   * derived classes to bind additional resources (e.g. textures).
+   *
+   * @param bindGroup - The bind group to which uniforms and resources are bound.
+   * @param ctx - The current draw context providing rendering state.
+   * @param pass - Index of the active render pass.
+   */
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
@@ -150,8 +257,49 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     }
     this.internalApplyUniforms(bindGroup, ctx, pass);
   }
+  /**
+   * Hook for derived classes to declare additional uniforms.
+   *
+   * @remarks
+   * This is invoked in both the vertex and fragment shader construction
+   * phases, allowing subclasses to register extra uniforms or resources
+   * needed by their custom shading logic.
+   *
+   * The base implementation does nothing.
+   *
+   * @param _scope - The current shader function scope.
+   */
   protected internalSetupUniforms(_scope: PBInsideFunctionScope) {}
+  /**
+   * Hook for derived classes to bind additional uniform values or resources.
+   *
+   * @remarks
+   * This is called from {@link Sprite3DMaterial.applyUniformValues} and is
+   * intended for subclasses to bind their own textures, samplers, or
+   * other GPU resources.
+   *
+   * The base implementation does nothing.
+   *
+   * @param _bindGroup - The bind group used for binding uniforms and resources.
+   * @param _ctx - The current draw context.
+   * @param _pass - Index of the active render pass.
+   */
   protected internalApplyUniforms(_bindGroup: BindGroup, _ctx: DrawContext, _pass: number) {}
+  /**
+   * Computes the fragment color expression for this material.
+   *
+   * @remarks
+   * The default implementation simply outputs the interpolated UV
+   * coordinates as color \([u, v, 0, 1]\), which is mainly useful
+   * for debugging.
+   *
+   * Derived classes are expected to override this method to implement
+   * actual shading, such as sampling a texture.
+   *
+   * @param scope - The current shader function scope.
+   * @returns A shader expression representing the fragment color.
+
+   */
   protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.$builder.vec4(scope.$inputs.zVertexUV, 0, 1);
   }

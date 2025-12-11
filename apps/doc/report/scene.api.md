@@ -436,6 +436,8 @@ export class AssetManager {
     fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T>;
     fetchTextData(url: string, postProcess?: (text: string) => string, httpRequest?: HttpRequest, VFSs?: VFS[]): Promise<string>;
     fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>, VFSs?: VFS[]): Promise<T>;
+    // (undocumented)
+    invalidateBluePrint(path: string): void;
     // @internal
     loadBinaryData(url: string, postProcess?: (data: ArrayBuffer) => ArrayBuffer, VFSs?: VFS[]): Promise<ArrayBuffer>;
     // (undocumented)
@@ -977,6 +979,24 @@ export interface BlueprintDAG {
     nodeMap: Record<number, IGraphNode>;
     order: number[];
     roots: number[];
+}
+
+// @public
+export interface BluePrintEditorState {
+    // (undocumented)
+    links: {
+        startNodeId: number;
+        startSlotId: number;
+        endNodeId: number;
+        endSlotId: number;
+    }[];
+    // (undocumented)
+    nodes: {
+        id: number;
+        locked: boolean;
+        node: object;
+        title: string;
+    }[];
 }
 
 // @public
@@ -2029,6 +2049,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     visitParticleSystem(node: ParticleSystem): boolean;
     // @internal (undocumented)
     visitPunctualLight(node: PunctualLight): boolean;
+    // (undocumented)
+    visitSprite3D(node: Sprite3D): boolean;
     // @internal (undocumented)
     visitTerrain(node: Terrain): boolean;
     // @internal (undocumented)
@@ -2934,13 +2956,6 @@ export function getInput(): InputManager;
 // @internal (undocumented)
 export function getMeshClass(): SerializableClass;
 
-// Warning: (ae-internal-missing-underscore) The name "getMeshMaterialInstanceUniformsClass" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal (undocumented)
-export function getMeshMaterialInstanceUniformsClass(cls: {
-    new (...args: any[]): MeshMaterial;
-}): SerializableClass;
-
 // Warning: (ae-internal-missing-underscore) The name "getMultiScattering" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -3452,6 +3467,16 @@ export type IMixinLight = {
 // Warning: (ae-forgotten-export) The symbol "IMixinPBRBRDF" needs to be exported by the entry point index.d.ts
 //
 // @public
+export type IMixinPBRBluePrint = {
+    PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outRoughness?: PBShaderExp): PBShaderExp;
+    getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
+    getCommonData(scope: PBInsideFunctionScope, data: PBShaderExp, viewVec: PBShaderExp, worldPos: PBShaderExp, worldNorm: PBShaderExp, worldTangent: PBShaderExp, worldBinormal: PBShaderExp, vertexColor: PBShaderExp, vertexUV: PBShaderExp, ir: MaterialBlueprintIR): void;
+    calculateCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR, viewVec: PBShaderExp, worldPos: PBShaderExp, worldNorm: PBShaderExp, worldTangent: PBShaderExp, worldBinormal: PBShaderExp, vertexColor: PBShaderExp, vertexUV: PBShaderExp, data: PBShaderExp): void;
+    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp): void;
+    indirectLighting(scope: PBInsideFunctionScope, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, outRoughness?: PBShaderExp): void;
+} & IMixinPBRBRDF & IMixinLight;
+
+// @public
 export type IMixinPBRCommon = {
     ior: number;
     emissiveColor: Vector3;
@@ -3812,7 +3837,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
 
 // @public
 export class MaterialBlueprintIR {
-    constructor(dag: BlueprintDAG, hash: string);
+    constructor(dag: BlueprintDAG, hash: string, editorState: BluePrintEditorState);
     get behaviors(): MaterialBlueprintIRBehaviors;
     compile(): boolean;
     create(pb: ProgramBuilder): {
@@ -3821,6 +3846,7 @@ export class MaterialBlueprintIR {
     }[];
     get DAG(): BlueprintDAG;
     set DAG(dag: BlueprintDAG);
+    get editorState(): BluePrintEditorState;
     get hash(): string;
     get ok(): boolean;
     get uniformTextures(): IRUniformTexture[];
@@ -4087,6 +4113,9 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T): T & (ne
 
 // @public
 export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinLight);
+
+// @public
+export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRBluePrint);
 
 // @public
 export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinPBRCommon);
@@ -4662,32 +4691,21 @@ export class PBRBlockNode extends BaseGraphNode {
 //
 // @public
 export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements Clonable<PBRBluePrintMaterial> {
-    constructor(irFrag: MaterialBlueprintIR, irVertex: MaterialBlueprintIR, uniformValues: BluePrintUniformValue[], uniformTextures: BluePrintUniformTexture[]);
-    // (undocumented)
+    constructor(irFrag?: MaterialBlueprintIR, irVertex?: MaterialBlueprintIR, uniformValues?: BluePrintUniformValue[], uniformTextures?: BluePrintUniformTexture[]);
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
-    // (undocumented)
     clone(): PBRBluePrintMaterial;
-    // (undocumented)
     protected _createHash(): string;
-    // (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): _zephyr3d_device.GPUProgram<unknown>;
-    // (undocumented)
     get fragmentIR(): MaterialBlueprintIR;
     set fragmentIR(ir: MaterialBlueprintIR);
-    // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
-    // (undocumented)
     protected onDispose(): void;
-    // @internal (undocumented)
     get uniformTextures(): BluePrintUniformTexture[];
     set uniformTextures(val: BluePrintUniformTexture[]);
-    // @internal (undocumented)
     get uniformValues(): BluePrintUniformValue[];
     set uniformValues(val: BluePrintUniformValue[]);
-    // (undocumented)
     get vertexIR(): MaterialBlueprintIR;
     set vertexIR(ir: MaterialBlueprintIR);
-    // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
 
@@ -5484,6 +5502,7 @@ export class ResourceManager {
         endSlotId: number;
     }[]): BlueprintDAG;
     deserializeObject<T extends object>(ctx: any, json: object): Promise<T>;
+    deserializeObjectProps(obj: any, json: any, info?: SerializableClass): Promise<void>;
     get editorMode(): boolean;
     fetchBinary(id: string): Promise<ArrayBuffer>;
     fetchMaterial<T extends Material = MeshMaterial>(id: string): Promise<T>;
@@ -5502,6 +5521,7 @@ export class ResourceManager {
     getPropertyByName(name: string): PropertyAccessor;
     getPropertyName(prop: PropertyAccessor): string;
     instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode>;
+    invalidateBluePrint(path: string): void;
     // (undocumented)
     loadBluePrint(path: string): Promise<Record<string, MaterialBlueprintIR>>;
     loadPrefabContent(path: string): Promise<{
@@ -5514,6 +5534,7 @@ export class ResourceManager {
     reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean): Promise<void>;
     saveScene(scene: Scene, filename: string): Promise<void>;
     serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]): Promise<any>;
+    serializeObjectProps(obj: any, json?: any, asyncTasks?: Promise<unknown>[], info?: SerializableClass): Promise<any>;
     setAssetId(asset: unknown, id: string): void;
     get VFS(): VFS;
     set VFS(vfs: VFS);
@@ -5697,6 +5718,7 @@ export class SceneNode extends SceneNode_base implements IDisposable {
     isParentOf(child: SceneNode): boolean;
     isParticleSystem(): this is ParticleSystem;
     isPunctualLight(): this is PunctualLight;
+    isSprite3D(): this is Sprite3D;
     isTerrain(): this is Terrain;
     isWater(): this is Water;
     iterate(callback: NodeIterateFunc): boolean;
@@ -6591,11 +6613,143 @@ export class SpotLight extends PunctualLight {
     setRange(val: number): this;
 }
 
+// Warning: (ae-forgotten-export) The symbol "Sprite3D_base" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class Sprite3D extends Sprite3D_base implements BatchDrawable {
+    constructor(scene: Scene, material?: Sprite3DMaterial);
+    // @internal (undocumented)
+    protected _anchor: Vector2;
+    // (undocumented)
+    get anchorX(): number;
+    set anchorX(value: number);
+    // (undocumented)
+    get anchorY(): number;
+    set anchorY(value: number);
+    // @internal (undocumented)
+    protected _batchable: boolean;
+    // (undocumented)
+    calculateLocalTransform(outMatrix: Matrix4x4): void;
+    // (undocumented)
+    calculateWorldTransform(outMatrix: Matrix4x4): void;
+    computeBoundingVolume(): BoundingVolume;
+    computeWorldBoundingVolume(): BoundingVolume;
+    draw(ctx: DrawContext, hash?: string): void;
+    getBoneMatrices(): Texture2D;
+    getInstanceId(_renderPass: RenderPass): string;
+    getInstanceUniforms(): Float32Array<ArrayBuffer>;
+    getMaterial(): MeshMaterial;
+    getMorphData(): any;
+    getMorphInfo(): MorphInfo;
+    getName(): string;
+    getNode(): SceneNode;
+    getPickTarget(): PickTarget;
+    getPrimitive(): Primitive;
+    getQueueType(): number;
+    // @internal (undocumented)
+    protected _instanceHash: string;
+    isBatchable(): this is BatchDrawable;
+    // (undocumented)
+    isSprite3D(): this is Sprite3D;
+    isUnlit(): boolean;
+    get material(): MeshMaterial;
+    set material(m: MeshMaterial);
+    // @internal (undocumented)
+    protected _materialChangeTag: number;
+    needSceneColor(): boolean;
+    needSceneDepth(): boolean;
+    protected onDispose(): void;
+    // @internal (undocumented)
+    protected _pickTarget: PickTarget;
+    // @internal (undocumented)
+    protected _renderBundle: Record<string, RenderBundle>;
+    // (undocumented)
+    setPickTarget(node: SceneNode, label?: string): void;
+    // @internal (undocumented)
+    protected _useRenderBundle: boolean;
+    // (undocumented)
+    get uvBottomRight(): Vector2;
+    set uvBottomRight(value: Vector2);
+    // (undocumented)
+    get uvTopLeft(): Vector2;
+    set uvTopLeft(value: Vector2);
+}
+
+// @public
+export class Sprite3DBlockNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
+    constructor(irFrag?: MaterialBlueprintIR, uniformValues?: BluePrintUniformValue[], uniformTextures?: BluePrintUniformTexture[]);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp;
+    clone(): Sprite3DBlueprintMaterial;
+    protected _createHash(): string;
+    protected createProgram(ctx: DrawContext, pass: number): _zephyr3d_device.GPUProgram<unknown>;
+    get fragmentIR(): MaterialBlueprintIR;
+    set fragmentIR(ir: MaterialBlueprintIR);
+    protected onDispose(): void;
+    get uniformTextures(): BluePrintUniformTexture[];
+    set uniformTextures(val: BluePrintUniformTexture[]);
+    get uniformValues(): BluePrintUniformValue[];
+    set uniformValues(val: BluePrintUniformValue[]);
+}
+
+// @public
+export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
+    constructor();
+    // (undocumented)
+    static ANCHOR: number;
+    get anchor(): Vector2;
+    set anchor(value: Vector2);
+    get anchorX(): number;
+    set anchorX(value: number);
+    get anchorY(): number;
+    set anchorY(value: number);
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp;
+    clone(): Sprite3DMaterial;
+    copyFrom(other: this): void;
+    fragmentShader(scope: PBFunctionScope): void;
+    protected internalApplyUniforms(_bindGroup: BindGroup, _ctx: DrawContext, _pass: number): void;
+    protected internalSetupUniforms(_scope: PBInsideFunctionScope): void;
+    setAnchor(anchorX: number, anchorY: number): void;
+    setUVInfo(uvx0: number, uvy0: number, uvx1: number, uvy1: number): void;
+    // (undocumented)
+    static UVINFO: number;
+    get uvinfo(): Vector4;
+    set uvinfo(value: Vector4);
+    vertexShader(scope: PBFunctionScope): void;
+}
+
 // @public
 export class SqrtNode extends GenericMathNode {
     constructor();
     // (undocumented)
     static getSerializationCls(): SerializableClass;
+}
+
+// @public
+export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonable<StandardSprite3DMaterial> {
+    constructor();
+    protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp;
+    clone(): StandardSprite3DMaterial;
+    copyFrom(other: this): void;
+    // (undocumented)
+    static FEATURE_SPRITE_TEXTURE: number;
+    protected internalApplyUniforms(bindGroup: BindGroup, ctx: DrawContext): void;
+    protected internalSetupUniforms(scope: PBInsideFunctionScope): void;
+    protected onDispose(): void;
+    get spriteTexture(): Texture2D | null;
+    set spriteTexture(tex: Texture2D);
+    // (undocumented)
+    protected _texture: DRef<Texture2D>;
 }
 
 // @public
@@ -7375,7 +7529,7 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:15175:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
+// dist/index.d.ts:14941:9 - (ae-incompatible-release-tags) The symbol "type" is marked as @public, but its signature references "InstanceUniformType" which is marked as @internal
 
 // (No @packageDocumentation comment for this package)
 

@@ -532,6 +532,9 @@ export class Interpolator {
 export function IS_INSTANCE_OF<T extends GenericConstructor>(value: unknown, constructor: T): value is InstanceType<T>;
 
 // @public
+export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends B>(derived: new (...args: any[]) => any, base: B): derived is D;
+
+// @public
 export function isPowerOf2(value: number): boolean;
 
 // @public
@@ -1581,7 +1584,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:517:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:525:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
