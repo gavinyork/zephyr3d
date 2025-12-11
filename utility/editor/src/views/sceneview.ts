@@ -273,10 +273,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               ]
             },
             {
-              label: 'Sprite3D',
-              action: () => this.handleAddNode(Sprite3D, 'Add Sprite3D')
-            },
-            {
               label: 'Light',
               subMenus: [
                 {
@@ -299,8 +295,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 {
                   label: 'Perspective Camera',
                   action: () => this.handleAddNode(PerspectiveCamera, 'Add perspective camera')
+                },
+                {
+                  label: 'Orthogonal Camera',
+                  action: () => this.handleAddNode(OrthoCamera, 'Add orthogonal camera')
                 }
               ]
+            },
+            {
+              label: 'Sprite3D',
+              action: () => this.handleAddNode(Sprite3D, 'Add Sprite3D')
             },
             {
               label: 'Particle System',
@@ -608,14 +612,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         viewportWidth,
         viewportHeight
       ];
-      if (camera instanceof PerspectiveCamera) {
-        camera.aspect = viewportWidth / viewportHeight;
-      } else if (camera instanceof OrthoCamera) {
-        camera.bottom = -10;
-        camera.top = 10;
-        camera.left = (-10 * viewportWidth) / viewportHeight;
-        camera.right = (10 * viewportWidth) / viewportHeight;
-      }
       camera.render(this.controller.model.scene);
 
       // Render selected camera
@@ -825,7 +821,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           } else {
             const ray = this.controller.model.scene.mainCamera.constructRay(this._mousePosX, this._mousePosY);
             let hitDistance = -ray.origin.y / ray.direction.y;
-            if (Number.isNaN(hitDistance) || hitDistance < 0) {
+            if (Number.isNaN(hitDistance) || !Number.isFinite(hitDistance) || hitDistance < 0) {
               hitDistance = 10;
             }
             const x = ray.origin.x + ray.direction.x * hitDistance;
@@ -1296,7 +1292,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         } else {
           const ray = this.controller.model.scene.mainCamera.constructRay(p[0], p[1]);
           let hitDistance = -ray.origin.y / ray.direction.y;
-          if (Number.isNaN(hitDistance) || hitDistance < 0) {
+          if (Number.isNaN(hitDistance) || !Number.isFinite(hitDistance) || hitDistance < 0) {
             hitDistance = 10;
           }
           const x = ray.origin.x + ray.direction.x * hitDistance;

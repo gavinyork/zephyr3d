@@ -145,7 +145,7 @@ export class SkyRenderer extends Disposable {
   constructor() {
     super();
     this._skyType = 'scatter';
-    this._skyColor = Vector4.one();
+    this._skyColor = new Vector4(0, 0, 0, 1);
     this._skyImage = new DRef();
     this._skyboxTexture = new DRef();
     this._skyboxTextureSize = 1024;
