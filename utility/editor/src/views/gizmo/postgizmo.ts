@@ -836,10 +836,25 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       } else {
         this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
         matrix.translation(tmpVecT);
-        const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
         if (!noScale) {
-          const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
-          matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+          if (this._camera.isPerspective()) {
+            const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
+            const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
+            matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+          } else {
+            const projMatrix = this._camera.getProjectionMatrix();
+            const scaleY =
+              (this._screenSize * Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane())) /
+              (2 * this._axisLength);
+            const vpWidth = this._camera.viewport
+              ? this._camera.viewport[2]
+              : getDevice().getDrawingBufferWidth();
+            const vpHeight = this._camera.viewport
+              ? this._camera.viewport[3]
+              : getDevice().getDrawingBufferHeight();
+            const scaleX = scaleY * (vpHeight / vpWidth);
+            matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
+          }
         }
       }
     } else {

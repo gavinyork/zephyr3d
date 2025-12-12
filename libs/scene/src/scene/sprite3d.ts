@@ -1,5 +1,5 @@
 import type { Matrix4x4 } from '@zephyr3d/base';
-import { applyMixins, DRef, Vector2, Vector3 } from '@zephyr3d/base';
+import { applyMixins, DRef, Quaternion, Vector2, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import type { RenderPass, BatchDrawable, DrawContext, PickTarget, MorphInfo } from '../render';
@@ -39,6 +39,8 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   protected _materialChangeTag: number;
   /** @internal */
   protected _anchor: Vector2;
+  /** @internal */
+  protected _rotateAngle: number;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -50,7 +52,8 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     this._pickTarget = { node: this };
     this._batchable = getDevice().type !== 'webgl';
     this._anchor = new Vector2(0.5, 0.5);
-    this.material = material ?? Sprite3D._getDefaultMaterial();
+    this._rotateAngle = 0;
+    this.material = material ?? new StandardSprite3DMaterial();
     this._renderBundle = {};
     this._useRenderBundle = true;
     this._materialChangeTag = null;
@@ -91,6 +94,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
       this._material.set(m);
       if (m) {
         m.anchor = this._anchor;
+        m.rotation = this._rotateAngle;
         RenderBundleWrapper.materialAttached(m.coreMaterial, this);
       }
       this._instanceHash = m ? `${this.constructor.name}:${this._scene?.id ?? 0}:${m.instanceId}` : null;
@@ -266,7 +270,15 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     return null;
   }
   calculateLocalTransform(outMatrix: Matrix4x4): void {
-    outMatrix.scaling(this.scale).translateLeft(this._position);
+    const rot = this.rotation.toEulerAngles().z;
+    const rotationZ = Quaternion.fromAxisAngle(Vector3.axisPZ(), rot);
+    outMatrix.compose(this._scaling, rotationZ, this._position);
+    if (this._material?.get()) {
+      this._rotateAngle = -rot;
+      this._material.get().rotation = this._rotateAngle;
+    }
+
+    //outMatrix.scaling(this.scale).translateLeft(this._position);
   }
   calculateWorldTransform(outMatrix: Matrix4x4): void {
     outMatrix.set(this.localMatrix);
@@ -285,14 +297,5 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     this._material.dispose();
     this._renderBundle = null;
     RenderBundleWrapper.drawableChanged(this);
-  }
-  /** @internal */
-  private static _defaultMaterial: Sprite3DMaterial = null;
-  /** @internal */
-  private static _getDefaultMaterial(): Sprite3DMaterial {
-    if (!this._defaultMaterial) {
-      this._defaultMaterial = new StandardSprite3DMaterial();
-    }
-    return this._defaultMaterial;
   }
 }
