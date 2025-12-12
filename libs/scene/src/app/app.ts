@@ -4,6 +4,7 @@ import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { Engine } from './engine';
 import { getApp, setApp } from './api';
+import { ScreenConfig } from './screen';
 
 type appEventMap = {
   /**
@@ -88,6 +89,10 @@ export type AppOptions = {
      * Whether the runtime scripting system is enabled. Should be true for user applications.
      */
     enabled?: boolean;
+    /**
+     * Screen configuration
+     */
+    screen?: ScreenConfig;
   };
 };
 
@@ -150,6 +155,9 @@ export class Application extends Observable<appEventMap> {
       opt.runtimeOptions?.editorMode,
       opt.runtimeOptions?.enabled
     );
+    if (opt.runtimeOptions?.screen) {
+      this._engine.screen.configure(opt.runtimeOptions.screen);
+    }
     this._ready = false;
   }
   /**

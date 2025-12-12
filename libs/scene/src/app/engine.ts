@@ -16,6 +16,7 @@ import {
   UnlitMaterial
 } from '../material';
 import { StandardSprite3DMaterial } from '../material/sprite3d_std';
+import { ScreenAdapter } from './screen';
 
 /**
  * Interface for objects that can be rendered.
@@ -60,6 +61,7 @@ export class Engine {
   private _scriptingSystem: ScriptingSystem;
   private _resourceManager: ResourceManager;
   private _enabled: boolean;
+  private _screen: ScreenAdapter;
   protected _activeRenderables: {
     renderable: DRef<IRenderable>;
     hook?: IRenderHook;
@@ -81,6 +83,7 @@ export class Engine {
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
     this._loadingScenes = [];
+    this._screen = new ScreenAdapter();
   }
   /**
    * Exposes the instance of {@link ScriptingSystem}.
@@ -107,6 +110,12 @@ export class Engine {
    */
   get resourceManager() {
     return this._resourceManager;
+  }
+  /**
+   * Exposes the instanceof {@link Screen}
+   */
+  get screen() {
+    return this._screen;
   }
   /** @internal */
   async init() {
