@@ -1,5 +1,10 @@
 import { Vector2 } from '@zephyr3d/base';
 
+/**
+ * Screen adapter configuration
+ *
+ * @public
+ */
 export type ScreenConfig = {
   /** Logical width in the design resolution coordinate system. */
   designWidth: number;
