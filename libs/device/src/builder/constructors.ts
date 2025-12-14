@@ -4,6 +4,7 @@ import * as typeinfo from './types';
 import * as AST from './ast';
 import * as errors from './errors';
 import type { ProgramBuilder } from './programbuilder';
+import type { Nullable } from '@zephyr3d/base';
 
 const StorageTextureFormatMap = {
   rgba8unorm: 'rgba8unorm',
@@ -173,7 +174,7 @@ export function setConstructors(cls: typeof ProgramBuilder) {
     typeinfo.typeAtomicI32
   );
   cls.prototype['atomic_uint'] = makeConstructor(
-    function (this: ProgramBuilder, ...args: any[]): PBShaderExp {
+    function (this: ProgramBuilder, ...args: any[]): Nullable<PBShaderExp> {
       if (args.length > 1) {
         throw new errors.PBParamLengthError('atomic_uint');
       }

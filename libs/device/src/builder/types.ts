@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { ASSERT } from '@zephyr3d/base';
 import type { TextureFormat } from '../base_types';
 import type { UniformBufferLayout } from '../gpuobject';
@@ -110,7 +111,7 @@ function makePrimitiveType(scalarTypeMask: number, rows: number, cols: number, n
   return scalarTypeMask | (rows << ROWS_BITSHIFT) | (cols << COLS_BITSHIFT) | (norm << NORM_BITSHIFT);
 }
 
-function typeToTypedArray(type: LayoutableType): PBPrimitiveType {
+function typeToTypedArray(type: LayoutableType): Nullable<PBPrimitiveType> {
   if (type.isPrimitiveType()) {
     return type.scalarType;
   } else if (type.isArrayType()) {
@@ -450,7 +451,7 @@ export type TypeDetailInfo =
  * @public
  */
 export interface PrimitiveTypeDetail {
-  primitiveType?: PBPrimitiveType;
+  primitiveType: PBPrimitiveType;
 }
 
 /**
@@ -461,9 +462,9 @@ export interface StructTypeDetail {
   /** Layout of the struct type */
   layout: PBStructLayout;
   /** Name of the struct type */
-  structName?: string;
+  structName: Nullable<string>;
   /** Members of the struct type */
-  structMembers?: {
+  structMembers: {
     /** Name of the struct member */
     name: string;
     /** Type of the struct member */
@@ -538,7 +539,7 @@ export interface TextureTypeDetail {
   /** type of the texture */
   textureType: PBTextureType;
   /** texture format if this is a storage texture */
-  storageTexelFormat: TextureFormat;
+  storageTexelFormat: Nullable<TextureFormat>;
   /** true if this is a readable storage texture type */
   readable: boolean;
   /** true if this is a writable storage texture type */
@@ -573,7 +574,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
   /** @internal */
   detail: DetailType;
   /** @internal */
-  protected id: string;
+  protected id: Nullable<string>;
   /** @internal */
   constructor(cls: PBTypeClass, detail: DetailType) {
     this.cls = cls;
@@ -661,7 +662,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
    * @param layout - Type of the layout
    * @returns The created buffer layout
    */
-  abstract toBufferLayout(offset: number, layout: PBStructLayout): UniformBufferLayout;
+  abstract toBufferLayout(offset: number, layout: PBStructLayout): Nullable<UniformBufferLayout>;
   /** @internal */
   abstract toTypeName(deviceType?: string, varName?: string): string;
   /** @internal */
@@ -689,7 +690,7 @@ export class PBVoidTypeInfo extends PBTypeInfo<null> {
     return 'void';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
 }
@@ -715,7 +716,7 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     return 'any';
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** {@inheritDoc PBTypeInfo.isCompatibleType} */
@@ -960,7 +961,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -975,7 +976,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
  */
 export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
   constructor(
-    name: string,
+    name: Nullable<string>,
     layout: PBStructLayout,
     members: {
       name: string;
@@ -1014,7 +1015,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     return this.detail.layout;
   }
   /** Get name of the struct type */
-  get structName(): string {
+  get structName(): Nullable<string> {
     return this.detail.structName;
   }
   set structName(val: string) {
@@ -1035,6 +1036,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         return member.type.isAtomicI32() || member.type.isAtomicU32();
       }
     }
+    return false;
   }
   /**
    * Creates a new struct type by extending this type
@@ -1067,11 +1069,11 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
   }
   /** @internal */
   getConstructorOverloads(): PBFunctionTypeInfo[] {
-    const result: PBFunctionTypeInfo[] = [new PBFunctionTypeInfo(this.structName, this, [])];
+    const result: PBFunctionTypeInfo[] = [new PBFunctionTypeInfo(this.structName!, this, [])];
     if (this.isConstructible()) {
       result.push(
         new PBFunctionTypeInfo(
-          this.structName,
+          this.structName!,
           this,
           this.structMembers.map((val) => ({ type: val.type }))
         )
@@ -1082,9 +1084,9 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
   /** @internal */
   toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
-      return varName ? `${varName}: ${this.structName}` : this.structName;
+      return varName ? `${varName}: ${this.structName}` : this.structName!;
     } else {
-      return varName ? `${this.structName} ${varName}` : this.structName;
+      return varName ? `${this.structName} ${varName}` : this.structName!;
     }
   }
   /** @internal */
@@ -1127,7 +1129,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         name: member.name,
         offset: offset,
         byteSize: size,
-        type: typeToTypedArray(member.type),
+        type: typeToTypedArray(member.type)!,
         subLayout: member.type.isStructType() ? member.type.toBufferLayout(offset, layout) : null,
         arraySize: member.type.isArrayType() ? member.type.dimension : 0
       });
@@ -1254,7 +1256,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   }
   /** @internal */
   isConstructible(): boolean {
-    return this.dimension && this.detail.elementType.isConstructible();
+    return !!this.dimension && this.detail.elementType.isConstructible();
   }
   /** @internal */
   isStorable(): boolean {
@@ -1308,7 +1310,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       : this.dimension * align(this.elementType.getLayoutSize(layout), elementAlignment);
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
@@ -1385,7 +1387,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -1428,7 +1430,7 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -1483,7 +1485,7 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -1536,7 +1538,7 @@ export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -1558,13 +1560,13 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
   ) {
     super(PBTypeClass.TEXTURE, {
       textureType: textureType,
-      readable,
-      writable,
-      storageTexelFormat: texelFormat || null
+      readable: readable ?? false,
+      writable: writable ?? false,
+      storageTexelFormat: texelFormat ?? null
     });
     ASSERT(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
     ASSERT(
-      !(textureType & BITFLAG_STORAGE) || !!storageTexelFormatMap[texelFormat],
+      !(textureType & BITFLAG_STORAGE) || (!!texelFormat && !!storageTexelFormatMap[texelFormat]),
       'invalid texel format for storage texture'
     );
   }
@@ -1573,7 +1575,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     return this.detail.textureType;
   }
   /** Get texture format if this is a storage texture */
-  get storageTexelFormat(): TextureFormat {
+  get storageTexelFormat(): Nullable<TextureFormat> {
     return this.detail.storageTexelFormat;
   }
   /** Returns true if this is a readable storage texture type */
@@ -1647,7 +1649,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     if (deviceType === 'webgpu') {
       let typename = textureTypeMapWGSL[this.textureType];
       if (this.isStorageTexture()) {
-        const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat];
+        const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat!];
         // storage textures currently only support 'write' access control
         const accessMode = this.writable ? (this.readable ? 'read_write' : 'write') : 'read'; // this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
@@ -1662,7 +1664,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */
@@ -1704,7 +1706,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     return `fn(${this.argHash}):${this.returnType.typeId}`;
   }
   /** {@inheritDoc PBTypeInfo.toBufferLayout} */
-  toBufferLayout(_offset: number): UniformBufferLayout {
+  toBufferLayout(_offset: number): Nullable<UniformBufferLayout> {
     return null;
   }
   /** @internal */

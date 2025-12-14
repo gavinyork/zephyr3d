@@ -1,4 +1,4 @@
-import type { VectorBase, CubeFace, TypedArray, IDisposable } from '@zephyr3d/base';
+import type { VectorBase, CubeFace, TypedArray, IDisposable, Nullable } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
 import type { PBTypeInfo } from './builder/types';
 import { PBArrayTypeInfo, PBPrimitiveTypeInfo, PBStructTypeInfo, PBPrimitiveType } from './builder/types';
@@ -749,8 +749,8 @@ export enum GPUResourceUsageFlags {
  * Get vertex attribute index by semantic
  * @public
  */
-export function getVertexAttribByName(name: VertexSemantic): number {
-  return vertexAttribNameMap[name];
+export function getVertexAttribByName(name: Nullable<VertexSemantic>): number | undefined {
+  return name ? vertexAttribNameMap[name] : undefined;
 }
 
 /**
@@ -787,6 +787,7 @@ export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic
   } else {
     return buffer.structure.structMembers[0].name === name;
   }
+  return false;
 }
 
 /**
@@ -842,7 +843,7 @@ export function getVertexAttribFormat(
   semantic: VertexSemantic,
   type: DataType,
   count: number
-): VertexAttribFormat {
+): Nullable<VertexAttribFormat> {
   const loc = getVertexAttribByName(semantic);
   for (const k in vertexAttribFormatMap) {
     const v = vertexAttribFormatMap[k];
@@ -895,7 +896,7 @@ export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
 export function getVertexBufferAttribTypeBySemantic(
   vertexBufferType: PBStructTypeInfo,
   semantic: VertexSemantic
-): PBPrimitiveTypeInfo {
+): Nullable<PBPrimitiveTypeInfo> {
   const k = vertexBufferType.structMembers[0];
   const vertexType = (k.type as PBArrayTypeInfo).elementType;
   if (vertexType.isStructType()) {
@@ -921,7 +922,7 @@ export function getVertexBufferAttribTypeBySemantic(
 export function getVertexBufferAttribType(
   vertexBufferType: PBStructTypeInfo,
   attrib: number
-): PBPrimitiveTypeInfo {
+): Nullable<PBPrimitiveTypeInfo> {
   const attribName = getVertexAttribName(attrib);
   if (!attribName) {
     return null;
@@ -937,7 +938,10 @@ export function getVertexBufferAttribType(
  *
  * @public
  */
-export function makeVertexBufferType(length: number, ...attributes: VertexAttribFormat[]): PBStructTypeInfo {
+export function makeVertexBufferType(
+  length: number,
+  ...attributes: VertexAttribFormat[]
+): Nullable<PBStructTypeInfo> {
   if (attributes.length === 0) {
     return null;
   }
@@ -982,13 +986,13 @@ export type VertexStepMode = 'vertex' | 'instance';
 export const semanticList: string[] = (function () {
   const list: string[] = [];
   for (let i = 0; i < MAX_VERTEX_ATTRIBUTES; i++) {
-    list.push(semanticToAttrib(i));
+    list.push(semanticToAttrib(i)!);
   }
   return list;
 })();
 
 /** @internal */
-export function semanticToAttrib(semantic: number): string {
+export function semanticToAttrib(semantic: number): Nullable<string> {
   switch (semantic) {
     case VERTEX_ATTRIB_POSITION:
       return 'a_position';
@@ -1120,7 +1124,7 @@ export interface UniformLayout {
   /** The primitive type of the uniform */
   type: PBPrimitiveType;
   /** Layout of the members if the uniform is struct type */
-  subLayout: UniformBufferLayout;
+  subLayout: Nullable<UniformBufferLayout>;
 }
 
 /**
@@ -1161,9 +1165,9 @@ export interface TextureBindingLayout {
   /** Whether the textur is a multisampled texture */
   multisampled: boolean;
   /** name of the default sampler uniform when using WebGPU device */
-  autoBindSampler: string;
+  autoBindSampler: Nullable<string>;
   /** name of the default comparison sampler uniform when using WebGPU device */
-  autoBindSamplerComparison: string;
+  autoBindSamplerComparison: Nullable<string>;
 }
 
 /**
@@ -1185,7 +1189,7 @@ export interface StorageTextureBindingLayout {
  */
 export interface ExternalTextureBindingLayout {
   /** name of the default sampler uniform when using WebGPU device */
-  autoBindSampler: string;
+  autoBindSampler: Nullable<string>;
 }
 
 /**

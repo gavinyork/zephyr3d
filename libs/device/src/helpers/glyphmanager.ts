@@ -3,6 +3,7 @@ import { FontCanvas } from './font';
 import type { AtlasInfo } from './textureatlas';
 import { TextureAtlasManager } from './textureatlas';
 import type { AbstractDevice } from '../base_types';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Manager of texture glyphs
@@ -30,18 +31,17 @@ export class GlyphManager extends TextureAtlasManager {
    * @param font - Font of the character
    * @returns [width, height]
    */
-  getGlyphSize(char: string, font: Font): [number, number] {
+  getGlyphSize(char: string, font: Font): Nullable<[number, number]> {
     return this._getGlyphSize(char, font);
   }
-  getGlyphInfo(char: string, font: Font): AtlasInfo {
-    if (!char || !font) {
-      return null;
-    }
+  getGlyphInfo(char: string, font: Font): Nullable<AtlasInfo> {
     let glyphInfo = this.getAtlasInfo(this._hash(char, font));
     if (!glyphInfo) {
       glyphInfo = this._cacheGlyph(char, font);
-      glyphInfo.width = Math.round(glyphInfo.width * (font.maxHeight / font.maxHeightScaled));
-      glyphInfo.height = font.maxHeight;
+      if (glyphInfo) {
+        glyphInfo.width = Math.round(glyphInfo.width * (font.maxHeight / font.maxHeightScaled));
+        glyphInfo.height = font.maxHeight;
+      }
     }
     return glyphInfo;
   }
@@ -102,10 +102,7 @@ export class GlyphManager extends TextureAtlasManager {
     return w;
   }
   /** @internal */
-  private _getGlyphSize(char: string, font: Font): [number, number] {
-    if (!font) {
-      return null;
-    }
+  private _getGlyphSize(char: string, font: Font): Nullable<[number, number]> {
     FontCanvas.font = font.fontNameScaled;
     const metric = FontCanvas.context.measureText(char);
     let w = metric.width;
@@ -122,7 +119,7 @@ export class GlyphManager extends TextureAtlasManager {
   private _getGlyphBitmap(
     char: string,
     font: Font
-  ): ImageData | { x: number; y: number; w: number; h: number } {
+  ): Nullable<ImageData | { x: number; y: number; w: number; h: number }> {
     if (!font) {
       return null;
     }
@@ -146,7 +143,7 @@ export class GlyphManager extends TextureAtlasManager {
     return `${font.family}@${font.size}&${char}`;
   }
   /** @internal */
-  private _cacheGlyph(char: string, font: Font): AtlasInfo {
+  private _cacheGlyph(char: string, font: Font): Nullable<AtlasInfo> {
     const bitmap = this._getGlyphBitmap(char, font) as ImageData;
     return this.pushBitmap(this._hash(char, font), bitmap);
   }

@@ -1,5 +1,5 @@
 import { PBPrimitiveType } from './builder/types';
-import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { StructuredValue, UniformBufferLayout, StructuredBuffer } from './gpuobject';
 
 /**
@@ -8,9 +8,9 @@ import type { StructuredValue, UniformBufferLayout, StructuredBuffer } from './g
  */
 export class StructuredBufferData {
   /** @internal */
-  protected _cache: ArrayBuffer;
+  protected _cache: Nullable<ArrayBuffer>;
   /** @internal */
-  protected _buffer: StructuredBuffer;
+  protected _buffer: Nullable<StructuredBuffer>;
   /** @internal */
   protected _size: number;
   /** @internal */
@@ -31,7 +31,7 @@ export class StructuredBufferData {
     this._uniformMap = {};
     this._uniformPositions = {};
     this._cache = buffer instanceof ArrayBuffer ? buffer : null;
-    this._buffer = buffer instanceof ArrayBuffer ? null : buffer;
+    this._buffer = buffer instanceof ArrayBuffer || !buffer ? null : buffer;
     this.init(layout, 0, '');
   }
   /** The buffer size in bytes */
@@ -39,7 +39,7 @@ export class StructuredBufferData {
     return this._size;
   }
   /** Get the data cache buffer */
-  get buffer(): ArrayBuffer {
+  get buffer(): Nullable<ArrayBuffer> {
     return this._cache;
   }
   /** Get all the uniform datas */
@@ -73,10 +73,10 @@ export class StructuredBufferData {
           const size = this._uniformPositions[name][1];
           if (typeof value === 'number') {
             view[0] = value;
-            this._buffer.bufferSubData(this._uniformPositions[name][0], view);
+            this._buffer!.bufferSubData(this._uniformPositions[name][0], view);
           } else if (value['BYTES_PER_ELEMENT'] && size <= (value['byteLength'] as number)) {
             const arr = value as TypedArray;
-            this._buffer.bufferSubData(
+            this._buffer!.bufferSubData(
               this._uniformPositions[name][0],
               arr,
               0,
@@ -116,7 +116,7 @@ export class StructuredBufferData {
           throw new Error('UniformBuffer(): invalid layout');
         }
         this._uniformPositions[name] = [entry.offset, entry.byteSize];
-        let viewCtor: TypedArrayConstructor = null;
+        let viewCtor: Nullable<TypedArrayConstructor> = null;
         switch (entry.type) {
           case PBPrimitiveType.F32:
             viewCtor = Float32Array;

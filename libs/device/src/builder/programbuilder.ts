@@ -35,6 +35,7 @@ import {
 
 import type { StorageTextureConstructor } from './constructors';
 import { getCurrentProgramBuilder, setCurrentProgramBuilder } from './misc';
+import type { Nullable } from '@zephyr3d/base';
 
 const COMPUTE_UNIFORM_NAME = 'zUBC';
 const COMPUTE_STORAGE_NAME = 'zSBC';
@@ -54,7 +55,7 @@ interface UniformInfo {
     exp: PBShaderExp;
   };
   texture?: {
-    autoBindSampler: 'sample' | 'comparison';
+    autoBindSampler: Nullable<'sample' | 'comparison'>;
     exp: PBShaderExp;
   };
   sampler?: PBShaderExp;
@@ -1008,7 +1009,7 @@ export class ProgramBuilder {
   /** @internal */
   _device: AbstractDevice;
   /** @internal */
-  _workgroupSize: [number, number, number];
+  _workgroupSize: Nullable<[number, number, number]>;
   /** @internal */
   _scopeStack: PBScope[] = [];
   /** @internal */
@@ -1018,13 +1019,13 @@ export class ProgramBuilder {
   /** @internal */
   _uniforms: UniformInfo[];
   /** @internal */
-  _globalScope: PBGlobalScope;
+  _globalScope: Nullable<PBGlobalScope>;
   /** @internal */
-  _builtinScope: PBBuiltinScope;
+  _builtinScope: Nullable<PBBuiltinScope>;
   /** @internal */
-  _inputScope: PBInputScope;
+  _inputScope: Nullable<PBInputScope>;
   /** @internal */
-  _outputScope: PBOutputScope;
+  _outputScope: Nullable<PBOutputScope>;
   /** @internal */
   _inputs: [string, AST.ASTDeclareVar][];
   /** @internal */
@@ -1036,7 +1037,7 @@ export class ProgramBuilder {
   /** @internal */
   _emulateDepthClamp: boolean;
   /** @internal */
-  _lastError: string;
+  _lastError: Nullable<string>;
   /** @internal */
   _reflection: PBReflection;
   /** @internal */
@@ -1068,7 +1069,7 @@ export class ProgramBuilder {
     this._nameMap = [];
   }
   /** Get last error */
-  get lastError(): string {
+  get lastError(): Nullable<string> {
     return this._lastError;
   }
   /** @internal */
@@ -1076,7 +1077,7 @@ export class ProgramBuilder {
     return this._shaderType;
   }
   /** Current shader kind */
-  get shaderKind(): ShaderKind {
+  get shaderKind(): Nullable<ShaderKind> {
     return this._shaderType === ShaderType.Vertex
       ? 'vertex'
       : this._shaderType === ShaderType.Fragment
@@ -1087,19 +1088,19 @@ export class ProgramBuilder {
   }
   /** Gets the global scope */
   getGlobalScope(): PBGlobalScope {
-    return this._globalScope;
+    return this._globalScope!;
   }
   /** @internal */
   get builtinScope(): PBBuiltinScope {
-    return this._builtinScope;
+    return this._builtinScope!;
   }
   /** @internal */
   get inputScope(): PBInputScope {
-    return this._inputScope;
+    return this._inputScope!;
   }
   /** @internal */
   get outputScope(): PBOutputScope {
-    return this._outputScope;
+    return this._outputScope!;
   }
   /** @internal */
   get depthRangeCorrection(): boolean {
@@ -1151,7 +1152,7 @@ export class ProgramBuilder {
   }
   /** @internal */
   popScope(): PBScope {
-    return this._scopeStack.shift();
+    return this._scopeStack.shift()!;
   }
   /** Gets the current scope */
   getCurrentScope<T extends PBScope = PBScope>(): T {
@@ -1159,18 +1160,18 @@ export class ProgramBuilder {
   }
   /** Gets the current function scope */
   getCurrentFunctionScope(): PBFunctionScope {
-    let funcScope: PBScope = this.getCurrentScope();
+    let funcScope: Nullable<PBScope> = this.getCurrentScope();
     while (funcScope && !(funcScope instanceof PBFunctionScope)) {
       funcScope = funcScope.$parent;
     }
-    return funcScope as PBFunctionScope;
+    return funcScope!;
   }
   /**
    * Generates shader codes for a render program
    * @param options - The build options
    * @returns a tuple made by vertex shader source, fragment shader source, bind group layouts and vertex attributes used, or null if build faild
    */
-  buildRender(options: PBRenderOptions): readonly [string, string, BindGroupLayout[], number[]] {
+  buildRender(options: PBRenderOptions): Nullable<readonly [string, string, BindGroupLayout[], number[]]> {
     setCurrentProgramBuilder(this);
     this._lastError = null;
     this.defineInternalStructs();
@@ -1184,7 +1185,7 @@ export class ProgramBuilder {
    * @param options - The build programs
    * @returns a tuple made by compute shader source and bind group layouts, or null if build failed
    */
-  buildCompute(options: PBComputeOptions): readonly [string, BindGroupLayout[]] {
+  buildCompute(options: PBComputeOptions): Nullable<readonly [string, BindGroupLayout[]]> {
     setCurrentProgramBuilder(this);
     this._lastError = null;
     this._workgroupSize = options.workgroupSize;
@@ -1199,7 +1200,7 @@ export class ProgramBuilder {
    * @param options - The build options
    * @returns The created program or null if build failed
    */
-  buildRenderProgram(options: PBRenderOptions): GPUProgram {
+  buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram> {
     const ret = this.buildRender(options);
     return ret
       ? this._device.createGPUProgram({
@@ -1219,7 +1220,7 @@ export class ProgramBuilder {
    * @param options - The build options
    * @returns The created program or null if build failed
    */
-  buildComputeProgram(options: PBComputeOptions): GPUProgram {
+  buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram> {
     const ret = this.buildCompute(options);
     return ret
       ? this._device.createGPUProgram({
@@ -1287,12 +1288,12 @@ export class ProgramBuilder {
    * @returns the created variable
    */
   struct(structName: string, instanceName: string): PBShaderExp {
-    let ctor: ShaderTypeFunc = null;
+    let ctor: Nullable<ShaderTypeFunc> = null;
     for (const st of [ShaderType.Vertex, ShaderType.Fragment, ShaderType.Compute]) {
       if (st & this._shaderType) {
         const structInfo = this._structInfo[st];
         ctor = structInfo?.structs[structName];
-        if (ctor) {
+        if (!!ctor) {
           break;
         }
       }
@@ -1345,7 +1346,7 @@ export class ProgramBuilder {
         structInfo = { structs: {}, types: [] };
         this._structInfo[shaderType] = structInfo;
       }
-      if (structInfo.structs[type.structName]) {
+      if (structInfo.structs[type.structName!]) {
         throw new errors.PBParamValueError(
           'defineStruct',
           'structName',
@@ -1402,13 +1403,13 @@ export class ProgramBuilder {
       })
     );
     for (const shaderType of [ShaderType.Vertex, ShaderType.Fragment, ShaderType.Compute]) {
-      let structDef: AST.ASTStructDefine = null;
-      let ctor: ShaderTypeFunc = null;
+      let structDef: Nullable<AST.ASTStructDefine> = null;
+      let ctor: Nullable<ShaderTypeFunc> = null;
       const structInfo = this._structInfo[shaderType];
       if (structInfo) {
         if (
-          getCurrentProgramBuilder().shaderType === shaderType &&
-          structInfo.structs[structType.structName]
+          getCurrentProgramBuilder()!.shaderType === shaderType &&
+          structInfo.structs[structType.structName!]
         ) {
           throw new errors.PBParamValueError(
             'defineStruct',
@@ -1419,7 +1420,7 @@ export class ProgramBuilder {
         for (const type of structInfo.types) {
           if (!type.builtin && this.isIdenticalStruct(type.getType(), structType, false)) {
             structDef = type;
-            ctor = structInfo.structs[type.getType().structName];
+            ctor = structInfo.structs[type.getType().structName!];
             break;
           }
         }
@@ -1428,17 +1429,18 @@ export class ProgramBuilder {
         if (structDef.type.layout !== layout) {
           throw new Error(`Can not redefine struct ${structDef.type.structName} with different layout`);
         }
-        if (shaderType !== getCurrentProgramBuilder().shaderType) {
-          if (!this._structInfo[getCurrentProgramBuilder().shaderType]) {
-            this._structInfo[getCurrentProgramBuilder().shaderType] = { structs: {}, types: [] };
+        if (shaderType !== getCurrentProgramBuilder()!.shaderType) {
+          if (!this._structInfo[getCurrentProgramBuilder()!.shaderType]) {
+            this._structInfo[getCurrentProgramBuilder()!.shaderType] = { structs: {}, types: [] };
           }
-          if (this._structInfo[getCurrentProgramBuilder().shaderType].types.indexOf(structDef) < 0) {
-            this._structInfo[getCurrentProgramBuilder().shaderType].types.push(structDef);
-            this._structInfo[getCurrentProgramBuilder().shaderType].structs[structDef.getType().structName] =
-              ctor;
+          if (this._structInfo[getCurrentProgramBuilder()!.shaderType].types.indexOf(structDef) < 0) {
+            this._structInfo[getCurrentProgramBuilder()!.shaderType].types.push(structDef);
+            this._structInfo[getCurrentProgramBuilder()!.shaderType].structs[
+              structDef.getType().structName!
+            ] = ctor!;
           }
         }
-        return ctor;
+        return ctor!;
       }
     }
     return this.internalDefineStruct(
@@ -1457,11 +1459,14 @@ export class ProgramBuilder {
   defineStructByType(structType: PBStructTypeInfo): ShaderTypeFunc {
     const typeCopy = structType.extends(structType.structName || this.generateStructureName(), []);
     for (const shaderType of [ShaderType.Vertex, ShaderType.Fragment, ShaderType.Compute]) {
-      let structDef: AST.ASTStructDefine = null;
-      let ctor: ShaderTypeFunc = null;
+      let structDef: Nullable<AST.ASTStructDefine> = null;
+      let ctor: Nullable<ShaderTypeFunc> = null;
       const structInfo = this._structInfo[shaderType];
       if (structInfo) {
-        if (getCurrentProgramBuilder().shaderType === shaderType && structInfo.structs[typeCopy.structName]) {
+        if (
+          getCurrentProgramBuilder()!.shaderType === shaderType &&
+          structInfo.structs[typeCopy.structName!]
+        ) {
           throw new errors.PBParamValueError(
             'defineStruct',
             'structName',
@@ -1471,7 +1476,7 @@ export class ProgramBuilder {
         for (const type of structInfo.types) {
           if (!type.builtin && this.isIdenticalStruct(type.getType(), typeCopy, false)) {
             structDef = type;
-            ctor = structInfo.structs[type.getType().structName];
+            ctor = structInfo.structs[type.getType().structName!];
             break;
           }
         }
@@ -1480,15 +1485,15 @@ export class ProgramBuilder {
         if (structDef.type.layout !== typeCopy.layout) {
           throw new Error(`Can not redefine struct ${structDef.type.structName} with different layout`);
         }
-        if (shaderType !== getCurrentProgramBuilder().shaderType) {
-          if (!this._structInfo[getCurrentProgramBuilder().shaderType]) {
-            this._structInfo[getCurrentProgramBuilder().shaderType] = { structs: {}, types: [] };
+        if (shaderType !== getCurrentProgramBuilder()!.shaderType) {
+          if (!this._structInfo[getCurrentProgramBuilder()!.shaderType]) {
+            this._structInfo[getCurrentProgramBuilder()!.shaderType] = { structs: {}, types: [] };
           }
-          this._structInfo[getCurrentProgramBuilder().shaderType].types.push(structDef);
-          this._structInfo[getCurrentProgramBuilder().shaderType].structs[structDef.getType().structName] =
-            ctor;
+          this._structInfo[getCurrentProgramBuilder()!.shaderType].types.push(structDef);
+          this._structInfo[getCurrentProgramBuilder()!.shaderType].structs[structDef.getType().structName!] =
+            ctor!;
         }
-        return ctor;
+        return ctor!;
       }
     }
     return this.internalDefineStructByType(this._shaderType, false, typeCopy);
@@ -1551,7 +1556,7 @@ export class ProgramBuilder {
           structInfo = { structs: {}, types: [] };
           this._structInfo[shaderType] = structInfo;
         }
-        if (structInfo.structs[structType.structName]) {
+        if (structInfo.structs[structType.structName!]) {
           throw new errors.PBParamValueError(
             'defineStruct',
             'structName',
@@ -1559,14 +1564,14 @@ export class ProgramBuilder {
           );
         }
         structInfo.types.push(new AST.ASTStructDefine(structType, builtin));
-        structInfo.structs[structType.structName] = struct;
+        structInfo.structs[structType.structName!] = struct;
       }
     }
     // this.changeStructLayout(structType, layout);
     return struct;
   }
   /** @internal */
-  getFunction(name: string): AST.ASTFunction[] {
+  getFunction(name: string): Nullable<AST.ASTFunction[]> {
     return this._globalScope ? this._globalScope.$getFunctions(name) : null;
   }
   /** @internal */
@@ -1581,7 +1586,7 @@ export class ProgramBuilder {
   defineBuiltinStruct(
     shaderType: ShaderType,
     inOrOut: 'in' | 'out'
-  ): [ShaderTypeFunc, PBShaderExp, string, PBShaderExp] {
+  ): Nullable<[ShaderTypeFunc, PBShaderExp, string, PBShaderExp]> {
     const structName =
       inOrOut === 'in'
         ? AST.getBuiltinInputStructName(shaderType)
@@ -1636,7 +1641,7 @@ export class ProgramBuilder {
           false,
           new PBStructTypeInfo(structName, 'default', args)
         );
-        this.findStructType(structName, shaderType).prefix = prefix;
+        this.findStructType(structName, shaderType)!.prefix = prefix;
         const structInstance = this.struct(structName, instanceName);
         const structInstanceIN =
           inOrOut === 'in' ? this.struct(structName, AST.getBuiltinParamName(shaderType)) : structInstance;
@@ -1658,9 +1663,9 @@ export class ProgramBuilder {
     if (args.length === 0) {
       throw new errors.PBParamLengthError('array');
     }
-    args = args.map((arg) => this.normalizeExpValue(arg));
+    args = args.map((arg) => this.normalizeExpValue(arg)!);
     let typeok = true;
-    let type: PBTypeInfo = null;
+    let type: Nullable<PBTypeInfo> = null;
     let isBool = true;
     let isFloat = true;
     let isInt = true;
@@ -1731,7 +1736,7 @@ export class ProgramBuilder {
     if (!typeok) {
       throw new errors.PBParamTypeError('array');
     }
-    if (!type.isPrimitiveType() && !type.isArrayType() && !type.isStructType()) {
+    if (!type!.isPrimitiveType() && !type!.isArrayType() && !type!.isStructType()) {
       throw new errors.PBParamTypeError('array');
     }
     const arrayType = new PBArrayTypeInfo(type, args.length);
@@ -1775,7 +1780,7 @@ export class ProgramBuilder {
   in(location: number, name: string, variable: PBShaderExp): void {
     if (this._inputs[location]) {
       // input already exists, create an alias
-      if (!this._inputScope[name]) {
+      if (!this._inputScope![name]) {
         Object.defineProperty(this._inputScope, name, {
           get: function (this: PBInputScope) {
             return variable;
@@ -1815,7 +1820,7 @@ export class ProgramBuilder {
           return variable;
         },
         set: function (this: PBOutputScope, v) {
-          getCurrentProgramBuilder()
+          getCurrentProgramBuilder()!
             .getCurrentScope()
             .$ast.statements.push(
               new AST.ASTAssignment(
@@ -1828,20 +1833,20 @@ export class ProgramBuilder {
     }
   }
   /** @internal */
-  getDefaultSampler(t: PBShaderExp, comparison: boolean): PBShaderExp {
+  getDefaultSampler(t: PBShaderExp, comparison: boolean): Nullable<PBShaderExp> {
     const u = this._uniforms.findIndex((val) => val.texture?.exp === t);
     if (u < 0) {
-      return;
+      return null;
       //throw new Error('invalid texture uniform object');
     }
     const samplerType = comparison ? 'comparison' : 'sample';
     if (
-      this._uniforms[u].texture.autoBindSampler &&
-      this._uniforms[u].texture.autoBindSampler !== samplerType
+      this._uniforms[u].texture!.autoBindSampler &&
+      this._uniforms[u].texture!.autoBindSampler !== samplerType
     ) {
       throw new Error('multiple sampler not supported');
     }
-    this._uniforms[u].texture.autoBindSampler = samplerType;
+    this._uniforms[u].texture!.autoBindSampler = samplerType;
     if (this._device.type === 'webgpu') {
       const samplerName = AST.genSamplerName(t.$str, comparison);
       if (!this.getGlobalScope()[samplerName]) {
@@ -1853,9 +1858,9 @@ export class ProgramBuilder {
     }
   }
   /** @internal */
-  normalizeExpValue(value: ExpValueType): ExpValueNonArrayType {
+  normalizeExpValue(value: ExpValueType): Nullable<ExpValueNonArrayType> {
     if (Array.isArray(value)) {
-      const converted = value.map((val) => (Array.isArray(val) ? this.normalizeExpValue(val) : val));
+      const converted = value.map((val) => (Array.isArray(val) ? this.normalizeExpValue(val)! : val));
       return this.array(...converted);
     } else {
       return value;
@@ -1863,7 +1868,7 @@ export class ProgramBuilder {
   }
   /** @internal */
   guessExpValueType(value: ExpValueType): PBTypeInfo {
-    const val = this.normalizeExpValue(value);
+    const val = this.normalizeExpValue(value)!;
     if (typeof val === 'boolean') {
       return typeBool;
     } else if (typeof val === 'number') {
@@ -1876,12 +1881,12 @@ export class ProgramBuilder {
       } else {
         throw new errors.PBValueOutOfRange(val);
       }
-    } else if (val instanceof PBShaderExp) {
+    } else {
       return val.$ast?.getType() || val.$typeinfo;
     }
   }
   /** @internal */
-  findStructType(name: string, shaderType: number): AST.ASTStructDefine {
+  findStructType(name: string, shaderType: number): Nullable<AST.ASTStructDefine> {
     for (const st of [ShaderType.Vertex, ShaderType.Fragment, ShaderType.Compute]) {
       if (st & shaderType) {
         const structInfo = this._structInfo[st];
@@ -1897,7 +1902,7 @@ export class ProgramBuilder {
     return null;
   }
   /** @internal */
-  findStructConstructor(name: string, shaderType: number): ShaderTypeFunc {
+  findStructConstructor(name: string, shaderType: number): Nullable<ShaderTypeFunc> {
     for (const st of [ShaderType.Vertex, ShaderType.Fragment, ShaderType.Compute]) {
       if (st & shaderType) {
         const structInfo = this._structInfo[st];
@@ -2003,14 +2008,14 @@ export class ProgramBuilder {
           vertexBuiltinScope,
           vertexInputs.map((val) => val[1]),
           vertexOutputs.map((val) => val[1])
-        ),
+        )!,
         this.generateRenderSource(
           ShaderType.Fragment,
           fragScope,
           fragBuiltinScope,
           fragInputs.map((val) => val[1]),
           fragOutputs.map((val) => val[1])
-        ),
+        )!,
         this.createBindGroupLayouts(options.label),
         this._vertexAttributes
       ] as const;
@@ -2032,19 +2037,19 @@ export class ProgramBuilder {
   }
   /** @internal */
   private generate(body?: (this: PBGlobalScope, pb: ProgramBuilder) => void): void {
-    this.pushScope(this._globalScope);
+    this.pushScope(this._globalScope!);
     if (this._emulateDepthClamp && this._shaderType === ShaderType.Vertex) {
-      this._globalScope.$outputs.clamppedDepth = this.float().tag('CLAMPPED_DEPTH');
+      this._globalScope!.$outputs.clamppedDepth = this.float().tag('CLAMPPED_DEPTH');
     }
-    body?.call(this._globalScope, this);
+    body?.call(this._globalScope!, this);
     this.popScope();
 
     // Global delcarations should be at the first
-    this._globalScope.$ast.statements = [
-      ...this._globalScope.$ast.statements.filter(
+    this._globalScope!.$ast.statements = [
+      ...this._globalScope!.$ast.statements.filter(
         (val) => val instanceof AST.ASTDeclareVar || val instanceof AST.ASTAssignment
       ),
-      ...this._globalScope.$ast.statements.filter(
+      ...this._globalScope!.$ast.statements.filter(
         (val) => !(val instanceof AST.ASTDeclareVar) && !(val instanceof AST.ASTAssignment)
       )
     ];
@@ -2056,7 +2061,7 @@ export class ProgramBuilder {
     builtinScope: PBBuiltinScope,
     inputs: AST.ShaderAST[],
     outputs: AST.ShaderAST[]
-  ) {
+  ): Nullable<string> {
     const context = {
       type: shaderType,
       mrt: shaderType === ShaderType.Fragment && outputs.length > 1,
@@ -2177,7 +2182,7 @@ export class ProgramBuilder {
             }
             const uname = `${nameList[i]}_${k}_${p}`;
             const structName = this.generateStructureName();
-            const t = getCurrentProgramBuilder().internalDefineStruct(
+            const t = getCurrentProgramBuilder()!.internalDefineStruct(
               structName,
               types[i],
               ShaderType.Compute,
@@ -2203,7 +2208,7 @@ export class ProgramBuilder {
             let writable = false;
             for (let n = allLists[p].length - 1; n >= 0; n--) {
               const u = allLists[p][n];
-              const exp = this._uniforms[u.uniform].block.exp;
+              const exp = this._uniforms[u.uniform].block!.exp;
               nameMap[exp.$str] = uname;
               exp.$str = `${uname}.${exp.$str}`;
               writable ||= exp.$ast.isWritable();
@@ -2317,7 +2322,7 @@ export class ProgramBuilder {
               }
               const uname = `${nameList[j][i]}_${k}_${p}`;
               const structName = this.generateStructureName();
-              const t = getCurrentProgramBuilder().internalDefineStruct(
+              const t = getCurrentProgramBuilder()!.internalDefineStruct(
                 structName,
                 layoutList[j],
                 maskList[i],
@@ -2358,7 +2363,7 @@ export class ProgramBuilder {
               let writable = false;
               for (let n = allLists[p].length - 1; n >= 0; n--) {
                 const u = allLists[p][n];
-                const exp = this._uniforms[u.uniform].block.exp;
+                const exp = this._uniforms[u.uniform].block!.exp;
                 nameMap[exp.$str] = uname;
                 exp.$str = `${uname}.${exp.$str}`;
                 writable ||= exp.$ast.isWritable();
@@ -2403,7 +2408,7 @@ export class ProgramBuilder {
       for (const u of this._uniforms) {
         if (u.mask & type) {
           const uniforms = (scope.$ast as AST.ASTGlobalScope).uniforms;
-          const name = u.block ? u.block.name : u.texture ? u.texture.exp.$str : u.sampler.$str;
+          const name = u.block ? u.block.name : u.texture ? u.texture.exp.$str : u.sampler!.$str;
           const index = uniforms.findIndex((val) => val.value.name === name);
           if (index < 0) {
             throw new Error(`updateUniformBindings() failed: unable to find uniform ${name}`);
@@ -2414,7 +2419,7 @@ export class ProgramBuilder {
     }
   }
   /** @internal */
-  private createBindGroupLayouts(label: string): BindGroupLayout[] {
+  private createBindGroupLayouts(label: string | undefined): BindGroupLayout[] {
     const layouts: BindGroupLayout[] = [];
     const dynamicOffsetIndex = [0, 0, 0, 0];
     for (const uniformInfo of this._uniforms) {
@@ -2432,9 +2437,8 @@ export class ProgramBuilder {
       const entry: BindGroupLayoutEntry = {
         binding: uniformInfo.binding,
         visibility: uniformInfo.mask,
-        type: null,
         name: ''
-      };
+      } as BindGroupLayoutEntry;
       if (uniformInfo.block) {
         entry.type = (uniformInfo.block.exp.$typeinfo as PBStructTypeInfo).clone(
           this.getBlockName(uniformInfo.block.name)
@@ -2444,7 +2448,7 @@ export class ProgramBuilder {
           type: isStorage ? (uniformInfo.block.exp.$readonly ? 'read-only-storage' : 'storage') : 'uniform',
           minBindingSize: uniformInfo.block.bindingSize,
           hasDynamicOffset: !!uniformInfo.block.bindingSize,
-          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout),
+          uniformLayout: entry.type.toBufferLayout(0, (entry.type as PBStructTypeInfo).layout)!,
           dynamicOffsetIndex: uniformInfo.block.bindingSize ? dynamicOffsetIndex[uniformInfo.group]++ : -1
         };
         entry.name = uniformInfo.block.name;
@@ -2454,7 +2458,7 @@ export class ProgramBuilder {
           throw new Error('internal error');
         }
         if (entry.type.isStorageTexture()) {
-          let viewDimension: typeof entry.texture.viewDimension;
+          let viewDimension: NonNullable<typeof entry.texture>['viewDimension'];
           if (entry.type.isArrayTexture()) {
             viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';
           } else if (entry.type.is3DTexture()) {
@@ -2469,7 +2473,7 @@ export class ProgramBuilder {
           entry.storageTexture = {
             access: 'write-only',
             viewDimension: viewDimension,
-            format: entry.type.storageTexelFormat
+            format: entry.type.storageTexelFormat!
           };
         } else if (entry.type.isExternalTexture()) {
           entry.externalTexture = {
@@ -2484,7 +2488,7 @@ export class ProgramBuilder {
               : uniformInfo.texture.autoBindSampler && entry.type.isDepthTexture()
                 ? 'float'
                 : uniformInfo.texture.exp.$sampleType;
-          let viewDimension: typeof entry.texture.viewDimension;
+          let viewDimension: NonNullable<typeof entry.texture>['viewDimension'];
           if (entry.type.isArrayTexture()) {
             viewDimension = entry.type.isCubeTexture() ? 'cube-array' : '2d-array';
           } else if (entry.type.is3DTexture()) {
@@ -2547,7 +2551,7 @@ export class ProgramBuilder {
   _getFunctionOverload(
     funcName: string,
     args: ExpValueNonArrayType[]
-  ): [AST.ASTFunction, AST.ASTExpression[]] {
+  ): Nullable<[AST.ASTFunction, AST.ASTExpression[]]> {
     const thisArgs = args.filter((val) => {
       if (val instanceof PBShaderExp) {
         const type = val.$ast.getType();
@@ -2568,15 +2572,15 @@ export class ProgramBuilder {
   _matchFunctionOverloading(
     overloadings: AST.ASTFunction[],
     args: ExpValueNonArrayType[]
-  ): [AST.ASTFunction, AST.ASTExpression[]] {
+  ): Nullable<[AST.ASTFunction, AST.ASTExpression[]]> {
     for (const overload of overloadings) {
-      if (args.length !== overload.funcType.argTypes.length) {
+      if (args.length !== overload.funcType!.argTypes.length) {
         continue;
       }
       const result: AST.ASTExpression[] = [];
       let matches = true;
       for (let i = 0; i < args.length; i++) {
-        const argInfo = overload.funcType.argTypes[i];
+        const argInfo = overload.funcType!.argTypes[i];
         const argType =
           argInfo.byRef && argInfo.type instanceof PBPointerTypeInfo
             ? argInfo.type.pointerType
@@ -2631,8 +2635,8 @@ export class ProgramBuilder {
     if (this.getCurrentScope() === this.getGlobalScope()) {
       throw new errors.PBNonScopedFunctionCall(funcName);
     }
-    const exp = new PBShaderExp('', func.returnType);
-    exp.$ast = new AST.ASTCallFunction(funcName, args, func, getCurrentProgramBuilder().getDevice().type);
+    const exp = new PBShaderExp('', func.returnType!);
+    exp.$ast = new AST.ASTCallFunction(funcName, args, func, getCurrentProgramBuilder()!.getDevice().type);
     this.getCurrentScope().$ast.statements.push(exp.$ast);
     return exp;
   }
@@ -2646,7 +2650,7 @@ export class ProgramBuilder {
       funcName,
       args,
       null,
-      getCurrentProgramBuilder().getDevice().type,
+      getCurrentProgramBuilder()!.getDevice().type,
       retType
     );
     this.getCurrentScope().$ast.statements.push(exp.$ast);
@@ -2662,14 +2666,14 @@ export class PBScope extends Proxiable<PBScope> {
   /** @internal */
   protected $_variables: Record<string, PBShaderExp>;
   /** @internal */
-  protected $_parentScope: PBScope;
+  protected $_parentScope: Nullable<PBScope>;
   /** @internal */
-  protected $_AST: AST.ASTScope;
+  protected $_AST: Nullable<AST.ASTScope>;
   /** @internal */
-  protected $_localScope: PBLocalScope;
+  protected $_localScope: Nullable<PBLocalScope>;
   [props: string]: any;
   /** @internal */
-  constructor(astScope: AST.ASTScope, parent?: PBScope) {
+  constructor(astScope: Nullable<AST.ASTScope>, parent?: Nullable<PBScope>) {
     super();
     this.$_parentScope = parent || null;
     this.$_variables = {};
@@ -2678,27 +2682,27 @@ export class PBScope extends Proxiable<PBScope> {
   }
   /** Get the program builder */
   get $builder(): ProgramBuilder {
-    return getCurrentProgramBuilder();
+    return getCurrentProgramBuilder()!;
   }
   /** Returns the scope of the builtin variables */
   get $builtins(): PBBuiltinScope {
-    return getCurrentProgramBuilder().builtinScope;
+    return getCurrentProgramBuilder()!.builtinScope;
   }
   /** Returns the scope of the input variables */
   get $inputs(): PBInputScope {
-    return getCurrentProgramBuilder().inputScope;
+    return getCurrentProgramBuilder()!.inputScope;
   }
   /** Returns the scope of the output variables */
   get $outputs(): PBOutputScope {
-    return getCurrentProgramBuilder().outputScope;
+    return getCurrentProgramBuilder()!.outputScope;
   }
   /** @internal */
-  get $parent(): PBScope {
+  get $parent(): Nullable<PBScope> {
     return this.$_parentScope;
   }
   /** @internal */
   get $ast(): AST.ASTScope {
-    return this.$_AST;
+    return this.$_AST!;
   }
   /** @internal */
   set $ast(ast: AST.ASTScope) {
@@ -2713,11 +2717,11 @@ export class PBScope extends Proxiable<PBScope> {
    * @param semantic - The vertex semantic
    * @returns The input vertex attribute or null if not exists
    */
-  $getVertexAttrib(semantic: VertexSemantic): PBShaderExp {
+  $getVertexAttrib(semantic: VertexSemantic): Nullable<PBShaderExp> {
     return this.$inputs.$getVertexAttrib(semantic); // getCurrentProgramBuilder().getReflection().attribute(semantic);
   }
   /** Get the current local scope */
-  get $l(): PBLocalScope {
+  get $l(): Nullable<PBLocalScope> {
     return this.$_getLocalScope();
   }
   /** Get the global scope */
@@ -2726,7 +2730,7 @@ export class PBScope extends Proxiable<PBScope> {
   }
   /** @internal */
   $local(variable: PBShaderExp, init?: ExpValueType): void {
-    const initNonArray = getCurrentProgramBuilder().normalizeExpValue(init);
+    const initNonArray = getCurrentProgramBuilder()!.normalizeExpValue(init!);
     variable.$global = this instanceof PBGlobalScope;
     this.$_declare(variable, initNonArray);
   }
@@ -2743,7 +2747,7 @@ export class PBScope extends Proxiable<PBScope> {
     return this.$builder.getReflection().tag(name);
   }
   /** @internal */
-  $_declareInternal(variable: PBShaderExp, init?: ExpValueNonArrayType): AST.ShaderAST {
+  $_declareInternal(variable: PBShaderExp, init?: Nullable<ExpValueNonArrayType>): AST.ShaderAST {
     const key = variable.$str;
     if (this.$_variables[key]) {
       throw new Error(`cannot re-declare variable '${key}'`);
@@ -2751,7 +2755,7 @@ export class PBScope extends Proxiable<PBScope> {
     if (!(variable.$ast instanceof AST.ASTPrimitive)) {
       throw new Error(
         `invalid variable declaration: '${variable.$ast.toString(
-          getCurrentProgramBuilder().getDevice().type
+          getCurrentProgramBuilder()!.getDevice().type
         )}'`
       );
     }
@@ -2794,7 +2798,7 @@ export class PBScope extends Proxiable<PBScope> {
   $_findOrSetUniform(variable: PBShaderExp): PBShaderExp {
     const name = variable.$str;
     const uniformInfo: UniformInfo = {
-      group: variable.$group,
+      group: variable.$group!,
       binding: 0,
       mask: 0
     };
@@ -2814,7 +2818,7 @@ export class PBScope extends Proxiable<PBScope> {
       // throw new Error(`unsupported uniform type: ${name}`);
     }
     let found = false;
-    for (const u of getCurrentProgramBuilder()._uniforms) {
+    for (const u of getCurrentProgramBuilder()!._uniforms) {
       if (u.group !== uniformInfo.group) {
         continue;
       }
@@ -2824,7 +2828,7 @@ export class PBScope extends Proxiable<PBScope> {
         u.block.name === uniformInfo.block.name &&
         u.block.exp.$typeinfo.isCompatibleType(uniformInfo.block.exp.$typeinfo)
       ) {
-        u.mask |= getCurrentProgramBuilder().shaderType;
+        u.mask |= getCurrentProgramBuilder()!.shaderType;
         variable = u.block.exp;
         // u.block.exp = variable;
         found = true;
@@ -2836,7 +2840,7 @@ export class PBScope extends Proxiable<PBScope> {
         uniformInfo.texture.exp.$str === u.texture.exp.$str &&
         uniformInfo.texture.exp.$typeinfo.isCompatibleType(u.texture.exp.$typeinfo)
       ) {
-        u.mask |= getCurrentProgramBuilder().shaderType;
+        u.mask |= getCurrentProgramBuilder()!.shaderType;
         variable = u.texture.exp;
         // u.texture.exp = variable;
         found = true;
@@ -2848,7 +2852,7 @@ export class PBScope extends Proxiable<PBScope> {
         uniformInfo.sampler.$str === u.sampler.$str &&
         uniformInfo.sampler.$typeinfo.isCompatibleType(u.sampler.$typeinfo)
       ) {
-        u.mask |= getCurrentProgramBuilder().shaderType;
+        u.mask |= getCurrentProgramBuilder()!.shaderType;
         variable = u.sampler;
         // u.sampler = variable;
         found = true;
@@ -2856,18 +2860,18 @@ export class PBScope extends Proxiable<PBScope> {
       }
     }
     if (!found) {
-      uniformInfo.mask = getCurrentProgramBuilder().shaderType;
-      getCurrentProgramBuilder()._uniforms.push(uniformInfo);
+      uniformInfo.mask = getCurrentProgramBuilder()!.shaderType;
+      getCurrentProgramBuilder()!._uniforms.push(uniformInfo);
     }
     if (
       uniformInfo.texture &&
       !(uniformInfo.texture.exp.$typeinfo as PBTextureTypeInfo).isStorageTexture() &&
-      getCurrentProgramBuilder().getDevice().type === 'webgpu'
+      getCurrentProgramBuilder()!.getDevice().type === 'webgpu'
     ) {
       // webgpu requires explicit sampler bindings
       const isDepth = variable.$typeinfo.isTextureType() && variable.$typeinfo.isDepthTexture();
       const samplerName = AST.genSamplerName(variable.$str, false);
-      const samplerExp = getCurrentProgramBuilder()
+      const samplerExp = getCurrentProgramBuilder()!
         .sampler(samplerName)
         .uniform(uniformInfo.group)
         .sampleType(variable.$sampleType);
@@ -2875,7 +2879,7 @@ export class PBScope extends Proxiable<PBScope> {
       this.$local(samplerExp);
       if (isDepth) {
         const samplerNameComp = AST.genSamplerName(variable.$str, true);
-        const samplerExpComp = getCurrentProgramBuilder()
+        const samplerExpComp = getCurrentProgramBuilder()!
           .samplerComparison(samplerNameComp)
           .uniform(uniformInfo.group)
           .sampleType(variable.$sampleType);
@@ -2885,7 +2889,7 @@ export class PBScope extends Proxiable<PBScope> {
     return variable;
   }
   /** @internal */
-  $_declare(variable: PBShaderExp, init?: ExpValueNonArrayType): void {
+  $_declare(variable: PBShaderExp, init?: Nullable<ExpValueNonArrayType>): void {
     if (this.$_variables[variable.$str]) {
       throw new errors.PBASTError(variable.$ast, 'cannot re-declare variable');
     }
@@ -2906,41 +2910,27 @@ export class PBScope extends Proxiable<PBScope> {
         throw new errors.PBASTError(
           variable.$ast,
           `type '${variable.$typeinfo.toTypeName(
-            getCurrentProgramBuilder().getDevice().type
+            getCurrentProgramBuilder()!.getDevice().type
           )}' cannot be declared in uniform address space`
         );
       }
       if (variable.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE) {
-        if (getCurrentProgramBuilder().getDevice().type !== 'webgpu') {
+        if (getCurrentProgramBuilder()!.getDevice().type !== 'webgpu') {
           throw new errors.PBDeviceNotSupport('storage buffer binding');
         } else if (!variable.$typeinfo.isHostSharable()) {
           throw new errors.PBASTError(
             variable.$ast,
             `type '${variable.$typeinfo.toTypeName(
-              getCurrentProgramBuilder().getDevice().type
+              getCurrentProgramBuilder()!.getDevice().type
             )}' cannot be declared in storage address space`
           );
         }
       }
-      const originalType: PBPrimitiveTypeInfo | PBArrayTypeInfo = null;
-      /*
-      if (
-        variable.$declareType === AST.DeclareType.DECLARE_TYPE_STORAGE &&
-        (variable.$typeinfo.isPrimitiveType() || variable.$typeinfo.isArrayType() || variable.$typeinfo.isAtomicI32() || variable.$typeinfo.isAtomicU32())
-      ) {
-        originalType = variable.$typeinfo as PBPrimitiveTypeInfo | PBArrayTypeInfo;
-        const wrappedStruct = getCurrentProgramBuilder().defineStruct(null, new PBShaderExp('value', originalType));
-        variable.$typeinfo = wrappedStruct().$typeinfo;
-      }
-      */
       variable = this.$_findOrSetUniform(variable);
       const ast = this.$_declareInternal(variable) as AST.ASTDeclareVar;
-      if (originalType) {
-        variable.$ast = new AST.ASTHash(variable.$ast, 'value', originalType);
-      }
-      ast.group = variable.$group;
+      ast.group = variable.$group!;
       ast.binding = 0;
-      ast.blockName = getCurrentProgramBuilder().getBlockName(name);
+      ast.blockName = getCurrentProgramBuilder()!.getBlockName(name);
       const type = variable.$typeinfo;
       if (
         (type.isStructType() && variable.$isBuffer) ||
@@ -2951,7 +2941,7 @@ export class PBScope extends Proxiable<PBScope> {
         (this.$ast as AST.ASTGlobalScope).uniforms.push(ast);
       }
       variable.$tags.forEach((val) => {
-        getCurrentProgramBuilder().tagShaderExp(() => variable, val);
+        getCurrentProgramBuilder()!.tagShaderExp(() => variable, val);
       });
     } else {
       const ast = this.$_declareInternal(variable, init);
@@ -2967,7 +2957,7 @@ export class PBScope extends Proxiable<PBScope> {
         return variable;
       },
       set: function (this: PBScope, val: number | PBShaderExp) {
-        getCurrentProgramBuilder()
+        getCurrentProgramBuilder()!
           .getCurrentScope()
           .$ast.statements.push(
             new AST.ASTAssignment(
@@ -3006,7 +2996,7 @@ export class PBScope extends Proxiable<PBScope> {
       this[prop] = value;
       return true;
     } else {
-      let scope: PBScope = this;
+      let scope: Nullable<PBScope> = this;
       while (scope && !(prop in scope)) {
         scope = scope.$_parentScope;
       }
@@ -3023,7 +3013,7 @@ export class PBScope extends Proxiable<PBScope> {
     return false;
   }
   /** @internal */
-  protected $_getLocalScope(): PBLocalScope {
+  protected $_getLocalScope(): Nullable<PBLocalScope> {
     if (!this.$_localScope) {
       this.$_localScope = new PBLocalScope(this);
     }
@@ -3071,7 +3061,7 @@ export class PBLocalScope extends PBScope {
     }
     const val = this.$_scope.$localGet(prop);
     if (val === undefined) {
-      const type = getCurrentProgramBuilder().guessExpValueType(value);
+      const type = getCurrentProgramBuilder()!.guessExpValueType(value);
       if (type.isCompatibleType(typeVoid)) {
         throw new Error(`Cannot assign void type to '${prop}'`);
       }
@@ -3081,7 +3071,7 @@ export class PBLocalScope extends PBScope {
         exp.$isBuffer = value.$isBuffer;
         exp.$bindingSize = value.$bindingSize;
         exp.$readonly = value.$readonly;
-        exp.$group = value.$group;
+        exp.$group = value.$group!;
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;
         exp.$precision = value.$precision;
@@ -3094,7 +3084,7 @@ export class PBLocalScope extends PBScope {
     }
   }
   /** @internal */
-  $_getLocalScope(): PBLocalScope {
+  $_getLocalScope(): Nullable<PBLocalScope> {
     return this;
   }
 }
@@ -3128,20 +3118,20 @@ export class PBBuiltinScope extends PBScope {
   /** @internal */
   $_usedBuiltins: Set<string>;
   /** @internal */
-  $_builtinVars: Record<string, PBShaderExp>;
+  $_builtinVars!: Record<string, PBShaderExp>;
   constructor() {
     super(null);
     this.$_usedBuiltins = new Set();
-    const isWebGPU = getCurrentProgramBuilder().getDevice().type === 'webgpu';
+    const isWebGPU = getCurrentProgramBuilder()!.getDevice().type === 'webgpu';
     if (!isWebGPU) {
       this.$_builtinVars = {};
-      const v = AST.builtinVariables[getCurrentProgramBuilder().getDevice().type];
+      const v = AST.builtinVariables[getCurrentProgramBuilder()!.getDevice().type];
       for (const k in v) {
         const info = v[k];
         this.$_builtinVars[k] = new PBShaderExp(info.name, info.type);
       }
     }
-    const v = AST.builtinVariables[getCurrentProgramBuilder().getDevice().type];
+    const v = AST.builtinVariables[getCurrentProgramBuilder()!.getDevice().type];
     const that = this;
     for (const k of Object.keys(v)) {
       Object.defineProperty(this, k, {
@@ -3153,7 +3143,7 @@ export class PBBuiltinScope extends PBScope {
             throw new Error(`Invalid output value assignment`);
           }
           const exp = that.$getBuiltinVar(k);
-          getCurrentProgramBuilder()
+          getCurrentProgramBuilder()!
             .getCurrentScope()
             .$ast.statements.push(
               new AST.ASTAssignment(new AST.ASTLValueScalar(exp.$ast), v instanceof PBShaderExp ? v.$ast : v)
@@ -3163,12 +3153,12 @@ export class PBBuiltinScope extends PBScope {
     }
   }
   /** @internal */
-  protected $_getLocalScope(): PBLocalScope {
+  protected $_getLocalScope(): Nullable<PBLocalScope> {
     return null;
   }
   /** @internal */
   private $getBuiltinVar(name: string) {
-    const pb = getCurrentProgramBuilder();
+    const pb = getCurrentProgramBuilder()!;
     this.$_usedBuiltins.add(name);
     const isWebGPU = pb.getDevice().type === 'webgpu';
     if (isWebGPU) {
@@ -3212,12 +3202,12 @@ export class PBInputScope extends PBScope {
     this.$_aliases = {};
   }
   /** @internal */
-  $getVertexAttrib(attrib: VertexSemantic): PBShaderExp {
+  $getVertexAttrib(attrib: VertexSemantic): Nullable<PBShaderExp> {
     const name = this.$_names[attrib];
     return name ? this[name] : null;
   }
   /** @internal */
-  protected $_getLocalScope(): PBLocalScope {
+  protected $_getLocalScope(): Nullable<PBLocalScope> {
     return null;
   }
   /** @internal */
@@ -3248,7 +3238,7 @@ export class PBInputScope extends PBScope {
       if (!(value instanceof PBShaderExp)) {
         throw new Error(`invalid vertex input value`);
       }
-      const st = getCurrentProgramBuilder().shaderType;
+      const st = getCurrentProgramBuilder()!.shaderType;
       if (st !== ShaderType.Vertex) {
         throw new Error(`shader input variables can only be declared in vertex shader: "${prop}"`);
       }
@@ -3256,8 +3246,8 @@ export class PBInputScope extends PBScope {
       if (attrib === undefined) {
         throw new Error(`can not declare shader input variable: invalid vertex attribute: "${prop}"`);
       }
-      if (getCurrentProgramBuilder()._vertexAttributes.indexOf(attrib) >= 0) {
-        const lastName = this.$_names[value.$attrib];
+      if (getCurrentProgramBuilder()!._vertexAttributes.indexOf(attrib) >= 0) {
+        const lastName = this.$_names[value.$attrib!];
         if (prop !== lastName) {
           const p = this[lastName] as PBShaderExp;
           if (p.$typeinfo.typeId !== value.$typeinfo.typeId) {
@@ -3276,16 +3266,16 @@ export class PBInputScope extends PBScope {
       if (!type.isPrimitiveType() || type.isMatrixType() || type.primitiveType === PBPrimitiveType.BOOL) {
         throw new Error(`type cannot be used as pipeline input/output: ${prop}`);
       }
-      this.$_names[value.$attrib] = prop;
-      const location = getCurrentProgramBuilder()._inputs.length;
+      this.$_names[value.$attrib!] = prop;
+      const location = getCurrentProgramBuilder()!._inputs.length;
       const exp = new PBShaderExp(`${input_prefix}${prop}`, type).tag(...value.$tags);
-      getCurrentProgramBuilder().in(location, prop, exp);
-      getCurrentProgramBuilder()._vertexAttributes.push(attrib);
+      getCurrentProgramBuilder()!.in(location, prop, exp);
+      getCurrentProgramBuilder()!._vertexAttributes.push(attrib);
       //getCurrentProgramBuilder().getReflection().setAttrib(value.$attrib, exp);
       // modify input struct for webgpu
-      if (getCurrentProgramBuilder().getDevice().type === 'webgpu') {
-        if (getCurrentProgramBuilder().findStructType(AST.getBuiltinInputStructName(st), st)) {
-          getCurrentProgramBuilder().defineBuiltinStruct(st, 'in');
+      if (getCurrentProgramBuilder()!.getDevice().type === 'webgpu') {
+        if (getCurrentProgramBuilder()!.findStructType(AST.getBuiltinInputStructName(st), st)) {
+          getCurrentProgramBuilder()!.defineBuiltinStruct(st, 'in');
         }
       }
     }
@@ -3302,7 +3292,7 @@ export class PBOutputScope extends PBScope {
     super(null);
   }
   /** @internal */
-  protected $_getLocalScope(): PBLocalScope {
+  protected $_getLocalScope(): Nullable<PBLocalScope> {
     return null;
   }
   /** @internal */
@@ -3310,7 +3300,7 @@ export class PBOutputScope extends PBScope {
     if (prop[0] === '$' /* || prop in this*/) {
       this[prop] = value;
     } else {
-      const pb = getCurrentProgramBuilder();
+      const pb = getCurrentProgramBuilder()!;
       if (!(prop in this)) {
         if (
           pb.getCurrentScope() === pb.getGlobalScope() &&
@@ -3332,14 +3322,14 @@ export class PBOutputScope extends PBScope {
           ).tag(...value.$tags)
         );
         // modify output struct for webgpu
-        if (getCurrentProgramBuilder().getDevice().type === 'webgpu') {
-          const st = getCurrentProgramBuilder().shaderType;
-          if (getCurrentProgramBuilder().findStructType(AST.getBuiltinInputStructName(st), st)) {
-            getCurrentProgramBuilder().defineBuiltinStruct(st, 'out');
+        if (pb.getDevice().type === 'webgpu') {
+          const st = pb.shaderType;
+          if (pb.findStructType(AST.getBuiltinInputStructName(st), st)) {
+            pb.defineBuiltinStruct(st, 'out');
           }
         }
       }
-      if (getCurrentProgramBuilder().getCurrentScope() !== getCurrentProgramBuilder().getGlobalScope()) {
+      if (pb.getCurrentScope() !== pb.getGlobalScope()) {
         const ast = value.$ast;
         if (!(ast instanceof AST.ASTShaderExpConstructor) || ast.args.length > 0) {
           this[prop] = value;
@@ -3356,14 +3346,14 @@ export class PBOutputScope extends PBScope {
  */
 export class PBGlobalScope extends PBScope {
   /** @internal */
-  $_inputStructInfo: [ShaderTypeFunc, PBShaderExp, string, PBShaderExp];
+  $_inputStructInfo: Nullable<[ShaderTypeFunc, PBShaderExp, string, PBShaderExp]>;
   /** @internal */
   constructor() {
     super(new AST.ASTGlobalScope());
     this.$_inputStructInfo = null;
   }
   /** @internal */
-  get $inputStructInfo(): [ShaderTypeFunc, PBShaderExp, string, PBShaderExp] {
+  get $inputStructInfo(): Nullable<[ShaderTypeFunc, PBShaderExp, string, PBShaderExp]> {
     if (!this.$_inputStructInfo) {
       this.$_inputStructInfo = this.$builder.defineBuiltinStruct(this.$builder.shaderType, 'in');
     }
@@ -3371,11 +3361,11 @@ export class PBGlobalScope extends PBScope {
   }
   /** @internal */
   get $inputStruct(): ShaderTypeFunc {
-    return this.$inputStructInfo[0];
+    return this.$inputStructInfo![0];
   }
   /** @internal */
   $mainFunc(body?: (this: PBFunctionScope) => void) {
-    const pb = getCurrentProgramBuilder();
+    const pb = getCurrentProgramBuilder()!;
     if (pb.getDevice().type === 'webgpu') {
       const inputStruct = this.$inputStructInfo;
       //this.$local(inputStruct[1]);
@@ -3416,7 +3406,7 @@ export class PBGlobalScope extends PBScope {
           }
 
           if (!isCompute) {
-            this.$return(outputStruct[1]);
+            this.$return(outputStruct![1]);
           }
         }
       );
@@ -3446,9 +3436,9 @@ export class PBGlobalScope extends PBScope {
   }
   /** @internal */
   $getCurrentFunctionScope(): PBScope {
-    let scope = getCurrentProgramBuilder().getCurrentScope();
+    let scope = getCurrentProgramBuilder()!.getCurrentScope();
     while (scope && !(scope instanceof PBFunctionScope)) {
-      scope = scope.$parent;
+      scope = scope.$parent!;
     }
     return scope;
   }
@@ -3460,7 +3450,7 @@ export class PBGlobalScope extends PBScope {
     isMain: boolean,
     body?: (this: PBFunctionScope) => void
   ) {
-    const pb = getCurrentProgramBuilder();
+    const pb = getCurrentProgramBuilder()!;
     if (pb.getDevice().type === 'webgpu' && !isMain) {
       params.push(this.$inputStruct(AST.getBuiltinParamName(pb.shaderType)));
     }
@@ -3470,7 +3460,7 @@ export class PBGlobalScope extends PBScope {
       }
       let ast: AST.ASTPrimitive | AST.ASTReferenceOf = param.$ast;
       if (param.$inout) {
-        if (getCurrentProgramBuilder().getDevice().type === 'webgpu') {
+        if (pb.getDevice().type === 'webgpu') {
           param.$typeinfo = new PBPointerTypeInfo(param.$typeinfo, PBAddressSpace.UNKNOWN);
         }
         ast = new AST.ASTReferenceOf(param.$ast);
@@ -3517,8 +3507,8 @@ export class PBGlobalScope extends PBScope {
       })
     );
     for (const overload of overloads) {
-      if (overload.funcType.argHash === astFunc.funcType.argHash) {
-        if (overload.returnType.isCompatibleType(astFunc.returnType)) {
+      if (overload.funcType!.argHash === astFunc.funcType.argHash) {
+        if (overload.returnType!.isCompatibleType(astFunc.returnType)) {
           // Function signature already exists
           // console.warn(`Function '${name}' already exists`);
           this.$ast.statements.splice(this.$ast.statements.indexOf(astFunc), 1);
@@ -3536,19 +3526,19 @@ export class PBGlobalScope extends PBScope {
             throw new Error(`function ${name} not found`);
           }
           return (...args: ExpValueType[]) => {
-            let inputArg: PBShaderExp = null;
+            let inputArg: Nullable<PBShaderExp> = null;
             if (pb.getDevice().type === 'webgpu') {
               let funcScope = pb.getCurrentScope();
               while (funcScope && !(funcScope instanceof PBFunctionScope)) {
-                funcScope = funcScope.$parent;
+                funcScope = funcScope.$parent!;
               }
               const funcArgs = (funcScope.$ast as AST.ASTFunction).args;
-              const arg = funcArgs[funcArgs.length - 1].paramAST;
+              const arg = funcArgs![funcArgs!.length - 1].paramAST;
               const name = (arg as AST.ASTPrimitive).name;
               inputArg = funcScope[name];
             }
-            const argsNonArray = (inputArg ? [...args, inputArg] : args).map((val) =>
-              pb.normalizeExpValue(val)
+            const argsNonArray = (inputArg ? [...args, inputArg] : args).map(
+              (val) => pb.normalizeExpValue(val)!
             );
             const funcType = pb._getFunctionOverload(name, argsNonArray);
             if (!funcType) {
@@ -3564,7 +3554,7 @@ export class PBGlobalScope extends PBScope {
                   .join(', ')})`
               );
             }
-            return getCurrentProgramBuilder().$callFunction(name, funcType[1], funcType[0]);
+            return getCurrentProgramBuilder()!.$callFunction(name, funcType[1], funcType[0]);
           };
         }
       });
@@ -3587,9 +3577,9 @@ export class PBInsideFunctionScope extends PBScope {
    */
   $return(retval?: ExpValueType) {
     const functionScope = this.findOwnerFunction();
-    const astFunc = functionScope.$ast as AST.ASTFunction;
-    let returnType: PBTypeInfo = null;
-    const retValNonArray = getCurrentProgramBuilder().normalizeExpValue(retval);
+    const astFunc = functionScope!.$ast as AST.ASTFunction;
+    let returnType: Nullable<PBTypeInfo> = null;
+    const retValNonArray = getCurrentProgramBuilder()!.normalizeExpValue(retval!);
     if (retValNonArray !== undefined && retValNonArray !== null) {
       if (typeof retValNonArray === 'number') {
         if (astFunc.returnType) {
@@ -3634,11 +3624,11 @@ export class PBInsideFunctionScope extends PBScope {
     } else if (!astFunc.returnType.isCompatibleType(returnType)) {
       throw new Error(
         `function ${astFunc.name}: return type must be ${
-          astFunc.returnType?.toTypeName(getCurrentProgramBuilder().getDevice().type) || 'void'
+          astFunc.returnType?.toTypeName(getCurrentProgramBuilder()!.getDevice().type) || 'void'
         }`
       );
     }
-    let returnValue: AST.ASTExpression = null;
+    let returnValue: Nullable<AST.ASTExpression> = null;
     if (retValNonArray !== undefined && retValNonArray !== null) {
       if (retValNonArray instanceof PBShaderExp) {
         returnValue = retValNonArray.$ast;
@@ -3649,7 +3639,7 @@ export class PBInsideFunctionScope extends PBScope {
         returnValue = new AST.ASTScalar(retValNonArray, returnType);
       }
     }
-    this.$ast.statements.push(new AST.ASTReturn(returnValue));
+    this.$ast.statements.push(new AST.ASTReturn(returnValue!));
   }
   /**
    * Creates a new scope
@@ -3776,8 +3766,8 @@ export class PBInsideFunctionScope extends PBScope {
     new PBWhileScope(this, astWhile, body);
   }
   /** @internal */
-  private findOwnerFunction(): PBFunctionScope {
-    for (let scope: PBScope = this; scope; scope = scope.$parent) {
+  private findOwnerFunction(): Nullable<PBFunctionScope> {
+    for (let scope: PBScope = this; scope; scope = scope.$parent!) {
       if (scope instanceof PBFunctionScope) {
         return scope;
       }
@@ -3785,8 +3775,8 @@ export class PBInsideFunctionScope extends PBScope {
     return null;
   }
   /** Gets main function scope */
-  $getMainScope(): PBFunctionScope {
-    for (let scope: PBScope = this; scope; scope = scope.$parent) {
+  $getMainScope(): Nullable<PBFunctionScope> {
+    for (let scope: PBScope = this; scope; scope = scope.$parent!) {
       if (scope instanceof PBFunctionScope && scope.$isMain()) {
         return scope;
       }
@@ -3801,7 +3791,7 @@ export class PBInsideFunctionScope extends PBScope {
  */
 export class PBFunctionScope extends PBInsideFunctionScope {
   /** @internal */
-  $typeinfo: PBFunctionTypeInfo;
+  $typeinfo!: PBFunctionTypeInfo;
   /** @internal */
   constructor(
     parent: PBGlobalScope,
@@ -3817,9 +3807,9 @@ export class PBFunctionScope extends PBInsideFunctionScope {
       }
       this.$_registerVar(param);
     }
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
   $isMain(): boolean {
     return (this.$ast as AST.ASTFunction).isMainFunc;
@@ -3835,9 +3825,9 @@ export class PBWhileScope extends PBInsideFunctionScope {
   constructor(parent: PBInsideFunctionScope, ast: AST.ASTScope, body: (this: PBWhileScope) => void) {
     super(parent);
     this.$ast = ast;
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
 }
 
@@ -3850,9 +3840,9 @@ export class PBDoWhileScope extends PBInsideFunctionScope {
   constructor(parent: PBInsideFunctionScope, ast: AST.ASTScope, body: (this: PBDoWhileScope) => void) {
     super(parent);
     this.$ast = ast;
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
   $while(condition: ExpValueNonArrayType) {
     (this.$ast as AST.ASTDoWhile).condition =
@@ -3873,14 +3863,14 @@ export class PBForScope extends PBInsideFunctionScope {
     counter: PBShaderExp,
     count: number | PBShaderExp,
     ast: AST.ASTScope,
-    body: (this: PBForScope) => void
+    body?: (this: PBForScope) => void
   ) {
     super(parent);
     this.$ast = ast;
     this.$_registerVar(counter);
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
 }
 
@@ -3893,9 +3883,9 @@ export class PBNakedScope extends PBInsideFunctionScope {
   constructor(parent: PBInsideFunctionScope, ast: AST.ASTScope, body: (this: PBNakedScope) => void) {
     super(parent);
     this.$ast = ast;
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
 }
 
@@ -3908,9 +3898,9 @@ export class PBIfScope extends PBInsideFunctionScope {
   constructor(parent: PBInsideFunctionScope, ast: AST.ASTScope, body: (this: PBIfScope) => void) {
     super(parent);
     this.$ast = ast;
-    getCurrentProgramBuilder().pushScope(this);
+    getCurrentProgramBuilder()!.pushScope(this);
     body?.call(this);
-    getCurrentProgramBuilder().popScope();
+    getCurrentProgramBuilder()!.popScope();
   }
   /**
    * Creates an 'else if' branch

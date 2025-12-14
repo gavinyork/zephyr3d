@@ -24,7 +24,8 @@ export class CPUTimer implements ITimer {
   private _ended: boolean;
   constructor() {
     this._cpuTimer = window.performance || window.Date;
-    this._cpuTime = null;
+    this._cpuStart = 0;
+    this._cpuTime = 0;
     this._ended = false;
   }
   now(): number {
@@ -32,7 +33,7 @@ export class CPUTimer implements ITimer {
   }
   begin(): void {
     this._cpuStart = this.now();
-    this._cpuTime = null;
+    this._cpuTime = 0;
     this._ended = false;
   }
   end(): void {

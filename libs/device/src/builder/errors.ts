@@ -1,6 +1,7 @@
 import type { ExpValueType } from './programbuilder';
 import type { PBTypeInfo } from './types';
 import type { ShaderAST } from './ast';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export function expValueToString(deviceType: string, value: ExpValueType): string {
@@ -75,7 +76,7 @@ export class PBParamLengthError extends PBError {
 /** @internal */
 export class PBParamTypeError extends PBError {
   func: string;
-  param: string;
+  param: Nullable<string>;
   constructor(func: string, param?: string) {
     super();
     this.func = func;
@@ -89,13 +90,13 @@ export class PBParamTypeError extends PBError {
 /** @internal */
 export class PBParamValueError extends PBError {
   func: string;
-  param: string;
-  reason: string;
+  param: Nullable<string>;
+  reason: Nullable<string>;
   constructor(func: string, param?: string, reason?: string) {
     super();
     this.func = func;
-    this.param = param || null;
-    this.reason = reason || null;
+    this.param = param ?? null;
+    this.reason = reason ?? null;
   }
   getMessage(_deviceType: string): string {
     return `invalid parameter value for function '${this.func}'${this.param ? ': ' + this.param : ''}${

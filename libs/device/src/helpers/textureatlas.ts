@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { RectsPacker } from '@zephyr3d/base';
 import type { AbstractDevice } from '../base_types';
 import type { BaseTexture, Texture2D } from '../gpuobject';
@@ -42,7 +43,7 @@ export class TextureAtlasManager {
   /** @internal */
   protected _atlasInfoMap: Record<string, AtlasInfo>;
   /** @internal */
-  protected _atlasRestoreHandler: (tex: BaseTexture) => void;
+  protected _atlasRestoreHandler: Nullable<(tex: BaseTexture) => void>;
   /**
    * Creates a new texture atlas manager instance
    * @param device - The render device
@@ -72,10 +73,10 @@ export class TextureAtlasManager {
    * The texture restore handler callback function
    * This callback function will be called whenever the device has been restored
    */
-  get atlasTextureRestoreHandler(): (tex: BaseTexture) => void {
+  get atlasTextureRestoreHandler(): Nullable<(tex: BaseTexture) => void> {
     return this._atlasRestoreHandler;
   }
-  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void) {
+  set atlasTextureRestoreHandler(f: Nullable<(tex: BaseTexture) => void>) {
     this._atlasRestoreHandler = f;
   }
   /**
@@ -91,7 +92,7 @@ export class TextureAtlasManager {
    * @param key - Key of the atlas
    * @returns Information of the atlas
    */
-  getAtlasInfo(key: string): AtlasInfo {
+  getAtlasInfo(key: string): Nullable<AtlasInfo> {
     return this._atlasInfoMap[key] || null;
   }
   /**
@@ -129,7 +130,7 @@ export class TextureAtlasManager {
     y: number,
     w: number,
     h: number
-  ): AtlasInfo {
+  ): Nullable<AtlasInfo> {
     const rc = this._packer.insert(w + 2 * this._rectBorderWidth, h + 2 * this._rectBorderWidth);
     if (rc) {
       const atlasX = rc.x + this._rectBorderWidth;
@@ -155,7 +156,7 @@ export class TextureAtlasManager {
    * @param bitmap - The bitmap object
    * @returns The atals info or null if insert failed
    */
-  pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo {
+  pushBitmap(key: string, bitmap: ImageData | ImageBitmap): Nullable<AtlasInfo> {
     const rc = this._packer.insert(
       bitmap.width + 2 * this._rectBorderWidth,
       bitmap.height + 2 * this._rectBorderWidth
@@ -201,7 +202,7 @@ export class TextureAtlasManager {
     xOffset: number,
     yOffset: number
   ): void {
-    let textureAtlas: Texture2D = null;
+    let textureAtlas: Texture2D;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
       this._atlasList.push(textureAtlas);
@@ -217,7 +218,7 @@ export class TextureAtlasManager {
     x: number,
     y: number
   ): void {
-    let textureAtlas: Texture2D = null;
+    let textureAtlas: Texture2D;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
       this._atlasList.push(textureAtlas);

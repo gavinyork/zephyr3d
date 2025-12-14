@@ -1,14 +1,16 @@
+import type { Nullable } from '@zephyr3d/base';
+
 /** @internal */
 export class FontCanvas {
-  private static _canvas: HTMLCanvasElement = null;
-  private static _context: CanvasRenderingContext2D = null;
+  private static _canvas: Nullable<HTMLCanvasElement> = null;
+  private static _context: Nullable<CanvasRenderingContext2D> = null;
   static get canvas(): HTMLCanvasElement {
     this._realize();
-    return this._canvas;
+    return this._canvas!;
   }
   static get context(): CanvasRenderingContext2D {
     this._realize();
-    return this._context;
+    return this._context!;
   }
   static get font(): string {
     return this.context.font;
@@ -26,7 +28,7 @@ export class FontCanvas {
       //document.body.appendChild(this._canvas);
       this._context = this._canvas.getContext('2d', {
         willReadFrequently: true
-      });
+      })!;
       this._context.textBaseline = 'top';
       this._context.textAlign = 'left';
       this._context.fillStyle = 'transparent';
@@ -52,7 +54,7 @@ export class Font {
   /** @internal */
   private _name: string;
   /** @internal */
-  private _nameScaled: string;
+  private _nameScaled: Nullable<string>;
   /** @internal */
   private readonly _scale: number;
   /** @internal */
@@ -118,7 +120,7 @@ export class Font {
   }
   /** Gets the scaled font name */
   get fontNameScaled(): string {
-    return this._nameScaled;
+    return this._nameScaled!;
   }
   /** Gets the font size */
   get size(): number {

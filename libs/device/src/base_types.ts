@@ -1,4 +1,4 @@
-import type { TypedArray, Vector4, IEventTarget } from '@zephyr3d/base';
+import type { TypedArray, Vector4, IEventTarget, Nullable } from '@zephyr3d/base';
 import { floatToHalf } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
 import type {
@@ -1940,7 +1940,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
     case 'rgba32i':
       return new Int32Array([r | 0, g | 0, b | 0, a | 0]);
     default:
-      return null;
+      throw new Error(`Invalid texture format: ${format}`);
   }
 }
 
@@ -2385,7 +2385,7 @@ export type DeviceViewport = {
  */
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get pool object */
-  pool: Pool;
+  pool: Nullable<Pool>;
   /** vSync */
   vSync: boolean;
   /** Check if a pool with given key exists */
@@ -2651,8 +2651,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createFrameBuffer(
     colorAttachments: BaseTexture[],
-    depthAttachment: BaseTexture,
-    options?: FrameBufferOptions
+    depthAttachment: Nullable<BaseTexture>,
+    options?: Nullable<FrameBufferOptions>
   ): FrameBuffer;
   /**
    * Set viewport from an array that contains the position and size
@@ -2794,7 +2794,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get the program builder */
   programBuilder: ProgramBuilder;
   /** Get the run loop callback function */
-  runLoopFunction: (device: AbstractDevice) => void;
+  runLoopFunction: Nullable<(device: AbstractDevice) => void>;
   /**
    * Begins a frame for rendering
    *
@@ -2820,7 +2820,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     semantic: VertexSemantic,
     dataType: DataType,
     componentCount: number
-  ): VertexAttribFormat;
+  ): Nullable<VertexAttribFormat>;
   /**
    * Creates an interleaved vertex buffer
    *
@@ -2833,7 +2833,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     attribFormats: VertexAttribFormat[],
     data: TypedArray,
     options?: BufferCreationOptions
-  ): StructuredBuffer;
+  ): Nullable<StructuredBuffer>;
   /**
    * Creates a non-interleaved vertex buffer
    *
@@ -2846,7 +2846,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     attribFormat: VertexAttribFormat,
     data: TypedArray,
     options?: BufferCreationOptions
-  ): StructuredBuffer;
+  ): Nullable<StructuredBuffer>;
   /**
    * Draw primitives
    *
@@ -2899,7 +2899,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @param uid - id of the GPU object
    */
-  getGPUObjectById(uid: number): GPUObject;
+  getGPUObjectById(uid: number): Nullable<GPUObject>;
   /**
    * Calculates the actual position of current frame buffer from screen position in X axis.
    *
@@ -2937,9 +2937,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   deviceYToScreen(val: number): number;
   /** Builds render program */
-  buildRenderProgram(options: PBRenderOptions): GPUProgram;
+  buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram>;
   /** Builds compute program */
-  buildComputeProgram(options: PBComputeOptions): GPUProgram;
+  buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram>;
   /** Pushes current FrameBuffer state */
   pushDeviceStates();
   /** Pops last FrameBuffer state */

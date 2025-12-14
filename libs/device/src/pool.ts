@@ -1,4 +1,4 @@
-import type { MaybeArray } from '@zephyr3d/base';
+import type { Nullable, MaybeArray } from '@zephyr3d/base';
 import type { AbstractDevice, TextureFormat } from './base_types';
 import type { BaseTexture, FrameBuffer, Texture2D, Texture2DArray, TextureCube } from './gpuobject';
 
@@ -86,15 +86,15 @@ export class Pool {
     mipmapping = false
   ): Texture2D {
     const hash = `2d:${format}:${width}:${height}:${mipmapping ? 1 : 0}`;
-    let texture: BaseTexture = null;
+    let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createTexture2D(format, width, height, { mipmapping });
       this._memCost += texture.memCost;
     } else {
-      texture = list.pop();
+      texture = list.pop()!;
       if (list.length === 0) {
-        this._freeTextures[hash] = undefined;
+        delete this._freeTextures[hash];
       }
     }
     this._allocatedTextures.set(texture, { hash, refcount: 1, dispose: false });
@@ -122,15 +122,15 @@ export class Pool {
     mipmapping = false
   ): Texture2DArray {
     const hash = `2darray:${format}:${width}:${height}:${numLayers}:${mipmapping ? 1 : 0}`;
-    let texture: BaseTexture = null;
+    let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createTexture2DArray(format, width, height, numLayers, { mipmapping });
       this._memCost += texture.memCost;
     } else {
-      texture = list.pop();
+      texture = list.pop()!;
       if (list.length === 0) {
-        this._freeTextures[hash] = undefined;
+        delete this._freeTextures[hash];
       }
     }
     this._allocatedTextures.set(texture, { hash, refcount: 1, dispose: false });
@@ -154,15 +154,15 @@ export class Pool {
     mipmapping = false
   ): TextureCube {
     const hash = `cube:${format}:${size}:${mipmapping ? 1 : 0}`;
-    let texture: BaseTexture = null;
+    let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createCubeTexture(format, size, { mipmapping });
       this._memCost += texture.memCost;
     } else {
-      texture = list.pop();
+      texture = list.pop()!;
       if (list.length === 0) {
-        this._freeTextures[hash] = undefined;
+        delete this._freeTextures[hash];
       }
     }
     this._allocatedTextures.set(texture, { hash, refcount: 1, dispose: false });
@@ -191,7 +191,7 @@ export class Pool {
     width: number,
     height: number,
     colorTexOrFormat: MaybeArray<TextureFormat | T>,
-    depthTexOrFormat: TextureFormat | T = null,
+    depthTexOrFormat: Nullable<TextureFormat | T> = null,
     mipmapping = false,
     sampleCount = 1,
     ignoreDepthStencil = true,
@@ -228,7 +228,7 @@ export class Pool {
         this.releaseTexture(colorAttachments[i]);
       }
     }
-    if (typeof depthTexOrFormat === 'string') {
+    if (!!depthAttachment && typeof depthTexOrFormat === 'string') {
       this.releaseTexture(depthAttachment);
     }
     return fb;
@@ -248,7 +248,7 @@ export class Pool {
   createTemporalFramebuffer(
     autoRelease: boolean,
     colorAttachments: BaseTexture[],
-    depthAttachment: BaseTexture = null,
+    depthAttachment: Nullable<BaseTexture> = null,
     sampleCount = 1,
     ignoreDepthStencil = true,
     attachmentMipLevel = 0,
@@ -263,7 +263,7 @@ export class Pool {
         hash += `:${tex.uid}`;
       }
     }
-    let fb: FrameBuffer = null;
+    let fb: Nullable<FrameBuffer> = null;
     const list = this._freeFramebuffers[hash];
     if (!list) {
       fb = this._device.createFrameBuffer(colorAttachments, depthAttachment, {
@@ -276,13 +276,13 @@ export class Pool {
         fb.setColorAttachmentLayer(i, attachmentLayer);
       }
     } else {
-      fb = list.pop();
+      fb = list.pop()!;
       if (list.length === 0) {
-        this._freeFramebuffers[hash] = undefined;
+        delete this._freeFramebuffers[hash];
       }
     }
     // Mark referenced textures
-    const info = this._allocatedTextures.get(depthAttachment);
+    const info = depthAttachment ? this._allocatedTextures.get(depthAttachment) : null;
     if (info) {
       info.refcount++;
     }

@@ -1,6 +1,7 @@
 import type { PBGlobalScope, ProgramBuilder } from './programbuilder';
 import type { PBShaderExp } from './base';
 import type { VertexSemantic } from '../gpuobject';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Shader variable getter function type
@@ -61,7 +62,7 @@ export class PBReflection {
   tag(
     arg0: string | Record<string, PBReflectionTagGetter>,
     arg1?: PBReflectionTagGetter
-  ): PBShaderExp | void {
+  ): Nullable<PBShaderExp> | void {
     if (typeof arg0 === 'string') {
       if (arg1 === undefined) {
         return this.getTag(arg0);
@@ -90,7 +91,7 @@ export class PBReflection {
     this._tagList[name] = exp;
   }
   /** @internal */
-  private getTag(name: string): PBShaderExp {
+  private getTag(name: string): Nullable<PBShaderExp> {
     const getter = this._tagList[name];
     return getter ? getter(this._builder.getGlobalScope()) : null;
   }
