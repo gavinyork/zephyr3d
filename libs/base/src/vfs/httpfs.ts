@@ -2,6 +2,7 @@ import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } f
 import { VFS, VFSError, GlobMatcher } from './vfs';
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './readers/reader';
 import { PathUtils } from './common';
+import type { Nullable } from '../utils';
 import { uint8ArrayToBase64 } from '../utils';
 
 /**
@@ -95,7 +96,7 @@ export class HttpFS extends VFS {
    *
    * If present, it is applied by {@link VFS.normalizePath} before other checks.
    */
-  get urlResolver(): (url: string) => string {
+  get urlResolver(): Nullable<(url: string) => string> {
     return this.options.urlResolver ?? null;
   }
   set urlResolver(resolver: (url: string) => string) {
@@ -278,7 +279,7 @@ export class HttpFS extends VFS {
       const lastModified = response.headers.get('last-modified');
       const contentType = response.headers.get('content-type');
 
-      const isDirectory = contentType?.includes('text/html') && path.endsWith('/');
+      const isDirectory = !!contentType && contentType.includes('text/html') && path.endsWith('/');
       const modifiedDate = lastModified ? new Date(lastModified) : new Date();
 
       return {
@@ -372,7 +373,10 @@ export class HttpFS extends VFS {
       clearTimeout(timeoutId);
     }
   }
-  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
+  private async selectReader(
+    dirPath: string,
+    ctx: HttpDirectoryReaderContext
+  ): Promise<Nullable<HttpDirectoryReader>> {
     if (this.dirReaders.length === 1) {
       return this.dirReaders[0];
     }

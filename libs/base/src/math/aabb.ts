@@ -44,7 +44,7 @@ export class AABB {
       this._maxPoint = new Vector3(arg0.maxPoint);
     } else if (arg0 instanceof Vector3) {
       this._minPoint = new Vector3(arg0);
-      this._maxPoint = new Vector3(arg1);
+      this._maxPoint = new Vector3(arg1!);
     } else {
       this._minPoint = new Vector3(-1, -1, -1);
       this._maxPoint = new Vector3(1, 1, 1);

@@ -191,12 +191,12 @@ export class HeightField {
     if (x0 < xmin) {
       tx = (xmin - x0) / dx;
     } else if (x0 > xmax) {
-      return;
+      return null;
     }
     if (y0 < ymin) {
       ty = (ymin - y0) / dy;
     } else if (y0 > ymax) {
-      return;
+      return null;
     }
     const t = tx > ty ? tx : ty;
     x0 += t * dx;

@@ -1,4 +1,4 @@
-const colorNames = {
+const colorNames: Record<string, string> = {
   aliceblue: '#f0f8ff',
   antiquewhite: '#faebd7',
   aqua: '#00ffff',
@@ -143,6 +143,12 @@ const colorNames = {
 };
 
 /**
+ * Nullable type modifier
+ * @public
+ */
+export type Nullable<T> = T | null;
+
+/**
  * A generic constructor type
  * @public
  */
@@ -193,23 +199,23 @@ export type TypedArrayConstructor<T extends TypedArray = any> = {
  */
 export class HttpRequest {
   /** @internal */
-  static _tempElement: HTMLAnchorElement = null;
+  static _tempElement: Nullable<HTMLAnchorElement> = null;
   /** @internal */
-  private _urlResolver: (url: string) => string;
+  private _urlResolver: Nullable<(url: string) => string>;
   /** @internal */
   private _crossOrigin: string;
   /** @internal */
   private _headers: Record<string, string>;
   constructor(urlResolver?: (url: string) => string) {
-    this._urlResolver = urlResolver;
+    this._urlResolver = urlResolver ?? null;
     this._crossOrigin = '';
     this._headers = {};
   }
   /** Get the custom URL resolver */
-  get urlResolver(): (url: string) => string {
+  get urlResolver(): Nullable<(url: string) => string> {
     return this._urlResolver;
   }
-  set urlResolver(resolver: (url: string) => string) {
+  set urlResolver(resolver: Nullable<(url: string) => string>) {
     this._urlResolver = resolver;
   }
   /** Get the cross origin property */
@@ -243,7 +249,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async request(url: string): Promise<Response> {
+  async request(url: string): Promise<Nullable<Response>> {
     url = this._urlResolver ? this._urlResolver(url) : this.resolveURL(url);
     return url
       ? fetch(url, {
@@ -472,9 +478,9 @@ export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends 
  * @public
  */
 export function parseColor(input: string): ColorRGBA {
-  input = input.trim().toLowerCase();
+  input = input.trim().toLowerCase() as keyof typeof colorNames;
   input = colorNames[input] || input;
-  let v: ColorRGBA = null;
+  let v: Nullable<ColorRGBA> = null;
   if (input[0] === '#') {
     const collen = (input.length - 1) / 3;
     const fact = [17, 1, 0.062272][collen - 1];
@@ -485,7 +491,7 @@ export function parseColor(input: string): ColorRGBA {
       a: 1
     };
   } else {
-    let m: RegExpMatchArray;
+    let m: Nullable<RegExpMatchArray>;
     if ((m = input.match(/^\s*rgb\s*\(\s*(\d*\.?\d*)\s*,\s*(\d*\.?\d*)\s*,\s*(\d\.?\d*)\s*\)\s*$/i))) {
       v = {
         r: Number(m[1]) / 255,

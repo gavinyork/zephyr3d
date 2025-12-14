@@ -89,8 +89,8 @@ export class Interpolator {
     this._target = target;
     this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
-    this._a = null;
-    this._h = null;
+    this._a = [];
+    this._h = [];
   }
   /** Gets the interpolation mode */
   get mode(): InterpolationMode {
@@ -126,8 +126,8 @@ export class Interpolator {
   set inputs(val: InterpolateData) {
     if (val !== this._inputs) {
       this._inputs = val;
-      this._a = null;
-      this._h = null;
+      this._a = [];
+      this._h = [];
     }
   }
   /** outputs */
@@ -137,8 +137,8 @@ export class Interpolator {
   set outputs(val: InterpolateData) {
     if (val !== this._outputs) {
       this._outputs = val;
-      this._a = null;
-      this._h = null;
+      this._a = [];
+      this._h = [];
     }
   }
   /**
@@ -149,9 +149,6 @@ export class Interpolator {
    * @returns The calcuated interpolation value
    */
   interpolate<T extends InterpolateData>(t: number, result: T): T {
-    if (t === undefined) {
-      return undefined;
-    }
     const ot = t;
     const input = this._inputs;
     const output = this._outputs;
@@ -166,7 +163,7 @@ export class Interpolator {
       this._prevKey = 0;
     }
     this._prevT = t;
-    let nextKey: number;
+    let nextKey = 0;
     for (let i = this._prevKey; i < input.length; ++i) {
       if (t <= input[i]) {
         nextKey = numberClamp(i, 1, input.length - 1);

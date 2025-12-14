@@ -28,9 +28,9 @@ export class Frustum {
   static readonly CORNER_RIGHT_BOTTOM_NEAR = 0b110;
   static readonly CORNER_RIGHT_BOTTOM_FAR = 0b111;
   /** @internal */
-  private _planes: Plane[];
+  private _planes!: Plane[];
   /** @internal */
-  private _corners: Vector3[];
+  private _corners!: Vector3[];
   /**
    * Creates a frustum from the tranform matrix.
    * @param transform - The transform matrix
@@ -42,8 +42,6 @@ export class Frustum {
    */
   constructor(other: Frustum);
   constructor(arg0: Matrix4x4 | Frustum) {
-    this._planes = null;
-    this._corners = null;
     if (arg0 instanceof Frustum) {
       this._planes = arg0._planes.map((plane) => new Plane(plane));
       this._corners = arg0._corners.map((vec) => new Vector3(vec));

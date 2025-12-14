@@ -1,3 +1,5 @@
+import type { Nullable } from './utils';
+
 type Rect = {
   x: number;
   y: number;
@@ -56,7 +58,7 @@ export class RectsPacker {
    * @param height - Height of the rectangle.
    * @returns The pack result.
    */
-  insert(width: number, height: number): PackRect {
+  insert(width: number, height: number): Nullable<PackRect> {
     if (width > this._width || height > this._height) {
       return null;
     }
@@ -73,13 +75,15 @@ export class RectsPacker {
     if (this._maxBins === 0 || this._bins.length < this._maxBins) {
       this._bins.push(new Bin(this._width, this._height));
       const rect = this._bins[this._bins.length - 1].insert(width, height);
-      return {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        binIndex: this._bins.length - 1
-      };
+      if (rect) {
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          binIndex: this._bins.length - 1
+        };
+      }
     }
     return null;
   }
@@ -90,7 +94,7 @@ class Bin {
   constructor(width: number, height: number) {
     this.freeRects = [{ x: 0, y: 0, width, height }];
   }
-  insert(width: number, height: number): Rect {
+  insert(width: number, height: number): Nullable<Rect> {
     const newRect = this.findBestFit(width, height);
     if (!newRect) {
       return null;
@@ -108,9 +112,9 @@ class Bin {
     this.pruneFreeRects();
     return newRect;
   }
-  private findBestFit(width: number, height: number): Rect {
+  private findBestFit(width: number, height: number): Nullable<Rect> {
     let score = Number.MAX_VALUE;
-    let rect: Rect = null;
+    let rect: Nullable<Rect> = null;
     for (const freeRect of this.freeRects) {
       if (freeRect.width >= width && freeRect.height >= height) {
         const areaFit = freeRect.width * freeRect.height - width * height;

@@ -1,4 +1,4 @@
-import type { GenericConstructor } from './utils';
+import type { GenericConstructor, Nullable } from './utils';
 
 /**
  * Mapping table of event types and their constructors
@@ -53,7 +53,7 @@ export interface IEventTarget<T extends EventMap = any> {
    * @param type - The event type for which to remove an event listener
    * @param listener - The callback function to be removed
    */
-  off<K extends keyof T>(type: K, listener: EventListener<T, K>, context?: unknown): void;
+  off<K extends keyof T>(type: K, listener?: Nullable<EventListener<T, K>>, context?: unknown): void;
   /**
    * Synchronously invoke the affected event listeners with an event object
    * @param evt - The event object to be dispatch.
@@ -73,7 +73,7 @@ export interface IEventTarget<T extends EventMap = any> {
  */
 export class Observable<X extends EventMap> implements IEventTarget<X> {
   /** @internal */
-  _listeners: EventListenerMap<X>;
+  _listeners: Nullable<EventListenerMap<X>>;
   /**
    * Creates an {@link Observable}.
    */
@@ -109,8 +109,10 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   /**
    * {@inheritDoc IEventTarget.off}
    */
-  off<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
-    this._internalRemoveEventListener(this._listeners, type, listener, context ?? null);
+  off<K extends keyof X>(type: K, listener?: Nullable<EventListener<X, K>>, context?: unknown): void {
+    if (listener) {
+      this._internalRemoveEventListener(this._listeners, type, listener, context ?? null);
+    }
   }
   /**
    * {@inheritDoc IEventTarget.dispatchEvent}
@@ -132,13 +134,13 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
    * @internal
    */
   _internalAddEventListener<K extends keyof X>(
-    listenerMap: EventListenerMap<X>,
+    listenerMap: Nullable<EventListenerMap<X>>,
     type: K,
     listener: EventListener<X, K>,
     options: REventHandlerOptions
-  ): EventListenerMap<X> {
+  ): Nullable<EventListenerMap<X>> {
     if (typeof type !== 'string') {
-      return;
+      return listenerMap;
     }
     if (!listenerMap) {
       listenerMap = {};
@@ -165,7 +167,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
    * @internal
    */
   _internalRemoveEventListener<K extends keyof X>(
-    listenerMap: EventListenerMap<X>,
+    listenerMap: Nullable<EventListenerMap<X>>,
     type: K,
     listener: EventListener<X, K>,
     context: unknown
@@ -245,7 +247,7 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
     type I = InstanceType<typeof cls> extends IEventTarget<infer U> ? X & U : X;
     return class E extends cls implements IEventTarget<I> {
       /** @internal */
-      _listeners: EventListenerMap<I>;
+      _listeners: Nullable<EventListenerMap<I>>;
       constructor(...args: any[]) {
         super(...args);
         this._listeners = null;
@@ -302,13 +304,13 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
        * @internal
        */
       _internalAddEventListener<K extends keyof I>(
-        listenerMap: EventListenerMap<I>,
+        listenerMap: Nullable<EventListenerMap<I>>,
         type: K,
         listener: EventListener<I, K>,
         options: REventHandlerOptions
-      ): EventListenerMap<I> {
+      ): Nullable<EventListenerMap<I>> {
         if (typeof type !== 'string') {
-          return;
+          return listenerMap;
         }
         if (!listenerMap) {
           listenerMap = {};
@@ -335,7 +337,7 @@ export function makeObservable<C extends GenericConstructor | ObjectConstructor>
        * @internal
        */
       _internalRemoveEventListener<K extends keyof I>(
-        listenerMap: EventListenerMap<I>,
+        listenerMap: Nullable<EventListenerMap<I>>,
         type: K,
         listener: EventListener<I, K>,
         context: unknown

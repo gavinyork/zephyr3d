@@ -1,3 +1,5 @@
+import type { Nullable } from './utils';
+
 /**
  * The list iterator class
  * @public
@@ -215,7 +217,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  insert(data: T, at: ListIterator<T>): ListIterator<T> {
+  insert(data: T, at: ListIterator<T>): Nullable<ListIterator<T>> {
     if (at.list === this) {
       if (at.valid()) {
         if (at.reversed) {
@@ -323,8 +325,6 @@ export class List<T = unknown> {
   private _remove(node: ListNodeImpl): void {
     node.prev.next = node.next;
     node.next.prev = node.prev;
-    node.prev = undefined;
-    node.next = undefined;
     this._length--;
   }
   /** @internal */

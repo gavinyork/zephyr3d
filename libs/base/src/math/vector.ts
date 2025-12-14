@@ -5,6 +5,7 @@
 import { toFloat } from './misc';
 import { CubeFace } from './types';
 import type { Plane } from './plane';
+import type { Nullable } from '../utils';
 
 const IDENT_MATRIX3x3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 const IDENT_MATRIX4x4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -484,12 +485,12 @@ export class Vector2 extends VectorBase {
  */
 export class ObservableVector2 extends Vector2 {
   /** @internal */
-  private _callback: () => void;
+  private _callback: Nullable<() => void> = null;
   /** The callback function which will be executed when the value changed */
-  get callback(): () => void {
+  get callback() {
     return this._callback;
   }
-  set callback(cb: () => void) {
+  set callback(cb: Nullable<() => void>) {
     this._callback = cb;
   }
   /**
@@ -1030,12 +1031,12 @@ export class Vector3 extends VectorBase {
  */
 export class ObservableVector3 extends Vector3 {
   /** @internal */
-  private _callback: () => void;
+  private _callback: Nullable<() => void> = null;
   /** The callback function which will be executed when the value changed */
-  get callback(): () => void {
+  get callback() {
     return this._callback;
   }
-  set callback(cb: () => void) {
+  set callback(cb: Nullable<() => void>) {
     this._callback = cb;
   }
   /**
@@ -1608,12 +1609,12 @@ export class Vector4 extends VectorBase {
  */
 export class ObservableVector4 extends Vector4 {
   /** @internal */
-  private _callback: () => void;
+  private _callback: Nullable<() => void> = null;
   /** The callback function which will be executed when the value changed */
-  get callback(): () => void {
+  get callback() {
     return this._callback;
   }
-  set callback(cb: () => void) {
+  set callback(cb: Nullable<() => void>) {
     this._callback = cb;
   }
   /**
@@ -2403,12 +2404,12 @@ export class Quaternion extends VectorBase {
  */
 export class ObservableQuaternion extends Quaternion {
   /** @internal */
-  private _callback: () => void;
+  private _callback: Nullable<() => void> = null;
   /** The callback function which will be executed when the value changed */
-  get callback(): () => void {
+  get callback() {
     return this._callback;
   }
-  set callback(cb: () => void) {
+  set callback(cb: Nullable<() => void>) {
     this._callback = cb;
   }
   /**
@@ -2589,14 +2590,14 @@ export class Matrix3x3 extends VectorBase {
       super(9);
       if (typeof arg0 === 'number') {
         this[0] = arg0;
-        this[1] = arg1;
-        this[2] = arg2;
-        this[3] = arg3;
-        this[4] = arg4;
-        this[5] = arg5;
-        this[6] = arg6;
-        this[7] = arg7;
-        this[8] = arg8;
+        this[1] = arg1!;
+        this[2] = arg2!;
+        this[3] = arg3!;
+        this[4] = arg4!;
+        this[5] = arg5!;
+        this[6] = arg6!;
+        this[7] = arg7!;
+        this[8] = arg8!;
       } else if (arg0 instanceof Quaternion) {
         arg0.toMatrix3x3(this);
       } else if (arg0 instanceof Matrix4x4) {
@@ -3286,21 +3287,21 @@ export class Matrix4x4 extends VectorBase {
       super(16);
       if (typeof arg0 === 'number') {
         this[0] = arg0;
-        this[1] = arg1;
-        this[2] = arg2;
-        this[3] = arg3;
-        this[4] = arg4;
-        this[5] = arg5;
-        this[6] = arg6;
-        this[7] = arg7;
-        this[8] = arg8;
-        this[9] = arg9;
-        this[10] = arg10;
-        this[11] = arg11;
-        this[12] = arg12;
-        this[13] = arg13;
-        this[14] = arg14;
-        this[15] = arg15;
+        this[1] = arg1!;
+        this[2] = arg2!;
+        this[3] = arg3!;
+        this[4] = arg4!;
+        this[5] = arg5!;
+        this[6] = arg6!;
+        this[7] = arg7!;
+        this[8] = arg8!;
+        this[9] = arg9!;
+        this[10] = arg10!;
+        this[11] = arg11!;
+        this[12] = arg12!;
+        this[13] = arg13!;
+        this[14] = arg14!;
+        this[15] = arg15!;
       } else if (arg0 instanceof Quaternion) {
         arg0.toMatrix4x4(this);
       } else if (arg0 instanceof Matrix3x3) {
@@ -4225,7 +4226,7 @@ export class Matrix4x4 extends VectorBase {
       case CubeFace.NZ:
         return this.lookAt(pos, new Vector3(pos.x, pos.y, pos.z - 1), new Vector3(0, -1, 0), result);
       default:
-        return null;
+        throw new Error(`Invalid cube face: ${face}`);
     }
   }
   /**

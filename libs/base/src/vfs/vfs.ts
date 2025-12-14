@@ -1,4 +1,5 @@
 import { Observable } from '../event';
+import type { Nullable } from '../utils';
 import { guessMimeType, PathUtils } from './common';
 
 /**
@@ -131,7 +132,7 @@ export interface GlobResult extends FileMetadata {
   /** The path relative to the search root directory */
   relativePath: string;
   /** The glob pattern that matched this result */
-  matchedPattern: string;
+  matchedPattern: Nullable<string>;
 }
 
 /**
@@ -373,7 +374,7 @@ export abstract class VFS extends Observable<{
    * @param uri - URL to parse
    * @returns parts of data URL
    */
-  parseDataURI(uri: string): RegExpMatchArray {
+  parseDataURI(uri: string): Nullable<RegExpMatchArray> {
     return uri?.match(/^data:([^;]+)/) ?? null;
   }
   /**
@@ -1228,7 +1229,11 @@ export abstract class VFS extends Observable<{
     this.sortedMountPaths = Array.from(this.simpleMounts.keys()).sort((a, b) => b.length - a.length);
 
     // Bubble child's events with host mount prefix
-    const callback = (type, subPath, itemType) => {
+    const callback = (
+      type: 'created' | 'deleted' | 'moved' | 'modified',
+      subPath: string,
+      itemType: 'file' | 'directory'
+    ) => {
       const rel = subPath === '/' ? '' : subPath;
       const hostPath = PathUtils.normalize(PathUtils.join(normalizedPath, rel));
       this.onChange(type, hostPath, itemType);

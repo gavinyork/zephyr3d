@@ -19,48 +19,48 @@ export class Ray {
   /** @internal */
   _direction: Vector3;
   /** @internal */
-  _ii: number;
+  _ii = 0;
   /** @internal */
-  _ij: number;
+  _ij = 0;
   /** @internal */
-  _ik: number;
+  _ik = 0;
   /** @internal */
-  _ibyj: number;
+  _ibyj = 0;
   /** @internal */
-  _jbyi: number;
+  _jbyi = 0;
   /** @internal */
-  _kbyj: number;
+  _kbyj = 0;
   /** @internal */
-  _jbyk: number;
+  _jbyk = 0;
   /** @internal */
-  _ibyk: number;
+  _ibyk = 0;
   /** @internal */
-  _kbyi: number;
+  _kbyi = 0;
   /** @internal */
-  _c_xy: number;
+  _c_xy = 0;
   /** @internal */
-  _c_xz: number;
+  _c_xz = 0;
   /** @internal */
-  _c_yx: number;
+  _c_yx = 0;
   /** @internal */
-  _c_yz: number;
+  _c_yz = 0;
   /** @internal */
-  _c_zx: number;
+  _c_zx = 0;
   /** @internal */
-  _c_zy: number;
+  _c_zy = 0;
 
   /**
    * Do a intersection test with an AABB.
    * @param bbox - The box to be test.
    * @returns true if the ray intersect with the box, otherwise false.
    */
-  bboxIntersectionTest: (bbox: AABB) => boolean;
+  bboxIntersectionTest!: (bbox: AABB) => boolean;
   /**
    * Do a intersection test with an AABB.
    * @param bbox - The box to be test.
    * @returns The distance from the origin to intersected point if the ray intersect with the box, otherwise null.
    */
-  bboxIntersectionTestEx: (bbox: AABB) => number | null;
+  bboxIntersectionTestEx!: (bbox: AABB) => number | null;
 
   /**
    * Construct a ray from origin and normalized direction vector.

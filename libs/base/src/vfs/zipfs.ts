@@ -1,3 +1,4 @@
+import type { Nullable } from '../utils';
 import { base64ToUint8Array, uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
 import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
@@ -110,11 +111,11 @@ export interface ZipEntry {
  * @public
  */
 export class ZipFS extends VFS {
-  private zipReader: ZipJSReader;
-  private zipWriter: ZipJSWriter;
+  private zipReader: Nullable<ZipJSReader>;
+  private zipWriter: Nullable<ZipJSWriter>;
   private readonly entries: Map<string, ZipJSEntry>;
   private readonly virtualFiles: Map<string, { data: ArrayBuffer | string; modified: Date }>;
-  private zipData: Blob | Uint8Array<ArrayBuffer> | ArrayBuffer;
+  private zipData: Nullable<Blob | Uint8Array<ArrayBuffer> | ArrayBuffer>;
   private isModified: boolean;
   private readonly zipJS: ZipJSDependencies;
 

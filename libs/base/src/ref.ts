@@ -1,4 +1,5 @@
 import { Observable, type IEventTarget } from './event';
+import type { Nullable } from './utils';
 
 /**
  * Represents an object that can be disposed
@@ -73,7 +74,7 @@ export function flushPendingDisposals() {
  * @remarks
  * Retains an object will increase the reference counter for this object
  */
-export function retainObject(obj: IDisposable) {
+export function retainObject(obj: Nullable<IDisposable>) {
   if (obj) {
     const ref = objectReferenceMap.get(obj) ?? 0;
     objectReferenceMap.set(obj, ref + 1);
@@ -92,7 +93,7 @@ export function retainObject(obj: IDisposable) {
  * Releases an object will decrease the reference counter for this object.
  * If reference counter become zero, the object will be disposed at next frame.
  */
-export function releaseObject(obj: IDisposable) {
+export function releaseObject(obj: Nullable<IDisposable>) {
   if (obj) {
     let refcount = objectReferenceMap.get(obj) ?? 0;
     if (refcount > 0) {
@@ -113,7 +114,7 @@ export function releaseObject(obj: IDisposable) {
  */
 export class DRef<T extends IDisposable> {
   /** @internal */
-  private _object: T;
+  private _object: Nullable<T>;
   /**
    * Creates a new reference to a disposable object.
    * @param obj - The disposable object to reference
@@ -156,7 +157,7 @@ export class DRef<T extends IDisposable> {
  */
 export class DWeakRef<T extends IDisposable> {
   /** @internal */
-  private _object: T;
+  private _object: Nullable<T>;
   /**
    * Creates a new reference to a disposable object.
    * @param obj - The disposable object to reference
