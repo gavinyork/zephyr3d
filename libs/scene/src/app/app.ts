@@ -4,7 +4,7 @@ import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { Engine } from './engine';
 import { getApp, setApp } from './api';
-import { ScreenConfig } from './screen';
+import type { ScreenConfig } from './screen';
 
 type appEventMap = {
   /**
@@ -45,6 +45,9 @@ type appEventMap = {
   drop: [evt: DragEvent];
 };
 
+/** Editor Mode */
+export type EditorMode = 'editor' | 'editor-preview' | 'none';
+
 /**
  * Creation options for Application.
  *
@@ -84,7 +87,7 @@ export type AppOptions = {
     /**
      * Whether the application is running in editor mode. Should be true for user applications.
      */
-    editorMode?: boolean;
+    editorMode?: EditorMode;
     /**
      * Whether the runtime scripting system is enabled. Should be true for user applications.
      */

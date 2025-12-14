@@ -1,3 +1,4 @@
+import type { EditorMode } from '@zephyr3d/scene';
 import { Application, getDevice, getEngine, getInput } from '@zephyr3d/scene';
 import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
@@ -14,7 +15,9 @@ const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 let rhiList: string[] = [];
 let settings: ProjectSettings = null;
+let editorMode: EditorMode;
 if (project && !open) {
+  editorMode = 'editor-preview';
   const setFavicon = (href: string, options: { rels?: string[]; type: string; sizes?: string }) => {
     const { rels = ['icon', 'shortcut icon', 'apple-touch-icon'], type, sizes } = options;
     const head = document.head || document.getElementsByTagName('head')[0];
@@ -52,6 +55,7 @@ if (project && !open) {
     setFavicon(url, { type });
   }
 } else {
+  editorMode = 'editor';
   const deviceType = searchParams.get('device');
   if (deviceType) {
     rhiList = [deviceType];
@@ -88,13 +92,13 @@ const editorApp = new Application({
   runtimeOptions: {
     VFS: ProjectService.VFS,
     scriptsRoot: '/assets',
-    editorMode: true,
+    editorMode,
     enabled: !!project
   }
 });
 
 editorApp.ready().then(async () => {
-  if (open || !project) {
+  if (editorMode === 'editor') {
     await initLeakDetector();
     const device = getDevice();
     let fontSize: number;

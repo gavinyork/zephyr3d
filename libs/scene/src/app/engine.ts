@@ -17,6 +17,7 @@ import {
 } from '../material';
 import { StandardSprite3DMaterial } from '../material/sprite3d_std';
 import { ScreenAdapter } from './screen';
+import type { EditorMode } from '.';
 
 /**
  * Interface for objects that can be rendered.
@@ -75,7 +76,7 @@ export class Engine {
    * @param editorMode - Optional editor mode flag for the underlying `ScriptingSystem`.
    * @param enabled - Whether runtime operations are active. Defaults to `true`.
    */
-  constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean) {
+  constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: EditorMode, enabled?: boolean) {
     VFS = VFS ?? new HttpFS('./');
     this._builtinsVFS = null;
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });

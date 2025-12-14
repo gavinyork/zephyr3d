@@ -113,6 +113,8 @@ export class Camera extends SceneNode {
   protected _clipMask: number;
   /** @internal Order-Independent Transparency reference. */
   protected _oit: DRef<OIT>;
+  /** @internal */
+  protected _adapted: boolean;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
   /** @internal Whether command buffers may be reused for optimization. */
@@ -258,6 +260,7 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = new DRef();
     this._depthPrePass = false;
+    this._adapted = false;
     this._HiZ = false;
     this._HDR = true;
     this._toneMap = true;
@@ -724,6 +727,13 @@ export class Camera extends SceneNode {
   }
   set commandBufferReuse(val: boolean) {
     this._commandBufferReuse = !!val;
+  }
+  /** Whether this camera is adapted to screen settins */
+  get adapted() {
+    return this._adapted;
+  }
+  set adapted(val: boolean) {
+    this._adapted = !!val;
   }
   /** OIT */
   get oit(): OIT {

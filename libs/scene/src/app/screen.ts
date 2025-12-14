@@ -1,4 +1,5 @@
 import { Vector2 } from '@zephyr3d/base';
+import { getDevice } from './api';
 
 /**
  * Screen adapter configuration
@@ -78,6 +79,8 @@ export type ResolutionTransform = {
  */
 export class ScreenAdapter {
   private _config: ScreenConfig;
+  private _transform: ResolutionTransform;
+  private _viewport: number[];
   /**
    * Creates a new {@link ScreenAdapter}.
    *
@@ -85,6 +88,8 @@ export class ScreenAdapter {
    *   a default of 1920×1080 with 'stretch' mode is used.
    */
   constructor(config?: ScreenConfig) {
+    this._viewport = null;
+    this._transform = null;
     this.configure(config);
   }
   /**
@@ -92,6 +97,35 @@ export class ScreenAdapter {
    */
   get config(): Readonly<ScreenConfig> {
     return this._config;
+  }
+  /**
+   * Returns the viewport of the screen
+   */
+  get viewport(): Readonly<number[]> {
+    return this._viewport;
+  }
+  set viewport(vp: number[]) {
+    vp = vp ?? null;
+    if (this._viewport !== vp) {
+      this._viewport = vp?.slice() ?? null;
+      this._transform = null;
+    }
+  }
+  /**
+   * Returns the calculated resolution transform
+   */
+  get transform(): Readonly<ResolutionTransform> {
+    if (!this._transform) {
+      const device = getDevice();
+      const vp = this._viewport ?? [
+        0,
+        0,
+        device.deviceXToScreen(device.getDrawingBufferWidth()),
+        device.deviceYToScreen(device.getDrawingBufferHeight())
+      ];
+      this._transform = this.calculateResolutionTransform(vp[0], vp[1], vp[2], vp[3]);
+    }
+    return this._transform;
   }
   /**
    * Configures the design resolution and scale mode.
@@ -229,15 +263,13 @@ export class ScreenAdapter {
    * rendering region, where (0, 0) corresponds to the top-left of the
    * adapted viewport.
    *
-   * @param transform - A {@link ResolutionTransform} previously computed
-   *   by {@link calculateResolutionTransform}.
    * @param canvasPos - Point in canvas coordinates (CSS pixels).
    * @param viewportPosOut - Optional output vector. If provided, it will be
    *   written into and returned; otherwise a new {@link Vector2} is allocated.
    * @returns The point in viewport-local coordinates.
    */
-  canvasPosToViewport(transform: ResolutionTransform, canvasPos: Vector2, viewportPosOut?: Vector2): Vector2 {
-    return this.transformPoint(transform.canvasToViewport, canvasPos, viewportPosOut);
+  canvasPosToViewport(canvasPos: Vector2, viewportPosOut?: Vector2): Vector2 {
+    return this.transformPoint(this.transform.canvasToViewport, canvasPos, viewportPosOut);
   }
   /**
    * Converts canvas coordinates into logical coordinates in the design
@@ -247,15 +279,13 @@ export class ScreenAdapter {
    * This is mainly intended for UI editing and interaction, so that logic
    * works consistently in the designWidth × designHeight coordinate system.
    *
-   * @param transform - A {@link ResolutionTransform} previously computed
-   *   by {@link calculateResolutionTransform}.
    * @param canvasPos - Point in canvas coordinates (CSS pixels).
    * @param logicPosOut - Optional output vector. If provided, it will be
    *   written into and returned; otherwise a new {@link Vector2} is allocated.
    * @returns The point in logical (design resolution) coordinates.
    */
-  canvasPosToLogic(transform: ResolutionTransform, canvasPos: Vector2, logicPosOut?: Vector2): Vector2 {
-    return this.transformPoint(transform.canvasToLogic, canvasPos, logicPosOut);
+  canvasPosToLogic(canvasPos: Vector2, logicPosOut?: Vector2): Vector2 {
+    return this.transformPoint(this.transform.canvasToLogic, canvasPos, logicPosOut);
   }
   /**
    * Applies a 2D affine transform to a point.
