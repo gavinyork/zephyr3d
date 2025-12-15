@@ -312,7 +312,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._drawGrid) {
       this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
-      PostGizmoRenderer._gridBindGroup.setValue('viewMatrix', ctx.camera.worldMatrix);
+      PostGizmoRenderer._gridBindGroup.setValue('viewMatrixInv', ctx.camera.worldMatrix);
       PostGizmoRenderer._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
       PostGizmoRenderer._gridBindGroup.setValue('params', this._gridParams);
       PostGizmoRenderer._gridBindGroup.setValue('steps', this._gridSteps);
@@ -959,20 +959,44 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.$inputs.pos = pb.vec3().attrib('position');
         this.params = pb.vec4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
+        this.viewMatrixInv = pb.mat4().uniform(0);
         this.viewProjMatrix = pb.mat4().uniform(0);
         this.flip = pb.float().uniform(0);
         pb.main(function () {
+          this.$l.worldPos = pb.vec3();
+          this.$if(pb.notEqual(this.params.z, 0), function () {
+            this.worldPos = pb.add(
+              pb.vec3(this.cameraPos.x, 0, this.cameraPos.y),
+              pb.mul(this.$inputs.pos, pb.vec3(this.params.x, 1, this.params.x))
+            );
+            this.$outputs.worldPos = this.worldPos;
+          }).$else(function () {
+            this.$l.right = this.viewMatrixInv[0].xyz;
+            this.$l.up = this.viewMatrixInv[1].xyz;
+            this.$l.scale = pb.mul(this.$inputs.pos.xz, this.params.x);
+            this.$l.planeNormal = this.viewMatrixInv[2].xyz;
+            this.$l.planeD = pb.neg(pb.dot(this.cameraPos, this.planeNormal));
+            this.$l.origin = pb.sub(pb.vec3(0), pb.mul(this.planeNormal, this.planeD));
+            this.$outputs.worldPos = pb.vec3(this.scale, 0);
+            this.worldPos = pb.add(
+              this.origin,
+              pb.mul(this.right, this.scale.x),
+              pb.mul(this.up, this.scale.y)
+            );
+          });
+          /*
           this.$outputs.worldPos = pb.add(
             pb.vec3(this.cameraPos.x, 0, this.cameraPos.y),
             pb.mul(this.$inputs.pos, pb.vec3(this.params.x, 1, this.params.x))
           );
-          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.worldPos, 1));
+          */
+          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.worldPos, 1));
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
         });
       },
       fragment(pb) {
         this.$outputs.outColor = pb.vec4();
-        this.viewMatrix = pb.mat4().uniform(0);
+        this.viewMatrixInv = pb.mat4().uniform(0);
         this.params = pb.vec4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         this.steps = pb.vec4[8]().uniform(0);
@@ -1056,7 +1080,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           [
             pb.vec3('P'),
             pb.vec3('cameraPos'),
-            pb.mat4('viewMatrix'),
+            pb.mat4('viewMatrixInv'),
             pb.float('distance'),
             pb.vec3('colorGrid'),
             pb.vec3('colorGridEmphasis'),
@@ -1084,12 +1108,20 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               this.dist = pb.clamp(this.dist, 0, 1);
               this.fade = pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.dist, 0.5)));
               this.dist = 1;
-              this.$l.angle = pb.sub(1, pb.abs(this.viewMatrix[2].y));
-              this.dist = pb.add(1, pb.mul(this.angle, 2));
+              /*
+              this.$l.angle = pb.abs(this.viewMatrixInv[2].z);
+              //this.dist = pb.add(1, pb.mul(this.angle, 2));
               this.angle = pb.mul(this.angle, this.angle);
               this.fade = pb.mul(this.fade, pb.sub(1, pb.mul(this.angle, this.angle)));
+              */
             });
-            this.$l.gridRes = pb.mul(pb.dot(this.dFdxPos, this.viewMatrix[0].xyz), 4);
+            this.$l.gridRes = pb.mul(
+              pb.dot(
+                this.dFdxPos,
+                this.$choice(pb.notEqual(this.persp, 0), this.viewMatrixInv[0].xyz, pb.vec3(1, 0, 0))
+              ),
+              4
+            );
             this.$l.step_id_x = pb.int(STEPS_LEN - 1);
             this.$l.step_id_y = pb.int(STEPS_LEN - 1);
             this.$for(pb.int('i'), STEPS_LEN - 2, 0, false, true, function () {
@@ -1130,8 +1162,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               )
             );
             this.blend = pb.mul(this.blend, this.blend, this.blend);
-            this.$l.gridPos = this.P.xz;
-            this.$l.gridFwidth = this.fwidthPos.xz;
+            this.$l.gridPos = this.$choice(pb.notEqual(this.persp, 0), this.P.xz, this.P.xy);
+            this.$l.gridFwidth = this.$choice(
+              pb.notEqual(this.persp, 0),
+              this.fwidthPos.xz,
+              this.fwidthPos.xy
+            );
             this.$l.lineSize = pb.float(0);
             this.$l.gridA = this.getGrid(
               this.gridPos,
@@ -1164,11 +1200,18 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             // Axis
             this.$l.axisDist = pb.vec3();
             this.$l.axisFwidth = pb.vec3();
-            this.$l.planeAxis = pb.vec3(1, 0, 1);
-            this.$l.axisDist.x = pb.dot(this.P.yz, this.planeAxis.yz);
-            this.$l.axisFwidth.x = pb.dot(this.fwidthPos.yz, this.planeAxis.yz);
-            this.$l.axisDist.z = pb.dot(this.P.xy, this.planeAxis.xy);
-            this.$l.axisFwidth.z = pb.dot(this.fwidthPos.xy, this.planeAxis.xy);
+            this.$if(pb.notEqual(this.persp, 0), function () {
+              this.$l.planeAxis = pb.vec3(1, 0, 1);
+              this.axisDist.x = pb.dot(this.P.yz, this.planeAxis.yz);
+              this.axisFwidth.x = pb.dot(this.fwidthPos.yz, this.planeAxis.yz);
+              this.axisDist.z = pb.dot(this.P.xy, this.planeAxis.xy);
+              this.axisFwidth.z = pb.dot(this.fwidthPos.xy, this.planeAxis.xy);
+            }).$else(function () {
+              this.axisDist.x = this.P.y;
+              this.axisFwidth.x = this.fwidthPos.y;
+              this.axisDist.z = this.P.x;
+              this.axisFwidth.z = this.fwidthPos.x;
+            });
             this.$l.axes = this.getAxis(this.axisDist, this.axisFwidth, 0.5, 0);
             this.outColor = pb.vec4(
               this.$choice(pb.lessThan(this.axes.x, 1e-8), this.outColor.rgb, pb.vec3(1, 0, 0)),
@@ -1176,10 +1219,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             );
             this.outColor = pb.vec4(
               this.$choice(pb.lessThan(this.axes.z, 1e-8), this.outColor.rgb, pb.vec3(0, 0, 1)),
-              pb.max(this.outColor.a, this.axes.x)
+              pb.max(this.outColor.a, this.axes.z)
             );
-
-            this.outAlpha = pb.mul(this.outColor.a, this.fade);
+            this.outAlpha = this.outColor.a; //pb.mul(this.outColor.a, this.fade);
             this.$return(pb.vec4(pb.mul(this.outColor.rgb, this.outAlpha), this.outAlpha));
           }
         );
@@ -1187,7 +1229,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$l.color = this.screenSpaceGrid(
             this.$inputs.worldPos,
             this.cameraPos,
-            this.viewMatrix,
+            this.viewMatrixInv,
             this.params.y,
             pb.vec3(0.112, 0.112, 0.112),
             pb.vec3(0.1384, 0.1384, 0.1384),
