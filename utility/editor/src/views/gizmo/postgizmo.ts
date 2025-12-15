@@ -1221,7 +1221,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               this.$choice(pb.lessThan(this.axes.z, 1e-8), this.outColor.rgb, pb.vec3(0, 0, 1)),
               pb.max(this.outColor.a, this.axes.z)
             );
-            this.outAlpha = this.outColor.a; //pb.mul(this.outColor.a, this.fade);
+            this.outAlpha = pb.mul(this.outColor.a, this.fade);
             this.$return(pb.vec4(pb.mul(this.outColor.rgb, this.outAlpha), this.outAlpha));
           }
         );
