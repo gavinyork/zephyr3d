@@ -118,7 +118,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     return this._anchorRotation.x;
   }
   set anchorX(value: number) {
-    if (this._anchorRotation.x !== this._anchorRotation.x) {
+    if (this._anchorRotation.x !== value) {
       this.anchorRotation = new Vector4(
         value,
         this._anchorRotation.y,
