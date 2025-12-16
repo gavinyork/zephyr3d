@@ -1,6 +1,7 @@
 import { Plane } from './plane';
 import { Matrix4x4, Vector3 } from './vector';
 import { BoxSide } from './types';
+import type { Immutable } from '../utils';
 
 const nnn = [-1, -1, -1];
 const nnp = [-1, -1, 1];
@@ -52,13 +53,13 @@ export class Frustum {
   /**
    * Get the frustum planes.
    */
-  get planes(): Plane[] {
+  get planes(): Immutable<Plane[]> {
     return this._planes;
   }
   /**
    * Get the corner points.
    */
-  get corners(): Vector3[] {
+  get corners(): Immutable<Vector3[]> {
     return this._corners;
   }
   /**

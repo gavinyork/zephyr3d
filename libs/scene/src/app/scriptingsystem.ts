@@ -2,7 +2,6 @@ import type { IDisposable, VFS } from '@zephyr3d/base';
 import { HttpFS } from '@zephyr3d/base';
 import { ScriptRegistry } from './scriptregistry';
 import { RuntimeScript } from './runtimescript';
-import type { EditorMode } from './app';
 
 /**
  * A host object that supports disposal.
@@ -25,8 +24,6 @@ export type ScriptingSystemOptions = {
   VFS?: VFS;
   /** Root path for scripts within the VFS. Defaults to `/`. */
   scriptsRoot?: string;
-  /** Editor Mode. Defaults to `none`. */
-  editorMode?: EditorMode;
   /**
    * Optional string appended to dynamic import URLs (e.g., for cache busting).
    * Example: `'?v=' + Date.now()`
@@ -85,11 +82,7 @@ export class ScriptingSystem {
    * @param opts - Optional configuration.
    */
   constructor(opts: ScriptingSystemOptions = {}) {
-    this._registry = new ScriptRegistry(
-      opts.VFS ?? new HttpFS('./'),
-      opts.scriptsRoot ?? '/',
-      opts.editorMode ?? 'none'
-    );
+    this._registry = new ScriptRegistry(opts.VFS ?? new HttpFS('./'), opts.scriptsRoot ?? '/');
     this._hostScripts = new Map();
     this._scriptHosts = new Map();
     this._importComment = opts.importComment;

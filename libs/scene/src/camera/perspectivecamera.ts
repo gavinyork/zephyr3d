@@ -1,5 +1,6 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
+import type { Immutable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 import { getDevice } from '../app/api';
 
@@ -34,7 +35,7 @@ export class PerspectiveCamera extends Camera {
     this._invalidate(true);
   }
   /** Sub-window of the frustum */
-  get window(): number[] {
+  get window(): Immutable<number[]> {
     return this._window;
   }
   set window(val: number[]) {

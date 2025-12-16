@@ -16,12 +16,12 @@ import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUTextureVideo } from './texturevideo_webgpu';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 
 export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
-  private readonly _layout: BindGroupLayout;
+  private readonly _layout: Immutable<BindGroupLayout>;
   private _layoutDesc: GPUBindGroupLayoutDescriptor;
   private _entries: GPUBindGroupEntry[];
   private _bindGroup: GPUBindGroup;
@@ -38,7 +38,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       | [WebGPUBaseTexture, GPUTextureView]
       | GPUSampler;
   };
-  constructor(device: WebGPUDevice, layout: BindGroupLayout) {
+  constructor(device: WebGPUDevice, layout: Immutable<BindGroupLayout>) {
     super(device);
     this._device = device;
     this._layout = layout;
@@ -92,10 +92,10 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     this._bindGroup = null;
     this._gpuId++;
   }
-  getLayout(): BindGroupLayout {
+  getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
   }
-  getDynamicOffsets(): number[] {
+  getDynamicOffsets(): Immutable<number[]> {
     return this._dynamicOffsets;
   }
   getBuffer(name: string, nocreate = true): GPUDataBuffer {
@@ -372,7 +372,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     });
   }
   /** @internal */
-  private _findTextureLayout(name: string): BindGroupLayoutEntry {
+  private _findTextureLayout(name: string): Immutable<BindGroupLayoutEntry> {
     for (const entry of this._layout.entries) {
       if ((entry.texture || entry.storageTexture || entry.externalTexture) && entry.name === name) {
         return entry;
@@ -381,7 +381,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return null;
   }
   /** @internal */
-  private _findSamplerLayout(name: string): BindGroupLayoutEntry {
+  private _findSamplerLayout(name: string): Immutable<BindGroupLayoutEntry> {
     for (const entry of this._layout.entries) {
       if (entry.sampler && entry.name === name) {
         return entry;

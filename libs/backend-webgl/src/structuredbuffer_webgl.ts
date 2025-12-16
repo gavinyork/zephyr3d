@@ -1,13 +1,18 @@
 import { WebGLGPUBuffer } from './buffer_webgl';
 import type { StructuredBuffer, StructuredValue, PBTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
 import { StructuredBufferData, GPUResourceUsageFlags, PBPrimitiveType } from '@zephyr3d/device';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 
 export class WebGLStructuredBuffer extends WebGLGPUBuffer implements StructuredBuffer {
   private _structure: PBStructTypeInfo;
   private _data: StructuredBufferData;
-  constructor(device: WebGLDevice, structure: PBStructTypeInfo, usage: number, source?: TypedArray) {
+  constructor(
+    device: WebGLDevice,
+    structure: Immutable<PBStructTypeInfo>,
+    usage: number,
+    source?: TypedArray
+  ) {
     if (!structure?.isStructType()) {
       throw new Error('invalid structure type');
     }
@@ -45,7 +50,7 @@ export class WebGLStructuredBuffer extends WebGLGPUBuffer implements StructuredB
   set(name: string, value: StructuredValue) {
     this._data.set(name, value);
   }
-  get structure(): PBStructTypeInfo {
+  get structure(): Immutable<PBStructTypeInfo> {
     return this._structure;
   }
   set structure(st: PBStructTypeInfo) {

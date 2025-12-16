@@ -1,4 +1,4 @@
-import type { CubeFace, Plane } from '@zephyr3d/base';
+import type { CubeFace, Immutable, Plane } from '@zephyr3d/base';
 import { DRef, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import type { Drawable, PickTarget } from '../render/drawable';
@@ -340,7 +340,7 @@ export class Camera extends SceneNode {
    *
    * Setting this invalidates derived data. Shaders should respect `clipMask` and plane.
    */
-  get clipPlane(): Plane {
+  get clipPlane(): Immutable<Plane> {
     return this._clipPlane;
   }
   set clipPlane(plane: Plane) {
@@ -652,7 +652,7 @@ export class Camera extends SceneNode {
     this._ssrBlurStdDev = val;
   }
   /** @internal */
-  get ssrParams(): Vector4 {
+  get ssrParams(): Immutable<Vector4> {
     return this._ssrParams;
   }
   /**
@@ -893,7 +893,7 @@ export class Camera extends SceneNode {
    * Gets the projection matrix of the camera
    * @returns The projection matrix
    */
-  getProjectionMatrix(): Matrix4x4 {
+  getProjectionMatrix(): Immutable<Matrix4x4> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
@@ -904,7 +904,7 @@ export class Camera extends SceneNode {
    * Gets the inverse projection matrix of the camera
    * @returns The projection matrix
    */
-  getInvProjectionMatrix(): Matrix4x4 {
+  getInvProjectionMatrix(): Immutable<Matrix4x4> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
@@ -928,14 +928,14 @@ export class Camera extends SceneNode {
    * @remarks
    * Camera's view matrix will transform a point from the world space to the camera space
    */
-  get viewMatrix(): Matrix4x4 {
+  get viewMatrix(): Immutable<Matrix4x4> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
     }
     return this._viewMatrix;
   }
-  get viewProjectionMatrix(): Matrix4x4 {
+  get viewProjectionMatrix(): Immutable<Matrix4x4> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
@@ -948,7 +948,7 @@ export class Camera extends SceneNode {
    * @remarks
    * The inverse-view-projection matrix transforms a point from the clip space to the camera space
    */
-  get invViewProjectionMatrix(): Matrix4x4 {
+  get invViewProjectionMatrix(): Immutable<Matrix4x4> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
@@ -956,14 +956,14 @@ export class Camera extends SceneNode {
     return this._invViewProjMatrix;
   }
   /** Gets the frustum of the camera */
-  get frustum(): Frustum {
+  get frustum(): Immutable<Frustum> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
     }
     return this._frustum;
   }
-  get frustumViewSpace(): Frustum {
+  get frustumViewSpace(): Immutable<Frustum> {
     if (this._dirty) {
       this._dirty = false;
       this._compute();
@@ -1198,31 +1198,31 @@ export class Camera extends SceneNode {
     this._controller?.reset();
   }
   /** @internal */
-  get jitteredVPMatrix() {
+  get jitteredVPMatrix(): Immutable<Matrix4x4> {
     return this._jitteredVPMatrix;
   }
   /** @internal */
-  get jitteredInvVPMatrix() {
+  get jitteredInvVPMatrix(): Immutable<Matrix4x4> {
     return this._jitteredInvVPMatrix;
   }
   /** @internal */
-  get jitterValue() {
+  get jitterValue(): Immutable<Vector2> {
     return this._jitterValue;
   }
   /** @internal */
-  get prevJitteredVPMatrix() {
+  get prevJitteredVPMatrix(): Immutable<Matrix4x4> {
     return this._prevJitteredVPMatrix;
   }
   /** @internal */
-  get prevJitterValue() {
+  get prevJitterValue(): Immutable<Vector2> {
     return this._prevJitterValue;
   }
   /** @internal */
-  get prevVPMatrix() {
+  get prevVPMatrix(): Immutable<Matrix4x4> {
     return this._prevVPMatrix;
   }
   /** @internal */
-  get prevPosition() {
+  get prevPosition(): Immutable<Vector3> {
     return this._prevPosition;
   }
   /** @internal */

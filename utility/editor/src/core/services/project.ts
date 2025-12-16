@@ -1,4 +1,4 @@
-import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
+import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
 import { HttpFS, IndexedDBFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine } from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
@@ -21,7 +21,7 @@ export type ProjectSettings = {
   dependencies?: { [name: string]: string };
 };
 
-const defaultProjectSettings: Readonly<ProjectSettings> = {
+const defaultProjectSettings: Immutable<ProjectSettings> = {
   preferredRHI: ['WebGL', 'WebGL2', 'WebGPU']
 };
 

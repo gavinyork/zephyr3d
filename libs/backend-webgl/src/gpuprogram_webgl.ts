@@ -14,7 +14,7 @@ import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
 import type { WebGLDevice } from './device_webgl';
-import type { TypedArrayConstructor } from '@zephyr3d/base';
+import type { Immutable, TypedArrayConstructor } from '@zephyr3d/base';
 
 type UniformBlockArray = Int32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Float32Array<ArrayBuffer>;
 export interface AttributeSetter {
@@ -115,10 +115,10 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     return null;
   }
-  get bindGroupLayouts(): BindGroupLayout[] {
+  get bindGroupLayouts(): Immutable<BindGroupLayout[]> {
     return this._bindGroupLayouts;
   }
-  get vertexAttributes(): number[] {
+  get vertexAttributes(): Immutable<number[]> {
     return this._vertexAttributes;
   }
   setUniform(name: string, value: IUniformValue | Record<string, IUniformValue> | IUniformValue[]) {

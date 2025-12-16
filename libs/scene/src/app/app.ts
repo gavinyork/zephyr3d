@@ -130,6 +130,7 @@ export class Application extends Observable<appEventMap> {
   private _device: AbstractDevice;
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
+  private readonly _editorMode: EditorMode;
   private _ready: boolean;
   /**
    * Construct the Application singleton with the provided options.
@@ -155,13 +156,19 @@ export class Application extends Observable<appEventMap> {
     this._engine = new Engine(
       opt.runtimeOptions?.VFS,
       opt.runtimeOptions?.scriptsRoot,
-      opt.runtimeOptions?.editorMode,
       opt.runtimeOptions?.enabled
     );
     if (opt.runtimeOptions?.screen) {
       this._engine.screen.configure(opt.runtimeOptions.screen);
     }
+    this._editorMode = opt.runtimeOptions?.editorMode ?? 'none';
     this._ready = false;
+  }
+  /**
+   * Editor mode
+   */
+  get editorMode() {
+    return this._editorMode;
   }
   /**
    * The input manager instance handling pointer/keyboard event routing.

@@ -1,4 +1,4 @@
-import type { CubeFace } from '@zephyr3d/base';
+import type { CubeFace, Immutable } from '@zephyr3d/base';
 import type { FrameBuffer, FrameBufferOptions, BaseTexture } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
@@ -90,7 +90,7 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
     this._hash = `${colorAttachmentHash}-${depthAttachmentHash}-${this._options.sampleCount ?? 1}`;
     this._init();
   }
-  getOptions(): Readonly<WebGPUFrameBufferOptions> {
+  getOptions(): Immutable<WebGPUFrameBufferOptions> {
     return this._options;
   }
   get bindFlag(): number {

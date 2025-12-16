@@ -11,6 +11,7 @@ import type {
 } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
+import type { Immutable } from '@zephyr3d/base';
 
 export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private static _hashCounter = 0;
@@ -81,7 +82,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     }
     return null;
   }
-  get bindGroupLayouts(): BindGroupLayout[] {
+  get bindGroupLayouts(): Immutable<BindGroupLayout[]> {
     return this._bindGroupLayouts;
   }
   get vertexAttributes(): string {
