@@ -332,6 +332,7 @@ export class FunctionInputNode extends BaseGraphNode {
             },
             set(this: FunctionInputNode, value) {
               this.name = value.str[0];
+              this.dispatchEvent('changed');
             }
           }
         ];
@@ -474,6 +475,7 @@ export class FunctionOutputNode extends BaseGraphNode {
             },
             set(this: FunctionOutputNode, value) {
               this.name = value.str[0];
+              this.dispatchEvent('changed');
             }
           }
         ];

@@ -2005,6 +2005,26 @@ export class StepNode extends GenericMathNode {
 }
 
 /**
+ * SmoothStep function
+ *
+ * @public
+ */
+export class SmoothStepNode extends GenericMathNode {
+  constructor() {
+    super('smoothStep', 3);
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SmoothStepNode,
+      name: 'SmoothStepNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
  * Fused multiply-add operation
  *
  * @remarks
