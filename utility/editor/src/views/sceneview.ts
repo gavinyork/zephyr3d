@@ -599,37 +599,35 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._toolbar.height -
       this._assetView.panel.height;
     if (viewportWidth > 0 && viewportHeight > 0) {
+      getEngine().screen.viewport = [
+        this._leftDockPanel.width,
+        this._statusbar.height + this._assetView.panel.height,
+        viewportWidth,
+        viewportHeight
+      ];
+      /*
       const transform = getEngine().screen.calculateResolutionTransform(
         this._leftDockPanel.width,
         this._statusbar.height + this._assetView.panel.height,
         viewportWidth,
         viewportHeight
       );
+      */
       const camera = this.controller.model.scene.mainCamera;
+      /*
       camera.viewport = [
         transform.viewportX,
         transform.viewportY,
         transform.viewportWidth,
         transform.viewportHeight
-        /*
-        this._leftDockPanel.width,
-        this._statusbar.height + this._assetView.panel.height,
-        viewportWidth,
-        viewportHeight
-        */
       ];
       camera.scissor = [
         transform.viewportX,
         transform.viewportY,
         transform.viewportWidth,
         transform.viewportHeight
-        /*
-        this._leftDockPanel.width,
-        this._statusbar.height + this._assetView.panel.height,
-        viewportWidth,
-        viewportHeight
-        */
       ];
+      */
       camera.render(this.controller.model.scene);
 
       // Render selected camera

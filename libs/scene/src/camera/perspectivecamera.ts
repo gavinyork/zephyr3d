@@ -2,7 +2,7 @@ import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
 import type { Immutable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
-import { getDevice } from '../app/api';
+import { getDevice, getEngine } from '../app/api';
 
 /**
  * Perspective camera class
@@ -94,8 +94,13 @@ export class PerspectiveCamera extends Camera {
     if (this._viewport) {
       this.aspect = this._viewport[2] / this._viewport[3];
     } else {
-      const vp = getDevice().getViewport();
-      this.aspect = vp.width / vp.height;
+      if (getDevice().getFramebuffer()) {
+        const vp = getDevice().getViewport();
+        this.aspect = vp.width / vp.height;
+      } else {
+        const transform = getEngine().screen.transform;
+        this.aspect = transform.viewportWidth / transform.viewportHeight;
+      }
     }
   }
   /**
