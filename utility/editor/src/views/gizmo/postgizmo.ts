@@ -1108,12 +1108,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               this.dist = pb.clamp(this.dist, 0, 1);
               this.fade = pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.dist, 0.5)));
               this.dist = 1;
-              /*
-              this.$l.angle = pb.abs(this.viewMatrixInv[2].z);
-              //this.dist = pb.add(1, pb.mul(this.angle, 2));
-              this.angle = pb.mul(this.angle, this.angle);
-              this.fade = pb.mul(this.fade, pb.sub(1, pb.mul(this.angle, this.angle)));
-              */
             });
             this.$l.gridRes = pb.mul(
               pb.dot(
@@ -1237,21 +1231,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           );
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = this.$builtins.fragCoord.z;
-          /*
-          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
-            this,
-            this.$builtins.fragCoord.z,
-            this.cameraNearFar
-          );
-          */
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
-          /*
-          this.$l.sceneDepth =
-            pb.getDevice().type === 'webgl'
-              ? decodeNormalizedFloatFromRGBA(this, this.sceneDepthSample)
-              : this.sceneDepthSample.r;
-          */
           this.$l.alpha = this.$choice(
             pb.greaterThan(this.depth, this.sceneDepth),
             pb.float(0),

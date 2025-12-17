@@ -144,7 +144,8 @@ import {
   EqualNode,
   NotEqualNode,
   LogicallyAndNode,
-  LogicallyOrNode
+  LogicallyOrNode,
+  SmoothStepNode
 } from '../blueprint/common/math';
 import {
   BillboardMatrixNode,
@@ -352,6 +353,7 @@ export class ResourceManager {
         MaxNode.getSerializationCls(),
         PowNode.getSerializationCls(),
         StepNode.getSerializationCls(),
+        SmoothStepNode.getSerializationCls(),
         FmaNode.getSerializationCls(),
         ClampNode.getSerializationCls(),
         SaturateNode.getSerializationCls(),

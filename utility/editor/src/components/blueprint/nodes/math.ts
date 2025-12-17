@@ -63,7 +63,8 @@ import {
   EqualNode,
   NotEqualNode,
   LogicallyAndNode,
-  LogicallyOrNode
+  LogicallyOrNode,
+  SmoothStepNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -311,6 +312,10 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Step',
           create: () => new StepNode()
+        },
+        {
+          name: 'SmoothStep',
+          create: () => new SmoothStepNode()
         },
         {
           name: 'Hash1',
