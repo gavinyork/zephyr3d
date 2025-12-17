@@ -7,7 +7,7 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { IDisposable, Quaternion } from '@zephyr3d/base';
+import type { IDisposable, Immutable, Quaternion } from '@zephyr3d/base';
 import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
@@ -992,26 +992,13 @@ export class SceneNode
     matrix.decompose(this._scaling, this._rotation, this._position);
     this._disableCallback = false;
     this._onTransformChanged(true);
-    /*
-    this._localMatrix = matrix;
-    this._disableCallback = true;
-    this._localMatrix.decompose(this._scaling, this._rotation, this._position);
-    this._disableCallback = false;
-    this._onTransformChanged(false);
-    */
     return this;
   }
   /** Local transformation matrix of the xform */
-  get localMatrix() {
+  get localMatrix(): Immutable<Matrix4x4> {
     if (!this._localMatrix) {
       this.calculateLocalTransform(this._tmpLocalMatrix);
       this._localMatrix = this._tmpLocalMatrix;
-      /*
-      this._localMatrix
-        .scaling(this._scaling)
-        .rotateLeft(new Matrix4x4(this._rotation))
-        .translateLeft(this._position);
-      */
     }
     return this._localMatrix;
   }
@@ -1019,7 +1006,7 @@ export class SceneNode
     this.setLocalTransform(matrix);
   }
   /** World transformation matrix of the xform */
-  get worldMatrix() {
+  get worldMatrix(): Immutable<Matrix4x4> {
     if (!this._worldMatrix) {
       this._worldMatrix = this._tmpWorldMatrix;
       this.calculateWorldTransform(this._worldMatrix);
@@ -1034,7 +1021,7 @@ export class SceneNode
     return this._worldMatrixDet;
   }
   /** Inverse of the world transformation matrix of the xform */
-  get invWorldMatrix() {
+  get invWorldMatrix(): Immutable<Matrix4x4> {
     if (!this._invWorldMatrix) {
       this._invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
     }

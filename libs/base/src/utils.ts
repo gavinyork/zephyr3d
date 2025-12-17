@@ -149,6 +149,21 @@ const colorNames: Record<string, string> = {
 export type Nullable<T> = T | null;
 
 /**
+ * Immutable type modifier
+ */
+export type Immutable<T> = T extends (...args: any[]) => any
+  ? T
+  : T extends readonly (infer U)[]
+    ? ReadonlyArray<Immutable<U>>
+    : T extends Map<infer K, infer V>
+      ? ReadonlyMap<Immutable<K>, Immutable<V>>
+      : T extends Set<infer U>
+        ? ReadonlySet<Immutable<U>>
+        : T extends object
+          ? Readonly<{ [K in keyof T]: Immutable<T[K]> }>
+          : T;
+
+/**
  * A generic constructor type
  * @public
  */

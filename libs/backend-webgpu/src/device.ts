@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Immutable } from '@zephyr3d/base';
 import type {
   FrameBufferOptions,
   SamplerOptions,
@@ -204,7 +204,7 @@ export class WebGPUDevice extends BaseDevice {
   isContextLost(): boolean {
     return false;
   }
-  getDeviceCaps(): DeviceCaps {
+  getDeviceCaps(): Immutable<DeviceCaps> {
     return this._deviceCaps;
   }
   getDrawingBufferWidth(): number {
@@ -556,7 +556,7 @@ export class WebGPUDevice extends BaseDevice {
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     return new WebGPUProgram(this, params);
   }
-  createBindGroup(layout: BindGroupLayout): BindGroup {
+  createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup {
     return new WebGPUBindGroup(this, layout);
   }
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
@@ -611,13 +611,13 @@ export class WebGPUDevice extends BaseDevice {
   setViewport(vp?: number[] | DeviceViewport) {
     this._commandQueue.setViewport(vp);
   }
-  getViewport(): DeviceViewport {
+  getViewport(): Immutable<DeviceViewport> {
     return this._commandQueue.getViewport();
   }
   setScissor(scissor?: number[] | DeviceViewport) {
     this._commandQueue.setScissor(scissor);
   }
-  getScissor(): DeviceViewport {
+  getScissor(): Immutable<DeviceViewport> {
     return this._commandQueue.getScissor();
   }
   setProgram(program: GPUProgram) {
@@ -741,7 +741,7 @@ export class WebGPUDevice extends BaseDevice {
     return this._samplerCache.fetchSampler(options);
   }
   /** @internal */
-  fetchBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
+  fetchBindGroupLayout(desc: Immutable<BindGroupLayout>): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     return this._bindGroupCache.fetchBindGroupLayout(desc);
   }
   flush(): void {

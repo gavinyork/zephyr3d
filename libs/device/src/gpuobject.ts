@@ -1,4 +1,4 @@
-import type { VectorBase, CubeFace, TypedArray, IDisposable, Nullable } from '@zephyr3d/base';
+import type { VectorBase, CubeFace, TypedArray, IDisposable, Nullable, Immutable } from '@zephyr3d/base';
 import type { ShaderKind, AbstractDevice } from './base_types';
 import type { PBTypeInfo } from './builder/types';
 import { PBArrayTypeInfo, PBPrimitiveTypeInfo, PBStructTypeInfo, PBPrimitiveType } from './builder/types';
@@ -872,7 +872,7 @@ export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo) {
  *
  * @public
  */
-export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
+export function getVertexBufferStride(vertexBufferType: Immutable<PBStructTypeInfo>) {
   const vertexType = (vertexBufferType.structMembers[0].type as PBArrayTypeInfo).elementType;
   if (vertexType.isStructType()) {
     let stride = 0;
@@ -894,7 +894,7 @@ export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo) {
  * @public
  */
 export function getVertexBufferAttribTypeBySemantic(
-  vertexBufferType: PBStructTypeInfo,
+  vertexBufferType: Immutable<PBStructTypeInfo>,
   semantic: VertexSemantic
 ): Nullable<PBPrimitiveTypeInfo> {
   const k = vertexBufferType.structMembers[0];
@@ -920,7 +920,7 @@ export function getVertexBufferAttribTypeBySemantic(
  * @public
  */
 export function getVertexBufferAttribType(
-  vertexBufferType: PBStructTypeInfo,
+  vertexBufferType: Immutable<PBStructTypeInfo>,
   attrib: number
 ): Nullable<PBPrimitiveTypeInfo> {
   const attribName = getVertexAttribName(attrib);
@@ -1477,7 +1477,7 @@ export interface IndexBuffer<T = unknown> extends GPUDataBuffer<T> {
  * @public
  */
 export interface StructuredBuffer<T = unknown> extends GPUDataBuffer<T> {
-  structure: PBStructTypeInfo;
+  structure: Immutable<PBStructTypeInfo>;
   set(name: string, value: StructuredValue);
 }
 
@@ -1532,7 +1532,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
  * @public
  */
 export interface GPUProgram<T = unknown> extends GPUObject<T> {
-  readonly bindGroupLayouts: BindGroupLayout[];
+  readonly bindGroupLayouts: Immutable<BindGroupLayout[]>;
   readonly type: 'render' | 'compute';
   getShaderSource(kind: ShaderKind): string;
   getCompileError(): string;
@@ -1552,8 +1552,8 @@ export type StructuredValue = number | TypedArray | VectorBase | { [name: string
  * @public
  */
 export interface BindGroup extends GPUObject<unknown> {
-  getLayout(): BindGroupLayout;
-  getDynamicOffsets(): number[];
+  getLayout(): Immutable<BindGroupLayout>;
+  getDynamicOffsets(): Immutable<number[]>;
   getGPUId(): string;
   getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
   getTexture(name: string): BaseTexture;

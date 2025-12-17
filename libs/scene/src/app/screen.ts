@@ -1,3 +1,4 @@
+import type { Immutable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { getDevice } from './api';
 
@@ -80,7 +81,7 @@ export type ResolutionTransform = {
 export class ScreenAdapter {
   private _config: ScreenConfig;
   private _transform: ResolutionTransform;
-  private _viewport: number[];
+  private _viewport: Immutable<number[]>;
   /**
    * Creates a new {@link ScreenAdapter}.
    *
@@ -95,16 +96,16 @@ export class ScreenAdapter {
   /**
    * Returns the current design resolution configuration.
    */
-  get config(): Readonly<ScreenConfig> {
+  get config(): Immutable<ScreenConfig> {
     return this._config;
   }
   /**
    * Returns the viewport of the screen
    */
-  get viewport(): Readonly<number[]> {
+  get viewport(): Immutable<number[]> {
     return this._viewport;
   }
-  set viewport(vp: number[]) {
+  set viewport(vp: Immutable<number[]>) {
     vp = vp ?? null;
     if (this._viewport !== vp) {
       this._viewport = vp?.slice() ?? null;
@@ -114,7 +115,7 @@ export class ScreenAdapter {
   /**
    * Returns the calculated resolution transform
    */
-  get transform(): Readonly<ResolutionTransform> {
+  get transform(): Immutable<ResolutionTransform> {
     if (!this._transform) {
       const device = getDevice();
       const vp = this._viewport ?? [

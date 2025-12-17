@@ -1,4 +1,4 @@
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, TypedArray } from '@zephyr3d/base';
 import { isPowerOf2 } from '@zephyr3d/base';
 import type {
   TextureCaps,
@@ -76,7 +76,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   get mipLevelCount(): number {
     return this._mipLevelCount;
   }
-  get samplerOptions(): SamplerOptions {
+  get samplerOptions(): Immutable<SamplerOptions> {
     return this._samplerOptions;
   }
   set samplerOptions(options: SamplerOptions) {
@@ -370,7 +370,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     return Math.floor(Math.log2(size)) + 1;
   }
   /** @internal */
-  protected _getSamplerOptions(params: TextureFormatInfoWebGL, shadow: boolean): SamplerOptions {
+  protected _getSamplerOptions(params: Immutable<TextureFormatInfoWebGL>, shadow: boolean): SamplerOptions {
     const comparison = this.isDepth() && shadow;
     const filterable = params.filterable || comparison;
     const magFilter = filterable ? 'linear' : 'nearest';

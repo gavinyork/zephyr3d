@@ -1,4 +1,4 @@
-import type { TypedArray, Vector4, IEventTarget, Nullable } from '@zephyr3d/base';
+import type { TypedArray, Vector4, IEventTarget, Nullable, Immutable } from '@zephyr3d/base';
 import { floatToHalf } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
 import type {
@@ -2292,7 +2292,7 @@ export interface TextureCaps {
    * @param format - The texture format
    * @returns the texture format infomation
    */
-  getTextureFormatInfo(format: TextureFormat): TextureFormatInfo;
+  getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfo>;
 }
 
 /**
@@ -2411,7 +2411,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get the height of back buffer */
   getBackBufferHeight(): number;
   /** Get the device capabilities */
-  getDeviceCaps(): DeviceCaps;
+  getDeviceCaps(): Immutable<DeviceCaps>;
   /** Schedule next frame */
   nextFrame(callback: () => void): number;
   /** Cancel schedule next frame */
@@ -2593,7 +2593,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param layout - Layout of the bind group
    * @returns The created bind group.
    */
-  createBindGroup(layout: BindGroupLayout): BindGroup;
+  createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
   /**
    * Creates a gpu buffer
    * @param sizeInBytes - Size of the buffer in bytes
@@ -2661,7 +2661,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   setViewport(vp?: DeviceViewport | number[]): void;
   /** Get current viewport as [x, y, width, height] */
-  getViewport(): DeviceViewport;
+  getViewport(): Immutable<DeviceViewport>;
   /**
    * Set scissor rectangle from an array that contains the position and size
    * @param scissor - The scissor rectangle position and size, if not specified, the scissor rectangle will be set to [0, 0, drawingBufferWidth,drawingBufferHeight]
@@ -2670,7 +2670,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /**
    * Get current scissor rectangle
    */
-  getScissor(): DeviceViewport;
+  getScissor(): Immutable<DeviceViewport>;
   /**
    * Set current GPU program
    * @param program - The GPU program to be set

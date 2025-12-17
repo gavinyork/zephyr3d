@@ -1596,6 +1596,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.controller.model.scene.mainCamera.controller = new EditorCameraController();
       this._postGizmoRenderer.camera = camera;
       this._postGizmoRenderer.node = null;
+      eventBus.dispatchEvent('scene_changed');
     }
   }
 }

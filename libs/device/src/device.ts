@@ -1,4 +1,4 @@
-import type { Nullable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { type Vector4, type TypedArray, type IEventTarget, Observable } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
@@ -312,7 +312,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract getDrawingBufferHeight(): number;
   abstract getBackBufferWidth(): number;
   abstract getBackBufferHeight(): number;
-  abstract getDeviceCaps(): DeviceCaps;
+  abstract getDeviceCaps(): Immutable<DeviceCaps>;
   abstract initContext(): Promise<void>;
   abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
   abstract createGPUTimer(): ITimer;
@@ -370,7 +370,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
   // program
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
-  abstract createBindGroup(layout: BindGroupLayout): BindGroup;
+  abstract createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
   abstract createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   abstract copyBuffer(
     sourceBuffer: GPUDataBuffer,
@@ -396,9 +396,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   ): FrameBuffer;
   // render related
   abstract setViewport(vp?: number[] | DeviceViewport): void;
-  abstract getViewport(): DeviceViewport;
+  abstract getViewport(): Immutable<DeviceViewport>;
   abstract setScissor(scissor?: number[] | DeviceViewport): void;
-  abstract getScissor(): DeviceViewport;
+  abstract getScissor(): Immutable<DeviceViewport>;
   abstract setProgram(program: GPUProgram): void;
   abstract getProgram(): GPUProgram;
   abstract setVertexLayout(vertexData: VertexLayout): void;

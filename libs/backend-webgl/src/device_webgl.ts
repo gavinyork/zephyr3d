@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Immutable } from '@zephyr3d/base';
 import { makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
@@ -270,7 +270,7 @@ export class WebGLDevice extends BaseDevice {
   isContextLost(): boolean {
     return this._contextLost;
   }
-  getDeviceCaps(): DeviceCaps {
+  getDeviceCaps(): Immutable<DeviceCaps> {
     return this._deviceCaps;
   }
   get vaoExt(): VertexArrayObjectEXT {
@@ -700,7 +700,7 @@ export class WebGLDevice extends BaseDevice {
       renderProgramParams.vertexAttributes
     );
   }
-  createBindGroup(layout: BindGroupLayout): BindGroup {
+  createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup {
     return new WebGLBindGroup(this, layout);
   }
   createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer {
@@ -785,8 +785,8 @@ export class WebGLDevice extends BaseDevice {
       this.screenYToDevice(this._currentViewport.height)
     );
   }
-  getViewport(): DeviceViewport {
-    return Object.assign({}, this._currentViewport);
+  getViewport(): Immutable<DeviceViewport> {
+    return this._currentViewport;
   }
   setScissor(scissor?: number[] | DeviceViewport) {
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
@@ -817,8 +817,8 @@ export class WebGLDevice extends BaseDevice {
       this.screenYToDevice(this._currentScissorRect.height)
     );
   }
-  getScissor(): DeviceViewport {
-    return Object.assign({}, this._currentScissorRect);
+  getScissor(): Immutable<DeviceViewport> {
+    return this._currentScissorRect;
   }
   setProgram(program: GPUProgram) {
     this._currentProgram = program as WebGLGPUProgram;

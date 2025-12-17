@@ -6,7 +6,7 @@ import {
   PBPrimitiveTypeInfo
 } from '@zephyr3d/device';
 import { WebGPUBuffer } from './buffer_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 const typeU8Vec2_Norm = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U8VEC2_NORM);
@@ -105,7 +105,7 @@ export class WebGPUStructuredBuffer extends WebGPUBuffer implements StructuredBu
   set(name: string, value: StructuredValue) {
     this._data.set(name, value);
   }
-  get structure(): PBStructTypeInfo {
+  get structure(): Immutable<PBStructTypeInfo> {
     return this._structure;
   }
   set structure(st: PBStructTypeInfo) {

@@ -7,6 +7,7 @@ import type {
   TextureCaps
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Immutable } from '@zephyr3d/base';
 
 export interface TextureParams {
   gpuFormat: GPUTextureFormat;
@@ -716,7 +717,7 @@ export class WebGPUTextureCaps implements TextureCaps {
   calcMemoryUsage(format: TextureFormat, numPixels): number {
     return this._textureFormatInfos[format] ? this._textureFormatInfos[format].size * numPixels : 0;
   }
-  getTextureFormatInfo(format: TextureFormat): TextureFormatInfoWebGPU {
+  getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGPU> {
     return this._textureFormatInfos[format];
   }
 }

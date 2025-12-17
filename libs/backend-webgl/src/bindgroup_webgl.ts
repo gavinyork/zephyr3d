@@ -14,16 +14,16 @@ import { WebGLGPUObject } from './gpuobject_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUProgram } from './gpuprogram_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
-  private readonly _layout: BindGroupLayout;
+  private readonly _layout: Immutable<BindGroupLayout>;
   private _dynamicOffsets: number[];
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
   private _createdBuffers: WebGLGPUBuffer[];
-  constructor(device: WebGLDevice, layout: BindGroupLayout) {
+  constructor(device: WebGLDevice, layout: Immutable<BindGroupLayout>) {
     super(device);
     this._device = device;
     this._layout = layout;
@@ -43,13 +43,13 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getGPUId(): string {
     return String(this._uid);
   }
-  getLayout(): BindGroupLayout {
+  getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
   }
   getBuffer(name: string, nocreate = true): GPUDataBuffer {
     return this._getBuffer(name, nocreate);
   }
-  getDynamicOffsets(): number[] {
+  getDynamicOffsets(): Immutable<number[]> {
     return this._dynamicOffsets;
   }
   setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, _bindOffset?: number, _bindSize?: number) {
@@ -203,7 +203,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     }
     return null;
   }
-  private _findTextureLayout(name: string): BindGroupLayoutEntry {
+  private _findTextureLayout(name: string): Immutable<BindGroupLayoutEntry> {
     for (const entry of this._layout.entries) {
       if ((entry.texture || entry.storageTexture || entry.externalTexture) && entry.name === name) {
         return entry;

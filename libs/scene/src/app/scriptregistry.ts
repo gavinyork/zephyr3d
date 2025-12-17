@@ -2,7 +2,7 @@ import type * as TS from 'typescript';
 import type { VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';
-import type { EditorMode } from './app';
+import { getApp } from './api';
 
 /**
  * Converts JavaScript source to a data URL tied to a logical module id.
@@ -63,18 +63,16 @@ export class ScriptRegistry {
   private _vfs: VFS;
   private _scriptsRoot: string;
   private _built: Map<string, string>; // logicalId -> dataURL
-  private _editorMode: EditorMode;
 
   /**
    * @param vfs - The virtual file system for existence checks, reads, and path ops.
    * @param scriptsRoot - Root directory for script resolution (used with `#/` specifiers).
    * @param editorMode - Whether to build modules to data URLs and rewrite imports.
    */
-  constructor(vfs: VFS, scriptsRoot: string, editorMode: EditorMode) {
+  constructor(vfs: VFS, scriptsRoot: string) {
     this._vfs = vfs;
     this._scriptsRoot = scriptsRoot;
     this._built = new Map();
-    this._editorMode = editorMode;
   }
 
   /**
@@ -90,16 +88,6 @@ export class ScriptRegistry {
       this._vfs = vfs;
       this._built.clear();
     }
-  }
-
-  /**
-   * Whether the registry operates in editor mode (rewrite/build to data URLs).
-   */
-  get editorMode() {
-    return this._editorMode;
-  }
-  set editorMode(val: EditorMode) {
-    this._editorMode = val;
   }
 
   /**
@@ -179,7 +167,7 @@ export class ScriptRegistry {
    */
   async resolveRuntimeUrl(entryId: string): Promise<string> {
     const id = await this.resolveLogicalId(entryId);
-    return this._editorMode !== 'none'
+    return getApp().editorMode !== 'none'
       ? await this.build(String(id))
       : id.endsWith('.js')
         ? id
@@ -404,7 +392,7 @@ export class ScriptRegistry {
       );
     } else if (spec.startsWith('/')) {
       path = spec.replace(/^\/+/, '/');
-    } else if (this._editorMode !== 'none') {
+    } else if (getApp().editorMode !== 'none') {
       // naked module, checking if it is a installed module in editor mode
       const depsExists = await this._vfs.exists('/libs/deps.lock.json');
       if (depsExists) {

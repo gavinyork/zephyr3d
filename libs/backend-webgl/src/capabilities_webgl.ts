@@ -9,6 +9,7 @@ import type {
   TextureCaps,
   TextureFormatInfo
 } from '@zephyr3d/device';
+import type { Immutable } from '@zephyr3d/base';
 
 export interface TextureParams {
   target: number;
@@ -1161,7 +1162,7 @@ export class WebGLTextureCaps implements TextureCaps {
         return 0;
     }
   }
-  getTextureFormatInfo(format: TextureFormat): TextureFormatInfoWebGL {
+  getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGL> {
     return this._textureFormatInfos[format];
   }
 }
