@@ -19,7 +19,7 @@ import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
-import { Camera } from '../camera/camera';
+import type { Camera } from '../camera/camera';
 import { prefilterCubemap } from '../utility/pmrem';
 import type { DirectionalLight } from '../scene';
 import type { BaseTexture, GPUDataBuffer, Texture2D } from '@zephyr3d/device';
@@ -48,6 +48,7 @@ import {
 import { getDevice, getEngine } from '../app/api';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { panoramaToCubemap } from '../utility/panorama';
+import { PerspectiveCamera } from '../camera';
 
 /**
  * Type of sky
@@ -81,9 +82,7 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  */
 export class SkyRenderer extends Disposable {
   private static readonly _skyCamera = (() => {
-    const camera = new Camera(null);
-    camera.setPerspective(Math.PI / 2, 1, 1, 20);
-    return camera;
+    return new PerspectiveCamera(null, Math.PI * 0.5, 1, 20, 1);
   })();
   private static transmittanceLutProgram: GPUProgram = null;
   private static multiScatteringLutProgram: GPUProgram = null;

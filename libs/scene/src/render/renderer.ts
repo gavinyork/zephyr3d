@@ -14,8 +14,8 @@ import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight, Scene } from '../scene';
-import type { PickResult } from '../camera';
-import { Camera } from '../camera';
+import type { PickResult, Camera } from '../camera';
+import { OrthoCamera, PerspectiveCamera } from '../camera';
 import { AbstractPostEffect, PostEffectLayer } from '../posteffect/posteffect';
 import { ClusteredLight } from './cluster_light';
 import { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
@@ -38,7 +38,9 @@ export class SceneRenderer {
   private static _skyMotionVectorBindGroup: BindGroup = null;
   private static _box: Primitive = null;
   /** @internal */
-  private static readonly _pickCamera = new Camera(null);
+  private static readonly _pickCameraPersp = new PerspectiveCamera(null);
+  /** @internal */
+  private static readonly _pickCameraOrtho = new OrthoCamera(null);
   /** @internal */
   private static readonly _scenePass = new LightPass();
   /** @internal */
@@ -554,11 +556,8 @@ export class SceneRenderer {
     const windowY = (vp.height - camera.getPickPosY() - 1) / vp.height;
     const windowW = 1 / vp.width;
     const windowH = 1 / vp.height;
-    camera.worldMatrix.decompose(
-      this._pickCamera.scale,
-      this._pickCamera.rotation,
-      this._pickCamera.position
-    );
+    const pickCamera = camera.isPerspective() ? this._pickCameraPersp : this._pickCameraOrtho;
+    camera.worldMatrix.decompose(pickCamera.scale, pickCamera.rotation, pickCamera.position);
     let left = camera.getProjectionMatrix().getLeftPlane();
     let right = camera.getProjectionMatrix().getRightPlane();
     let bottom = camera.getProjectionMatrix().getBottomPlane();
@@ -571,18 +570,18 @@ export class SceneRenderer {
     bottom += height * windowY;
     right = left + width * windowW;
     top = bottom + height * windowH;
-    this._pickCamera.setProjectionMatrix(
+    pickCamera.setProjectionMatrix(
       camera.isPerspective()
         ? Matrix4x4.frustum(left, right, bottom, top, near, far)
         : Matrix4x4.ortho(left, right, bottom, top, near, far)
     );
-    const cameraPos = isWebGL1 ? new Vector3(this._pickCamera.position) : null;
+    const cameraPos = isWebGL1 ? new Vector3(pickCamera.position) : null;
     const ray = isWebGL1 ? camera.constructRay(camera.getPickPosX(), camera.getPickPosY()) : null;
     ctx.device.setFramebuffer(fb);
     this._objectColorPass.clearColor = Vector4.zero();
     this._objectColorPass.clearDepth = 1;
-    const rq = this._objectColorPass.cullScene(ctx, this._pickCamera);
-    ctx.camera = this._pickCamera;
+    const rq = this._objectColorPass.cullScene(ctx, pickCamera);
+    ctx.camera = pickCamera;
     this._objectColorPass.render(ctx, null, rq);
     rq.dispose();
     ctx.camera = camera;

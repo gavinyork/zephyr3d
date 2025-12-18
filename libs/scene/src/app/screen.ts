@@ -1,4 +1,4 @@
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Rect } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { getDevice } from './api';
 
@@ -16,10 +16,12 @@ export type ScreenConfig = {
    * Scaling mode used to adapt the design resolution to the viewport.
    *
    * - 'fit'    – Preserve aspect ratio, show whole design area, may add letterboxing (black bars).
+   * - 'fit-width'  – Match viewport width exactly; height follows aspect ratio (may crop or letterbox vertically).
+   * - 'fit-height' – Match viewport height exactly; width follows aspect ratio (may crop or letterbox horizontall
    * - 'cover'  – Preserve aspect ratio, fill the entire viewport, design area may be cropped.
    * - 'stretch' – Do not preserve aspect ratio, stretch to fill the viewport.
    */
-  scaleMode: 'fit' | 'cover' | 'stretch';
+  scaleMode: 'fit' | 'fit-width' | 'fit-height' | 'cover' | 'stretch';
 };
 
 /**
@@ -56,6 +58,10 @@ export type ResolutionTransform = {
    * Height of the adjusted viewport in canvas coordinates (CSS pixels).
    */
   viewportHeight: number;
+  /**
+   * Visible part of the adjusted viewport, i.e. intersection with original viewport.
+   **/
+  croppedViewport: Rect;
   /**
    * Transform from canvas coordinates to the adjusted viewport's local coordinates.
    *
@@ -138,7 +144,7 @@ export class ScreenAdapter {
     this._config = this._config = {
       designWidth: 1920,
       designHeight: 1080,
-      scaleMode: 'stretch',
+      scaleMode: 'cover',
       ..._config
     };
   }
@@ -168,6 +174,7 @@ export class ScreenAdapter {
         viewportY,
         viewportWidth: 0,
         viewportHeight: 0,
+        croppedViewport: { x: viewportX, y: viewportY, width: 0, height: 0 },
         canvasToViewport: { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 },
         canvasToLogic: { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 }
       };
@@ -214,7 +221,62 @@ export class ScreenAdapter {
         finalViewportY = viewportY;
         break;
       }
+      case 'fit-width': {
+        // Match width exactly; height follows aspect ratio.
+        const s = sx; // width-driven
+        scaleX = scaleY = s;
+        finalViewportWidth = designWidth * s; // == viewportWidth
+        finalViewportHeight = designHeight * s; // may be > or < viewportHeight
+        finalViewportX = viewportX;
+        finalViewportY = viewportY + (viewportHeight - finalViewportHeight) * 0.5;
+        break;
+      }
+      case 'fit-height': {
+        // Match height exactly; width follows aspect ratio.
+        const s = sy; // height-driven
+        scaleX = scaleY = s;
+        finalViewportHeight = designHeight * s; // == viewportHeight
+        finalViewportWidth = designWidth * s; // may be > or < viewportWidth
+        finalViewportY = viewportY;
+        finalViewportX = viewportX + (viewportWidth - finalViewportWidth) * 0.5;
+        break;
+      }
     }
+
+    // ---- 交集：缩放后的视口 ∩ 原始 viewport ----
+    const adjLeft = finalViewportX;
+    const adjTop = finalViewportY;
+    const adjRight = finalViewportX + finalViewportWidth;
+    const adjBottom = finalViewportY + finalViewportHeight;
+
+    const rawLeft = viewportX;
+    const rawTop = viewportY;
+    const rawRight = viewportX + viewportWidth;
+    const rawBottom = viewportY + viewportHeight;
+
+    const cropLeft = Math.max(adjLeft, rawLeft);
+    const cropTop = Math.max(adjTop, rawTop);
+    const cropRight = Math.min(adjRight, rawRight);
+    const cropBottom = Math.min(adjBottom, rawBottom);
+
+    let croppedViewport: Rect;
+    if (cropRight <= cropLeft || cropBottom <= cropTop) {
+      // No intersection
+      croppedViewport = {
+        x: viewportX,
+        y: viewportY,
+        width: 0,
+        height: 0
+      };
+    } else {
+      croppedViewport = {
+        x: cropLeft,
+        y: cropTop,
+        width: cropRight - cropLeft,
+        height: cropBottom - cropTop
+      };
+    }
+
     // Transform: canvas -> viewport-local
     //   viewportLocalX = canvasX - finalViewportX
     //   viewportLocalY = canvasY - finalViewportY
@@ -252,6 +314,7 @@ export class ScreenAdapter {
       viewportY: finalViewportY,
       viewportWidth: finalViewportWidth,
       viewportHeight: finalViewportHeight,
+      croppedViewport,
       canvasToViewport,
       canvasToLogic
     };

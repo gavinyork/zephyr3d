@@ -1,11 +1,4 @@
-import type { Nullable } from './utils';
-
-type Rect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+import type { Nullable, Rect } from './utils';
 
 /**
  * The type of packed result.

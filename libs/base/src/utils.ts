@@ -173,6 +173,17 @@ export type GenericConstructor<T = object> = {
 };
 
 /**
+ * Rectangle type
+ * @public
+ */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
  * Clonable interface
  * @public
  */
