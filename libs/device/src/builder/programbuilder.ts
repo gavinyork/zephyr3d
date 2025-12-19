@@ -1164,7 +1164,7 @@ export class ProgramBuilder {
     while (funcScope && !(funcScope instanceof PBFunctionScope)) {
       funcScope = funcScope.$parent;
     }
-    return funcScope!;
+    return funcScope! as PBFunctionScope;
   }
   /**
    * Generates shader codes for a render program

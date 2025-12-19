@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "downlevelIteration": true,
+    "moduleResolution": "node",
+    "target": "ES2015",
+    "module": "ES2015",
+    "lib": ["ES6", "ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitAny": false,
+    "preserveConstEnums": false,
+    "listEmittedFiles": true,
+    "noUnusedLocals": true,
+    "strictNullChecks": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "sourceMap": true,
+    "stripInternal": true,
+    "typeRoots": ["./node_modules/@webgpu/types"]
+  },
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
+}

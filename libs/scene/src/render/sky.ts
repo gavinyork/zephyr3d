@@ -137,7 +137,7 @@ export class SkyRenderer extends Disposable {
   private _bindgroupSky: Partial<Record<SkyType, DRef<BindGroup>>> = {};
   private readonly _bindgroupFog: DRef<BindGroup> = null;
   private readonly _bindgroupFogNoDepth: DRef<BindGroup> = null;
-  private readonly _format: TextureFormat;
+  private _format: TextureFormat;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -179,12 +179,7 @@ export class SkyRenderer extends Disposable {
     this._bindgroupSky = {};
     this._bindgroupFog = new DRef();
     this._bindgroupFogNoDepth = new DRef();
-    const texCaps = getDevice().getDeviceCaps().textureCaps;
-    this._format = texCaps.getTextureFormatInfo('rg11b10uf')?.renderable
-      ? 'rg11b10uf'
-      : texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
-        ? 'rgba16f'
-        : 'rgba32f';
+    this._format = null;
   }
   /** @internal */
   getHash(_ctx: DrawContext): string {
@@ -194,6 +189,14 @@ export class SkyRenderer extends Disposable {
    * Gets the preferred environment texture format.
    */
   get envTextureFormat() {
+    if (!this._format) {
+      const texCaps = getDevice().getDeviceCaps().textureCaps;
+      this._format = texCaps.getTextureFormatInfo('rg11b10uf')?.renderable
+        ? 'rg11b10uf'
+        : texCaps.supportHalfFloatColorBuffer && texCaps.supportLinearHalfFloatTexture
+          ? 'rgba16f'
+          : 'rgba32f';
+    }
     return this._format;
   }
   /** Which type of the sky should be rendered */
@@ -470,7 +473,7 @@ export class SkyRenderer extends Disposable {
    */
   get radianceMap(): TextureCube {
     if (!this._radianceMap.get()) {
-      this._radianceMap.set(getDevice().createCubeTexture(this._format, this._radianceMapWidth));
+      this._radianceMap.set(getDevice().createCubeTexture(this.envTextureFormat, this._radianceMapWidth));
       this._radianceMap.get().name = 'SkyRadianceMap';
     }
     return this._radianceMap.get();
@@ -593,7 +596,7 @@ export class SkyRenderer extends Disposable {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
-      const tex = ctx.device.createTexture2D(this._format, 1, 1, { mipmapping: false });
+      const tex = ctx.device.createTexture2D(this.envTextureFormat, 1, 1, { mipmapping: false });
       tex.name = 'DistantSkyLut';
       this._skyDistantLightLut.set(ctx.device.createFrameBuffer([tex], null));
       this._bakedSkyboxDirty = true;
@@ -675,7 +678,7 @@ export class SkyRenderer extends Disposable {
     const tex =
       this._bakedSkyboxTexture.get() && this._bakedSkyboxTexture.get().width === this._bakedSkyboxTextureSize
         ? this._bakedSkyboxTexture.get()
-        : device.createCubeTexture(this._format, this._bakedSkyboxTextureSize, {
+        : device.createCubeTexture(this.envTextureFormat, this._bakedSkyboxTextureSize, {
             mipmapping: false
           });
     tex.name = 'BakedSkyboxTexture';
@@ -815,9 +818,13 @@ export class SkyRenderer extends Disposable {
           if (!tex.isTexture2D()) {
             console.error(`Invalid panorama texture asset: ${this._panoramaAsset}`);
           } else {
-            const skyboxTexture = getDevice().createCubeTexture(this._format, this._skyboxTextureSize, {
-              mipmapping: false
-            });
+            const skyboxTexture = getDevice().createCubeTexture(
+              this.envTextureFormat,
+              this._skyboxTextureSize,
+              {
+                mipmapping: false
+              }
+            );
             panoramaToCubemap(tex, skyboxTexture);
             skyboxTexture.name = 'SkyboxTexture';
             this.skyboxTexture = skyboxTexture;

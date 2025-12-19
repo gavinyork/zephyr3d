@@ -243,7 +243,7 @@ export class ScreenAdapter {
       }
     }
 
-    // ---- 交集：缩放后的视口 ∩ 原始 viewport ----
+    // calculate cropped viewport
     const adjLeft = finalViewportX;
     const adjTop = finalViewportY;
     const adjRight = finalViewportX + finalViewportWidth;
