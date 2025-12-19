@@ -106,6 +106,7 @@ dist/
 # Rush temporal files
 common/temp/
 .rush/
+rush-logs/
 
 # rollup
 .rollup.cache
