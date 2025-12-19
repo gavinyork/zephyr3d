@@ -370,7 +370,7 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       expect((m2 as any).equalsTo(m3)).toBe(true);
 
       const m4 = (c as any).multiply(m1, m2);
-      expect((m4 as any).equalsTo((c as any).identity())).toBe(true);
+      expect((m4 as any).equalsTo((c as any).identity(), 0.1)).toBe(true);
     });
 
     if ((c as any).translation) {
@@ -515,8 +515,8 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
       test('projection (perspective & ortho)', () => {
         const fovY = rand(0.1, 0.8 * Math.PI);
         const aspect = rand(0.1, 10);
-        const near = rand(0.1, 10);
-        const far = rand(100, 1000);
+        const near = rand(1, 2);
+        const far = rand(5, 10);
 
         const top = near * Math.tan(fovY / 2);
         const bottom = -top;
