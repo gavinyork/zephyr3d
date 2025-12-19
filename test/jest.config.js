@@ -14,6 +14,13 @@ module.exports = {
   moduleNameMapper: {
     '^@zephyr3d/base$': '<rootDir>/../libs/base/src',
     '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',
-    '^@zephyr3d/device$': '<rootDir>/../libs/device/src'
+    '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
+    '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',
+    '^@zephyr3d/scene/(.*)$': '<rootDir>/../libs/scene/src/$1'
+  },
+  globals: {
+    'ts-jest': {
+      isolatedModules: false
+    }
   }
 };

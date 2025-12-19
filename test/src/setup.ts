@@ -1,4 +1,5 @@
 import { numberEquals } from './mathtest/common';
+import 'fake-indexeddb/auto';
 
 expect.extend({
   toBeNear(received: number, expected: number, tol = 0.01) {

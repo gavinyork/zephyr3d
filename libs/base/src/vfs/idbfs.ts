@@ -408,7 +408,6 @@ export class IndexedDBFS extends VFS {
       const deleteRequest = indexedDB.deleteDatabase(name);
 
       deleteRequest.onsuccess = () => {
-        console.info(`Database "${name}" deleted successfully`);
         resolve();
       };
 
