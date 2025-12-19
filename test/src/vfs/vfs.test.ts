@@ -2,11 +2,11 @@ import type { VFS } from '@zephyr3d/base';
 import { VFSError, MemoryFS, ZipFS, IndexedDBFS } from '@zephyr3d/base';
 import * as zipjs from '@zip.js/zip.js';
 
-// VFS类型定义
+// Supported VFS implementations
 const VFSTypes = ['MemoryFS', 'IndexedDBFS', 'ZipFS'] as const;
 type VFSType = (typeof VFSTypes)[number];
 
-// 工厂函数
+// Factory for creating VFS instances
 function createVFS(type: VFSType, name: string = 'TestVFS', readonly = false): VFS {
   switch (type) {
     case 'MemoryFS':
@@ -18,9 +18,9 @@ function createVFS(type: VFSType, name: string = 'TestVFS', readonly = false): V
   }
 }
 
-// 创建测试文件结构
+// Populate a VFS instance with a structure for glob tests
 async function createGlobTestStructure(fs: VFS) {
-  // 根目录文件
+  // Files in root
   await fs.writeFile('/file1.txt', 'content1');
   await fs.writeFile('/file2.log', 'content2');
   await fs.writeFile('/File3.TXT', 'content3');
@@ -30,7 +30,7 @@ async function createGlobTestStructure(fs: VFS) {
   await fs.writeFile('/test.min.js', 'minified');
   await fs.writeFile('/app.js', 'app code');
 
-  // src 目录
+  // src
   await fs.makeDirectory('/src');
   await fs.writeFile('/src/index.js', 'index');
   await fs.writeFile('/src/utils.ts', 'utils');
@@ -38,20 +38,20 @@ async function createGlobTestStructure(fs: VFS) {
   await fs.writeFile('/src/styles.css', 'styles');
   await fs.writeFile('/src/config.json', 'config');
 
-  // src/components 目录
+  // src/components
   await fs.makeDirectory('/src/components');
   await fs.writeFile('/src/components/Button.tsx', 'button');
   await fs.writeFile('/src/components/Modal.jsx', 'modal');
   await fs.writeFile('/src/components/index.js', 'exports');
   await fs.writeFile('/src/components/.DS_Store', 'system');
 
-  // tests 目录
+  // tests
   await fs.makeDirectory('/tests');
   await fs.writeFile('/tests/unit.test.js', 'unit tests');
   await fs.writeFile('/tests/integration.test.ts', 'integration tests');
   await fs.writeFile('/tests/setup.js', 'test setup');
 
-  // docs 目录
+  // docs
   await fs.makeDirectory('/docs');
   await fs.writeFile('/docs/api.md', 'api docs');
   await fs.writeFile('/docs/guide.md', 'guide docs');
@@ -59,14 +59,14 @@ async function createGlobTestStructure(fs: VFS) {
   await fs.writeFile('/docs/images/logo.png', 'logo');
   await fs.writeFile('/docs/images/screenshot.jpg', 'screenshot');
 
-  // node_modules 目录
+  // node_modules
   await fs.makeDirectory('/node_modules/package', true);
   await fs.writeFile('/node_modules/package/index.js', 'dependency');
 }
 
-// 使用 describe.each 为每种 VFS 类型生成测试套件
+// Generate a full test suite for each VFS implementation
 describe.each(VFSTypes)('%s Tests', (vfsType) => {
-  describe('基础文件操作', () => {
+  describe('basic file operations', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -77,20 +77,20 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能写入和读取文件', async () => {
+    test('writes and reads files', async () => {
       await fs.writeFile('/test.txt', 'Hello World');
       const content = await fs.readFile('/test.txt', { encoding: 'utf8' });
       expect(content).toBe('Hello World');
     });
 
-    test('应该正确检查文件是否存在', async () => {
+    test('checks file existence', async () => {
       await fs.writeFile('/test.txt', 'content');
       expect(await fs.exists('/test.txt')).toBe(true);
       expect(await fs.exists('/nonexistent.txt')).toBe(false);
     });
   });
 
-  describe('目录操作', () => {
+  describe('directory operations', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -101,12 +101,12 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能创建目录', async () => {
+    test('creates directories', async () => {
       await fs.makeDirectory('/testdir');
       expect(await fs.exists('/testdir')).toBe(true);
     });
 
-    test('应该能列举目录内容', async () => {
+    test('lists directory contents', async () => {
       await fs.makeDirectory('/testdir');
       await fs.writeFile('/testdir/file.txt', 'content');
       const entries = await fs.readDirectory('/testdir');
@@ -115,7 +115,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
     });
   });
 
-  describe('挂载操作', () => {
+  describe('mounts', () => {
     let rootFS: VFS;
     let subFS: VFS;
 
@@ -129,7 +129,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await subFS.wipe();
     });
 
-    test('应该能挂载和访问子文件系统', async () => {
+    test('mounts a sub file system and reads from it', async () => {
       await subFS.writeFile('/sub-file.txt', 'sub content');
       await rootFS.mount('/mnt', subFS);
 
@@ -139,7 +139,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(content).toBe('sub content');
     });
 
-    test('应该能卸载文件系统', async () => {
+    test('unmounts file systems', async () => {
       await subFS.writeFile('/sub-file.txt', 'sub content');
       await rootFS.mount('/mnt', subFS);
 
@@ -148,7 +148,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(rootFS.hasMounts()).toBe(false);
     });
 
-    test('不应该允许删除挂载点', async () => {
+    test('does not allow deleting a mount point', async () => {
       await subFS.writeFile('/sub-file.txt', 'sub content');
       await rootFS.mount('/mnt', subFS);
 
@@ -156,7 +156,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
     });
   });
 
-  describe('文件复制', () => {
+  describe('file copy', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -167,7 +167,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能复制文件', async () => {
+    test('copies files', async () => {
       await fs.writeFile('/source.txt', 'original content');
       await fs.copyFile('/source.txt', '/copy.txt');
 
@@ -177,7 +177,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
     });
   });
 
-  describe('错误处理', () => {
+  describe('error handling', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -188,17 +188,17 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('读取不存在的文件应该抛出错误', async () => {
+    test('throws when reading a missing file', async () => {
       await expect(fs.readFile('/nonexistent.txt')).rejects.toThrow(VFSError);
     });
 
-    test('只读文件系统不应允许写入', async () => {
+    test('does not allow writes on a read-only file system', async () => {
       const readOnlyFS = createVFS(vfsType, `${vfsType}_readonly`, true);
       await expect(readOnlyFS.writeFile('/test.txt', 'content')).rejects.toThrow(VFSError);
     });
   });
 
-  describe('二进制数据', () => {
+  describe('binary data', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -209,7 +209,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能处理二进制数据', async () => {
+    test('reads and writes binary data', async () => {
       const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
       await fs.writeFile('/binary.dat', binaryData.buffer);
 
@@ -220,7 +220,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(readArray).toEqual(binaryData);
     });
 
-    test('应该能追加二进制数据', async () => {
+    test('appends binary data', async () => {
       const data1 = new Uint8Array([1, 2, 3]);
       const data2 = new Uint8Array([4, 5, 6]);
       const expected = new Uint8Array([1, 2, 3, 4, 5, 6]);
@@ -234,7 +234,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
     });
   });
 
-  describe('文件移动', () => {
+  describe('file moves', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -245,7 +245,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能重命名文件', async () => {
+    test('renames files', async () => {
       await fs.writeFile('/source.txt', 'Hello World');
       await fs.move('/source.txt', '/renamed.txt');
 
@@ -256,7 +256,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(content).toBe('Hello World');
     });
 
-    test('应该能移动目录', async () => {
+    test('moves directories', async () => {
       await fs.makeDirectory('/testdir');
       await fs.writeFile('/testdir/nested.txt', 'nested content');
       await fs.move('/testdir', '/newdir');
@@ -266,14 +266,14 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(await fs.exists('/newdir/nested.txt')).toBe(true);
     });
 
-    test('默认不应覆盖已存在的文件', async () => {
+    test('does not overwrite existing files by default', async () => {
       await fs.writeFile('/source.txt', 'source content');
       await fs.writeFile('/target.txt', 'target content');
 
       await expect(fs.move('/source.txt', '/target.txt')).rejects.toThrow(VFSError);
     });
 
-    test('设置overwrite后应该能覆盖文件', async () => {
+    test('overwrites files when overwrite is enabled', async () => {
       await fs.writeFile('/source.txt', 'source content');
       await fs.writeFile('/target.txt', 'target content');
 
@@ -287,7 +287,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
     });
   });
 
-  describe('Glob 操作', () => {
+  describe('glob', () => {
     let fs: VFS;
 
     beforeEach(async () => {
@@ -299,13 +299,13 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('* 通配符应该匹配文件', async () => {
+    test('* matches files in the current directory', async () => {
       const txtFiles = await fs.glob('*.txt');
       const txtNames = txtFiles.map((r) => r.name).sort();
       expect(txtNames).toEqual(['file1.txt']);
     });
 
-    test('** 通配符应该递归匹配', async () => {
+    test('** matches files recursively', async () => {
       const allJsFiles = await fs.glob('**/*.js');
       expect(allJsFiles.length).toBeGreaterThanOrEqual(5);
 
@@ -314,14 +314,14 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(paths).toContain('src/components/index.js');
     });
 
-    test('应该能忽略指定模式', async () => {
+    test('supports ignore patterns', async () => {
       const withoutMin = await fs.glob('**/*.js', { ignore: '**/*.min.js' });
       const names = withoutMin.map((r) => r.name);
       expect(names).not.toContain('test.min.js');
     });
   });
 
-  describe('工作目录（CWD）', () => {
+  describe('working directory (CWD)', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -332,17 +332,17 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('默认工作目录应该是根目录', () => {
+    test('defaults to root', () => {
       expect(fs.getCwd()).toBe('/');
     });
 
-    test('应该能切换工作目录', async () => {
+    test('changes the working directory', async () => {
       await fs.makeDirectory('/home/user', true);
       await fs.chdir('/home/user');
       expect(fs.getCwd()).toBe('/home/user');
     });
 
-    test('应该能用相对路径操作文件', async () => {
+    test('supports relative paths', async () => {
       await fs.makeDirectory('/home/user', true);
       await fs.chdir('/home/user');
       await fs.writeFile('test.txt', 'test content');
@@ -350,7 +350,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(await fs.exists('/home/user/test.txt')).toBe(true);
     });
 
-    test('pushd 和 popd 应该正常工作', async () => {
+    test('pushd and popd manage a directory stack', async () => {
       await fs.makeDirectory('/home/user', true);
       await fs.makeDirectory('/tmp', true);
 
@@ -362,12 +362,12 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(fs.getCwd()).toBe('/home/user');
     });
 
-    test('空栈 popd 应该抛出错误', async () => {
+    test('popd on an empty stack throws', async () => {
       await expect(fs.popd()).rejects.toThrow(VFSError);
     });
   });
 
-  describe('文件状态', () => {
+  describe('stat', () => {
     let fs: VFS;
 
     beforeEach(() => {
@@ -378,7 +378,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       await fs.wipe();
     });
 
-    test('应该能获取文件状态', async () => {
+    test('returns file stats', async () => {
       await fs.writeFile('/file.txt', 'content');
       const stat = await fs.stat('/file.txt');
 
@@ -389,7 +389,7 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
       expect(stat.modified).toBeInstanceOf(Date);
     });
 
-    test('应该能获取目录状态', async () => {
+    test('returns directory stats', async () => {
       await fs.makeDirectory('/directory');
       const stat = await fs.stat('/directory');
 
