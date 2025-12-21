@@ -596,13 +596,26 @@ interface FormatToken {
   };
   width?: number; // number or from-arg
   widthFromArg?: boolean; // *
+  widthIndex?: number;
   precision?: number; // .number or from-arg
   precisionFromArg?: boolean; // .*
+  precisionIndex?: number;
   type: string; // s d i u f x X o c %
   explicitIndex?: number; // n$ style index (1-based)
 }
 
-const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc])/g;
+// 说明：
+//  1: i$           -> 显式索引（整个转换的值索引）
+//  2: flagsStr
+//  3: starWidth    -> '*'（有星号宽度）
+//  4: widthIndex$  -> 星号宽度的显式索引，如 *3$ 里的 3
+//  5: widthNum     -> 数字宽度，如 10
+//  6: starPrec     -> '*'（有星号精度）
+//  7: precIndex$   -> 星号精度的显式索引，如 *4$ 里的 4
+//  8: precNum      -> 数字精度，如 .2
+//  9: type
+const formatRegex =
+  /%(?:(\d+)\$)?([-+ 0#]*)(?:(\*)(?:(\d+)\$)?|(\d+))?(?:\.(?:(\*)(?:(\d+)\$)?|(\d+)))?([%sdifuoxXc])/g;
 
 /**
  * Simple sprintf implementation:
@@ -669,150 +682,172 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
     return n;
   };
 
-  format.replace(formatRegex, (match, i$, flagsStr, widthStr, precStr, type, offset) => {
-    out += format.slice(lastIndex, offset);
-    lastIndex = offset + match.length;
+  format.replace(
+    formatRegex,
+    (
+      match,
+      i$, // 1
+      flagsStr, // 2
+      starWidth, // 3: '*' or undefined
+      widthIndex$, // 4: like '3' in *3$
+      widthNum, // 5: like '10'
+      starPrec, // 6: '*' or undefined
+      precIndex$, // 7: like '4' in *4$
+      precNum, // 8: like '2'
+      type, // 9
+      offset
+    ) => {
+      out += format.slice(lastIndex, offset);
+      lastIndex = offset + match.length;
 
-    const token: FormatToken = {
-      flags: {
-        leftAlign: false,
-        sign: false,
-        space: false,
-        zeroPad: false,
-        alt: false
-      },
-      type
-    };
-
-    if (i$) {
-      token.explicitIndex = parseInt(i$, 10);
-    }
-
-    // flags
-    for (const ch of flagsStr || '') {
-      switch (ch) {
-        case '-':
-          token.flags.leftAlign = true;
-          break;
-        case '+':
-          token.flags.sign = true;
-          break;
-        case ' ':
-          token.flags.space = true;
-          break;
-        case '0':
-          token.flags.zeroPad = true;
-          break;
-        case '#':
-          token.flags.alt = true;
-          break;
-      }
-    }
-
-    // width
-    if (widthStr === '*') {
-      token.widthFromArg = true;
-    } else if (widthStr) {
-      token.width = parseInt(widthStr, 10);
-    }
-
-    // precision
-    if (precStr === '*') {
-      token.precisionFromArg = true;
-    } else if (precStr) {
-      token.precision = parseInt(precStr, 10);
-    }
-
-    const render = (): string => {
-      // read * parameter of width/precision
-      if (token.widthFromArg) {
-        const wArg = readArg(token.explicitIndex);
-        token.width = parseNumber(wArg, 'width');
-      }
-      if (token.precisionFromArg) {
-        const pArg = readArg(token.explicitIndex);
-        token.precision = parseNumber(pArg, 'precision');
-        if (token.precision! < 0) {
-          token.precision = undefined;
-        }
-      }
-
-      const t = token.type;
-
-      if (t === '%') {
-        // literal %
-        return '%';
-      }
-
-      const raw = readArg(token.explicitIndex);
-
-      let body = '';
-      let signStr = '';
-
-      const asNumber = (v: SprintfArg): number => {
-        const n =
-          typeof v === 'boolean'
-            ? v
-              ? 1
-              : 0
-            : v == null
-              ? NaN
-              : typeof v === 'string' && v.trim() === ''
-                ? 0
-                : Number(v);
-        return n;
+      const token: FormatToken = {
+        flags: {
+          leftAlign: false,
+          sign: false,
+          space: false,
+          zeroPad: false,
+          alt: false
+        },
+        type
       };
 
-      const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
-        if (!width || s.length >= width) {
-          return s;
-        }
-        const fill = padChar.repeat(width - s.length);
-        return leftAlign ? s + fill : fill + s;
-      };
+      if (i$) {
+        token.explicitIndex = parseInt(i$, 10);
+      }
 
-      const prefixForAlt = (t: string): string => {
-        if (t === 'x') {
-          return '0x';
+      // flags
+      for (const ch of flagsStr || '') {
+        switch (ch) {
+          case '-':
+            token.flags.leftAlign = true;
+            break;
+          case '+':
+            token.flags.sign = true;
+            break;
+          case ' ':
+            token.flags.space = true;
+            break;
+          case '0':
+            token.flags.zeroPad = true;
+            break;
+          case '#':
+            token.flags.alt = true;
+            break;
         }
-        if (t === 'X') {
-          return '0X';
-        }
-        if (t === 'o') {
-          return '0o';
-        }
-        return '';
-      };
+      }
 
-      switch (t) {
-        case 's': {
-          body = String(raw ?? '');
-          if (token.precision != null) {
-            // precision
-            body = body.slice(0, token.precision);
+      // width
+      if (starWidth) {
+        token.widthFromArg = true;
+        if (widthIndex$) {
+          token.widthIndex = parseInt(widthIndex$, 10);
+        }
+      } else if (widthNum) {
+        token.width = parseInt(widthNum, 10);
+      }
+
+      // precision
+      if (starPrec) {
+        token.precisionFromArg = true;
+        if (precIndex$) {
+          token.precisionIndex = parseInt(precIndex$, 10);
+        }
+      } else if (precNum) {
+        token.precision = parseInt(precNum, 10);
+      }
+
+      const render = (): string => {
+        const readIndex = (idx?: number): SprintfArg => readArg(idx);
+
+        // read * parameter of width/precision
+        if (token.widthFromArg) {
+          const wArg = readIndex(token.widthIndex ?? token.explicitIndex);
+          token.width = parseNumber(wArg, 'width');
+        }
+        if (token.precisionFromArg) {
+          const pArg = readIndex(token.precisionIndex ?? token.explicitIndex);
+          token.precision = parseNumber(pArg, 'precision');
+          if (token.precision! < 0) {
+            token.precision = undefined;
           }
-          break;
         }
-        case 'c': {
-          if (typeof raw === 'number') {
-            body = String.fromCharCode(raw);
-          } else {
-            const s = String(raw ?? '');
-            body = s.length ? s[0] : '\u0000';
+
+        const t = token.type;
+
+        if (t === '%') {
+          // literal %
+          return '%';
+        }
+
+        const raw = readArg(token.explicitIndex);
+
+        let body = '';
+        let signStr = '';
+
+        const asNumber = (v: SprintfArg): number => {
+          const n =
+            typeof v === 'boolean'
+              ? v
+                ? 1
+                : 0
+              : v == null
+                ? NaN
+                : typeof v === 'string' && v.trim() === ''
+                  ? 0
+                  : Number(v);
+          return n;
+        };
+
+        const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
+          if (!width || s.length >= width) {
+            return s;
           }
-          break;
-        }
-        case 'd':
-        case 'i':
-        case 'u': {
-          let n = asNumber(raw);
-          if (t === 'u') {
-            n = Math.floor(Math.abs(n)) >>> 0; // unsigned 32bit
-            body = n.toString(10);
-          } else {
+          const fill = padChar.repeat(width - s.length);
+          return leftAlign ? s + fill : fill + s;
+        };
+
+        const prefixForAlt = (t: string): string => {
+          if (t === 'x') {
+            return '0x';
+          }
+          if (t === 'X') {
+            return '0X';
+          }
+          if (t === 'o') {
+            return '0o';
+          }
+          return '';
+        };
+
+        switch (t) {
+          case 's': {
+            body = String(raw ?? '');
+            if (token.precision != null) {
+              // precision: max length
+              body = body.slice(0, token.precision);
+            }
+            break;
+          }
+          case 'c': {
+            if (typeof raw === 'number') {
+              body = String.fromCharCode(raw);
+            } else {
+              const s = String(raw ?? '');
+              body = s.length ? s[0] : '\u0000';
+            }
+            break;
+          }
+          case 'd':
+          case 'i': {
+            const n = asNumber(raw);
             const isNeg = n < 0 || Object.is(n, -0);
             const abs = Math.abs(n);
             body = Math.trunc(abs).toString(10);
+
+            if (token.precision != null) {
+              body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
+            }
+
             if (isNeg) {
               signStr = '-';
             } else if (token.flags.sign) {
@@ -820,73 +855,81 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
             } else if (token.flags.space) {
               signStr = ' ';
             }
+
+            body = signStr + body;
+            break;
           }
-          if (token.precision != null) {
-            body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
-          }
-          body = signStr + body;
-          break;
-        }
-        case 'f': {
-          const n = asNumber(raw);
-          const prec = token.precision ?? 6;
-          if (!Number.isFinite(n)) {
-            body = String(n);
-          } else {
-            body = n.toFixed(Math.max(0, Math.min(100, prec)));
-          }
-          if (n >= 0) {
-            if (token.flags.sign) {
-              body = '+' + body;
-            } else if (token.flags.space) {
-              body = ' ' + body;
+          case 'u': {
+            const n = asNumber(raw);
+            const u = n >>> 0; // unsigned 32-bit
+            body = u.toString(10);
+
+            if (token.precision != null) {
+              body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
             }
+            break;
           }
-          break;
+          case 'f': {
+            const n = asNumber(raw);
+            const prec = token.precision ?? 6;
+            if (!Number.isFinite(n)) {
+              body = String(n);
+            } else {
+              body = n.toFixed(Math.max(0, Math.min(100, prec)));
+            }
+            if (n >= 0) {
+              if (token.flags.sign) {
+                body = '+' + body;
+              } else if (token.flags.space) {
+                body = ' ' + body;
+              }
+            }
+            break;
+          }
+          case 'x':
+          case 'X':
+          case 'o': {
+            const n = asNumber(raw);
+            const isUpper = t === 'X';
+            const abs = Math.trunc(Math.abs(n));
+            let str = t === 'o' ? abs.toString(8) : abs.toString(16);
+            if (isUpper) {
+              str = str.toUpperCase();
+            }
+            if (token.precision != null) {
+              str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
+            }
+            const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
+            body = pre + str;
+            break;
+          }
+          default:
+            throw new Error(`Unsupported format type: ${t}`);
         }
-        case 'x':
-        case 'X':
-        case 'o': {
-          const n = asNumber(raw);
-          const isUpper = t === 'X';
-          const abs = Math.trunc(Math.abs(n));
-          let str = t === 'o' ? abs.toString(8) : abs.toString(16);
-          if (isUpper) {
-            str = str.toUpperCase();
-          }
-          if (token.precision != null) {
-            str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
-          }
-          const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
-          body = pre + str;
-          break;
+
+        const useZeroPad =
+          token.flags.zeroPad &&
+          !token.flags.leftAlign &&
+          token.type !== 's' &&
+          token.precision == null &&
+          token.type !== '%';
+
+        if (useZeroPad) {
+          const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
+          const prefix = prefixMatch ? prefixMatch[0] : '';
+          const rest = body.slice(prefix.length);
+          body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
+        } else {
+          body = pad(body, token.width, token.flags.leftAlign, ' ');
         }
-        default:
-          throw new Error(`Unsupported format type: ${t}`);
-      }
 
-      const useZeroPad =
-        token.flags.zeroPad &&
-        !token.flags.leftAlign &&
-        token.type !== 's' &&
-        token.precision == null &&
-        token.type !== '%';
+        return body;
+      };
 
-      if (useZeroPad) {
-        const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
-        const prefix = prefixMatch ? prefixMatch[0] : '';
-        const rest = body.slice(prefix.length);
-        body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
-      } else {
-        body = pad(body, token.width, token.flags.leftAlign, ' ');
-      }
-
-      return body;
-    };
-
-    out += render();
-    return match;
-  });
+      out += render();
+      return match;
+    }
+  );
 
   out += format.slice(lastIndex);
   return out;

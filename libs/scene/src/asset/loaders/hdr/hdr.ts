@@ -1,10 +1,10 @@
 import { AbstractTextureLoader } from '../loader';
 import type { TypedArray } from '@zephyr3d/base';
-import { floatToHalf, packFloat3 } from '@zephyr3d/base';
+import { float2half, packFloat3 } from '@zephyr3d/base';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
 import { getDevice } from '../../../app/api';
 
-const _f16one = floatToHalf(1);
+const _f16one = float2half(1);
 /**
  * The HDR texture loader
  * @internal
@@ -58,9 +58,9 @@ export class HDRLoader extends AbstractTextureLoader {
     const result = new Uint16Array(length * 4);
     for (let i = 0; i < length; i++) {
       const s = Math.pow(2, buffer[i * 4 + 3] - (128 + 8));
-      result[i * 4 + 0] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4] * s, 65504)));
-      result[i * 4 + 1] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4 + 1] * s, 65504)));
-      result[i * 4 + 2] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4 + 2] * s, 65504)));
+      result[i * 4 + 0] = float2half(Math.max(-65504, Math.min(buffer[i * 4] * s, 65504)));
+      result[i * 4 + 1] = float2half(Math.max(-65504, Math.min(buffer[i * 4 + 1] * s, 65504)));
+      result[i * 4 + 2] = float2half(Math.max(-65504, Math.min(buffer[i * 4 + 2] * s, 65504)));
       result[i * 4 + 3] = _f16one;
     }
     return result;

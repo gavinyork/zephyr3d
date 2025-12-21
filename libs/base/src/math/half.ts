@@ -1,3 +1,7 @@
+const tmpArrayBuffer = new ArrayBuffer(4);
+const tmpFloatArray = new Float32Array(tmpArrayBuffer);
+const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
+
 /**
  * Convert float16 to float32
  * @param f16 - float16 value
@@ -5,16 +9,24 @@
  * @public
  */
 export function half2float(f16: number): number {
-  const s = (f16 & 0x8000) >> 15; // sign
-  const e = (f16 & 0x7c00) >> 10; // exponent
-  const f = f16 & 0x03ff; // fraction
-
-  if (e === 0) {
-    return (s ? -1 : 1) * Math.pow(2, -14) * (f / 0x0400);
-  } else if (e === 0x1f) {
-    return f ? NaN : (s ? -1 : 1) * Infinity;
+  let mantissa = f16 & 0x3ff;
+  let exponent = f16 & 0x7c00;
+  if (exponent === 0x7c00) {
+    exponent = 0x8f;
+  } else if (exponent !== 0) {
+    exponent = (f16 >>> 10) & 0x1f;
+  } else if (mantissa !== 0) {
+    exponent = 1;
+    do {
+      exponent--;
+      mantissa <<= 1;
+    } while ((mantissa & 0x0400) === 0);
+    mantissa &= 0x3ff;
+  } else {
+    exponent = -112;
   }
-  return (s ? -1 : 1) * Math.pow(2, e - 15) * (1 + f / 0x0400);
+  tmpUint32Array[0] = ((f16 & 0x8000) << 16) | (((exponent + 112) << 23) | (mantissa << 13));
+  return tmpFloatArray[0];
 }
 
 /**
@@ -24,47 +36,25 @@ export function half2float(f16: number): number {
  * @public
  */
 export function float2half(f32: number): number {
-  const buf = new ArrayBuffer(4);
-  const view = new DataView(buf);
-  view.setFloat32(0, f32, false);
-
-  const i32 = view.getInt32(0, false);
-
-  const sign = (i32 >>> 31) & 0x1;
-  const exponent = (i32 >>> 23) & 0xff;
-  let fraction = i32 & 0x7fffff;
-
-  if (exponent === 0xff) {
-    if (fraction === 0) {
-      return (sign << 15) | 0x7c00;
-    } else {
-      return (sign << 15) | 0x7c00 | (fraction >>> 13);
-    }
+  tmpFloatArray[0] = f32;
+  let ivalue = tmpUint32Array[0];
+  let result: number;
+  const sign = (ivalue & 0x80000000) >>> 16;
+  ivalue = ivalue & 0x7fffffff;
+  if (ivalue >= 0x47800000) {
+    // number is too large
+    result = 0x7c00 | (ivalue > 0x7f800000 ? 0x200 | ((ivalue >>> 13) & 0x3ff) : 0);
+  } else if (ivalue <= 0x33000000) {
+    result = 0;
+  } else if (ivalue < 0x38800000) {
+    const shift = 125 - (ivalue >>> 23);
+    ivalue = 0x800000 | (ivalue & 0x7fffff);
+    result = ivalue >>> (shift + 1);
+    const s = (ivalue & ((1 << shift) - 1)) !== 0 ? 1 : 0;
+    result += (result | s) & ((ivalue >>> shift) & 1);
+  } else {
+    ivalue += 0xc8000000;
+    result = ((ivalue + 0x0fff + ((ivalue >>> 13) & 1)) >>> 13) & 0x7fff;
   }
-
-  if (exponent <= 112) {
-    return sign << 15;
-  }
-
-  if (exponent >= 143) {
-    return (sign << 15) | 0x7c00;
-  }
-
-  let e = exponent - 127 + 15;
-  const extra = fraction & 0x1fff;
-  fraction = fraction >>> 13;
-
-  if (extra > 0x1000 || (extra === 0x1000 && (fraction & 0x1) === 1)) {
-    fraction++;
-    if (fraction === 0x400) {
-      fraction = 0;
-      e++;
-    }
-  }
-
-  if (e >= 31) {
-    return (sign << 15) | 0x7c00;
-  }
-
-  return (sign << 15) | (e << 10) | fraction;
+  return result | sign;
 }

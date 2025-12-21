@@ -71,61 +71,6 @@ export function nextPowerOf2(value: number): number {
 }
 
 /**
- * Converts float value to half float
- *
- * @param val - The float value to be converted.
- * @returns A 16-bits integer presents the half float value
- *
- * @public
- */
-export function floatToHalf(val: number): number {
-  /*
-  _floatView[0] = val;
-  const x = _int32View[0];
-  let bits = (x >> 16) & 0x8000;
-  let m = (x >> 12) & 0x07ff;
-  const e = (x >> 23) & 0xff;
-  if (e < 103) {
-    return bits;
-  }
-  if (e > 142) {
-    bits |= 0x7c00;
-    bits |= (e === 255 ? 0 : 1) && x & 0x007fffff;
-    return bits;
-  }
-  if (e < 113) {
-    m |= 0x0800;
-    bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-    return bits;
-  }
-  bits |= ((e - 112) << 10) | (m >> 1);
-  bits += m & 1;
-  return bits;
-  */
-  tmpFloatArray[0] = val;
-  let ivalue = tmpUint32Array[0];
-  let result: number;
-  const sign = (ivalue & 0x80000000) >>> 16;
-  ivalue = ivalue & 0x7fffffff;
-  if (ivalue >= 0x47800000) {
-    // number is too large
-    result = 0x7c00 | (ivalue > 0x7f800000 ? 0x200 | ((ivalue >>> 13) & 0x3ff) : 0);
-  } else if (ivalue <= 0x33000000) {
-    result = 0;
-  } else if (ivalue < 0x38800000) {
-    const shift = 125 - (ivalue >>> 23);
-    ivalue = 0x800000 | (ivalue & 0x7fffff);
-    result = ivalue >>> (shift + 1);
-    const s = (ivalue & ((1 << shift) - 1)) !== 0 ? 1 : 0;
-    result += (result | s) & ((ivalue >>> shift) & 1);
-  } else {
-    ivalue += 0xc8000000;
-    result = ((ivalue + 0x0fff + ((ivalue >>> 13) & 1)) >>> 13) & 0x7fff;
-  }
-  return result | sign;
-}
-
-/**
  * Converts half float value to float
  *
  * @param val - A 16-bits integer presents the half float value to be converted.
@@ -179,12 +124,6 @@ export function halfToFloat(val: number): number {
  * @public
  */
 export function packFloat3(a: number, b: number, c: number): number {
-  /*
-  const x = floatToHalf(a);
-  const y = floatToHalf(b);
-  const z = floatToHalf(c);
-  return ((x >> 4) & 0x7ff) | (((y << 7) & 0x3ff800)) | (((z << 17) & 0xffc00000));
-  */
   const ivalues: number[] = [];
   const result: number[] = [];
   tmpFloatArray[0] = a;

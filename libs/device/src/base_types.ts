@@ -1,5 +1,5 @@
 import type { TypedArray, Vector4, IEventTarget, Nullable, Immutable } from '@zephyr3d/base';
-import { floatToHalf } from '@zephyr3d/base';
+import { float2half } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
 import type {
   BaseTexture,
@@ -1865,7 +1865,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
     case 'r8snorm':
       return new Int8Array([normalizeColorComponentSigned(r, 255)]);
     case 'r16f':
-      return new Uint16Array([floatToHalf(r)]);
+      return new Uint16Array([float2half(r)]);
     case 'r32f':
       return new Float32Array([r]);
     case 'r8ui':
@@ -1885,7 +1885,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
     case 'rg8snorm':
       return new Int8Array([normalizeColorComponentSigned(r, 255), normalizeColorComponentSigned(g, 255)]);
     case 'rg16f':
-      return new Uint16Array([floatToHalf(r), floatToHalf(g)]);
+      return new Uint16Array([float2half(r), float2half(g)]);
     case 'rg32f':
       return new Float32Array([r, g]);
     case 'rg8ui':
@@ -1924,7 +1924,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
         normalizeColorComponentSigned(a, 255)
       ]);
     case 'rgba16f':
-      return new Uint16Array([floatToHalf(r), floatToHalf(g), floatToHalf(b), floatToHalf(a)]);
+      return new Uint16Array([float2half(r), float2half(g), float2half(b), float2half(a)]);
     case 'rgba32f':
       return new Float32Array([r, g, b, a]);
     case 'rgba8ui':
@@ -1961,7 +1961,7 @@ export function encodePixelToArray(
       arr.push(normalizeColorComponentSigned(r, 255));
       break;
     case 'r16f':
-      arr.push(floatToHalf(r));
+      arr.push(float2half(r));
       break;
     case 'r32f':
       arr.push(r);
@@ -1991,7 +1991,7 @@ export function encodePixelToArray(
       arr.push(normalizeColorComponentSigned(r, 255), normalizeColorComponentSigned(g, 255));
       break;
     case 'rg16f':
-      arr.push(floatToHalf(r), floatToHalf(g));
+      arr.push(float2half(r), float2half(g));
       break;
     case 'rg32f':
       arr.push(r, g);
@@ -2041,7 +2041,7 @@ export function encodePixelToArray(
       );
       break;
     case 'rgba16f':
-      arr.push(floatToHalf(r), floatToHalf(g), floatToHalf(b), floatToHalf(a));
+      arr.push(float2half(r), float2half(g), float2half(b), float2half(a));
       break;
     case 'rgba32f':
       arr.push(r, g, b, a);
