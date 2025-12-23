@@ -527,6 +527,9 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
         const m2 = Matrix4x4.frustum(left, right, bottom, top, near, far);
         expect(m1.equalsTo(m2)).toBe(true);
 
+        expect(m1.getFov()).toBeNear(fovY, 0.01);
+        expect(m1.getTanHalfFov()).toBeNear(Math.tan(fovY * 0.5), 0.01);
+        expect(m1.getAspect()).toBeNear(aspect, 0.01);
         expect(m1.getLeftPlane()).toBeNear(left, 0.01);
         expect(m1.getRightPlane()).toBeNear(right, 0.01);
         expect(m1.getTopPlane()).toBeNear(top, 0.01);
@@ -577,6 +580,9 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
         }
 
         const m3 = Matrix4x4.ortho(left, right, bottom, top, near, far);
+        expect(m3.getFov() === 0).toBe(true);
+        expect(m3.getTanHalfFov() === 0).toBe(true);
+        expect(m3.getAspect()).toBeNear((right - left) / (top - bottom), 0.01);
         expect(numberEquals(m3.getLeftPlane(), left, 0.01)).toBe(true);
         expect(numberEquals(m3.getRightPlane(), right, 0.01)).toBe(true);
         expect(numberEquals(m3.getTopPlane(), top, 0.01)).toBe(true);
