@@ -159,7 +159,6 @@ export class SceneRenderer {
         scene,
         renderWidth,
         renderHeight,
-        primaryCamera: camera,
         picking: false,
         oit: null,
         motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur),

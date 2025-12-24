@@ -2,7 +2,6 @@ import type { Scene } from './scene';
 import type { GraphNode } from './graph_node';
 import type { Mesh } from './mesh';
 import type { Camera } from '../camera/camera';
-import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
@@ -410,7 +409,7 @@ export class SceneNode
    */
   async clone(): Promise<this> {
     this.iterate((node) => {
-      if (node.isTerrain() || node.isClipmapTerrain()) {
+      if (node.isClipmapTerrain()) {
         throw new Error('Cloning terrain node is not allowed');
       }
     });
@@ -543,10 +542,6 @@ export class SceneNode
   }
   /** Type guard: true if this node is a batch group. */
   isBatchGroup(): this is BatchGroup {
-    return false;
-  }
-  /** Type guard: true if this node is a terrain. */
-  isTerrain(): this is Terrain {
     return false;
   }
   /** Type guard: true if this node is a clipmap terrain. */

@@ -49,8 +49,6 @@ export interface DrawContext {
   renderWidth: number;
   /** Framebuffer height for rendering (in pixels). */
   renderHeight: number;
-  /** The camera position/view used by the primary render pass of this frame. */
-  primaryCamera: Camera;
   /** The render queue which is currently being rendered (if applicable). */
   renderQueue?: RenderQueue;
   /** Allocator for global (frame/pass) bind groups and descriptor resources. */

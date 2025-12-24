@@ -1232,7 +1232,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     let hasTerrain = false;
     node.iterate((node) => {
-      if (node.isTerrain() || node.isClipmapTerrain()) {
+      if (node.isClipmapTerrain()) {
         hasTerrain = true;
         return true;
       }
@@ -1460,7 +1460,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleSavePrefab(node: SceneNode) {
     let hasTerrain = false;
     node.iterate((node) => {
-      if (node.isTerrain() || node.isClipmapTerrain()) {
+      if (node.isClipmapTerrain()) {
         hasTerrain = true;
         return true;
       }

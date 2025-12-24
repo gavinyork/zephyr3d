@@ -128,7 +128,7 @@ export abstract class RenderPass extends Disposable {
   cullScene(ctx: DrawContext, cullCamera: Camera): RenderQueue {
     if (cullCamera) {
       const renderQueue = new RenderQueue(this);
-      const cullVisitor = new CullVisitor(this, cullCamera, renderQueue, ctx.primaryCamera);
+      const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
       if (ctx.scene.octree) {
         ctx.scene.octree.getRootNode().traverse(cullVisitor);
       } else {
@@ -149,7 +149,7 @@ export abstract class RenderPass extends Disposable {
     hash: string
   ) {
     let recording = false;
-    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+    if (renderBundle && ctx.camera.commandBufferReuse) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
         ctx.device.executeRenderBundle(bundle);
@@ -178,7 +178,7 @@ export abstract class RenderPass extends Disposable {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
     }
-    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+    if (renderBundle && ctx.camera.commandBufferReuse) {
       renderBundle.endRenderBundle(hash);
     }
   }

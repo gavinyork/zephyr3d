@@ -112,13 +112,11 @@ export class LightPass extends RenderPass {
         )
       : null;
     const oit =
-      renderQueue.drawTransparent &&
-      ctx.primaryCamera.oit &&
-      ctx.primaryCamera.oit.supportDevice(ctx.device.type)
-        ? ctx.primaryCamera.oit
+      renderQueue.drawTransparent && ctx.camera.oit && ctx.camera.oit.supportDevice(ctx.device.type)
+        ? ctx.camera.oit
         : null;
     if (!oit && renderQueue.drawTransparent) {
-      renderQueue.sortTransparentItems(ctx.primaryCamera.getWorldPosition());
+      renderQueue.sortTransparentItems(ctx.camera.getWorldPosition());
     }
     const flags: any = {
       lightSet: {},

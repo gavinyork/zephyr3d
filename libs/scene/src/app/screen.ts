@@ -144,7 +144,7 @@ export class ScreenAdapter {
     this._config = this._config = {
       designWidth: 1920,
       designHeight: 1080,
-      scaleMode: 'cover',
+      scaleMode: 'stretch',
       ..._config
     };
   }

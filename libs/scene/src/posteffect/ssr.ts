@@ -161,7 +161,7 @@ export class SSR extends AbstractPostEffect {
     const device = ctx.device;
     const hash = `${Number(blur)}:${
       ctx.env.light.envLight ? ctx.env.light.getHash() : ''
-    }:${!!ctx.HiZTexture}:${!!ctx.primaryCamera.ssrCalcThickness}`;
+    }:${!!ctx.HiZTexture}:${!!ctx.camera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
     if (program === undefined) {
       program = this._createIntersectProgram(ctx, blur);
@@ -649,7 +649,7 @@ export class SSR extends AbstractPostEffect {
                   this.targetSize,
                   this.depthTex,
                   this.normalTex,
-                  !!ctx.primaryCamera.ssrCalcThickness
+                  !!ctx.camera.ssrCalcThickness
                 );
             if (blur) {
               this.blurRadius = pb.float(0);

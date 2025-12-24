@@ -1,7 +1,6 @@
 import { Ray, Vector3 } from '@zephyr3d/base';
 import { OctreeNode } from './octree';
 import type { Mesh } from './mesh';
-import type { Terrain } from './terrain';
 import type { Visitor } from './visitor';
 import type { SceneNode } from './scene_node';
 import type { PickTarget } from '../render';
@@ -43,22 +42,8 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
     }
     if (target.isMesh()) {
       return this.visitMesh(target);
-    } else if (target.isTerrain()) {
-      return this.visitTerrain(target);
     } else if (target.isWater()) {
       return this.visitWater(target);
-    }
-    return false;
-  }
-  visitTerrain(node: Terrain) {
-    if (!node.hidden && node.pickable) {
-      this._ray.transform(node.invWorldMatrix, this._rayLocal);
-      const d = node.rayIntersect(this._rayLocal); // this._rayLocal.bboxIntersectionTestEx(node.getBoundingVolume().toAABB());
-      if (this.updateVisitResult(d, node)) {
-        this._intersectedDist = d;
-        this._intersected = { node };
-        return true;
-      }
     }
     return false;
   }

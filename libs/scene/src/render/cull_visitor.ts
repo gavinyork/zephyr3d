@@ -6,7 +6,6 @@ import type { GraphNode } from '../scene/graph_node';
 import type { RenderQueue } from './render_queue';
 import type { RenderPass, Drawable } from '.';
 import type { Mesh } from '../scene/mesh';
-import type { Terrain } from '../scene/terrain';
 import type { ClipmapTerrain } from '../scene/terrain-cm';
 import type { PunctualLight } from '../scene/light';
 import type { Visitor } from '../scene/visitor';
@@ -21,8 +20,6 @@ import type { Water } from '../scene/water';
  * @public
  */
 export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
-  /** @internal */
-  private readonly _primaryCamera: Camera;
   /** @internal */
   private _camera: Camera;
   /** @internal */
@@ -42,8 +39,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
    * @param rendeQueue - RenderQueue
    * @param viewPoint - Camera position of the primary render pass
    */
-  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue, primaryCamera: Camera) {
-    this._primaryCamera = primaryCamera;
+  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue) {
     this._camera = camera;
     this._renderQueue = renderQueue;
     this._skipClipTest = false;
@@ -64,10 +60,6 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   set frustumCulling(val: boolean) {
     this._skipClipTest = !val;
-  }
-  /** The camera position of the primary render pass */
-  get primaryCamera() {
-    return this._primaryCamera;
   }
   /** Render pass for the culling task */
   get renderPass(): RenderPass {
@@ -107,8 +99,6 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitWater(target);
     } else if (target.isParticleSystem()) {
       return this.visitParticleSystem(target);
-    } else if (target.isTerrain()) {
-      return this.visitTerrain(target);
     } else if (target.isClipmapTerrain()) {
       return this.visitClipmapTerrain(target);
     } else if (target.isPunctualLight()) {
@@ -124,20 +114,6 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.renderQueue.pushLight(node);
         return true;
-      }
-    }
-    return false;
-  }
-  /** @internal */
-  visitTerrain(node: Terrain) {
-    if (
-      !node.hidden &&
-      (node.castShadow || !this._isShadowMapping) &&
-      (node.gpuPickable || !this._isGPUPicking)
-    ) {
-      const clipState = this.getClipStateWithNode(node);
-      if (clipState !== ClipState.NOT_CLIPPED) {
-        return node.cull(this) > 0;
       }
     }
     return false;

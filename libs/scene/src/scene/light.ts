@@ -206,7 +206,7 @@ export class PunctualLight extends BaseLight {
         const aabb = new AABB();
         aabb.beginExtend();
         this.scene.rootNode.iterate((child) => {
-          if (child.isMesh() || child.isTerrain() || child.isClipmapTerrain()) {
+          if (child.isMesh() || child.isClipmapTerrain()) {
             if (child.castShadow) {
               const bbox = child.getWorldBoundingVolume().toAABB();
               aabb.extend(bbox.minPoint);
