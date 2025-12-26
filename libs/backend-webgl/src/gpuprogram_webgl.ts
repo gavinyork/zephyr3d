@@ -14,7 +14,7 @@ import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
 import type { WebGLDevice } from './device_webgl';
-import type { Immutable, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Immutable, Nullable, TypedArrayConstructor } from '@zephyr3d/base';
 
 type UniformBlockArray = Int32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Float32Array<ArrayBuffer>;
 export interface AttributeSetter {
@@ -37,8 +37,8 @@ interface ProgramUniformInfo {
   isArray: boolean;
   viewCtor: TypedArrayConstructor<UniformBlockArray>;
   viewElementSize: number;
-  view: UniformBlockArray;
-  location: WebGLUniformLocation;
+  view: Nullable<UniformBlockArray>;
+  location: Nullable<WebGLUniformLocation>;
 }
 
 interface ProgramBlockInfo {
@@ -53,13 +53,13 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   private readonly _fs: string;
   private _unitCounter: number;
   private _uniformSetters: Record<string, UniformSetter>;
-  private _uniformInfo: ProgramUniformInfo[];
+  private _uniformInfo: Nullable<ProgramUniformInfo>[];
   private _blockInfo: Record<string, ProgramBlockInfo>;
   private readonly _bindGroupLayouts: BindGroupLayout[];
   private readonly _vertexAttributes: number[];
-  private _error: string;
-  private _vertexShader: WebGLShader;
-  private _fragmentShader: WebGLShader;
+  private _error: Nullable<string>;
+  private _vertexShader: Nullable<WebGLShader>;
+  private _fragmentShader: Nullable<WebGLShader>;
   constructor(
     device: WebGLDevice,
     vertexShader: string,
@@ -70,9 +70,9 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     super(device);
     this._object = this._device.context.createProgram();
     this._unitCounter = 0;
-    this._uniformSetters = null;
-    this._uniformInfo = null;
-    this._blockInfo = null;
+    this._uniformSetters = {};
+    this._uniformInfo = [];
+    this._blockInfo = {};
     this._error = '';
     this._vertexShader = null;
     this._fragmentShader = null;
@@ -85,20 +85,20 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   get type(): 'render' | 'compute' {
     return 'render';
   }
-  getCompileError(): string {
+  getCompileError(): Nullable<string> {
     return this._error;
   }
-  getShaderSource(kind: ShaderKind): string {
+  getShaderSource(kind: ShaderKind): Nullable<string> {
     switch (kind) {
       case 'vertex':
         return this._vs;
       case 'fragment':
         return this._fs;
-      case 'compute':
+      default:
         return null;
     }
   }
-  getBindingInfo(name: string): BindPointInfo {
+  getBindingInfo(name: string): Nullable<BindPointInfo> {
     for (let group = 0; group < this._bindGroupLayouts.length; group++) {
       const layout = this._bindGroupLayouts[group];
       const bindName = layout.nameMap?.[name] ?? name;
@@ -164,9 +164,9 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this._device.context.deleteProgram(this._object);
       this._object = null;
       this._unitCounter = 0;
-      this._uniformSetters = null;
-      this._uniformInfo = null;
-      this._blockInfo = null;
+      this._uniformSetters = {};
+      this._uniformInfo = [];
+      this._blockInfo = {};
       this._error = '';
       this._vertexShader = null;
       this._fragmentShader = null;
@@ -192,7 +192,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     return true;
   }
-  createUniformBuffer(uniform: string): StructuredBuffer<unknown> {
+  createUniformBuffer(uniform: string): Nullable<StructuredBuffer<unknown>> {
     const type = this.getBindingInfo(uniform)?.type as PBStructTypeInfo;
     return type ? this.device.createStructuredBuffer(type, { usage: 'uniform' }) : null;
   }
@@ -217,13 +217,13 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this._object = this._device.context.createProgram();
     }
     this._vertexShader = gl.createShader(WebGLEnum.VERTEX_SHADER);
-    gl.attachShader(this._object, this._vertexShader);
-    gl.shaderSource(this._vertexShader, this._vs);
-    gl.compileShader(this._vertexShader);
+    gl.attachShader(this._object, this._vertexShader!);
+    gl.shaderSource(this._vertexShader!, this._vs);
+    gl.compileShader(this._vertexShader!);
     this._fragmentShader = gl.createShader(WebGLEnum.FRAGMENT_SHADER);
-    gl.attachShader(this._object, this._fragmentShader);
-    gl.shaderSource(this._fragmentShader, this._fs);
-    gl.compileShader(this._fragmentShader);
+    gl.attachShader(this._object, this._fragmentShader!);
+    gl.shaderSource(this._fragmentShader!, this._fs);
+    gl.compileShader(this._fragmentShader!);
     for (let loc = 0; loc < semanticList.length; loc++) {
       gl.bindAttribLocation(this._object, loc, semanticList[loc]);
     }
@@ -240,8 +240,8 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
           if (!gl.getShaderParameter(this._vertexShader, WebGLEnum.COMPILE_STATUS)) {
             this._error = gl.getShaderInfoLog(this._vertexShader);
             console.error(new Error(`Compile shader failed: ${this._error}`));
-          } else if (!gl.getShaderParameter(this._fragmentShader, WebGLEnum.COMPILE_STATUS)) {
-            this._error = gl.getShaderInfoLog(this._fragmentShader);
+          } else if (!gl.getShaderParameter(this._fragmentShader!, WebGLEnum.COMPILE_STATUS)) {
+            this._error = gl.getShaderInfoLog(this._fragmentShader!);
             console.error(new Error(`Compile shader failed: ${this._error}`));
           } else {
             this._error = gl.getProgramInfoLog(this._object);
@@ -268,7 +268,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     return true;
   }
   private createUniformSetter(info: ProgramUniformInfo) {
-    const loc = info.location;
+    const loc = info.location!;
     const isArray = info.isArray;
     const gl = this._device.context;
     switch (info.type) {
@@ -375,11 +375,11 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   private createUniformSetters() {
     const uniformSetters = {};
     const gl = this._device.context;
-    const numUniforms = gl.getProgramParameter(this._object, WebGLEnum.ACTIVE_UNIFORMS) as number;
+    const numUniforms = gl.getProgramParameter(this._object!, WebGLEnum.ACTIVE_UNIFORMS) as number;
 
     this._uniformInfo = [];
     for (let index = 0; index < numUniforms; index++) {
-      const info = gl.getActiveUniform(this._object, index);
+      const info = gl.getActiveUniform(this._object!, index)!;
       let name = info.name;
       let isArray = false;
       if (name.startsWith('gl_') || name.startsWith('webgl_')) {
@@ -394,7 +394,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         const type = info.type;
         const blockIndex = -1;
         const offset = 0;
-        const location = gl.getUniformLocation(this._object, info.name);
+        const location = gl.getUniformLocation(this._object!, info.name);
         const view = null;
         const { ctor: viewCtor, elementSize: viewElementSize } = this.getTypedArrayInfo(info.type);
         const uniformInfo = {
@@ -418,33 +418,33 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     if (isWebGL2(gl)) {
       this._blockInfo = {};
-      const numBlocks = gl.getProgramParameter(this._object, WebGLEnum.ACTIVE_UNIFORM_BLOCKS) as number;
+      const numBlocks = gl.getProgramParameter(this._object!, WebGLEnum.ACTIVE_UNIFORM_BLOCKS) as number;
       for (let i = 0; i < numBlocks; i++) {
-        const name = gl.getActiveUniformBlockName(this._object, i);
-        const index = gl.getUniformBlockIndex(this._object, name);
+        const name = gl.getActiveUniformBlockName(this._object!, i)!;
+        const index = gl.getUniformBlockIndex(this._object!, name);
         const usedInVS = !!gl.getActiveUniformBlockParameter(
-          this._object,
+          this._object!,
           i,
           WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER
         );
         const usedInFS = !!gl.getActiveUniformBlockParameter(
-          this._object,
+          this._object!,
           i,
           WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER
         );
         const used = usedInVS || usedInFS;
         const size = gl.getActiveUniformBlockParameter(
-          this._object,
+          this._object!,
           i,
           WebGLEnum.UNIFORM_BLOCK_DATA_SIZE
         ) as number;
         const uniformIndices = gl.getActiveUniformBlockParameter(
-          this._object,
+          this._object!,
           i,
           WebGLEnum.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES
         ) as Uint32Array<ArrayBuffer>;
         this._blockInfo[name] = { index, used, size, uniformIndices };
-        gl.uniformBlockBinding(this._object, index, index);
+        gl.uniformBlockBinding(this._object!, index, index);
       }
       /*
       const indices: number[] = this._uniformInfo.map(val => val.index);
@@ -621,7 +621,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     ctor: TypedArrayConstructor<UniformBlockArray>;
     elementSize: number;
   } {
-    let ctor: TypedArrayConstructor<UniformBlockArray> = null;
+    let ctor: Nullable<TypedArrayConstructor<UniformBlockArray>> = null;
     let elementSize = 0;
     switch (type) {
       case WebGLEnum.INT:
@@ -701,6 +701,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         elementSize = 64;
         break;
     }
-    return { ctor, elementSize };
+    return { ctor: ctor!, elementSize };
   }
 }

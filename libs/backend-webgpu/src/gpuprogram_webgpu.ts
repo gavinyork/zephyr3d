@@ -11,23 +11,23 @@ import type {
 } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 
 export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private static _hashCounter = 0;
   private readonly _type: 'render' | 'compute';
-  private readonly _vs: string;
-  private readonly _fs: string;
-  private readonly _cs: string;
+  private readonly _vs!: string;
+  private readonly _fs!: string;
+  private readonly _cs!: string;
   private readonly _label: string;
   private readonly _hash: string;
   private _error: string;
   private readonly _bindGroupLayouts: BindGroupLayout[];
-  private readonly _vertexAttributes: string;
-  private _csModule: GPUShaderModule;
-  private _vsModule: GPUShaderModule;
-  private _fsModule: GPUShaderModule;
-  private _pipelineLayout: GPUPipelineLayout;
+  private readonly _vertexAttributes!: string;
+  private _csModule!: GPUShaderModule;
+  private _vsModule!: GPUShaderModule;
+  private _fsModule!: GPUShaderModule;
+  private _pipelineLayout!: GPUPipelineLayout;
   constructor(device: WebGPUDevice, params: GPUProgramConstructParams) {
     super(device);
     this._type = params.type;
@@ -65,7 +65,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
         return this._cs;
     }
   }
-  getBindingInfo(name: string): BindPointInfo {
+  getBindingInfo(name: string): Nullable<BindPointInfo> {
     for (let group = 0; group < this._bindGroupLayouts.length; group++) {
       const layout = this._bindGroupLayouts[group];
       const bindName = layout.nameMap?.[name] ?? name;
@@ -111,9 +111,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     return this._fsModule;
   }
   destroy() {
-    this._vsModule = null;
-    this._fsModule = null;
-    this._pipelineLayout = null;
     this._object = null;
   }
   restore() {
@@ -124,7 +121,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   isProgram(): this is GPUProgram {
     return true;
   }
-  createUniformBuffer(uniform: string): StructuredBuffer<unknown> {
+  createUniformBuffer(uniform: string): Nullable<StructuredBuffer<unknown>> {
     const type = this.getBindingInfo(uniform)?.type as PBStructTypeInfo;
     return type ? this.device.createStructuredBuffer(type, { usage: 'uniform' }) : null;
   }
@@ -148,7 +145,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     });
   }
   private createShaderModule(code: string): GPUShaderModule {
-    let sm = this._device.device.createShaderModule({ label: this._label, code });
+    let sm: Nullable<GPUShaderModule> = this._device.device.createShaderModule({ label: this._label, code });
     if (sm) {
       const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
         (sm as any).compilationInfo || (sm as any).getCompilationInfo;

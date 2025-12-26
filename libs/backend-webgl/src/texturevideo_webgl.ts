@@ -4,16 +4,15 @@ import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLDevice } from './device_webgl';
 import type { WebGLTextureCaps } from './capabilities_webgl';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 
 export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<WebGLTexture> {
-  private _source: HTMLVideoElement;
-  private _callbackId: number;
+  private _source!: HTMLVideoElement;
+  private _callbackId: Nullable<number>;
   constructor(device: WebGLDevice, source: HTMLVideoElement) {
     super(device, '2d');
-    this._source = null;
     this._callbackId = null;
-    this._format = 'unknown';
+    this._format = null;
     this.loadFromElement(source);
   }
   isTextureVideo(): this is TextureVideo {
@@ -74,7 +73,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     this.allocInternal('rgba8unorm', this._source.videoWidth, this._source.videoHeight, 1, 1);
     if (!this._device.isContextLost()) {
       const target = textureTargetMap[this._target];
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       this._device.bindTexture(target, 0, this);
       //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);

@@ -20,16 +20,16 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     return true;
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._height, this._mipLevelCount);
   }
   update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number): void {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -61,9 +61,9 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -81,7 +81,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, x, y, width, height, 0, 0, width, height);
       this._device.context.texSubImage2D(
         textureTargetMap[this._target],
@@ -215,7 +215,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     }
     this.allocInternal(format, width, height, 1, mipLevelCount);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);
       //this._device.context.bindTexture(target, this._object);
@@ -265,7 +265,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
   private loadImage(element: TextureImageElement, format: TextureFormat): void {
     this.allocInternal(format, Number(element.width), Number(element.height), 1, 0);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       (this.device as WebGLDevice).clearErrors();
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);

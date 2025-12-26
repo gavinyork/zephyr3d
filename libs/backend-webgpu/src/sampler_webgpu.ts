@@ -2,9 +2,10 @@ import { WebGPUObject } from './gpuobject_webgpu';
 import { textureWrappingMap, textureFilterMap, compareFuncMap } from './constants_webgpu';
 import type { SamplerOptions, TextureSampler } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 
 export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements TextureSampler<GPUSampler> {
-  private readonly _options: SamplerOptions;
+  private readonly _options: RequireOptionals<SamplerOptions>;
   constructor(device: WebGPUDevice, options: SamplerOptions) {
     super(device);
     this._options = Object.assign(
@@ -24,7 +25,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
     );
     this._load();
   }
-  get hash(): number {
+  get hash(): Nullable<number> {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
   get addressModeU() {
@@ -75,7 +76,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
       mipmapFilter: textureFilterMap[this._options.mipFilter],
       lodMinClamp: this._options.lodMin,
       lodMaxClamp: this._options.lodMax,
-      compare: compareFuncMap[this._options.compare] || undefined,
+      compare: this._options.compare ? compareFuncMap[this._options.compare] : undefined,
       maxAnisotropy: this._options.maxAnisotropy
     });
     return !!this._object;

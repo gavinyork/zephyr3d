@@ -336,18 +336,6 @@ export class Camera extends SceneNode {
     this._interactionRect = rect;
   }
   /**
-   * Clip plane in camera space.
-   *
-   * Setting this invalidates derived data. Shaders should respect `clipMask` and plane.
-   */
-  get clipPlane(): Immutable<Plane> {
-    return this._clipPlane;
-  }
-  set clipPlane(plane: Plane) {
-    this._clipPlane = plane;
-    this._invalidate(false);
-  }
-  /**
    * Framebuffer clear color, or `null` to disable.
    */
   get clearColor(): Vector4 {

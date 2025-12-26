@@ -12,6 +12,7 @@ import type {
 import { VertexData } from '@zephyr3d/device';
 import { typeMap } from './constants_webgl';
 import type { WebGLDevice } from './device_webgl';
+import type { Nullable } from '@zephyr3d/base';
 
 export class WebGLVertexLayout
   extends WebGLGPUObject<WebGLVertexArrayObject | WebGLVertexArrayObjectOES>
@@ -56,13 +57,13 @@ export class WebGLVertexLayout
       }
     }
   }
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
+  getVertexBuffer(semantic: VertexSemantic): Nullable<StructuredBuffer> {
     return this._vertexData.getVertexBuffer(semantic);
   }
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
+  getVertexBufferInfo(semantic: VertexSemantic): Nullable<VertexBufferInfo> {
     return this._vertexData.getVertexBufferInfo(semantic);
   }
-  getIndexBuffer(): IndexBuffer {
+  getIndexBuffer(): Nullable<IndexBuffer> {
     return this._vertexData.getIndexBuffer();
   }
   bind() {
@@ -112,7 +113,7 @@ export class WebGLVertexLayout
         if (buffer.disposed) {
           buffer.reload();
         }
-        gl.bindBuffer(WebGLEnum.ARRAY_BUFFER, buffer.object);
+        gl.bindBuffer(WebGLEnum.ARRAY_BUFFER, buffer.object!);
         gl.enableVertexAttribArray(loc);
         if (bufferInfo.stepMode === 'instance' && this._device.instancedArraysExt) {
           gl.vertexAttribPointer(
@@ -143,7 +144,7 @@ export class WebGLVertexLayout
     }
     gl.bindBuffer(
       WebGLEnum.ELEMENT_ARRAY_BUFFER,
-      this._vertexData.indexBuffer ? this._vertexData.indexBuffer.object : null
+      this._vertexData.indexBuffer ? this._vertexData.indexBuffer.object! : null
     );
   }
 }

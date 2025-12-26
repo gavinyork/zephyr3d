@@ -20,7 +20,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     return true;
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -35,9 +35,9 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     const gl = this._device.context as WebGL2RenderingContext;
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //gl.bindTexture(textureTargetMap[this._target], this._object);
@@ -151,7 +151,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     }
     this.allocInternal(format, width, height, levels.arraySize, mipLevelCount);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       const gl = this._device.context as WebGL2RenderingContext;
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
       //gl.bindTexture(textureTargetMap[this._target], this._object);

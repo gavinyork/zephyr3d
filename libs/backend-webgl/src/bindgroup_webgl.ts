@@ -14,13 +14,13 @@ import { WebGLGPUObject } from './gpuobject_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUProgram } from './gpuprogram_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
-import type { Immutable, TypedArray } from '@zephyr3d/base';
+import type { Immutable, Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 import { WebGLGPUBuffer } from './buffer_webgl';
 
 export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup {
   private readonly _layout: Immutable<BindGroupLayout>;
-  private _dynamicOffsets: number[];
+  private _dynamicOffsets: Nullable<number[]>;
   private _resources: Record<string, WebGLGPUBuffer | [WebGLBaseTexture, WebGLTextureSampler]>;
   private _createdBuffers: WebGLGPUBuffer[];
   constructor(device: WebGLDevice, layout: Immutable<BindGroupLayout>) {
@@ -46,10 +46,10 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
   }
-  getBuffer(name: string, nocreate = true): GPUDataBuffer {
+  getBuffer(name: string, nocreate = true): Nullable<GPUDataBuffer> {
     return this._getBuffer(name, nocreate);
   }
-  getDynamicOffsets(): Immutable<number[]> {
+  getDynamicOffsets(): Nullable<Immutable<number[]>> {
     return this._dynamicOffsets;
   }
   setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, _bindOffset?: number, _bindSize?: number) {
@@ -67,7 +67,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
             this._resources[entry.name] = buffer as WebGLGPUBuffer;
           }
           if (entry.buffer.hasDynamicOffset) {
-            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
+            this._dynamicOffsets![entry.buffer.dynamicOffsetIndex] = offset ?? 0;
           }
         }
         return;
@@ -120,7 +120,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   ) {
     throw new Error('setTextureView() not supported for webgl device');
   }
-  getTexture(name: string): BaseTexture {
+  getTexture(name: string): Nullable<BaseTexture> {
     const entry = this._findTextureLayout(name);
     if (entry) {
       return (this._resources[name]?.[0] as BaseTexture) || null;
@@ -143,7 +143,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   setSampler(_name: string, _value: TextureSampler) {
     // no sampler uniform support for webgl
   }
-  apply(program: WebGLGPUProgram, offsets?: Iterable<number>) {
+  apply(program: WebGLGPUProgram, offsets?: Nullable<Iterable<number>>) {
     const webgl2 = this._device.isWebGL2;
     const dynamicOffsets = offsets ?? this.getDynamicOffsets();
     for (let i = 0; i < this._layout.entries.length; i++) {
@@ -151,14 +151,14 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       const res = this._resources[entry.name];
       if (res instanceof WebGLGPUBuffer) {
         if (webgl2) {
-          if (entry.buffer.hasDynamicOffset) {
+          if (entry.buffer!.hasDynamicOffset) {
             program.setBlock(
-              (entry.type as PBStructTypeInfo).structName,
+              (entry.type as PBStructTypeInfo).structName!,
               res,
-              dynamicOffsets[entry.buffer.dynamicOffsetIndex]
+              dynamicOffsets![entry.buffer!.dynamicOffsetIndex]
             );
           } else {
-            program.setBlock((entry.type as PBStructTypeInfo).structName, res, 0);
+            program.setBlock((entry.type as PBStructTypeInfo).structName!, res, 0);
           }
         } else if (res instanceof WebGLStructuredBuffer) {
           program.setUniform(entry.name, res.getUniformData().uniforms);
@@ -186,7 +186,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   isBindGroup(): this is BindGroup {
     return true;
   }
-  private _getBuffer(name: string, nocreate = false): GPUDataBuffer {
+  private _getBuffer(name: string, nocreate = false): Nullable<GPUDataBuffer> {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.name === bindName) {
@@ -203,7 +203,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     }
     return null;
   }
-  private _findTextureLayout(name: string): Immutable<BindGroupLayoutEntry> {
+  private _findTextureLayout(name: string): Nullable<Immutable<BindGroupLayoutEntry>> {
     for (const entry of this._layout.entries) {
       if ((entry.texture || entry.storageTexture || entry.externalTexture) && entry.name === name) {
         return entry;

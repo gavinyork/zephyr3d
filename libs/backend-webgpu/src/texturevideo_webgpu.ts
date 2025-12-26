@@ -1,4 +1,4 @@
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
@@ -53,7 +53,7 @@ export class WebGPUTextureVideo
     }
     return false;
   }
-  createView(_level?: number, _face?: number, _mipCount?: number): GPUTextureView {
+  createView(_level?: number, _face?: number, _mipCount?: number): Nullable<GPUTextureView> {
     return null;
   }
   init(): void {

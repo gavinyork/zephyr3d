@@ -38,6 +38,7 @@ import type {
   StencilState
 } from './render_states';
 import type { Pool } from './pool';
+import { ITimer } from './timer';
 
 /**
  * The webgl context type
@@ -192,7 +193,6 @@ function makeTextureFormat(
  * @public
  */
 export type TextureFormat =
-  | 'unknown'
   | 'r8unorm'
   | 'r8snorm'
   | 'r16f'
@@ -276,7 +276,6 @@ export type TextureFormat =
   | 'astc-12x12-srgb';
 
 const textureFormatMap: Record<TextureFormat, number> = {
-  unknown: 0,
   r8unorm: makeTextureFormat(
     0,
     true,
@@ -2211,8 +2210,6 @@ export interface ShaderCaps {
   supportShaderTextureLod: boolean;
   /** True if the device supports high precison float number for shader programs */
   supportHighPrecisionFloat: boolean;
-  /** True if the device supports high precison integer number for shader programs */
-  supportHighPrecisionInt: boolean;
   /** The maximum number of bytes of uniform buffer */
   maxUniformBufferSize: number;
   /** The uniform buffer offset alignment */
@@ -2433,6 +2430,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param clearStencil - If not null, the stencil buffer will be cleared to this value.
    */
   clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
+  /** Creates a GPU timer */
+  createGPUTimer(): Nullable<ITimer>;
   /** Creates a render state set object */
   createRenderStateSet(): RenderStateSet;
   /** Creates a blending state object */
@@ -2461,7 +2460,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T;
+  ): Nullable<T>;
   /**
    * Creates a 2d texture
    * @param format - The texture format
@@ -2475,7 +2474,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   /**
    * Creates a 2d texture from a image element
    * @param element - The image element
@@ -2486,7 +2485,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   /**
    * Creates a 2d array texture
    * @param format - The texture format
@@ -2502,7 +2501,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   /**
    * Creates a 2d array texture from a seris of image elements
    * @remarks image elements must have the same size.
@@ -2514,7 +2513,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   /**
    * Creates a 3D texture
    * @param format - The texture format
@@ -2530,7 +2529,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D;
+  ): Nullable<Texture3D>;
   /**
    * Creates a cube texture
    * @param format - The texture format
@@ -2538,7 +2537,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param options - The creation options
    * @returns The created cube texture.
    */
-  createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
+  createCubeTexture(
+    format: TextureFormat,
+    size: number,
+    options?: TextureCreationOptions
+  ): Nullable<TextureCube>;
   /**
    * Creates a video texture from a video element
    * @param el - The video element
@@ -2659,14 +2662,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @param vp - The viewport position and size, if not specified, the viewport will be set to [0, 0, drawingBufferWidth, drawingBufferHeight]
    */
-  setViewport(vp?: DeviceViewport | number[]): void;
+  setViewport(vp: Nullable<DeviceViewport | number[]>): void;
   /** Get current viewport as [x, y, width, height] */
   getViewport(): Immutable<DeviceViewport>;
   /**
    * Set scissor rectangle from an array that contains the position and size
    * @param scissor - The scissor rectangle position and size, if not specified, the scissor rectangle will be set to [0, 0, drawingBufferWidth,drawingBufferHeight]
    */
-  setScissor(scissor?: DeviceViewport | number[]): void;
+  setScissor(scissor: Nullable<DeviceViewport | number[]>): void;
   /**
    * Get current scissor rectangle
    */
@@ -2675,33 +2678,33 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Set current GPU program
    * @param program - The GPU program to be set
    */
-  setProgram(program: GPUProgram): void;
+  setProgram(program: Nullable<GPUProgram>): void;
   /**
    * Get current GPU program
    */
-  getProgram(): GPUProgram;
+  getProgram(): Nullable<GPUProgram>;
   /**
    * Set current vertex layout
    *
    * @param vertexData - The vertex layout to be set
    */
-  setVertexLayout(vertexData: VertexLayout): void;
+  setVertexLayout(vertexData: Nullable<VertexLayout>): void;
   /** Get current vertex layout */
-  getVertexLayout(): VertexLayout;
+  getVertexLayout(): Nullable<VertexLayout>;
   /**
    * Set current render states
    *
    * @param renderStates - The render state set
    */
-  setRenderStates(renderStates: RenderStateSet): void;
+  setRenderStates(renderStates: Nullable<RenderStateSet>): void;
   /** Get current render states */
-  getRenderStates(): RenderStateSet;
+  getRenderStates(): Nullable<RenderStateSet>;
   /**
    * Sets the current framebuffer to the specified FrameBuffer object.
    *
    * @param rt - The FrameBuffer object to set as the current framebuffer.
    */
-  setFramebuffer(rt: FrameBuffer);
+  setFramebuffer(rt: Nullable<FrameBuffer>);
   /**
    * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
    *
@@ -2714,15 +2717,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param depth - Optional BaseTexture to serve as the depth attachment.
    * @param sampleCount - Optional sample count defining the number of samples for multisampling.
    */
-  setFramebuffer(
-    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
-    depth?: BaseTexture,
-    miplevel?: number,
-    face?: number,
-    sampleCount?: number
-  );
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
+  setFramebuffer(colorOrRT: BaseTexture[] | Nullable<FrameBuffer>, depth?: BaseTexture, sampleCount?: number);
   /** Get current frame buffer */
-  getFramebuffer(): FrameBuffer;
+  getFramebuffer(): Nullable<FrameBuffer>;
   /**
    * Set current bind group
    *
@@ -2730,12 +2728,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param bindGroup - The bind group to be set
    * @param dynamicOffsets - dynamic uniform buffer offsets of the bind group or null
    */
-  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
+  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>);
   /**
    * Get current bind group
    * @param index - index of the bind group to get
    */
-  getBindGroup(index: number): [BindGroup, Iterable<number>];
+  getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
   /** Flush the gpu command buffer */
   flush(): void;
   /**

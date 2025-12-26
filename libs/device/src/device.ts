@@ -70,18 +70,18 @@ import { Pool } from './pool';
 export interface DeviceBackend {
   typeName(): string;
   supported(): Promise<boolean>;
-  createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice>;
+  createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<Nullable<AbstractDevice>>;
 }
 
 type DeviceState = {
-  framebuffer: FrameBuffer;
+  framebuffer: Nullable<FrameBuffer>;
   windowOrderReversed: boolean;
   viewport: DeviceViewport;
   scissor: DeviceViewport;
-  renderStateSet: RenderStateSet;
-  program: GPUProgram;
-  vertexLayout: VertexLayout;
-  bindGroups: [BindGroup, Iterable<number>][];
+  renderStateSet: Nullable<RenderStateSet>;
+  program: Nullable<GPUProgram>;
+  vertexLayout: Nullable<VertexLayout>;
+  bindGroups: [BindGroup, Nullable<Iterable<number>>][];
 };
 
 type ResizeCallback = (
@@ -315,7 +315,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract getDeviceCaps(): Immutable<DeviceCaps>;
   abstract initContext(): Promise<void>;
   abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
-  abstract createGPUTimer(): ITimer;
+  abstract createGPUTimer(): Nullable<ITimer>;
   abstract createRenderStateSet(): RenderStateSet;
   abstract createBlendingState(): BlendingState;
   abstract createColorState(): ColorState;
@@ -327,42 +327,42 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T;
+  ): Nullable<T>;
   abstract createTexture2D(
     format: TextureFormat,
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   abstract createTexture2DFromImage(
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   abstract createTexture2DArray(
     format: TextureFormat,
     width: number,
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   abstract createTexture2DArrayFromImages(
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   abstract createTexture3D(
     format: TextureFormat,
     width: number,
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D;
+  ): Nullable<Texture3D>;
   abstract createCubeTexture(
     format: TextureFormat,
     size: number,
     options?: TextureCreationOptions
-  ): TextureCube;
+  ): Nullable<TextureCube>;
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
@@ -395,19 +395,19 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     options?: Nullable<FrameBufferOptions>
   ): FrameBuffer;
   // render related
-  abstract setViewport(vp?: number[] | DeviceViewport): void;
+  abstract setViewport(vp: Nullable<number[] | DeviceViewport>): void;
   abstract getViewport(): Immutable<DeviceViewport>;
-  abstract setScissor(scissor?: number[] | DeviceViewport): void;
+  abstract setScissor(scissor: Nullable<number[] | DeviceViewport>): void;
   abstract getScissor(): Immutable<DeviceViewport>;
-  abstract setProgram(program: GPUProgram): void;
-  abstract getProgram(): GPUProgram;
-  abstract setVertexLayout(vertexData: VertexLayout): void;
-  abstract getVertexLayout(): VertexLayout;
-  abstract setRenderStates(renderStates: RenderStateSet): void;
-  abstract getRenderStates(): RenderStateSet;
-  abstract getFramebuffer(): FrameBuffer;
-  abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
-  abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
+  abstract setProgram(program: Nullable<GPUProgram>): void;
+  abstract getProgram(): Nullable<GPUProgram>;
+  abstract setVertexLayout(vertexData: Nullable<VertexLayout>): void;
+  abstract getVertexLayout(): Nullable<VertexLayout>;
+  abstract setRenderStates(renderStates: Nullable<RenderStateSet>): void;
+  abstract getRenderStates(): Nullable<RenderStateSet>;
+  abstract getFramebuffer(): Nullable<FrameBuffer>;
+  abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>);
+  abstract getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
   abstract flush(): void;
   abstract nextFrame(callback: () => void): number;
   abstract cancelNextFrame(handle: number);
@@ -495,9 +495,13 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   drawText(text: string, x: number, y: number, color: string) {
     DrawText.drawText(this, text, color, x, y);
   }
-  setFramebuffer(rt: FrameBuffer);
+  setFramebuffer(rt: Nullable<FrameBuffer>);
   setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
-  setFramebuffer(colorOrRT: BaseTexture[] | FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
+  setFramebuffer(
+    colorOrRT: BaseTexture[] | Nullable<FrameBuffer>,
+    depth?: BaseTexture,
+    sampleCount?: number
+  ) {
     let newRT: Nullable<FrameBuffer> = null;
     let temporal = false;
     if (!Array.isArray(colorOrRT)) {
@@ -508,7 +512,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     const currentRT = this.getFramebuffer();
     if (currentRT !== newRT) {
-      if (this._temporalFramebuffer) {
+      if (this._temporalFramebuffer && currentRT) {
         this.pool!.releaseFrameBuffer(currentRT);
       }
       this._temporalFramebuffer = temporal;
@@ -803,7 +807,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
-  protected abstract _setFramebuffer(fb: FrameBuffer);
+  protected abstract _setFramebuffer(fb: Nullable<FrameBuffer>);
   protected abstract _handleResize(
     cssWidth: number,
     cssHeight: number,
@@ -969,8 +973,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
-  protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number {
-    const usage = options?.usage || defaultUsage;
+  protected parseBufferOptions(options?: BufferCreationOptions, defaultUsage?: BufferUsage): number {
+    options = options ?? {};
+    const usage = options.usage ?? defaultUsage;
     let usageFlag: number;
     switch (usage) {
       case 'uniform':

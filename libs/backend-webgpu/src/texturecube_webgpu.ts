@@ -1,4 +1,4 @@
-import type { CubeFace, TypedArray } from '@zephyr3d/base';
+import type { CubeFace, Nullable, TypedArray } from '@zephyr3d/base';
 import type {
   TextureMipmapData,
   TextureCube,
@@ -15,7 +15,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     super(device, 'cube');
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -29,7 +29,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, 1, xOffset, yOffset, face, 0);
     if (this._mipLevelCount > 1) {
@@ -50,14 +50,14 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     if (data instanceof HTMLCanvasElement || this._device.isTextureUploading(this)) {
       // Copy the pixel values out in case the canvas content may be changed later
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, srcX, srcY, width, height, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
       this.update(imageData.data, destX, destY, width, height, face);
@@ -78,10 +78,10 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
   isTextureCube(): this is TextureCube {
     return true;
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
-          format: this._gpuFormat,
+          format: this._gpuFormat!,
           dimension: '2d',
           baseMipLevel: level ?? 0,
           mipLevelCount: mipCount || this._mipLevelCount - (level ?? 0),

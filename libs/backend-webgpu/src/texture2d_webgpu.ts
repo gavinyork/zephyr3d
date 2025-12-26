@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import { linearTextureFormatToSRGB, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUTexture> {
@@ -18,14 +18,14 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     return true;
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._height, this._mipLevelCount);
   }
   update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number): void {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, 1, xOffset, yOffset, 0, 0);
     if (this._mipLevelCount > 1) {
@@ -45,14 +45,14 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     if (data instanceof HTMLCanvasElement || this._device.isTextureUploading(this)) {
       // Copy the pixel values out in case the canvas content may be changed later
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, srcX, srcY, width, height, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
       this.update(imageData.data, destX, destY, width, height);
@@ -118,7 +118,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, 0);
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',

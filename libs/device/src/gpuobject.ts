@@ -709,7 +709,7 @@ export interface TextureCreationOptions extends BaseCreationOptions {
   writable?: boolean;
   texture?: BaseTexture;
   mipmapping?: boolean;
-  samplerOptions?: SamplerOptions;
+  samplerOptions?: Nullable<SamplerOptions>;
 }
 /**
  * Options for creating gpu buffer
@@ -1253,7 +1253,7 @@ export interface SamplerOptions {
   mipFilter?: TextureFilterMode;
   lodMin?: number;
   lodMax?: number;
-  compare?: CompareFunc;
+  compare?: Nullable<CompareFunc>;
   maxAnisotropy?: number;
 }
 
@@ -1265,13 +1265,13 @@ export interface GPUObject<T = unknown> extends IDisposable {
   /** The object was created by which device */
   readonly device: AbstractDevice;
   /** The internal GPU object  */
-  readonly object: T;
+  readonly object: Nullable<T>;
   /** unique id */
   readonly uid: number;
   readonly cid: number;
   readonly disposed: boolean;
   name: string;
-  restoreHandler: (tex: GPUObject) => void;
+  restoreHandler: Nullable<(tex: GPUObject) => void>;
   isVertexLayout(): this is VertexLayout;
   isFramebuffer(): this is FrameBuffer;
   isSampler(): this is TextureSampler;
@@ -1303,7 +1303,7 @@ export interface TextureSampler<T = unknown> extends GPUObject<T> {
   readonly mipFilter: TextureFilterMode;
   readonly lodMin: number;
   readonly lodMax: number;
-  readonly compare: CompareFunc;
+  readonly compare: Nullable<CompareFunc>;
   readonly maxAnisotropy: number;
 }
 
@@ -1319,7 +1319,7 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
   readonly format: TextureFormat;
   readonly mipLevelCount: number;
   readonly memCost: number;
-  samplerOptions: SamplerOptions;
+  samplerOptions: Nullable<Immutable<SamplerOptions>>;
   init(): void;
   generateMipmaps(): void;
   isSRGBFormat(): boolean;
@@ -1487,13 +1487,13 @@ export interface StructuredBuffer<T = unknown> extends GPUDataBuffer<T> {
  */
 export interface VertexLayout<T = unknown> extends GPUObject<T> {
   readonly vertexBuffers: {
-    [semantic: number]: { buffer: StructuredBuffer; offset: number };
+    [semantic: number]: Nullable<{ buffer: StructuredBuffer; offset: number }>;
   };
-  readonly indexBuffer: IndexBuffer;
+  readonly indexBuffer: Nullable<IndexBuffer>;
   setDrawOffset(buffer: StructuredBuffer, byteOffset: number): void;
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
-  getIndexBuffer(): IndexBuffer;
+  getVertexBuffer(semantic: VertexSemantic): Nullable<StructuredBuffer>;
+  getVertexBufferInfo(semantic: VertexSemantic): Nullable<VertexBufferInfo>;
+  getIndexBuffer(): Nullable<IndexBuffer>;
   bind(): void;
   draw(primitiveType: PrimitiveType, first: number, count: number): void;
   drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number);
@@ -1521,7 +1521,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
   setDepthAttachmentLayer(layer: number): void;
   getDepthAttachmentLayer(): number;
   getColorAttachments(): BaseTexture[];
-  getDepthAttachment(): BaseTexture;
+  getDepthAttachment(): Nullable<BaseTexture>;
   getColorAttachment<T extends BaseTexture = BaseTexture>(index: number): T;
   bind(): boolean;
   unbind(): void;
@@ -1534,10 +1534,10 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
 export interface GPUProgram<T = unknown> extends GPUObject<T> {
   readonly bindGroupLayouts: Immutable<BindGroupLayout[]>;
   readonly type: 'render' | 'compute';
-  getShaderSource(kind: ShaderKind): string;
-  getCompileError(): string;
-  getBindingInfo(name: string): BindPointInfo;
-  createUniformBuffer(uniform: string): StructuredBuffer;
+  getShaderSource(kind: ShaderKind): Nullable<string>;
+  getCompileError(): Nullable<string>;
+  getBindingInfo(name: string): Nullable<BindPointInfo>;
+  createUniformBuffer(uniform: string): Nullable<StructuredBuffer>;
   use(): void;
 }
 
@@ -1553,10 +1553,10 @@ export type StructuredValue = number | TypedArray | VectorBase | { [name: string
  */
 export interface BindGroup extends GPUObject<unknown> {
   getLayout(): Immutable<BindGroupLayout>;
-  getDynamicOffsets(): Immutable<number[]>;
+  getDynamicOffsets(): Nullable<Immutable<number[]>>;
   getGPUId(): string;
-  getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
-  getTexture(name: string): BaseTexture;
+  getBuffer(name: string, nocreate?: boolean): Nullable<GPUDataBuffer>;
+  getTexture(name: string): Nullable<BaseTexture>;
   setBuffer(
     name: string,
     buffer: GPUDataBuffer,

@@ -17,7 +17,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     super(device, 'cube');
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -31,9 +31,9 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -66,9 +66,9 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -86,7 +86,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, x, y, width, height, 0, 0, width, height);
       this._device.context.texSubImage2D(
         textureTargetMap[this._target],
@@ -243,7 +243,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
     this.allocInternal(format, width, height, 1, mipLevelCount);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
       (this.device as WebGLDevice).clearErrors();
       for (let face = 0; face < 6; face++) {

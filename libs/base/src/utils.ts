@@ -149,6 +149,14 @@ const colorNames: Record<string, string> = {
 export type Nullable<T> = T | null;
 
 /**
+ * Make optional properties as required
+ * @public
+ */
+export type RequireOptionals<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? Exclude<T[K], undefined> : T[K];
+};
+
+/**
  * Immutable type modifier
  */
 export type Immutable<T> = T extends (...args: any[]) => any

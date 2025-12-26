@@ -9,7 +9,7 @@ import type {
   TextureCaps,
   TextureFormatInfo
 } from '@zephyr3d/device';
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 
 export interface TextureParams {
   target: number;
@@ -174,9 +174,9 @@ export interface TextureFormatInfoWebGL extends TextureFormatInfo {
 
 export class WebGLFramebufferCaps implements FramebufferCaps {
   private readonly _isWebGL2: boolean;
-  private readonly _extDrawBuffers: WEBGL_draw_buffers;
-  private readonly _extFloatBlending: EXT_float_blend;
-  private readonly _extRenderMipmap: OES_fbo_render_mipmap;
+  private readonly _extDrawBuffers: Nullable<WEBGL_draw_buffers>;
+  private readonly _extFloatBlending: Nullable<EXT_float_blend>;
+  private readonly _extRenderMipmap: Nullable<OES_fbo_render_mipmap>;
   maxDrawBuffers: number;
   maxColorAttachmentBytesPerSample: number;
   supportRenderMipmap: boolean;
@@ -207,8 +207,8 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
 
 export class WebGLMiscCaps implements MiscCaps {
   private readonly _isWebGL2: boolean;
-  private readonly _extIndexUint32: OES_element_index_uint;
-  private readonly _extBlendMinMax: EXT_blend_minmax;
+  private readonly _extIndexUint32: Nullable<OES_element_index_uint>;
+  private readonly _extBlendMinMax: Nullable<EXT_blend_minmax>;
   supportOversizedViewport: boolean;
   supportBlendMinMax: boolean;
   support32BitIndex: boolean;
@@ -218,7 +218,7 @@ export class WebGLMiscCaps implements MiscCaps {
   constructor(gl: WebGLContext) {
     this._isWebGL2 = isWebGL2(gl);
     this._extBlendMinMax = null;
-    this._extIndexUint32 = isWebGL2 ? gl.getExtension('OES_element_index_uint') : null;
+    this._extIndexUint32 = this._isWebGL2 ? gl.getExtension('OES_element_index_uint') : null;
     if (this._isWebGL2) {
       this.supportBlendMinMax = true;
       this.support32BitIndex = true;
@@ -234,14 +234,13 @@ export class WebGLMiscCaps implements MiscCaps {
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {
-  private readonly _extFragDepth: EXT_frag_depth;
-  private readonly _extStandardDerivatives: OES_standard_derivatives;
-  private readonly _extShaderTextureLod: EXT_shader_texture_lod;
+  private readonly _extFragDepth: Nullable<EXT_frag_depth>;
+  private readonly _extStandardDerivatives: Nullable<OES_standard_derivatives>;
+  private readonly _extShaderTextureLod: Nullable<EXT_shader_texture_lod>;
   supportFragmentDepth: boolean;
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
   supportHighPrecisionFloat: boolean;
-  supportHighPrecisionInt: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
@@ -249,6 +248,7 @@ export class WebGLShaderCaps implements ShaderCaps {
   constructor(gl: WebGLContext) {
     this._extFragDepth = null;
     this._extStandardDerivatives = null;
+    this._extShaderTextureLod = null;
     this.maxStorageBufferSize = 0;
     this.storageBufferOffsetAlignment = 0;
     if (isWebGL2(gl)) {
@@ -276,18 +276,18 @@ export class WebGLShaderCaps implements ShaderCaps {
 }
 export class WebGLTextureCaps implements TextureCaps {
   private readonly _isWebGL2: boolean;
-  private readonly _extS3TC: WEBGL_compressed_texture_s3tc;
-  private readonly _extS3TCSRGB: WEBGL_compressed_texture_s3tc_srgb;
-  private readonly _extBPTC: EXT_texture_compression_bptc;
-  private readonly _extRGTC: EXT_texture_compression_rgtc;
-  private readonly _extASTC: WEBGL_compressed_texture_astc;
-  private readonly _extTextureFilterAnisotropic: EXT_texture_filter_anisotropic;
-  private readonly _extDepthTexture: WEBGL_depth_texture;
-  private readonly _extSRGB: EXT_sRGB;
-  private readonly _extTextureFloat: OES_texture_float;
-  private readonly _extTextureFloatLinear: OES_texture_float_linear;
-  private readonly _extTextureHalfFloat: OES_texture_half_float;
-  private readonly _extTextureHalfFloatLinear: OES_texture_half_float_linear;
+  private readonly _extS3TC: Nullable<WEBGL_compressed_texture_s3tc>;
+  private readonly _extS3TCSRGB: Nullable<WEBGL_compressed_texture_s3tc_srgb>;
+  private readonly _extBPTC: Nullable<EXT_texture_compression_bptc>;
+  private readonly _extRGTC: Nullable<EXT_texture_compression_rgtc>;
+  private readonly _extASTC: Nullable<WEBGL_compressed_texture_astc>;
+  private readonly _extTextureFilterAnisotropic: Nullable<EXT_texture_filter_anisotropic>;
+  private readonly _extDepthTexture: Nullable<WEBGL_depth_texture>;
+  private readonly _extSRGB: Nullable<EXT_sRGB>;
+  private readonly _extTextureFloat: Nullable<OES_texture_float>;
+  private readonly _extTextureFloatLinear: Nullable<OES_texture_float_linear>;
+  private readonly _extTextureHalfFloat: Nullable<OES_texture_half_float>;
+  private readonly _extTextureHalfFloatLinear: Nullable<OES_texture_half_float_linear>;
   private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
@@ -317,6 +317,7 @@ export class WebGLTextureCaps implements TextureCaps {
       gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
     this.supportAnisotropicFiltering = !!this._extTextureFilterAnisotropic;
     if (this._isWebGL2) {
+      this._extDepthTexture = null;
       this.supportDepthTexture = true;
     } else {
       this._extDepthTexture = gl.getExtension('WEBGL_depth_texture');
@@ -326,6 +327,7 @@ export class WebGLTextureCaps implements TextureCaps {
     this._extSRGB = this._isWebGL2 ? null : gl.getExtension('EXT_sRGB');
     this.supportSRGBTexture = this._isWebGL2 || !!this._extSRGB;
     if (this._isWebGL2) {
+      this._extTextureFloat = null;
       this.supportFloatTexture = true;
     } else {
       this._extTextureFloat = gl.getExtension('OES_texture_float');
@@ -334,7 +336,9 @@ export class WebGLTextureCaps implements TextureCaps {
     this._extTextureFloatLinear = gl.getExtension('OES_texture_float_linear');
     this.supportLinearFloatTexture = !!this._extTextureFloatLinear;
     if (this._isWebGL2) {
+      this._extTextureHalfFloat = null;
       this.supportHalfFloatTexture = true;
+      this._extTextureHalfFloatLinear = null;
       this.supportLinearHalfFloatTexture = true;
     } else {
       this._extTextureHalfFloat = gl.getExtension('OES_texture_half_float');
@@ -395,7 +399,7 @@ export class WebGLTextureCaps implements TextureCaps {
         size: 4
       }
     } as Record<TextureFormat, TextureFormatInfoWebGL>;
-    if (this.supportASTC) {
+    if (this._extASTC) {
       for (const k of [
         '4x4',
         '5x4',
@@ -437,7 +441,7 @@ export class WebGLTextureCaps implements TextureCaps {
         };
       }
     }
-    if (this.supportS3TC) {
+    if (this._extS3TC) {
       this._textureFormatInfos['dxt1'] = {
         glFormat: gl.NONE,
         glInternalFormat: this._extS3TC.COMPRESSED_RGB_S3TC_DXT1_EXT,
@@ -472,7 +476,7 @@ export class WebGLTextureCaps implements TextureCaps {
         blockHeight: 4
       };
     }
-    if (this.supportS3TCSRGB) {
+    if (this._extS3TCSRGB) {
       this._textureFormatInfos['dxt1-srgb'] = {
         glFormat: gl.NONE,
         glInternalFormat: this._extS3TCSRGB.COMPRESSED_SRGB_S3TC_DXT1_EXT,
@@ -507,7 +511,7 @@ export class WebGLTextureCaps implements TextureCaps {
         blockHeight: 4
       };
     }
-    if (this.supportRGTC) {
+    if (this._extRGTC) {
       this._textureFormatInfos['bc4'] = {
         glFormat: gl.NONE,
         glInternalFormat: this._extRGTC.COMPRESSED_RED_RGTC1_EXT,
@@ -553,7 +557,7 @@ export class WebGLTextureCaps implements TextureCaps {
         blockHeight: 4
       };
     }
-    if (this.supportBPTC) {
+    if (this._extBPTC) {
       this._textureFormatInfos['bc6h'] = {
         glFormat: gl.NONE,
         glInternalFormat: this._extBPTC.COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT,
@@ -1015,7 +1019,7 @@ export class WebGLTextureCaps implements TextureCaps {
           glFormat: gl.RGBA,
           glInternalFormat: gl.RGBA,
           glType: [
-            this._extTextureHalfFloat.HALF_FLOAT_OES,
+            WebGLEnum.HALF_FLOAT,
             gl.UNSIGNED_BYTE,
             gl.UNSIGNED_SHORT_4_4_4_4,
             gl.UNSIGNED_SHORT_5_5_5_1
@@ -1030,8 +1034,8 @@ export class WebGLTextureCaps implements TextureCaps {
       }
       if (this.supportSRGBTexture) {
         this._textureFormatInfos['rgba8unorm-srgb'] = {
-          glFormat: this._extSRGB.SRGB_ALPHA_EXT,
-          glInternalFormat: this._extSRGB.SRGB_ALPHA_EXT,
+          glFormat: WebGLEnum.SRGB_ALPHA,
+          glInternalFormat: WebGLEnum.SRGB_ALPHA,
           glType: [gl.UNSIGNED_BYTE],
           filterable: true,
           renderable: false,
@@ -1067,7 +1071,7 @@ export class WebGLTextureCaps implements TextureCaps {
         this._textureFormatInfos['d24s8'] = {
           glFormat: gl.DEPTH_STENCIL,
           glInternalFormat: gl.DEPTH_STENCIL,
-          glType: [this._extDepthTexture.UNSIGNED_INT_24_8_WEBGL],
+          glType: [WebGLEnum.UNSIGNED_INT_24_8],
           filterable: false,
           renderable: true,
           compressed: false,

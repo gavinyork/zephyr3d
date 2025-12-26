@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, Immutable } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
 import { makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
@@ -96,24 +96,24 @@ import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
   interface WebGLRenderingContext {
-    _currentFramebuffer: WebGLFrameBuffer;
-    _currentProgram: WebGLGPUProgram;
+    _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
+    _currentProgram?: Nullable<WebGLGPUProgram>;
   }
   interface WebGL2RenderingContext {
-    _currentFramebuffer: WebGLFrameBuffer;
-    _currentProgram: WebGLGPUProgram;
+    _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
+    _currentProgram?: Nullable<WebGLGPUProgram>;
   }
 }
 
 type VAOObject = WebGLVertexArrayObject | WebGLVertexArrayObjectOES;
 
 type WebGLRenderBundle = {
-  program: WebGLGPUProgram;
+  program: Nullable<WebGLGPUProgram>;
   bindGroups: WebGLBindGroup[];
-  bindGroupOffsets: Iterable<number>[];
-  vertexLayout: WebGLVertexLayout;
+  bindGroupOffsets: Nullable<Iterable<number>>[];
+  vertexLayout: Nullable<WebGLVertexLayout>;
   primitiveType: PrimitiveType;
-  renderStateSet: RenderStateSet;
+  renderStateSet: Nullable<RenderStateSet>;
   first: number;
   count: number;
   numInstances: number;
@@ -121,7 +121,7 @@ type WebGLRenderBundle = {
 
 export interface VertexArrayObjectEXT {
   createVertexArray: () => VAOObject;
-  bindVertexArray: (arrayObject: VAOObject) => void;
+  bindVertexArray: (arrayObject: Nullable<VAOObject>) => void;
   deleteVertexArray: (arrayObject: VAOObject) => void;
   isVertexArray: (arrayObject: VAOObject) => GLboolean;
 }
@@ -150,27 +150,27 @@ export class WebGLDevice extends BaseDevice {
   private readonly _context: WebGLContext;
   private readonly _isWebGL2: boolean;
   private readonly _msaaSampleCount: number;
-  private readonly _loseContextExtension: WEBGL_lose_context;
+  private readonly _loseContextExtension: Nullable<WEBGL_lose_context>;
   private _contextLost: boolean;
   private _isRendering: boolean;
   private _reverseWindingOrder: boolean;
-  private _deviceCaps: DeviceCaps;
-  private _vaoExt: VertexArrayObjectEXT;
-  private _instancedArraysExt: InstancedArraysEXT;
-  private _drawBuffersExt: DrawBuffersEXT;
-  private _currentProgram: WebGLGPUProgram;
-  private _currentVertexData: WebGLVertexLayout;
-  private _currentStateSet: WebGLRenderStateSet;
+  private _deviceCaps!: DeviceCaps;
+  private _vaoExt: Nullable<VertexArrayObjectEXT>;
+  private _instancedArraysExt: Nullable<InstancedArraysEXT>;
+  private _drawBuffersExt: Nullable<DrawBuffersEXT>;
+  private _currentProgram: Nullable<WebGLGPUProgram>;
+  private _currentVertexData: Nullable<WebGLVertexLayout>;
+  private _currentStateSet: Nullable<WebGLRenderStateSet>;
   private _currentBindGroups: WebGLBindGroup[];
-  private _currentBindGroupOffsets: Iterable<number>[];
+  private _currentBindGroupOffsets: Nullable<Iterable<number>>[];
   private _currentViewport: DeviceViewport;
   private _currentScissorRect: DeviceViewport;
   private _samplerCache: SamplerCache;
-  private _textureSamplerMap: WeakMap<BaseTexture, WebGLTextureSampler>;
-  private _captureRenderBundle: WebGLRenderBundle;
+  private _textureSamplerMap: WeakMap<BaseTexture, Nullable<WebGLTextureSampler>>;
+  private _captureRenderBundle: Nullable<WebGLRenderBundle>;
   private _deviceUniformBuffers: WebGLBuffer[];
   private _deviceUniformBufferOffsets: number[];
-  private _bindTextures: Record<number, WebGLTexture[]>;
+  private _bindTextures: Record<number, Nullable<WebGLTexture>[]>;
   private _bindSamplers: WebGLSampler[];
   private _readFormats: Record<
     string,
@@ -185,8 +185,7 @@ export class WebGLDevice extends BaseDevice {
     this._isRendering = false;
     this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
-    let context: WebGLContext = null;
-    context = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
+    const context: WebGLContext = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
       antialias: !!options?.msaa,
       depth: true,
       stencil: true,
@@ -202,16 +201,30 @@ export class WebGLDevice extends BaseDevice {
       version: context.getParameter(context.VERSION)
     };
     this._contextLost = false;
+    this._vaoExt = null;
+    this._instancedArraysExt = null;
+    this._drawBuffersExt = null;
     this._reverseWindingOrder = false;
-    this._deviceCaps = null;
     this._context = context;
     this._currentProgram = null;
     this._currentVertexData = null;
     this._currentStateSet = null;
     this._currentBindGroups = [];
     this._currentBindGroupOffsets = [];
-    this._currentViewport = null;
-    this._currentScissorRect = null;
+    this._currentViewport = {
+      x: 0,
+      y: 0,
+      width: this.deviceXToScreen(this.canvas.width),
+      height: this.deviceYToScreen(this.canvas.height),
+      default: true
+    };
+    this._currentScissorRect = {
+      x: 0,
+      y: 0,
+      width: this.deviceXToScreen(this.canvas.width),
+      height: this.deviceYToScreen(this.canvas.height),
+      default: true
+    };
     this._deviceUniformBuffers = [];
     this._deviceUniformBufferOffsets = [];
     this._bindTextures = {
@@ -273,13 +286,13 @@ export class WebGLDevice extends BaseDevice {
   getDeviceCaps(): Immutable<DeviceCaps> {
     return this._deviceCaps;
   }
-  get vaoExt(): VertexArrayObjectEXT {
+  get vaoExt(): Nullable<VertexArrayObjectEXT> {
     return this._vaoExt;
   }
-  get instancedArraysExt(): InstancedArraysEXT {
+  get instancedArraysExt(): Nullable<InstancedArraysEXT> {
     return this._instancedArraysExt;
   }
-  get drawBuffersExt() {
+  get drawBuffersExt(): Nullable<DrawBuffersEXT> {
     return this._drawBuffersExt;
   }
   getDrawingBufferWidth(): number {
@@ -302,7 +315,12 @@ export class WebGLDevice extends BaseDevice {
       [WebGLEnum.TEXTURE_2D_ARRAY]: []
     };
   }
-  bindTexture(target: number, layer: number, texture: WebGLBaseTexture, sampler?: WebGLTextureSampler) {
+  bindTexture(
+    target: number,
+    layer: number,
+    texture: Nullable<WebGLBaseTexture>,
+    sampler?: Nullable<WebGLTextureSampler>
+  ) {
     const tex = texture?.object ?? null;
     const gl = this._context;
     gl.activeTexture(WebGLEnum.TEXTURE0 + layer);
@@ -352,7 +370,7 @@ export class WebGLDevice extends BaseDevice {
           buffer.object
         );
       }
-      this._deviceUniformBuffers[index] = buffer.object;
+      this._deviceUniformBuffers[index] = buffer.object!;
       this._deviceUniformBufferOffsets[index] = offset;
     }
   }
@@ -437,7 +455,7 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   // factory
-  createGPUTimer(): ITimer {
+  createGPUTimer(): Nullable<ITimer> {
     return new GPUTimer(this);
   }
   createRenderStateSet(): RenderStateSet {
@@ -465,7 +483,7 @@ export class WebGLDevice extends BaseDevice {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T {
+  ): Nullable<T> {
     if (!data) {
       console.error(`Device.createTextureFromMipmapData() failed: invalid data`);
       return null;
@@ -497,7 +515,7 @@ export class WebGLDevice extends BaseDevice {
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D {
+  ): Nullable<Texture2D> {
     const tex = (options?.texture as WebGLTexture2D) ?? new WebGLTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2D() failed: options.texture must be 2d texture');
@@ -511,7 +529,7 @@ export class WebGLDevice extends BaseDevice {
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D {
+  ): Nullable<Texture2D> {
     const tex = (options?.texture as WebGLTexture2D) ?? new WebGLTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromImage() failed: options.texture must be 2d texture');
@@ -527,7 +545,7 @@ export class WebGLDevice extends BaseDevice {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray {
+  ): Nullable<Texture2DArray> {
     const tex = (options?.texture as WebGLTexture2DArray) ?? new WebGLTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArray() failed: options.texture must be 2d array texture');
@@ -541,7 +559,7 @@ export class WebGLDevice extends BaseDevice {
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray {
+  ): Nullable<Texture2DArray> {
     if (!elements || elements.length === 0) {
       console.error('createTexture2DArrayFromImages() failed: Invalid image elements');
       return null;
@@ -561,7 +579,7 @@ export class WebGLDevice extends BaseDevice {
       console.error('createTexture2DArrayFromImages() failed: options.texture must be 2d array texture');
       return null;
     }
-    let tex: Texture2DArray = options?.texture as Texture2DArray;
+    let tex: Nullable<Texture2DArray> = options?.texture as Nullable<Texture2DArray>;
     if (tex) {
       if (tex.depth !== elements.length) {
         console.error(
@@ -583,6 +601,10 @@ export class WebGLDevice extends BaseDevice {
         elements.length,
         options
       );
+      if (!tex) {
+        console.error('createTexture2DArrayFromImages() failed');
+        return null;
+      }
       for (let i = 0; i < elements.length; i++) {
         tex.updateFromElement(elements[i], 0, 0, i, 0, 0, width, height);
       }
@@ -596,7 +618,7 @@ export class WebGLDevice extends BaseDevice {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D {
+  ): Nullable<Texture3D> {
     if (!this.isWebGL2) {
       console.error('device does not support 3d texture');
       return null;
@@ -610,7 +632,11 @@ export class WebGLDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube {
+  createCubeTexture(
+    format: TextureFormat,
+    size: number,
+    options?: TextureCreationOptions
+  ): Nullable<TextureCube> {
     const tex = (options?.texture as WebGLTextureCube) ?? new WebGLTextureCube(this);
     if (!tex.isTextureCube()) {
       console.error('createCubeTexture() failed: options.texture must be cube texture');
@@ -718,8 +744,8 @@ export class WebGLDevice extends BaseDevice {
       return;
     }
     const gl = this._context as WebGL2RenderingContext;
-    gl.bindBuffer(gl.COPY_READ_BUFFER, sourceBuffer.object);
-    gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object);
+    gl.bindBuffer(gl.COPY_READ_BUFFER, sourceBuffer.object!);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object!);
     gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
   }
   createIndexBuffer(
@@ -740,23 +766,23 @@ export class WebGLDevice extends BaseDevice {
   }
   createFrameBuffer(
     colorAttachments: BaseTexture[],
-    depthAttachement: BaseTexture,
+    depthAttachement: Nullable<BaseTexture>,
     options?: FrameBufferOptions
   ): FrameBuffer {
     return new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
-  setBindGroup(index: number, bindGroup: BindGroup, bindGroupOffsets?: Iterable<number>) {
+  setBindGroup(index: number, bindGroup: BindGroup, bindGroupOffsets?: Nullable<Iterable<number>>) {
     if (bindGroupOffsets && !isWebGL2(this._context)) {
       throw new Error(`setBindGroup(): no dynamic offset buffer support for WebGL1 device`);
     }
     this._currentBindGroups[index] = bindGroup as WebGLBindGroup;
     this._currentBindGroupOffsets[index] = bindGroupOffsets || null;
   }
-  getBindGroup(index: number): [BindGroup, Iterable<number>] {
+  getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>] {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp?: number[] | DeviceViewport) {
+  setViewport(vp: Nullable<number[] | DeviceViewport>) {
     if (vp === null || vp === undefined || (!Array.isArray(vp) && vp.default)) {
       this._currentViewport = {
         x: 0,
@@ -788,7 +814,7 @@ export class WebGLDevice extends BaseDevice {
   getViewport(): Immutable<DeviceViewport> {
     return this._currentViewport;
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
+  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
       this._currentScissorRect = {
         x: 0,
@@ -820,25 +846,25 @@ export class WebGLDevice extends BaseDevice {
   getScissor(): Immutable<DeviceViewport> {
     return this._currentScissorRect;
   }
-  setProgram(program: GPUProgram) {
+  setProgram(program: Nullable<GPUProgram>) {
     this._currentProgram = program as WebGLGPUProgram;
   }
-  getProgram(): GPUProgram {
+  getProgram(): Nullable<GPUProgram> {
     return this._currentProgram;
   }
-  setVertexLayout(vertexData: VertexLayout) {
+  setVertexLayout(vertexData: Nullable<VertexLayout>) {
     this._currentVertexData = vertexData as WebGLVertexLayout;
   }
-  getVertexLayout(): VertexLayout {
+  getVertexLayout(): Nullable<VertexLayout> {
     return this._currentVertexData;
   }
-  setRenderStates(stateSet: RenderStateSet) {
+  setRenderStates(stateSet: Nullable<RenderStateSet>) {
     this._currentStateSet = stateSet as WebGLRenderStateSet;
   }
-  getRenderStates(): RenderStateSet {
+  getRenderStates(): Nullable<RenderStateSet> {
     return this._currentStateSet;
   }
-  getFramebuffer(): FrameBuffer {
+  getFramebuffer(): Nullable<FrameBuffer> {
     return this._context._currentFramebuffer ?? null;
   }
   reverseVertexWindingOrder(reverse: boolean): void {
@@ -893,7 +919,7 @@ export class WebGLDevice extends BaseDevice {
         usage: 'pack-pixel',
         managed: false
       });
-      this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object);
+      this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object!);
       this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
       //this.flush();
       this.context.readPixels(x, y, w, h, glFormat, glType, 0);
@@ -940,7 +966,7 @@ export class WebGLDevice extends BaseDevice {
     } else if (size === 4) {
       glType = float ? WebGLEnum.FLOAT : signed ? WebGLEnum.INT : WebGLEnum.UNSIGNED_INT;
     }
-    this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, buffer.object);
+    this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, buffer.object!);
     this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
     this.context.readPixels(x, y, w, h, glFormat, glType, 0);
     this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
@@ -1146,7 +1172,7 @@ export class WebGLDevice extends BaseDevice {
     throw new Error('WebGL device does not support compute shader');
   }
   /** @internal */
-  private createInstancedArraysEXT(): InstancedArraysEXT {
+  private createInstancedArraysEXT(): Nullable<InstancedArraysEXT> {
     const gl = this._context;
     if (isWebGL2(gl)) {
       return {
@@ -1155,7 +1181,7 @@ export class WebGLDevice extends BaseDevice {
         drawElementsInstanced: gl.drawElementsInstanced.bind(gl)
       };
     } else {
-      const extInstancedArray: ANGLE_instanced_arrays = gl.getExtension('ANGLE_instanced_arrays');
+      const extInstancedArray: Nullable<ANGLE_instanced_arrays> = gl.getExtension('ANGLE_instanced_arrays');
       return extInstancedArray
         ? {
             vertexAttribDivisor: extInstancedArray.vertexAttribDivisorANGLE.bind(extInstancedArray),
@@ -1166,14 +1192,14 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   /** @internal */
-  private createDrawBuffersEXT(): DrawBuffersEXT {
+  private createDrawBuffersEXT(): Nullable<DrawBuffersEXT> {
     const gl = this._context;
     if (isWebGL2(gl)) {
       return {
         drawBuffers: gl.drawBuffers.bind(gl)
       };
     } else {
-      const extDrawBuffers: WEBGL_draw_buffers = gl.getExtension('WEBGL_draw_buffers');
+      const extDrawBuffers: Nullable<WEBGL_draw_buffers> = gl.getExtension('WEBGL_draw_buffers');
       return extDrawBuffers
         ? {
             drawBuffers: extDrawBuffers.drawBuffersWEBGL.bind(extDrawBuffers)
@@ -1182,7 +1208,7 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   /** @internal */
-  private createVertexArrayObjectEXT(): VertexArrayObjectEXT {
+  private createVertexArrayObjectEXT(): Nullable<VertexArrayObjectEXT> {
     const gl = this._context;
     if (isWebGL2(gl)) {
       return {
@@ -1192,7 +1218,7 @@ export class WebGLDevice extends BaseDevice {
         isVertexArray: gl.isVertexArray.bind(gl)
       };
     } else {
-      const extVAO: OES_vertex_array_object = gl.getExtension('OES_vertex_array_object');
+      const extVAO: Nullable<OES_vertex_array_object> = gl.getExtension('OES_vertex_array_object');
       return extVAO
         ? {
             createVertexArray: extVAO.createVertexArrayOES.bind(extVAO),
@@ -1219,8 +1245,21 @@ export class WebGLDevice extends BaseDevice {
     this._currentStateSet = null;
     this._currentBindGroups = [];
     this._currentBindGroupOffsets = [];
-    this._currentViewport = null;
-    this._currentScissorRect = null;
+    this._currentViewport = {
+      x: 0,
+      y: 0,
+      width: this.deviceXToScreen(this.canvas.width),
+      height: this.deviceYToScreen(this.canvas.height),
+      default: true
+    };
+    this._currentScissorRect = {
+      x: 0,
+      y: 0,
+      width: this.deviceXToScreen(this.canvas.width),
+      height: this.deviceYToScreen(this.canvas.height),
+      default: true
+    };
+
     this._samplerCache = new SamplerCache(this);
     if (this._isRendering) {
       this._isRendering = false;
@@ -1268,10 +1307,10 @@ export class WebGLDevice extends BaseDevice {
     return this._textureSamplerMap.get(tex);
   }
   /** @internal */
-  setCurrentSamplerForTexture(tex: BaseTexture, sampler: WebGLTextureSampler) {
+  setCurrentSamplerForTexture(tex: BaseTexture, sampler: Nullable<WebGLTextureSampler>) {
     this._textureSamplerMap.set(tex, sampler);
   }
-  getError(throwError?: boolean): Error {
+  getError(throwError?: boolean): Nullable<Error> {
     const errcode = this._context.getError();
     const err = errcode === WebGLEnum.NO_ERROR ? null : new WebGLError(errcode);
     if (err && throwError) {
@@ -1281,20 +1320,20 @@ export class WebGLDevice extends BaseDevice {
   }
 }
 
-let webGL1Supported: boolean = null;
-let webGL2Supported: boolean = null;
+let webGL1Supported: Nullable<boolean> = null;
+let webGL2Supported: Nullable<boolean> = null;
 const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
   backend: DeviceBackend,
   cvs: HTMLCanvasElement,
   options?: DeviceOptions
-): Promise<AbstractDevice> {
+): Promise<Nullable<AbstractDevice>> {
   try {
     const device = new factory(backend, cvs, options);
     await device.initContext();
-    device.setViewport();
-    device.setScissor();
+    device.setViewport(null);
+    device.setScissor(null);
     return device;
   } catch (err) {
     console.error(err);

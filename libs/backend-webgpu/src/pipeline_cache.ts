@@ -14,6 +14,7 @@ import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUDevice } from './device';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
+import type { Nullable } from '@zephyr3d/base';
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const stencilFormats = ['stencil8', 'depth24plus-stencil8', 'depth24unorm-stencil8', 'depth32float-stencil8'];
@@ -26,11 +27,11 @@ const depthFormats = [
   'depth32float-stencil8'
 ];
 export type FrameBufferInfo = {
-  frameBuffer: WebGPUFrameBuffer;
+  frameBuffer: Nullable<WebGPUFrameBuffer>;
   colorFormats: GPUTextureFormat[];
-  depthFormat: GPUTextureFormat;
+  depthFormat?: GPUTextureFormat;
   sampleCount: number;
-  hash: string;
+  hash: Nullable<string>;
   clearHash: string;
 };
 
@@ -66,29 +67,26 @@ export class PipelineCache {
   }
   fetchRenderPipeline(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType,
     frameBufferInfo: FrameBufferInfo
-  ): GPURenderPipeline {
+  ): Nullable<GPURenderPipeline> {
     if (!frameBufferInfo.hash) {
       return null;
     }
-    if (!program.vertexAttributes) {
-      // no vertex data needed for this pipeline
-      vertexData = null;
-    }
+    const vertexLayout = program.vertexAttributes ? vertexData : null;
     const hash = this.getRenderPipelineHash(
       frameBufferInfo.hash,
       program,
-      vertexData,
+      vertexLayout,
       stateSet,
       primitiveType
     );
     let pipeline = this._renderPipelines[hash];
     if (pipeline === undefined) {
-      const bufferLayouts = vertexData
-        ? this._device.fetchVertexLayout(vertexData.getLayouts(program.vertexAttributes).layoutHash)
+      const bufferLayouts = vertexLayout
+        ? this._device.fetchVertexLayout(vertexLayout.getLayouts(program.vertexAttributes)!.layoutHash)
         : null;
       const shaderModule = program.getShaderModule();
       const vertex: GPUVertexState = {
@@ -98,7 +96,7 @@ export class PipelineCache {
       if (bufferLayouts) {
         vertex.buffers = bufferLayouts;
       }
-      const primitiveState = this.createPrimitiveState(vertexData, stateSet, primitiveType);
+      const primitiveState = this.createPrimitiveState(vertexLayout, stateSet, primitiveType);
       const depthStencilState = this.createDepthStencilState(frameBufferInfo.depthFormat, stateSet);
       const colorTargetStates = frameBufferInfo.colorFormats.map((val) =>
         this.createColorTargetState(stateSet, val)
@@ -122,7 +120,7 @@ export class PipelineCache {
     return pipeline;
   }
   private createPrimitiveState(
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
   ): GPUPrimitiveState {
@@ -160,9 +158,9 @@ export class PipelineCache {
     };
   }
   private createDepthStencilState(
-    depthFormat: GPUTextureFormat,
+    depthFormat: GPUTextureFormat | undefined,
     stateSet: WebGPURenderStateSet
-  ): GPUDepthStencilState {
+  ): GPUDepthStencilState | undefined {
     if (!depthFormat) {
       return undefined;
     }
@@ -275,12 +273,12 @@ export class PipelineCache {
   private getRenderPipelineHash(
     fbHash: string,
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
   ): string {
     const programHash = program.hash;
-    const vertexHash = vertexData?.getLayouts(program.vertexAttributes).layoutHash || '';
+    const vertexHash = vertexData?.getLayouts(program.vertexAttributes)?.layoutHash || '';
     const stateHash = stateSet?.hash || '';
     return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}:${stateHash}:${Number(
       this._device.isWindingOrderReversed()

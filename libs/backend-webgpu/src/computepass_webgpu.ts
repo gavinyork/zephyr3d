@@ -1,13 +1,14 @@
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUDevice } from './device';
+import type { Nullable } from '@zephyr3d/base';
 
 const VALIDATION_FAILED = 1 << 0;
 
 export class WebGPUComputePass {
   private readonly _device: WebGPUDevice;
-  private _computeCommandEncoder: GPUCommandEncoder;
-  private _computePassEncoder: GPUComputePassEncoder;
+  private _computeCommandEncoder: Nullable<GPUCommandEncoder>;
+  private _computePassEncoder: Nullable<GPUComputePassEncoder>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._computeCommandEncoder = this._device.device.createCommandEncoder();
@@ -19,7 +20,7 @@ export class WebGPUComputePass {
   compute(
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     workgroupCountX: number,
     workgroupCountY: number,
     workgroupCountZ: number
@@ -31,18 +32,18 @@ export class WebGPUComputePass {
     if (!this.active) {
       this.begin();
     }
-    this.setBindGroupsForCompute(this._computePassEncoder, program, bindGroups, bindGroupOffsets);
+    this.setBindGroupsForCompute(this._computePassEncoder!, program, bindGroups, bindGroupOffsets);
     const pipeline = this._device.pipelineCache.fetchComputePipeline(program);
     if (pipeline) {
-      this._computePassEncoder.setPipeline(pipeline);
-      this._computePassEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
+      this._computePassEncoder!.setPipeline(pipeline);
+      this._computePassEncoder!.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
     }
   }
   private setBindGroupsForCompute(
     computePassEncoder: GPUComputePassEncoder,
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[]
+    bindGroupOffsets: Nullable<Iterable<number>>[]
   ): boolean {
     if (bindGroups) {
       for (let i = 0; i < 4; i++) {
@@ -74,9 +75,9 @@ export class WebGPUComputePass {
   }
   end() {
     if (this.active) {
-      this._computePassEncoder.end();
+      this._computePassEncoder!.end();
       this._computePassEncoder = null;
-      this._device.device.queue.submit([this._computeCommandEncoder.finish()]);
+      this._device.device.queue.submit([this._computeCommandEncoder!.finish()]);
       this._computeCommandEncoder = null;
     }
   }

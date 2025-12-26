@@ -68,7 +68,6 @@ export class WebGPUShaderCaps implements ShaderCaps {
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
   supportHighPrecisionFloat: boolean;
-  supportHighPrecisionInt: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;

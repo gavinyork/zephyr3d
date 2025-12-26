@@ -22,7 +22,7 @@ export class StructuredBufferData {
    * @param layout - Layout of the structure
    * @param buffer - Buffer that holds the data
    */
-  constructor(layout: UniformBufferLayout, buffer?: StructuredBuffer | ArrayBuffer) {
+  constructor(layout: UniformBufferLayout, buffer?: Nullable<StructuredBuffer | ArrayBuffer>) {
     this._size = (layout.byteSize + 15) & ~15;
     if (this._size <= 0) {
       throw new Error(`UniformBuffer(): invalid uniform buffer byte size: ${this._size}`);

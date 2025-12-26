@@ -25,10 +25,11 @@ import {
   compareFuncInvMap
 } from './constants_webgl';
 import { WebGLEnum } from './webgl_enum';
+import type { Nullable } from '@zephyr3d/base';
 
 export abstract class WebGLRenderState {
   protected static _defaultState: WebGLRenderState;
-  protected static _currentState: WebGLRenderState;
+  protected static _currentState: Nullable<WebGLRenderState>;
   apply(gl: WebGLContext, force?: boolean) {
     const c: any = this.constructor;
     if (force || c._currentState !== this) {
@@ -49,7 +50,7 @@ export abstract class WebGLRenderState {
 
 export class WebGLColorState extends WebGLRenderState implements ColorState {
   protected static _defaultState: WebGLColorState = new WebGLColorState();
-  protected static _currentState: WebGLColorState = null;
+  protected static _currentState: Nullable<WebGLColorState> = null;
   redMask: boolean;
   greenMask: boolean;
   blueMask: boolean;
@@ -75,13 +76,13 @@ export class WebGLColorState extends WebGLRenderState implements ColorState {
 
 export class WebGLBlendingState extends WebGLRenderState implements BlendingState {
   protected static _defaultState: WebGLBlendingState = new WebGLBlendingState();
-  protected static _currentState: WebGLBlendingState = null;
-  private _srcBlendRGB: number;
-  private _dstBlendRGB: number;
-  private _srcBlendAlpha: number;
-  private _dstBlendAlpha: number;
-  private _rgbEquation: number;
-  private _alphaEquation: number;
+  protected static _currentState: Nullable<WebGLBlendingState> = null;
+  private _srcBlendRGB!: number;
+  private _dstBlendRGB!: number;
+  private _srcBlendAlpha!: number;
+  private _dstBlendAlpha!: number;
+  private _rgbEquation!: number;
+  private _alphaEquation!: number;
   enabled: boolean;
   alphaToCoverageEnabled: boolean;
   constructor() {
@@ -192,8 +193,8 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
 
 export class WebGLRasterizerState extends WebGLRenderState implements RasterizerState {
   protected static _defaultState: WebGLRasterizerState = new WebGLRasterizerState();
-  protected static _currentState: WebGLRasterizerState = null;
-  private _cullMode: number;
+  protected static _currentState: Nullable<WebGLRasterizerState> = null;
+  private _cullMode!: number;
   constructor() {
     super();
     this.cullMode = 'back';
@@ -235,12 +236,12 @@ export class WebGLRasterizerState extends WebGLRenderState implements Rasterizer
 
 export class WebGLDepthState extends WebGLRenderState implements DepthState {
   protected static _defaultState: WebGLDepthState = new WebGLDepthState();
-  protected static _currentState: WebGLDepthState = null;
+  protected static _currentState: Nullable<WebGLDepthState> = null;
   testEnabled: boolean;
   writeEnabled: boolean;
   depthBias: number;
   depthBiasSlopeScale: number;
-  private _compareFunc: number;
+  private _compareFunc!: number;
   constructor() {
     super();
     this.testEnabled = true;
@@ -259,7 +260,7 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     return other;
   }
   get compareFunc(): CompareFunc {
-    return compareFuncInvMap[this._compareFunc];
+    return compareFuncInvMap[this._compareFunc]!;
   }
   set compareFunc(val: CompareFunc) {
     this._compareFunc = compareFuncMap[val];
@@ -303,19 +304,19 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
 
 export class WebGLStencilState extends WebGLRenderState implements StencilState {
   protected static _defaultState: WebGLStencilState = new WebGLStencilState();
-  protected static _currentState: WebGLStencilState = null;
+  protected static _currentState: Nullable<WebGLStencilState> = null;
   enabled: boolean;
   writeMask: number;
   ref: number;
   readMask: number;
-  private _failOp: number;
-  private _failOpBack: number;
-  private _zFailOp: number;
-  private _zFailOpBack: number;
-  private _passOp: number;
-  private _passOpBack: number;
-  private _func: number;
-  private _funcBack: number;
+  private _failOp!: number;
+  private _failOpBack!: number;
+  private _zFailOp!: number;
+  private _zFailOpBack!: number;
+  private _passOp!: number;
+  private _passOpBack!: number;
+  private _func!: number;
+  private _funcBack!: number;
   constructor() {
     super();
     this.enabled = false;
@@ -376,13 +377,13 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
     this._passOpBack = stencilOpMap[val];
   }
   get func(): CompareFunc {
-    return compareFuncInvMap[this._func];
+    return compareFuncInvMap[this._func]!;
   }
   set func(val: CompareFunc) {
     this._func = compareFuncMap[val];
   }
   get funcBack(): CompareFunc {
-    return compareFuncInvMap[this._funcBack];
+    return compareFuncInvMap[this._funcBack]!;
   }
   set funcBack(val: CompareFunc) {
     this._funcBack = compareFuncMap[val];
@@ -440,11 +441,11 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
 
 export class WebGLRenderStateSet implements RenderStateSet {
   private readonly _gl: WebGLContext;
-  colorState: WebGLColorState;
-  blendingState: WebGLBlendingState;
-  rasterizerState: WebGLRasterizerState;
-  depthState: WebGLDepthState;
-  stencilState: WebGLStencilState;
+  colorState: Nullable<WebGLColorState>;
+  blendingState: Nullable<WebGLBlendingState>;
+  rasterizerState: Nullable<WebGLRasterizerState>;
+  depthState: Nullable<WebGLDepthState>;
+  stencilState: Nullable<WebGLStencilState>;
   constructor(gl: WebGLContext) {
     this._gl = gl;
     this.colorState = null;

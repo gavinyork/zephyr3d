@@ -3,7 +3,7 @@ import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { UploadBuffer } from './uploadringbuffer';
 import { UploadRingBuffer } from './uploadringbuffer';
-import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuffer<GPUBuffer> {
@@ -27,7 +27,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     this._pendingUploads = [];
     this.load(typeof data === 'number' ? null : data);
   }
-  get hash(): number {
+  get hash(): Nullable<number> {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
   get byteLength() {
@@ -104,7 +104,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       }
       this.pushUpload(start, end - start, insertIndex);
     }
-    new Uint8Array(this._pendingUploads[0].mappedBuffer.mappedRange, dstByteOffset, uploadSize).set(
+    new Uint8Array(this._pendingUploads[0].mappedBuffer.mappedRange!, dstByteOffset, uploadSize).set(
       new Uint8Array(data.buffer, uploadOffset, uploadSize)
     );
     if (commit) {
@@ -172,7 +172,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         cmdEncoder.copyBufferToBuffer(
           upload.mappedBuffer.buffer,
           upload.mappedBuffer.offset,
-          this._object,
+          this._object!,
           upload.uploadOffset,
           upload.uploadSize
         );
@@ -191,7 +191,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       this._ringBuffer.purge();
     }
   }
-  private load(data?: TypedArray): void {
+  private load(data?: Nullable<TypedArray>): void {
     if (this._device.isContextLost()) {
       return;
     }
@@ -264,7 +264,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       },
       uploadSize: byteSize,
       uploadOffset: dstByteOffset,
-      uploadBuffer: this._object
+      uploadBuffer: this._object!
     });
   }
 }

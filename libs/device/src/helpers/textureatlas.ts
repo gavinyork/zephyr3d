@@ -1,6 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { RectsPacker } from '@zephyr3d/base';
-import type { AbstractDevice } from '../base_types';
+import type { AbstractDevice, TextureFormat } from '../base_types';
 import type { BaseTexture, Texture2D } from '../gpuobject';
 
 /**
@@ -181,9 +181,13 @@ export class TextureAtlasManager {
   }
   /** @internal */
   protected _createAtlasTexture(): Texture2D {
-    const tex = this._device.createTexture2D('rgba8unorm', this._binWidth, this._binHeight, {
+    const format: TextureFormat = 'rgba8unorm';
+    const tex = this._device.createTexture2D(format, this._binWidth, this._binHeight, {
       mipmapping: false
     });
+    if (!tex) {
+      throw new Error(`Create 2D texture failed: ${format}-${this._binWidth}x${this._binHeight}`);
+    }
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
     tex.restoreHandler = () => {
       tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);

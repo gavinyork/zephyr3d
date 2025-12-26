@@ -1,7 +1,7 @@
 import type { Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUTexture> {
@@ -12,7 +12,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     return true;
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -27,7 +27,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, depth, xOffset, yOffset, zOffset, 0);
   }
@@ -41,7 +41,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createView(_level?: number, face?: number, _mipCount?: number): GPUTextureView {
+  createView(_level?: number, face?: number, _mipCount?: number): Nullable<GPUTextureView> {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',

@@ -16,26 +16,26 @@ import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUTextureVideo } from './texturevideo_webgpu';
 import type { WebGPUTextureSampler } from './sampler_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
-import type { Immutable, TypedArray } from '@zephyr3d/base';
+import type { Immutable, Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 
 export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
   private readonly _layout: Immutable<BindGroupLayout>;
-  private _layoutDesc: GPUBindGroupLayoutDescriptor;
-  private _entries: GPUBindGroupEntry[];
-  private _bindGroup: GPUBindGroup;
+  private _layoutDesc: Nullable<GPUBindGroupLayoutDescriptor>;
+  private _entries: Nullable<GPUBindGroupEntry[]>;
+  private _bindGroup: Nullable<GPUBindGroup>;
   private _buffers: WebGPUBuffer[];
   private _textures: WebGPUBaseTexture[];
   private _createdBuffers: WebGPUBuffer[];
   private _gpuId: number;
-  private _videoTextures: WebGPUTextureVideo[];
-  private _dynamicOffsets: number[];
+  private _videoTextures: Nullable<WebGPUTextureVideo[]>;
+  private _dynamicOffsets: Nullable<number[]>;
   private _resources: {
     [name: string]:
       | [WebGPUBuffer, number, number]
       | WebGPUTextureVideo
-      | [WebGPUBaseTexture, GPUTextureView]
+      | [WebGPUBaseTexture, Nullable<GPUTextureView>]
       | GPUSampler;
   };
   constructor(device: WebGPUDevice, layout: Immutable<BindGroupLayout>) {
@@ -67,13 +67,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
     return this._bindGroup;
   }
-  get layoutDescriptor(): GPUBindGroupLayoutDescriptor {
+  get layoutDescriptor(): Nullable<GPUBindGroupLayoutDescriptor> {
     if (!this._bindGroup) {
       this._bindGroup = this._create();
     }
     return this._layoutDesc;
   }
-  get entries(): GPUBindGroupEntry[] {
+  get entries(): Nullable<GPUBindGroupEntry[]> {
     if (!this._bindGroup) {
       this._bindGroup = this._create();
     }
@@ -95,10 +95,10 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
   }
-  getDynamicOffsets(): Immutable<number[]> {
+  getDynamicOffsets(): Nullable<Immutable<number[]>> {
     return this._dynamicOffsets;
   }
-  getBuffer(name: string, nocreate = true): GPUDataBuffer {
+  getBuffer(name: string, nocreate = true): Nullable<GPUDataBuffer> {
     return this._getBuffer(
       name,
       GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE,
@@ -128,7 +128,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             this.invalidate();
           }
           if (entry.buffer.hasDynamicOffset) {
-            this._dynamicOffsets[entry.buffer.dynamicOffsetIndex] = offset ?? 0;
+            this._dynamicOffsets![entry.buffer.dynamicOffsetIndex] = offset ?? 0;
           }
         }
         return;
@@ -179,7 +179,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       }
     }
   }
-  getTexture(name: string): BaseTexture {
+  getTexture(name: string): Nullable<BaseTexture> {
     const entry = this._findTextureLayout(name);
     if (entry) {
       const t = this._resources[name] as [WebGPUBaseTexture, GPUTextureView];
@@ -223,7 +223,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             !sampler || sampler.compare ? value.getDefaultSampler(false) : sampler
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[entry.texture.autoBindSampler]) {
-            this._resources[entry.texture.autoBindSampler] = s.object;
+            this._resources[entry.texture.autoBindSampler] = s.object!;
             this.invalidate();
           }
         }
@@ -238,7 +238,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             !sampler || !sampler.compare ? value.getDefaultSampler(true) : sampler
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[entry.texture.autoBindSamplerComparison]) {
-            this._resources[entry.texture.autoBindSamplerComparison] = s.object;
+            this._resources[entry.texture.autoBindSamplerComparison] = s.object!;
             this.invalidate();
           }
         }
@@ -306,7 +306,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             !sampler || sampler.compare ? value.getDefaultSampler(false) : sampler
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[autoBindSampler]) {
-            this._resources[autoBindSampler] = s.object;
+            this._resources[autoBindSampler] = s.object!;
             this.invalidate();
           }
         }
@@ -322,7 +322,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             !sampler || !sampler.compare ? value.getDefaultSampler(true) : sampler
           ) as WebGPUTextureSampler;
           if (s.object !== this._resources[autoBindSamplerComparison]) {
-            this._resources[autoBindSamplerComparison] = s.object;
+            this._resources[autoBindSamplerComparison] = s.object!;
             this.invalidate();
           }
         }
@@ -372,7 +372,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     });
   }
   /** @internal */
-  private _findTextureLayout(name: string): Immutable<BindGroupLayoutEntry> {
+  private _findTextureLayout(name: string): Nullable<Immutable<BindGroupLayoutEntry>> {
     for (const entry of this._layout.entries) {
       if ((entry.texture || entry.storageTexture || entry.externalTexture) && entry.name === name) {
         return entry;
@@ -381,7 +381,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return null;
   }
   /** @internal */
-  private _findSamplerLayout(name: string): Immutable<BindGroupLayoutEntry> {
+  private _findSamplerLayout(name: string): Nullable<Immutable<BindGroupLayoutEntry>> {
     for (const entry of this._layout.entries) {
       if (entry.sampler && entry.name === name) {
         return entry;
@@ -390,12 +390,16 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return null;
   }
   /** @internal */
-  private _getBuffer(name: string, usage: number, nocreate = false): GPUDataBuffer {
+  private _getBuffer(name: string, usage: number, nocreate = false): Nullable<GPUDataBuffer> {
     const info = this._getBufferInfo(name, usage, nocreate);
     return info?.[0] ?? null;
   }
   /** @internal */
-  private _getBufferInfo(name: string, usage: number, nocreate = false): [WebGPUBuffer, number, number] {
+  private _getBufferInfo(
+    name: string,
+    usage: number,
+    nocreate = false
+  ): Nullable<[WebGPUBuffer, number, number]> {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.name === bindName) {
@@ -406,14 +410,14 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         if (!(usage & bufferUsage)) {
           return null;
         }
-        let buffer = this._resources[entry.name] as [WebGPUBuffer, number, number];
+        let buffer = this._resources[entry.name] as [Nullable<WebGPUBuffer>, number, number];
         if (!nocreate && buffer?.[0]?.disposed) {
           buffer[0] = null;
           this.invalidate();
         }
         if ((!buffer || !buffer[0]) && !nocreate) {
           const options: BufferCreationOptions = {
-            usage: bufferUsage === GPUResourceUsageFlags.BF_UNIFORM ? 'uniform' : null,
+            usage: bufferUsage === GPUResourceUsageFlags.BF_UNIFORM ? 'uniform' : undefined,
             storage: bufferUsage === GPUResourceUsageFlags.BF_STORAGE,
             dynamic: true
           };
@@ -422,17 +426,17 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             options
           ) as WebGPUStructuredBuffer;
           buffer = [gpuBuffer, 0, gpuBuffer.byteLength];
-          this._resources[entry.name] = buffer;
+          this._resources[entry.name] = buffer as [WebGPUBuffer, number, number];
           this._createdBuffers.push(gpuBuffer);
         }
-        return buffer;
+        return buffer as [WebGPUBuffer, number, number];
       }
     }
     return null;
   }
   /** @internal */
-  private _create(): GPUBindGroup {
-    let bindGroup = null;
+  private _create(): Nullable<GPUBindGroup> {
+    let bindGroup: Nullable<GPUBindGroup> = null;
     this._layoutDesc = null;
     this._entries = null;
     this._textures = [];
@@ -458,7 +462,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           this._buffers.push(buffer[0]);
         }
         ge.resource = {
-          buffer: buffer[0].object,
+          buffer: buffer[0].object!,
           offset: buffer[1],
           size: buffer[2]
         };
@@ -477,7 +481,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         }
       } else if (entry.externalTexture) {
         const t = this._resources[entry.name] as WebGPUTextureVideo;
-        ge.resource = t.object;
+        ge.resource = t.object!;
         resourceOk = resourceOk && !!t.object;
       } else if (entry.sampler) {
         const sampler = this._resources[entry.name] as GPUSampler;

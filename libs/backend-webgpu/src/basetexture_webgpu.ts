@@ -23,7 +23,7 @@ import {
 import type { UploadTexture, UploadImage } from './uploadringbuffer';
 import { UploadRingBuffer } from './uploadringbuffer';
 import { textureFormatMap } from './constants_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUTextureCaps, TextureFormatInfoWebGPU } from './capabilities_webgpu';
@@ -34,21 +34,20 @@ export abstract class WebGPUBaseTexture<
   T extends GPUTexture | GPUExternalTexture = GPUTexture
 > extends WebGPUObject<T> {
   protected _target: TextureType;
-  protected _hash: string;
   protected _memCost: number;
   protected _views: GPUTextureView[][][];
-  protected _defaultView: GPUTextureView;
+  protected _defaultView: Nullable<GPUTextureView>;
   protected _mipmapDirty: boolean;
   protected _flags: number;
   protected _width: number;
   protected _height: number;
   protected _depth: number;
-  protected _format: TextureFormat;
+  protected _format: Nullable<TextureFormat>;
   protected _renderable: boolean;
   protected _fb: boolean;
-  protected _gpuFormat: GPUTextureFormat;
+  protected _gpuFormat: Nullable<GPUTextureFormat>;
   protected _mipLevelCount: number;
-  protected _samplerOptions: SamplerOptions;
+  protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
   protected _ringBuffer: UploadRingBuffer;
   protected _mipBindGroups: WebGPUBindGroup[][];
   protected _pendingUploads: (UploadTexture | UploadImage)[];
@@ -61,7 +60,7 @@ export abstract class WebGPUBaseTexture<
     this._depth = 0;
     this._renderable = false;
     this._fb = false;
-    this._format = 'unknown';
+    this._format = null;
     this._gpuFormat = null;
     this._mipLevelCount = 0;
     this._samplerOptions = null;
@@ -73,7 +72,7 @@ export abstract class WebGPUBaseTexture<
     this._ringBuffer = new UploadRingBuffer(device);
     this._pendingUploads = [];
   }
-  get hash(): number {
+  get hash(): Nullable<number> {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
   get target(): TextureType {
@@ -92,22 +91,26 @@ export abstract class WebGPUBaseTexture<
     return this._memCost;
   }
   get format(): TextureFormat {
-    return this._format;
+    return this._format!;
   }
   get mipLevelCount(): number {
     return this._mipLevelCount;
   }
-  get gpuFormat(): GPUTextureFormat {
+  get gpuFormat(): Nullable<GPUTextureFormat> {
     return this._gpuFormat;
   }
-  get samplerOptions(): SamplerOptions {
+  get samplerOptions(): Nullable<Immutable<SamplerOptions>> {
     return this._samplerOptions;
   }
-  set samplerOptions(options: SamplerOptions) {
-    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
-    this._samplerOptions = options
-      ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
-      : null;
+  set samplerOptions(options: Nullable<Immutable<SamplerOptions>>) {
+    if (this._format) {
+      const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+      this._samplerOptions = options
+        ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
+        : null;
+    } else {
+      console.error('Set sampler options failed: texture not initialized');
+    }
   }
   abstract init(): void;
   abstract readPixels(
@@ -132,7 +135,7 @@ export abstract class WebGPUBaseTexture<
     return true;
   }
   isFilterable(): boolean {
-    if (!this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
+    if (!this._format || !this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
       return false;
     }
     return true;
@@ -178,22 +181,22 @@ export abstract class WebGPUBaseTexture<
     return this._device.getDeviceCaps().textureCaps;
   }
   isSRGBFormat(): boolean {
-    return isSRGBTextureFormat(this._format);
+    return !!this._format && isSRGBTextureFormat(this._format);
   }
   isFloatFormat(): boolean {
-    return isFloatTextureFormat(this._format);
+    return !!this._format && isFloatTextureFormat(this._format);
   }
   isIntegerFormat(): boolean {
-    return isIntegerTextureFormat(this._format);
+    return !!this._format && isIntegerTextureFormat(this._format);
   }
   isSignedFormat(): boolean {
-    return isSignedTextureFormat(this._format);
+    return !!this._format && isSignedTextureFormat(this._format);
   }
   isCompressedFormat(): boolean {
-    return isCompressedTextureFormat(this._format);
+    return !!this._format && isCompressedTextureFormat(this._format);
   }
   isDepth(): boolean {
-    return hasDepthChannel(this._format);
+    return !!this._format && hasDepthChannel(this._format);
   }
   isRenderable(): boolean {
     return this._renderable;
@@ -209,11 +212,11 @@ export abstract class WebGPUBaseTexture<
       this._views[face][level] = [];
     }
     if (!this._views[face][level][mipCount]) {
-      this._views[face][level][mipCount] = this.createView(level, face, mipCount);
+      this._views[face][level][mipCount] = this.createView(level, face, mipCount)!;
     }
     return this._views[face][level][mipCount];
   }
-  getDefaultView(): GPUTextureView {
+  getDefaultView(): Nullable<GPUTextureView> {
     if (!this._defaultView && this._object && !this.isTextureVideo()) {
       this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
         dimension: this.isTextureCube()
@@ -259,7 +262,7 @@ export abstract class WebGPUBaseTexture<
     this._mipmapDirty = true;
     this._device.textureUpload(this as WebGPUBaseTexture);
   }
-  beginSyncChanges(encoder: GPUCommandEncoder) {
+  beginSyncChanges(encoder: Nullable<GPUCommandEncoder>) {
     if (!this.isTextureVideo() && this._pendingUploads.length > 0 && this._object) {
       const cmdEncoder = encoder || this._device.device.createCommandEncoder();
       for (const u of this._pendingUploads) {
@@ -332,14 +335,14 @@ export abstract class WebGPUBaseTexture<
     }
   }
   getDefaultSampler(shadow: boolean): TextureSampler {
-    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format!);
     return this._device.createSampler(
       !this._samplerOptions || !this._samplerOptions.compare !== !shadow
         ? this._getSamplerOptions(params, shadow)
         : this._samplerOptions
     );
   }
-  abstract createView(level?: number, face?: number, mipCount?: number): GPUTextureView;
+  abstract createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView>;
   /** @internal */
   private sync() {
     this._device.flush();
@@ -543,7 +546,7 @@ export abstract class WebGPUBaseTexture<
       return;
     }
     const data = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
-    const info = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+    const info = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format!);
     const blockWidth = info.blockWidth || 1;
     const blockHeight = info.blockHeight || 1;
     const blocksPerRow = Math.ceil(width / blockWidth);
@@ -578,7 +581,7 @@ export abstract class WebGPUBaseTexture<
       const bufferStride = (rowStride + 255) & ~255; // align to 256 bytes
       const uploadSize = bufferStride * blocksPerCol * depth;
       const upload = this._ringBuffer.uploadBuffer(null, null, 0, 0, uploadSize);
-      const mappedRange = upload.mappedBuffer.mappedRange;
+      const mappedRange = upload.mappedBuffer.mappedRange!;
       const src = new Uint8Array(data);
       const dst = new Uint8Array(mappedRange, upload.mappedBuffer.offset, uploadSize);
       if (uploadSize === data.byteLength) {
@@ -680,7 +683,10 @@ export abstract class WebGPUBaseTexture<
     return levelGroup;
   }
   /** @internal */
-  protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean): SamplerOptions {
+  protected _getSamplerOptions(
+    params: Partial<TextureFormatInfoWebGPU>,
+    shadow: boolean
+  ): RequireOptionals<SamplerOptions> {
     const comparison = this.isDepth() && shadow;
     const filterable = params.filterable || comparison;
     const magFilter = filterable ? 'linear' : 'nearest';
@@ -693,6 +699,9 @@ export abstract class WebGPUBaseTexture<
       magFilter,
       minFilter,
       mipFilter,
+      lodMin: 0,
+      lodMax: 32,
+      maxAnisotropy: 1,
       compare: comparison ? 'lt' : null
     };
   }

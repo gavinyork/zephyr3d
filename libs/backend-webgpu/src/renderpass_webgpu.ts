@@ -1,4 +1,4 @@
-import type { TypedArray, Vector4 } from '@zephyr3d/base';
+import type { Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
 import {
   hasStencilChannel,
@@ -26,11 +26,11 @@ const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 export class WebGPURenderPass {
   private readonly _device: WebGPUDevice;
-  private _renderCommandEncoder: GPUCommandEncoder;
-  private _renderPassEncoder: GPURenderPassEncoder;
-  private _fbBindFlag: number;
-  private _currentViewport: DeviceViewport;
-  private _currentScissor: DeviceViewport;
+  private _renderCommandEncoder: Nullable<GPUCommandEncoder>;
+  private _renderPassEncoder: Nullable<GPURenderPassEncoder>;
+  private _fbBindFlag: Nullable<number>;
+  private _currentViewport: Nullable<DeviceViewport>;
+  private _currentScissor: Nullable<DeviceViewport>;
   private _frameBufferInfo: FrameBufferInfo;
   constructor(device: WebGPUDevice) {
     this._device = device;
@@ -44,7 +44,7 @@ export class WebGPURenderPass {
   get active(): boolean {
     return !!this._renderPassEncoder;
   }
-  private createFrameBufferInfo(fb: WebGPUFrameBuffer): FrameBufferInfo {
+  private createFrameBufferInfo(fb: Nullable<WebGPUFrameBuffer>): FrameBufferInfo {
     const info: FrameBufferInfo = !fb
       ? {
           frameBuffer: null,
@@ -56,14 +56,14 @@ export class WebGPURenderPass {
         }
       : {
           frameBuffer: fb,
-          colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat),
-          depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat,
-          sampleCount: fb.getOptions().sampleCount,
+          colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat!),
+          depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat!,
+          sampleCount: fb.getOptions().sampleCount ?? 1,
           hash: null,
           clearHash: fb
             .getColorAttachments()
             .map((val) => {
-              const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat];
+              const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat!];
               return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
             })
             .join('')
@@ -79,10 +79,10 @@ export class WebGPURenderPass {
       this.setScissor(null);
     }
   }
-  getFramebuffer(): WebGPUFrameBuffer {
+  getFramebuffer(): Nullable<WebGPUFrameBuffer> {
     return this._frameBufferInfo.frameBuffer;
   }
-  setViewport(vp?: number[] | DeviceViewport) {
+  setViewport(vp: Nullable<number[] | DeviceViewport>) {
     if (!vp || (!Array.isArray(vp) && vp.default)) {
       this._currentViewport = {
         x: 0,
@@ -122,7 +122,7 @@ export class WebGPURenderPass {
   getViewport(): DeviceViewport {
     return Object.assign({}, this._currentViewport);
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
+  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
     const backBufferWidth = this._device.deviceXToScreen(this._device.drawingBufferWidth);
     const backBufferHeight = this._device.deviceYToScreen(this._device.drawingBufferHeight);
     if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
@@ -178,14 +178,14 @@ export class WebGPURenderPass {
     if (!this.active) {
       this.begin();
     }
-    this._renderPassEncoder.executeBundles([renderBundle]);
+    this._renderPassEncoder!.executeBundles([renderBundle]);
   }
   draw(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
@@ -202,7 +202,7 @@ export class WebGPURenderPass {
       this.begin();
     }
     this.drawInternal(
-      this._renderPassEncoder,
+      this._renderPassEncoder!,
       program,
       vertexData,
       stateSet,
@@ -222,9 +222,9 @@ export class WebGPURenderPass {
       if (!this._renderPassEncoder) {
         this.begin();
       }
-      this._renderPassEncoder.insertDebugMarker('clear');
+      this._renderPassEncoder!.insertDebugMarker('clear');
       WebGPUClearQuad.drawClearQuad(this, color, depth, stencil);
-      this._renderPassEncoder.insertDebugMarker('end clear');
+      this._renderPassEncoder!.insertDebugMarker('end clear');
     }
   }
   getDevice(): WebGPUDevice {
@@ -244,17 +244,17 @@ export class WebGPURenderPass {
       const mainPassDesc = this._device.defaultRenderPassDesc;
       const colorAttachmentDesc = this._device.defaultRenderPassDesc.colorAttachments[0];
       if (this._frameBufferInfo.sampleCount > 1) {
-        colorAttachmentDesc.resolveTarget = this._device.context.getCurrentTexture().createView();
+        colorAttachmentDesc.resolveTarget = this._device.context!.getCurrentTexture().createView();
       } else {
-        colorAttachmentDesc.view = this._device.context.getCurrentTexture().createView();
+        colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
       }
       colorAttachmentDesc.loadOp = color ? 'clear' : 'load';
       colorAttachmentDesc.clearValue = color;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
-      depthAttachmentDesc.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc.depthClearValue = depth;
-      depthAttachmentDesc.stencilLoadOp = typeof stencil === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc.stencilClearValue = stencil;
+      depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
+      depthAttachmentDesc!.depthClearValue = depth;
+      depthAttachmentDesc!.stencilLoadOp = typeof stencil === 'number' ? 'clear' : 'load';
+      depthAttachmentDesc!.stencilClearValue = stencil;
       this._renderPassEncoder = this._renderCommandEncoder.beginRenderPass(mainPassDesc);
     } else {
       const depthAttachmentTexture = frameBuffer.getDepthAttachment() as WebGPUBaseTexture;
@@ -264,9 +264,9 @@ export class WebGPURenderPass {
         const attachment = frameBuffer.getOptions().depthAttachment;
         const layer =
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
-            ? attachment.layer
+            ? attachment!.layer
             : depthAttachmentTexture.isTextureCube()
-              ? attachment.face
+              ? attachment!.face
               : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
@@ -293,7 +293,7 @@ export class WebGPURenderPass {
                   storeOp: 'store'
                 } as GPURenderPassColorAttachment;
               } else {
-                const msaaTexture = frameBuffer.getMSAAColorAttacments()[index];
+                const msaaTexture = frameBuffer.getMSAAColorAttacments()![index];
                 const msaaView = this._device.gpuCreateTextureView(msaaTexture, {
                   dimension: '2d',
                   baseMipLevel: attachment.level ?? 0,
@@ -316,7 +316,7 @@ export class WebGPURenderPass {
         depthStencilAttachment: depthAttachmentTexture
           ? frameBuffer.getOptions().sampleCount === 1
             ? {
-                view: depthTextureView,
+                view: depthTextureView!,
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
                 depthClearValue: depth,
                 depthStoreOp: 'store',
@@ -329,7 +329,7 @@ export class WebGPURenderPass {
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
             : {
-                view: frameBuffer.getMSAADepthAttachment().createView(),
+                view: frameBuffer.getMSAADepthAttachment()!.createView(),
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
                 depthClearValue: depth,
                 depthStoreOp: 'store',
@@ -382,14 +382,14 @@ export class WebGPURenderPass {
     vertexData: WebGPUVertexLayout,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number
   ): void {
     this.drawInternal(
-      this._renderPassEncoder,
+      this._renderPassEncoder!,
       program,
       vertexData,
       stateSet,
@@ -405,10 +405,10 @@ export class WebGPURenderPass {
   private drawInternal(
     renderPassEncoder: GPURenderPassEncoder,
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
@@ -447,11 +447,11 @@ export class WebGPURenderPass {
           const indexBuffer = vertexData.getIndexBuffer() as unknown as WebGPUIndexBuffer;
           if (indexBuffer) {
             renderPassEncoder.setIndexBuffer(
-              indexBuffer.object,
+              indexBuffer.object!,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
             );
             renderBundleEncoder?.setIndexBuffer(
-              indexBuffer.object,
+              indexBuffer.object!,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
             );
             renderPassEncoder.drawIndexed(count, numInstances, first);
@@ -507,7 +507,7 @@ export class WebGPURenderPass {
     renderPassEncoder: GPURenderPassEncoder,
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     renderBundleEncoder?: GPURenderBundleEncoder
   ): boolean {
     if (bindGroups) {

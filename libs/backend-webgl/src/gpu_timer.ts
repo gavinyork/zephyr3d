@@ -2,6 +2,7 @@ import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
 import type { ITimer } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
+import type { Nullable } from '@zephyr3d/base';
 
 const GPU_DISJOINT_EXT = 0x8fbb;
 const TIME_ELAPSED_EXT = 0x88bf;
@@ -14,12 +15,12 @@ const enum QueryState {
 
 interface TimerQuery {
   createQuery: () => unknown;
-  deleteQuery: (query: unknown) => void;
-  isQuery: (query: unknown) => boolean;
-  beginQuery: (target: number, query: unknown) => void;
+  deleteQuery: (query: Nullable<WebGLQuery>) => void;
+  isQuery: (query: Nullable<WebGLQuery>) => boolean;
+  beginQuery: (target: number, query: WebGLQuery) => void;
   endQuery: (target: number) => void;
   getQuery: (target: number, pname: number) => unknown;
-  getQueryObject: (query: unknown, pname: number) => unknown;
+  getQueryObject: (query: WebGLQuery, pname: number) => unknown;
   queryCounter: (query: unknown, target: number) => void;
 }
 
@@ -27,11 +28,12 @@ export class GPUTimer implements ITimer {
   private readonly _device: WebGLDevice;
   private readonly _query: unknown;
   private _state: QueryState;
-  private readonly _timerQuery: TimerQuery;
-  private _gpuTime: number;
+  private readonly _timerQuery: Nullable<TimerQuery>;
+  private _gpuTime: Nullable<number>;
   constructor(device: WebGLDevice) {
     this._device = device;
     this._state = QueryState.QUERY_STATE_NONE;
+    this._timerQuery = null;
     this._gpuTime = null;
     const gl = this._device.context;
     if (isWebGL2(gl)) {
@@ -73,7 +75,7 @@ export class GPUTimer implements ITimer {
       this.end();
     }
     if (this._query) {
-      this._timerQuery.beginQuery(TIME_ELAPSED_EXT, this._query);
+      this._timerQuery!.beginQuery(TIME_ELAPSED_EXT, this._query);
     }
     this._gpuTime = null;
     this._state = QueryState.QUERY_STATE_QUERYING;
@@ -81,7 +83,7 @@ export class GPUTimer implements ITimer {
   end() {
     if (this._state === QueryState.QUERY_STATE_QUERYING) {
       if (this._query) {
-        this._timerQuery.endQuery(TIME_ELAPSED_EXT);
+        this._timerQuery!.endQuery(TIME_ELAPSED_EXT);
       }
       this._state = QueryState.QUERY_STATE_FINISHED;
     }
@@ -94,15 +96,15 @@ export class GPUTimer implements ITimer {
       if (
         this._gpuTime === null &&
         this._query &&
-        this._timerQuery.getQueryObject(this._query, WebGLEnum.QUERY_RESULT_AVAILABLE)
+        this._timerQuery!.getQueryObject(this._query, WebGLEnum.QUERY_RESULT_AVAILABLE)
       ) {
         const gpuTimerDisjoint = this._device.context.getParameter(GPU_DISJOINT_EXT);
         if (!gpuTimerDisjoint) {
           this._gpuTime =
-            Number(this._timerQuery.getQueryObject(this._query, WebGLEnum.QUERY_RESULT)) / 1000000;
+            Number(this._timerQuery!.getQueryObject(this._query, WebGLEnum.QUERY_RESULT)) / 1000000;
         }
       }
     }
-    return this._gpuTime;
+    return this._gpuTime ?? 0;
   }
 }

@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
@@ -10,7 +11,7 @@ import type { WebGPURenderPass } from './renderpass_webgpu';
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
     {};
-  private static _clearStateSet: WebGPURenderStateSet = null;
+  private static _clearStateSet: Nullable<WebGPURenderStateSet> = null;
   private static readonly _defaultClearColor = new Vector4(0, 0, 0, 1);
 
   static drawClearQuad(
@@ -29,10 +30,9 @@ export class WebGPUClearQuad {
     const bClearStencil = !(clearStencil === null || clearStencil === undefined);
     program.bindGroup.setValue('clearDepth', clearDepth ?? 1);
     program.bindGroup.setValue('clearColor', clearColor ?? this._defaultClearColor);
-    this._clearStateSet.useDepthState().enableWrite(bClearDepth);
-    this._clearStateSet.useColorState().setColorMask(bClearColor, bClearColor, bClearColor, bClearColor);
-    this._clearStateSet
-      .useStencilState()
+    this._clearStateSet!.useDepthState().enableWrite(bClearDepth);
+    this._clearStateSet!.useColorState().setColorMask(bClearColor, bClearColor, bClearColor, bClearColor);
+    this._clearStateSet!.useStencilState()
       .enable(bClearStencil)
       .setReference(bClearStencil ? clearStencil : 0);
     renderPass
@@ -40,7 +40,7 @@ export class WebGPUClearQuad {
       .commandQueue.draw(
         program.program,
         null,
-        this._clearStateSet,
+        this._clearStateSet!,
         [program.bindGroup],
         null,
         'triangle-strip',
@@ -118,14 +118,14 @@ export class WebGPUClearQuad {
 }
 
 export class WebGPUMipmapGenerator {
-  static _frameBufferInfo: FrameBufferInfo = null;
-  static _mipmapGenerationProgram: WebGPUProgram = null;
-  static _mipmapGenerationStateSet: WebGPURenderStateSet = null;
+  static _frameBufferInfo: Nullable<FrameBufferInfo> = null;
+  static _mipmapGenerationProgram: Nullable<WebGPUProgram> = null;
+  static _mipmapGenerationStateSet: Nullable<WebGPURenderStateSet> = null;
   static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
     }
-    return this._mipmapGenerationProgram.bindGroupLayouts[0];
+    return this._mipmapGenerationProgram!.bindGroupLayouts[0];
   }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     if (!tex.isRenderable()) {
@@ -140,7 +140,7 @@ export class WebGPUMipmapGenerator {
     tex.setMipmapDirty(false);
     for (let face = 0; face < numLayers; face++) {
       for (let level = 1; level < miplevels; level++) {
-        this.generateMiplevel(device, encoder, tex, tex.object, tex.gpuFormat, level, level, face);
+        this.generateMiplevel(device, encoder, tex, tex.object!, tex.gpuFormat!, level, level, face);
       }
     }
     if (!cmdEncoder) {
@@ -171,11 +171,11 @@ export class WebGPUMipmapGenerator {
     const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format, dstLevel, face);
     renderPassEncoder.setBindGroup(0, srcTex.getMipmapGenerationBindGroup(srcLevel, face).bindGroup);
     const pipeline = device.pipelineCache.fetchRenderPipeline(
-      this._mipmapGenerationProgram,
+      this._mipmapGenerationProgram!,
       null,
-      this._mipmapGenerationStateSet,
+      this._mipmapGenerationStateSet!,
       'triangle-strip',
-      this._frameBufferInfo
+      this._frameBufferInfo!
     );
     if (pipeline) {
       renderPassEncoder.setPipeline(pipeline);
@@ -213,7 +213,7 @@ export class WebGPUMipmapGenerator {
       sampleCount: 1,
       hash: null,
       clearHash: null
-    };
+    } as unknown as FrameBufferInfo;
     this._frameBufferInfo.hash = `${this._frameBufferInfo.colorFormats.join('-')}:${
       this._frameBufferInfo.depthFormat
     }:${this._frameBufferInfo.sampleCount}`;

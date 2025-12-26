@@ -1,8 +1,9 @@
 import { WebGPUDevice } from './device';
 import type { DeviceBackend, DeviceEventMap } from '@zephyr3d/device';
+import type { Nullable } from '@zephyr3d/base';
 import { makeObservable } from '@zephyr3d/base';
 
-let webGPUStatus: Promise<boolean> = null;
+let webGPUStatus: Nullable<Promise<boolean>> = null;
 
 /**
  * The WebGPU backend
@@ -23,15 +24,15 @@ export const backendWebGPU: DeviceBackend = {
           const adapter = await navigator.gpu.requestAdapter();
           if (!adapter) {
             status = false;
+          } else {
+            const device = await adapter.requestDevice();
+            if (!device) {
+              status = false;
+            } else if (typeof device.destroy === 'function') {
+              device.destroy();
+            }
+            status = true;
           }
-          const device = await adapter.requestDevice();
-          if (!device) {
-            status = false;
-          }
-          if (typeof device.destroy === 'function') {
-            device.destroy();
-          }
-          status = true;
         } catch {
           status = false;
         }
@@ -45,8 +46,8 @@ export const backendWebGPU: DeviceBackend = {
       const factory = makeObservable(WebGPUDevice)<DeviceEventMap>();
       const device = new factory(this, cvs, options);
       await device.initContext();
-      device.setViewport();
-      device.setScissor();
+      device.setViewport(null);
+      device.setScissor(null);
       return device;
     } catch (err) {
       console.error(err);

@@ -3,13 +3,13 @@ import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
 import { isWebGL2 } from './utils';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 
 export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDataBuffer<WebGLBuffer> {
   protected _size: number;
   protected _usage: number;
-  protected _systemMemoryBuffer: Uint8Array<ArrayBuffer>;
+  protected _systemMemoryBuffer: Nullable<Uint8Array<ArrayBuffer>>;
   protected _systemMemory: boolean;
   protected _memCost: number;
   constructor(device: WebGLDevice, usage: number, data: TypedArray | number, systemMemory = false) {
@@ -54,7 +54,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   get byteLength() {
     return this._size;
   }
-  get systemMemoryBuffer(): ArrayBuffer {
+  get systemMemoryBuffer(): Nullable<ArrayBuffer> {
     return this._systemMemoryBuffer?.buffer || null;
   }
   get usage(): number {
@@ -72,7 +72,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     if (this._systemMemory || this._usage & GPUResourceUsageFlags.MANAGED) {
       // copy to system backup buffer if present
-      this._systemMemoryBuffer.set(
+      this._systemMemoryBuffer!.set(
         new Uint8Array(
           data.buffer,
           data.byteOffset + srcPos * data.BYTES_PER_ELEMENT,
@@ -150,8 +150,10 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       const gl = this._device.context as WebGL2RenderingContext;
       if (isWebGL2(gl)) {
         const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        await this.clientWaitAsync(gl, sync, 0, 10);
-        gl.deleteSync(sync);
+        if (sync) {
+          await this.clientWaitAsync(gl, sync, 0, 10);
+          gl.deleteSync(sync);
+        }
       }
       this._device.vaoExt?.bindVertexArray(null);
       let target: number;
@@ -193,7 +195,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   isBuffer(): this is GPUDataBuffer {
     return true;
   }
-  protected load(data?: TypedArray): void {
+  protected load(data: Nullable<TypedArray>): void {
     if (!this._device.isContextLost()) {
       if (!this._object) {
         this._object = this._device.context.createBuffer();

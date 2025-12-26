@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, Immutable } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
 import type {
   FrameBufferOptions,
   SamplerOptions,
@@ -74,44 +74,42 @@ import { CommandQueueImmediate } from './commandqueue';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import { textureFormatInvMap } from './constants_webgpu';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { WebGPURenderPass } from './renderpass_webgpu';
-import type { WebGPUComputePass } from './computepass_webgpu';
 
 type WebGPURenderBundle = {
   dc: number;
   encoder: GPURenderBundleEncoder;
-  renderBundle: GPURenderBundle;
+  renderBundle: Nullable<GPURenderBundle>;
 };
 
 export class WebGPUDevice extends BaseDevice {
-  private _context: GPUCanvasContext;
-  private _device: GPUDevice;
-  private _adapter: GPUAdapter;
-  private _deviceCaps: DeviceCaps;
+  private _context: Nullable<GPUCanvasContext>;
+  private _device: Nullable<GPUDevice>;
+  private _adapter: Nullable<GPUAdapter>;
+  private _deviceCaps!: DeviceCaps;
   private _reverseWindingOrder: boolean;
-  private _canRender: boolean;
-  private _backBufferFormat: GPUTextureFormat;
-  private _depthFormat: GPUTextureFormat;
-  private _defaultMSAAColorTexture: GPUTexture;
-  private _defaultMSAAColorTextureView: GPUTextureView;
-  private _defaultDepthTexture: GPUTexture;
-  private _defaultDepthTextureView: GPUTextureView;
-  private _pipelineCache: PipelineCache;
-  private _bindGroupCache: BindGroupCache;
-  private _vertexLayoutCache: VertexLayoutCache;
+  private _canRender!: boolean;
+  private _backBufferFormat!: GPUTextureFormat;
+  private _depthFormat!: GPUTextureFormat;
+  private _defaultMSAAColorTexture: Nullable<GPUTexture>;
+  private _defaultMSAAColorTextureView: Nullable<GPUTextureView>;
+  private _defaultDepthTexture: Nullable<GPUTexture>;
+  private _defaultDepthTextureView: Nullable<GPUTextureView>;
+  private _pipelineCache: Nullable<PipelineCache>;
+  private _bindGroupCache: Nullable<BindGroupCache>;
+  private _vertexLayoutCache: Nullable<VertexLayoutCache>;
   private readonly _samplerCache: SamplerCache;
-  private _currentProgram: WebGPUProgram;
-  private _currentVertexData: WebGPUVertexLayout;
-  private _currentStateSet: WebGPURenderStateSet;
+  private _currentProgram: Nullable<WebGPUProgram>;
+  private _currentVertexData: Nullable<WebGPUVertexLayout>;
+  private _currentStateSet: Nullable<WebGPURenderStateSet>;
   private _currentBindGroups: WebGPUBindGroup[];
-  private _currentBindGroupOffsets: Iterable<number>[];
-  private _commandQueue: CommandQueueImmediate;
+  private _currentBindGroupOffsets: Nullable<Iterable<number>>[];
+  private _commandQueue!: CommandQueueImmediate;
   private _gpuObjectHashCounter: number;
   private readonly _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
-  private _defaultRenderPassDesc: GPURenderPassDescriptor;
+  private _defaultRenderPassDesc: Nullable<GPURenderPassDescriptor>;
   private readonly _sampleCount: number;
-  private _emptyBindGroup: GPUBindGroup;
-  private _captureRenderBundle: WebGPURenderBundle;
+  private _emptyBindGroup!: GPUBindGroup;
+  private _captureRenderBundle: Nullable<WebGPURenderBundle>;
   private _adapterInfo: any;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend, options?.dpr);
@@ -133,10 +131,8 @@ export class WebGPUDevice extends BaseDevice {
     this._currentBindGroupOffsets = [];
     this._defaultRenderPassDesc = null;
     this._sampleCount = options?.msaa ? 4 : 1;
-    this._deviceCaps = null;
     this._gpuObjectHasher = new WeakMap();
     this._gpuObjectHashCounter = 1;
-    this._emptyBindGroup = null;
     this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
     this._adapterInfo = {};
@@ -148,10 +144,10 @@ export class WebGPUDevice extends BaseDevice {
     return this.getFramebuffer()?.getSampleCount() ?? this._sampleCount;
   }
   get device(): GPUDevice {
-    return this._device;
+    return this._device!;
   }
   get adapter(): GPUAdapter {
-    return this._adapter;
+    return this._adapter!;
   }
   get commandQueue(): CommandQueueImmediate {
     return this._commandQueue;
@@ -169,7 +165,7 @@ export class WebGPUDevice extends BaseDevice {
     return this.canvas.clientHeight;
   }
   get pipelineCache(): PipelineCache {
-    return this._pipelineCache;
+    return this._pipelineCache!;
   }
   get backbufferFormat(): GPUTextureFormat {
     return this._backBufferFormat;
@@ -178,21 +174,21 @@ export class WebGPUDevice extends BaseDevice {
     return this._depthFormat;
   }
   get defaultDepthTexture(): GPUTexture {
-    return this._defaultDepthTexture;
+    return this._defaultDepthTexture!;
   }
   get defaultDepthTextureView(): GPUTextureView {
-    return this._defaultDepthTextureView;
+    return this._defaultDepthTextureView!;
   }
   get defaultMSAAColorTextureView(): GPUTextureView {
-    return this._defaultMSAAColorTextureView;
+    return this._defaultMSAAColorTextureView!;
   }
   get defaultRenderPassDesc(): GPURenderPassDescriptor {
-    return this._defaultRenderPassDesc;
+    return this._defaultRenderPassDesc!;
   }
   get sampleCount(): number {
     return this._sampleCount;
   }
-  get currentPass(): WebGPURenderPass | WebGPUComputePass {
+  get currentPass() {
     return this._commandQueue.currentPass;
   }
   get emptyBindGroup(): GPUBindGroup {
@@ -308,7 +304,7 @@ export class WebGPUDevice extends BaseDevice {
     this._commandQueue.clear(clearColor, clearDepth, clearStencil);
   }
   // factory
-  createGPUTimer(): ITimer {
+  createGPUTimer(): Nullable<ITimer> {
     // throw new Error('not implemented');
     return null;
   }
@@ -337,7 +333,7 @@ export class WebGPUDevice extends BaseDevice {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T {
+  ): Nullable<T> {
     if (!data) {
       console.error(`Device.createTextureFromMipmapData() failed: invalid data`);
       return null;
@@ -369,7 +365,7 @@ export class WebGPUDevice extends BaseDevice {
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D {
+  ): Nullable<Texture2D> {
     const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2D() failed: options.texture must be 2d texture');
@@ -383,7 +379,7 @@ export class WebGPUDevice extends BaseDevice {
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D {
+  ): Nullable<Texture2D> {
     const tex = (options?.texture as WebGPUTexture2D) ?? new WebGPUTexture2D(this);
     if (!tex.isTexture2D()) {
       console.error('createTexture2DFromImage() failed: options.texture must be 2d texture');
@@ -399,7 +395,7 @@ export class WebGPUDevice extends BaseDevice {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray {
+  ): Nullable<Texture2DArray> {
     const tex = (options?.texture as WebGPUTexture2DArray) ?? new WebGPUTexture2DArray(this);
     if (!tex.isTexture2DArray()) {
       console.error('createTexture2DArray() failed: options.texture must be 2d array texture');
@@ -413,7 +409,7 @@ export class WebGPUDevice extends BaseDevice {
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray {
+  ): Nullable<Texture2DArray> {
     if (!elements || elements.length === 0) {
       console.error('createTexture2DArrayFromImages() failed: Invalid image elements');
       return null;
@@ -433,7 +429,7 @@ export class WebGPUDevice extends BaseDevice {
       console.error('createTexture2DArrayFromImages() failed: options.texture must be 2d array texture');
       return null;
     }
-    let tex: Texture2DArray = options?.texture as Texture2DArray;
+    let tex: Nullable<Texture2DArray> = options?.texture as Texture2DArray;
     if (tex) {
       if (tex.depth !== elements.length) {
         console.error(
@@ -455,6 +451,9 @@ export class WebGPUDevice extends BaseDevice {
         elements.length,
         options
       );
+      if (!tex) {
+        return null;
+      }
       for (let i = 0; i < elements.length; i++) {
         tex.updateFromElement(elements[i], 0, 0, i, 0, 0, width, height);
       }
@@ -468,7 +467,7 @@ export class WebGPUDevice extends BaseDevice {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D {
+  ): Nullable<Texture3D> {
     const tex = (options?.texture as WebGPUTexture3D) ?? new WebGPUTexture3D(this);
     if (!tex.isTexture3D()) {
       console.error('createTexture3D() failed: options.texture must be 3d texture');
@@ -478,7 +477,11 @@ export class WebGPUDevice extends BaseDevice {
     tex.samplerOptions = options?.samplerOptions ?? null;
     return tex;
   }
-  createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube {
+  createCubeTexture(
+    format: TextureFormat,
+    size: number,
+    options?: TextureCreationOptions
+  ): Nullable<TextureCube> {
     const tex = (options?.texture as WebGPUTextureCube) ?? new WebGPUTextureCube(this);
     if (!tex.isTextureCube()) {
       console.error('createCubeTexture() failed: options.texture must be cube texture');
@@ -533,15 +536,15 @@ export class WebGPUDevice extends BaseDevice {
     this.flush();
     const srcTex = src as WebGPUTexture2D;
     const dstTex = dst as WebGPUTexture2D;
-    const commandEncoder = this._device.createCommandEncoder();
+    const commandEncoder = this._device!.createCommandEncoder();
     commandEncoder.copyTextureToTexture(
       {
-        texture: srcTex.object,
+        texture: srcTex.object!,
         mipLevel: srcLevel,
         origin: { x: 0, y: 0, z: 0 }
       },
       {
-        texture: dstTex.object,
+        texture: dstTex.object!,
         mipLevel: dstLevel,
         origin: { x: 0, y: 0, z: 0 }
       },
@@ -551,7 +554,7 @@ export class WebGPUDevice extends BaseDevice {
         depthOrArrayLayers: 1
       }
     );
-    this._device.queue.submit([commandEncoder.finish()]);
+    this._device!.queue.submit([commandEncoder.finish()]);
   }
   createGPUProgram(params: GPUProgramConstructParams): GPUProgram {
     return new WebGPUProgram(this, params);
@@ -600,45 +603,45 @@ export class WebGPUDevice extends BaseDevice {
   ): FrameBuffer {
     return new WebGPUFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
-  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>) {
+  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>) {
     this._currentBindGroups[index] = bindGroup as WebGPUBindGroup;
     this._currentBindGroupOffsets[index] = dynamicOffsets ?? bindGroup?.getDynamicOffsets() ?? null;
   }
-  getBindGroup(index: number): [BindGroup, Iterable<number>] {
+  getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>] {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp?: number[] | DeviceViewport) {
+  setViewport(vp: Nullable<number[] | DeviceViewport>) {
     this._commandQueue.setViewport(vp);
   }
   getViewport(): Immutable<DeviceViewport> {
     return this._commandQueue.getViewport();
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
+  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
     this._commandQueue.setScissor(scissor);
   }
   getScissor(): Immutable<DeviceViewport> {
     return this._commandQueue.getScissor();
   }
-  setProgram(program: GPUProgram) {
+  setProgram(program: Nullable<GPUProgram>) {
     this._currentProgram = program as WebGPUProgram;
   }
-  getProgram(): GPUProgram {
+  getProgram(): Nullable<GPUProgram> {
     return this._currentProgram;
   }
-  setVertexLayout(vertexData: VertexLayout) {
+  setVertexLayout(vertexData: Nullable<VertexLayout>) {
     this._currentVertexData = vertexData as WebGPUVertexLayout;
   }
-  getVertexLayout(): VertexLayout {
+  getVertexLayout(): Nullable<VertexLayout> {
     return this._currentVertexData;
   }
-  setRenderStates(stateSet: RenderStateSet) {
+  setRenderStates(stateSet: Nullable<RenderStateSet>) {
     this._currentStateSet = stateSet as WebGPURenderStateSet;
   }
-  getRenderStates(): RenderStateSet {
+  getRenderStates(): Nullable<RenderStateSet> {
     return this._currentStateSet;
   }
-  getFramebuffer(): FrameBuffer {
+  getFramebuffer(): Nullable<FrameBuffer> {
     return this._commandQueue.getFramebuffer() ?? null;
   }
   reverseVertexWindingOrder(reverse: boolean): void {
@@ -656,21 +659,16 @@ export class WebGPUDevice extends BaseDevice {
     return this._commandQueue.isTextureUploading(tex);
   }
   /** @internal */
-  getFramebufferInfo(): {
-    colorFormats: GPUTextureFormat[];
-    depthFormat: GPUTextureFormat;
-    sampleCount: number;
-    hash: string;
-  } {
+  getFramebufferInfo() {
     return this._commandQueue.getFramebufferInfo();
   }
   /** @internal */
-  gpuGetObjectHash(obj: GPUObjectBase): number {
-    return this._gpuObjectHasher.get(obj);
+  gpuGetObjectHash(obj: GPUObjectBase): Nullable<number> {
+    return this._gpuObjectHasher.get(obj) ?? null;
   }
   /** @internal */
   gpuCreateTexture(desc: GPUTextureDescriptor): GPUTexture {
-    const tex = this._device.createTexture(desc);
+    const tex = this._device!.createTexture(desc);
     if (tex) {
       this._gpuObjectHasher.set(tex, ++this._gpuObjectHashCounter);
     }
@@ -678,7 +676,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuImportExternalTexture(el: HTMLVideoElement): GPUExternalTexture {
-    const tex = this._device.importExternalTexture({ source: el });
+    const tex = this._device!.importExternalTexture({ source: el });
     if (tex) {
       this._gpuObjectHasher.set(tex, ++this._gpuObjectHashCounter);
     }
@@ -686,7 +684,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuCreateSampler(desc: GPUSamplerDescriptor): GPUSampler {
-    const sampler = this._device.createSampler(desc);
+    const sampler = this._device!.createSampler(desc);
     if (sampler) {
       this._gpuObjectHasher.set(sampler, ++this._gpuObjectHashCounter);
     }
@@ -694,7 +692,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuCreateBindGroup(desc: GPUBindGroupDescriptor): GPUBindGroup {
-    const bindGroup = this._device.createBindGroup(desc);
+    const bindGroup = this._device!.createBindGroup(desc);
     if (bindGroup) {
       this._gpuObjectHasher.set(bindGroup, ++this._gpuObjectHashCounter);
     }
@@ -702,7 +700,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuCreateBuffer(desc: GPUBufferDescriptor): GPUBuffer {
-    const buffer = this._device.createBuffer(desc);
+    const buffer = this._device!.createBuffer(desc);
     if (buffer) {
       this._gpuObjectHasher.set(buffer, ++this._gpuObjectHashCounter);
     }
@@ -718,7 +716,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuCreateRenderPipeline(desc: GPURenderPipelineDescriptor): GPURenderPipeline {
-    const pipeline = this._device.createRenderPipeline(desc);
+    const pipeline = this._device!.createRenderPipeline(desc);
     if (pipeline) {
       this._gpuObjectHasher.set(pipeline, ++this._gpuObjectHashCounter);
     }
@@ -726,7 +724,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   gpuCreateComputePipeline(desc: GPUComputePipelineDescriptor): GPUComputePipeline {
-    const pipeline = this._device.createComputePipeline(desc);
+    const pipeline = this._device!.createComputePipeline(desc);
     if (pipeline) {
       this._gpuObjectHasher.set(pipeline, ++this._gpuObjectHashCounter);
     }
@@ -734,7 +732,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   fetchVertexLayout(hash: string): GPUVertexBufferLayout[] {
-    return this._vertexLayoutCache.fetchVertexLayout(hash);
+    return this._vertexLayoutCache!.fetchVertexLayout(hash);
   }
   /** @internal */
   fetchSampler(options: SamplerOptions): WebGPUTextureSampler {
@@ -742,7 +740,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   fetchBindGroupLayout(desc: Immutable<BindGroupLayout>): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
-    return this._bindGroupCache.fetchBindGroupLayout(desc);
+    return this._bindGroupCache!.fetchBindGroupLayout(desc);
   }
   flush(): void {
     this._commandQueue.flush();
@@ -758,7 +756,7 @@ export class WebGPUDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
-      : this.context.getCurrentTexture();
+      : this.context!.getCurrentTexture();
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
@@ -780,14 +778,14 @@ export class WebGPUDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
-      : this.context.getCurrentTexture();
+      : this.context!.getCurrentTexture();
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
     if (colorAttachment && texFormat) {
       this.flush();
       WebGPUBaseTexture.copyTexturePixelsToBuffer(
-        this._device,
+        this._device!,
         colorAttachment,
         texFormat,
         x,
@@ -822,7 +820,7 @@ export class WebGPUDevice extends BaseDevice {
     };
     this._captureRenderBundle = {
       dc: 0,
-      encoder: this._device.createRenderBundleEncoder(desc),
+      encoder: this._device!.createRenderBundleEncoder(desc),
       renderBundle: null
     };
   }
@@ -870,9 +868,9 @@ export class WebGPUDevice extends BaseDevice {
   /** @internal */
   protected _draw(primitiveType: PrimitiveType, first: number, count: number): void {
     this._commandQueue.draw(
-      this._currentProgram,
-      this._currentVertexData,
-      this._currentStateSet,
+      this._currentProgram!,
+      this._currentVertexData!,
+      this._currentStateSet!,
       this._currentBindGroups,
       this._currentBindGroupOffsets,
       primitiveType,
@@ -884,9 +882,9 @@ export class WebGPUDevice extends BaseDevice {
       this._captureRenderBundle.dc++;
       this._commandQueue.capture(
         this._captureRenderBundle.encoder,
-        this._currentProgram,
-        this._currentVertexData,
-        this._currentStateSet,
+        this._currentProgram!,
+        this._currentVertexData!,
+        this._currentStateSet!,
         this._currentBindGroups,
         this._currentBindGroupOffsets,
         primitiveType,
@@ -904,9 +902,9 @@ export class WebGPUDevice extends BaseDevice {
     numInstances: number
   ): void {
     this._commandQueue.draw(
-      this._currentProgram,
-      this._currentVertexData,
-      this._currentStateSet,
+      this._currentProgram!,
+      this._currentVertexData!,
+      this._currentStateSet!,
       this._currentBindGroups,
       this._currentBindGroupOffsets,
       primitiveType,
@@ -918,9 +916,9 @@ export class WebGPUDevice extends BaseDevice {
       this._captureRenderBundle.dc++;
       this._commandQueue.capture(
         this._captureRenderBundle.encoder,
-        this._currentProgram,
-        this._currentVertexData,
-        this._currentStateSet,
+        this._currentProgram!,
+        this._currentVertexData!,
+        this._currentStateSet!,
         this._currentBindGroups,
         this._currentBindGroupOffsets,
         primitiveType,
@@ -933,7 +931,7 @@ export class WebGPUDevice extends BaseDevice {
   /** @internal */
   protected _compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {
     this._commandQueue.compute(
-      this._currentProgram,
+      this._currentProgram!,
       this._currentBindGroups,
       this._currentBindGroupOffsets,
       workgroupCountX,
@@ -946,8 +944,8 @@ export class WebGPUDevice extends BaseDevice {
     this._depthFormat = this._deviceCaps.framebufferCaps.supportDepth32floatStencil8
       ? 'depth32float-stencil8'
       : 'depth24plus-stencil8';
-    this._context.configure({
-      device: this._device,
+    this._context!.configure({
+      device: this._device!,
       format: this._backBufferFormat,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
       alphaMode: 'opaque',
@@ -962,8 +960,6 @@ export class WebGPUDevice extends BaseDevice {
     this._defaultMSAAColorTexture = null;
     this._defaultMSAAColorTextureView = null;
     this._defaultDepthTexture?.destroy();
-    this._defaultDepthTexture = null;
-    this._defaultDepthTextureView = null;
     if (this._sampleCount > 1) {
       this._defaultMSAAColorTexture = this.gpuCreateTexture({
         size: {
@@ -1001,7 +997,7 @@ export class WebGPUDevice extends BaseDevice {
           loadOp: 'clear',
           clearValue: [0, 0, 0, 0],
           storeOp: 'store'
-        }
+        } as GPURenderPassColorAttachment
       ],
       depthStencilAttachment: {
         view: this._defaultDepthTextureView,

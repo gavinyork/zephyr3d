@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
@@ -54,7 +54,7 @@ export class CommandQueueImmediate {
       textureUploads.forEach((_, tex) => tex.endSyncChanges());
     }
   }
-  get currentPass(): WebGPURenderPass | WebGPUComputePass {
+  get currentPass(): Nullable<WebGPURenderPass | WebGPUComputePass> {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
   }
   beginFrame(): void {}
@@ -76,7 +76,7 @@ export class CommandQueueImmediate {
     }
     this._renderPass.setFramebuffer(fb);
   }
-  getFramebuffer(): WebGPUFrameBuffer {
+  getFramebuffer(): Nullable<WebGPUFrameBuffer> {
     return this._renderPass.getFramebuffer();
   }
   getFramebufferInfo(): FrameBufferInfo {
@@ -91,7 +91,7 @@ export class CommandQueueImmediate {
   }
   bufferUpload(buffer: WebGPUBuffer) {
     if (this._bufferUploads.has(buffer)) {
-      if (this._drawcallCounter > this._bufferUploads.get(buffer)) {
+      if (this._drawcallCounter > this._bufferUploads.get(buffer)!) {
         this.flush();
       }
     } else {
@@ -100,7 +100,7 @@ export class CommandQueueImmediate {
   }
   textureUpload(tex: WebGPUBaseTexture) {
     if (this._textureUploads.has(tex)) {
-      if (this._drawcallCounter > this._textureUploads.get(tex)) {
+      if (this._drawcallCounter > this._textureUploads.get(tex)!) {
         this.flush();
       }
     } else {
@@ -116,13 +116,13 @@ export class CommandQueueImmediate {
   ) {
     this.flush();
     const copyCommandEncoder = this._device.device.createCommandEncoder();
-    copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);
+    copyCommandEncoder.copyBufferToBuffer(srcBuffer.object!, srcOffset, dstBuffer.object!, dstOffset, bytes);
     this._device.device.queue.submit([copyCommandEncoder.finish()]);
   }
   compute(
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     workgroupCountX: number,
     workgroupCountY: number,
     workgroupCountZ: number
@@ -143,10 +143,10 @@ export class CommandQueueImmediate {
   }
   draw(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
@@ -175,7 +175,7 @@ export class CommandQueueImmediate {
     vertexData: WebGPUVertexLayout,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     primitiveType: PrimitiveType,
     first: number,
     count: number,
@@ -199,13 +199,13 @@ export class CommandQueueImmediate {
       numInstances
     );
   }
-  setViewport(vp?: number[] | DeviceViewport) {
+  setViewport(vp: Nullable<number[] | DeviceViewport>) {
     this._renderPass.setViewport(vp);
   }
   getViewport(): DeviceViewport {
     return this._renderPass.getViewport();
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
+  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
     this._renderPass.setScissor(scissor);
   }
   getScissor(): DeviceViewport {

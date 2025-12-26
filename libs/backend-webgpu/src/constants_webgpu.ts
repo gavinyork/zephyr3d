@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type {
   TextureFormat,
   CompareFunc,
@@ -17,7 +18,7 @@ export const textureWrappingMap: Record<TextureAddressMode, GPUAddressMode> = {
   clamp: 'clamp-to-edge'
 };
 
-export const textureFilterMap: Record<TextureFilterMode, GPUFilterMode> = {
+export const textureFilterMap: Record<TextureFilterMode, GPUFilterMode | undefined> = {
   nearest: 'nearest',
   linear: 'linear',
   none: undefined
@@ -45,7 +46,7 @@ export const stencilOpMap: Record<StencilOp, GPUStencilOperation> = {
   'decr-wrap': 'decrement-wrap'
 };
 
-export const primitiveTypeMap: Record<PrimitiveType, GPUPrimitiveTopology> = {
+export const primitiveTypeMap: Record<PrimitiveType, Nullable<GPUPrimitiveTopology>> = {
   'triangle-list': 'triangle-list',
   'triangle-strip': 'triangle-strip',
   'triangle-fan': null,
@@ -123,7 +124,6 @@ export const vertexFormatToHash: Record<string, string> = {
 };
 
 export const textureFormatMap: Record<TextureFormat, GPUTextureFormat> = {
-  ['unknown']: null,
   ['rgba8unorm']: 'rgba8unorm',
   ['rgba8snorm']: 'rgba8snorm',
   ['bgra8unorm']: 'bgra8unorm',

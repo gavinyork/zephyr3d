@@ -1,4 +1,4 @@
-import type { Immutable, TypedArray } from '@zephyr3d/base';
+import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
 import { isPowerOf2 } from '@zephyr3d/base';
 import type {
   TextureCaps,
@@ -36,9 +36,9 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   protected _width: number;
   protected _height: number;
   protected _depth: number;
-  protected _format: TextureFormat;
+  protected _format: Nullable<TextureFormat>;
   protected _mipLevelCount: number;
-  protected _samplerOptions: SamplerOptions;
+  protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
   protected _webgl1fallback: boolean;
   protected _readFrameBuffers: FrameBuffer[][];
   constructor(device: WebGLDevice, target?: TextureType) {
@@ -49,7 +49,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     this._width = 0;
     this._height = 0;
     this._depth = 1;
-    this._format = 'unknown';
+    this._format = null;
     this._mipLevelCount = 0;
     this._samplerOptions = null;
     this._webgl1fallback = false;
@@ -71,25 +71,29 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     return this._memCost;
   }
   get format() {
-    return this._format;
+    return this._format!;
   }
   get mipLevelCount(): number {
     return this._mipLevelCount;
   }
-  get samplerOptions(): Immutable<SamplerOptions> {
+  get samplerOptions(): Nullable<Immutable<SamplerOptions>> {
     return this._samplerOptions;
   }
-  set samplerOptions(options: SamplerOptions) {
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    this._samplerOptions = options
-      ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
-      : null;
+  set samplerOptions(options: Nullable<Immutable<SamplerOptions>>) {
+    if (this._format) {
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      this._samplerOptions = options
+        ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
+        : null;
+    } else {
+      console.log('Set sampler options failed: Texture not initialized');
+    }
   }
   get isWebGL1Fallback(): boolean {
     return this._webgl1fallback;
   }
   isFilterable(): boolean {
-    if (!this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
+    if (!this._format || !this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
       return false;
     }
     if (!(this.device as WebGLDevice).isWebGL2 && !isPowerOf2(this._width) && !isPowerOf2(this._height)) {
@@ -128,30 +132,34 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     return this._device.getDeviceCaps().textureCaps;
   }
   isSRGBFormat(): boolean {
-    return isSRGBTextureFormat(this._format);
+    return !!this._format && isSRGBTextureFormat(this._format);
   }
   isFloatFormat(): boolean {
-    return isFloatTextureFormat(this._format);
+    return !!this._format && isFloatTextureFormat(this._format);
   }
   isIntegerFormat(): boolean {
-    return isIntegerTextureFormat(this._format);
+    return !!this._format && isIntegerTextureFormat(this._format);
   }
   isSignedFormat(): boolean {
-    return isSignedTextureFormat(this._format);
+    return !!this._format && isSignedTextureFormat(this._format);
   }
   isCompressedFormat(): boolean {
-    return isCompressedTextureFormat(this._format);
+    return !!this._format && isCompressedTextureFormat(this._format);
   }
   isDepth(): boolean {
-    return hasDepthChannel(this._format);
+    return !!this._format && hasDepthChannel(this._format);
   }
   getDefaultSampler(shadow: boolean): TextureSampler {
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-    return this._device.createSampler(
-      !this._samplerOptions || !this._samplerOptions.compare !== !shadow
-        ? this._getSamplerOptions(params, shadow)
-        : this._samplerOptions
-    );
+    if (this._format) {
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      return this._device.createSampler(
+        !this._samplerOptions || !this._samplerOptions.compare !== !shadow
+          ? this._getSamplerOptions(params, shadow)
+          : this._samplerOptions
+      );
+    } else {
+      throw new Error('Get default sampler failed: texture not initialized');
+    }
   }
   protected _getFramebufferForRead(faceOrLevel: number, mipLevel: number) {
     let faceFramebuffers = this._readFrameBuffers[faceOrLevel];
@@ -292,7 +300,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
                     w,
                     h,
                     0,
-                    data
+                    data!
                   );
                 } else {
                   this._device.context.texImage2D(
@@ -317,7 +325,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
                   w,
                   h,
                   0,
-                  data
+                  data!
                 );
               } else {
                 this._device.context.texImage2D(
@@ -370,7 +378,10 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     return Math.floor(Math.log2(size)) + 1;
   }
   /** @internal */
-  protected _getSamplerOptions(params: Immutable<TextureFormatInfoWebGL>, shadow: boolean): SamplerOptions {
+  protected _getSamplerOptions(
+    params: Immutable<TextureFormatInfoWebGL>,
+    shadow: boolean
+  ): RequireOptionals<SamplerOptions> {
     const comparison = this.isDepth() && shadow;
     const filterable = params.filterable || comparison;
     const magFilter = filterable ? 'linear' : 'nearest';
@@ -383,7 +394,10 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       magFilter,
       minFilter,
       mipFilter,
-      compare: comparison ? 'le' : null
+      lodMin: 0,
+      lodMax: 32,
+      maxAnisotropy: 1,
+      compare: comparison ? 'lt' : null
     };
   }
 }

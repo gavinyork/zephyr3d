@@ -925,7 +925,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
-        ShaderHelper.discardIfClipped(this, this.worldPos);
         let output = true;
         if (!that.isTransparentPass(that.pass) && !that.alphaToCoverage) {
           this.outColor.a = 1;
@@ -962,7 +961,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             });
           }
         }
-        ShaderHelper.discardIfClipped(this, this.worldPos);
         const depthPass = that.drawContext.renderPass as DepthPass;
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (depthPass.encodeDepth) {
@@ -999,7 +997,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             pb.discard();
           });
         }
-        ShaderHelper.discardIfClipped(this, this.worldPos);
         this.$outputs.zFragmentOutput = scope.$inputs.zObjectColor;
         if (that.drawContext.device.type === 'webgl') {
           this.$l.linearDepth = ShaderHelper.nonLinearDepthToLinearNormalized(
@@ -1019,7 +1016,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             pb.discard();
           });
         }
-        ShaderHelper.discardIfClipped(this, this.worldPos);
         const shadowMapParams = that.drawContext.shadowMapInfo.get(
           (that.drawContext.renderPass as ShadowMapPass).light
         );

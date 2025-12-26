@@ -90,6 +90,9 @@ export class Pool {
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createTexture2D(format, width, height, { mipmapping });
+      if (!texture) {
+        throw new Error(`Create 2D texture failed: ${format}-${width}x${height}`);
+      }
       this._memCost += texture.memCost;
     } else {
       texture = list.pop()!;
@@ -126,6 +129,9 @@ export class Pool {
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createTexture2DArray(format, width, height, numLayers, { mipmapping });
+      if (!texture) {
+        throw new Error(`Create 2DArray texture failed: ${format}-${width}x${height}x${numLayers}`);
+      }
       this._memCost += texture.memCost;
     } else {
       texture = list.pop()!;
@@ -158,6 +164,9 @@ export class Pool {
     const list = this._freeTextures[hash];
     if (!list) {
       texture = this._device.createCubeTexture(format, size, { mipmapping });
+      if (!texture) {
+        throw new Error(`Create Cube texture failed: ${format}-${size}`);
+      }
       this._memCost += texture.memCost;
     } else {
       texture = list.pop()!;

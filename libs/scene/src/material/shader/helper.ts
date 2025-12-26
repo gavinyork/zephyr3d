@@ -183,7 +183,6 @@ export class ShaderHelper {
     const scope = pb.getGlobalScope();
     const cameraStruct = pb.defineStruct([
       pb.vec4('position'),
-      pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('invViewProjectionMatrix'),
       pb.mat4('unjitteredVPMatrix'),
@@ -777,8 +776,7 @@ export class ShaderHelper {
       ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
       ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
     const cameraStruct = {
-      position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
-      clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
+      position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
       viewProjectionMatrix: useJitter ? ctx.camera.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
       unjitteredVPMatrix: ctx.camera.viewProjectionMatrix,
@@ -1034,27 +1032,6 @@ export class ShaderHelper {
    */
   static getFramestamp(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.camera.framestamp;
-  }
-  /**
-   * Discard the fragment if it was clipped by the clip plane
-   * @param scope - Current shader scope
-   */
-  static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
-    const funcName = 'Z_discardIfClippped';
-    const pb = scope.$builder;
-    const that = this;
-    pb.func(funcName, [pb.vec3('worldPos')], function () {
-      this.$if(pb.notEqual(that.getCameraClipPlaneFlag(this), 0), function () {
-        this.$l.clipPlane = that.getCameraClipPlane(this);
-        this.$if(
-          pb.greaterThan(pb.add(pb.dot(this.worldPos.xyz, this.clipPlane.xyz), this.clipPlane.w), 0),
-          function () {
-            pb.discard();
-          }
-        );
-      });
-    });
-    pb.getGlobalScope()[funcName](worldPos);
   }
   /**
    * Gets the clip plane flag

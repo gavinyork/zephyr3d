@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export interface MappedBuffer {
@@ -5,13 +6,13 @@ export interface MappedBuffer {
   size: number;
   offset: number;
   used: boolean;
-  mappedRange: ArrayBuffer;
+  mappedRange: Nullable<ArrayBuffer>;
 }
 
 export interface UploadBuffer {
   mappedBuffer: MappedBuffer;
   uploadSize: number;
-  uploadBuffer: GPUBuffer;
+  uploadBuffer: Nullable<GPUBuffer>;
   uploadOffset: number;
 }
 
@@ -53,8 +54,8 @@ export class UploadRingBuffer {
     this._unmappedBufferList = [];
   }
   uploadBuffer(
-    src: ArrayBuffer,
-    dst: GPUBuffer,
+    src: Nullable<ArrayBuffer>,
+    dst: Nullable<GPUBuffer>,
     srcOffset: number,
     dstOffset: number,
     uploadSize: number,
@@ -64,7 +65,7 @@ export class UploadRingBuffer {
     const mappedBuffer = this.fetchBufferMapped(size, !!allowOverlap);
     if (src) {
       const mappedRange = mappedBuffer.mappedRange; //mappedBuffer.buffer.getMappedRange(mappedBuffer.offset, size);
-      new Uint8Array(mappedRange, mappedBuffer.offset, size).set(new Uint8Array(src, srcOffset, uploadSize));
+      new Uint8Array(mappedRange!, mappedBuffer.offset, size).set(new Uint8Array(src, srcOffset, uploadSize));
     }
     const upload = {
       mappedBuffer: { ...mappedBuffer },

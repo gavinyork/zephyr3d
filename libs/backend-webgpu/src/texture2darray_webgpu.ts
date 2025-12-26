@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2DArray<GPUTexture> {
@@ -18,7 +18,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     return true;
   }
   init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+    this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -33,7 +33,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, depth, xOffset, yOffset, zOffset, 0);
     if (this._mipLevelCount > 1) {
@@ -54,14 +54,14 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
     if (data instanceof HTMLCanvasElement || this._device.isTextureUploading(this)) {
       // Copy the pixel values out in case the canvas content may be changed later
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, srcX, srcY, width, height, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
       this.update(imageData.data, destX, destY, destZ, width, height, 1);
@@ -95,7 +95,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       }
     }
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',

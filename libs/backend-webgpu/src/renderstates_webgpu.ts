@@ -12,10 +12,11 @@ import type {
   StencilOp
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Nullable } from '@zephyr3d/base';
 
 export abstract class WebGPURenderState {
   protected static _defaultState: WebGPURenderState;
-  protected _hash: string;
+  protected _hash: Nullable<string>;
   static get defaultState() {
     return this._defaultState;
   }
@@ -405,13 +406,13 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
   private _enabled: boolean;
   private _writeMask: number;
   private _failOp: StencilOp;
-  private _failOpBack: StencilOp;
+  private _failOpBack!: StencilOp;
   private _zFailOp: StencilOp;
-  private _zFailOpBack: StencilOp;
+  private _zFailOpBack!: StencilOp;
   private _passOp: StencilOp;
-  private _passOpBack: StencilOp;
+  private _passOpBack!: StencilOp;
   private _func: CompareFunc;
-  private _funcBack: CompareFunc;
+  private _funcBack!: CompareFunc;
   private _ref: number;
   private _readMask: number;
   constructor() {
@@ -597,11 +598,11 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
 
 export class WebGPURenderStateSet implements RenderStateSet {
   private readonly _device: WebGPUDevice;
-  colorState: WebGPUColorState;
-  blendingState: WebGPUBlendingState;
-  rasterizerState: WebGPURasterizerState;
-  depthState: WebGPUDepthState;
-  stencilState: WebGPUStencilState;
+  colorState: Nullable<WebGPUColorState>;
+  blendingState: Nullable<WebGPUBlendingState>;
+  rasterizerState: Nullable<WebGPURasterizerState>;
+  depthState: Nullable<WebGPUDepthState>;
+  stencilState: Nullable<WebGPUStencilState>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this.colorState = null;
