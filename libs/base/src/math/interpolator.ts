@@ -1,3 +1,4 @@
+import type { Nullable } from '../utils';
 import { Quaternion } from './vector';
 
 /**
@@ -55,9 +56,9 @@ export class Interpolator {
   /** @internal */
   private readonly _maxTime: number;
   /** @internal */
-  private _a: number[];
+  private _a: Nullable<number[]>;
   /** @internal */
-  private _h: number[];
+  private _h: Nullable<number[]>;
 
   /**
    * Interpolation target to stride
@@ -89,8 +90,8 @@ export class Interpolator {
     this._target = target;
     this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
-    this._a = [];
-    this._h = [];
+    this._a = null;
+    this._h = null;
   }
   /** Gets the interpolation mode */
   get mode(): InterpolationMode {
@@ -126,8 +127,8 @@ export class Interpolator {
   set inputs(val: InterpolateData) {
     if (val !== this._inputs) {
       this._inputs = val;
-      this._a = [];
-      this._h = [];
+      this._a = null;
+      this._h = null;
     }
   }
   /** outputs */
@@ -137,8 +138,8 @@ export class Interpolator {
   set outputs(val: InterpolateData) {
     if (val !== this._outputs) {
       this._outputs = val;
-      this._a = [];
-      this._h = [];
+      this._a = null;
+      this._h = null;
     }
   }
   /**
@@ -271,16 +272,16 @@ export class Interpolator {
     }
     const seg = Math.min(Math.max(this._getSegment(t), 0), this._inputs.length - 2) + 1;
     const t1 = t - this._inputs[seg - 1];
-    const t2 = this._h[seg] - t1;
+    const t2 = this._h![seg] - t1;
     for (let i = 0; i < this._stride; i++) {
       result[i] =
-        (((-this._a[(seg - 1) * this._stride + i] / 6) * (t2 + this._h[seg]) * t1 +
+        (((-this._a![(seg - 1) * this._stride + i] / 6) * (t2 + this._h![seg]) * t1 +
           this._outputs[(seg - 1) * this._stride + i]) *
           t2 +
-          ((-this._a[seg * this._stride + i] / 6) * (t1 + this._h[seg]) * t2 +
+          ((-this._a![seg * this._stride + i] / 6) * (t1 + this._h![seg]) * t2 +
             this._outputs[seg * this._stride + i]) *
             t1) /
-        this._h[seg];
+        this._h![seg];
     }
     return result;
   }
@@ -316,15 +317,15 @@ export class Interpolator {
     for (let i = 2; i <= n; ++i) {
       sub[i] /= diag[i - 1];
       diag[i] -= sub[i] * sup[i - 1];
-      this._a[i] -= this._a[i - 1] * sub[i];
+      this._a![i] -= this._a![i - 1] * sub[i];
     }
     for (let i = 0; i < this._stride; i++) {
-      this._a[n * this._stride + i] /= diag[n];
+      this._a![n * this._stride + i] /= diag[n];
     }
     for (let i = n - 1; i >= 1; --i) {
       for (let j = 0; j < this._stride; j++) {
         const k = i * this._stride + j;
-        this._a[k] = (this._a[k] - this._a[k + this._stride] * sup[i]) / diag[i];
+        this._a![k] = (this._a![k] - this._a![k + this._stride] * sup[i]) / diag[i];
       }
     }
   }
