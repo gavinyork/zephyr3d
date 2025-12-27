@@ -20,6 +20,7 @@ export interface RGBA extends RGB {
 }
 
 import * as Bind from './bind-imgui';
+import { Nullable } from '@zephyr3d/base';
 
 //export { Bind };
 
@@ -2585,7 +2586,7 @@ export class script_ImFontGlyph implements Bind.interface_ImFontGlyph {
   U1 = 1.0;
   V1 = 1.0;
 
-  TexID: number = null;
+  TexID: number = -1;
 
   Char = 0;
 }
@@ -2933,7 +2934,7 @@ export class ImFontAtlas {
     }
     return this._Fonts;
   }
-  _Fonts: ImVector<ImFont> = null;
+  _Fonts: Nullable<ImVector<ImFont>> = null;
 
   // ImVector<CustomRect>        CustomRects;        // Rectangles for packing custom texture data into the atlas.
   // ImVector<ImFontConfig>      ConfigData;         // Internal data
@@ -3042,7 +3043,7 @@ export class ImFont {
   }
   // ImFontConfig*               ConfigData;         //              // Pointer within ContainerAtlas->ConfigData
   get ConfigData(): ImFontConfig {
-    return new ImFontConfig(this.native.ConfigData);
+    return new ImFontConfig(this.native.ConfigData ?? undefined);
   }
   // ImFontAtlas*                ContainerAtlas;     //              // What we has been loaded into
   get ContainerAtlas(): ImFontAtlas | null {
@@ -3176,7 +3177,7 @@ export class ImFont {
     return false;
   } // TODO
 
-  get GlyphToCreate(): ImFontGlyph {
+  get GlyphToCreate(): Nullable<ImFontGlyph> {
     const glyph = this.native.GlyphToCreate();
     return glyph ? new ImFontGlyph(glyph) : null;
   }
@@ -7439,18 +7440,18 @@ export class ImGuiWindow {
     this.native.ItemWidthDefault = v;
   }
 
-  get ParentWindow(): ImGuiWindow {
+  get ParentWindow(): Nullable<ImGuiWindow> {
     return this.native.ParentWindow ? new ImGuiWindow(this.native.ParentWindow) : null;
   }
-  get RootWindow(): ImGuiWindow {
+  get RootWindow(): Nullable<ImGuiWindow> {
     return this.native.RootWindow ? new ImGuiWindow(this.native.RootWindow) : null;
   }
-  get RootWindowForTitleBarHighlight(): ImGuiWindow {
+  get RootWindowForTitleBarHighlight(): Nullable<ImGuiWindow> {
     return this.native.RootWindowForTitleBarHighlight
       ? new ImGuiWindow(this.native.RootWindowForTitleBarHighlight)
       : null;
   }
-  get RootWindowForNav(): ImGuiWindow {
+  get RootWindowForNav(): Nullable<ImGuiWindow> {
     return this.native.RootWindowForNav ? new ImGuiWindow(this.native.RootWindowForNav) : null;
   }
 }
@@ -7481,13 +7482,13 @@ export class ImGuiInputTextState {
 export function GetCurrentWindow(): ImGuiWindow {
   return new ImGuiWindow(bind.GetCurrentWindow());
 }
-export function GetHoveredWindow(): ImGuiWindow {
+export function GetHoveredWindow(): Nullable<ImGuiWindow> {
   return bind.GetHoveredWindow() ? new ImGuiWindow(bind.GetHoveredWindow()) : null;
 }
-export function GetHoveredRootWindow(): ImGuiWindow {
+export function GetHoveredRootWindow(): Nullable<ImGuiWindow> {
   return bind.GetHoveredRootWindow() ? new ImGuiWindow(bind.GetHoveredRootWindow()) : null;
 }
-export function GetActiveWindow(): ImGuiWindow {
+export function GetActiveWindow(): Nullable<ImGuiWindow> {
   return bind.GetActiveWindow() ? new ImGuiWindow(bind.GetActiveWindow()) : null;
 }
 
@@ -7523,7 +7524,7 @@ export function Font_toString(font: ImFont): string {
 export function CreateFont(name: string, size: number, style?: string): ImFont {
   const io = GetIO();
   const font = io.Fonts.AddFontDefault();
-  font.FontStyle = style;
+  font.FontStyle = style as string;
   font.FontName = name;
   font.FontSize = size;
   return font;

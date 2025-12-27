@@ -2721,8 +2721,8 @@ export class PBScope extends Proxiable<PBScope> {
     return this.$inputs.$getVertexAttrib(semantic); // getCurrentProgramBuilder().getReflection().attribute(semantic);
   }
   /** Get the current local scope */
-  get $l(): Nullable<PBLocalScope> {
-    return this.$_getLocalScope();
+  get $l(): PBLocalScope {
+    return this.$_getLocalScope()!;
   }
   /** Get the global scope */
   get $g(): PBGlobalScope {

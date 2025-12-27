@@ -2,13 +2,14 @@ import type { AbstractDevice, AtlasInfo, Texture2D } from '@zephyr3d/device';
 import { GlyphManager, Font as DeviceFont } from '@zephyr3d/device';
 import { Renderer } from './renderer';
 import * as ImGui from './imgui';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 
 let clipboard_text = '';
-let renderer: Renderer = null;
+let renderer: Nullable<Renderer> = null;
 let prev_time = 0;
-let g_FontTexture: Texture2D = null;
-let glyphManager: GlyphManager = null;
+let g_FontTexture: Nullable<Texture2D> = null;
+let glyphManager: Nullable<GlyphManager> = null;
 let wantKeyboard = false;
 let fontSizeGlyph = 0;
 const fonts: Record<string, DeviceFont> = {};
@@ -53,7 +54,7 @@ export class Input {
     e.preventDefault();
     for (let i = 0; i < e.data.length; i++) {
       const io = ImGui.GetIO();
-      io.AddInputCharacter(e.data.codePointAt(i));
+      io.AddInputCharacter(e.data.codePointAt(i)!);
     }
   }
   blur() {
@@ -276,8 +277,8 @@ function canvas_on_wheel(event: WheelEvent): boolean {
 let touch_count = 0;
 let touch_id: number;
 export class ITouch {
-  x: number;
-  y: number;
+  x = 0;
+  y = 0;
 }
 export let multi_touch: { [key: number]: ITouch } = {};
 
@@ -310,7 +311,7 @@ function canvas_on_touchend(event: TouchEvent): void {
     if (touch.identifier == touch_id) {
       io.MouseDown[0] = false;
     }
-    multi_touch[touch.identifier] = undefined;
+    delete multi_touch[touch.identifier];
   }
   touch_count++;
   if (touch_count >= 200) {
@@ -461,12 +462,12 @@ export function NewFrame(time: number): void {
     }
   }
 
-  const viewport = renderer.device.getViewport();
-  const canvas = renderer.device.canvas;
+  const viewport = renderer!.device.getViewport();
+  const canvas = renderer!.device.canvas;
   const w: number = viewport.width;
   const h: number = viewport.height;
-  const display_w: number = renderer.device.screenXToDevice(w);
-  const display_h: number = renderer.device.screenYToDevice(h);
+  const display_w: number = renderer!.device.screenXToDevice(w);
+  const display_h: number = renderer!.device.screenYToDevice(h);
   io.DisplaySize.x = w;
   io.DisplaySize.y = h;
   io.DisplayFramebufferScale.x = w > 0 ? display_w / w : 0;
@@ -666,7 +667,7 @@ function toRgba(col:number):string
 }
 */
 
-let charCodeMap: Record<number, string> = null;
+let charCodeMap: Record<number, string> = {};
 
 const glyphFontMap: Record<number, DeviceFont> = {};
 
@@ -676,7 +677,7 @@ export function addCustomGlyph(charCode: number, font: DeviceFont) {
 }
 
 /** @internal */
-export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
+export function calcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
   const font = ImGui.GetFont();
   const fontName = font.FontSize + 'px ' + font.FontName;
   let deviceFont = fonts[fontName];
@@ -688,7 +689,7 @@ export function calcTextSize(text: string, out: ImGui.ImVec2): ImGui.ImVec2 {
   let y = 0;
   if (text) {
     for (const ch of text) {
-      const glyphSize = glyphManager.getGlyphSize(ch, deviceFont);
+      const glyphSize = glyphManager!.getGlyphSize(ch, deviceFont) ?? 0;
       x += glyphSize[0];
       y = Math.max(glyphSize[1]);
     }
@@ -714,7 +715,7 @@ export function font_update(io: ImGui.IO) {
       const charCode = charCodeMap?.[glyph.Char] ?? glyph.Char;
       let char: string;
       let glyphInfo: AtlasInfo;
-      let f: DeviceFont = null;
+      let f: Nullable<DeviceFont> = null;
       if (typeof charCode === 'number') {
         f = glyphFontMap[charCode];
         char = String.fromCodePoint(charCode);
@@ -722,9 +723,9 @@ export function font_update(io: ImGui.IO) {
         char = charCode;
       }
       if (f) {
-        glyphInfo = glyphManager.getGlyphInfo(char, f);
+        glyphInfo = glyphManager!.getGlyphInfo(char, f)!;
       } else {
-        glyphInfo = glyphManager.getGlyphInfo(char, deviceFont);
+        glyphInfo = glyphManager!.getGlyphInfo(char, deviceFont)!;
       }
       glyph.X0 = 0;
       glyph.X1 = Math.ceil(glyphInfo.width * scale);
@@ -735,7 +736,7 @@ export function font_update(io: ImGui.IO) {
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
       glyph.V1 = glyphInfo.vMax;
-      glyph.TextureID = glyphManager.getAtlasTexture(glyphInfo.atlasIndex);
+      glyph.TextureID = glyphManager!.getAtlasTexture(glyphInfo.atlasIndex);
       font.GlyphCreated(glyph);
       glyph = font.GlyphToCreate;
     }
@@ -809,7 +810,7 @@ function input_text_update(_io: ImGui.IO): void {
 }
 
 export function ClearBuffer(color: ImGui.ImVec4) {
-  renderer.device.clearFrameBuffer(new Vector4(color.x, color.y, color.z, color.w), 1, 0);
+  renderer!.device.clearFrameBuffer(new Vector4(color.x, color.y, color.z, color.w), 1, 0);
 }
 
 export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawData()): void {
@@ -833,8 +834,8 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
 
   // Draw
   const pos = draw_data.DisplayPos;
-  const scissorOld = renderer.device.getScissor();
-  renderer.beginRender();
+  const scissorOld = renderer!.device.getScissor();
+  renderer!.beginRender();
   draw_data.IterateDrawLists((draw_list: ImGui.DrawList): void => {
     const vx = draw_list.VtxBuffer;
     const ix = draw_list.IdxBuffer;
@@ -855,11 +856,11 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
         if (clip_rect.x < fb_width && clip_rect.y < fb_height && clip_rect.z >= 0.0 && clip_rect.w >= 0.0) {
           // Apply scissor/clipping rectangle
           // renderer.device.setScissor([clip_rect.x, fb_height - clip_rect.w, clip_rect.z - clip_rect.x, clip_rect.w - clip_rect.y]);
-          const scissorX = renderer.device.deviceXToScreen(clip_rect.x);
-          const scissorY = renderer.device.deviceYToScreen(fb_height - clip_rect.w);
-          const scissorW = renderer.device.deviceXToScreen(clip_rect.z - clip_rect.x);
-          const scissorH = renderer.device.deviceYToScreen(clip_rect.w - clip_rect.y);
-          renderer.stream(vx, ixU16, indexOffset, draw_cmd.ElemCount, draw_cmd.TextureId, [
+          const scissorX = renderer!.device.deviceXToScreen(clip_rect.x);
+          const scissorY = renderer!.device.deviceYToScreen(fb_height - clip_rect.w);
+          const scissorW = renderer!.device.deviceXToScreen(clip_rect.z - clip_rect.x);
+          const scissorH = renderer!.device.deviceYToScreen(clip_rect.w - clip_rect.y);
+          renderer!.stream(vx, ixU16, indexOffset, draw_cmd.ElemCount, draw_cmd.TextureId, [
             scissorX,
             scissorY,
             scissorW,
@@ -870,7 +871,7 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
       indexOffset += draw_cmd.ElemCount;
     });
   });
-  renderer.device.setScissor(scissorOld);
+  renderer!.device.setScissor(scissorOld);
 }
 
 export function CreateFontsTexture(): void {
@@ -896,10 +897,10 @@ export function CreateFontsTexture(): void {
       rgba8[i++] = p;
     });
     // Upload texture to graphics system
-    g_FontTexture = renderer.device.createTexture2D('rgba8unorm', width, height, {
+    g_FontTexture = renderer!.device.createTexture2D('rgba8unorm', width, height, {
       mipmapping: false
     });
-    g_FontTexture.update(rgba8, 0, 0, width, height);
+    g_FontTexture!.update(rgba8, 0, 0, width, height);
     //gl && gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
     // Store our identifier
@@ -953,7 +954,7 @@ export interface ITextureParam {
 }
 
 export class Texture {
-  public _texture: Texture2D;
+  public _texture: Nullable<Texture2D> = null;
   public _width = 1;
   public _height = 1;
 
@@ -994,18 +995,18 @@ export class Texture {
     }
     if (!this._texture || this._texture.width !== w || this._texture.height !== h) {
       this._texture?.dispose();
-      this._texture = renderer.device.createTexture2D('rgba8unorm', w, h, {
+      this._texture = renderer!.device.createTexture2D('rgba8unorm', w, h, {
         mipmapping: false
       });
       this._width = w;
       this._height = h;
     }
     if (src instanceof Uint8Array || src instanceof Uint16Array) {
-      this._texture.update(src, 0, 0, w, h);
+      this._texture!.update(src, 0, 0, w, h);
     } else if (src instanceof ImageData) {
-      this._texture.update(src.data, 0, 0, w, h);
+      this._texture!.update(src.data, 0, 0, w, h);
     } else {
-      this._texture.updateFromElement(src, 0, 0, 0, 0, w, h);
+      this._texture!.updateFromElement(src, 0, 0, 0, 0, w, h);
     }
   }
 }

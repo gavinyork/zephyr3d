@@ -1,4 +1,4 @@
-import type { ColorRGBA } from '@zephyr3d/base';
+import type { ColorRGBA, Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
@@ -86,7 +86,7 @@ export class Renderer extends Disposable {
               ['position_f32x2', 'tex0_f32x2', 'diffuse_u8normx4'],
               this._vertexCache,
               { dynamic: true }
-            )
+            )!
           }
         ],
         indexBuffer: this._device.createIndexBuffer(this._indexCache, { dynamic: true })
@@ -115,7 +115,7 @@ export class Renderer extends Disposable {
   createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
       mipmapping: false
-    });
+    })!;
     if (color) {
       this.clearTexture(tex, color);
     }
@@ -181,7 +181,7 @@ export class Renderer extends Disposable {
     indexData: Uint16Array<ArrayBuffer>,
     indexOffset: number,
     indexCount: number,
-    texture: Texture2D,
+    texture: Nullable<Texture2D>,
     scissor: number[]
   ) {
     let tex = texture || null;
@@ -206,10 +206,10 @@ export class Renderer extends Disposable {
       indexData = alignedIndexData;
       indexOffset = 0;
     }
-    const vertexBuffer = vertexLayout.getVertexBuffer('position');
+    const vertexBuffer = vertexLayout.getVertexBuffer('position')!;
     vertexBuffer.bufferSubData(this._drawPosition * 20, vertexData, 0, vertexCount * 20);
     vertexLayout
-      .getIndexBuffer()
+      .getIndexBuffer()!
       .bufferSubData(this._indexPosition * 2, indexData, indexOffset, alignedIndexCount);
     vertexLayout.setDrawOffset(vertexBuffer, this._drawPosition * 20);
     if (texture) {
@@ -252,9 +252,12 @@ export class Renderer extends Disposable {
   /** Disposes this renderer */
   protected onDispose() {
     super.onDispose();
-    this._primitiveBuffer = null;
-    this._vertexCache = null;
-    this._device = null;
+    this._bindGroup?.dispose();
+    this._bindGroupTexture?.dispose();
+    this._primitiveBuffer?.forEach((vertexLayout) => vertexLayout.dispose());
+    this._program?.dispose();
+    this._programTexture?.dispose();
+    this._textureSampler?.dispose();
   }
   /** @internal */
   private createStateSet(): RenderStateSet {
@@ -303,7 +306,7 @@ export class Renderer extends Disposable {
           this.$outputs.outColor = pb.vec4(pb.mul(this.color.rgb, this.color.a), this.color.a);
         });
       }
-    });
+    })!;
     program.name = diffuseMap ? '@UI_withDiffuse' : '@UI_noDiffuse';
     return program;
   }
