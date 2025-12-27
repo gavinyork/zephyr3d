@@ -214,7 +214,7 @@ export class WebGPURenderPass {
       numInstances
     );
   }
-  clear(color: Vector4, depth: number, stencil: number): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>): void {
     if (!this._currentScissor) {
       this.end();
       this.begin(color, depth, stencil);
@@ -233,7 +233,7 @@ export class WebGPURenderPass {
   getFrameBufferInfo(): FrameBufferInfo {
     return this._frameBufferInfo;
   }
-  begin(color?: TypedArray, depth?: number, stencil?: number): void {
+  begin(color?: Nullable<TypedArray>, depth?: Nullable<number>, stencil?: Nullable<number>): void {
     if (this.active) {
       console.error('WebGPURenderPass.begin() failed: begin() has already been called');
       return;
@@ -252,9 +252,9 @@ export class WebGPURenderPass {
       colorAttachmentDesc.clearValue = color;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
       depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc!.depthClearValue = depth;
+      depthAttachmentDesc!.depthClearValue = depth ?? undefined;
       depthAttachmentDesc!.stencilLoadOp = typeof stencil === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc!.stencilClearValue = stencil;
+      depthAttachmentDesc!.stencilClearValue = stencil ?? undefined;
       this._renderPassEncoder = this._renderCommandEncoder.beginRenderPass(mainPassDesc);
     } else {
       const depthAttachmentTexture = frameBuffer.getDepthAttachment() as WebGPUBaseTexture;
@@ -318,27 +318,27 @@ export class WebGPURenderPass {
             ? {
                 view: depthTextureView!,
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
-                depthClearValue: depth,
+                depthClearValue: depth ?? undefined,
                 depthStoreOp: 'store',
                 stencilLoadOp: hasStencilChannel(depthAttachmentTexture.format)
                   ? typeof stencil === 'number'
                     ? 'clear'
                     : 'load'
                   : undefined,
-                stencilClearValue: stencil,
+                stencilClearValue: stencil ?? undefined,
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
             : {
                 view: frameBuffer.getMSAADepthAttachment()!.createView(),
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
-                depthClearValue: depth,
+                depthClearValue: depth ?? undefined,
                 depthStoreOp: 'store',
                 stencilLoadOp: hasStencilChannel(depthAttachmentTexture.format)
                   ? typeof stencil === 'number'
                     ? 'clear'
                     : 'load'
                   : undefined,
-                stencilClearValue: stencil,
+                stencilClearValue: stencil ?? undefined,
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
           : undefined

@@ -211,7 +211,7 @@ export class CommandQueueImmediate {
   getScissor(): DeviceViewport {
     return this._renderPass.getScissor();
   }
-  clear(color: Vector4, depth: number, stencil: number): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>): void {
     this._renderPass.clear(color, depth, stencil);
   }
   finish() {

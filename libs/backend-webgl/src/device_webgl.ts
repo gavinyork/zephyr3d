@@ -402,7 +402,11 @@ export class WebGLDevice extends BaseDevice {
     this.setViewport(this._currentViewport);
     this.setScissor(this._currentScissorRect);
   }
-  clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number) {
+  clearFrameBuffer(
+    clearColor: Nullable<Vector4>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
+  ) {
     const gl = this._context;
     const colorFlag = clearColor ? gl.COLOR_BUFFER_BIT : 0;
     const depthFlag = typeof clearDepth === 'number' ? gl.DEPTH_BUFFER_BIT : 0;
@@ -416,7 +420,7 @@ export class WebGLDevice extends BaseDevice {
             gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth ?? 1, clearStencil ?? 0);
           }
         }
-        if (colorFlag) {
+        if (clearColor) {
           const attachments = gl._currentFramebuffer.getColorAttachments();
           for (let i = 0; i < attachments.length; i++) {
             if (isIntegerTextureFormat(attachments[i].format)) {
@@ -439,14 +443,14 @@ export class WebGLDevice extends BaseDevice {
           }
         }
       } else {
-        if (colorFlag) {
+        if (clearColor) {
           gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         }
         if (depthFlag) {
-          gl.clearDepth(clearDepth);
+          gl.clearDepth(clearDepth as number);
         }
         if (stencilFlag) {
-          gl.clearStencil(clearStencil);
+          gl.clearStencil(clearStencil as number);
         }
         gl.clear(colorFlag | depthFlag | stencilFlag);
       }

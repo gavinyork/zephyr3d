@@ -2429,7 +2429,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param clearDepth - If not null, the depth buffer will be cleared to this value.
    * @param clearStencil - If not null, the stencil buffer will be cleared to this value.
    */
-  clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
+  clearFrameBuffer(
+    clearColor: Nullable<Vector4>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
+  );
   /** Creates a GPU timer */
   createGPUTimer(): Nullable<ITimer>;
   /** Creates a render state set object */

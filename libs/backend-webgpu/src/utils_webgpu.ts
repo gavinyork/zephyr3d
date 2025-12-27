@@ -16,9 +16,9 @@ export class WebGPUClearQuad {
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,
-    clearColor: Float32Array<ArrayBuffer>,
-    clearDepth: number,
-    clearStencil: number
+    clearColor: Nullable<Float32Array<ArrayBuffer>>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
   ) {
     if (!this._clearStateSet) {
       this.initClearQuad(renderPass);

@@ -314,7 +314,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract getBackBufferHeight(): number;
   abstract getDeviceCaps(): Immutable<DeviceCaps>;
   abstract initContext(): Promise<void>;
-  abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
+  abstract clearFrameBuffer(
+    clearColor: Nullable<Vector4>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
+  );
   abstract createGPUTimer(): Nullable<ITimer>;
   abstract createRenderStateSet(): RenderStateSet;
   abstract createBlendingState(): BlendingState;
