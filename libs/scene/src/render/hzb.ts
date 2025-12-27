@@ -3,11 +3,12 @@ import { drawFullscreenQuad } from './fullscreenquad';
 import { CopyBlitter } from '../blitter';
 import { fetchSampler } from '../utility/misc';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
-let hzbProgram: GPUProgram = null;
-let hzbBindGroup: BindGroup = null;
-let blitter: CopyBlitter = null;
-let srcSize: Int32Array<ArrayBuffer> = null;
+let hzbProgram: Nullable<GPUProgram> = null;
+let hzbBindGroup: Nullable<BindGroup> = null;
+let blitter: Nullable<CopyBlitter> = null;
+const srcSize = new Int32Array(2);
 
 /*
 vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
@@ -224,7 +225,7 @@ function buildHZBProgram(device: AbstractDevice): GPUProgram {
         this.$outputs.color = pb.vec4(this.d, 0, 0, 1);
       });
     }
-  });
+  })!;
   program.name = '@HZB_Builder';
   return program;
 }
@@ -250,15 +251,15 @@ function buildHiZLevel(
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
   srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
   srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
-  hzbBindGroup.setValue('srcSize', srcSize);
+  hzbBindGroup!.setValue('srcSize', srcSize);
   if (device.type === 'webgpu') {
-    hzbBindGroup.setTextureView('srcTex', srcTexture, miplevel, 0, 1, sampler);
+    hzbBindGroup!.setTextureView('srcTex', srcTexture, miplevel, 0, 1, sampler);
   } else {
-    hzbBindGroup.setTexture('srcTex', srcTexture, sampler);
-    hzbBindGroup.setValue('srcMipLevel', miplevel);
+    hzbBindGroup!.setTexture('srcTex', srcTexture, sampler);
+    hzbBindGroup!.setValue('srcMipLevel', miplevel);
   }
   device.setProgram(hzbProgram);
-  device.setBindGroup(0, hzbBindGroup);
+  device.setBindGroup(0, hzbBindGroup!);
   device.setFramebuffer(framebuffer);
   drawFullscreenQuad();
   if (srcTexture !== dstTexture) {
@@ -273,9 +274,8 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
     hzbProgram = buildHZBProgram(device);
     hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);
     blitter = new CopyBlitter();
-    srcSize = new Int32Array(2);
   }
-  blitter.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
+  blitter!.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
   device.pushDeviceStates();
   const srcTex = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
   if (device.type === 'webgpu') {

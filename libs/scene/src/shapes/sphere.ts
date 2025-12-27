@@ -1,4 +1,4 @@
-import type { Clonable, Ray } from '@zephyr3d/base';
+import type { Clonable, DeepRequireOptionals, Ray } from '@zephyr3d/base';
 import type { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
@@ -36,8 +36,8 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
   constructor(options?: SphereCreationOptions) {
     super(options);
   }
-  clone(): SphereShape {
-    return new SphereShape(this._options);
+  clone(): this {
+    return new SphereShape(this._options) as this;
   }
   /** type of the shape */
   get type(): string {
@@ -72,7 +72,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
    * @param indices - vertex indices
    */
   static generateData(
-    options: SphereCreationOptions,
+    options: DeepRequireOptionals<SphereCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],

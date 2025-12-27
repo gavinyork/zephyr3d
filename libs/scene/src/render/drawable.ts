@@ -1,4 +1,4 @@
-import type { DRef, TypedArray, Vector4 } from '@zephyr3d/base';
+import type { DRef, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -50,27 +50,27 @@ export interface DrawContext {
   /** Framebuffer height for rendering (in pixels). */
   renderHeight: number;
   /** The render queue which is currently being rendered (if applicable). */
-  renderQueue?: RenderQueue;
+  renderQueue?: Nullable<RenderQueue>;
   /** Allocator for global (frame/pass) bind groups and descriptor resources. */
   globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera associated with the current drawing task (may differ from primaryCamera). */
   camera: Camera;
   /** Order-Independent Transparency interface for transparent passes. */
-  oit: OIT;
+  oit: Nullable<OIT>;
   /** Whether motion vectors are being written this pass (used by TAA/MotionBlur). */
   motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
-  motionVectorTexture?: Texture2D;
+  motionVectorTexture?: Nullable<Texture2D>;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
   HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
-  HiZTexture: Texture2D;
+  HiZTexture: Nullable<Texture2D>;
   /** The scene currently being drawn. */
   scene: Scene;
   /** The render pass to which this drawing task belongs. */
-  renderPass: RenderPass;
+  renderPass: Nullable<RenderPass>;
   /** Stable hash for the current pass/draw state, for render bundle or pipeline cache. */
-  renderPassHash: string;
+  renderPassHash: Nullable<string>;
   /** Fog application flags for transparent objects (bitmask). */
   fogFlags: number;
   /** Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions). */
@@ -78,7 +78,7 @@ export interface DrawContext {
   /** Whether this is the base lighting pass that draws environment lighting. */
   drawEnvLight: boolean;
   /** Scene environment (sky, IBL, exposure, etc.) used for shading. */
-  env: Environment;
+  env: Nullable<Environment>;
   /** Timestamp for the current draw (engine-defined time units). */
   timestamp: number;
   /** Current sub-queue index within the render queue (e.g., opaque, transparent). */
@@ -98,23 +98,23 @@ export interface DrawContext {
   /** Default color buffer format for targets created in this pass. */
   colorFormat?: TextureFormat;
   /** Instance data buffer/metadata for the current drawing task (instanced rendering). */
-  instanceData?: InstanceData;
+  instanceData?: Nullable<InstanceData>;
   /** Compositor used to apply post-processing effects at the end of the frame/pass. */
-  compositor?: Compositor;
+  compositor?: Nullable<Compositor>;
   /** @internal Map of punctual lights to their shadow map parameters for this pass. */
-  shadowMapInfo?: Map<PunctualLight, ShadowMapParams>;
+  shadowMapInfo?: Nullable<Map<PunctualLight, ShadowMapParams>>;
   /** @internal The punctual light currently rendering shadows (shadow pass). */
-  currentShadowLight?: PunctualLight;
+  currentShadowLight?: Nullable<PunctualLight>;
   /** Sun/directional light reference for passes that need it. */
-  sunLight?: DirectionalLight;
+  sunLight?: Nullable<DirectionalLight>;
   /** Clustered light index/structure for lighting in forward+, clustered shading, etc. */
   clusteredLight?: ClusteredLight;
   /** Material varying bit flags that influence shader selection. */
   materialFlags: number;
   /** Force cull mode override for special passes (optional). */
-  forceCullMode?: FaceMode;
+  forceCullMode?: Nullable<FaceMode>;
   /** Force color mask state override for special passes (optional). */
-  forceColorState?: ColorState;
+  forceColorState?: Nullable<ColorState>;
   /** Temporal anti-aliasing is active this frame/pass. */
   TAA: boolean;
   /** Screen-space reflections are active this frame/pass. */
@@ -126,9 +126,9 @@ export interface DrawContext {
   /** SSR normal input texture (usually view-space or world-space normals). */
   SSRNormalTexture: Texture2D;
   /** Final framebuffer target where the last stage renders. */
-  finalFramebuffer: FrameBuffer;
+  finalFramebuffer: Nullable<FrameBuffer>;
   /** Intermediate framebuffer used by the compositor or multi-pass pipelines. */
-  intermediateFramebuffer: FrameBuffer;
+  intermediateFramebuffer: Nullable<FrameBuffer>;
 }
 
 /**
@@ -170,13 +170,13 @@ export interface Drawable {
    */
   getPickTarget(): PickTarget;
   /** Returns the texture containing bone matrices for skinned meshes. */
-  getBoneMatrices(): Texture2D;
+  getBoneMatrices(): Nullable<Texture2D>;
   /** Returns the unique color used for GPU picking (object ID in color). */
   getObjectColor(): Vector4;
   /** Returns the morph target data texture (if morphing is used). */
-  getMorphData(): MorphData;
+  getMorphData(): Nullable<MorphData>;
   /** Returns the morph information buffer (weights, ranges, etc.). */
-  getMorphInfo(): MorphInfo;
+  getMorphInfo(): Nullable<MorphInfo>;
   /**
    * Computes the distance used for sorting (e.g., transparent draw order).
    *
@@ -192,9 +192,9 @@ export interface Drawable {
   /** True if shading is unlit (does not depend on scene lighting). */
   isUnlit(): boolean;
   /** Returns the bound material driving shading for this drawable. */
-  getMaterial(): MeshMaterial;
+  getMaterial(): Nullable<MeshMaterial>;
   /** Returns the geometry primitive to be drawn. */
-  getPrimitive(): Primitive;
+  getPrimitive(): Nullable<Primitive>;
   /**
    * Pushes a reference to the current render queue for cleanup or back-references.
    *

@@ -12,6 +12,7 @@ import {
   UnlitMaterial
 } from '../../../material';
 import type { PropertyAccessor, SerializableClass } from '../types';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
@@ -687,7 +688,7 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
                 this.spriteTexture = null;
               } else {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId, {
                     linearColorSpace: false
@@ -748,7 +749,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
                 this.alphaMap = null;
               } else {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D> = null;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId, { linearColorSpace: true });
                 } catch (err) {
@@ -787,7 +788,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
                 this.rampMap = null;
               } else {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D> = null;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {

@@ -1,5 +1,6 @@
 import { AnimationTrack } from './animationtrack';
-import type { PropertyAccessor, PropertyValue } from '../utility';
+import type { PropertyAccessor } from '../utility';
+import type { Nullable } from '@zephyr3d/base';
 import { Interpolator } from '@zephyr3d/base';
 
 /**
@@ -21,13 +22,13 @@ import { Interpolator } from '@zephyr3d/base';
  *
  * @public
  */
-export class PropertyTrack extends AnimationTrack<PropertyValue> {
-  private readonly _state: PropertyValue;
-  private _stateAlpha: PropertyValue;
+export class PropertyTrack extends AnimationTrack<number[]> {
+  private readonly _state: number[];
+  private _stateAlpha: number[];
   private readonly _prop: PropertyAccessor;
   private readonly _count: number;
-  private _interpolator: Interpolator;
-  private _interpolatorAlpha: Interpolator;
+  private _interpolator: Nullable<Interpolator>;
+  private _interpolatorAlpha: Nullable<Interpolator>;
   /**
    * Construct a PropertyTrack for a specific property.
    *
@@ -43,12 +44,12 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   constructor(prop: PropertyAccessor, value?: number[], embedded?: boolean) {
     super(embedded);
     this._prop = prop;
-    this._state = { num: [0, 0, 0, 0] };
-    this._stateAlpha = null;
+    this._state = [0, 0, 0, 0];
+    this._stateAlpha = [0];
     this._interpolator = null;
     this._interpolatorAlpha = null;
     if (value) {
-      this._state.num = value.slice();
+      this._state = value.slice();
     }
     switch (this._prop.type) {
       case 'float':
@@ -57,7 +58,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
           'cubicspline-natural',
           'number',
           new Float32Array([0, 1]),
-          new Float32Array([this._state.num[0], this._state.num[0]])
+          new Float32Array([this._state[0], this._state[0]])
         );
         break;
       case 'vec2':
@@ -66,7 +67,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
           'cubicspline-natural',
           'vec2',
           new Float32Array([0, 1]),
-          new Float32Array([...this._state.num.slice(0, 2), ...this._state.num.slice(0, 2)])
+          new Float32Array([...this._state.slice(0, 2), ...this._state.slice(0, 2)])
         );
         break;
       case 'rgb':
@@ -76,7 +77,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
           'cubicspline-natural',
           'vec3',
           new Float32Array([0, 1]),
-          new Float32Array([...this._state.num.slice(0, 3), ...this._state.num.slice(0, 3)])
+          new Float32Array([...this._state.slice(0, 3), ...this._state.slice(0, 3)])
         );
         break;
       case 'vec4':
@@ -85,7 +86,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
           'cubicspline-natural',
           'vec4',
           new Float32Array([0, 1]),
-          new Float32Array([...this._state.num.slice(0, 4), ...this._state.num.slice(0, 4)])
+          new Float32Array([...this._state.slice(0, 4), ...this._state.slice(0, 4)])
         );
         break;
       case 'rgba':
@@ -94,15 +95,15 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
           'linear',
           'vec3',
           new Float32Array([0, 1]),
-          new Float32Array([...this._state.num.slice(0, 3), ...this._state.num.slice(0, 3)])
+          new Float32Array([...this._state.slice(0, 3), ...this._state.slice(0, 3)])
         );
         this._interpolatorAlpha = new Interpolator(
           'linear',
           'number',
           new Float32Array([0, 1]),
-          new Float32Array([this._state.num[3], this._state.num[3]])
+          new Float32Array([this._state[3], this._state[3]])
         );
-        this._stateAlpha = { num: [this._state.num[3]] };
+        this._stateAlpha = [this._state[3]];
         break;
       default:
         throw new Error(`Property '${this._prop.name}' cannot be animated`);
@@ -117,7 +118,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   get interpolator() {
     return this._interpolator;
   }
-  set interpolator(interpolator: Interpolator) {
+  set interpolator(interpolator: Nullable<Interpolator>) {
     this._interpolator = interpolator;
   }
   /**
@@ -129,32 +130,32 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   get interpolatorAlpha() {
     return this._interpolatorAlpha;
   }
-  set interpolatorAlpha(interpolator: Interpolator) {
+  set interpolatorAlpha(interpolator: Nullable<Interpolator>) {
     this._interpolatorAlpha = interpolator ?? null;
     if (!this._stateAlpha && this._interpolatorAlpha) {
-      this._stateAlpha = { num: [0] };
+      this._stateAlpha = [0];
     }
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
-  calculateState(target: unknown, currentTime: number): PropertyValue {
-    this._interpolator.interpolate(currentTime, this._state.num);
+  calculateState(target: unknown, currentTime: number): number[] {
+    this._interpolator!.interpolate(currentTime, this._state);
     if (this._interpolatorAlpha) {
-      this._interpolatorAlpha.interpolate(currentTime, this._stateAlpha.num);
-      this._state.num[3] = this._stateAlpha.num[0];
+      this._interpolatorAlpha.interpolate(currentTime, this._stateAlpha);
+      this._state[3] = this._stateAlpha[0];
     }
     return this._state;
   }
   /** {@inheritDoc AnimationTrack.applyState} */
-  applyState(target: object, state: PropertyValue) {
-    this._prop.set.call(target, state);
+  applyState(target: object, state: number[]) {
+    this._prop.set!.call(target, { num: state } as any);
   }
   /** {@inheritDoc AnimationTrack.mixState} */
-  mixState(a: PropertyValue, b: PropertyValue, t: number): PropertyValue {
+  mixState(a: number[], b: number[], t: number): number[] {
     const v: number[] = [];
     for (let i = 0; i < this._count; i++) {
-      v[i] = a.num[i] + t * (b.num[i] - a.num[i]);
+      v[i] = a[i] + t * (b[i] - a[i]);
     }
-    return { num: v };
+    return v;
   }
   /** {@inheritDoc AnimationTrack.getBlendId} */
   getBlendId(): unknown {
@@ -162,7 +163,7 @@ export class PropertyTrack extends AnimationTrack<PropertyValue> {
   }
   /** {@inheritDoc AnimationTrack.getDuration} */
   getDuration(): number {
-    return this._interpolator.maxTime;
+    return this._interpolator?.maxTime ?? 0;
   }
   /**
    * Access the underlying property accessor.

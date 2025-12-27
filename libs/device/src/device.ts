@@ -399,9 +399,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     options?: Nullable<FrameBufferOptions>
   ): FrameBuffer;
   // render related
-  abstract setViewport(vp: Nullable<number[] | DeviceViewport>): void;
+  abstract setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>): void;
   abstract getViewport(): Immutable<DeviceViewport>;
-  abstract setScissor(scissor: Nullable<number[] | DeviceViewport>): void;
+  abstract setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>): void;
   abstract getScissor(): Immutable<DeviceViewport>;
   abstract setProgram(program: Nullable<GPUProgram>): void;
   abstract getProgram(): Nullable<GPUProgram>;
@@ -473,8 +473,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   set vSync(val: boolean) {
     this._vSync = !!val;
   }
-  get pool(): Nullable<Pool> {
-    return this._poolMap.get(this._defaultPoolKey) ?? null;
+  get pool(): Pool {
+    return this._poolMap.get(this._defaultPoolKey)!;
   }
   get runLoopFunction(): Nullable<(device: AbstractDevice) => void> {
     return this._runLoopFunc;

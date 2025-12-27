@@ -615,13 +615,13 @@ export class WebGPUDevice extends BaseDevice {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp: Nullable<number[] | DeviceViewport>) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._commandQueue.setViewport(vp);
   }
   getViewport(): Immutable<DeviceViewport> {
     return this._commandQueue.getViewport();
   }
-  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._commandQueue.setScissor(scissor);
   }
   getScissor(): Immutable<DeviceViewport> {

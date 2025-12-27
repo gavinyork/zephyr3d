@@ -1,5 +1,5 @@
 import type { TextureFormat, TextureMipmapLevelData, TextureMipmapData } from '@zephyr3d/device';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 
 const DDSHeaderSize = 31; // in DWORD
 const DDSHeaderSizeExtended = 31 + 5; // in DWORD
@@ -72,10 +72,10 @@ enum DXGIFormat {
 
 function FourCCToInt32(value: string) {
   return (
-    value.codePointAt(0) +
-    (value.codePointAt(1) << 8) +
-    (value.codePointAt(2) << 16) +
-    (value.codePointAt(3) << 24)
+    value.codePointAt(0)! +
+    (value.codePointAt(1)! << 8) +
+    (value.codePointAt(2)! << 16) +
+    (value.codePointAt(3)! << 24)
   );
 }
 
@@ -117,7 +117,7 @@ interface DDSHeaderDX10 {
   arraySize: number;
 }
 
-function loadDDSHeader(dds: ArrayBuffer, offset: number): DDSHeader {
+function loadDDSHeader(dds: ArrayBuffer, offset: number): Nullable<DDSHeader> {
   const ddsHeader = {} as DDSHeader;
   const header = new Uint32Array(dds, offset, DDSHeaderSize + 1);
   const magic = header[0];
@@ -494,12 +494,13 @@ function getTextureFormat(header: DDSHeader) {
   return legacyDDSMap[index].format;
 }
 
-function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): DDSMetaData {
+function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): Nullable<DDSMetaData> {
   metaData = metaData || ({} as DDSMetaData);
-  metaData.format = getTextureFormat(header);
-  if (metaData.format === null) {
+  const fmt = getTextureFormat(header);
+  if (!fmt) {
     return null;
   }
+  metaData.format = fmt;
   metaData.isCompressed =
     metaData.format === 'dxt1' ||
     metaData.format === 'dxt3' ||
@@ -538,7 +539,7 @@ function getMipmapData(
   height: number,
   format: TextureFormat,
   dataOffset: number
-): TypedArray {
+): Nullable<TypedArray> {
   switch (format) {
     case 'r16f':
       return new Uint16Array(dds, dataOffset, width * height);
@@ -574,7 +575,7 @@ function getMipmapData(
 }
 
 /** @internal */
-export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number): DDSMetaData {
+export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number): Nullable<DDSMetaData> {
   const ddsHeader = loadDDSHeader(dds, offset);
   if (!ddsHeader) {
     return null;
@@ -589,6 +590,9 @@ export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number): DDSMetaDa
     let height = ddsLevelsInfo.height;
     for (let mip = 0; mip < ddsLevelsInfo.mipLevels; mip++) {
       const mipData = getMipmapData(dds, width, height, ddsLevelsInfo.format, dataOffset + offset);
+      if (!mipData) {
+        return null;
+      }
       mipDatas.push({ data: mipData, width: width, height: height });
       dataOffset += mipData.byteLength;
       width = Math.max(1, width >> 1);

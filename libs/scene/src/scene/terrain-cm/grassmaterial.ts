@@ -43,11 +43,11 @@ export class ClipmapGrassMaterial
     this.specularFactor = new Vector4(1, 1, 1, 0.2);
     this._terrain = new DWeakRef(terrain);
     this._terrainPosScale = new Vector4();
-    this._heightMapSize = new Vector2(1 / terrain.heightMap.width, 1 / terrain.heightMap.height);
+    this._heightMapSize = new Vector2(1 / terrain.heightMap!.width, 1 / terrain.heightMap!.height);
     this._textureSize = Vector2.one();
   }
   clone(): ClipmapGrassMaterial {
-    const other = new ClipmapGrassMaterial(this._terrain.get());
+    const other = new ClipmapGrassMaterial(this._terrain.get()!);
     other.copyFrom(this);
     return other;
   }
@@ -84,9 +84,9 @@ export class ClipmapGrassMaterial
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
     super.applyUniformValues(bindGroup, ctx, pass);
-    const terrain = this._terrain.get();
+    const terrain = this._terrain.get()!;
     this._terrainPosScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
-    bindGroup.setTexture('terrainHeightMap', terrain.heightMap, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('terrainHeightMap', terrain.heightMap!, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
@@ -167,7 +167,7 @@ export class ClipmapGrassMaterial
         pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
       );
       scope.$l.litColor = pb.vec3(0);
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,

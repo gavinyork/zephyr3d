@@ -157,6 +157,30 @@ export type RequireOptionals<T> = {
 };
 
 /**
+ * Deep version: recursively apply RequireOptionals
+ * @public
+ */
+export type DeepRequireOptionals<T> = T extends
+  | Function
+  | Date
+  | RegExp
+  | symbol
+  | bigint
+  | string
+  | number
+  | boolean
+  ? T
+  : T extends readonly (infer U)[]
+    ? readonly DeepRequireOptionals<U>[]
+    : T extends object
+      ? {
+          [K in keyof T]-?: {} extends Pick<T, K>
+            ? Exclude<DeepRequireOptionals<T[K]>, undefined>
+            : DeepRequireOptionals<T[K]>;
+        }
+      : T;
+
+/**
  * Immutable type modifier
  */
 export type Immutable<T> = T extends (...args: any[]) => any

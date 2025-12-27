@@ -137,7 +137,7 @@ export class AnimationClip extends Disposable {
       console.error('Cannot delete animation track which is not belongs to THIS animation');
     }
     for (const k of this._tracks.keys()) {
-      const tracks = this._tracks.get(k);
+      const tracks = this._tracks.get(k)!;
       const index = tracks.indexOf(track);
       if (index >= 0) {
         tracks.splice(index, 1);
@@ -163,21 +163,21 @@ export class AnimationClip extends Disposable {
    */
   addTrack(target: object, track: AnimationTrack): this {
     if (!track) {
-      return;
+      return this;
     }
     if (track.animation) {
       if (track.animation === this) {
-        return;
+        return this;
       } else {
         console.error('Track is already in another animation');
-        return;
+        return this;
       }
     }
     const blendId = track.getBlendId();
     const tracks = this._tracks.get(target);
     if (tracks && tracks.findIndex((track) => track.getBlendId() === blendId) >= 0) {
       console.error('Tracks with same BlendId could not be added to same animation');
-      return;
+      return this;
     }
     track.animation = this;
     let trackInfo = this._tracks.get(target);
@@ -208,17 +208,5 @@ export class AnimationClip extends Disposable {
       }
       callback(frame);
     }
-  }
-  /**
-   * Dispose internal resources/references held by this clip.
-   *
-   * Notes:
-   * - Clears track collections and disposes registered skeletons.
-   * - The clip becomes unusable after disposing.
-   */
-  protected onDispose() {
-    super.onDispose();
-    this._tracks = null;
-    this._skeletons = null;
   }
 }

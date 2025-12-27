@@ -38,7 +38,7 @@ import type {
   StencilState
 } from './render_states';
 import type { Pool } from './pool';
-import { ITimer } from './timer';
+import type { ITimer } from './timer';
 
 /**
  * The webgl context type
@@ -2382,7 +2382,7 @@ export type DeviceViewport = {
  */
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get pool object */
-  pool: Nullable<Pool>;
+  pool: Pool;
   /** vSync */
   vSync: boolean;
   /** Check if a pool with given key exists */
@@ -2666,14 +2666,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @param vp - The viewport position and size, if not specified, the viewport will be set to [0, 0, drawingBufferWidth, drawingBufferHeight]
    */
-  setViewport(vp: Nullable<DeviceViewport | number[]>): void;
+  setViewport(vp: Nullable<Immutable<DeviceViewport | number[]>>): void;
   /** Get current viewport as [x, y, width, height] */
   getViewport(): Immutable<DeviceViewport>;
   /**
    * Set scissor rectangle from an array that contains the position and size
    * @param scissor - The scissor rectangle position and size, if not specified, the scissor rectangle will be set to [0, 0, drawingBufferWidth,drawingBufferHeight]
    */
-  setScissor(scissor: Nullable<DeviceViewport | number[]>): void;
+  setScissor(scissor: Nullable<Immutable<DeviceViewport | number[]>>): void;
   /**
    * Get current scissor rectangle
    */

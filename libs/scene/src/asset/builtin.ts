@@ -17,7 +17,7 @@ export function testCubemapLoader(): TextureCube {
   const device = getDevice();
   const tex = device.createCubeTexture('rgba8unorm', 32, {
     mipmapping: false
-  });
+  })!;
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();
   device.setFramebuffer(fb);

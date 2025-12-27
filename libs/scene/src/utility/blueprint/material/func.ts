@@ -160,7 +160,7 @@ export class FunctionCallNode extends BaseGraphNode {
       async createFunc(_, init: string) {
         const IR = await manager.loadBluePrint(init);
         const funcName = manager.VFS.basename(init, manager.VFS.extname(init));
-        return { obj: new FunctionCallNode(init, funcName, IR['func']) };
+        return { obj: new FunctionCallNode(init, funcName, IR!['func']) };
       },
       getInitParams(obj: FunctionCallNode) {
         return obj.path;
@@ -195,7 +195,7 @@ export class FunctionCallNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -504,7 +504,7 @@ export class FunctionOutputNode extends BaseGraphNode {
     if (!this._inputs[0].inputNode) {
       return 'Missing result';
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return 'Cannot determin result type';
     }
@@ -521,6 +521,6 @@ export class FunctionOutputNode extends BaseGraphNode {
    * to work with multiple types without explicit type declarations.
    */
   protected getType(): string {
-    return this._inputs[0].inputNode ? this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId) : '';
+    return this._inputs[0].inputNode ? this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!) : '';
   }
 }

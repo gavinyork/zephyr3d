@@ -1,6 +1,6 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 
 /**
@@ -15,7 +15,7 @@ export class OrthoCamera extends Camera {
   private _bottom: number;
   private _near: number;
   private _far: number;
-  private _window: number[];
+  private _window: Nullable<number[]>;
   /**
    * Creates an instance of PerspectiveCamera
    * @param scene - The scene that the camera belongs to.
@@ -24,7 +24,7 @@ export class OrthoCamera extends Camera {
    * @param nearPlane - The near clip plane
    * @param farPlane - The far clip plane
    */
-  constructor(scene: Scene, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
+  constructor(scene: Nullable<Scene>, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
     super(scene);
     this._left = left;
     this._right = right;
@@ -36,10 +36,10 @@ export class OrthoCamera extends Camera {
     this._invalidate(true);
   }
   /** Sub-window of the frustum */
-  get window(): Immutable<number[]> {
+  get window(): Nullable<Immutable<number[]>> {
     return this._window;
   }
-  set window(val: number[]) {
+  set window(val: Nullable<Immutable<number[]>>) {
     this._window = val?.slice() ?? null;
     this._invalidate(true);
   }

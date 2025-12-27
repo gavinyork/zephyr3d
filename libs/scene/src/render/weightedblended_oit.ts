@@ -85,7 +85,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
    */
   endPass(ctx: DrawContext, _pass: number) {
     const device = ctx.device;
-    const accumBuffer = device.getFramebuffer();
+    const accumBuffer = device.getFramebuffer()!;
     device.popDeviceStates();
     const accumTargets = accumBuffer.getColorAttachments();
     this.composite(ctx, device, accumTargets[0] as Texture2D, accumTargets[1] as Texture2D);
@@ -153,8 +153,8 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
   }
   /** @internal */
   private getAccumFramebuffer(ctx: DrawContext, device: AbstractDevice) {
-    const width = ctx.depthTexture.width;
-    const height = ctx.depthTexture.height;
+    const width = ctx.depthTexture!.width;
+    const height = ctx.depthTexture!.height;
     const accumColor = device.pool.fetchTemporalTexture2D(false, 'rgba16f', width, height, false);
     const accumAlpha = device.pool.fetchTemporalTexture2D(
       false,
@@ -198,7 +198,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
             );
           });
         }
-      });
+      })!;
       this._compositeProgram.name = '@WBOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();

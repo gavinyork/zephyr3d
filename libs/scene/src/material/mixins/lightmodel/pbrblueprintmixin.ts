@@ -233,7 +233,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         vertexUV
       ];
       pb.func(funcName, params, function () {
-        const outputs = ir.create(pb);
+        const outputs = ir.create(pb)!;
         this.zCommonData.albedo = pb.vec4(
           (that.getOutput(outputs, 'BaseColor') as PBShaderExp)?.rgb ?? pb.vec3(1),
           (that.getOutput(outputs, 'Opacity') as number | PBShaderExp) ?? 1
@@ -357,7 +357,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         function () {
           if (
             !ctx.drawEnvLight ||
-            (!ctx.env.light.envLight.hasRadiance() && !ctx.env.light.envLight.hasIrradiance())
+            (!ctx.env!.light.envLight.hasRadiance() && !ctx.env!.light.envLight.hasIrradiance())
           ) {
             return;
           }
@@ -379,13 +379,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.data.f0.rgb
           );
           this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
-          if (outRoughness || ctx.env.light.envLight.hasRadiance()) {
+          if (outRoughness || ctx.env!.light.envLight.hasRadiance()) {
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.specularFactor = pb.mul(this.FssEss, this.occlusion);
             if (outRoughness) {
               this.outRoughness = pb.vec4(this.specularFactor /*this.data.f0.rgb*/, this.data.roughness);
-            } else if (ctx.env.light.envLight.hasRadiance()) {
-              this.$l.radiance = ctx.env.light.envLight.getRadiance(
+            } else if (ctx.env!.light.envLight.hasRadiance()) {
+              this.$l.radiance = ctx.env!.light.envLight.getRadiance(
                 this,
                 pb.reflect(pb.neg(this.viewVec), this.data.normal),
                 this.data.roughness
@@ -393,8 +393,8 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               this.outColor = pb.add(this.outColor, pb.mul(this.radiance, this.specularFactor));
             }
           }
-          if (ctx.env.light.envLight.hasIrradiance()) {
-            this.$l.irradiance = ctx.env.light.envLight.getIrradiance(this, this.data.normal);
+          if (ctx.env!.light.envLight.hasIrradiance()) {
+            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.data.normal);
             this.$l.mixedF0 = this.data.f0.rgb;
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));

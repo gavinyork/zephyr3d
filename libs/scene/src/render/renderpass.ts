@@ -1,3 +1,4 @@
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
@@ -20,11 +21,11 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   protected _globalBindGroups: Record<string, BindGroup>;
   /** @internal */
-  protected _clearColor: Vector4;
+  protected _clearColor: Nullable<Vector4>;
   /** @internal */
-  protected _clearDepth: number;
+  protected _clearDepth: Nullable<number>;
   /** @internal */
-  protected _clearStencil: number;
+  protected _clearStencil: Nullable<number>;
   /**
    * Creates an instanceof RenderPass
    * @param type - Render pass type
@@ -38,25 +39,25 @@ export abstract class RenderPass extends Disposable {
     this._globalBindGroups = {};
   }
   /** Color value that is used to clear the frame buffer  */
-  get clearColor(): Vector4 {
+  get clearColor(): Nullable<Immutable<Vector4>> {
     return this._clearColor;
   }
-  set clearColor(color: Vector4) {
-    this._clearColor = color ?? null;
+  set clearColor(color: Nullable<Immutable<Vector4>>) {
+    this._clearColor = color;
   }
   /** Depth value that is used to clear the frame buffer */
-  get clearDepth(): number {
+  get clearDepth() {
     return this._clearDepth;
   }
-  set clearDepth(depth: number) {
-    this._clearDepth = depth ?? null;
+  set clearDepth(depth) {
+    this._clearDepth = depth;
   }
   /** Stencil value that is used to clear the frame buffer */
-  get clearStencil(): number {
+  get clearStencil() {
     return this._clearStencil;
   }
-  set clearStencil(stencil: number) {
-    this._clearStencil = stencil ?? null;
+  set clearStencil(stencil) {
+    this._clearStencil = stencil;
   }
   /**
    * The render pass type
@@ -72,7 +73,7 @@ export abstract class RenderPass extends Disposable {
    * Renders a scene
    * @param ctx - Drawing context
    */
-  render(ctx: DrawContext, cullCamera?: Camera, renderQueue?: RenderQueue) {
+  render(ctx: DrawContext, cullCamera?: Nullable<Camera>, renderQueue?: RenderQueue) {
     ctx.renderPass = this;
     this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
   }
@@ -126,25 +127,22 @@ export abstract class RenderPass extends Disposable {
    * @returns The cull result
    */
   cullScene(ctx: DrawContext, cullCamera: Camera): RenderQueue {
-    if (cullCamera) {
-      const renderQueue = new RenderQueue(this);
-      const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
-      if (ctx.scene.octree) {
-        ctx.scene.octree.getRootNode().traverse(cullVisitor);
-      } else {
-        ctx.scene.rootNode.traverse(cullVisitor);
-      }
-      renderQueue.end(cullCamera);
-      ctx.sunLight = renderQueue.sunLight;
-      return renderQueue;
+    const renderQueue = new RenderQueue(this);
+    const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
+    if (ctx.scene.octree) {
+      ctx.scene.octree.getRootNode().traverse(cullVisitor);
+    } else {
+      ctx.scene.rootNode!.traverse(cullVisitor);
     }
-    return null;
+    renderQueue.end(cullCamera);
+    ctx.sunLight = renderQueue.sunLight;
+    return renderQueue;
   }
   /** @internal */
   private internalDrawItemList(
     ctx: DrawContext,
     items: RenderQueueItem[],
-    renderBundle: RenderBundleWrapper,
+    renderBundle: Nullable<RenderBundleWrapper>,
     reverseWinding: boolean,
     hash: string
   ) {
@@ -167,9 +165,9 @@ export abstract class RenderPass extends Disposable {
       if (recording) {
         RenderBundleWrapper.addDrawable(
           item.drawable,
-          item.drawable.getMaterial()?.coreMaterial,
-          item.drawable.getPrimitive(),
-          renderBundle,
+          item.drawable.getMaterial()?.coreMaterial!,
+          item.drawable.getPrimitive()!,
+          renderBundle!,
           hash
         );
       }
@@ -199,7 +197,13 @@ export abstract class RenderPass extends Disposable {
           MaterialVaryingFlags.MORPH_ANIMATION
         );
         itemList.materialList.forEach((mat) => mat.apply(ctx));
-        this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
+        this.internalDrawItemList(
+          ctx,
+          itemList.itemList,
+          itemList.renderBundle ?? null,
+          reverseWinding,
+          hash
+        );
       }
       if (itemList.skinItemList.length > 0) {
         ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION;
@@ -208,7 +212,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinItemList,
-          itemList.skinRenderBundle,
+          itemList.skinRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -220,7 +224,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.morphItemList,
-          itemList.morphRenderBundle,
+          itemList.morphRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -232,7 +236,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinAndMorphItemList,
-          itemList.skinAndMorphRenderBundle,
+          itemList.skinAndMorphRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -244,7 +248,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.instanceItemList,
-          itemList.instanceRenderBundle,
+          itemList.instanceRenderBundle ?? null,
           reverseWinding,
           hash
         );

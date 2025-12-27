@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { AnimationClip } from './animation';
 
 /**
@@ -21,7 +22,7 @@ export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
   protected _embedded: boolean;
   /** @internal */
-  protected _animation: AnimationClip;
+  protected _animation: Nullable<AnimationClip>;
   /** @internal */
   protected _target: string;
   /** @internal */
@@ -33,6 +34,7 @@ export abstract class AnimationTrack<StateType = unknown> {
    */
   constructor(embedded?: boolean) {
     this._name = 'noname';
+    this._animation = null;
     this._embedded = !!embedded;
     this._target = '';
     this._jointIndex = -1;
@@ -55,10 +57,10 @@ export abstract class AnimationTrack<StateType = unknown> {
   /**
    * The `AnimationClip` that owns this track.
    */
-  get animation(): AnimationClip {
+  get animation(): Nullable<AnimationClip> {
     return this._animation;
   }
-  set animation(ani: AnimationClip) {
+  set animation(ani: Nullable<AnimationClip>) {
     this._animation = ani;
   }
   /**

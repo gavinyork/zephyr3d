@@ -1,3 +1,4 @@
+import type { DeepRequireOptionals } from '@zephyr3d/base';
 import { Vector3, type AABB, type Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
@@ -32,8 +33,8 @@ export class TetrahedronShape
     super(options);
   }
 
-  clone(): TetrahedronShape {
-    return new TetrahedronShape(this._options);
+  clone(): this {
+    return new TetrahedronShape(this._options) as this;
   }
 
   get type(): string {
@@ -104,7 +105,7 @@ export class TetrahedronShape
   }
 
   static generateData(
-    options: TetrahedronCreationOptions,
+    options: DeepRequireOptionals<TetrahedronCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -256,8 +257,8 @@ export class TetrahedronFrameShape
     super(options);
   }
 
-  clone(): TetrahedronShape {
-    return new TetrahedronShape(this._options);
+  clone(): this {
+    return new TetrahedronShape(this._options) as this;
   }
 
   get type(): string {
@@ -331,7 +332,7 @@ export class TetrahedronFrameShape
   }
 
   static generateData(
-    options: TetrahedronCreationOptions,
+    options: DeepRequireOptionals<TetrahedronCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],

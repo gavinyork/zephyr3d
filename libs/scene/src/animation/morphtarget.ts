@@ -11,7 +11,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
     return;
   }
   const attributes = Object.getOwnPropertyNames(subMesh.targets);
-  const numVertices = subMesh.primitive.get().getNumVertices();
+  const numVertices = subMesh.primitive.get()!.getNumVertices();
   const weightsAndOffsets = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
   for (let i = 0; i < numTargets; i++) {
     weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;
@@ -34,7 +34,7 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
       continue;
     }
     weightsAndOffsets[4 + MAX_MORPH_TARGETS + attrib] = offset >> 2;
-    const info = subMesh.targets[attrib];
+    const info = subMesh.targets![attrib]!;
     if (info.data.length !== numTargets) {
       console.error(`Invalid morph target data`);
       return;
@@ -51,17 +51,17 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
   const morphBoundingBox = new BoundingBox();
   calculateMorphBoundingBox(
     morphBoundingBox,
-    subMesh.targetBox,
+    subMesh.targetBox!,
     weightsAndOffsets.subarray(4, 4 + MAX_MORPH_TARGETS),
     numTargets
   );
-  const meshAABB = subMesh.mesh.getBoundingVolume().toAABB();
+  const meshAABB = subMesh.mesh!.getBoundingVolume()!.toAABB();
   morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
   morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
-  subMesh.mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
-  subMesh.mesh.setMorphInfo({ data: weightsAndOffsets });
-  subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
+  subMesh.mesh!.setMorphData({ width: textureSize, height: textureSize, data: textureData });
+  subMesh.mesh!.setMorphInfo({ data: weightsAndOffsets });
+  subMesh.mesh!.setAnimatedBoundingBox(morphBoundingBox);
 }
 
 /** @internal */

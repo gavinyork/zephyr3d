@@ -77,7 +77,7 @@ export class BlinnMaterial
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normal = this.calculateNormal(
           scope,
           scope.$inputs.worldPos,

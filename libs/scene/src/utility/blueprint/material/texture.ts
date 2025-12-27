@@ -44,11 +44,11 @@ export function getDefaultTexture2D(): Texture2D {
   if (!defaultTexture2D.get()) {
     const defaultTex = getDevice().createTexture2D('rgba8unorm', 1, 1, {
       mipmapping: false
-    });
+    })!;
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
     defaultTexture2D.set(defaultTex);
   }
-  return defaultTexture2D.get();
+  return defaultTexture2D.get()!;
 }
 
 /**
@@ -66,11 +66,11 @@ export function getDefaultTexture2DArray(): Texture2DArray {
   if (!defaultTexture2DArray.get()) {
     const defaultTex = getDevice().createTexture2DArray('rgba8unorm', 1, 1, 1, {
       mipmapping: false
-    });
+    })!;
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 0, 1, 1, 1);
     defaultTexture2DArray.set(defaultTex);
   }
-  return defaultTexture2DArray.get();
+  return defaultTexture2DArray.get()!;
 }
 
 /**
@@ -88,13 +88,13 @@ export function getDefaultTextureCube(): TextureCube {
   if (!defaultTextureCube.get()) {
     const defaultTex = getDevice().createCubeTexture('rgba8unorm', 1, {
       mipmapping: false
-    });
+    })!;
     for (let i = 0; i < 6; i++) {
       defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1, i);
     }
     defaultTextureCube.set(defaultTex);
   }
-  return defaultTextureCube.get();
+  return defaultTextureCube.get()!;
 }
 
 /**
@@ -908,14 +908,14 @@ export class TextureSampleNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
     }
     if (!this._inputs[0].type.includes(type0)) {
       return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
     }
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (!type1) {
       return `Cannot determine type of argument \`${this._inputs[1].name}\``;
     }
@@ -1058,14 +1058,14 @@ export class TextureSampleGrad extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
     }
     if (!this._inputs[0].type.includes(type0)) {
       return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
     }
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (!type1) {
       return `Cannot determine type of argument \`${this._inputs[1].name}\``;
     }

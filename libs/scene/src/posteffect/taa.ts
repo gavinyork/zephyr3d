@@ -5,16 +5,17 @@ import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 
 /** @internal */
 export class TAA extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram[] = [];
-  private static _skyMotionVectorProgram: GPUProgram = null;
+  private static _skyMotionVectorProgram: Nullable<GPUProgram> = null;
   private static _box: Primitive;
   private static readonly _texSize = new Vector2();
-  private _bindGroup: BindGroup;
-  private _skyMotionVectorBindGroup: BindGroup;
+  private _bindGroup: Nullable<BindGroup>;
+  private _skyMotionVectorBindGroup: Nullable<BindGroup>;
   constructor() {
     super();
     this._bindGroup = null;
@@ -26,7 +27,7 @@ export class TAA extends AbstractPostEffect {
       false,
       0,
       0,
-      ctx.motionVectorTexture,
+      ctx.motionVectorTexture!,
       ctx.depthTexture
     );
     const program = TAA._getSkyMotionVectorProgram(ctx);
@@ -35,9 +36,9 @@ export class TAA extends AbstractPostEffect {
     }
     const box = TAA._getBox(ctx);
     this._skyMotionVectorBindGroup.setValue('VPMatrix', ctx.camera.viewProjectionMatrix);
-    this._skyMotionVectorBindGroup.setValue('prevVPMatrix', ctx.camera.prevVPMatrix);
+    this._skyMotionVectorBindGroup.setValue('prevVPMatrix', ctx.camera.prevVPMatrix!);
     this._skyMotionVectorBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    this._skyMotionVectorBindGroup.setValue('prevCameraPos', ctx.camera.prevPosition);
+    this._skyMotionVectorBindGroup.setValue('prevCameraPos', ctx.camera.prevPosition!);
     ctx.device.pushDeviceStates();
     ctx.device.setProgram(program);
     ctx.device.setBindGroup(0, this._skyMotionVectorBindGroup);
@@ -76,7 +77,7 @@ export class TAA extends AbstractPostEffect {
       this._bindGroup.setTexture('currentDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
       this._bindGroup.setTexture(
         'motionVector',
-        ctx.motionVectorTexture,
+        ctx.motionVectorTexture!,
         fetchSampler('clamp_nearest_nomip')
       );
       this._bindGroup.setTexture(
@@ -96,14 +97,14 @@ export class TAA extends AbstractPostEffect {
     if (data.prevColorTex) {
       ctx.device.pool.releaseTexture(data.prevColorTex);
     }
-    const currentColorTex = ctx.device.getFramebuffer().getColorAttachments()[0];
+    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0];
     ctx.device.pool.retainTexture(currentColorTex);
     data.prevColorTex = currentColorTex;
     if (data.prevMotionVectorTex) {
       ctx.device.pool.releaseTexture(data.prevMotionVectorTex);
     }
-    ctx.device.pool.retainTexture(ctx.motionVectorTexture);
-    data.prevMotionVectorTex = ctx.motionVectorTexture;
+    ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
+    data.prevMotionVectorTex = ctx.motionVectorTexture!;
   }
   requireLinearDepthTexture(_ctx: DrawContext): boolean {
     return true;
@@ -144,7 +145,7 @@ export class TAA extends AbstractPostEffect {
             this.$outputs.color = pb.vec4(this.motionVector, 0, 1);
           });
         }
-      });
+      })!;
       this._skyMotionVectorProgram.name = '@TAA_SkyMotionVector';
     }
     return this._skyMotionVectorProgram;
@@ -202,7 +203,7 @@ export class TAA extends AbstractPostEffect {
           });
         });
       }
-    });
+    })!;
     program.name = '@TAA_Resolve';
     return program;
   }

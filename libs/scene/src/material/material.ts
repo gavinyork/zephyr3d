@@ -5,12 +5,12 @@ import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { Disposable } from '@zephyr3d/base';
-import type { Clonable, IDisposable } from '@zephyr3d/base';
+import type { Clonable, IDisposable, Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
 
 type MaterialState = {
   program: GPUProgram;
-  bindGroup: BindGroup;
+  bindGroup: Nullable<BindGroup>;
   bindGroupTag: string;
   renderStateSet: RenderStateSet;
   materialTag: number;
@@ -82,7 +82,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Per-pass hash cached results. Length scales with `numPasses`.
    * @internal
    */
-  protected _hash: string[];
+  protected _hash: Nullable<string>[];
   /**
    * Incremented each time options change (via `optionChanged`), used to decide whether
    * uniforms need update on next `apply()`.
@@ -249,7 +249,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Base returns `null`. Subclasses that support instancing can return a lightweight instance.
    */
   createInstance(): this {
-    return null;
+    throw new Error('Abstract function call');
   }
   /**
    * Returns the core material that owns GPU state.
@@ -297,7 +297,9 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       if (!state.program) {
         return false;
       }
-      this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
+      if (state.bindGroup) {
+        this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
+      }
       state.materialTag = this._optionTag;
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
@@ -310,6 +312,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
         }
       }
     }
+    return true;
   }
   /**
    * Bind the program, bind group, and render states for the specified pass.
@@ -332,8 +335,11 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       return false;
     }
     device.setProgram(state.program);
-    device.setBindGroup(2, state.bindGroup);
+    if (state.bindGroup) {
+      device.setBindGroup(2, state.bindGroup);
+    }
     device.setRenderStates(state.renderStateSet);
+    return true;
   }
   /**
    * Compute the global hash for the given pass and draw context.
@@ -490,7 +496,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns The created program, or `null` on failure.
    */
   protected _createProgram(_pb: ProgramBuilder, _ctx: DrawContext, _pass: number): GPUProgram {
-    return null;
+    throw new Error('Abstract function call');
   }
   /**
    * Upload uniforms and bind resources to the per-material bind group (index 2).
@@ -542,6 +548,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @internal
    */
   get $instanceUniforms(): Float32Array<ArrayBuffer> {
-    return null;
+    throw new Error('Abstract function call');
   }
 }

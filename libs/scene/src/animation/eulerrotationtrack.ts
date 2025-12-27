@@ -11,7 +11,7 @@ const tmpVec3 = new Vector3();
  */
 export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   private readonly _state: Quaternion;
-  private _interpolator: Interpolator;
+  private _interpolator!: Interpolator;
   /**
    * Create an instance of EulerRotationTrack
    */
@@ -36,7 +36,6 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
   ) {
     if (modeOrInterpolator === undefined) {
       super(false);
-      this._interpolator = null;
     } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`EulerRotationTrack(): interpolator target must be 'vec3'`);

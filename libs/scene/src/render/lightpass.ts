@@ -1,5 +1,6 @@
 import { RenderPass } from './renderpass';
 import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -13,7 +14,7 @@ import { PostEffectLayer } from '../posteffect/posteffect';
  */
 export class LightPass extends RenderPass {
   /** @internal */
-  protected _shadowMapHash: string;
+  protected _shadowMapHash: Nullable<string>;
   /** @internal */
   protected _transmission: boolean;
   /**
@@ -22,6 +23,7 @@ export class LightPass extends RenderPass {
   constructor() {
     super(RENDER_PASS_TYPE_LIGHT);
     this._shadowMapHash = null;
+    this._transmission = false;
     this._clearColor = Vector4.zero();
   }
   /** @internal */
@@ -33,7 +35,7 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env.getHash(ctx)}:${
+    return `${this._shadowMapHash}:${ctx.oit?.calculateHash() ?? ''}:${ctx.env!.getHash(ctx)}:${
       ctx.materialFlags
     }:${ctx.linearDepthTexture?.uid ?? 0}:${ctx.sceneColorTexture?.uid ?? 0}:${ctx.HiZTexture?.uid ?? 0}`;
   }
@@ -47,8 +49,8 @@ export class LightPass extends RenderPass {
     const baseLightPass = !ctx.lightBlending;
     ctx.drawEnvLight =
       baseLightPass &&
-      ctx.env.light.type !== 'none' &&
-      (ctx.env.light.envLight.hasRadiance() || ctx.env.light.envLight.hasIrradiance());
+      ctx.env!.light.type !== 'none' &&
+      (ctx.env!.light.envLight.hasRadiance() || ctx.env!.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     if (!flags.cameraSet[ctx.renderPassHash]) {
@@ -62,10 +64,10 @@ export class LightPass extends RenderPass {
         ShaderHelper.setLightUniforms(
           bindGroup,
           ctx,
-          ctx.clusteredLight.clusterParam,
-          ctx.clusteredLight.countParam,
-          ctx.clusteredLight.lightBuffer,
-          ctx.clusteredLight.lightIndexTexture
+          ctx.clusteredLight!.clusterParam,
+          ctx.clusteredLight!.countParam,
+          ctx.clusteredLight!.lightBuffer!,
+          ctx.clusteredLight!.lightIndexTexture!
         );
         flags.lightSet[ctx.renderPassHash] = 1;
       }
@@ -73,13 +75,13 @@ export class LightPass extends RenderPass {
     if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG && !flags.fogSet[ctx.renderPassHash]) {
       ShaderHelper.setFogUniforms(
         bindGroup,
-        ctx.env.sky.skyType === 'scatter' ? 1 : 0,
-        ctx.env.sky.mappedFogType,
+        ctx.env!.sky.skyType === 'scatter' ? 1 : 0,
+        ctx.env!.sky.mappedFogType,
         baseLightPass ? 0 : 1,
-        ctx.env.sky.atmosphereParams,
-        ctx.env.sky.heightFogParams,
-        ctx.env.sky.getAerialPerspectiveLUT(ctx),
-        ctx.env.sky.getSkyDistantLightLUT(ctx)
+        ctx.env!.sky.atmosphereParams,
+        ctx.env!.sky.heightFogParams,
+        ctx.env!.sky.getAerialPerspectiveLUT(ctx),
+        ctx.env!.sky.getSkyDistantLightLUT(ctx)
       );
       flags.fogSet[ctx.renderPassHash] = 1;
     }
@@ -107,8 +109,8 @@ export class LightPass extends RenderPass {
           false,
           ctx.device.getDrawingBufferWidth(),
           ctx.device.getDrawingBufferHeight(),
-          ctx.device.getFramebuffer().getColorAttachments()[0],
-          ctx.device.getFramebuffer().getDepthAttachment()
+          ctx.device.getFramebuffer()!.getColorAttachments()[0],
+          ctx.device.getFramebuffer()!.getDepthAttachment()
         )
       : null;
     const oit =
@@ -147,8 +149,8 @@ export class LightPass extends RenderPass {
             for (const k of ctx.shadowMapInfo.keys()) {
               ctx.currentShadowLight = k;
               ctx.lightBlending = lightIndex > 0;
-              this._shadowMapHash = ctx.shadowMapInfo.get(k).shaderHash;
-              this.renderLightPass(ctx, lists[i], [k], flags);
+              this._shadowMapHash = ctx.shadowMapInfo.get(k)!.shaderHash;
+              this.renderLightPass(ctx, lists[i]!, [k], flags);
               lightIndex++;
             }
           }
@@ -161,7 +163,7 @@ export class LightPass extends RenderPass {
               ctx.device.pushDeviceStates();
               ctx.device.setFramebuffer(tmpFramebuffer);
             }
-            this.renderLightPass(ctx, lists[i], renderQueue.unshadowedLights, flags);
+            this.renderLightPass(ctx, lists[i]!, renderQueue.unshadowedLights, flags);
             if (ctx.lightBlending && tmpFramebuffer) {
               ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
               ctx.device.popDeviceStates();
@@ -181,7 +183,7 @@ export class LightPass extends RenderPass {
           ctx.device.pushDeviceStates();
           ctx.device.setFramebuffer(tmpFramebuffer);
         }
-        ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
+        ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode!.worldMatrix;
         ctx.env.sky.renderSky(ctx);
         if (ctx.env.sky.fogPresents) {
           ctx.env.sky.renderFog(ctx.camera);
@@ -195,7 +197,7 @@ export class LightPass extends RenderPass {
           ctx.compositor?.drawPostEffects(
             ctx,
             i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
-            ctx.linearDepthTexture
+            ctx.linearDepthTexture!
           );
         }
       }

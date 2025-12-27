@@ -143,7 +143,7 @@ export class PBRBluePrintMaterial
   set uniformTextures(val: BluePrintUniformTexture[]) {
     if (val !== this._uniformTextures) {
       const newUniforms = val.map((v) => ({
-        finalTexture: new DRef(v.finalTexture.get()),
+        finalTexture: new DRef(v.finalTexture!.get()),
         finalSampler: v.finalSampler,
         name: v.name,
         params: v.params?.clone() ?? Vector4.zero(),
@@ -159,7 +159,7 @@ export class PBRBluePrintMaterial
         mipFilter: v.mipFilter
       }));
       for (const u of this._uniformTextures) {
-        u.finalTexture.dispose();
+        u.finalTexture!.dispose();
       }
       this._uniformTextures = newUniforms;
       this.uniformChanged();
@@ -208,7 +208,7 @@ export class PBRBluePrintMaterial
         pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
       }
     }
-    const outputs = this._irVertex.create(pb);
+    const outputs = this._irVertex.create(pb)!;
     scope.$l.oPos = this.getOutput(outputs, 'Position') ?? ShaderHelper.resolveVertexPosition(scope);
     const worldMatrix = ShaderHelper.getWorldMatrix(scope);
     scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
@@ -260,7 +260,7 @@ export class PBRBluePrintMaterial
         scope.$inputs.zVertexUV,
         this._irFrag
       );
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
           scope.$l.outRoughness = pb.vec4();
           scope.$l.litColor = this.PBRLight(
@@ -304,10 +304,10 @@ export class PBRBluePrintMaterial
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       for (const u of this._uniformValues) {
-        bindGroup.setValue(u.name, u.finalValue);
+        bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
-        bindGroup.setTexture(u.name, u.finalTexture.get(), u.finalSampler);
+        bindGroup.setTexture(u.name, u.finalTexture!.get()!, u.finalSampler);
       }
     }
   }
@@ -359,7 +359,7 @@ export class PBRBluePrintMaterial
   protected onDispose(): void {
     super.onDispose();
     for (const u of this._uniformTextures) {
-      u.finalTexture.dispose();
+      u.finalTexture!.dispose();
     }
   }
   /**

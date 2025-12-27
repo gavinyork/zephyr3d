@@ -75,10 +75,10 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns The current alpha map texture or `undefined` if not set.
    */
-  get alphaMap(): Texture2D {
+  get alphaMap() {
     return this._alphaMap.get();
   }
-  set alphaMap(tex: Texture2D) {
+  set alphaMap(tex) {
     if (tex !== this._alphaMap.get()) {
       this._alphaMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_ALPHA_MAP, !!this._alphaMap.get());
@@ -92,10 +92,10 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns The current ramp map texture or `undefined` if not set.
    */
-  get rampMap(): Texture2D {
+  get rampMap() {
     return this._rampMap.get();
   }
-  set rampMap(tex: Texture2D) {
+  set rampMap(tex) {
     if (tex !== this._rampMap.get()) {
       this._rampMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_RAMP_MAP, !!this._rampMap.get());

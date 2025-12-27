@@ -116,7 +116,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     _level?: number,
     _face?: number,
     _mipCount?: number,
-    _sampler?: TextureSampler
+    _sampler?: Nullable<TextureSampler>
   ) {
     throw new Error('setTextureView() not supported for webgl device');
   }
@@ -128,7 +128,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       throw new Error(`getTexture() failed:${name} is not a texture`);
     }
   }
-  setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler) {
+  setTexture(name: string, texture: BaseTexture, sampler?: Nullable<TextureSampler>) {
     const entry = this._findTextureLayout(name);
     if (entry) {
       this._resources[name] = [

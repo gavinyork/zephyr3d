@@ -13,6 +13,7 @@ import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
+import type { Nullable } from '@zephyr3d/base';
 import { Disposable } from '@zephyr3d/base';
 
 /**
@@ -28,22 +29,22 @@ export class ABufferOIT extends Disposable implements OIT {
   public static readonly type = 'ab';
   public static readonly usePremultipliedAlpha = true;
   private static readonly MAX_FRAGMENT_LAYERS = 75;
-  private static _compositeProgram: GPUProgram = null;
-  private static _compositeBindGroup: BindGroup = null;
-  private static _compositeRenderStates: RenderStateSet = null;
+  private static _compositeProgram: Nullable<GPUProgram> = null;
+  private static _compositeBindGroup: Nullable<BindGroup> = null;
+  private static _compositeRenderStates: Nullable<RenderStateSet> = null;
   private static _ubAlignment = 0;
-  private _nodeBuffer: GPUDataBuffer;
-  private _headStagingBuffer: GPUDataBuffer;
-  private _headBuffer: GPUDataBuffer;
-  private _scissorOffsetBuffer: GPUDataBuffer;
+  private _nodeBuffer: Nullable<GPUDataBuffer>;
+  private _headStagingBuffer: Nullable<GPUDataBuffer>;
+  private _headBuffer: Nullable<GPUDataBuffer>;
+  private _scissorOffsetBuffer: Nullable<GPUDataBuffer>;
   private readonly _numLayers: number;
   private _screenSize: Uint32Array<ArrayBuffer>;
-  private _hash: string;
+  private _hash: Nullable<string>;
   private readonly _debug: boolean;
   private _scissorSlices: number;
   private _scissorHeight: number;
   private _currentPass: number;
-  private _savedScissor: DeviceViewport;
+  private _savedScissor: Nullable<DeviceViewport>;
   /**
    * Creates an instance of ABufferOIT class
    *
@@ -167,15 +168,15 @@ export class ABufferOIT extends Disposable implements OIT {
       device.deviceXToScreen(this._screenSize[0]),
       device.deviceYToScreen(scissorH)
     ]);
-    device.copyBuffer(this._headStagingBuffer, this._headBuffer, 0, 0, this._headStagingBuffer.byteLength);
+    device.copyBuffer(this._headStagingBuffer!, this._headBuffer!, 0, 0, this._headStagingBuffer!.byteLength);
     // Update render hash
-    this._hash = `${this.getType()}#${this._nodeBuffer.uid}#${this._headBuffer.uid}#${
-      this._scissorOffsetBuffer.uid
+    this._hash = `${this.getType()}#${this._nodeBuffer!.uid}#${this._headBuffer!.uid}#${
+      this._scissorOffsetBuffer!.uid
     }#${pass}`;
     if (this._debug) {
-      const data = new Uint8Array(this._headBuffer.byteLength);
-      const readBuffer = device.createBuffer(this._headBuffer.byteLength, { usage: 'read' });
-      device.copyBuffer(this._headBuffer, readBuffer, 0, 0, this._headBuffer.byteLength);
+      const data = new Uint8Array(this._headBuffer!.byteLength);
+      const readBuffer = device.createBuffer(this._headBuffer!.byteLength, { usage: 'read' });
+      device.copyBuffer(this._headBuffer!, readBuffer, 0, 0, this._headBuffer!.byteLength);
       readBuffer.getBufferSubData(data).then(() => {
         const uint = new Uint32Array(data.buffer);
         for (let i = 0; i < uint.length; i++) {
@@ -197,42 +198,42 @@ export class ABufferOIT extends Disposable implements OIT {
     ABufferOIT.getCompositeProgram(device);
     const lastBindGroup = device.getBindGroup(0);
     device.setProgram(ABufferOIT.getCompositeProgram(device));
-    const bindGroup = ABufferOIT._compositeBindGroup;
+    const bindGroup = ABufferOIT._compositeBindGroup!;
     bindGroup.setBuffer(
       'scissorOffset',
-      this._scissorOffsetBuffer,
+      this._scissorOffsetBuffer!,
       0,
       pass * ABufferOIT._ubAlignment,
       ABufferOIT._ubAlignment
     );
-    bindGroup.setBuffer('headBuffer', this._headBuffer);
-    bindGroup.setBuffer('nodeBuffer', this._nodeBuffer);
+    bindGroup.setBuffer('headBuffer', this._headBuffer!);
+    bindGroup.setBuffer('nodeBuffer', this._nodeBuffer!);
     bindGroup.setValue('screenWidth', this._screenSize[0]);
     device.setBindGroup(0, bindGroup);
-    drawFullscreenQuad(ABufferOIT._compositeRenderStates);
+    drawFullscreenQuad(ABufferOIT._compositeRenderStates!);
     device.setBindGroup(0, lastBindGroup[0], lastBindGroup[1]);
   }
   /**
    * {@inheritDoc OIT.calculateHash}
    */
   calculateHash(): string {
-    return this._hash;
+    return this._hash!;
   }
   /**
    * {@inheritDoc OIT.applyUniforms}
    */
   applyUniforms(ctx: DrawContext, bindGroup: BindGroup) {
-    bindGroup.setBuffer('Z_AB_nodeBuffer', this._nodeBuffer);
+    bindGroup.setBuffer('Z_AB_nodeBuffer', this._nodeBuffer!);
     bindGroup.setBuffer(
       'Z_AB_scissorOffset',
-      this._scissorOffsetBuffer,
+      this._scissorOffsetBuffer!,
       0,
       this._currentPass * ABufferOIT._ubAlignment,
       ABufferOIT._ubAlignment
     );
-    bindGroup.setBuffer('Z_AB_headImage', this._headBuffer);
+    bindGroup.setBuffer('Z_AB_headImage', this._headBuffer!);
     bindGroup.setValue('Z_AB_screenSize', this._screenSize[0]);
-    bindGroup.setTexture('Z_AB_depthTexture', ctx.linearDepthTexture);
+    bindGroup.setTexture('Z_AB_depthTexture', ctx.linearDepthTexture!);
   }
   /**
    * {@inheritDoc OIT.outputFragmentColor}
@@ -363,7 +364,7 @@ export class ABufferOIT extends Disposable implements OIT {
             });
           });
         }
-      });
+      })!;
       this._compositeProgram.name = '@ABufferOIT_Composite';
       this._compositeBindGroup = device.createBindGroup(this._compositeProgram.bindGroupLayouts[0]);
       this._compositeRenderStates = device.createRenderStateSet();

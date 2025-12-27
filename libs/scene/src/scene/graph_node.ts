@@ -4,6 +4,7 @@ import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 import type { OctreeNode } from '.';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Graph scene node
@@ -14,7 +15,7 @@ import type { OctreeNode } from '.';
  * @public
  */
 export class GraphNode extends SceneNode {
-  private _octreeNode: OctreeNode;
+  private _octreeNode: Nullable<OctreeNode>;
   /**
    * Creates a graph node
    * @param scene - The scene to which the node belongs
@@ -24,10 +25,10 @@ export class GraphNode extends SceneNode {
     this._octreeNode = null;
   }
   /** @internal */
-  get octreeNode(): OctreeNode {
+  get octreeNode() {
     return this._octreeNode;
   }
-  set octreeNode(node: OctreeNode) {
+  set octreeNode(node) {
     this._octreeNode = node;
   }
   /** Gets the name */
@@ -50,7 +51,7 @@ export class GraphNode extends SceneNode {
   /**
    * {@inheritDoc Drawable.getBoneMatrices}
    */
-  getBoneMatrices(): Texture2D {
+  getBoneMatrices(): Nullable<Texture2D> {
     return null;
   }
   /**

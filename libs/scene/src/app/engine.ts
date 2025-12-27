@@ -1,4 +1,4 @@
-import type { IDisposable, ReadOptions } from '@zephyr3d/base';
+import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
 import { MemoryFS } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
@@ -57,7 +57,7 @@ export interface IRenderHook {
  * @public
  */
 export class Engine {
-  private _builtinsVFS: MemoryFS;
+  private _builtinsVFS: Nullable<MemoryFS>;
   private _scriptingSystem: ScriptingSystem;
   private _resourceManager: ResourceManager;
   private _enabled: boolean;
@@ -140,7 +140,7 @@ export class Engine {
    * @param module - Module identifier to resolve and load.
    * @returns The `RuntimeScript<T>` instance, or `null` if disabled or on failure.
    */
-  async attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>> {
+  async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
     return this._enabled ? await this._scriptingSystem.attachScript(host, module) : null;
   }
   /**
@@ -189,7 +189,7 @@ export class Engine {
     }
     return this._loadingScenes[path];
   }
-  setRenderable(renderable: IRenderable, layer = 0, hook?: IRenderHook) {
+  setRenderable(renderable: Nullable<IRenderable>, layer = 0, hook?: IRenderHook) {
     if (!this._activeRenderables[layer]) {
       this._activeRenderables[layer] = {
         renderable: new DRef<IRenderable>(null)
@@ -201,7 +201,7 @@ export class Engine {
   async readFile<T extends ReadOptions['encoding'] = 'binary'>(
     path: string,
     encoding?: T
-  ): Promise<T extends 'binary' ? ArrayBuffer : string> {
+  ): Promise<Nullable<T extends 'binary' ? ArrayBuffer : string>> {
     try {
       const content = await this.VFS.readFile(path, { encoding: encoding ?? 'binary' });
       return content as T extends 'binary' ? ArrayBuffer : string;
@@ -285,7 +285,7 @@ export class Engine {
       console.error(`Write file '${path}' failed: ${err}`);
     }
   }
-  private async _loadScene(path: string): Promise<Scene> {
+  private async _loadScene(path: string): Promise<Nullable<Scene>> {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
@@ -298,7 +298,7 @@ export class Engine {
         }
         const P: Promise<any>[] = [];
         const scripts: string[] = [];
-        scene.rootNode.iterate((node) => {
+        scene.rootNode!.iterate((node) => {
           if (node.script) {
             scripts.push(node.script);
             P.push(this.attachScript(node, node.script));

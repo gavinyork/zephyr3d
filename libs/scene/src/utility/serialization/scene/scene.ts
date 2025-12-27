@@ -2,7 +2,7 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { EnvLightType, FogType, SkyType } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import type { SerializableClass } from '../types';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Nullable, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
@@ -234,7 +234,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {
@@ -579,7 +579,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             if (sceneNode) {
               sceneNode.remove();
               for (const child of sceneNode.children.slice()) {
-                child.get().parent = this.rootNode;
+                child.get()!.parent = this.rootNode;
               }
             }
           }

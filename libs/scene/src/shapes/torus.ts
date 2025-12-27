@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, DeepRequireOptionals } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -58,8 +58,8 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
   constructor(options?: TorusCreationOptions) {
     super(options);
   }
-  clone(): TorusShape {
-    return new TorusShape(this._options);
+  clone(): this {
+    return new TorusShape(this._options) as this;
   }
   /** type of the shape */
   get type(): string {
@@ -73,7 +73,7 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
    * @param indices - vertex indices
    */
   static generateData(
-    options: TorusCreationOptions,
+    options: DeepRequireOptionals<TorusCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],

@@ -89,7 +89,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     val = val ?? [];
     if (val !== this._uniformTextures) {
       const newUniforms = val.map((v) => ({
-        finalTexture: new DRef(v.finalTexture.get()),
+        finalTexture: new DRef(v.finalTexture!.get()),
         finalSampler: v.finalSampler,
         name: v.name,
         params: v.params?.clone() ?? Vector4.zero(),
@@ -105,7 +105,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
         mipFilter: v.mipFilter
       }));
       for (const u of this._uniformTextures) {
-        u.finalTexture.dispose();
+        u.finalTexture!.dispose();
       }
       this._uniformTextures = newUniforms;
       this.uniformChanged();
@@ -144,10 +144,10 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       for (const u of this._uniformValues) {
-        bindGroup.setValue(u.name, u.finalValue);
+        bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
-        bindGroup.setTexture(u.name, u.finalTexture.get(), u.finalSampler);
+        bindGroup.setTexture(u.name, u.finalTexture!.get()!, u.finalSampler);
       }
     }
   }
@@ -170,7 +170,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
     const pb = scope.$builder;
     const that = this;
     pb.func('zCalcSpriteColor', [pb.vec3('zWorldPos'), pb.vec2('zVertexUV')], function () {
-      const outputs = that._irFrag.create(pb);
+      const outputs = that._irFrag.create(pb)!;
       this.$return(that.getOutput(outputs, 'Color') as PBShaderExp);
     });
     return scope.zCalcSpriteColor(scope.$inputs.zWorldPos, scope.$inputs.zVertexUV);
@@ -220,7 +220,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
   protected onDispose(): void {
     super.onDispose();
     for (const u of this._uniformTextures) {
-      u.finalTexture.dispose();
+      u.finalTexture!.dispose();
     }
   }
   /**

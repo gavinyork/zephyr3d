@@ -17,14 +17,16 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     async createFunc(ctx: Scene | SceneNode, init?: { prefabId: string; patch: DiffPatch }) {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init) {
-        const prefabData = (await manager.loadPrefabContent(init.prefabId)).data as DiffValue;
+        const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
         const nodeData = applyPatch(prefabData, init.patch);
         const tmpNode = new DRef(new SceneNode(scene));
-        tmpNode.get().remove();
-        tmpNode.get().prefabId = init.prefabId;
+        tmpNode.get()!.remove();
+        tmpNode.get()!.prefabId = init.prefabId;
         const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData as object);
-        sceneNode.prefabId = init.prefabId;
-        sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        if (sceneNode) {
+          sceneNode.prefabId = init.prefabId;
+          sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        }
         tmpNode.dispose();
         return { obj: sceneNode, loadProps: false };
       }
@@ -36,11 +38,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     },
     async getInitParams(obj: SceneNode, flags) {
       const prefabId = obj.prefabId;
-      let patch: DiffPatch;
+      let patch: DiffPatch | undefined = undefined;
       if (prefabId) {
         try {
           obj.prefabId = '';
-          const prefabData = (await manager.loadPrefabContent(prefabId)).data as DiffValue;
+          const prefabData = (await manager.loadPrefabContent(prefabId))!.data as DiffValue;
           const nodeData = await manager.serializeObject(obj);
           patch = diff(prefabData, nodeData);
           ASSERT(diff(applyPatch(prefabData, patch), nodeData).length === 0, 'Patch test failed');
@@ -206,14 +208,14 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
-              if (!child.get().sealed) {
+              if (!child.get()!.sealed) {
                 value.object.push(child.get());
               }
             }
           },
           set(this: SceneNode, value) {
             for (let i = this.children.length - 1; i >= 0; i--) {
-              const child = this.children[i].get();
+              const child = this.children[i].get()!;
               if (!value.object.includes(child) && !child.sealed) {
                 child.remove();
               }
@@ -334,7 +336,7 @@ export function getGraphNodeClass(): SerializableClass {
     parent: SceneNode,
     name: 'GraphNode',
     createFunc(ctx: SceneNode) {
-      const node = new GraphNode(ctx.scene);
+      const node = new GraphNode(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

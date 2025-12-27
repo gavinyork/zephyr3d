@@ -97,7 +97,7 @@ export class AbstractPostEffect extends Disposable {
   ) {
     copyTexture(
       inputColorTexture,
-      ctx.device.getFramebuffer(),
+      ctx.device.getFramebuffer()!,
       fetchSampler('clamp_nearest_nomip'),
       renderStates,
       0,
@@ -116,7 +116,7 @@ export class AbstractPostEffect extends Disposable {
     return device.createVertexLayout({
       vertexBuffers: [
         {
-          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))!
         }
       ]
     });

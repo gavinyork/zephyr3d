@@ -174,7 +174,7 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
           ) ?? pb.vec4(pb.add(pb.mul(this.n.xyz, 0.5), pb.vec3(0.5)), 1);
       });
     }
-  });
+  })!;
   program.name = '@Ocean_Render';
   return program;
 }
@@ -267,7 +267,7 @@ export function createProgramPostFFT2(
     program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   } else {
     program = getDevice().buildRenderProgram({
       vertex(pb) {
@@ -277,7 +277,7 @@ export function createProgramPostFFT2(
         });
       },
       fragment: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   }
   program.name = '@Water_PostFFT2';
   return program;
@@ -485,7 +485,7 @@ export function createProgramHk(
     program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   } else {
     program = getDevice().buildRenderProgram({
       vertex(pb) {
@@ -495,7 +495,7 @@ export function createProgramHk(
         });
       },
       fragment: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   }
   program.name = '@Water_Hk';
   return program;
@@ -649,7 +649,7 @@ export function createProgramH0(
     program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   } else {
     program = getDevice().buildRenderProgram({
       vertex(pb) {
@@ -659,7 +659,7 @@ export function createProgramH0(
         });
       },
       fragment: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   }
   program.name = '@Water_H0';
   return program;
@@ -844,7 +844,7 @@ export function createProgramFFT2V(
     program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   } else {
     program = getDevice().buildRenderProgram({
       vertex(pb) {
@@ -854,7 +854,7 @@ export function createProgramFFT2V(
         });
       },
       fragment: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   }
   program.name = '@Water_PreFFT2';
   return program;
@@ -1039,7 +1039,7 @@ export function createProgramFFT2H(
     program = getDevice().buildComputeProgram({
       workgroupSize: [threadGroupSize, threadGroupSize, 1],
       compute: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   } else {
     program = getDevice().buildRenderProgram({
       vertex(pb) {
@@ -1049,7 +1049,7 @@ export function createProgramFFT2H(
         });
       },
       fragment: getComputeFunc(useComputeShader, targetFormat)
-    });
+    })!;
   }
   program.name = '@Water_FFT2H';
   return program;

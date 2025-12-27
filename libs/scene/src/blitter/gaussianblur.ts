@@ -8,6 +8,7 @@ import type {
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Gaussian blur blitter
@@ -27,7 +28,7 @@ export class GaussianBlurBlitter extends Blitter {
   /** @internal */
   protected _logSpaceMultiplier: number;
   /** @internal */
-  protected _depthTex: Texture2D;
+  protected _depthTex: Nullable<Texture2D>;
   /** @internal */
   protected _depthCutoff: number;
   /**
@@ -83,10 +84,10 @@ export class GaussianBlurBlitter extends Blitter {
     this._logSpaceMultiplier = val;
   }
   /** Linear depth texture */
-  get depthTexture(): Texture2D {
+  get depthTexture() {
     return this._depthTex;
   }
-  set depthTexture(tex: Texture2D) {
+  set depthTexture(tex) {
     if (this._depthTex !== tex) {
       if (!tex || !this._depthTex) {
         this.invalidateHash();

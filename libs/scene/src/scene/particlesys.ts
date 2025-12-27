@@ -1,4 +1,4 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, nextPowerOf2, DRef } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
@@ -87,7 +87,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   private readonly _material: DRef<ParticleMaterial>;
   private readonly _wsBoundingBox: BoundingBox;
   private readonly _pickTarget: PickTarget;
-  private _instanceData: Float32Array<ArrayBuffer>;
+  private _instanceData: Nullable<Float32Array<ArrayBuffer>>;
   /**
    * Creates a new ParticleSystem node
    * @param scene - Which scene the node belongs to
@@ -134,10 +134,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     scene.queueUpdateNode(this);
   }
   /** Material of the particle system node */
-  get material(): ParticleMaterial {
+  get material() {
     return this._material.get();
   }
-  set material(material: ParticleMaterial) {
+  set material(material: Nullable<ParticleMaterial>) {
     this._material.set(material);
   }
   /** Maximum particle count */
@@ -199,10 +199,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   /** Particle aspect ratio */
   get aspect(): number {
-    return this._material.get().aspect;
+    return this._material.get()!.aspect;
   }
   set aspect(value: number) {
-    this._material.get().aspect = value;
+    this._material.get()!.aspect = value;
   }
   /** true if particle effected by wind */
   get airResistence(): boolean {
@@ -234,10 +234,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   /** Particle jitter power */
   get jitterPower(): number {
-    return this._material.get().jitterPower;
+    return this._material.get()!.jitterPower;
   }
   set jitterPower(value: number) {
-    this._material.get().jitterPower = value;
+    this._material.get()!.jitterPower = value;
   }
   /** Particle emitter shape */
   get emitterShape(): EmitterShape {
@@ -353,10 +353,10 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   }
   /** Whether particles are directional */
   get directional(): boolean {
-    return this._material.get().directional;
+    return this._material.get()!.directional;
   }
   set directional(val: boolean) {
-    this._material.get().directional = val;
+    this._material.get()!.directional = val;
   }
   /** Whether particles are in world space */
   get worldSpace(): boolean {
@@ -517,19 +517,19 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     if (!this._primitive.get()) {
       this._primitive.set(new Primitive());
       this._primitive
-        .get()
+        .get()!
         .createAndSetVertexBuffer(
           'position_f32x4',
           new Float32Array([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3])
         );
-      this._primitive.get().createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
-      this._primitive.get().primitiveType = 'triangle-strip';
+      this._primitive.get()!.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
+      this._primitive.get()!.primitiveType = 'triangle-strip';
     }
     if (!this._instanceData || this._instanceData.length < this._maxParticleCount * 10) {
-      this._primitive.get().removeVertexBuffer('texCoord0');
+      this._primitive.get()!.removeVertexBuffer('texCoord0');
       this._instanceData = new Float32Array(nextPowerOf2(this._maxParticleCount) * 10);
       this._primitive
-        .get()
+        .get()!
         .createAndSetVertexBuffer(['tex0_f32x3', 'tex1_f32x4', 'tex2_f32x3'], this._instanceData, 'instance');
     }
   }
@@ -537,7 +537,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     if (!this.attached) {
       return;
     }
-    this.scene.queueUpdateNode(this);
+    this.scene!.queueUpdateNode(this);
     const animationSet = this._animationSet.get();
     if (animationSet && animationSet.numAnimations > 0) {
       animationSet.update(deltaInSeconds);
@@ -604,32 +604,33 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     let n = 0;
     const worldSpace = !!(this._flags & PS_WORLDSPACE);
     const invWorldMatrix = this.invWorldMatrix;
+    const instanceData = this._instanceData!;
     for (const p of this._activeParticleList) {
       if (worldSpace) {
         invWorldMatrix.transformPointAffine(p.particle.position, tmpVec3);
-        this._instanceData[n++] = tmpVec3.x;
-        this._instanceData[n++] = tmpVec3.y;
-        this._instanceData[n++] = tmpVec3.z;
+        instanceData[n++] = tmpVec3.x;
+        instanceData[n++] = tmpVec3.y;
+        instanceData[n++] = tmpVec3.z;
         this._wsBoundingBox.extend(tmpVec3);
       } else {
-        this._instanceData[n++] = p.particle.position.x;
-        this._instanceData[n++] = p.particle.position.y;
-        this._instanceData[n++] = p.particle.position.z;
+        instanceData[n++] = p.particle.position.x;
+        instanceData[n++] = p.particle.position.y;
+        instanceData[n++] = p.particle.position.z;
         this._wsBoundingBox.extend(p.particle.position);
       }
-      this._instanceData[n++] = p.size;
-      this._instanceData[n++] = p.rotation;
-      this._instanceData[n++] = p.jitterAngle;
-      this._instanceData[n++] = p.elapsedTime / p.particle.lifeSpan;
+      instanceData[n++] = p.size;
+      instanceData[n++] = p.rotation;
+      instanceData[n++] = p.jitterAngle;
+      instanceData[n++] = p.elapsedTime / p.particle.lifeSpan;
       if (worldSpace) {
         invWorldMatrix.transformVectorAffine(p.particle.velocity, tmpVec3);
-        this._instanceData[n++] = tmpVec3.x;
-        this._instanceData[n++] = tmpVec3.y;
-        this._instanceData[n++] = tmpVec3.z;
+        instanceData[n++] = tmpVec3.x;
+        instanceData[n++] = tmpVec3.y;
+        instanceData[n++] = tmpVec3.z;
       } else {
-        this._instanceData[n++] = p.particle.velocity.x;
-        this._instanceData[n++] = p.particle.velocity.y;
-        this._instanceData[n++] = p.particle.velocity.z;
+        instanceData[n++] = p.particle.velocity.x;
+        instanceData[n++] = p.particle.velocity.y;
+        instanceData[n++] = p.particle.velocity.z;
       }
     }
     let maxParticleSize = Math.max(
@@ -650,7 +651,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._wsBoundingBox.maxPoint.x += maxParticleSize;
     this._wsBoundingBox.maxPoint.y += maxParticleSize;
     this._wsBoundingBox.maxPoint.z += maxParticleSize;
-    this._primitive.get().getVertexBuffer('texCoord0').bufferSubData(0, this._instanceData);
+    this._primitive.get()!.getVertexBuffer('texCoord0')!.bufferSubData(0, instanceData);
   }
   newParticle(num: number, worldMatrix: Matrix4x4) {
     for (let i = 0; i < num; i++) {
@@ -682,13 +683,13 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): MorphData {
+  getMorphData(): Nullable<MorphData> {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): MorphInfo {
+  getMorphInfo(): Nullable<MorphInfo> {
     return null;
   }
   /**
@@ -707,24 +708,24 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
    * {@inheritDoc Drawable.needSceneColor}
    */
   needSceneColor(): boolean {
-    return this._material.get()?.needSceneColor();
+    return this._material.get()?.needSceneColor() ?? false;
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
   needSceneDepth(): boolean {
-    return this._material.get()?.needSceneDepth();
+    return this._material.get()?.needSceneDepth() ?? false;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): MeshMaterial {
+  getMaterial(): Nullable<MeshMaterial> {
     return this._material.get();
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Primitive {
+  getPrimitive(): Nullable<Primitive> {
     return this._primitive.get();
   }
   /**
@@ -739,7 +740,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   draw(ctx: DrawContext) {
     if (this._activeParticleList.length > 0) {
       this.bind(ctx);
-      this._material.get().draw(this._primitive.get(), ctx, this._activeParticleList.length);
+      this._material.get()!.draw(this._primitive.get()!, ctx, this._activeParticleList.length);
     }
   }
   /**
@@ -751,7 +752,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._material.dispose();
     const func = ParticleSystem.updateFuncMap.get(this);
     if (func) {
-      this._scene.off('update', func);
+      this._scene!.off('update', func);
     }
   }
 }

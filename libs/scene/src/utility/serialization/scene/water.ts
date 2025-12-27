@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import type { SceneNode } from '../../../scene';
 import { GraphNode } from '../../../scene';
@@ -187,7 +188,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
     name: 'Water',
     parent: GraphNode,
     createFunc(ctx: SceneNode) {
-      const node = new Water(ctx.scene);
+      const node = new Water(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
@@ -313,7 +314,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {
@@ -345,7 +346,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {

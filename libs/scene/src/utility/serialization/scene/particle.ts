@@ -11,7 +11,7 @@ export function getParticleNodeClass(): SerializableClass {
     name: 'ParticleSystem',
     parent: GraphNode,
     createFunc(ctx: SceneNode) {
-      const node = new ParticleSystem(ctx.scene);
+      const node = new ParticleSystem(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

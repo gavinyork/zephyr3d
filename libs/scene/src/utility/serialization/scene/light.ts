@@ -133,10 +133,10 @@ export function getPunctualLightClass(): SerializableClass {
           create(this: PunctualLight) {
             const aabb = new AABB();
             aabb.beginExtend();
-            this.scene.rootNode.iterate((child) => {
+            this.scene!.rootNode!.iterate((child) => {
               if (child instanceof Mesh || child instanceof ClipmapTerrain) {
                 if (child.castShadow) {
-                  const bbox = child.getWorldBoundingVolume().toAABB();
+                  const bbox = child.getWorldBoundingVolume()!.toAABB();
                   aabb.extend(bbox.minPoint);
                   aabb.extend(bbox.maxPoint);
                 }
@@ -415,7 +415,7 @@ export function getDirectionalLightClass(): SerializableClass {
     name: 'DirectionalLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new DirectionalLight(ctx.scene);
+      const node = new DirectionalLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
@@ -444,7 +444,7 @@ export function getPointLightClass(): SerializableClass {
     name: 'PointLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new PointLight(ctx.scene);
+      const node = new PointLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
@@ -478,7 +478,7 @@ export function getSpotLightClass(): SerializableClass {
     name: 'SpotLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new SpotLight(ctx.scene);
+      const node = new SpotLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

@@ -1,4 +1,4 @@
-import type { Clonable } from '@zephyr3d/base';
+import type { Clonable, DeepRequireOptionals, Nullable } from '@zephyr3d/base';
 import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -31,7 +31,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     needTangent: true,
     needUV: true
   };
-  protected _options: T;
+  protected _options!: DeepRequireOptionals<T>;
   /**
    * Creates an instance of shape
    * @param options - The creation options
@@ -96,9 +96,9 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     return [t0, t1, t2, w];
   }
 
-  abstract clone(): Shape<T>;
+  abstract clone(): this;
   /** Get shape creation options */
-  get options(): T {
+  get options(): DeepRequireOptionals<T> {
     return this._options;
   }
   set options(options: T) {
@@ -111,8 +111,8 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
    * @param options - creation options
    * @returns Normalized creation options
    */
-  normalizeOptions(options?: T): T {
-    const defaultOptions = (this.constructor as any)._defaultOptions as T;
+  normalizeOptions(options?: T): DeepRequireOptionals<T> {
+    const defaultOptions = (this.constructor as any)._defaultOptions as DeepRequireOptionals<T>;
     return Object.assign({}, defaultOptions, options ?? {});
   }
   /** @internal */
@@ -120,9 +120,9 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     this._options = this.normalizeOptions(options);
     const vertices: number[] = [];
     const indices: number[] = [];
-    const normals: number[] = this._options.needNormal ? [] : null;
-    const tangents: number[] = this._options.needTangent ? [] : null;
-    const uvs: number[] = this._options.needUV ? [] : null;
+    const normals: Nullable<number[]> = this._options.needNormal ? [] : null;
+    const tangents: Nullable<number[]> = this._options.needTangent ? [] : null;
+    const uvs: Nullable<number[]> = this._options.needUV ? [] : null;
     const bbox = new BoundingBox();
     bbox.beginExtend();
     this.primitiveType = (this.constructor as any).generateData(

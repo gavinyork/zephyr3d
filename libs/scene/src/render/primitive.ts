@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import {
   Disposable,
   makeObservable,
@@ -48,7 +49,7 @@ export class Primitive
   implements Clonable<Primitive>
 {
   /** @internal Current vertex layout object (created lazily from options). */
-  protected _vertexLayout: VertexLayout;
+  protected _vertexLayout: Nullable<VertexLayout>;
   /** @internal Mutable options used to build the vertex layout. */
   protected _vertexLayoutOptions: VertexLayoutOptions;
   /** @internal Primitive topology (e.g., 'triangle-list', 'line-strip'). */
@@ -56,7 +57,7 @@ export class Primitive
   /** @internal First index/vertex to draw. */
   protected _indexStart: number;
   /** @internal Number of indices/vertices to draw (computed lazily if null). */
-  protected _indexCount: number;
+  protected _indexCount: Nullable<number>;
   /** @internal Cached default index count (derived when needed). */
   protected _defaultIndexCount: number;
   /** @internal Marks layout dirty when buffers/topology change. */
@@ -66,7 +67,7 @@ export class Primitive
   /** @internal Unique runtime id for the instance. */
   protected _id: number;
   /** @internal Optional bounding volume for culling/raycast. */
-  protected _bbox: BoundingVolume;
+  protected _bbox: Nullable<BoundingVolume>;
   /** @internal Change tag increments when draw-affecting state changes. */
   private _changeTag: number;
   /**
@@ -135,7 +136,7 @@ export class Primitive
     for (const info of other._vertexLayoutOptions.vertexBuffers) {
       this.setVertexBuffer(info.buffer, info.stepMode);
     }
-    this.setIndexBuffer(other._vertexLayoutOptions.indexBuffer);
+    this.setIndexBuffer(other._vertexLayoutOptions.indexBuffer ?? null);
     this.primitiveType = other.primitiveType;
     this.indexStart = other.indexStart;
     this.indexCount = other.indexCount;
@@ -247,7 +248,7 @@ export class Primitive
    * @param semantic - The vertex semantic to look up.
    * @returns The matching vertex buffer, or `null` if not found.
    */
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
+  getVertexBuffer(semantic: VertexSemantic): Nullable<StructuredBuffer> {
     for (const info of this._vertexLayoutOptions.vertexBuffers) {
       if (info.buffer && matchVertexBuffer(info.buffer, semantic)) {
         return info.buffer;
@@ -261,7 +262,7 @@ export class Primitive
    * @param semantic - The vertex semantic to look up.
    * @returns The `VertexBufferInfo`, or `null` if not found.
    */
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
+  getVertexBufferInfo(semantic: VertexSemantic): Nullable<VertexBufferInfo> {
     this.checkVertexLayout();
     return this._vertexLayout?.getVertexBufferInfo(semantic) ?? null;
   }
@@ -283,8 +284,8 @@ export class Primitive
   ): StructuredBuffer {
     const device = getDevice();
     const buffer = Array.isArray(format)
-      ? device.createInterleavedVertexBuffer(format, data)
-      : device.createVertexBuffer(format, data);
+      ? device.createInterleavedVertexBuffer(format, data)!
+      : device.createVertexBuffer(format, data)!;
     return this.setVertexBuffer(buffer, stepMode);
   }
   /**
@@ -335,10 +336,10 @@ export class Primitive
    * @param buffer - The index buffer to set (non-null).
    * @returns void
    */
-  setIndexBuffer(buffer: IndexBuffer): void {
+  setIndexBuffer(buffer: Nullable<IndexBuffer>): void {
     if (this._vertexLayoutOptions.indexBuffer !== buffer) {
       retainObject(buffer);
-      releaseObject(this._vertexLayoutOptions.indexBuffer);
+      releaseObject(this._vertexLayoutOptions.indexBuffer ?? null);
       this._vertexLayoutOptions.indexBuffer = buffer;
       this._vertexLayoutDirty = true;
       this._changeTag++;
@@ -350,8 +351,8 @@ export class Primitive
    *
    * @returns The index buffer, or `undefined`/`null` if none set.
    */
-  getIndexBuffer(): IndexBuffer {
-    return this._vertexLayoutOptions.indexBuffer;
+  getIndexBuffer(): Nullable<IndexBuffer> {
+    return this._vertexLayoutOptions.indexBuffer ?? null;
   }
   /**
    * Issue a non-instanced draw for the current topology and range.
@@ -385,11 +386,10 @@ export class Primitive
     this._vertexLayout?.dispose();
     this._vertexLayout = null;
     if (this._vertexLayoutOptions) {
-      releaseObject(this._vertexLayoutOptions.indexBuffer);
+      releaseObject(this._vertexLayoutOptions.indexBuffer ?? null);
       for (const info of this._vertexLayoutOptions.vertexBuffers) {
         releaseObject(info.buffer);
       }
-      this._vertexLayoutOptions = null;
     }
   }
   /*
@@ -406,7 +406,7 @@ export class Primitive
    *
    * @returns The current bounding volume, or `null` if not set.
    */
-  getBoundingVolume(): BoundingVolume {
+  getBoundingVolume(): Nullable<BoundingVolume> {
     return this._bbox;
   }
   /**
@@ -429,7 +429,7 @@ export class Primitive
    * @param ray - Ray to test against the primitive's AABB (derived from its bounding volume).
    * @returns The distance from ray origin to the intersection, or `null` if no hit or no AABB.
    */
-  raycast(ray: Ray): number {
+  raycast(ray: Ray): Nullable<number> {
     const aabb = this.getBoundingVolume()?.toAABB();
     return aabb ? ray.bboxIntersectionTestEx(aabb) : null;
   }

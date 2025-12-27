@@ -1,4 +1,4 @@
-import type { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable, RequireOptionals } from '@zephyr3d/base';
 
 /**
  * Enumerates supported data types for serializable properties.
@@ -49,7 +49,7 @@ export type PropertyValue = {
   /** Boolean lane(s) for boolean properties. */
   bool?: boolean[];
   /** Object lane(s) for object references or embedded objects. */
-  object?: object[];
+  object?: Nullable<object>[];
 };
 
 /**
@@ -139,7 +139,7 @@ export type PropertyAccessor<T = object> = {
    *
    * @param value - Output container to be filled by the getter.
    */
-  get: (this: T, value: PropertyValue) => void;
+  get: (this: T, value: RequireOptionals<PropertyValue>) => void;
   /**
    * Writes an incoming value to `this`.
    *
@@ -150,7 +150,7 @@ export type PropertyAccessor<T = object> = {
    * @param index - Optional element index for array-like properties.
    * @returns Optionally `Promise<void>` if asynchronous work is required.
    */
-  set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
+  set?: (this: T, value: RequireOptionals<PropertyValue>, index?: number) => void | Promise<void>;
   /**
    * Creates a new embedded/contained object for object-like properties.
    *
@@ -160,7 +160,7 @@ export type PropertyAccessor<T = object> = {
    * @param index - Target index where the new object will be inserted.
    * @returns The newly created object instance.
    */
-  create?: (this: T, ctor: GenericConstructor, index: number) => object;
+  create?: (this: T, ctor: GenericConstructor, index: number) => Nullable<object>;
   /**
    * Deletes an element from an array-like property or clears a value.
    *

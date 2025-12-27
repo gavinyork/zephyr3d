@@ -15,7 +15,7 @@ export function getSprite3DClass(): SerializableClass {
     parent: GraphNode,
     noTitle: true,
     createFunc(ctx: SceneNode) {
-      const node = new Sprite3D(ctx.scene);
+      const node = new Sprite3D(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

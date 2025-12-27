@@ -1,4 +1,4 @@
-import type { Immutable, Rect } from '@zephyr3d/base';
+import type { Immutable, Nullable, Rect } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { getDevice } from './api';
 
@@ -85,9 +85,9 @@ export type ResolutionTransform = {
  * @public
  */
 export class ScreenAdapter {
-  private _config: ScreenConfig;
-  private _transform: ResolutionTransform;
-  private _viewport: Immutable<number[]>;
+  private _config!: ScreenConfig;
+  private _transform: Nullable<ResolutionTransform>;
+  private _viewport: Nullable<Immutable<number[]>>;
   /**
    * Creates a new {@link ScreenAdapter}.
    *
@@ -108,11 +108,10 @@ export class ScreenAdapter {
   /**
    * Returns the viewport of the screen
    */
-  get viewport(): Immutable<number[]> {
+  get viewport(): Nullable<Immutable<number[]>> {
     return this._viewport;
   }
-  set viewport(vp: Immutable<number[]>) {
-    vp = vp ?? null;
+  set viewport(vp: Nullable<Immutable<number[]>>) {
     if (this._viewport !== vp) {
       this._viewport = vp?.slice() ?? null;
       this._transform = null;
@@ -140,8 +139,8 @@ export class ScreenAdapter {
    * @param config - Design resolution configuration. Any missing fields
    *   are filled with default values: 1920×1080 and 'stretch' mode.
    */
-  configure(_config: ScreenConfig): void {
-    this._config = this._config = {
+  configure(_config?: ScreenConfig): void {
+    this._config = {
       designWidth: 1920,
       designHeight: 1080,
       scaleMode: 'stretch',

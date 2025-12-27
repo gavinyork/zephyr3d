@@ -121,7 +121,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
   ): Promise<Uint8Array<ArrayBuffer>> {
@@ -131,7 +131,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     return this._getBufferData(dstBuffer, offsetInBytes, sizeInBytes);
   }
   protected async _getBufferData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
   ): Promise<Uint8Array<ArrayBuffer>> {

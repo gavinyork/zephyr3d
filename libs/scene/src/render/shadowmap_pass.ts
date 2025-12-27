@@ -4,6 +4,7 @@ import type { PunctualLight } from '../scene/light';
 import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Shadow map render pass
@@ -12,7 +13,7 @@ import { ShaderHelper } from '../material/shader/helper';
  */
 export class ShadowMapPass extends RenderPass {
   /** @internal */
-  protected _currentLight: PunctualLight;
+  protected _currentLight: Nullable<PunctualLight>;
   /**
    * Creates an instance of ShadowMapPass
    */
@@ -21,15 +22,15 @@ export class ShadowMapPass extends RenderPass {
     this._currentLight = null;
   }
   /** The light that will be used to render shadow map */
-  get light(): PunctualLight {
+  get light() {
     return this._currentLight;
   }
-  set light(light: PunctualLight) {
+  set light(light) {
     this._currentLight = light;
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${ctx.shadowMapInfo.get(this.light).shaderHash}`;
+    return `${ctx.shadowMapInfo!.get(this.light!)!.shaderHash}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
@@ -42,7 +43,7 @@ export class ShadowMapPass extends RenderPass {
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
-      ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight);
+      ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight!);
       ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       for (const lit of items.opaque.lit) {

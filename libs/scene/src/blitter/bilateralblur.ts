@@ -10,6 +10,7 @@ import type {
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { fetchSampler } from '../utility/misc';
 
@@ -18,9 +19,9 @@ import { fetchSampler } from '../utility/misc';
  * @public
  */
 export class BilateralBlurBlitter extends Blitter {
-  protected _depthTex: Texture2D;
-  protected _sampler: TextureSampler;
-  protected _blurSizeTex: Texture2D;
+  protected _depthTex: Nullable<Texture2D>;
+  protected _sampler: Nullable<TextureSampler>;
+  protected _blurSizeTex: Nullable<Texture2D>;
   protected _blurSizeScale: number;
   protected _blurSizeIndex: number;
   protected _kernelRadius: number;
@@ -51,16 +52,16 @@ export class BilateralBlurBlitter extends Blitter {
     this._uvStep = this._finalPhase ? new Vector2(1, 0) : new Vector2(0, 1);
     this.calcGaussion();
   }
-  get depthTex(): Texture2D {
+  get depthTex() {
     return this._depthTex;
   }
-  set depthTex(tex: Texture2D) {
+  set depthTex(tex) {
     this._depthTex = tex;
   }
-  get blurSizeTex(): Texture2D {
+  get blurSizeTex() {
     return this._blurSizeTex;
   }
-  set blurSizeTex(tex: Texture2D) {
+  set blurSizeTex(tex) {
     this._blurSizeTex = tex;
   }
   get blurSizeIndex(): number {
@@ -75,10 +76,10 @@ export class BilateralBlurBlitter extends Blitter {
   set blurSizeScale(val: number) {
     this._blurSizeScale = val;
   }
-  get sampler(): TextureSampler {
+  get sampler() {
     return this._sampler;
   }
-  set sampler(sampler: TextureSampler) {
+  set sampler(sampler) {
     this._sampler = sampler;
   }
   get cameraNearFar(): Vector2 {
@@ -167,7 +168,7 @@ export class BilateralBlurBlitter extends Blitter {
   }
   setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture) {
     super.setUniforms(bindGroup, sourceTex);
-    bindGroup.setTexture('depthTex', this._depthTex, this._sampler ?? fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture('depthTex', this._depthTex!, this._sampler ?? fetchSampler('clamp_nearest_nomip'));
     if (this._blurSizeTex) {
       bindGroup.setTexture('blurSizeTex', this._blurSizeTex, fetchSampler('clamp_linear_nomip'));
       bindGroup.setValue('blurSizeScale', this._blurSizeScale);

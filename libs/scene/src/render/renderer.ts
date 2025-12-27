@@ -1,6 +1,7 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
+import type { Nullable } from '@zephyr3d/base';
 import { isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -33,10 +34,10 @@ import { getDevice, getEngine } from '../app/api';
  */
 export class SceneRenderer {
   /** @internal */
-  private static _skyMotionVectorProgram: GPUProgram = null;
+  private static _skyMotionVectorProgram: Nullable<GPUProgram> = null;
   /** @internal */
-  private static _skyMotionVectorBindGroup: BindGroup = null;
-  private static _box: Primitive = null;
+  private static _skyMotionVectorBindGroup: Nullable<BindGroup> = null;
+  private static _box: Nullable<Primitive> = null;
   /** @internal */
   private static readonly _pickCameraPersp = new PerspectiveCamera(null);
   /** @internal */
@@ -50,9 +51,9 @@ export class SceneRenderer {
   /** @internal */
   private static readonly _objectColorPass = new ObjectColorPass();
   /** @internal */
-  private static _frontDepthColorState: ColorState = null;
+  private static _frontDepthColorState: Nullable<ColorState> = null;
   /** @internal */
-  private static _backDepthColorState: ColorState = null;
+  private static _backDepthColorState: Nullable<ColorState> = null;
   /** @internal */
   private static readonly _clusters: ClusteredLight[] = [];
   /** lighting render pass */
@@ -70,7 +71,7 @@ export class SceneRenderer {
   /** @internal */
   static getClusteredLight(): ClusteredLight {
     if (this._clusters.length > 0) {
-      return this._clusters.pop();
+      return this._clusters.pop()!;
     }
     return new ClusteredLight();
   }
@@ -218,7 +219,11 @@ export class SceneRenderer {
     }
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
-  private static renderSceneDepth(ctx: DrawContext, renderQueue: RenderQueue, depthFramebuffer: FrameBuffer) {
+  private static renderSceneDepth(
+    ctx: DrawContext,
+    renderQueue: RenderQueue,
+    depthFramebuffer: Nullable<FrameBuffer>
+  ) {
     const transmission = !!depthFramebuffer;
     if (!depthFramebuffer) {
       const format: TextureFormat =
@@ -357,9 +362,9 @@ export class SceneRenderer {
       // TODO: fetch resizable framebuffer if ctx.defaultViewport is true
       ctx.intermediateFramebuffer = device.pool.fetchTemporalFramebuffer(
         false,
-        ctx.depthTexture.width,
-        ctx.depthTexture.height,
-        ctx.colorFormat,
+        ctx.depthTexture!.width,
+        ctx.depthTexture!.height,
+        ctx.colorFormat!,
         ctx.depthTexture
       );
     }
@@ -382,15 +387,15 @@ export class SceneRenderer {
       ctx.compositor = null;
       const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
         true,
-        ctx.depthTexture.width,
-        ctx.depthTexture.height,
+        ctx.depthTexture!.width,
+        ctx.depthTexture!.height,
         ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
           ? [
-              ctx.colorFormat,
-              device.getFramebuffer().getColorAttachments()[1],
-              device.getFramebuffer().getColorAttachments()[2]
+              ctx.colorFormat!,
+              device.getFramebuffer()!.getColorAttachments()[1]!,
+              device.getFramebuffer()!.getColorAttachments()[2]!
             ]
-          : ctx.colorFormat,
+          : ctx.colorFormat!,
         ctx.depthTexture,
         false
       );
@@ -415,7 +420,7 @@ export class SceneRenderer {
     if (renderQueue.needSceneColor()) {
       this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
     }
-    ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture);
+    ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture!);
     ctx.compositor?.end(ctx);
     renderQueue.dispose();
     ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
@@ -433,7 +438,7 @@ export class SceneRenderer {
 
     // Restore sun color
     if (sunLightColor) {
-      ctx.sunLight.color = sunLightColor;
+      ctx.sunLight!.color = sunLightColor;
     }
   }
   private static _getSkyMotionVectorProgram(ctx: DrawContext): GPUProgram {
@@ -469,7 +474,7 @@ export class SceneRenderer {
             this.$outputs.color = pb.vec4(this.motionVector, 0, 1);
           });
         }
-      });
+      })!;
       this._skyMotionVectorProgram.name = '@TAA_SkyMotionVector';
     }
     return this._skyMotionVectorProgram;
@@ -502,9 +507,9 @@ export class SceneRenderer {
     }
     const box = this._getBox(ctx);
     this._skyMotionVectorBindGroup.setValue('VPMatrix', ctx.camera.viewProjectionMatrix);
-    this._skyMotionVectorBindGroup.setValue('prevVPMatrix', ctx.camera.prevVPMatrix);
+    this._skyMotionVectorBindGroup.setValue('prevVPMatrix', ctx.camera.prevVPMatrix!);
     this._skyMotionVectorBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-    this._skyMotionVectorBindGroup.setValue('prevCameraPos', ctx.camera.prevPosition);
+    this._skyMotionVectorBindGroup.setValue('prevCameraPos', ctx.camera.prevPosition!);
     ctx.device.pushDeviceStates();
     ctx.device.setProgram(program);
     ctx.device.setBindGroup(0, this._skyMotionVectorBindGroup);
@@ -534,7 +539,7 @@ export class SceneRenderer {
   /** @internal */
   private static renderObjectColors(
     ctx: DrawContext,
-    pickResolveFunc: (result: PickResult) => void,
+    pickResolveFunc: (result: Nullable<PickResult>) => void,
     renderQueue: RenderQueue
   ) {
     const camera = ctx.camera;
@@ -610,10 +615,10 @@ export class SceneRenderer {
           : distancePixels[0];
         const intersectedPoint = new Vector3(distancePixels[0], distancePixels[1], distancePixels[2]);
         if (isWebGL1) {
-          intersectedPoint.x = cameraPos.x + ray.direction.x * d;
-          intersectedPoint.y = cameraPos.y + ray.direction.y * d;
-          intersectedPoint.z = cameraPos.z + ray.direction.z * d;
-          d = Vector3.distance(intersectedPoint, cameraPos);
+          intersectedPoint.x = cameraPos!.x + ray!.direction.x * d;
+          intersectedPoint.y = cameraPos!.y + ray!.direction.y * d;
+          intersectedPoint.z = cameraPos!.z + ray!.direction.z * d;
+          d = Vector3.distance(intersectedPoint, cameraPos!);
         }
         pickResolveFunc(
           drawable

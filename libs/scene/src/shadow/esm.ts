@@ -8,14 +8,15 @@ import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 type ESMImplData = {
-  blurFramebuffer: FrameBuffer;
-  blurFramebuffer2: FrameBuffer;
+  blurFramebuffer: Nullable<FrameBuffer>;
+  blurFramebuffer2: Nullable<FrameBuffer>;
 };
 
 class BlurBlitter extends GaussianBlurBlitter {
-  protected _packFloat: boolean;
+  protected _packFloat = false;
   get packFloat(): boolean {
     return this._packFloat;
   }
@@ -139,8 +140,8 @@ export class ESM extends ShadowImpl {
     const implData = shadowMapParams.implData as ESMImplData;
     return (
       implData
-        ? implData.blurFramebuffer2.getColorAttachments()[0]
-        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+        ? implData.blurFramebuffer2!.getColorAttachments()[0]
+        : shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0]
     ) as ShadowMapType;
   }
   /** @internal */
@@ -151,7 +152,7 @@ export class ESM extends ShadowImpl {
     width: number,
     height: number,
     colorFormat: TextureFormat,
-    depthFormat: TextureFormat,
+    depthFormat: Nullable<TextureFormat>,
     mipmapping?: boolean
   ) {
     const device = getDevice();
@@ -179,7 +180,7 @@ export class ESM extends ShadowImpl {
           ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
           : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
-    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments, depthAttachment);
+    const fb = device.pool.createTemporalFramebuffer(autoRelease, colorAttachments!, depthAttachment);
     if (colorAttachments) {
       device.pool.releaseTexture(colorAttachments[0]);
     }
@@ -194,9 +195,9 @@ export class ESM extends ShadowImpl {
       blurFramebuffer2: null
     };
     shadowMapParams.implData = implData;
-    const colorFormat = this.getShadowMapColorFormat(shadowMapParams);
-    const shadowMapWidth = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].width;
-    const shadowMapHeight = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0].height;
+    const colorFormat = this.getShadowMapColorFormat(shadowMapParams)!;
+    const shadowMapWidth = shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0].width;
+    const shadowMapHeight = shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0].height;
     if (this._blur) {
       shadowMapParams.implData = {
         blurFramebuffer: this.fetchTemporalFramebuffer(
@@ -229,7 +230,7 @@ export class ESM extends ShadowImpl {
   postRenderShadowMap(shadowMapParams: ShadowMapParams) {
     if (shadowMapParams.implData) {
       const implData = shadowMapParams.implData as ESMImplData;
-      const colorAttachment = shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0];
+      const colorAttachment = shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0];
       this._blitterH.blurSize = this._blurSize / colorAttachment.width;
       this._blitterH.kernelSize = this._kernelSize;
       this._blitterH.logSpace = this._logSpace;
@@ -238,10 +239,10 @@ export class ESM extends ShadowImpl {
       this._blitterV.kernelSize = this._kernelSize;
       this._blitterV.logSpace = this._logSpace;
       this._blitterV.packFloat = colorAttachment.format === 'rgba8unorm';
-      this._blitterH.blit(colorAttachment as any, implData.blurFramebuffer);
+      this._blitterH.blit(colorAttachment as any, implData.blurFramebuffer!);
       this._blitterV.blit(
-        implData.blurFramebuffer.getColorAttachments()[0] as any,
-        implData.blurFramebuffer2
+        implData.blurFramebuffer!.getColorAttachments()[0] as any,
+        implData.blurFramebuffer2!
       );
     }
   }
@@ -254,7 +255,7 @@ export class ESM extends ShadowImpl {
   getShaderHash(): string {
     return '';
   }
-  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? device.type === 'webgl'
@@ -274,7 +275,7 @@ export class ESM extends ShadowImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
   ): PBShaderExp {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -309,7 +310,7 @@ export class ESM extends ShadowImpl {
           this.shadow = filterShadowESM(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             this.shadowCoord,
             this.split
           );
@@ -330,7 +331,7 @@ export class ESM extends ShadowImpl {
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
         this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
-        this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap.format, this.dir));
+        this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap!.format, this.dir));
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
         this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
@@ -352,7 +353,7 @@ export class ESM extends ShadowImpl {
           this.shadow = filterShadowESM(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             this.shadowCoord
           );
         });

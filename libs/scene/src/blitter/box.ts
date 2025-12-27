@@ -12,8 +12,6 @@ export class BoxFilterBlitter extends Blitter {
   /** @internal */
   protected _kernelSize: number;
   /** @internal */
-  protected _sigma: number;
-  /** @internal */
   protected _blurSize: number;
   /** @internal */
   protected _logSpace: boolean;

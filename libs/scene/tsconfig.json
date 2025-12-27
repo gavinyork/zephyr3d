@@ -10,7 +10,7 @@
     "preserveConstEnums": false,
     "listEmittedFiles": true,
     "noUnusedLocals": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": false,
     "emitDecoratorMetadata": false,

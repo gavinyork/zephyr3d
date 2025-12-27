@@ -1,4 +1,4 @@
-import type { Nullable, Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
@@ -199,13 +199,13 @@ export class CommandQueueImmediate {
       numInstances
     );
   }
-  setViewport(vp: Nullable<number[] | DeviceViewport>) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setViewport(vp);
   }
   getViewport(): DeviceViewport {
     return this._renderPass.getViewport();
   }
-  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setScissor(scissor);
   }
   getScissor(): DeviceViewport {

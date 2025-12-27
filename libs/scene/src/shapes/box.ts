@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, DeepRequireOptionals } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -43,8 +43,8 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
   constructor(options?: BoxCreationOptions) {
     super(options);
   }
-  clone(): BoxShape {
-    return new BoxShape(this._options);
+  clone(): this {
+    return new BoxShape(this._options) as this;
   }
   /** type of the shape */
   get type(): string {
@@ -58,7 +58,7 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
    * @param indices - vertex indices
    */
   static generateData(
-    options: BoxCreationOptions,
+    options: DeepRequireOptionals<BoxCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -143,14 +143,14 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
       ...bottomFacePos
     );
     normals?.push(
-      ...topFacenormal,
-      ...frontFaceNormal,
-      ...rightFaceNormal,
-      ...backFaceNormal,
-      ...leftFaceNormal,
-      ...bottomFaceNormal
+      ...topFacenormal!,
+      ...frontFaceNormal!,
+      ...rightFaceNormal!,
+      ...backFaceNormal!,
+      ...leftFaceNormal!,
+      ...bottomFaceNormal!
     );
-    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    uvs?.push(...uv!, ...uv!, ...uv!, ...uv!, ...uv!, ...uv!);
     if (tangents) {
       const pushFaceTangent = (tx: number, ty: number, tz: number) => {
         tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);
@@ -215,8 +215,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   constructor(options?: BoxCreationOptions) {
     super(options);
   }
-  clone(): BoxFrameShape {
-    return new BoxFrameShape(this._options);
+  clone(): this {
+    return new BoxFrameShape(this._options) as this;
   }
   /** type of the shape */
   get type(): string {
@@ -230,7 +230,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
    * @param indices - vertex indices
    */
   static generateData(
-    options: BoxCreationOptions,
+    options: DeepRequireOptionals<BoxCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -287,8 +287,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
       6 + indexOffset
     );
     vertices?.push(...topFacePos, ...bottomFacePos);
-    normals?.push(...topFacenormal, ...bottomFaceNormal);
-    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    normals?.push(...topFacenormal!, ...bottomFaceNormal!);
+    uvs?.push(...uv!, ...uv!, ...uv!, ...uv!, ...uv!, ...uv!);
     if (tangents) {
       const pushFaceTangent = (tx: number, ty: number, tz: number) => {
         tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);

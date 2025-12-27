@@ -1,9 +1,10 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { SerializableClass } from './types';
 
 export class JSONProp {
-  parent: JSONData;
+  parent: Nullable<JSONData>;
   name: string;
-  constructor(data: JSONData) {
+  constructor(data: Nullable<JSONData>) {
     this.parent = data;
     if (this.parent && !(this.parent instanceof JSONArray)) {
       for (let i = 1; ; i++) {
@@ -44,11 +45,11 @@ export class JSONBool extends JSONProp {
 }
 
 export class JSONData extends JSONProp {
-  value: (JSONNumber | JSONString | JSONBool | JSONData)[];
-  data: object;
-  isnull: boolean;
-  isundefined: boolean;
-  constructor(parent: JSONData, data: object = {}) {
+  value!: Nullable<JSONNumber | JSONString | JSONBool | JSONData>[];
+  data!: object;
+  isnull!: boolean;
+  isundefined!: boolean;
+  constructor(parent: Nullable<JSONData>, data: object = {}) {
     super(parent);
     this.updateObject(data);
   }
@@ -86,7 +87,7 @@ export class JSONData extends JSONProp {
     for (const prop of this.value) {
       if (prop instanceof JSONData) {
         this.data[prop.name] = prop.data;
-      } else {
+      } else if (prop) {
         this.data[prop.name] = prop.value;
       }
     }
@@ -95,7 +96,7 @@ export class JSONData extends JSONProp {
 }
 
 export class JSONArray extends JSONData {
-  constructor(parent: JSONData, data: unknown[] = []) {
+  constructor(parent: Nullable<JSONData>, data: unknown[] = []) {
     super(parent);
     this.updateObject(data);
   }
@@ -112,7 +113,7 @@ export class JSONArray extends JSONData {
     if (data?.length > 0) {
       for (let i = 0; i < data.length; i++) {
         const val = data[i];
-        let prop: JSONString | JSONNumber | JSONBool | JSONData;
+        let prop: Nullable<JSONString | JSONNumber | JSONBool | JSONData>;
         if (typeof val === 'string') {
           prop = new JSONString(this, val);
         } else if (typeof val === 'number') {
@@ -167,9 +168,9 @@ export function getJSONPropClass(): SerializableClass {
           },
           set(this: JSONProp, value) {
             const data = this.parent;
-            if (data && value.str[0] && !data.value.find((p) => p !== this && p.name === value.str[0])) {
+            if (data && value.str[0] && !data.value.find((p) => p !== this && p!.name === value.str[0])) {
               this.name = value.str[0];
-              this.parent.updateProps();
+              this.parent!.updateProps();
             }
           }
         }
@@ -201,7 +202,7 @@ export function getJSONStringClass(): SerializableClass {
           set(this: JSONString, value) {
             if (this.value !== value.str[0]) {
               this.value = value.str[0];
-              this.parent.updateProps();
+              this.parent!.updateProps();
             }
           }
         }
@@ -233,7 +234,7 @@ export function getJSONNumberClass(): SerializableClass {
           set(this: JSONNumber, value) {
             if (this.value !== value.num[0]) {
               this.value = value.num[0];
-              this.parent.updateProps();
+              this.parent!.updateProps();
             }
           }
         }
@@ -265,7 +266,7 @@ export function getJSONBoolClass(): SerializableClass {
           set(this: JSONBool, value) {
             if (this.value !== value.bool[0]) {
               this.value = value.bool[0];
-              this.parent.updateProps();
+              this.parent!.updateProps();
             }
           }
         }
@@ -302,7 +303,7 @@ export function getJSONObjectClass(): SerializableClass {
           set(this: JSONData, value, index) {
             if (value === null) {
               this.isnull = true;
-            } else if (index >= 0) {
+            } else if (typeof index === 'number' && index >= 0) {
               this.value[index] = value.object[0] as JSONString | JSONNumber | JSONBool | JSONData;
               this.updateProps();
             } else {
@@ -315,7 +316,7 @@ export function getJSONObjectClass(): SerializableClass {
             return c ? new c(this) : null;
           },
           add(this: JSONData, value, index) {
-            this.value.splice(index, 0, value.object[0] as JSONString | JSONNumber | JSONBool | JSONData);
+            this.value.splice(index!, 0, value.object![0] as JSONString | JSONNumber | JSONBool | JSONData);
             this.updateProps();
           },
           delete(this: JSONData, index) {
@@ -353,8 +354,8 @@ export function getJSONArrayClass(): SerializableClass {
           set(this: JSONArray, value, index) {
             if (value === null) {
               this.isnull = true;
-            } else if (index >= 0) {
-              this.value[index] = value.object[0] as
+            } else if (index! >= 0) {
+              this.value[index!] = value.object[0] as
                 | JSONString
                 | JSONNumber
                 | JSONBool
@@ -387,9 +388,9 @@ export function getJSONArrayClass(): SerializableClass {
           },
           add(this: JSONArray, value, index) {
             this.value.splice(
-              index,
+              index!,
               0,
-              value.object[0] as JSONString | JSONNumber | JSONBool | JSONData | JSONArray
+              value.object![0] as JSONString | JSONNumber | JSONBool | JSONData | JSONArray
             );
             this.updateProps();
           },

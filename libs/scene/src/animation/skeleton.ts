@@ -67,13 +67,13 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _bindPoseMatrices: Matrix4x4[];
   /** @internal */
-  protected _jointMatrices: Matrix4x4[];
+  protected _jointMatrices!: Matrix4x4[];
   /** @internal */
   protected _jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[];
   /** @internal */
-  protected _jointOffsets: Float32Array<ArrayBuffer>;
+  protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
-  protected _jointMatrixArray: Float32Array<ArrayBuffer>;
+  protected _jointMatrixArray!: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _jointTexture: DRef<Texture2D>;
   /** @internal */
@@ -96,9 +96,6 @@ export class Skeleton extends Disposable {
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
     this._bindPoseMatrices = bindPoseMatrices;
-    this._jointMatrixArray = null;
-    this._jointMatrices = null;
-    this._jointOffsets = null;
     this._jointTexture = new DRef();
     this._playing = false;
     if (jointTransforms) {
@@ -177,7 +174,7 @@ export class Skeleton extends Disposable {
    * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
    */
   get jointTexture(): Texture2D {
-    return this._jointTexture.get();
+    return this._jointTexture.get()!;
   }
   /**
    * Update joint matrices from either provided transforms or the joints' world matrices.
@@ -227,7 +224,7 @@ export class Skeleton extends Disposable {
   computeBindPose(model: SceneNode) {
     this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
     this._jointOffsets[1] = this._jointOffsets[0];
-    const tex = this._jointTexture.get();
+    const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
@@ -237,7 +234,7 @@ export class Skeleton extends Disposable {
    */
   computeJoints() {
     this.updateJointMatrices();
-    const tex = this._jointTexture.get();
+    const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
@@ -301,11 +298,6 @@ export class Skeleton extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._jointTexture.dispose();
-    this._joints = null;
-    this._inverseBindMatrices = null;
-    this._bindPoseMatrices = null;
-    this._jointMatrices = null;
-    this._jointMatrixArray = null;
     const m = Skeleton._registry.get(this._id);
     if (m?.get() === this) {
       Skeleton._registry.delete(this._id);

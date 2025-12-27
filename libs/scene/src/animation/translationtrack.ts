@@ -9,7 +9,7 @@ import type { SceneNode } from '../scene';
  */
 export class NodeTranslationTrack extends AnimationTrack<Vector3> {
   private readonly _state: Vector3;
-  private _interpolator: Interpolator;
+  private _interpolator!: Interpolator;
   /**
    * Create an instance of TranslationTrack
    */
@@ -34,7 +34,6 @@ export class NodeTranslationTrack extends AnimationTrack<Vector3> {
   ) {
     if (modeOrInterpolator === undefined) {
       super(false);
-      this._interpolator = null;
     } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'vec3') {
         throw new Error(`TranslationTrack(): interpolator target must be 'vec3'`);

@@ -1,5 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export abstract class ShadowImpl {
@@ -40,7 +41,7 @@ export abstract class ShadowImpl {
     NdotL: PBShaderExp,
     split: PBShaderExp
   ): PBShaderExp;
-  abstract getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat;
+  abstract getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat>;
   abstract getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat;
   abstract useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean;
 }

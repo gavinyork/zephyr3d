@@ -5326,7 +5326,11 @@ export class Matrix4x4 extends VectorBase {
    * @param translation - The output translation vector.
    * @returns self
    */
-  decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, translation?: Vector3): this {
+  decompose(
+    scale?: Nullable<Vector3>,
+    rotation?: Nullable<Quaternion | Matrix3x3 | Matrix4x4>,
+    translation?: Nullable<Vector3>
+  ): this {
     if (translation) {
       translation.setXYZ(this[12], this[13], this[14]);
     }

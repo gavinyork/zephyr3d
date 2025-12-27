@@ -1,5 +1,5 @@
 import type * as TS from 'typescript';
-import type { VFS } from '@zephyr3d/base';
+import type { Nullable, VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';
 import { getApp } from './api';
@@ -113,7 +113,7 @@ export class ScriptRegistry {
   protected async fetchSource(
     id: string
   ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
-    let type: 'js' | 'ts' = null;
+    let type: Nullable<'js' | 'ts'> = null;
     let pathWithExt = '';
     if (id.endsWith('.ts')) {
       pathWithExt = id;
@@ -379,19 +379,17 @@ export class ScriptRegistry {
    * @throws If a relative import is provided without `fromId`.
    */
   async resolveLogicalId(spec: string, fromId?: string): Promise<string> {
-    let path: string;
-
     if (spec.startsWith('#/')) {
-      path = this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, spec.slice(2)));
+      return this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, spec.slice(2)));
     } else if (spec.startsWith('./') || spec.startsWith('../')) {
       if (!fromId) {
         throw new Error(`Relative import "${spec}" requires fromId`);
       }
-      path = this._vfs.normalizePath(
+      return this._vfs.normalizePath(
         this._vfs.join(this._vfs.dirname(this._vfs.normalizePath(fromId)), spec)
       );
     } else if (spec.startsWith('/')) {
-      path = spec.replace(/^\/+/, '/');
+      return spec.replace(/^\/+/, '/');
     } else if (getApp().editorMode !== 'none') {
       // naked module, checking if it is a installed module in editor mode
       const depsExists = await this._vfs.exists('/libs/deps.lock.json');
@@ -399,13 +397,11 @@ export class ScriptRegistry {
         const content = (await this._vfs.readFile('/libs/deps.lock.json', { encoding: 'utf8' })) as string;
         const depsInfo = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
         if (depsInfo?.dependencies[spec]) {
-          path = this._vfs.normalizePath(depsInfo.dependencies[spec].entry);
+          return this._vfs.normalizePath(depsInfo.dependencies[spec].entry);
         }
       }
-    } else {
-      return spec;
     }
-    return path;
+    return spec;
   }
 
   /**
@@ -420,7 +416,7 @@ export class ScriptRegistry {
    * @returns `{ type, path }` or `null` if not found.
    */
   async resolveSourcePath(logicalId: string) {
-    let type: 'js' | 'ts' = null;
+    let type: Nullable<'js' | 'ts'> = null;
     let pathWithExt = '';
     if (logicalId.endsWith('.ts')) {
       pathWithExt = logicalId;

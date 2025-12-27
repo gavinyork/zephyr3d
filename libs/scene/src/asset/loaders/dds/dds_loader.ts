@@ -1,7 +1,7 @@
 import { getDDSMipLevelsInfo } from './dds';
 import { AbstractTextureLoader } from '../loader';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
 
 /**
@@ -17,8 +17,8 @@ export class DDSLoader extends AbstractTextureLoader {
     data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
-  ): Promise<BaseTexture> {
+    texture?: Nullable<BaseTexture>
+  ): Promise<Nullable<BaseTexture>> {
     const arrayBuffer = data instanceof ArrayBuffer ? data : data.buffer;
     const offset = data instanceof ArrayBuffer ? 0 : data.byteOffset;
     const mipmapLevelData = getDDSMipLevelsInfo(arrayBuffer, offset);
@@ -26,7 +26,7 @@ export class DDSLoader extends AbstractTextureLoader {
       throw new Error('read DDS file failed');
     }
     const options: TextureCreationOptions = {
-      texture: texture,
+      texture: texture ?? undefined,
       samplerOptions
     };
     return getDevice().createTextureFromMipmapData(mipmapLevelData, srgb, options);

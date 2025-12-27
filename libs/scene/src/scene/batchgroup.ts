@@ -105,14 +105,14 @@ export class BatchGroup extends GraphNode {
     this.invalidate();
   }
   /** @internal */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     const bv = new BoundingBox();
     const invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
     bv.beginExtend();
     this.iterate((node) => {
       if (node.isMesh()) {
         Matrix4x4.multiplyAffine(invWorldMatrix, node.worldMatrix, tmpMatrix);
-        const wb = node.getBoundingVolume().transform(tmpMatrix).toAABB();
+        const wb = node.getBoundingVolume()!.transform(tmpMatrix).toAABB();
         bv.extend(wb.minPoint);
         bv.extend(wb.maxPoint);
       }

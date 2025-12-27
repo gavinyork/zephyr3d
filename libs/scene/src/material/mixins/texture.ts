@@ -7,7 +7,7 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 
@@ -44,13 +44,13 @@ export type TextureMixinInstanceTypes<T> =
  */
 export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
-    ? Texture2D
+    ? Nullable<Texture2D>
     : P extends 'TextureSampler'
-      ? TextureSampler
+      ? Nullable<TextureSampler>
       : P extends 'TexCoordIndex'
         ? number
         : P extends 'TexCoordMatrix'
-          ? Matrix4x4
+          ? Nullable<Matrix4x4>
           : never;
 };
 
@@ -93,11 +93,11 @@ export function mixinTextureProps<U extends string>(name: U) {
       constructor() {
         super();
         const texture = new DRef<Texture2D>();
-        let sampler: TextureSampler = null;
+        let sampler: Nullable<TextureSampler> = null;
         let texCoord = 0;
-        let matrix: Matrix4x4 = null;
+        let matrix: Nullable<Matrix4x4> = null;
         Object.defineProperty(this, `${name}Texture`, {
-          get: function (): Texture2D {
+          get: function (): Nullable<Texture2D> {
             return texture.get();
           },
           set: function (newValue: Texture2D) {
@@ -115,7 +115,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TextureSampler`, {
-          get: function (): TextureSampler {
+          get: function (): Nullable<TextureSampler> {
             return sampler;
           },
           set: function (newValue: TextureSampler) {
@@ -128,7 +128,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TexCoordMatrix`, {
-          get: function (): Matrix4x4 {
+          get: function (): Nullable<Matrix4x4> {
             return matrix;
           },
           set: function (newValue: Matrix4x4) {
@@ -159,10 +159,10 @@ export function mixinTextureProps<U extends string>(name: U) {
         const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
         return scope.$builder.textureSample(tex, coord);
       }
-      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope): PBShaderExp {
+      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
         return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
       }
-      [`get${capName}TexCoord`](scope: PBInsideFunctionScope): PBShaderExp {
+      [`get${capName}TexCoord`](scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
         const texCoord = (this as any)[`${name}TexCoordIndex`];
         if (texCoord < 0) {
           return null;

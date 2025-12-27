@@ -1,4 +1,4 @@
-import type { Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
 import {
   hasStencilChannel,
@@ -82,8 +82,8 @@ export class WebGPURenderPass {
   getFramebuffer(): Nullable<WebGPUFrameBuffer> {
     return this._frameBufferInfo.frameBuffer;
   }
-  setViewport(vp: Nullable<number[] | DeviceViewport>) {
-    if (!vp || (!Array.isArray(vp) && vp.default)) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
+    if (!vp || (!Array.isArray(vp) && (vp as DeviceViewport).default)) {
       this._currentViewport = {
         x: 0,
         y: 0,
@@ -101,7 +101,7 @@ export class WebGPURenderPass {
           default: false
         };
       } else {
-        this._currentViewport = Object.assign({ default: false }, vp);
+        this._currentViewport = Object.assign({ default: false }, vp as DeviceViewport);
       }
     }
     const vx = this._device.screenXToDevice(this._currentViewport.x);
@@ -122,10 +122,14 @@ export class WebGPURenderPass {
   getViewport(): DeviceViewport {
     return Object.assign({}, this._currentViewport);
   }
-  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
     const backBufferWidth = this._device.deviceXToScreen(this._device.drawingBufferWidth);
     const backBufferHeight = this._device.deviceYToScreen(this._device.drawingBufferHeight);
-    if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
+    if (
+      scissor === null ||
+      scissor === undefined ||
+      (!Array.isArray(scissor) && (scissor as DeviceViewport).default)
+    ) {
       this._currentScissor = {
         x: 0,
         y: 0,
@@ -143,7 +147,7 @@ export class WebGPURenderPass {
           default: false
         };
       } else {
-        this._currentScissor = Object.assign({ default: false }, scissor);
+        this._currentScissor = Object.assign({ default: false }, scissor as DeviceViewport);
       }
     }
     let vx = this._device.screenXToDevice(this._currentScissor.x);

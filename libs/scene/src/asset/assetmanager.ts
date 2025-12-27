@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import type { HttpRequest, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
+import type { HttpRequest, Nullable, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
 import {
   isPowerOf2,
   nextPowerOf2,
@@ -170,7 +170,7 @@ export class AssetManager {
   };
   /** @internal */
   private _binaryDatas: {
-    [url: string]: Promise<ArrayBuffer>;
+    [url: string]: Promise<Nullable<ArrayBuffer>>;
   };
   /** @internal */
   private _textDatas: {
@@ -178,15 +178,15 @@ export class AssetManager {
   };
   /** @internal */
   private _bluePrints: {
-    [url: string]: Promise<Record<string, MaterialBlueprintIR>>;
+    [url: string]: Promise<Nullable<Record<string, MaterialBlueprintIR>>>;
   };
   /** @internal */
   private _materials: {
-    [url: string]: Promise<Material> | DWeakRef<Material>;
+    [url: string]: Promise<Nullable<Material>> | DWeakRef<Material>;
   };
   /** @internal */
   private _primitives: {
-    [url: string]: Promise<Primitive> | DWeakRef<Primitive>;
+    [url: string]: Promise<Nullable<Primitive>> | DWeakRef<Primitive>;
   };
   /** @internal */
   private _skeletons: {
@@ -207,6 +207,7 @@ export class AssetManager {
     this._models = {};
     this._materials = {};
     this._primitives = {};
+    this._skeletons = {};
     this._bluePrints = {};
     this._binaryDatas = {};
     this._textDatas = {};
@@ -353,10 +354,10 @@ export class AssetManager {
    */
   async fetchBinaryData(
     url: string,
-    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
-    httpRequest?: HttpRequest,
+    postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
+    httpRequest?: Nullable<HttpRequest>,
     VFSs?: VFS[]
-  ): Promise<ArrayBuffer> {
+  ): Promise<Nullable<ArrayBuffer>> {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._binaryDatas[hash];
     if (!P) {
@@ -365,7 +366,7 @@ export class AssetManager {
     }
     return P;
   }
-  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>> {
+  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Nullable<Record<string, MaterialBlueprintIR>>> {
     const hash = url;
     let P = this._bluePrints[hash];
     if (!P) {
@@ -381,11 +382,11 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @returns A promise that resolves to the loaded material.
    */
-  async fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T> {
+  async fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     const hash = url;
-    let P = this._materials[hash] as Promise<T> | DWeakRef<T>;
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    let P = this._materials[hash] as Promise<Nullable<T>> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadMaterial<T>(url, false, VFSs);
       this._materials[hash] = P;
@@ -403,11 +404,11 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @returns A promise that resolves to the loaded primitive.
    */
-  async fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+  async fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     const hash = url;
-    let P = this._primitives[hash] as Promise<T> | DWeakRef<T>;
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    let P = this._primitives[hash] as Promise<Nullable<T>> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadPrimitive<T>(url, VFSs);
       this._primitives[hash] = P;
@@ -449,8 +450,8 @@ export class AssetManager {
     } else {
       const hash = this.getHash('2d', url, options);
       let P = this._textures[hash] as Promise<T> | DWeakRef<T>;
-      if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-        return P.get();
+      if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+        return P.get()!;
       } else if (!P || P instanceof DWeakRef) {
         P = this.loadTexture(
           url,
@@ -483,8 +484,8 @@ export class AssetManager {
   async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
     const hash = url;
     let P = this._models[hash];
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadModel(url, options, VFSs);
       this._models[hash] = P;
@@ -567,9 +568,9 @@ export class AssetManager {
    */
   async loadBinaryData(
     url: string,
-    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
     VFSs?: VFS[]
-  ): Promise<ArrayBuffer> {
+  ): Promise<Nullable<ArrayBuffer>> {
     try {
       let data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
       if (postProcess) {
@@ -581,7 +582,7 @@ export class AssetManager {
       return null;
     }
   }
-  async loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+  async loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; data: any };
@@ -644,7 +645,7 @@ export class AssetManager {
     }
   }
   async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
-    const promises: Promise<Material>[] = [];
+    const promises: Promise<Nullable<Material>>[] = [];
     const paths: string[] = [];
     for (const k of Object.keys(this._materials)) {
       const m = this._materials[k];
@@ -652,7 +653,7 @@ export class AssetManager {
         promises.push(m);
         paths.push(k);
       } else if (m instanceof DWeakRef && !!m.get()) {
-        promises.push(Promise.resolve(m.get()));
+        promises.push(Promise.resolve(m.get()!));
         paths.push(k);
       }
     }
@@ -661,10 +662,12 @@ export class AssetManager {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
         const data = await this.loadBluePrintMaterialData(paths[i], true);
-        m.fragmentIR = data.irFragment;
-        m.vertexIR = data.irVertex;
-        m.uniformValues = data.uniformValues;
-        m.uniformTextures = data.uniformTextures;
+        if (data) {
+          m.fragmentIR = data.irFragment!;
+          m.vertexIR = data.irVertex!;
+          m.uniformValues = data.uniformValues;
+          m.uniformTextures = data.uniformTextures;
+        }
       }
     }
   }
@@ -727,8 +730,8 @@ export class AssetManager {
         });
       }
       return {
-        irFragment: ir['fragment'],
-        irVertex: ir['vertex'],
+        irFragment: ir?.['fragment'] ?? null,
+        irVertex: ir?.['vertex'] ?? null,
         uniformValues,
         uniformTextures
       };
@@ -747,7 +750,11 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded material.
    * @internal
    */
-  async loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T> {
+  async loadMaterial<T extends Material = Material>(
+    url: string,
+    reload: boolean,
+    VFSs?: VFS[]
+  ): Promise<Nullable<T>> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; props: any; data: any };
@@ -759,7 +766,7 @@ export class AssetManager {
       );
       let mat: T;
       if (content.type === 'PBRBluePrintMaterial') {
-        const data = await this.loadBluePrintMaterialData(
+        const data = (await this.loadBluePrintMaterialData(
           content.data as {
             IR: string;
             uniformValues: BluePrintUniformValue[];
@@ -767,15 +774,15 @@ export class AssetManager {
           },
           reload,
           VFSs
-        );
+        ))!;
         mat = new PBRBluePrintMaterial(
-          data.irFragment,
-          data.irVertex,
+          data.irFragment!,
+          data.irVertex!,
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
       } else if (content.type === 'Sprite3DBluePrintMaterial') {
-        const data = await this.loadBluePrintMaterialData(
+        const data = (await this.loadBluePrintMaterialData(
           content.data as {
             IR: string;
             uniformValues: BluePrintUniformValue[];
@@ -783,9 +790,9 @@ export class AssetManager {
           },
           reload,
           VFSs
-        );
+        ))!;
         mat = new Sprite3DBlueprintMaterial(
-          data.irFragment,
+          data.irFragment!,
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
@@ -871,10 +878,10 @@ export class AssetManager {
     gs: GraphStructure,
     nodes: Record<number, IGraphNode>,
     roots: number[]
-  ): {
+  ): Nullable<{
     order: number[];
     levels: number[][];
-  } {
+  }> {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
     }
@@ -927,7 +934,7 @@ export class AssetManager {
     for (const k in gs.incoming) {
       const node = nodeMap[k];
       for (const conn of gs.incoming[k]) {
-        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        const input = node.inputs.find((input) => input.id === conn.endSlotId)!;
         input.inputNode = nodeMap[conn.targetNodeId];
         input.inputId = conn.startSlotId;
       }
@@ -936,7 +943,7 @@ export class AssetManager {
       graph: gs,
       nodeMap,
       roots,
-      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots)!.order.reverse()
     };
   }
   invalidateBluePrint(path: string) {
@@ -961,8 +968,8 @@ export class AssetManager {
         const state = states[k];
         for (const node of state.nodes) {
           const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
-          nodeMap[node.id] = impl;
-          if (impl.outputs.length === 0) {
+          nodeMap[node.id] = impl!;
+          if (impl!.outputs.length === 0) {
             roots.push(node.id);
           }
         }
@@ -1023,12 +1030,12 @@ export class AssetManager {
    */
   async loadTexture(
     url: string,
-    mimeType?: string,
+    mimeType?: Nullable<string>,
     srgb?: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture,
+    texture?: Nullable<BaseTexture>,
     VFSs?: VFS[]
-  ): Promise<BaseTexture> {
+  ): Promise<Nullable<BaseTexture>> {
     const data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
     mimeType = mimeType ?? this.vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
@@ -1036,7 +1043,9 @@ export class AssetManager {
         continue;
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
-      tex.name = this.vfs.basename(url);
+      if (tex) {
+        tex.name = this.vfs.basename(url);
+      }
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
@@ -1060,35 +1069,17 @@ export class AssetManager {
     data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
-  ): Promise<BaseTexture> {
+    texture?: Nullable<BaseTexture>
+  ): Promise<Nullable<BaseTexture>> {
     const device = getDevice();
     if (device.type !== 'webgl') {
       return await loader.load(mimeType, data, srgb, samplerOptions, texture);
     } else {
       let tex = await loader.load(mimeType, data, srgb, samplerOptions);
-      if (texture) {
-        const magFilter = tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
-        const minFilter = magFilter;
-        const mipFilter = 'none';
-        const sampler = device.createSampler({
-          addressU: 'clamp',
-          addressV: 'clamp',
-          magFilter,
-          minFilter,
-          mipFilter
-        });
-        const blitter = new CopyBlitter();
-        blitter.blit(tex as any, texture as any, sampler);
-        tex = texture;
-      } else {
-        const po2_w = isPowerOf2(tex.width);
-        const po2_h = isPowerOf2(tex.height);
-        const srgb = tex.isSRGBFormat();
-        if (srgb || !po2_w || !po2_h) {
-          const newWidth = po2_w ? tex.width : nextPowerOf2(tex.width);
-          const newHeight = po2_h ? tex.height : nextPowerOf2(tex.height);
-          const magFilter = newWidth !== tex.width || newHeight !== tex.height ? 'linear' : 'nearest';
+      if (tex) {
+        if (texture) {
+          const magFilter =
+            tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
           const minFilter = magFilter;
           const mipFilter = 'none';
           const sampler = device.createSampler({
@@ -1098,14 +1089,35 @@ export class AssetManager {
             minFilter,
             mipFilter
           });
-          const destFormat = srgb ? 'rgba8unorm' : tex.format;
           const blitter = new CopyBlitter();
-          const newTexture = tex.isTexture2D()
-            ? device.createTexture2D(destFormat, newWidth, newHeight)
-            : device.createCubeTexture(destFormat, newWidth);
-          blitter.blit(tex as any, newTexture as any, sampler);
-          tex.dispose();
-          tex = newTexture;
+          blitter.blit(tex as any, texture as any, sampler);
+          tex = texture;
+        } else {
+          const po2_w = isPowerOf2(tex.width);
+          const po2_h = isPowerOf2(tex.height);
+          const srgb = tex.isSRGBFormat();
+          if (srgb || !po2_w || !po2_h) {
+            const newWidth = po2_w ? tex.width : nextPowerOf2(tex.width);
+            const newHeight = po2_h ? tex.height : nextPowerOf2(tex.height);
+            const magFilter = newWidth !== tex.width || newHeight !== tex.height ? 'linear' : 'nearest';
+            const minFilter = magFilter;
+            const mipFilter = 'none';
+            const sampler = device.createSampler({
+              addressU: 'clamp',
+              addressV: 'clamp',
+              magFilter,
+              minFilter,
+              mipFilter
+            });
+            const destFormat = srgb ? 'rgba8unorm' : tex.format;
+            const blitter = new CopyBlitter();
+            const newTexture = tex.isTexture2D()
+              ? device.createTexture2D(destFormat, newWidth, newHeight)
+              : device.createCubeTexture(destFormat, newWidth);
+            blitter.blit(tex as any, newTexture as any, sampler);
+            tex.dispose();
+            tex = newTexture;
+          }
         }
       }
       return tex;
@@ -1199,7 +1211,7 @@ export class AssetManager {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {
-      this._builtinTextureLoaders[name] = undefined;
+      delete this._builtinTextureLoaders[name];
     }
   }
   /**
@@ -1214,7 +1226,11 @@ export class AssetManager {
    * @returns A string cache key combining type, URL, and color space choice.
    * @internal
    */
-  private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {
+  private getHash<T extends BaseTexture>(
+    type: string,
+    url: string,
+    options?: TextureFetchOptions<T>
+  ): string {
     return `${type}:${url}:${!options?.linearColorSpace}`;
   }
   /**

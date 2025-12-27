@@ -786,8 +786,8 @@ export class WebGLDevice extends BaseDevice {
     return [this._currentBindGroups[index], this._currentBindGroupOffsets[index]];
   }
   // render related
-  setViewport(vp: Nullable<number[] | DeviceViewport>) {
-    if (vp === null || vp === undefined || (!Array.isArray(vp) && vp.default)) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
+    if (vp === null || vp === undefined || (!Array.isArray(vp) && (vp as DeviceViewport).default)) {
       this._currentViewport = {
         x: 0,
         y: 0,
@@ -805,7 +805,7 @@ export class WebGLDevice extends BaseDevice {
           default: false
         };
       } else {
-        this._currentViewport = Object.assign({ default: false }, vp);
+        this._currentViewport = Object.assign({ default: false }, vp as DeviceViewport);
       }
     }
     this._context.viewport(
@@ -818,8 +818,12 @@ export class WebGLDevice extends BaseDevice {
   getViewport(): Immutable<DeviceViewport> {
     return this._currentViewport;
   }
-  setScissor(scissor: Nullable<number[] | DeviceViewport>) {
-    if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
+    if (
+      scissor === null ||
+      scissor === undefined ||
+      (!Array.isArray(scissor) && (scissor as DeviceViewport).default)
+    ) {
       this._currentScissorRect = {
         x: 0,
         y: 0,
@@ -837,7 +841,7 @@ export class WebGLDevice extends BaseDevice {
           default: false
         };
       } else {
-        this._currentScissorRect = Object.assign({ default: false }, scissor);
+        this._currentScissorRect = Object.assign({ default: false }, scissor as DeviceViewport);
       }
     }
     this._context.scissor(

@@ -7,11 +7,12 @@ import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export class PCFOPT extends ShadowImpl {
   protected _kernelSize: number;
-  protected _shadowSampler: TextureSampler;
+  protected _shadowSampler: Nullable<TextureSampler>;
   constructor(kernelSize?: number) {
     super();
     this._kernelSize = kernelSize ?? 5;
@@ -39,8 +40,8 @@ export class PCFOPT extends ShadowImpl {
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
     return (
       this.useNativeShadowMap(shadowMapParams)
-        ? shadowMapParams.shadowMapFramebuffer.getDepthAttachment()
-        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+        ? shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()
+        : shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0]
     ) as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
@@ -56,7 +57,7 @@ export class PCFOPT extends ShadowImpl {
   getShaderHash(): string {
     return `${this._kernelSize}`;
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
@@ -67,7 +68,7 @@ export class PCFOPT extends ShadowImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
   ): PBShaderExp {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -106,7 +107,7 @@ export class PCFOPT extends ShadowImpl {
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             that._kernelSize,
             this.shadowCoord,
             this.receiverPlaneDepthBias,
@@ -186,7 +187,7 @@ export class PCFOPT extends ShadowImpl {
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             that._kernelSize,
             this.shadowCoord,
             this.receiverPlaneDepthBias
@@ -212,7 +213,7 @@ export class PCFOPT extends ShadowImpl {
     const pb = scope.$builder;
     const that = this;
     pb.func(funcNameSampleShadowMap, [pb.vec3('coords'), pb.float('z'), pb.float('bias')], function () {
-      const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+      const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
       if (that.useNativeShadowMap(shadowMapParams)) {
         this.$return(
           pb.clamp(
@@ -252,10 +253,10 @@ export class PCFOPT extends ShadowImpl {
       funcNameSampleShadowMapCSM,
       [pb.vec4('coords'), pb.int('split'), pb.float('z'), pb.float('bias')],
       function () {
-        const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+        const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
         this.$l.distance = pb.sub(this.z, this.bias);
         if (that.useNativeShadowMap(shadowMapParams)) {
-          if (shadowMapParams.shadowMap.isTexture2DArray()) {
+          if (shadowMapParams.shadowMap!.isTexture2DArray()) {
             this.$return(
               pb.clamp(
                 pb.textureArraySampleCompareLevel(
@@ -278,7 +279,7 @@ export class PCFOPT extends ShadowImpl {
             );
           }
         } else {
-          if (shadowMapParams.shadowMap.isTexture2DArray()) {
+          if (shadowMapParams.shadowMap!.isTexture2DArray()) {
             this.$l.shadowTex = pb.textureArraySampleLevel(
               ShaderHelper.getShadowMap(this),
               this.coords.xy,

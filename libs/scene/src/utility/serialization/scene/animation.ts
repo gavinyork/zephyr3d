@@ -67,7 +67,7 @@ export function getInterpolatorClass(): SerializableClass {
           name: 'Target',
           type: 'string',
           get(this: Interpolator, value) {
-            value.str[0] = this.target;
+            value.str[0] = this.target ?? '';
           }
         }
       ];
@@ -454,7 +454,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
           name: 'TrackProp',
           type: 'string',
           get(this: PropertyTrack, value) {
-            value.str[0] = manager.getPropertyName(this.getProp());
+            value.str[0] = manager.getPropertyName(this.getProp()) ?? '';
           }
         },
         {
@@ -498,11 +498,11 @@ export function getSkeletonClass(): SerializableClass {
     ) {
       const prefabNode = ctx.getPrefabNode();
       const joints = init.joints
-        .map((id) => prefabNode.findNodeById(id))
+        .map((id) => prefabNode!.findNodeById(id)!)
         .map((node) => {
-          node.jointTypeT = 'static';
-          node.jointTypeS = 'static';
-          node.jointTypeR = 'static';
+          node!.jointTypeT = 'static';
+          node!.jointTypeS = 'static';
+          node!.jointTypeR = 'static';
           return node;
         });
       const inverseBindMatricesArray = new Float32Array(base64ToUint8Array(init.inverseBindMatrices).buffer);
@@ -658,7 +658,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
                 }
               } else if (track instanceof AnimationTrack) {
                 const prefabNode = this._animationSet.model.getPrefabNode();
-                const node = prefabNode.findNodeById(track.target);
+                const node = prefabNode!.findNodeById(track.target);
                 if (node) {
                   this.addTrack(node, track);
                 } else {

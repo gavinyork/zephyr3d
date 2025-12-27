@@ -202,7 +202,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -273,7 +273,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -404,7 +404,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
           bindGroup.setValue('zNormalScale', this._normalScale);
         }
@@ -416,7 +416,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * @returns true Environment lighting should be calculated, otherwise false
      */
     needCalculateEnvLight(): boolean {
-      return this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && this.drawContext.drawEnvLight;
+      return this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && this.drawContext.drawEnvLight;
     }
     /**
      * Get irradiance of current environment light
@@ -431,9 +431,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         console.warn('getEnvLightIrradiance(): No need to calculate environment lighting');
         return scope.$builder.vec3(0);
       }
-      return this.drawContext.env.light.envLight.hasIrradiance()
+      return this.drawContext.env!.light.envLight.hasIrradiance()
         ? scope.$builder.mul(
-            this.drawContext.env.light.envLight.getIrradiance(scope, normal).rgb,
+            this.drawContext.env!.light.envLight.getIrradiance(scope, normal).rgb,
             ShaderHelper.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
@@ -456,9 +456,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         console.warn('getEnvLightRadiance(): No need to calculate environment lighting');
         return scope.$builder.vec3(0);
       }
-      return this.drawContext.env.light.envLight.hasRadiance()
+      return this.drawContext.env!.light.envLight.hasRadiance()
         ? scope.$builder.mul(
-            this.drawContext.env.light.envLight.getRadiance(scope, reflectVec, roughness).rgb,
+            this.drawContext.env!.light.envLight.getRadiance(scope, reflectVec, roughness)!.rgb,
             ShaderHelper.getEnvLightStrength(scope)
           )
         : scope.$builder.vec3(0);
@@ -470,7 +470,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     protected needCalculateShadow(): boolean {
       return (
-        this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT && !!this.drawContext.currentShadowLight
+        this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && !!this.drawContext.currentShadowLight
       );
     }
     /**
@@ -588,7 +588,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      if (that.drawContext.renderPass.type !== RENDER_PASS_TYPE_LIGHT) {
+      if (that.drawContext.renderPass!.type !== RENDER_PASS_TYPE_LIGHT) {
         console.warn('LitMaterial.forEachLight(): must be called in forward render pass');
         return;
       }
@@ -718,7 +718,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         if (this.normalTexture) {
           scope.zNormalScale = pb.float().uniform(2);
         }

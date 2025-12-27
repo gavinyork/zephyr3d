@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
@@ -46,7 +47,11 @@ export abstract class EnvironmentLighting extends Disposable {
    *
    * @returns The radiance for the fragment
    */
-  abstract getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
+  abstract getRadiance(
+    scope: PBInsideFunctionScope,
+    refl: PBShaderExp,
+    roughness: PBShaderExp
+  ): Nullable<PBShaderExp>;
   /**
    * Get irradiance for a fragment
    *
@@ -107,24 +112,24 @@ export class EnvShIBL extends EnvironmentLighting {
     return 'ibl';
   }
   /** The radiance map */
-  get radianceMap(): TextureCube {
+  get radianceMap() {
     return this._radianceMap.get();
   }
-  set radianceMap(tex: TextureCube) {
+  set radianceMap(tex) {
     this._radianceMap.set(tex);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSH(): GPUDataBuffer {
+  get irradianceSH() {
     return this._irradianceSH.get();
   }
-  set irradianceSH(value: GPUDataBuffer) {
+  set irradianceSH(value) {
     this._irradianceSH.set(value);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSHFB(): FrameBuffer {
+  get irradianceSHFB() {
     return this._irradianceSHFB.get();
   }
-  set irradianceSHFB(value: FrameBuffer) {
+  set irradianceSHFB(value) {
     this._irradianceSHFB.set(value);
   }
   /** The irradiance sh window */
@@ -432,7 +437,11 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
+  getRadiance(
+    _scope: PBInsideFunctionScope,
+    _refl: PBShaderExp,
+    _roughness: PBShaderExp
+  ): Nullable<PBShaderExp> {
     return null;
   }
   /**

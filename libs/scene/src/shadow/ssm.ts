@@ -7,6 +7,7 @@ import { computeShadowMapDepth } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export class SSM extends ShadowImpl {
@@ -26,8 +27,8 @@ export class SSM extends ShadowImpl {
   getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
     return (
       this.useNativeShadowMap(shadowMapParams)
-        ? shadowMapParams.shadowMapFramebuffer.getDepthAttachment()
-        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+        ? shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()
+        : shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0]
     ) as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
@@ -43,7 +44,7 @@ export class SSM extends ShadowImpl {
   getShaderHash(): string {
     return '';
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     if (this.useNativeShadowMap(shadowMapParams)) {
       return null;
     } else {
@@ -67,7 +68,7 @@ export class SSM extends ShadowImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
   ): PBShaderExp {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -83,7 +84,7 @@ export class SSM extends ShadowImpl {
       funcNameComputeShadowCSM,
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
-        const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+        const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
         this.$l.shadowCoord = pb.div(this.shadowVertex.xyz, this.shadowVertex.w);
         this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord.xyz, 0.5), 0.5);
         this.$l.inShadow = pb.all(
@@ -104,7 +105,7 @@ export class SSM extends ShadowImpl {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
           if (that.useNativeShadowMap(shadowMapParams)) {
-            if (shadowMapParams.shadowMap.isTexture2DArray()) {
+            if (shadowMapParams.shadowMap!.isTexture2DArray()) {
               this.shadow = pb.textureArraySampleCompareLevel(
                 ShaderHelper.getShadowMap(this),
                 this.shadowCoord.xy,
@@ -119,7 +120,7 @@ export class SSM extends ShadowImpl {
               );
             }
           } else {
-            if (shadowMapParams.shadowMap.isTexture2DArray()) {
+            if (shadowMapParams.shadowMap!.isTexture2DArray()) {
               this.$l.shadowTex = pb.textureArraySampleLevel(
                 ShaderHelper.getShadowMap(this),
                 this.shadowCoord.xy,
@@ -154,7 +155,7 @@ export class SSM extends ShadowImpl {
     const pb = scope.$builder;
     const that = this;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
-      const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+      const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
         this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
         if (that.useNativeShadowMap(shadowMapParams)) {

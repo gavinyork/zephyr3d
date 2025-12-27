@@ -119,7 +119,7 @@ export class DRef<T extends IDisposable> {
    * Creates a new reference to a disposable object.
    * @param obj - The disposable object to reference
    */
-  constructor(obj?: T) {
+  constructor(obj?: Nullable<T>) {
     this._object = obj ?? null;
     retainObject(this._object);
   }
@@ -134,10 +134,10 @@ export class DRef<T extends IDisposable> {
    * Sets a new object reference, releasing the previous one if it exists.
    * @param obj - The new object to reference
    */
-  set(obj: T) {
+  set(obj: Nullable<T>) {
     if (obj !== this._object) {
       releaseObject(this._object);
-      this._object = obj ?? null;
+      this._object = obj;
       retainObject(this._object);
     }
   }
@@ -162,7 +162,7 @@ export class DWeakRef<T extends IDisposable> {
    * Creates a new reference to a disposable object.
    * @param obj - The disposable object to reference
    */
-  constructor(obj?: T) {
+  constructor(obj?: Nullable<T>) {
     this._object = obj ?? null;
     this.retain();
   }
@@ -180,10 +180,10 @@ export class DWeakRef<T extends IDisposable> {
    * Sets a new object reference, releasing the previous one if it exists.
    * @param obj - The new object to reference
    */
-  set(obj: T) {
+  set(obj: Nullable<T>) {
     if (obj !== this._object) {
       this.release();
-      this._object = obj ?? null;
+      this._object = obj;
       this.retain();
     }
   }

@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector4 } from '@zephyr3d/base';
 import { MAX_CLUSTERED_LIGHTS } from '../values';
 import type {
@@ -21,13 +22,13 @@ export class ClusteredLight {
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
   private readonly _lights: Float32Array<ArrayBuffer>;
-  private _lightIndexTexture: Texture2D;
-  private _lightIndexFramebuffer: FrameBuffer;
-  private _lightIndexProgram: GPUProgram;
-  private _bindGroup: BindGroup;
-  private _lightIndexVertexLayout: VertexLayout;
-  private _lightIndexRenderStates: RenderStateSet;
-  private _lightBuffer: StructuredBuffer;
+  private _lightIndexTexture: Nullable<Texture2D>;
+  private _lightIndexFramebuffer: Nullable<FrameBuffer>;
+  private _lightIndexProgram: Nullable<GPUProgram>;
+  private _bindGroup: Nullable<BindGroup>;
+  private _lightIndexVertexLayout: Nullable<VertexLayout>;
+  private _lightIndexRenderStates: Nullable<RenderStateSet>;
+  private _lightBuffer: Nullable<StructuredBuffer>;
   private readonly _sizeParam: Vector4;
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
@@ -70,7 +71,7 @@ export class ClusteredLight {
         vertices[i * 3 + 1] = (2 * (iy + 0.5)) / textureHeight - 1;
         vertices[i * 3 + 2] = i;
       }
-      vb = device.createVertexBuffer('position_f32x3', vertices);
+      vb = device.createVertexBuffer('position_f32x3', vertices)!;
     } else {
       const vertices = new Float32Array(this._tileCountX * this._tileCountY * this._tileCountZ * 2);
       for (let i = 0; i < vertices.length; i++) {
@@ -79,7 +80,7 @@ export class ClusteredLight {
         vertices[i * 2 + 0] = (2 * (ix + 0.5)) / textureWidth - 1;
         vertices[i * 2 + 1] = (2 * (iy + 0.5)) / textureHeight - 1;
       }
-      vb = device.createVertexBuffer('position_f32x2', vertices);
+      vb = device.createVertexBuffer('position_f32x2', vertices)!;
     }
     this._lightIndexVertexLayout = device.createVertexLayout({
       vertexBuffers: [{ buffer: vb }]
@@ -306,13 +307,13 @@ export class ClusteredLight {
           this.$outputs.color = this.$inputs.value;
         });
       }
-    });
+    })!;
     this._lightIndexProgram.name = '@ClusteredLight_Index';
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
     this._lightBuffer?.dispose();
     const lightBufferType = this._lightIndexProgram.getBindingInfo(
-      ShaderHelper.getLightBufferUniformName()
-    ).type;
+      ShaderHelper.getLightBufferUniformName()!
+    )!.type;
     this._lightBuffer = device.createStructuredBuffer(lightBufferType as PBStructTypeInfo, {
       usage: 'uniform'
     });
@@ -331,7 +332,7 @@ export class ClusteredLight {
       textureWidth,
       textureHeight,
       { mipmapping: false }
-    );
+    )!;
     this._lightIndexTexture.name = 'ClusterLightIndex';
     this._lightIndexFramebuffer?.dispose();
     this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);
@@ -346,7 +347,7 @@ export class ClusteredLight {
       this.createProgram(device);
     }
     if (!this._lightIndexVertexLayout) {
-      this.createVertexLayout(device, this._lightIndexTexture.width, this._lightIndexTexture.height);
+      this.createVertexLayout(device, this._lightIndexTexture!.width, this._lightIndexTexture!.height);
     }
     if (!this._lightIndexRenderStates) {
       this.createRenderState(device);
@@ -363,23 +364,23 @@ export class ClusteredLight {
     device.pushDeviceStates();
     device.setFramebuffer(this._lightIndexFramebuffer);
     if (numLights > 0) {
-      if (this._lightBuffer.disposed) {
-        this._lightBuffer.reload();
+      if (this._lightBuffer!.disposed) {
+        this._lightBuffer!.reload();
       }
-      this._lightBuffer.bufferSubData(0, this._lights);
+      this._lightBuffer!.bufferSubData(0, this._lights);
       this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
       this._countParam[0] = this._tileCountX;
       this._countParam[1] = this._tileCountY;
       this._countParam[2] = this._tileCountZ;
       this._countParam[3] = numLights + 1;
-      this._bindGroup.setValue('invProjMatrix', Matrix4x4.invert(camera.getProjectionMatrix()));
-      this._bindGroup.setValue('viewMatrix', camera.viewMatrix);
-      this._bindGroup.setValue('sizeParam', this._sizeParam);
-      this._bindGroup.setValue('countParam', this._countParam);
-      this._bindGroup.setBuffer(ShaderHelper.getLightBufferUniformName(), this._lightBuffer);
+      this._bindGroup!.setValue('invProjMatrix', Matrix4x4.invert(camera.getProjectionMatrix()));
+      this._bindGroup!.setValue('viewMatrix', camera.viewMatrix);
+      this._bindGroup!.setValue('sizeParam', this._sizeParam);
+      this._bindGroup!.setValue('countParam', this._countParam);
+      this._bindGroup!.setBuffer(ShaderHelper.getLightBufferUniformName(), this._lightBuffer!);
       device.setProgram(this._lightIndexProgram);
       device.setVertexLayout(this._lightIndexVertexLayout);
-      device.setBindGroup(0, this._bindGroup);
+      device.setBindGroup(0, this._bindGroup!);
       const savedRS = device.getRenderStates();
       device.setRenderStates(this._lightIndexRenderStates);
       device.draw('point-list', 0, this._tileCountX * this._tileCountY * this._tileCountZ);

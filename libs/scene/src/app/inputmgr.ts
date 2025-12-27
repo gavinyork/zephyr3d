@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { Application } from '../app';
 
 type PointerEventData = {
@@ -166,7 +167,7 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  use(handler: InputEventHandler, ctx?: unknown): this {
+  use(handler: Nullable<InputEventHandler>, ctx?: unknown): this {
     if (handler) {
       this._middlewares.push({ handler, ctx });
     }
@@ -179,7 +180,7 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  useFirst(handler: InputEventHandler, ctx?: unknown): this {
+  useFirst(handler: Nullable<InputEventHandler>, ctx?: unknown): this {
     if (handler) {
       this._middlewares.unshift({ handler, ctx });
     }

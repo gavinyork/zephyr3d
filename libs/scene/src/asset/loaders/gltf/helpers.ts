@@ -1,5 +1,5 @@
 import type { Accessor, AccessorSparse } from './gltf';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { GLTFContent } from './gltf_loader';
 
 /** @internal */
@@ -29,20 +29,20 @@ export class GLTFAccessor {
   min: number[];
   sparse: AccessorSparse;
   name: string;
-  private _typedView: TypedArray;
-  private _filteredView: TypedArray;
-  private _normalizedFilteredView: TypedArray;
-  private _normalizedTypedView: TypedArray;
+  private _typedView: Nullable<TypedArray>;
+  private _filteredView: Nullable<TypedArray>;
+  private _normalizedFilteredView: Nullable<TypedArray>;
+  private _normalizedTypedView: Nullable<TypedArray>;
   constructor(accessorInfo: Accessor) {
-    this.bufferView = accessorInfo.bufferView;
+    this.bufferView = accessorInfo.bufferView!;
     this.byteOffset = accessorInfo.byteOffset ?? 0;
     this.componentType = accessorInfo.componentType;
     this.normalized = !!accessorInfo.normalized;
     this.count = accessorInfo.count;
     this.type = accessorInfo.type;
-    this.max = accessorInfo.max;
-    this.min = accessorInfo.min;
-    this.sparse = accessorInfo.sparse;
+    this.max = accessorInfo.max!;
+    this.min = accessorInfo.min!;
+    this.sparse = accessorInfo.sparse!;
     this.name = accessorInfo.name;
     this._typedView = null;
     this._filteredView = null;
@@ -55,8 +55,8 @@ export class GLTFAccessor {
     }
 
     if (this.bufferView !== undefined) {
-      const bufferView = gltf.bufferViews[this.bufferView];
-      const buffer = gltf._loadedBuffers[bufferView.buffer];
+      const bufferView = gltf.bufferViews![this.bufferView];
+      const buffer = gltf._loadedBuffers![bufferView.buffer];
       const byteOffset = this.byteOffset + (bufferView.byteOffset ?? 0);
 
       const componentSize = this.getComponentSize(this.componentType);
@@ -102,7 +102,7 @@ export class GLTFAccessor {
           break;
       }
     } else if (this.sparse !== undefined) {
-      this._typedView = this.createView();
+      this._typedView = this.createView()!;
     }
 
     if (!this._typedView) {
@@ -124,7 +124,7 @@ export class GLTFAccessor {
 
     const typedView = this.getTypedView(gltf);
     this._normalizedTypedView = this.normalized
-      ? GLTFAccessor.dequantize(typedView, this.componentType)
+      ? GLTFAccessor.dequantize(typedView!, this.componentType)
       : typedView;
     return this._normalizedTypedView;
   }
@@ -177,8 +177,8 @@ export class GLTFAccessor {
     }
 
     if (this.bufferView !== undefined) {
-      const bufferView = gltf.bufferViews[this.bufferView];
-      const buffer = gltf._loadedBuffers[bufferView.buffer];
+      const bufferView = gltf.bufferViews![this.bufferView];
+      const buffer = gltf._loadedBuffers![bufferView.buffer];
       const byteOffset = this.byteOffset + (bufferView.byteOffset ?? 0);
       const stride =
         bufferView.byteStride !== undefined && bufferView.byteStride !== 0
@@ -190,7 +190,7 @@ export class GLTFAccessor {
         this._filteredView[i] = dataView[func](offset, true);
       }
     } else if (this.sparse !== undefined) {
-      this._filteredView = this.createView();
+      this._filteredView = this.createView()!;
     }
 
     if (this.sparse !== undefined) {
@@ -234,9 +234,9 @@ export class GLTFAccessor {
       return this._normalizedFilteredView;
     }
 
-    const filteredView = this.getDeinterlacedView(gltf);
+    const filteredView = this.getDeinterlacedView(gltf)!;
     this._normalizedFilteredView = this.normalized
-      ? GLTFAccessor.dequantize(filteredView, this.componentType)
+      ? GLTFAccessor.dequantize(filteredView!, this.componentType)
       : filteredView;
     return this._normalizedFilteredView;
   }
@@ -244,9 +244,9 @@ export class GLTFAccessor {
   applySparse(gltf: GLTFContent, view: TypedArray) {
     // Gather indices.
 
-    const indicesBufferView = gltf.bufferViews[this.sparse.indices.bufferView];
-    const indicesBuffer = gltf._loadedBuffers[indicesBufferView.buffer];
-    const indicesByteOffset = this.sparse.indices.byteOffset + (indicesBufferView.byteOffset ?? 0);
+    const indicesBufferView = gltf.bufferViews![this.sparse.indices.bufferView];
+    const indicesBuffer = gltf._loadedBuffers![indicesBufferView.buffer];
+    const indicesByteOffset = this.sparse.indices.byteOffset! + (indicesBufferView.byteOffset ?? 0);
 
     const indicesComponentSize = this.getComponentSize(this.sparse.indices.componentType);
     let indicesComponentCount = 1;
@@ -272,9 +272,9 @@ export class GLTFAccessor {
 
     // Gather values.
 
-    const valuesBufferView = gltf.bufferViews[this.sparse.values.bufferView];
-    const valuesBuffer = gltf._loadedBuffers[valuesBufferView.buffer];
-    const valuesByteOffset = this.sparse.values.byteOffset + (valuesBufferView.byteOffset ?? 0);
+    const valuesBufferView = gltf.bufferViews![this.sparse.values.bufferView];
+    const valuesBuffer = gltf._loadedBuffers![valuesBufferView.buffer];
+    const valuesByteOffset = this.sparse.values.byteOffset! + (valuesBufferView.byteOffset ?? 0);
 
     const valuesComponentSize = this.getComponentSize(this.componentType);
     let valuesComponentCount = this.getComponentCount(this.type);
@@ -314,7 +314,7 @@ export class GLTFAccessor {
 
     for (let i = 0; i < this.sparse.count; ++i) {
       for (let k = 0; k < valuesComponentCount; ++k) {
-        view[indicesTypedView[i] * valuesComponentCount + k] = valuesTypedView[i * valuesComponentCount + k];
+        view[indicesTypedView[i] * valuesComponentCount + k] = valuesTypedView![i * valuesComponentCount + k];
       }
     }
   }

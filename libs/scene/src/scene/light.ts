@@ -1,4 +1,4 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4, DWeakRef, AABB } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { BoundingVolume } from '../utility/bounding_volume';
@@ -17,11 +17,11 @@ export abstract class BaseLight extends GraphNode {
   /** @internal */
   protected _intensity: number;
   /** @internal */
-  protected _positionRange: Vector4;
+  protected _positionRange: Nullable<Vector4>;
   /** @internal */
-  protected _directionCutoff: Vector4;
+  protected _directionCutoff: Nullable<Vector4>;
   /** @internal */
-  protected _diffuseIntensity: Vector4;
+  protected _diffuseIntensity: Nullable<Vector4>;
   /**
    * Creates a light node
    * @param scene - The scene to which the light node belongs
@@ -57,7 +57,7 @@ export abstract class BaseLight extends GraphNode {
     if (!this._positionRange) {
       this.computeUniforms();
     }
-    return this._positionRange;
+    return this._positionRange!;
   }
   /**
    * Direction and cutoff of the light
@@ -70,7 +70,7 @@ export abstract class BaseLight extends GraphNode {
     if (!this._directionCutoff) {
       this.computeUniforms();
     }
-    return this._directionCutoff;
+    return this._directionCutoff!;
   }
   /**
    * Color and intensity of the light
@@ -83,7 +83,7 @@ export abstract class BaseLight extends GraphNode {
     if (!this._diffuseIntensity) {
       this.computeUniforms();
     }
-    return this._diffuseIntensity;
+    return this._diffuseIntensity!;
   }
   /**
    * View matrix of the light
@@ -205,10 +205,10 @@ export class PunctualLight extends BaseLight {
       if (!this.shadow.shadowRegion && this.isDirectionLight()) {
         const aabb = new AABB();
         aabb.beginExtend();
-        this.scene.rootNode.iterate((child) => {
+        this.scene!.rootNode!.iterate((child) => {
           if (child.isMesh() || child.isClipmapTerrain()) {
             if (child.castShadow) {
-              const bbox = child.getWorldBoundingVolume().toAABB();
+              const bbox = child.getWorldBoundingVolume()!.toAABB();
               aabb.extend(bbox.minPoint);
               aabb.extend(bbox.maxPoint);
             }
@@ -262,7 +262,7 @@ export class DirectionalLight extends PunctualLight {
   static getSunLight(scene: Scene) {
     return this._currentSunLight.get(scene)?.get() ?? null;
   }
-  static setSunLight(scene: Scene, light: DirectionalLight) {
+  static setSunLight(scene: Scene, light: Nullable<DirectionalLight>) {
     if (light && scene !== light.scene) {
       throw new Error('setSunLight(): Light does not belongs to scene');
     }
@@ -280,13 +280,13 @@ export class DirectionalLight extends PunctualLight {
    * Only one directional light will be marked as sun light.
    **/
   get sunLight(): boolean {
-    return DirectionalLight.getSunLight(this.scene) === this;
+    return DirectionalLight.getSunLight(this.scene!) === this;
   }
   set sunLight(val: boolean) {
     if (val) {
-      DirectionalLight.setSunLight(this.scene, this);
-    } else if (DirectionalLight.getSunLight(this.scene) === this) {
-      DirectionalLight.setSunLight(this.scene, null);
+      DirectionalLight.setSunLight(this.scene!, this);
+    } else if (DirectionalLight.getSunLight(this.scene!) === this) {
+      DirectionalLight.setSunLight(this.scene!, null);
     }
   }
   /**
@@ -297,7 +297,7 @@ export class DirectionalLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     return null;
   }
   /** @internal */

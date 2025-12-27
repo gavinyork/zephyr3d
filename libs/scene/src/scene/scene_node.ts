@@ -6,7 +6,7 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { IDisposable, Immutable, Quaternion } from '@zephyr3d/base';
+import type { IDisposable, Immutable, Nullable, Quaternion } from '@zephyr3d/base';
 import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
@@ -122,14 +122,14 @@ export class SceneNode
   /** @internal Friendly name for debugging/UI. */
   protected _name: string;
   /** @internal Owning scene. */
-  protected _scene: Scene;
+  protected _scene: Nullable<Scene>;
 
   /** @internal Local-space bounding volume cache. */
-  protected _bv: BoundingVolume;
+  protected _bv: Nullable<BoundingVolume>;
   /** @internal True if local BV needs recomputing. */
   protected _bvDirty: boolean;
   /** @internal World-space bounding volume cache. */
-  protected _bvWorld: BoundingVolume;
+  protected _bvWorld: Nullable<BoundingVolume>;
 
   /** @internal Whether this node participates in scene spatial structures (octree). */
   private _placeToOctree: boolean;
@@ -137,7 +137,7 @@ export class SceneNode
   private _sealed: boolean;
 
   /** @internal Parent node. */
-  protected _parent: SceneNode;
+  protected _parent: Nullable<SceneNode>;
   /** @internal Children list (DRef for memory/resource mgmt). */
   protected _children: DRef<SceneNode>[];
 
@@ -149,13 +149,13 @@ export class SceneNode
   protected _rotation: ObservableQuaternion;
 
   /** @internal Local transform matrix cache. */
-  protected _localMatrix: Matrix4x4;
+  protected _localMatrix: Nullable<Matrix4x4>;
   /** @internal World transform matrix cache. */
-  protected _worldMatrix: Matrix4x4;
+  protected _worldMatrix: Nullable<Matrix4x4>;
   /** @internal Determinant of world transform (cached). */
-  protected _worldMatrixDet: number;
+  protected _worldMatrixDet: Nullable<number>;
   /** @internal Inverse world transform matrix cache. */
-  protected _invWorldMatrix: Matrix4x4;
+  protected _invWorldMatrix: Nullable<Matrix4x4>;
 
   /** @internal Scratch local matrix to avoid allocations. */
   protected _tmpLocalMatrix: Matrix4x4;
@@ -168,7 +168,7 @@ export class SceneNode
   protected _transformChangeCallback: () => void;
 
   /** @internal Arbitrary metadata payload for this node. */
-  protected _metaData: Metadata;
+  protected _metaData: Nullable<Metadata>;
   /** @internal If true, suppress transform-change callbacks (during bulk updates). */
   private _disableCallback: boolean;
   /** @internal User-attached script entry (engine-defined). */
@@ -182,7 +182,7 @@ export class SceneNode
    *
    * @param scene - Scene that will own this node.
    */
-  constructor(scene: Scene) {
+  constructor(scene: Nullable<Scene>) {
     super();
     this._runtimeId = SceneNode._runTimeId++;
     this._id = randomUUID();
@@ -278,7 +278,7 @@ export class SceneNode
    * Get prefab node this node belongs to, or null if this node does not belongs to any prefab
    * @returns prefab node this node belongs to
    */
-  getPrefabNode(): SceneNode {
+  getPrefabNode(): Nullable<SceneNode> {
     return this._prefabId ? this : (this.parent?.getPrefabNode() ?? null);
   }
   /**
@@ -323,10 +323,10 @@ export class SceneNode
    * @remarks
    * Stored and transported with the node; format is application-defined.
    */
-  get metaData(): Metadata {
+  get metaData() {
     return this._metaData;
   }
-  set metaData(val: Metadata) {
+  set metaData(val: Nullable<Metadata>) {
     this._metaData = val;
   }
   /**
@@ -351,14 +351,17 @@ export class SceneNode
     this._name = val || '';
   }
   /** The owning scene. */
-  get scene(): Scene {
+  get scene() {
     return this._scene;
   }
   /**
    * Whether this node is currently attached under the scene's root.
    */
   get attached(): boolean {
-    let node: SceneNode = this;
+    if (!this._scene) {
+      return false;
+    }
+    let node: Nullable<SceneNode> = this;
     while (node && node !== this._scene.rootNode) {
       node = node.parent;
     }
@@ -383,9 +386,9 @@ export class SceneNode
   get animationSet() {
     if (!this._animationSet.get()) {
       this._animationSet.set(new AnimationSet(this));
-      this.scene.queueUpdateNode(this);
+      this.scene?.queueUpdateNode(this);
     }
-    return this._animationSet.get();
+    return this._animationSet.get()!;
   }
   /**
    * Shared model reference for instancing/streaming systems.
@@ -393,7 +396,7 @@ export class SceneNode
   get sharedModel() {
     return this._sharedModel.get();
   }
-  set sharedModel(model: SharedModel) {
+  set sharedModel(model: Nullable<SharedModel>) {
     this._sharedModel.set(model);
   }
   /**
@@ -416,7 +419,7 @@ export class SceneNode
     const parent = this.parent;
     const tmpParent = new SceneNode(this.scene);
     const data = await getEngine().resourceManager.serializeObject(this);
-    const other = await getEngine().resourceManager.deserializeObject<this>(tmpParent, data);
+    const other = (await getEngine().resourceManager.deserializeObject<this>(tmpParent, data))!;
     other.persistentId = randomUUID();
     other.parent = parent;
     tmpParent.dispose();
@@ -445,7 +448,7 @@ export class SceneNode
    */
   removeChildren() {
     while (this._children.length) {
-      this._children[0].get().remove();
+      this._children[0].get()!.remove();
     }
   }
   /**
@@ -453,7 +456,7 @@ export class SceneNode
    */
   isParentOf(child: SceneNode): boolean {
     while (child && child !== this) {
-      child = child.parent;
+      child = child.parent!;
     }
     return child === this;
   }
@@ -474,7 +477,7 @@ export class SceneNode
   traverse(v: Visitor<SceneNode>): void {
     v.visit(this);
     for (const child of this._children) {
-      child.get().traverse(v);
+      child.get()!.traverse(v);
     }
   }
   /**
@@ -490,7 +493,7 @@ export class SceneNode
       return true;
     }
     for (const child of this._children) {
-      if (child.get().iterate(callback)) {
+      if (child.get()!.iterate(callback)) {
         return true;
       }
     }
@@ -507,7 +510,7 @@ export class SceneNode
   iterateBottomToTop(callback: NodeIterateFunc): boolean {
     for (let i = this._children.length - 1; i >= 0; i--) {
       const child = this._children[i];
-      if (child.get().iterateBottomToTop(callback)) {
+      if (child.get()!.iterateBottomToTop(callback)) {
         return true;
       }
     }
@@ -560,14 +563,14 @@ export class SceneNode
    * Computes the bounding volume of the node
    * @returns The output bounding volume
    */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume(): Nullable<BoundingVolume> {
     return null;
   }
   /**
    * Gets the bounding volume of the node
    * @returns The bounding volume of the node
    */
-  getBoundingVolume(): BoundingVolume {
+  getBoundingVolume(): Nullable<BoundingVolume> {
     if (this._bvDirty) {
       this._bv = this.computeBoundingVolume();
       this._bvDirty = false;
@@ -589,7 +592,7 @@ export class SceneNode
    * Gets the world space bounding volume of the node
    * @returns The world space bounding volume of the node
    */
-  getWorldBoundingVolume(): BoundingVolume {
+  getWorldBoundingVolume(): Nullable<BoundingVolume> {
     if (!this._bvWorld) {
       this._bvWorld = this.computeWorldBoundingVolume(this.getBoundingVolume());
     }
@@ -599,7 +602,7 @@ export class SceneNode
    * Computes the world space bounding volume of the node
    * @returns The output bounding volume
    */
-  computeWorldBoundingVolume(localBV: BoundingVolume): BoundingVolume {
+  computeWorldBoundingVolume(localBV: Nullable<BoundingVolume>): Nullable<BoundingVolume> {
     return localBV?.transform(this.worldMatrix) ?? null;
   }
   /**
@@ -616,7 +619,7 @@ export class SceneNode
       if (transformChanged) {
         this.iterate((node) => {
           if (node.isGraphNode()) {
-            this._scene.invalidateNodePlacement(node);
+            this._scene!.invalidateNodePlacement(node);
           }
         });
       } else if (this.isGraphNode()) {
@@ -634,7 +637,7 @@ export class SceneNode
   }
   /** Computed value of show state */
   get hidden(): boolean {
-    let node: SceneNode = this;
+    let node: Nullable<SceneNode> = this;
     while (node && node._visible === 'inherit') {
       node = node.parent;
     }
@@ -652,7 +655,7 @@ export class SceneNode
         if (this.isGraphNode()) {
           this._scene?.invalidateNodePlacement(this);
         }
-        let parent: SceneNode = this;
+        let parent: Nullable<SceneNode> = this;
         while (parent) {
           parent.dispatchEvent('visiblechanged', this);
           parent = parent.parent;
@@ -682,29 +685,30 @@ export class SceneNode
    * @param id - Persistent identifier to match against `SceneNode.persistentId`.
    * @returns The first matching node, or `null` if not found.
    */
-  findNodeById<T extends SceneNode>(id: string) {
-    let node: T = null;
+  findNodeById<T extends SceneNode>(id: string): T {
+    let node: Nullable<T> = null;
     this.iterate((child) => {
       if (child.persistentId === id) {
         node = child as T;
         return true;
       }
     });
-    return node;
+    return node as unknown as T;
   }
   /**
    * Finds a skeleton object by its persistent ID.
    * @param id - Persistent identifier to match against `Skeleton.persistentId`.
    * @returns The first matchign node, or `null` if not found.
    */
-  findSkeletonById(id: string) {
+  findSkeletonById(id: string): Nullable<Skeleton> {
     const prefabNode = this.getPrefabNode() ?? this;
-    let sk: DRef<Skeleton> = null;
+    let sk: Nullable<DRef<Skeleton>> = null;
     prefabNode.iterate((node) => {
-      sk = node.animationSet.skeletons.find((s) => s.get().persistentId === id);
+      sk = node.animationSet.skeletons.find((s) => s.get()!.persistentId === id) ?? null;
       return !!sk;
     });
-    return sk?.get() ?? null;
+    // avoid ts2339 compilation error (maybe a typescript bug?)
+    return (sk as Nullable<DRef<Skeleton>>)?.get() ?? null;
   }
   /**
    * Finds a scene node by name.
@@ -719,8 +723,8 @@ export class SceneNode
    * @remarks
    * Names are not guaranteed unique. Prefer IDs for stable references.
    */
-  findNodeByName<T extends SceneNode>(name: string) {
-    let node: T = null;
+  findNodeByName<T extends SceneNode>(name: string): Nullable<T> {
+    let node: Nullable<T> = null;
     this.iterate((child) => {
       if (child.name === name) {
         node = child as T;
@@ -755,13 +759,11 @@ export class SceneNode
     super.onDispose();
     this.remove();
     this.removeChildren();
-    this._animationSet?.dispose();
-    this._animationSet = null;
-    this._sharedModel?.dispose();
-    this._sharedModel = null;
+    this._animationSet.dispose();
+    this._sharedModel.dispose();
   }
   /** @internal */
-  protected _setParent(p: SceneNode): void {
+  protected _setParent(p: Nullable<SceneNode>): void {
     if (p && p._scene !== this._scene) {
       throw new Error('Parent node and child node must belongs to the same scene');
     }
@@ -809,7 +811,7 @@ export class SceneNode
     this._worldMatrixDet = null;
     this._transformTag++;
     for (const child of this._children) {
-      child.get()._onTransformChanged(false);
+      child.get()!._onTransformChanged(false);
     }
     this.invalidateWorldBoundingVolume(true);
     this.dispatchEvent('transformchanged', this);
@@ -825,7 +827,7 @@ export class SceneNode
   /** @internal */
   protected _attached(): void {
     this.iterate((child) => {
-      this.scene.queueUpdateNode(child);
+      this.scene!.queueUpdateNode(child);
       child._onAttached();
     });
   }
@@ -839,8 +841,8 @@ export class SceneNode
   notifyHiddenChanged() {
     this._visibleChanged();
     for (const child of this._children) {
-      if (child.get().showState === 'inherit') {
-        child.get().notifyHiddenChanged();
+      if (child.get()!.showState === 'inherit') {
+        child.get()!.notifyHiddenChanged();
       }
     }
   }
@@ -850,8 +852,7 @@ export class SceneNode
   get parent() {
     return this._parent;
   }
-  set parent(p: SceneNode) {
-    p = p || null;
+  set parent(p: Nullable<SceneNode>) {
     if (p !== this._parent) {
       this._setParent(p);
     }
@@ -1065,7 +1066,7 @@ export class SceneNode
     if (animationSet) {
       if (animationSet.numAnimations > 0 || animationSet.skeletons.length > 0) {
         animationSet.update(deltaInSeconds);
-        this.scene.queueUpdateNode(this);
+        this.scene!.queueUpdateNode(this);
       } else {
         this._animationSet.dispose();
       }
@@ -1083,8 +1084,8 @@ export class SceneNode
    * @param p - The new parent node that this node should be added to or null
    * @returns self
    */
-  reparent(p?: SceneNode) {
-    this.parent = p;
+  reparent(p?: Nullable<SceneNode>) {
+    this.parent = p ?? null;
     return this;
   }
   /** @internal */

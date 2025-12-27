@@ -22,7 +22,7 @@ import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { ShaderHelper } from './shader/helper';
-import type { Clonable } from '@zephyr3d/base';
+import type { Clonable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { getDevice } from '../app/api';
@@ -164,7 +164,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /** @internal Per-object color for object picking pass. */
   private readonly _objectColor: Vector4;
   /** @internal Last draw context used for shader creation. */
-  private _ctx: DrawContext;
+  private _ctx: Nullable<DrawContext>;
   /** @internal Current material pass index during program building. */
   private _materialPass: number;
   /**
@@ -374,13 +374,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       const value = that[prop];
       switch (type) {
         case 'float': {
-          uniformsHolder[offset] = Number(value);
+          uniformsHolder![offset] = Number(value);
           Object.defineProperty(instance, prop, {
             get() {
-              return uniformsHolder[offset];
+              return uniformsHolder![offset];
             },
             set(value) {
-              uniformsHolder[offset] = value;
+              uniformsHolder![offset] = value;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -390,18 +390,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (!(value instanceof Vector2)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
           }
-          uniformsHolder[offset] = value.x;
-          uniformsHolder[offset + 1] = value.y;
+          uniformsHolder![offset] = value.x;
+          uniformsHolder![offset + 1] = value.y;
           Object.defineProperty(instance, prop, {
             get() {
-              return new Vector2(uniformsHolder[offset], uniformsHolder[offset + 1]);
+              return new Vector2(uniformsHolder![offset], uniformsHolder![offset + 1]);
             },
             set(value) {
               if (!(value instanceof Vector2)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector2`);
               }
-              uniformsHolder[offset] = value.x;
-              uniformsHolder[offset + 1] = value.y;
+              uniformsHolder![offset] = value.x;
+              uniformsHolder![offset + 1] = value.y;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -412,24 +412,24 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (!(value instanceof Vector3)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
           }
-          uniformsHolder[offset] = value.x;
-          uniformsHolder[offset + 1] = value.y;
-          uniformsHolder[offset + 2] = value.z;
+          uniformsHolder![offset] = value.x;
+          uniformsHolder![offset + 1] = value.y;
+          uniformsHolder![offset + 2] = value.z;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector3(
-                uniformsHolder[offset],
-                uniformsHolder[offset + 1],
-                uniformsHolder[offset + 2]
+                uniformsHolder![offset],
+                uniformsHolder![offset + 1],
+                uniformsHolder![offset + 2]
               );
             },
             set(value) {
               if (!(value instanceof Vector3)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector3`);
               }
-              uniformsHolder[offset] = value.x;
-              uniformsHolder[offset + 1] = value.y;
-              uniformsHolder[offset + 2] = value.z;
+              uniformsHolder![offset] = value.x;
+              uniformsHolder![offset + 1] = value.y;
+              uniformsHolder![offset + 2] = value.z;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -440,27 +440,27 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (!(value instanceof Vector4)) {
             throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
           }
-          uniformsHolder[offset] = value.x;
-          uniformsHolder[offset + 1] = value.y;
-          uniformsHolder[offset + 2] = value.z;
-          uniformsHolder[offset + 3] = value.w;
+          uniformsHolder![offset] = value.x;
+          uniformsHolder![offset + 1] = value.y;
+          uniformsHolder![offset + 2] = value.z;
+          uniformsHolder![offset + 3] = value.w;
           Object.defineProperty(instance, prop, {
             get() {
               return new Vector4(
-                uniformsHolder[offset],
-                uniformsHolder[offset + 1],
-                uniformsHolder[offset + 2],
-                uniformsHolder[offset + 3]
+                uniformsHolder![offset],
+                uniformsHolder![offset + 1],
+                uniformsHolder![offset + 2],
+                uniformsHolder![offset + 3]
               );
             },
             set(value) {
               if (!(value instanceof Vector4)) {
                 throw new Error(`Instance uniform property ${prop} must be of type Vector4`);
               }
-              uniformsHolder[offset] = value.x;
-              uniformsHolder[offset + 1] = value.y;
-              uniformsHolder[offset + 2] = value.z;
-              uniformsHolder[offset + 3] = value.w;
+              uniformsHolder![offset] = value.x;
+              uniformsHolder![offset + 1] = value.y;
+              uniformsHolder![offset + 2] = value.z;
+              uniformsHolder![offset + 3] = value.w;
               RenderBundleWrapper.materialUniformsChanged(instance);
             }
           });
@@ -477,7 +477,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns The last `DrawContext` used to build or apply this material.
    */
   get drawContext(): DrawContext {
-    return this._ctx;
+    return this._ctx!;
   }
   /**
    * Current material pass index during program building.
@@ -615,7 +615,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns void
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
-    const isObjectColorPass = ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
+    const isObjectColorPass = ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     const blending =
       !isObjectColorPass && (this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none' || ctx.lightBlending);
     const a2c = !isObjectColorPass && this.featureUsed<boolean>(FEATURE_ALPHATOCOVERAGE);
@@ -652,7 +652,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
     if (ctx.forceCullMode || this._cullMode !== 'back') {
       stateSet.useRasterizerState().cullMode = ctx.forceCullMode || this._cullMode;
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
+    } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       stateSet.useRasterizerState().cullMode = 'none';
     } else {
       stateSet.defaultRasterizerState();
@@ -682,7 +682,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     }
     if (
       this.isTransparentPass(pass) &&
-      ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT &&
+      ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT &&
       !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
     ) {
       bindGroup.setValue('zOpacity', this._opacity);
@@ -690,7 +690,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (ctx.oit) {
       ctx.oit.applyUniforms(ctx, bindGroup);
     }
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
       bindGroup.setValue('zTAAStrength', (1 - this._taaStrength) * 50000);
     }
   }
@@ -724,8 +724,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
     const pb = new ProgramBuilder(ctx.device);
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
-      const shadowMapParams = ctx.shadowMapInfo.get((ctx.renderPass as ShadowMapPass).light);
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      const shadowMapParams = ctx.shadowMapInfo!.get((ctx.renderPass as ShadowMapPass).light!)!;
       pb.emulateDepthClamp = !!shadowMapParams.depthClampEnabled;
     }
     return this._createProgram(pb, ctx, pass);
@@ -787,7 +787,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   needFragmentColor(ctx?: DrawContext): boolean {
     return (
-      (ctx ?? this.drawContext).renderPass.type === RENDER_PASS_TYPE_LIGHT ||
+      (ctx ?? this.drawContext).renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
       this._alphaCutoff > 0 ||
       this.alphaToCoverage
     );
@@ -815,14 +815,14 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
       }
       if (this.isTransparentPass(this.pass)) {
         scope.$outputs.zOpacity = this.getInstancedUniform(scope, MeshMaterial.OPACITY_UNIFORM);
       }
     } else {
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         scope.$outputs.zObjectColor = scope[ShaderHelper.getObjectColorUniformName()];
       }
     }
@@ -841,7 +841,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (this._alphaCutoff > 0) {
       scope.zAlphaCutoff = pb.float().uniform(2);
     }
-    if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+    if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       if (
         this.isTransparentPass(this.pass) &&
         !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
@@ -879,11 +879,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             this.$outputs.zSSRRoughness = pb.vec4();
             this.$outputs.zSSRNormal = pb.vec4();
           }
-          if (ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
             this.$outputs.zMotionVector = pb.vec4();
             this.zTAAStrength = pb.float().uniform(2);
           }
-          if (ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
           }
         }
@@ -915,7 +915,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   outputFragmentColor(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
-    color: PBShaderExp,
+    color: Nullable<PBShaderExp>,
     ssrRoughness?: PBShaderExp,
     ssrNormal?: PBShaderExp
   ) {
@@ -924,7 +924,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const funcName = 'Z_outputFragmentColor';
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
-      if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         let output = true;
         if (!that.isTransparentPass(that.pass) && !that.alphaToCoverage) {
           this.outColor.a = 1;
@@ -953,7 +953,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
           this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
         }
-      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           if (this.zAlphaCutoff) {
             this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
@@ -961,7 +961,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             });
           }
         }
-        const depthPass = that.drawContext.renderPass as DepthPass;
+        const depthPass = that.drawContext.renderPass! as DepthPass;
         this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
         if (depthPass.encodeDepth) {
           this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
@@ -991,7 +991,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             }
           }
         }
-      } else if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
@@ -1016,10 +1016,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             pb.discard();
           });
         }
-        const shadowMapParams = that.drawContext.shadowMapInfo.get(
-          (that.drawContext.renderPass as ShadowMapPass).light
-        );
-        this.$outputs.zFragmentOutput = shadowMapParams.impl.computeShadowMapDepth(
+        const shadowMapParams = that.drawContext.shadowMapInfo!.get(
+          (that.drawContext.renderPass as ShadowMapPass).light!
+        )!;
+        this.$outputs.zFragmentOutput = shadowMapParams.impl!.computeShadowMapDepth(
           shadowMapParams,
           this,
           this.worldPos

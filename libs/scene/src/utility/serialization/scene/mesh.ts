@@ -14,7 +14,7 @@ export function getMeshClass(): SerializableClass {
     parent: GraphNode,
     noTitle: true,
     createFunc(ctx: SceneNode) {
-      const node = new Mesh(ctx.scene);
+      const node = new Mesh(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
@@ -178,7 +178,9 @@ export function getMeshClass(): SerializableClass {
             mimeTypes: ['application/vnd.zephyr3d.mesh+json']
           },
           get(this: Mesh, value) {
-            value.str[0] = this.primitive ? getEngine().resourceManager.getAssetId(this.primitive) : '';
+            value.str[0] = this.primitive
+              ? (getEngine().resourceManager.getAssetId(this.primitive) ?? '')
+              : '';
           },
           async set(this: Mesh, value) {
             if (value?.str[0]) {
@@ -219,7 +221,9 @@ export function getMeshClass(): SerializableClass {
             value.bool[0] = !!this.material?.$isInstance;
           },
           set(this: Mesh, value) {
-            this.material = value.bool[0] ? this.material?.createInstance() : this.material?.coreMaterial;
+            this.material = value.bool[0]
+              ? (this.material?.createInstance() ?? null)
+              : (this.material?.coreMaterial ?? null);
           }
         },
         {
@@ -230,7 +234,7 @@ export function getMeshClass(): SerializableClass {
             objectTypes: []
           },
           isHidden(this: Mesh) {
-            return this.material && !this.material?.$isInstance;
+            return !!this.material && !this.material?.$isInstance;
           },
           isNullable() {
             return true;
@@ -239,7 +243,7 @@ export function getMeshClass(): SerializableClass {
             const C = this.material?.$isInstance
               ? meshInstanceClsMap.get(this.material.coreMaterial.constructor as typeof MeshMaterial)
               : null;
-            value.object[0] = C ? new C.C(this.material) : null;
+            value.object[0] = C ? new C.C(this.material!) : null;
           },
           set(this: Mesh, value) {
             if (value.object[0]) {

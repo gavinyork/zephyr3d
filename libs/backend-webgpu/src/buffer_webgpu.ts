@@ -112,7 +112,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
   ): Promise<Uint8Array<ArrayBuffer>> {

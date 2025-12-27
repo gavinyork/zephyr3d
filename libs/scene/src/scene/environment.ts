@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
 import { Vector3, DRef, Disposable } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
@@ -12,7 +12,7 @@ import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
  * @public
  */
 export class EnvLightWrapper extends Disposable {
-  private _envLight: EnvironmentLighting;
+  private _envLight: Nullable<EnvironmentLighting>;
   private readonly _ambientColor: ObservableVector4;
   private readonly _ambientDown: ObservableVector4;
   private readonly _ambientUp: ObservableVector4;
@@ -54,14 +54,14 @@ export class EnvLightWrapper extends Disposable {
   /** @internal */
   getHash(ctx?: DrawContext): string {
     return !ctx || ctx.drawEnvLight
-      ? `${this.type}:${this._envLight.hasRadiance() ? '1' : '0'}:${
-          this._envLight.hasIrradiance() ? '1' : '0'
+      ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
+          this._envLight!.hasIrradiance() ? '1' : '0'
         }`
       : 'none';
   }
   /** @internal */
   get envLight(): EnvironmentLighting {
-    return this._envLight;
+    return this._envLight!;
   }
   /** The strength of environment lighting */
   get strength(): number {
@@ -92,30 +92,30 @@ export class EnvLightWrapper extends Disposable {
     this._ambientDown.set(val);
   }
   /** Radiance map for environment light type ibl */
-  get radianceMap(): TextureCube {
+  get radianceMap() {
     return this._radianceMap.get();
   }
-  set radianceMap(tex: TextureCube) {
+  set radianceMap(tex) {
     this._radianceMap.set(tex);
     if (this.type === 'ibl') {
       (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
     }
   }
   /** Irradiance SH buffer for environment light type ibl */
-  get irradianceSH(): GPUDataBuffer {
+  get irradianceSH() {
     return this._irradianceSH.get();
   }
-  set irradianceSH(value: GPUDataBuffer) {
+  set irradianceSH(value) {
     this._irradianceSH.set(value);
     if (this.type === 'ibl') {
       (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
     }
   }
   /** Irradiance SH texture for environment light type ibl */
-  get irradianceSHFB(): FrameBuffer {
+  get irradianceSHFB() {
     return this._irradianceSHFB.get();
   }
-  set irradianceSHFB(value: FrameBuffer) {
+  set irradianceSHFB(value) {
     this._irradianceSHFB.set(value);
     if (this.type === 'ibl') {
       (this._envLight as EnvShIBL).irradianceSHFB = this.irradianceSHFB;
@@ -142,7 +142,7 @@ export class EnvLightWrapper extends Disposable {
         break;
       case 'ibl':
         if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvShIBL(this.radianceMap, this.irradianceSH);
+          this._envLight = new EnvShIBL(this.radianceMap!, this.irradianceSH!);
         }
         (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
         (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;

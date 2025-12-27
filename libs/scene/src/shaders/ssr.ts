@@ -1,5 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
+import type { Nullable } from '@zephyr3d/base';
 
 const MAX_FLOAT_VALUE = 3.402823466e38;
 
@@ -94,9 +95,9 @@ function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat:
 function validateHit(
   scope: PBInsideFunctionScope,
   hit2D: PBShaderExp,
-  hit3D: PBShaderExp,
+  hit3D: Nullable<PBShaderExp>,
   surfaceZ: PBShaderExp,
-  thickness: PBShaderExp,
+  thickness: Nullable<PBShaderExp>,
   uv: PBShaderExp,
   traceRay: PBShaderExp,
   viewMatrix: PBShaderExp,

@@ -18,7 +18,7 @@ export function debugTexture(tex: BaseTexture, label: string) {
       [
         tex.device.createTexture2D(tex.format, tex.width, tex.height, {
           mipmapping: false
-        })
+        })!
       ],
       null
     );

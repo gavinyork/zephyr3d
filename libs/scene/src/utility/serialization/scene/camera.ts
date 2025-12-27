@@ -689,7 +689,7 @@ export function getOrthoCameraClass(): SerializableClass {
     parent: Camera,
     name: 'OrthoCamera',
     createFunc(ctx: SceneNode) {
-      const node = new OrthoCamera(ctx.scene);
+      const node = new OrthoCamera(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

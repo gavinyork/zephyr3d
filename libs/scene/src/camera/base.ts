@@ -1,4 +1,4 @@
-import type { Vector3 } from '@zephyr3d/base';
+import type { Nullable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
 
 /**
@@ -181,7 +181,7 @@ export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keyp
  */
 export class BaseCameraController {
   /** @internal */
-  private _camera: Camera;
+  private _camera: Nullable<Camera>;
   /**
    * Create a base camera controller.
    *
@@ -209,7 +209,7 @@ export class BaseCameraController {
    * @param camera - The camera to attach.
    * @internal
    */
-  _setCamera(camera: Camera) {
+  _setCamera(camera: Nullable<Camera>) {
     if (this._camera !== camera) {
       this._camera = camera;
       this.reset();
@@ -223,7 +223,7 @@ export class BaseCameraController {
    * @param up - Up direction.
    */
   lookAt(from: Vector3, to: Vector3, up: Vector3) {
-    this._camera.lookAt(from, to, up);
+    this._camera?.lookAt(from, to, up);
   }
   /**
    * Reset the controller's internal state.

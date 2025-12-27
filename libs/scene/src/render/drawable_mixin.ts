@@ -1,4 +1,4 @@
-import type { Disposable, GenericConstructor } from '@zephyr3d/base';
+import type { Disposable, GenericConstructor, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import type { BindGroup } from '@zephyr3d/device';
@@ -33,9 +33,9 @@ const usedBindGroups: WeakMap<BindGroup, string> = new WeakMap();
 function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolean) {
   const hash = `${instancing}:${morphing}:${skinning}`;
   const bindGroups = bindGroupCache[hash];
-  let bindGroup: BindGroup = null;
+  let bindGroup: Nullable<BindGroup> = null;
   if (bindGroups && bindGroups.length > 0) {
-    bindGroup = bindGroups.pop();
+    bindGroup = bindGroups.pop()!;
   } else {
     const layout = ShaderHelper.getDrawableBindGroupLayout(skinning, morphing, instancing);
     bindGroup = getDevice().createBindGroup(layout);
@@ -44,7 +44,7 @@ function fetchBindGroup(skinning: boolean, morphing: boolean, instancing: boolea
   return bindGroup;
 }
 
-function releaseBindGroup(bindGroup: BindGroup) {
+function releaseBindGroup(bindGroup: Nullable<BindGroup>) {
   if (bindGroup) {
     const hash = usedBindGroups.get(bindGroup);
     if (hash) {
@@ -68,20 +68,20 @@ export function mixinDrawable<
       getNode(): SceneNode;
     } & Disposable
   >
->(baseCls?: T): T & { new (...args: any[]): IMixinDrawable } {
+>(baseCls: T): T & { new (...args: any[]): IMixinDrawable } {
   const cls = class extends baseCls {
     private readonly _mdRenderQueueRef: RenderQueueRef[];
-    private _mdDrawableBindGroup: BindGroup;
+    private _mdDrawableBindGroup: Nullable<BindGroup>;
     private readonly _mdDrawableBindGroupInstanced: Map<RenderQueue, BindGroup>;
-    private _mdDrawableBindGroupSkin: BindGroup;
-    private _mdDrawableBindGroupMorph: BindGroup;
-    private _mdDrawableBindGroupSkinMorph: BindGroup;
+    private _mdDrawableBindGroupSkin: Nullable<BindGroup>;
+    private _mdDrawableBindGroupMorph: Nullable<BindGroup>;
+    private _mdDrawableBindGroupSkinMorph: Nullable<BindGroup>;
     private readonly _worldMatrixBuffer: Float32Array<ArrayBuffer>;
     private _framestampBuffer: Int32Array<ArrayBuffer>;
     private readonly _currentWorldMatrixBuffer: Float32Array<ArrayBuffer>;
     private readonly _prevWorldMatrixBuffer: Float32Array<ArrayBuffer>;
     private readonly _drawableId: number;
-    private _objectColor: Vector4;
+    private _objectColor: Nullable<Vector4>;
     constructor(...args: any[]) {
       super(...args);
       this._drawableId = ++_drawableId;
@@ -216,11 +216,13 @@ export function mixinDrawable<
     /** @internal */
     bind(ctx: DrawContext): void {
       const device = ctx.device;
-      const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue);
+      const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue!);
       device.setBindGroup(1, drawableBindGroup);
-      device.setBindGroup(3, ctx.instanceData ? ctx.instanceData.bindGroup.bindGroup : null);
+      if (ctx.instanceData) {
+        device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
+      }
       if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
-        const boneTexture = (this as unknown as Mesh).getBoneMatrices();
+        const boneTexture = (this as unknown as Mesh).getBoneMatrices()!;
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
@@ -230,10 +232,10 @@ export function mixinDrawable<
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTextureSize);
       }
       if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
-        const morphData = (this as unknown as Mesh).getMorphData();
-        const morphInfo = (this as unknown as Mesh).getMorphInfo();
-        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData.texture.get());
-        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo.buffer.get());
+        const morphData = (this as unknown as Mesh).getMorphData()!;
+        const morphInfo = (this as unknown as Mesh).getMorphInfo()!;
+        drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData.texture!.get()!);
+        drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo.buffer!.get()!);
       }
     }
     /** @internal */

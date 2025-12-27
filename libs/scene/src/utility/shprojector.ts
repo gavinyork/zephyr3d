@@ -8,6 +8,7 @@ import type {
   TextureCube
 } from '@zephyr3d/device';
 import { Primitive } from '../render/primitive';
+import type { Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 import { getDevice } from '../app/api';
@@ -31,9 +32,9 @@ import { getDevice } from '../app/api';
  * @public
  */
 export class CubemapSHProjector extends Disposable {
-  private static _programInst: GPUProgram = null;
-  private static _bindGroupInst: BindGroup = null;
-  private static _renderStats: RenderStateSet = null;
+  private static _programInst: Nullable<GPUProgram> = null;
+  private static _bindGroupInst: Nullable<BindGroup> = null;
+  private static _renderStats: Nullable<RenderStateSet> = null;
   private readonly _primitive: DRef<Primitive>;
   private readonly _renderTarget: DRef<FrameBuffer>;
   private readonly _numSamples: number;
@@ -71,8 +72,8 @@ export class CubemapSHProjector extends Disposable {
    * ```
    */
   projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer, radianceSource = true) {
-    this.projectCubemapToTexture(cubemap, this._renderTarget.get(), radianceSource);
-    this._renderTarget.get().getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
+    this.projectCubemapToTexture(cubemap, this._renderTarget.get()!, radianceSource);
+    this._renderTarget.get()!.getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
   /**
    * Projects a cubemap texture into spherical harmonics coefficients and stores them in a 3x3 texture.
@@ -103,11 +104,11 @@ export class CubemapSHProjector extends Disposable {
     device.setProgram(CubemapSHProjector._programInst);
     device.setFramebuffer(framebuffer);
     device.clearFrameBuffer(clearColor, null, null);
-    const bindGroup = CubemapSHProjector._bindGroupInst;
+    const bindGroup = CubemapSHProjector._bindGroupInst!;
     bindGroup.setTexture('cubemap', cubemap, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('scale', radianceSource ? 1.0 : Math.PI);
     device.setBindGroup(0, bindGroup);
-    this._primitive.get().drawInstanced(9);
+    this._primitive.get()!.drawInstanced(9);
     device.popDeviceStates();
   }
   /**
@@ -118,7 +119,7 @@ export class CubemapSHProjector extends Disposable {
     super.onDispose();
     this._primitive.dispose();
     if (this._renderTarget.get()) {
-      this._renderTarget.get().getColorAttachments()[0].dispose();
+      this._renderTarget.get()!.getColorAttachments()[0].dispose();
       this._renderTarget.dispose();
     }
   }
@@ -167,7 +168,7 @@ export class CubemapSHProjector extends Disposable {
     if (!this._renderTarget.get()) {
       const texture = device.createTexture2D('rgba32f', 3, 3, {
         mipmapping: false
-      });
+      })!;
       this._renderTarget.set(device.createFrameBuffer([texture], null));
     }
 
@@ -184,7 +185,7 @@ export class CubemapSHProjector extends Disposable {
     }
 
     if (!CubemapSHProjector._programInst) {
-      CubemapSHProjector._programInst = CubemapSHProjector._createProgram(device);
+      CubemapSHProjector._programInst = CubemapSHProjector._createProgram(device)!;
       CubemapSHProjector._bindGroupInst = device.createBindGroup(
         CubemapSHProjector._programInst.bindGroupLayouts[0]
       );
@@ -316,7 +317,7 @@ export class CubemapSHProjector extends Disposable {
           );
         });
       }
-    });
+    })!;
     program.name = '@CubemapSHProjector_SHProject';
     return program;
   }

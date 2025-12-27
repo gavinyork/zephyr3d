@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, DeepRequireOptionals } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 import type { PrimitiveType } from '@zephyr3d/device';
@@ -49,8 +49,8 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
   constructor(options?: CylinderCreationOptions) {
     super(options);
   }
-  clone(): CylinderShape {
-    return new CylinderShape(this._options);
+  clone(): this {
+    return new CylinderShape(this._options) as this;
   }
   /** type of the shape */
   get type(): string {
@@ -86,7 +86,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
    * @param indices - vertex indices
    */
   static generateData(
-    options: CylinderCreationOptions,
+    options: DeepRequireOptionals<CylinderCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],

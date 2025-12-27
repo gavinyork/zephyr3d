@@ -10,6 +10,7 @@ import type {
 import { isFloatTextureFormat } from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
@@ -66,12 +67,12 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
  * @public
  */
 export class SAO extends AbstractPostEffect {
-  private static _program: GPUProgram = null;
-  private static _programPacked: GPUProgram = null;
-  private static _renderState: RenderStateSet = null;
-  private static _renderStateBlend: RenderStateSet = null;
-  private static _bindgroup: BindGroup = null;
-  private static _bindgroupPacked: BindGroup = null;
+  private static _program: Nullable<GPUProgram> = null;
+  private static _programPacked: Nullable<GPUProgram> = null;
+  private static _renderState: Nullable<RenderStateSet> = null;
+  private static _renderStateBlend: Nullable<RenderStateSet> = null;
+  private static _bindgroup: Nullable<BindGroup> = null;
+  private static _bindgroupPacked: Nullable<BindGroup> = null;
   private _saoScale: number;
   private _saoBias: number;
   private _saoIntensity: number;
@@ -180,7 +181,7 @@ export class SAO extends AbstractPostEffect {
       return;
     }
     const fmt = this._getIntermediateTextureFormat(device);
-    const depth = device.getFramebuffer().getDepthAttachment() as Texture2D;
+    const depth = device.getFramebuffer()!.getDepthAttachment() as Texture2D;
 
     const fbao = device.pool.fetchTemporalTexture2D(false, fmt, depth.width, depth.height, false);
     const fbblur = device.pool.fetchTemporalTexture2D(false, fmt, depth.width, depth.height, false);
@@ -189,7 +190,7 @@ export class SAO extends AbstractPostEffect {
     device.pushDeviceStates();
     device.setFramebuffer([fbao], depth);
     device.clearFrameBuffer(packed ? new Vector4(0, 0, 0, 1) : new Vector4(1, 0, 0, 1), null, null);
-    const bindgroup = packed ? SAO._bindgroupPacked : SAO._bindgroup;
+    const bindgroup = packed ? SAO._bindgroupPacked! : SAO._bindgroup!;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     bindgroup.setTexture('depthTex', sceneDepthTexture);
     bindgroup.setValue('scale', this._saoScale);
@@ -204,7 +205,7 @@ export class SAO extends AbstractPostEffect {
     device.setRenderStates(SAO._renderState);
     device.setProgram(packed ? SAO._programPacked : SAO._program);
     device.setBindGroup(0, bindgroup);
-    this.drawFullscreenQuad(SAO._renderState);
+    this.drawFullscreenQuad(SAO._renderState!);
     this._blitterH.size = new Vector2(inputColorTexture.width, inputColorTexture.height);
     this._blitterH.depthTex = sceneDepthTexture;
     this._blitterH.depthCutoff = this._saoBlurDepthCutoff;
@@ -222,7 +223,7 @@ export class SAO extends AbstractPostEffect {
     this._blitterV.renderStates = SAO._renderStateBlend;
     this._blitterH.blit(fbao, fbblur);
     device.popDeviceStates();
-    this._blitterV.blit(fbblur, device.getFramebuffer());
+    this._blitterV.blit(fbblur, device.getFramebuffer()!);
     device.pool.releaseTexture(fbao);
     device.pool.releaseTexture(fbblur);
   }
@@ -378,7 +379,7 @@ export class SAO extends AbstractPostEffect {
               }
             });
           }
-        });
+        })!;
         program.name = packed ? '@SAO_Packed' : '@SAO';
         return program;
       }

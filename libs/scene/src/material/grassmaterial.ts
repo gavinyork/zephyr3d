@@ -1,4 +1,4 @@
-import type { Clonable } from '@zephyr3d/base';
+import type { Clonable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
@@ -28,7 +28,7 @@ export class GrassMaterial
    * @param normalMap - normal map
    * @param grassTexture - grass texture
    */
-  constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Texture2D) {
+  constructor(terrainSize: Vector2, normalMap: Texture2D, grassTexture?: Nullable<Texture2D>) {
     super();
     this.metallic = 0;
     this.roughness = 1;
@@ -117,7 +117,7 @@ export class GrassMaterial
         pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
       );
       scope.$l.litColor = pb.vec3(0);
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,

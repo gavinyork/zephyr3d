@@ -676,7 +676,7 @@ export type VertexLayoutOptions = {
   /**
    * optional index buffer in this vertex layout
    */
-  indexBuffer?: IndexBuffer;
+  indexBuffer?: Nullable<IndexBuffer>;
 };
 
 /**
@@ -707,7 +707,7 @@ export interface BaseCreationOptions {
  */
 export interface TextureCreationOptions extends BaseCreationOptions {
   writable?: boolean;
-  texture?: BaseTexture;
+  texture?: Nullable<BaseTexture>;
   mipmapping?: boolean;
   samplerOptions?: Nullable<SamplerOptions>;
 }
@@ -1457,7 +1457,7 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
   readonly usage: number;
   bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void;
   getBufferSubData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
   ): Promise<Uint8Array<ArrayBuffer>>;
@@ -1566,14 +1566,14 @@ export interface BindGroup extends GPUObject<unknown> {
   ): void;
   setValue(name: string, value: StructuredValue);
   setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number);
-  setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler);
+  setTexture(name: string, texture: BaseTexture, sampler?: Nullable<TextureSampler>);
   setTextureView(
     name: string,
     value: BaseTexture,
     level?: number,
     face?: number,
     mipCount?: number,
-    sampler?: TextureSampler
+    sampler?: Nullable<TextureSampler>
   );
   setSampler(name: string, sampler: TextureSampler);
 }

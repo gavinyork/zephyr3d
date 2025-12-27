@@ -1,11 +1,11 @@
-import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { Decoder, Mesh, DecoderModule, DataType } from 'draco3d';
 
 /** @public */
 export class DracoMeshDecoder {
   private readonly _module: DecoderModule;
-  private readonly _decoder: Decoder;
-  private readonly _mesh: Mesh;
+  private readonly _decoder: Nullable<Decoder>;
+  private readonly _mesh: Nullable<Mesh>;
   constructor(data: Int8Array<ArrayBuffer>, decoderModule: DecoderModule) {
     this._module = decoderModule;
     this._decoder = new this._module.Decoder();

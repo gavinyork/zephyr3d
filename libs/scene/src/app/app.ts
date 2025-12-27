@@ -1,4 +1,4 @@
-import type { VFS } from '@zephyr3d/base';
+import type { Nullable, VFS } from '@zephyr3d/base';
 import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
@@ -127,7 +127,7 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
  */
 export class Application extends Observable<appEventMap> {
   private readonly _options: AppOptions;
-  private _device: AbstractDevice;
+  private _device: Nullable<AbstractDevice>;
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
   private readonly _editorMode: EditorMode;
@@ -162,6 +162,7 @@ export class Application extends Observable<appEventMap> {
       this._engine.screen.configure(opt.runtimeOptions.screen);
     }
     this._editorMode = opt.runtimeOptions?.editorMode ?? 'none';
+    this._device = null;
     this._ready = false;
   }
   /**
@@ -196,7 +197,7 @@ export class Application extends Observable<appEventMap> {
    * Available after `await ready()`.
    */
   get device(): AbstractDevice {
-    return this._device;
+    return this._device!;
   }
   /**
    * Convenience accessor for the device type name provided by the backend.
@@ -208,7 +209,7 @@ export class Application extends Observable<appEventMap> {
    * Set keyboard focus to the device's canvas element.
    */
   focus() {
-    this._device.canvas.focus();
+    this._device!.canvas.focus();
   }
   /**
    * Initialize the rendering device and start input processing.

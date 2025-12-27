@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
@@ -192,7 +193,7 @@ export class ShaderHelper {
       pb.mat4('projectionMatrix'),
       pb.mat4('invProjectionMatrix'),
       pb.vec4('params'),
-      ...(ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH
+      ...(ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH
         ? [pb.mat4('prevUnjitteredVPMatrix')]
         : []),
       pb.vec2('renderSize'),
@@ -202,7 +203,7 @@ export class ShaderHelper {
       pb.float('elapsedTime'),
       pb.int('framestamp')
     ]);
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
         pb.vec4('positionAndRange'),
         pb.vec4('directionCutoff'),
@@ -213,11 +214,11 @@ export class ShaderHelper {
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
     } else if (
-      ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH ||
-      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
+      ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
     ) {
       scope.camera = cameraStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+    } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
         const fogStructMembers: PBShaderExp[] = [
@@ -264,21 +265,21 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
       if (ctx.currentShadowLight) {
         const scope = pb.getGlobalScope();
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        const tex = shadowMapParams.shadowMap.isTextureCube()
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight)!;
+        const tex = shadowMapParams.shadowMap!.isTextureCube()
           ? shadowMapParams.shadowMap.isDepth()
             ? scope.$builder.texCubeShadow()
             : scope.$builder.texCube()
-          : shadowMapParams.shadowMap.isTexture2D()
+          : shadowMapParams.shadowMap!.isTexture2D()
             ? shadowMapParams.shadowMap.isDepth()
               ? scope.$builder.tex2DShadow()
               : scope.$builder.tex2D()
-            : shadowMapParams.shadowMap.isDepth()
+            : shadowMapParams.shadowMap!.isDepth()
               ? scope.$builder.tex2DArrayShadow()
               : scope.$builder.tex2DArray();
         if (
-          !shadowMapParams.shadowMap.isDepth() &&
-          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+          !shadowMapParams.shadowMap!.isDepth() &&
+          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap!.format)
             .filterable
         ) {
           tex.sampleType('unfilterable-float');
@@ -286,7 +287,7 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }
       if (ctx.drawEnvLight) {
-        ctx.env.light.envLight.initShaderBindings(pb);
+        ctx.env!.light.envLight.initShaderBindings(pb);
       }
       if (ctx.linearDepthTexture) {
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb.tex2D().uniform(0);
@@ -329,7 +330,7 @@ export class ShaderHelper {
    *
    * @returns Skinning matrix for current vertex, or null if there is not skeletal animation
    */
-  static calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static calculateSkinMatrix(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
     if (!this.hasSkinning(scope)) {
       return null;
     }
@@ -361,8 +362,8 @@ export class ShaderHelper {
     const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = scope.$getVertexAttrib('blendIndices');
-      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      const blendIndices = scope.$getVertexAttrib('blendIndices')!;
+      const blendWeights = scope.$getVertexAttrib('blendWeights')!;
       this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
       this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
       this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
@@ -477,8 +478,8 @@ export class ShaderHelper {
     const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [pb.float('boneOffset')], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = scope.$getVertexAttrib('blendIndices');
-      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      const blendIndices = scope.$getVertexAttrib('blendIndices')!;
+      const blendWeights = scope.$getVertexAttrib('blendWeights')!;
       this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[0], this.boneOffset);
       this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[1], this.boneOffset);
       this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[2], this.boneOffset);
@@ -526,7 +527,7 @@ export class ShaderHelper {
           ? [pb.mat4('skinMatrix')]
           : [];
     pb.func('Z_resolveVertexPosition', params, function () {
-      this.$l.opos = this.$getVertexAttrib('position').xyz;
+      this.$l.opos = this.$getVertexAttrib('position')!.xyz;
       if (that.hasMorphing(scope)) {
         this.opos = pb.add(this.opos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }
@@ -596,7 +597,7 @@ export class ShaderHelper {
       if (!scope.$getVertexAttrib('normal')) {
         scope.$inputs.Z_normal = pb.vec3().attrib('normal');
       }
-      normal = scope.$getVertexAttrib('normal');
+      normal = scope.$getVertexAttrib('normal')!;
     }
     if (this.hasMorphing(scope)) {
       normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
@@ -628,7 +629,7 @@ export class ShaderHelper {
       if (!scope.$getVertexAttrib('tangent')) {
         scope.$inputs.Z_tangent = pb.vec4().attrib('tangent');
       }
-      tangent = scope.$getVertexAttrib('tangent');
+      tangent = scope.$getVertexAttrib('tangent')!;
     }
     if (this.hasMorphing(scope)) {
       tangent = pb.normalize(
@@ -773,8 +774,8 @@ export class ShaderHelper {
     const pos = ctx.camera.getWorldPosition();
     const useJitter =
       ctx.motionVectors &&
-      ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-      ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP &&
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
@@ -798,10 +799,10 @@ export class ShaderHelper {
       elapsedTime: getDevice().frameInfo.elapsedOverall * 0.001,
       framestamp: getDevice().frameInfo.frameCounter
     } as any;
-    if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
+    if (ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
       cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
     }
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       if (ctx.linearDepthTexture) {
         bindGroup.setTexture(UNIFORM_NAME_LINEAR_DEPTH_MAP, ctx.linearDepthTexture);
         bindGroup.setValue(
@@ -829,7 +830,7 @@ export class ShaderHelper {
   /** @internal */
   static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     if (light) {
-      const shadowMapParams = ctx.shadowMapInfo.get(light);
+      const shadowMapParams = ctx.shadowMapInfo!.get(light)!;
       bindGroup.setValue('light', {
         positionAndRange: light.positionAndRange,
         directionCutoff: light.directionAndCutoff,
@@ -872,19 +873,19 @@ export class ShaderHelper {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
       clusterParams: clusterParams,
       countParams: countParams,
-      envLightStrength: ctx.env.light.strength ?? 0,
+      envLightStrength: ctx.env!.light.strength ?? 0,
       lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height])
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
   }
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
-    const shadowMapParams = ctx.shadowMapInfo.get(light);
+    const shadowMapParams = ctx.shadowMapInfo!.get(light)!;
     this._lightUniformShadow.sunDir = ctx.sunLight
       ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1)
       : this.defaultSunDir;
@@ -901,12 +902,12 @@ export class ShaderHelper {
     bindGroup.setValue('light', this._lightUniformShadow);
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_MAP,
-      shadowMapParams.shadowMap,
+      shadowMapParams.shadowMap!,
       shadowMapParams.shadowMapSampler
     );
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
   }
   /**
@@ -1293,7 +1294,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+    const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
     const funcName = 'Z_calculateShadow';
     pb.func(funcName, [pb.vec3('worldPos'), pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
@@ -1324,8 +1325,8 @@ export class ShaderHelper {
         } else {
           this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.split);
         }
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
+        this.$l.shadow = shadowMapParams.impl!.computeShadowCSM(
           shadowMapParams,
           this,
           this.shadowVertex,
@@ -1345,8 +1346,8 @@ export class ShaderHelper {
         this.$return(this.shadow);
       } else {
         this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadow(
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
+        this.$l.shadow = shadowMapParams.impl!.computeShadow(
           shadowMapParams,
           this,
           this.shadowVertex,

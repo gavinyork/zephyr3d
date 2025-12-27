@@ -194,7 +194,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     level?: number,
     face?: number,
     mipCount?: number,
-    sampler?: TextureSampler
+    sampler?: Nullable<TextureSampler>
   ) {
     if (!value) {
       throw new Error(`WebGPUBindGroup.setTextureView() failed: invalid texture uniform value: ${value}`);
@@ -247,7 +247,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       }
     }
   }
-  setTexture(name: string, value: BaseTexture | TextureVideo, sampler?: TextureSampler) {
+  setTexture(name: string, value: BaseTexture | TextureVideo, sampler?: Nullable<TextureSampler>) {
     if (!value) {
       throw new Error(`WebGPUBindGroup.setTexture() failed: invalid texture uniform value: ${value}`);
     } else {

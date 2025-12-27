@@ -28,10 +28,10 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    *
    * @returns The current sprite texture, or `null` if no texture is assigned.
    */
-  get spriteTexture(): Texture2D | null {
+  get spriteTexture() {
     return this._texture.get();
   }
-  set spriteTexture(tex: Texture2D) {
+  set spriteTexture(tex) {
     tex = tex ?? null;
     if (tex !== this._texture.get()) {
       this._texture.set(tex);

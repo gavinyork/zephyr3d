@@ -7,6 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import type { PropertyAccessor, SerializableClass } from '../types';
 import type { Material, MeshMaterial } from '../../../material';
+import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { getDevice, getEngine } from '../../../app/api';
@@ -36,7 +37,7 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
       name: `${cls.name}InstanceUniforms`,
       async createFunc(_ctx, init) {
         const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
-        return { obj: new C(material.createInstance()) };
+        return { obj: new C(material!.createInstance()) };
       },
       getInitParams(obj: C) {
         return obj.materialId;
@@ -85,8 +86,14 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
 
 export function getTextureProps<T extends Material>(
   manager: ResourceManager,
-  name: keyof T & string & { [P in keyof T]: T[P] extends Texture2D | TextureCube ? P : never }[keyof T],
-  type: T[typeof name] extends Texture2D ? '2D' : T[typeof name] extends TextureCube ? 'Cube' : never,
+  name: keyof T &
+    string &
+    { [P in keyof T]: T[P] extends Nullable<Texture2D | TextureCube> ? P : never }[keyof T],
+  type: T[typeof name] extends Nullable<Texture2D>
+    ? '2D'
+    : T[typeof name] extends Nullable<TextureCube>
+      ? 'Cube'
+      : never,
   sRGB: boolean,
   phase: number,
   isValid?: (this: T) => boolean
@@ -111,10 +118,10 @@ export function getTextureProps<T extends Material>(
       },
       async set(value) {
         if (!value || !value.str[0]) {
-          this[name] = null;
+          this[name] = null as any;
         } else {
           const assetId = value.str[0];
-          let tex: Texture2D | TextureCube;
+          let tex: Nullable<Texture2D | TextureCube>;
           try {
             tex = await manager.fetchTexture<Texture2D | TextureCube>(assetId, { linearColorSpace: !sRGB });
           } catch (err) {

@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Nullable } from '@zephyr3d/base';
 import { Disposable, PRNG, Vector2, Vector4 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type {
@@ -89,18 +89,18 @@ function getDefaultBuildParams(): OceanFieldBuildParams {
 
 type Programs = {
   h0Program: GPUProgram;
-  hkProgram: GPUProgram;
-  hkProgram2: GPUProgram;
-  hkProgram4: GPUProgram;
-  fft2hProgram: GPUProgram;
-  fft2hProgram2: GPUProgram;
-  fft2hProgram4: GPUProgram;
-  fft2vProgram: GPUProgram;
-  fft2vProgram2: GPUProgram;
-  fft2vProgram4: GPUProgram;
-  postfft2Program: GPUProgram;
-  postfft2Program2: GPUProgram;
-  postfft2Program4: GPUProgram;
+  hkProgram: Nullable<GPUProgram>;
+  hkProgram2: Nullable<GPUProgram>;
+  hkProgram4: Nullable<GPUProgram>;
+  fft2hProgram: Nullable<GPUProgram>;
+  fft2hProgram2: Nullable<GPUProgram>;
+  fft2hProgram4: Nullable<GPUProgram>;
+  fft2vProgram: Nullable<GPUProgram>;
+  fft2vProgram2: Nullable<GPUProgram>;
+  fft2vProgram4: Nullable<GPUProgram>;
+  postfft2Program: Nullable<GPUProgram>;
+  postfft2Program2: Nullable<GPUProgram>;
+  postfft2Program4: Nullable<GPUProgram>;
 };
 
 type Globales = {
@@ -111,19 +111,19 @@ type Globales = {
 };
 
 type WaterInstanceData = {
-  h0Framebuffer: FrameBuffer;
+  h0Framebuffer: Nullable<FrameBuffer>;
   h0Textures: Texture2D[] | Texture2DArray;
-  spectrumFramebuffer: FrameBuffer;
-  spectrumFramebuffer2: FrameBuffer;
-  spectrumFramebuffer4: FrameBuffer;
+  spectrumFramebuffer: Nullable<FrameBuffer>;
+  spectrumFramebuffer2: Nullable<FrameBuffer>;
+  spectrumFramebuffer4: Nullable<FrameBuffer>;
   spectrumTextures: Texture2D[] | Texture2DArray;
-  pingpongFramebuffer: FrameBuffer;
-  pingpongFramebuffer2: FrameBuffer;
-  pingpongFramebuffer4: FrameBuffer;
+  pingpongFramebuffer: Nullable<FrameBuffer>;
+  pingpongFramebuffer2: Nullable<FrameBuffer>;
+  pingpongFramebuffer4: Nullable<FrameBuffer>;
   pingpongTextures: Texture2D[] | Texture2DArray;
-  postIfft2Framebuffer: FrameBuffer;
-  postIfft2Framebuffer2: FrameBuffer;
-  postIfft2Framebuffer4: FrameBuffer;
+  postIfft2Framebuffer: Nullable<FrameBuffer>;
+  postIfft2Framebuffer2: Nullable<FrameBuffer>;
+  postIfft2Framebuffer4: Nullable<FrameBuffer>;
   dataTextures: Texture2D[] | Texture2DArray;
 };
 
@@ -138,35 +138,35 @@ const THREAD_GROUP_SIZE = 16;
  * @public
  */
 export class FFTWaveGenerator extends Disposable implements WaveGenerator {
-  private static _globals: Globales = null;
+  private static _globals: Nullable<Globales> = null;
   private readonly _useComputeShader: boolean;
-  private readonly _h0BindGroup: BindGroup;
-  private readonly _hkBindGroup: BindGroup;
-  private readonly _hkBindGroup2: BindGroup;
-  private readonly _hkBindGroup4: BindGroup;
-  private readonly _fft2hBindGroup: BindGroup;
-  private readonly _fft2vBindGroup: BindGroup;
-  private readonly _fft2hBindGroup2Used: BindGroup[][];
-  private readonly _fft2hBindGroup2Free: BindGroup[][];
-  private readonly _fft2hBindGroup4Used: BindGroup[][];
-  private readonly _fft2hBindGroup4Free: BindGroup[][];
-  private readonly _fft2vBindGroup2Used: BindGroup[][];
-  private readonly _fft2vBindGroup2Free: BindGroup[][];
-  private readonly _fft2vBindGroup4Used: BindGroup[][];
-  private readonly _fft2vBindGroup4Free: BindGroup[][];
-  private readonly _postfft2BindGroup: BindGroup;
-  private readonly _postfft2BindGroup2: BindGroup;
-  private readonly _postfft2BindGroup4: BindGroup;
-  private readonly _updateRenderStates: RenderStateSet;
-  private _sizes: Vector4;
-  private _croppinesses: Vector4;
-  private readonly _params: OceanFieldBuildParams;
-  private _instanceData: WaterInstanceData;
-  private _ifftTextures: Texture2D[] | Texture2DArray;
-  private readonly _cascades: Vector4[];
-  private _paramsChanged: boolean;
-  private _version: number;
-  private _resolutionChanged: boolean;
+  private readonly _h0BindGroup!: BindGroup;
+  private readonly _hkBindGroup!: Nullable<BindGroup>;
+  private readonly _hkBindGroup2!: Nullable<BindGroup>;
+  private readonly _hkBindGroup4!: Nullable<BindGroup>;
+  private readonly _fft2hBindGroup!: Nullable<BindGroup>;
+  private readonly _fft2vBindGroup!: Nullable<BindGroup>;
+  private readonly _fft2hBindGroup2Used!: BindGroup[][];
+  private readonly _fft2hBindGroup2Free!: BindGroup[][];
+  private readonly _fft2hBindGroup4Used!: BindGroup[][];
+  private readonly _fft2hBindGroup4Free!: BindGroup[][];
+  private readonly _fft2vBindGroup2Used!: BindGroup[][];
+  private readonly _fft2vBindGroup2Free!: BindGroup[][];
+  private readonly _fft2vBindGroup4Used!: BindGroup[][];
+  private readonly _fft2vBindGroup4Free!: BindGroup[][];
+  private readonly _postfft2BindGroup!: Nullable<BindGroup>;
+  private readonly _postfft2BindGroup2!: Nullable<BindGroup>;
+  private readonly _postfft2BindGroup4!: Nullable<BindGroup>;
+  private readonly _updateRenderStates!: RenderStateSet;
+  private _sizes!: Vector4;
+  private _croppinesses!: Vector4;
+  private readonly _params!: OceanFieldBuildParams;
+  private _instanceData!: Nullable<WaterInstanceData>;
+  private _ifftTextures!: Nullable<Texture2D[] | Texture2DArray>;
+  private readonly _cascades!: Vector4[];
+  private _paramsChanged!: boolean;
+  private _version!: number;
+  private _resolutionChanged!: boolean;
   private readonly _textureFormat: TextureFormat;
   private readonly _h0TextureFormat: TextureFormat;
   private readonly _dataTextureFormat: TextureFormat;
@@ -202,28 +202,32 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
             this._renderMode === RENDER_NORMAL
               ? createProgramHk(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
               : null,
-          hkProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, null, 2) : null,
-          hkProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, null, 4) : null,
+          hkProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, undefined, 2) : null,
+          hkProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramHk(false, 0, undefined, 4) : null,
           fft2hProgram:
             this._renderMode === RENDER_NORMAL
               ? createProgramFFT2H(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
               : null,
-          fft2hProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, null, 2) : null,
-          fft2hProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, null, 4) : null,
+          fft2hProgram2:
+            this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, undefined, 2) : null,
+          fft2hProgram4:
+            this._renderMode === RENDER_TWO_PASS ? createProgramFFT2H(false, 0, undefined, 4) : null,
           fft2vProgram:
             this._renderMode === RENDER_NORMAL
               ? createProgramFFT2V(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
               : null,
-          fft2vProgram2: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, null, 2) : null,
-          fft2vProgram4: this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, null, 4) : null,
+          fft2vProgram2:
+            this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, undefined, 2) : null,
+          fft2vProgram4:
+            this._renderMode === RENDER_TWO_PASS ? createProgramFFT2V(false, 0, undefined, 4) : null,
           postfft2Program:
             this._renderMode === RENDER_NORMAL
               ? createProgramPostFFT2(this._useComputeShader, THREAD_GROUP_SIZE, this._dataTextureFormat)
               : null,
           postfft2Program2:
-            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 2) : null,
+            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, undefined, 2) : null,
           postfft2Program4:
-            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, null, 4) : null
+            this._renderMode === RENDER_TWO_PASS ? createProgramPostFFT2(false, 0, undefined, 4) : null
         },
         quad: FFTWaveGenerator.createQuad(),
         noiseTextures: new Map(),
@@ -233,19 +237,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       const programs = FFTWaveGenerator._globals.programs;
       this._h0BindGroup = device.createBindGroup(programs.h0Program.bindGroupLayouts[0]);
       this._hkBindGroup = programs.hkProgram
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.hkProgram.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.hkProgram.bindGroupLayouts[0])
         : null;
       this._hkBindGroup2 = programs.hkProgram2
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.hkProgram2.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.hkProgram2.bindGroupLayouts[0])
         : null;
       this._hkBindGroup4 = programs.hkProgram4
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.hkProgram4.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.hkProgram4.bindGroupLayouts[0])
         : null;
       this._fft2hBindGroup = programs.fft2hProgram
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.fft2hProgram.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.fft2hProgram.bindGroupLayouts[0])
         : null;
       this._fft2vBindGroup = programs.fft2vProgram
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.fft2vProgram.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.fft2vProgram.bindGroupLayouts[0])
         : null;
       this._fft2hBindGroup2Used = [[], []];
       this._fft2hBindGroup2Free = [[], []];
@@ -256,13 +260,13 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this._fft2vBindGroup4Used = [[], []];
       this._fft2vBindGroup4Free = [[], []];
       this._postfft2BindGroup = programs.postfft2Program
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.postfft2Program.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.postfft2Program.bindGroupLayouts[0])
         : null;
       this._postfft2BindGroup2 = programs.postfft2Program2
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.postfft2Program2.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.postfft2Program2.bindGroupLayouts[0])
         : null;
       this._postfft2BindGroup4 = programs.postfft2Program4
-        ? device.createBindGroup(FFTWaveGenerator._globals.programs.postfft2Program4.bindGroupLayouts[0])
+        ? device.createBindGroup(programs.postfft2Program4.bindGroupLayouts[0])
         : null;
       this._instanceData = null;
       this._ifftTextures = null;
@@ -400,14 +404,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   /** @internal */
   private getButterflyTexture(size: number) {
     const device = getDevice();
-    let tex = FFTWaveGenerator._globals.butterflyTextures.get(size);
+    let tex = FFTWaveGenerator._globals!.butterflyTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D('rgba32f', Math.log2(size), size, {
         mipmapping: false
-      });
+      })!;
       tex.name = `butterfly${size}`;
       tex.update(this.createButterflyTexture(size), 0, 0, tex.width, tex.height);
-      FFTWaveGenerator._globals.butterflyTextures.set(size, tex);
+      FFTWaveGenerator._globals!.butterflyTextures.set(size, tex);
     }
     return tex;
   }
@@ -415,7 +419,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   private generateInitialSpectrum(): void {
     const device = getDevice();
     const instanceData = this.getInstanceData();
-    device.setProgram(FFTWaveGenerator._globals.programs.h0Program);
+    device.setProgram(FFTWaveGenerator._globals!.programs.h0Program);
     device.setBindGroup(0, this._h0BindGroup);
     this._h0BindGroup.setTexture(
       'noise',
@@ -446,20 +450,20 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     } else {
       device.setFramebuffer(instanceData.h0Framebuffer);
       device.clearFrameBuffer(Vector4.zero(), null, null);
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
     }
   }
   /** @internal */
   private getNoiseTexture(size: number, randomSeed: number): Texture2D {
     const device = getDevice();
-    let tex = FFTWaveGenerator._globals.noiseTextures.get(size);
+    let tex = FFTWaveGenerator._globals!.noiseTextures.get(size);
     if (!tex) {
       tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
         mipmapping: false
-      });
+      })!;
       tex.name = `noiseTex${size}`;
       tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);
-      FFTWaveGenerator._globals.noiseTextures.set(size, tex);
+      FFTWaveGenerator._globals!.noiseTextures.set(size, tex);
     }
     return tex;
   }
@@ -624,12 +628,12 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       mipmapping: false
     };
     if (this._useComputeShader) {
-      const tex = device.createTexture2DArray(format, size, size, num, options);
+      const tex = device.createTexture2DArray(format, size, size, num, options)!;
       tex.name = name;
       return tex;
     } else {
       return Array.from({ length: num }).map((val, index) => {
-        const tex = device.createTexture2D(format, size, size, options);
+        const tex = device.createTexture2D(format, size, size, options)!;
         tex.name = `${name}-${index}`;
         return tex;
       });
@@ -668,7 +672,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return true;
   }
   /** @internal */
-  private disposeNTextures(texture: Texture2D[] | Texture2DArray) {
+  private disposeNTextures(texture: Nullable<Texture2D[] | Texture2DArray>) {
     if (Array.isArray(texture)) {
       texture.forEach((tex) => tex.dispose());
     } else if (texture) {
@@ -679,13 +683,9 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   private disposeInstanceData(): void {
     if (this._instanceData) {
       this.disposeNTextures(this._instanceData.dataTextures);
-      this._instanceData.dataTextures = null;
       this.disposeNTextures(this._instanceData.h0Textures);
-      this._instanceData.h0Textures = null;
       this.disposeNTextures(this._instanceData.pingpongTextures);
-      this._instanceData.pingpongTextures = null;
       this.disposeNTextures(this._instanceData.spectrumTextures);
-      this._instanceData.spectrumTextures = null;
       this._instanceData.h0Framebuffer?.dispose();
       this._instanceData.pingpongFramebuffer?.dispose();
       this._instanceData.pingpongFramebuffer2?.dispose();
@@ -704,31 +704,31 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
-    device.setProgram(FFTWaveGenerator._globals.programs.hkProgram);
-    device.setBindGroup(0, this._hkBindGroup);
-    this._hkBindGroup.setValue('t', time);
-    this._hkBindGroup.setValue('resolution', this._params.resolution);
-    this._hkBindGroup.setValue('sizes', this._sizes);
+    device.setProgram(FFTWaveGenerator._globals!.programs.hkProgram);
+    device.setBindGroup(0, this._hkBindGroup!);
+    this._hkBindGroup!.setValue('t', time);
+    this._hkBindGroup!.setValue('resolution', this._params.resolution);
+    this._hkBindGroup!.setValue('sizes', this._sizes);
     if (this._useComputeShader) {
-      this._hkBindGroup.setTexture('h0Texture', instanceData.h0Textures as Texture2DArray);
-      this._hkBindGroup.setTexture('spectrum', instanceData.spectrumTextures as Texture2DArray);
+      this._hkBindGroup!.setTexture('h0Texture', instanceData.h0Textures as Texture2DArray);
+      this._hkBindGroup!.setTexture('spectrum', instanceData.spectrumTextures as Texture2DArray);
       device.compute(
         this._params.resolution / THREAD_GROUP_SIZE,
         this._params.resolution / THREAD_GROUP_SIZE,
         1
       );
     } else {
-      this._hkBindGroup.setTexture('h0Texture0', instanceData.h0Textures[0], nearestRepeatSampler);
-      this._hkBindGroup.setTexture('h0Texture1', instanceData.h0Textures[1], nearestRepeatSampler);
-      this._hkBindGroup.setTexture('h0Texture2', instanceData.h0Textures[2], nearestRepeatSampler);
+      this._hkBindGroup!.setTexture('h0Texture0', instanceData.h0Textures[0], nearestRepeatSampler);
+      this._hkBindGroup!.setTexture('h0Texture1', instanceData.h0Textures[1], nearestRepeatSampler);
+      this._hkBindGroup!.setTexture('h0Texture2', instanceData.h0Textures[2], nearestRepeatSampler);
       if (device.type === 'webgl') {
-        this._hkBindGroup.setValue(
+        this._hkBindGroup!.setValue(
           'h0TexSize',
           new Vector2(instanceData.h0Textures[0].width, instanceData.h0Textures[0].height)
         );
       }
       device.setFramebuffer(instanceData.spectrumFramebuffer);
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
     }
   }
   /** @internal */
@@ -736,36 +736,36 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
-    device.setProgram(FFTWaveGenerator._globals.programs.hkProgram4);
-    device.setBindGroup(0, this._hkBindGroup4);
-    this._hkBindGroup4.setValue('resolution', this._params.resolution);
-    this._hkBindGroup4.setValue('sizes', this._sizes);
-    this._hkBindGroup4.setTexture('h0Texture0', instanceData.h0Textures[0], nearestRepeatSampler);
-    this._hkBindGroup4.setTexture('h0Texture1', instanceData.h0Textures[1], nearestRepeatSampler);
-    this._hkBindGroup4.setValue('t', time);
+    device.setProgram(FFTWaveGenerator._globals!.programs.hkProgram4);
+    device.setBindGroup(0, this._hkBindGroup4!);
+    this._hkBindGroup4!.setValue('resolution', this._params.resolution);
+    this._hkBindGroup4!.setValue('sizes', this._sizes);
+    this._hkBindGroup4!.setTexture('h0Texture0', instanceData.h0Textures[0], nearestRepeatSampler);
+    this._hkBindGroup4!.setTexture('h0Texture1', instanceData.h0Textures[1], nearestRepeatSampler);
+    this._hkBindGroup4!.setValue('t', time);
     if (device.type === 'webgl') {
-      this._hkBindGroup4.setValue(
+      this._hkBindGroup4!.setValue(
         'h0TexSize',
         new Vector2(instanceData.h0Textures[0].width, instanceData.h0Textures[0].height)
       );
     }
     device.setFramebuffer(instanceData.spectrumFramebuffer4);
-    FFTWaveGenerator._globals.quad.draw();
+    FFTWaveGenerator._globals!.quad.draw();
 
-    device.setProgram(FFTWaveGenerator._globals.programs.hkProgram2);
-    device.setBindGroup(0, this._hkBindGroup2);
-    this._hkBindGroup2.setValue('resolution', this._params.resolution);
-    this._hkBindGroup2.setValue('sizes', this._sizes);
-    this._hkBindGroup2.setTexture('h0Texture2', instanceData.h0Textures[2], nearestRepeatSampler);
-    this._hkBindGroup2.setValue('t', time);
+    device.setProgram(FFTWaveGenerator._globals!.programs.hkProgram2);
+    device.setBindGroup(0, this._hkBindGroup2!);
+    this._hkBindGroup2!.setValue('resolution', this._params.resolution);
+    this._hkBindGroup2!.setValue('sizes', this._sizes);
+    this._hkBindGroup2!.setTexture('h0Texture2', instanceData.h0Textures[2], nearestRepeatSampler);
+    this._hkBindGroup2!.setValue('t', time);
     if (device.type === 'webgl') {
-      this._hkBindGroup2.setValue(
+      this._hkBindGroup2!.setValue(
         'h0TexSize',
         new Vector2(instanceData.h0Textures[0].width, instanceData.h0Textures[0].height)
       );
     }
     device.setFramebuffer(instanceData.spectrumFramebuffer2);
-    FFTWaveGenerator._globals.quad.draw();
+    FFTWaveGenerator._globals!.quad.draw();
   }
   /** @internal */
   private ifft2(): void {
@@ -777,8 +777,10 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       instanceData.spectrumTextures,
       instanceData.pingpongTextures
     ];
-    const pingPongFramebuffers: [FrameBuffer | Texture2DArray, FrameBuffer | Texture2DArray] = this
-      ._useComputeShader
+    const pingPongFramebuffers: [
+      Nullable<FrameBuffer> | Texture2DArray,
+      Nullable<FrameBuffer> | Texture2DArray
+    ] = this._useComputeShader
       ? [instanceData.pingpongTextures as Texture2DArray, instanceData.spectrumTextures as Texture2DArray]
       : [instanceData.pingpongFramebuffer, instanceData.spectrumFramebuffer];
     const butterflyTex = this.getButterflyTexture(this._params.resolution);
@@ -786,18 +788,18 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let pingPong = 0;
 
     // horizontal ifft
-    device.setProgram(FFTWaveGenerator._globals.programs.fft2hProgram);
-    device.setBindGroup(0, this._fft2hBindGroup);
-    this._fft2hBindGroup.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
+    device.setProgram(FFTWaveGenerator._globals!.programs.fft2hProgram);
+    device.setBindGroup(0, this._fft2hBindGroup!);
+    this._fft2hBindGroup!.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
     for (let phase = 0; phase < phases; phase++) {
-      this._fft2hBindGroup.setValue('phase', phase);
+      this._fft2hBindGroup!.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2hBindGroup.setTexture(
+        this._fft2hBindGroup!.setTexture(
           'spectrum',
           pingPongTextures[pingPong] as Texture2DArray,
           nearestRepeatSampler
         );
-        this._fft2hBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
+        this._fft2hBindGroup!.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
           this._params.resolution / THREAD_GROUP_SIZE,
           this._params.resolution / THREAD_GROUP_SIZE,
@@ -805,14 +807,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         );
       } else {
         device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
-        this._fft2hBindGroup.setTexture('spectrum0', pingPongTextures[pingPong][0], nearestRepeatSampler);
-        this._fft2hBindGroup.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
-        this._fft2hBindGroup.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
-        this._fft2hBindGroup.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
-        this._fft2hBindGroup.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
-        this._fft2hBindGroup.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum0', pingPongTextures[pingPong][0], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
+        this._fft2hBindGroup!.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
         if (device.type === 'webgl') {
-          this._fft2hBindGroup.setValue(
+          this._fft2hBindGroup!.setValue(
             'texSize',
             new Vector4(
               pingPongTextures[pingPong][0].width,
@@ -822,23 +824,23 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
             )
           );
         }
-        FFTWaveGenerator._globals.quad.draw();
+        FFTWaveGenerator._globals!.quad.draw();
       }
       pingPong = 1 - pingPong; //(pingPong + 1) % 2;
     }
     // vertical ifft
-    device.setProgram(FFTWaveGenerator._globals.programs.fft2vProgram);
-    device.setBindGroup(0, this._fft2vBindGroup);
-    this._fft2vBindGroup.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
+    device.setProgram(FFTWaveGenerator._globals!.programs.fft2vProgram);
+    device.setBindGroup(0, this._fft2vBindGroup!);
+    this._fft2vBindGroup!.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
     for (let phase = 0; phase < phases; phase++) {
-      this._fft2vBindGroup.setValue('phase', phase);
+      this._fft2vBindGroup!.setValue('phase', phase);
       if (this._useComputeShader) {
-        this._fft2vBindGroup.setTexture(
+        this._fft2vBindGroup!.setTexture(
           'spectrum',
           pingPongTextures[pingPong] as Texture2DArray,
           nearestRepeatSampler
         );
-        this._fft2vBindGroup.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
+        this._fft2vBindGroup!.setTexture('ifft', pingPongFramebuffers[pingPong] as Texture2DArray);
         device.compute(
           this._params.resolution / THREAD_GROUP_SIZE,
           this._params.resolution / THREAD_GROUP_SIZE,
@@ -846,14 +848,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         );
       } else {
         device.setFramebuffer(pingPongFramebuffers[pingPong] as FrameBuffer);
-        this._fft2vBindGroup.setTexture('spectrum0', pingPongTextures[pingPong][0], nearestRepeatSampler);
-        this._fft2vBindGroup.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
-        this._fft2vBindGroup.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
-        this._fft2vBindGroup.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
-        this._fft2vBindGroup.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
-        this._fft2vBindGroup.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum0', pingPongTextures[pingPong][0], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
+        this._fft2vBindGroup!.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
         if (device.type === 'webgl') {
-          this._fft2vBindGroup.setValue(
+          this._fft2vBindGroup!.setValue(
             'texSize',
             new Vector4(
               pingPongTextures[pingPong][0].width,
@@ -863,7 +865,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
             )
           );
         }
-        FFTWaveGenerator._globals.quad.draw();
+        FFTWaveGenerator._globals!.quad.draw();
       }
       pingPong = 1 - pingPong;
     }
@@ -874,7 +876,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let bindGroup = this._fft2hBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
-        FFTWaveGenerator._globals.programs.fft2hProgram2.bindGroupLayouts[0]
+        FFTWaveGenerator._globals!.programs.fft2hProgram2!.bindGroupLayouts[0]
       );
     }
     this._fft2hBindGroup2Free[pingpong].push(bindGroup);
@@ -885,7 +887,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let bindGroup = this._fft2hBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
-        FFTWaveGenerator._globals.programs.fft2hProgram4.bindGroupLayouts[0]
+        FFTWaveGenerator._globals!.programs.fft2hProgram4!.bindGroupLayouts[0]
       );
     }
     this._fft2hBindGroup4Free[pingpong].push(bindGroup);
@@ -896,7 +898,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let bindGroup = this._fft2vBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
-        FFTWaveGenerator._globals.programs.fft2vProgram2.bindGroupLayouts[0]
+        FFTWaveGenerator._globals!.programs.fft2vProgram2!.bindGroupLayouts[0]
       );
     }
     this._fft2vBindGroup2Free[pingpong].push(bindGroup);
@@ -907,7 +909,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let bindGroup = this._fft2vBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
-        FFTWaveGenerator._globals.programs.fft2vProgram4.bindGroupLayouts[0]
+        FFTWaveGenerator._globals!.programs.fft2vProgram4!.bindGroupLayouts[0]
       );
     }
     this._fft2vBindGroup4Free[pingpong].push(bindGroup);
@@ -924,12 +926,12 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       instanceData.pingpongTextures as Texture2D[]
     ];
     const pingPongFramebuffers4: [FrameBuffer, FrameBuffer] = [
-      instanceData.pingpongFramebuffer4,
-      instanceData.spectrumFramebuffer4
+      instanceData.pingpongFramebuffer4!,
+      instanceData.spectrumFramebuffer4!
     ];
     const pingPongFramebuffers2: [FrameBuffer, FrameBuffer] = [
-      instanceData.pingpongFramebuffer2,
-      instanceData.spectrumFramebuffer2
+      instanceData.pingpongFramebuffer2!,
+      instanceData.spectrumFramebuffer2!
     ];
     const butterflyTex = this.getButterflyTexture(this._params.resolution);
 
@@ -937,7 +939,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     let pingPong = 0;
     for (let phase = 0; phase < phases; phase++) {
       device.setFramebuffer(pingPongFramebuffers4[pingPong]);
-      device.setProgram(FFTWaveGenerator._globals.programs.fft2hProgram4);
+      device.setProgram(FFTWaveGenerator._globals!.programs.fft2hProgram4);
       const fft2hBindGroup4 = this.getFFT2hBindGroup4(device, pingPong);
       device.setBindGroup(0, fft2hBindGroup4);
       fft2hBindGroup4.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
@@ -957,9 +959,9 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
           )
         );
       }
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
       device.setFramebuffer(pingPongFramebuffers2[pingPong]);
-      device.setProgram(FFTWaveGenerator._globals.programs.fft2hProgram2);
+      device.setProgram(FFTWaveGenerator._globals!.programs.fft2hProgram2);
       const fft2hBindGroup2 = this.getFFT2hBindGroup2(device, pingPong);
       device.setBindGroup(0, fft2hBindGroup2);
       fft2hBindGroup2.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
@@ -977,14 +979,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
           )
         );
       }
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
       pingPong = (pingPong + 1) % 2;
     }
 
     // vertical ifft
     for (let phase = 0; phase < phases; phase++) {
       device.setFramebuffer(pingPongFramebuffers4[pingPong]);
-      device.setProgram(FFTWaveGenerator._globals.programs.fft2vProgram4);
+      device.setProgram(FFTWaveGenerator._globals!.programs.fft2vProgram4);
       const fft2vBindGroup4 = this.getFFT2vBindGroup4(device, pingPong);
       device.setBindGroup(0, fft2vBindGroup4);
       fft2vBindGroup4.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
@@ -1004,9 +1006,9 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
           )
         );
       }
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
       device.setFramebuffer(pingPongFramebuffers2[pingPong]);
-      device.setProgram(FFTWaveGenerator._globals.programs.fft2vProgram2);
+      device.setProgram(FFTWaveGenerator._globals!.programs.fft2vProgram2);
       const fft2vBindGroup2 = this.getFFT2vBindGroup2(device, pingPong);
       device.setBindGroup(0, fft2vBindGroup2);
       fft2vBindGroup2.setTexture('butterfly', butterflyTex, nearestRepeatSampler);
@@ -1024,7 +1026,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
           )
         );
       }
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
       pingPong = (pingPong + 1) % 2;
     }
     this._ifftTextures = pingPongTextures[pingPong];
@@ -1044,12 +1046,12 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
-    device.setProgram(FFTWaveGenerator._globals.programs.postfft2Program);
-    device.setBindGroup(0, this._postfft2BindGroup);
-    this._postfft2BindGroup.setValue('N2', this._params.resolution * this._params.resolution);
+    device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program);
+    device.setBindGroup(0, this._postfft2BindGroup!);
+    this._postfft2BindGroup!.setValue('N2', this._params.resolution * this._params.resolution);
     if (this._useComputeShader) {
-      this._postfft2BindGroup.setTexture('output', instanceData.dataTextures as Texture2DArray);
-      this._postfft2BindGroup.setTexture('ifft', this._ifftTextures as Texture2DArray, nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('output', instanceData.dataTextures as Texture2DArray);
+      this._postfft2BindGroup!.setTexture('ifft', this._ifftTextures as Texture2DArray, nearestRepeatSampler);
       device.compute(
         this._params.resolution / THREAD_GROUP_SIZE,
         this._params.resolution / THREAD_GROUP_SIZE,
@@ -1057,19 +1059,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       );
     } else {
       device.setFramebuffer(instanceData.postIfft2Framebuffer);
-      this._postfft2BindGroup.setTexture('ifft0', this._ifftTextures[0], nearestRepeatSampler);
-      this._postfft2BindGroup.setTexture('ifft1', this._ifftTextures[1], nearestRepeatSampler);
-      this._postfft2BindGroup.setTexture('ifft2', this._ifftTextures[2], nearestRepeatSampler);
-      this._postfft2BindGroup.setTexture('ifft3', this._ifftTextures[3], nearestRepeatSampler);
-      this._postfft2BindGroup.setTexture('ifft4', this._ifftTextures[4], nearestRepeatSampler);
-      this._postfft2BindGroup.setTexture('ifft5', this._ifftTextures[5], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft0', this._ifftTextures![0], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft1', this._ifftTextures![1], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft2', this._ifftTextures![2], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft3', this._ifftTextures![3], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft4', this._ifftTextures![4], nearestRepeatSampler);
+      this._postfft2BindGroup!.setTexture('ifft5', this._ifftTextures![5], nearestRepeatSampler);
       if (device.type === 'webgl') {
-        this._postfft2BindGroup.setValue(
+        this._postfft2BindGroup!.setValue(
           'ifftTexSize',
-          new Vector2(this._ifftTextures[0].width, this._ifftTextures[0].height)
+          new Vector2(this._ifftTextures![0].width, this._ifftTextures![0].height)
         );
       }
-      FFTWaveGenerator._globals.quad.draw();
+      FFTWaveGenerator._globals!.quad.draw();
     }
   }
   /** @internal */
@@ -1078,33 +1080,33 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setFramebuffer(instanceData.postIfft2Framebuffer4);
-    device.setProgram(FFTWaveGenerator._globals.programs.postfft2Program4);
-    device.setBindGroup(0, this._postfft2BindGroup4);
-    this._postfft2BindGroup4.setValue('N2', this._params.resolution * this._params.resolution);
-    this._postfft2BindGroup4.setTexture('ifft0', this._ifftTextures[0], nearestRepeatSampler);
-    this._postfft2BindGroup4.setTexture('ifft1', this._ifftTextures[1], nearestRepeatSampler);
-    this._postfft2BindGroup4.setTexture('ifft2', this._ifftTextures[2], nearestRepeatSampler);
-    this._postfft2BindGroup4.setTexture('ifft3', this._ifftTextures[3], nearestRepeatSampler);
+    device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program4);
+    device.setBindGroup(0, this._postfft2BindGroup4!);
+    this._postfft2BindGroup4!.setValue('N2', this._params.resolution * this._params.resolution);
+    this._postfft2BindGroup4!.setTexture('ifft0', this._ifftTextures![0], nearestRepeatSampler);
+    this._postfft2BindGroup4!.setTexture('ifft1', this._ifftTextures![1], nearestRepeatSampler);
+    this._postfft2BindGroup4!.setTexture('ifft2', this._ifftTextures![2], nearestRepeatSampler);
+    this._postfft2BindGroup4!.setTexture('ifft3', this._ifftTextures![3], nearestRepeatSampler);
     if (device.type === 'webgl') {
-      this._postfft2BindGroup4.setValue(
+      this._postfft2BindGroup4!.setValue(
         'ifftTexSize',
-        new Vector2(this._ifftTextures[0].width, this._ifftTextures[0].height)
+        new Vector2(this._ifftTextures![0].width, this._ifftTextures![0].height)
       );
     }
-    FFTWaveGenerator._globals.quad.draw();
+    FFTWaveGenerator._globals!.quad.draw();
     device.setFramebuffer(instanceData.postIfft2Framebuffer2);
-    device.setProgram(FFTWaveGenerator._globals.programs.postfft2Program2);
-    device.setBindGroup(0, this._postfft2BindGroup2);
-    this._postfft2BindGroup2.setValue('N2', this._params.resolution * this._params.resolution);
-    this._postfft2BindGroup2.setTexture('ifft4', this._ifftTextures[4], nearestRepeatSampler);
-    this._postfft2BindGroup2.setTexture('ifft5', this._ifftTextures[5], nearestRepeatSampler);
+    device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program2);
+    device.setBindGroup(0, this._postfft2BindGroup2!);
+    this._postfft2BindGroup2!.setValue('N2', this._params.resolution * this._params.resolution);
+    this._postfft2BindGroup2!.setTexture('ifft4', this._ifftTextures![4], nearestRepeatSampler);
+    this._postfft2BindGroup2!.setTexture('ifft5', this._ifftTextures![5], nearestRepeatSampler);
     if (device.type === 'webgl') {
-      this._postfft2BindGroup2.setValue(
+      this._postfft2BindGroup2!.setValue(
         'ifftTexSize',
-        new Vector2(this._ifftTextures[0].width, this._ifftTextures[0].height)
+        new Vector2(this._ifftTextures![0].width, this._ifftTextures![0].height)
       );
     }
-    FFTWaveGenerator._globals.quad.draw();
+    FFTWaveGenerator._globals!.quad.draw();
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {

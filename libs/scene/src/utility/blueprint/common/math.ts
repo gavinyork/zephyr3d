@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { SerializableClass } from '../../serialization';
 import { BaseGraphNode, getNodeTypeComponents } from '../node';
 
@@ -126,7 +127,7 @@ export class MakeVectorNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -166,7 +167,7 @@ export class MakeVectorNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return '';
       }
@@ -267,7 +268,7 @@ export class SwizzleNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return `Cannot determine type of argument \`${name}\``;
     }
@@ -308,7 +309,7 @@ export class SwizzleNode extends BaseGraphNode {
     if (!this._inputs[0].inputNode) {
       return '';
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return '';
     }
@@ -436,8 +437,8 @@ export class CompComparisonNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (type0 !== type1) {
       return 'Input arguments must be the same type';
     }
@@ -454,7 +455,7 @@ export class CompComparisonNode extends BaseGraphNode {
     if (err) {
       return '';
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     return `bvec${getNodeTypeComponents(type)}`;
   }
 }
@@ -656,12 +657,12 @@ export class SelectionNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (type0 !== type1) {
       return 'Input arguments 0-1 must be the same type';
     }
-    const type2 = this._inputs[2].inputNode.getOutputType(this._inputs[2].inputId);
+    const type2 = this._inputs[2].inputNode!.getOutputType(this._inputs[2].inputId!);
     const n = getNodeTypeComponents(type2);
     if (n > 1 && n !== getNodeTypeComponents(type0)) {
       return 'Invalid type of argument 2';
@@ -679,7 +680,7 @@ export class SelectionNode extends BaseGraphNode {
     if (err) {
       return '';
     }
-    return this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    return this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
   }
 }
 
@@ -791,7 +792,7 @@ export class TransformNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -841,7 +842,7 @@ export class TransformNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return '';
       }
@@ -924,9 +925,9 @@ export abstract class GenericMathNode extends BaseGraphNode {
   /** The explicit output type, if specified (otherwise inferred from inputs) */
   readonly outType: string;
   /** Maps input slot IDs to allowed types for that specific slot */
-  readonly explicitInTypes: Record<number, string[]>;
+  readonly explicitInTypes: Nullable<Record<number, string[]>>;
   /** Maps input slot IDs to additional allowed types beyond the common type */
-  readonly additionalInTypes: Record<number, string[]>;
+  readonly additionalInTypes: Nullable<Record<number, string[]>>;
   /**
    * Creates a new generic math node
    *
@@ -945,10 +946,10 @@ export abstract class GenericMathNode extends BaseGraphNode {
   constructor(
     func: string,
     numArgs: number,
-    outType?: string,
-    inTypes?: string[],
-    explicitInTypes?: Record<number, string[]>,
-    additionalInTypes?: Record<number, string[]>,
+    outType?: Nullable<string>,
+    inTypes?: Nullable<string[]>,
+    explicitInTypes?: Nullable<Record<number, string[]>>,
+    additionalInTypes?: Nullable<Record<number, string[]>>,
     originTypes?: string[]
   ) {
     super();
@@ -1000,7 +1001,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
     let type: string = '';
     for (let i = 0; i < this._inputs.length; i++) {
       const name = 'abcdefghijklmn'[i];
-      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const t = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!t) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -1037,7 +1038,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const t = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!t) {
         return '';
       }
@@ -1841,10 +1842,10 @@ export class CompMulNode extends GenericMathNode {
   }
   protected getType(): string {
     const type1 = this.inputs[0].inputNode
-      ? this.inputs[0].inputNode.getOutputType(this.inputs[0].inputId)
+      ? this.inputs[0].inputNode.getOutputType(this.inputs[0].inputId!)
       : '';
     const type2 = this.inputs[1].inputNode
-      ? this.inputs[1].inputNode.getOutputType(this.inputs[1].inputId)
+      ? this.inputs[1].inputNode.getOutputType(this.inputs[1].inputId!)
       : '';
     if (!type1 || !type2) {
       return '';

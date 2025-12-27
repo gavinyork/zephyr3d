@@ -21,7 +21,7 @@ export class GlobalBindGroupAllocator {
    * @returns Global bind group
    */
   getGlobalBindGroup(ctx: DrawContext): BindGroup {
-    const hash = ctx.renderPassHash;
+    const hash = ctx.renderPassHash!;
     let bindGroup = this._bindGroups[hash];
     if (!bindGroup) {
       let layout = GlobalBindGroupAllocator._layouts[hash];

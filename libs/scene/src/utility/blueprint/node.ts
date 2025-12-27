@@ -508,7 +508,7 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
         return `Missing required argument: input[${i}]`;
       }
       if (input.inputNode) {
-        const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+        const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
         if (!type) {
           return `Cannot determine type of argument ${i}`;
         }

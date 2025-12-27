@@ -1,5 +1,5 @@
-import { weightedAverage, DWeakRef, Disposable } from '@zephyr3d/base';
-import type { DRef, IDisposable } from '@zephyr3d/base';
+import { weightedAverage, Disposable } from '@zephyr3d/base';
+import type { DRef, IDisposable, Nullable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
@@ -82,7 +82,7 @@ export type StopAnimationOptions = {
  */
 export class AnimationSet extends Disposable implements IDisposable {
   /** @internal */
-  private _model: DWeakRef<SceneNode>;
+  private _model: SceneNode;
   /** @internal */
   private _animations: Record<string, AnimationClip>;
   /** @internal */
@@ -114,7 +114,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   constructor(model: SceneNode) {
     super();
-    this._model = new DWeakRef<SceneNode>(model);
+    this._model = model;
     this._animations = {};
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
@@ -125,7 +125,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    * The model (SceneNode) controlled by this animation set.
    */
   get model(): SceneNode {
-    return this._model.get();
+    return this._model;
   }
   /**
    * Number of animation clips registered in this set.
@@ -153,14 +153,14 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param embedded - Whether the clip is embedded/owned (implementation-specific). Default false.
    * @returns The created clip, or null if the name is empty or not unique.
    */
-  createAnimation(name: string, embedded = false): AnimationClip {
+  createAnimation(name: string, embedded = false): Nullable<AnimationClip> {
     if (!name || this._animations[name]) {
       console.error('Animation must have unique name');
       return null;
     } else {
       const animation = new AnimationClip(name, this, embedded);
       this._animations[name] = animation;
-      this._model.get().scene.queueUpdateNode(this._model.get());
+      this._model.scene?.queueUpdateNode(this._model);
       return animation;
     }
   }
@@ -236,7 +236,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         );
         if (tracks.length > 0) {
           const weights = tracks.map((track) => {
-            const info = this._activeAnimations.get(track.animation);
+            const info = this._activeAnimations.get(track.animation!)!;
             const weight = info.weight;
             const fadeIn = info.fadeIn === 0 ? 1 : Math.min(1, info.animateTime / info.fadeIn);
             let fadeOut = 1;
@@ -246,9 +246,8 @@ export class AnimationSet extends Disposable implements IDisposable {
             return weight * fadeIn * fadeOut;
           });
           const states = tracks.map((track) => {
-            const t =
-              (this._activeAnimations.get(track.animation).currentTime / track.animation.timeDuration) *
-              track.getDuration();
+            const info = this._activeAnimations.get(track.animation!)!;
+            const t = (info.currentTime / track.animation!.timeDuration) * track.getDuration();
             return track.calculateState(k, t);
           });
           const state = weightedAverage(weights, states, (a, b, t) => {
@@ -400,7 +399,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         ani.skeletons?.forEach((v, k) => {
           const skeleton = this.model.findSkeletonById(k);
           if (skeleton) {
-            const refcount = this._activeSkeletons.get(skeleton);
+            const refcount = this._activeSkeletons.get(skeleton)!;
             if (refcount === 1) {
               skeleton.reset();
               this._activeSkeletons.delete(skeleton);
@@ -421,8 +420,6 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   protected onDispose() {
     super.onDispose();
-    this._model?.dispose();
-    this._model = null;
     for (const k in this._animations) {
       this._animations[k].dispose();
     }

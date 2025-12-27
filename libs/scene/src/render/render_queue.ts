@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
 import { Disposable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
@@ -24,7 +24,7 @@ const maxBufferSizeInFloats = 65536 / 4;
 
 /** @internal */
 export class InstanceBindGroupAllocator {
-  private static _instanceBindGroupLayout: BindGroupLayout = null;
+  private static _instanceBindGroupLayout: Nullable<BindGroupLayout> = null;
   _bindGroupList: CachedBindGroup[] = [];
   private _allocFrameStamp: number;
   constructor() {
@@ -89,7 +89,7 @@ export interface RenderQueueItem {
   drawable: Drawable;
   sortDistance: number;
   instanceColor?: Vector4;
-  instanceData: InstanceData;
+  instanceData: Nullable<InstanceData>;
 }
 
 /** @internal */
@@ -149,7 +149,7 @@ export interface DrawableInstanceInfo {
  */
 export class RenderQueue extends Disposable {
   /** @internal */
-  private _itemList: RenderItemList;
+  private _itemList: Nullable<RenderItemList>;
   /** @internal */
   private readonly _renderPass: RenderPass;
   /** @internal */
@@ -157,7 +157,7 @@ export class RenderQueue extends Disposable {
   /** @internal */
   private _unshadowedLightList: PunctualLight[];
   /** @internal */
-  private _sunLight: DirectionalLight;
+  private _sunLight: Nullable<DirectionalLight>;
   /** @internal */
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
@@ -193,10 +193,10 @@ export class RenderQueue extends Disposable {
     this._objectColorMaps = [new Map()];
   }
   /** The sun light */
-  get sunLight(): DirectionalLight {
+  get sunLight() {
     return this._sunLight;
   }
-  set sunLight(light: DirectionalLight) {
+  set sunLight(light) {
     this._sunLight = light;
   }
   /** @internal */
@@ -320,7 +320,7 @@ export class RenderQueue extends Disposable {
       this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
-        drawable.getMaterial().objectColor = drawable.getObjectColor();
+        drawable.getMaterial()!.objectColor = drawable.getObjectColor();
         this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
@@ -442,7 +442,7 @@ export class RenderQueue extends Disposable {
   /** @internal */
   end(camera: Camera, createRenderBundles?: boolean): this {
     const frameCounter = getDevice().frameInfo.frameCounter;
-    const itemList = this._itemList;
+    const itemList = this._itemList!;
     if (!this.itemList) {
       return this;
     }
@@ -465,8 +465,8 @@ export class RenderQueue extends Disposable {
         const instanceList = info.instanceList;
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          let bindGroup: CachedBindGroup = null;
-          let item: RenderQueueItem = null;
+          let bindGroup: Nullable<CachedBindGroup> = null;
+          let item: Nullable<RenderQueueItem> = null;
           for (let i = 0; i < drawables.length; i++) {
             const drawable = drawables[i];
             const instanceUniforms = drawable.getInstanceUniforms();
@@ -492,7 +492,7 @@ export class RenderQueue extends Disposable {
             drawable.applyTransformUniforms(this);
             drawable.applyMaterialUniforms(instanceInfo);
             bindGroup.offset += stride;
-            item.instanceData.numInstances++;
+            item!.instanceData!.numInstances++;
             const mat = drawable.getMaterial();
             if (mat) {
               info.materialList.add(mat.coreMaterial);
@@ -524,10 +524,10 @@ export class RenderQueue extends Disposable {
   binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem) {
     let left = 0;
     let right = itemList.length - 1;
-    const newInstanceId = item.drawable.getMaterial().instanceId;
+    const newInstanceId = item.drawable.getMaterial()!.instanceId;
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
-      const instanceId = itemList[mid].drawable.getMaterial().instanceId;
+      const instanceId = itemList[mid].drawable.getMaterial()!.instanceId;
       if (instanceId === newInstanceId) {
         itemList.splice(mid + 1, 0, item);
         return;

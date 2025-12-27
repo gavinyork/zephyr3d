@@ -1,4 +1,4 @@
-import type { CubeFace, Immutable, Plane } from '@zephyr3d/base';
+import type { CubeFace, Immutable, Nullable, Plane } from '@zephyr3d/base';
 import { DRef, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import type { Drawable, PickTarget } from '../render/drawable';
@@ -49,8 +49,8 @@ export type PickResult = {
  * @public
  */
 export type CameraHistoryData = {
-  prevColorTex: BaseTexture;
-  prevMotionVectorTex: BaseTexture;
+  prevColorTex: Nullable<BaseTexture>;
+  prevMotionVectorTex: Nullable<BaseTexture>;
 };
 
 /**
@@ -85,8 +85,6 @@ export class Camera extends SceneNode {
   protected _viewMatrix: Matrix4x4;
   /** @internal View-projection matrix. */
   protected _viewProjMatrix: Matrix4x4;
-  /** @internal Rotation matrix derived from world transform (camera conventions). */
-  protected _rotationMatrix: Matrix4x4;
   /** @internal Inverse view-projection matrix. */
   protected _invViewProjMatrix: Matrix4x4;
   /** @internal Framebuffer clear color, disabled when null. Default is null */
@@ -96,19 +94,19 @@ export class Camera extends SceneNode {
   /** @internal Framebuffer stencil clear value, disabled when null. Default is 0 */
   protected _clearStencil: number;
   /** @internal Optional clip plane in camera space. */
-  protected _clipPlane: Plane;
+  protected _clipPlane: Nullable<Plane>;
   /** @internal Camera controller (input). */
-  protected _controller: BaseCameraController;
+  protected _controller: Nullable<BaseCameraController>;
   /** @internal World-space frustum (from VP). */
-  protected _frustum: Frustum;
+  protected _frustum: Nullable<Frustum>;
   /** @internal View-space frustum (from P). */
-  protected _frustumV: Frustum;
+  protected _frustumV: Nullable<Frustum>;
   /** @internal Dirty flag indicating derived matrices/frusta need recompute. */
   protected _dirty: boolean;
   /** @internal Viewport [x, y, w, h]; null uses full framebuffer. */
-  protected _viewport: number[];
+  protected _viewport: Nullable<number[]>;
   /** @internal Scissor rectangle [x, y, w, h]; null uses viewport. */
-  protected _scissor: number[];
+  protected _scissor: Nullable<number[]>;
   /** @internal Clip plane mask for custom clipping schemes. */
   protected _clipMask: number;
   /** @internal Order-Independent Transparency reference. */
@@ -201,34 +199,34 @@ export class Camera extends SceneNode {
   protected _SSAOBlurDepthCutoff: number;
 
   /** @internal Pending GPU-pick promise (one-shot). */
-  protected _pickResultPromise: Promise<PickResult>;
+  protected _pickResultPromise: Nullable<Promise<Nullable<PickResult>>>;
   /** @internal Resolver for the pending pick promise. */
-  protected _pickResultResolve: (result: PickResult) => void;
+  protected _pickResultResolve: Nullable<(result: Nullable<PickResult>) => void>;
   /** @internal Last pick X position (viewport-relative). */
   protected _pickPosX: number;
   /** @internal Last pick Y position (viewport-relative). */
   protected _pickPosY: number;
   /** @internal Last resolved pick result (optional cache). */
-  protected _pickResult: PickResult;
+  protected _pickResult: Nullable<PickResult>;
 
   /** @internal Current jitter value in clip space (x, y). */
   protected _jitterValue: Vector2;
   /** @internal Previous frame’s jitter value. */
-  protected _prevJitterValue: Vector2;
+  protected _prevJitterValue: Nullable<Vector2>;
   /** @internal Current jittered VP matrix. */
   protected _jitteredVPMatrix: Matrix4x4;
   /** @internal Inverse of the current jittered VP matrix. */
   protected _jitteredInvVPMatrix: Matrix4x4;
   /** @internal Previous frame’s non-jittered VP matrix. */
-  protected _prevVPMatrix: Matrix4x4;
+  protected _prevVPMatrix: Nullable<Matrix4x4>;
   /** @internal Previous frame’s camera world position. */
-  protected _prevPosition: Vector3;
+  protected _prevPosition: Nullable<Vector3>;
   /** @internal Previous frame’s jittered VP matrix. */
-  protected _prevJitteredVPMatrix: Matrix4x4;
+  protected _prevJitteredVPMatrix: Nullable<Matrix4x4>;
   /** @internal Post-processing compositor attached to this camera. */
   protected _compositor: Compositor;
   /** @internal Pointer interaction rectangle in css pixels (relative to canvas) */
-  protected _interactionRect: [left: number, top: number, width: number, height: number];
+  protected _interactionRect: Nullable<[left: number, top: number, width: number, height: number]>;
   /** @internal captured by which mouse button (-1 if not captured) */
   protected _capturedButton: number;
   /**
@@ -240,7 +238,7 @@ export class Camera extends SceneNode {
    * @param scene - The scene that owns this camera.
    * @param projectionMatrix - Optional projection matrix to initialize with.
    */
-  constructor(scene: Scene, projectionMatrix?: Matrix4x4) {
+  constructor(scene: Nullable<Scene>, projectionMatrix?: Matrix4x4) {
     super(scene);
     this._projMatrix = projectionMatrix || Matrix4x4.identity();
     this._invProjMatrix = Matrix4x4.invert(this._projMatrix);
@@ -388,19 +386,19 @@ export class Camera extends SceneNode {
    * Whether tonemapping is enabled via the post effect.
    */
   get toneMap(): boolean {
-    return this._postEffectTonemap.get().enabled;
+    return this._postEffectTonemap.get()!.enabled;
   }
   set toneMap(val: boolean) {
-    this._postEffectTonemap.get().enabled = !!val;
+    this._postEffectTonemap.get()!.enabled = !!val;
   }
   /**
    * Whether motion blur is enabled via the post effect.
    */
   get motionBlur(): boolean {
-    return this._postEffectMotionBlur.get().enabled;
+    return this._postEffectMotionBlur.get()!.enabled;
   }
   set motionBlur(val: boolean) {
-    this._postEffectMotionBlur.get().enabled = !!val;
+    this._postEffectMotionBlur.get()!.enabled = !!val;
   }
   /** Motion blur strength */
   get motionBlurStrength(): number {
@@ -409,17 +407,17 @@ export class Camera extends SceneNode {
   set motionBlurStrength(val: number) {
     this._motionBlurStrength = val;
     if (this._postEffectMotionBlur.get()) {
-      this._postEffectMotionBlur.get().strength = this._motionBlurStrength;
+      this._postEffectMotionBlur.get()!.strength = this._motionBlurStrength;
     }
   }
   /**
    * Gets whether Bloom is enabled.
    */
   get bloom(): boolean {
-    return this._postEffectBloom.get().enabled;
+    return this._postEffectBloom.get()!.enabled;
   }
   set bloom(val: boolean) {
-    this._postEffectBloom.get().enabled = !!val;
+    this._postEffectBloom.get()!.enabled = !!val;
   }
   /**
    * Maximum bloom downsample levels
@@ -430,7 +428,7 @@ export class Camera extends SceneNode {
   set bloomMaxDownsampleLevels(val: number) {
     this._bloomMaxDownsampleLevels = val;
     if (this._postEffectBloom.get()) {
-      this._postEffectBloom.get().maxDownsampleLevel = val;
+      this._postEffectBloom.get()!.maxDownsampleLevel = val;
     }
   }
   /**
@@ -442,7 +440,7 @@ export class Camera extends SceneNode {
   set bloomDownsampleLimit(val: number) {
     this._bloomDownsampleLimit = val;
     if (this._postEffectBloom.get()) {
-      this._postEffectBloom.get().downsampleLimit = val;
+      this._postEffectBloom.get()!.downsampleLimit = val;
     }
   }
   /**
@@ -454,7 +452,7 @@ export class Camera extends SceneNode {
   set bloomThreshold(val: number) {
     this._bloomThreshold = val;
     if (this._postEffectBloom.get()) {
-      this._postEffectBloom.get().threshold = val;
+      this._postEffectBloom.get()!.threshold = val;
     }
   }
   /**
@@ -466,7 +464,7 @@ export class Camera extends SceneNode {
   set bloomThresholdKnee(val: number) {
     this._bloomThresholdKnee = val;
     if (this._postEffectBloom.get()) {
-      this._postEffectBloom.get().thresholdKnee = val;
+      this._postEffectBloom.get()!.thresholdKnee = val;
     }
   }
   /**
@@ -478,17 +476,17 @@ export class Camera extends SceneNode {
   set bloomIntensity(val: number) {
     this._bloomIntensity = val;
     if (this._postEffectBloom.get()) {
-      this._postEffectBloom.get().intensity = val;
+      this._postEffectBloom.get()!.intensity = val;
     }
   }
   /**
    * Gets whether FXAA is enabled.
    */
   get FXAA(): boolean {
-    return this._postEffectFXAA.get().enabled;
+    return this._postEffectFXAA.get()!.enabled;
   }
   set FXAA(val: boolean) {
-    this._postEffectFXAA.get().enabled = !!val;
+    this._postEffectFXAA.get()!.enabled = !!val;
   }
   /**
    * Tonemap exposure
@@ -499,17 +497,17 @@ export class Camera extends SceneNode {
   set toneMapExposure(val: number) {
     this._tonemapExposure = val;
     if (this._postEffectTonemap.get()) {
-      this._postEffectTonemap.get().exposure = val;
+      this._postEffectTonemap.get()!.exposure = val;
     }
   }
   /**
    * Gets whether TAA is enabled.
    */
   get TAA(): boolean {
-    return this._postEffectTAA.get().enabled;
+    return this._postEffectTAA.get()!.enabled;
   }
   set TAA(val: boolean) {
-    this._postEffectTAA.get().enabled = !!val;
+    this._postEffectTAA.get()!.enabled = !!val;
   }
   /**
    * Gets the debug flag for TAA
@@ -524,10 +522,10 @@ export class Camera extends SceneNode {
    * Gets whether Screen Space Reflections (SSR) is enabled.
    */
   get SSR(): boolean {
-    return this._postEffectSSR.get().enabled;
+    return this._postEffectSSR.get()!.enabled;
   }
   set SSR(val: boolean) {
-    this._postEffectSSR.get().enabled = !!val;
+    this._postEffectSSR.get()!.enabled = !!val;
   }
   /**
    * Gets the maximum roughness value for screen space reflections.
@@ -647,10 +645,10 @@ export class Camera extends SceneNode {
    * Gets whether SSAO is enabled.
    */
   get SSAO(): boolean {
-    return this._postEffectSSAO.get().enabled;
+    return this._postEffectSSAO.get()!.enabled;
   }
   set SSAO(val: boolean) {
-    this._postEffectSSAO.get().enabled = !!val;
+    this._postEffectSSAO.get()!.enabled = !!val;
   }
   /** SSAO scale */
   get SSAOScale() {
@@ -658,8 +656,8 @@ export class Camera extends SceneNode {
   }
   set SSAOScale(val: number) {
     this._SSAOScale = val;
-    if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get().scale = val;
+    if (this._postEffectSSAO.get()!) {
+      this._postEffectSSAO.get()!.scale = val;
     }
   }
   /** SSAO bias */
@@ -669,7 +667,7 @@ export class Camera extends SceneNode {
   set SSAOBias(val: number) {
     this._SSAOBias = val;
     if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get().bias = val;
+      this._postEffectSSAO.get()!.bias = val;
     }
   }
   /** SSAO radius */
@@ -679,7 +677,7 @@ export class Camera extends SceneNode {
   set SSAORadius(val: number) {
     this._SSAORadius = val;
     if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get().radius = val;
+      this._postEffectSSAO.get()!.radius = val;
     }
   }
   /** SSAO intensity */
@@ -689,7 +687,7 @@ export class Camera extends SceneNode {
   set SSAOIntensity(val: number) {
     this._SSAOIntensity = val;
     if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get().intensity = val;
+      this._postEffectSSAO.get()!.intensity = val;
     }
   }
   /** SSAO depth cutoff */
@@ -699,7 +697,7 @@ export class Camera extends SceneNode {
   set SSAOBlurDepthCutoff(val: number) {
     this._SSAOBlurDepthCutoff = val;
     if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get().blurDepthCutoff = val;
+      this._postEffectSSAO.get()!.blurDepthCutoff = val;
     }
   }
   /** Whether to perform a depth pass */
@@ -724,10 +722,10 @@ export class Camera extends SceneNode {
     this._adapted = !!val;
   }
   /** OIT */
-  get oit(): OIT {
+  get oit() {
     return this._oit.get();
   }
-  set oit(val: OIT) {
+  set oit(val) {
     this._oit.set(val);
   }
   /** Clip plane mask */
@@ -738,17 +736,17 @@ export class Camera extends SceneNode {
     this._clipMask = val;
   }
   /** Viewport used for rendering, if null, use full framebuffer size */
-  get viewport(): number[] {
-    return this._viewport ? [...this._viewport] : null;
+  get viewport(): Nullable<Immutable<number[]>> {
+    return this._viewport;
   }
-  set viewport(rect: number[]) {
+  set viewport(rect: Nullable<Immutable<number[]>>) {
     this._viewport = rect?.slice() ?? null;
   }
   /** Scissor rectangle used for rendering, if null, use viewport value */
-  get scissor(): number[] {
-    return this._scissor ? [...this._scissor] : null;
+  get scissor(): Nullable<Immutable<number[]>> {
+    return this._scissor;
   }
-  set scissor(rect: number[]) {
+  set scissor(rect: Nullable<Immutable<number[]>>) {
     this._scissor = rect?.slice() ?? null;
   }
   /**
@@ -949,7 +947,7 @@ export class Camera extends SceneNode {
       this._dirty = false;
       this._compute();
     }
-    return this._frustum;
+    return this._frustum!;
   }
   get frustumViewSpace(): Immutable<Frustum> {
     if (this._dirty) {
@@ -959,13 +957,13 @@ export class Camera extends SceneNode {
     if (!this._frustumV) {
       this._frustumV = new Frustum(this._projMatrix);
     }
-    return this._frustumV;
+    return this._frustumV!;
   }
   /** The camera controller  */
-  get controller(): BaseCameraController {
-    return this._controller || null;
+  get controller() {
+    return this._controller;
   }
-  set controller(controller: BaseCameraController) {
+  set controller(controller) {
     this.setController(controller);
   }
   /** {@inheritDoc SceneNode.isCamera} */
@@ -1140,19 +1138,19 @@ export class Camera extends SceneNode {
     scene.getRenderer().renderScene(scene, this);
     device.popDeviceStates();
     if (useMotionVector) {
-      this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
-      this._prevJitterValue.set(this._jitterValue);
-      this._prevVPMatrix.set(this.viewProjectionMatrix);
+      this._prevJitteredVPMatrix!.set(this._jitteredVPMatrix);
+      this._prevJitterValue!.set(this._jitterValue);
+      this._prevVPMatrix!.set(this.viewProjectionMatrix);
       this._prevPosition = this.getWorldPosition();
     }
     scene.dispatchEvent('endrender', scene, this, this._compositor);
   }
-  async pickAsync(posX: number, posY: number): Promise<PickResult> {
+  async pickAsync(posX: number, posY: number): Promise<Nullable<PickResult>> {
     this._pickPosX = posX;
     this._pickPosY = posY;
     if (!this._pickResultPromise) {
-      this._pickResultPromise = new Promise<PickResult>((resolve) => {
-        this._pickResultResolve = (result: PickResult) => {
+      this._pickResultPromise = new Promise<Nullable<PickResult>>((resolve) => {
+        this._pickResultResolve = (result: Nullable<PickResult>) => {
           resolve(result);
           this._pickResultPromise = null;
           this._pickResultResolve = null;
@@ -1198,23 +1196,23 @@ export class Camera extends SceneNode {
     return this._jitterValue;
   }
   /** @internal */
-  get prevJitteredVPMatrix(): Immutable<Matrix4x4> {
+  get prevJitteredVPMatrix(): Nullable<Immutable<Matrix4x4>> {
     return this._prevJitteredVPMatrix;
   }
   /** @internal */
-  get prevJitterValue(): Immutable<Vector2> {
+  get prevJitterValue(): Nullable<Immutable<Vector2>> {
     return this._prevJitterValue;
   }
   /** @internal */
-  get prevVPMatrix(): Immutable<Matrix4x4> {
+  get prevVPMatrix(): Nullable<Immutable<Matrix4x4>> {
     return this._prevVPMatrix;
   }
   /** @internal */
-  get prevPosition(): Immutable<Vector3> {
+  get prevPosition(): Nullable<Immutable<Vector3>> {
     return this._prevPosition;
   }
   /** @internal */
-  private setController(controller: BaseCameraController): this {
+  private setController(controller: Nullable<BaseCameraController>): this {
     if (this._controller !== controller) {
       if (controller && controller._getCamera() && controller._getCamera() !== this) {
         throw new Error(
@@ -1258,9 +1256,6 @@ export class Camera extends SceneNode {
     super.onDispose();
     this.setController(null);
     this.clearHistoryData();
-    this._projMatrix = null;
-    this._viewMatrix = null;
-    this._viewProjMatrix = null;
     this._postEffectBloom.dispose();
     this._postEffectFXAA.dispose();
     this._postEffectMotionBlur.dispose();

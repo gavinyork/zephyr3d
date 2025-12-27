@@ -1,10 +1,10 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, DRef, Quaternion, Vector2, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
-import type { RenderPass, BatchDrawable, DrawContext, PickTarget, MorphInfo } from '../render';
+import type { RenderPass, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';
-import type { RenderBundle, Texture2D } from '@zephyr3d/device';
+import type { RenderBundle } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -26,7 +26,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /** @internal */
   private readonly _material: DRef<Sprite3DMaterial>;
   /** @internal */
-  protected _instanceHash: string;
+  protected _instanceHash: Nullable<string>;
   /** @internal */
   protected _batchable: boolean;
   /** @internal */
@@ -36,7 +36,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /** @internal */
   protected _useRenderBundle: boolean;
   /** @internal */
-  protected _materialChangeTag: number;
+  protected _materialChangeTag: Nullable<number>;
   /** @internal */
   protected _anchor: Vector2;
   /** @internal */
@@ -74,7 +74,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
    * {@inheritDoc BatchDrawable.getInstanceUniforms}
    */
   getInstanceUniforms(): Float32Array<ArrayBuffer> {
-    return this._material.get().$instanceUniforms;
+    return this._material.get()!.$instanceUniforms;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
@@ -87,7 +87,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   }
   /** Material of the mesh */
   get material(): MeshMaterial {
-    return this._material.get();
+    return this._material.get()!;
   }
   set material(m: MeshMaterial) {
     if (this._material.get() !== m && m instanceof Sprite3DMaterial) {
@@ -129,20 +129,20 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     }
   }
   get uvTopLeft(): Vector2 {
-    const uvinfo = this._material.get().uvinfo;
+    const uvinfo = this._material.get()!.uvinfo;
     return new Vector2(uvinfo.x, uvinfo.y);
   }
   set uvTopLeft(value: Vector2) {
-    const uvinfo = this._material.get().uvinfo;
-    this._material.get().setUVInfo(value.x, value.y, uvinfo.z, uvinfo.w);
+    const uvinfo = this._material.get()!.uvinfo;
+    this._material.get()!.setUVInfo(value.x, value.y, uvinfo.z, uvinfo.w);
   }
   get uvBottomRight(): Vector2 {
-    const uvinfo = this._material.get().uvinfo;
+    const uvinfo = this._material.get()!.uvinfo;
     return new Vector2(uvinfo.z, uvinfo.w);
   }
   set uvBottomRight(value: Vector2) {
-    const uvinfo = this._material.get().uvinfo;
-    this._material.get().setUVInfo(uvinfo.x, uvinfo.y, value.x, value.y);
+    const uvinfo = this._material.get()!.uvinfo;
+    this._material.get()!.setUVInfo(uvinfo.x, uvinfo.y, value.x, value.y);
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
@@ -153,14 +153,14 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): MorphInfo {
+  getMorphInfo() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.isBatchable}
    */
   isBatchable(): this is BatchDrawable {
-    return this._batchable && this._material.get()?.isBatchable();
+    return this._batchable && !!this._material.get() && this._material.get()!.isBatchable();
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
@@ -236,7 +236,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getBoneMatrices}
    */
-  getBoneMatrices(): Texture2D {
+  getBoneMatrices() {
     return null;
   }
   /**
@@ -249,13 +249,13 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc SceneNode.computeBoundingVolume}
    */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     return null;
   }
   /**
    * {@inheritDoc SceneNode.computeWorldBoundingVolume}
    */
-  computeWorldBoundingVolume(): BoundingVolume {
+  computeWorldBoundingVolume(): Nullable<BoundingVolume> {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
     if (mat) {
@@ -275,7 +275,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     outMatrix.compose(this._scaling, rotationZ, this._position);
     if (this._material?.get()) {
       this._rotateAngle = -rot;
-      this._material.get().rotation = this._rotateAngle;
+      this._material.get()!.rotation = this._rotateAngle;
     }
 
     //outMatrix.scaling(this.scale).translateLeft(this._position);
@@ -295,7 +295,6 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   protected onDispose() {
     super.onDispose();
     this._material.dispose();
-    this._renderBundle = null;
     RenderBundleWrapper.drawableChanged(this);
   }
 }

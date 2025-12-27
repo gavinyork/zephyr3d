@@ -3,6 +3,7 @@ import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D, SSR_calcJitter } from '../shaders/ssr';
+import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
@@ -19,12 +20,12 @@ import { ShaderHelper } from '../material';
 export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
-  private static _combineProgram: GPUProgram = undefined;
-  private static _blurBlitterH: BilateralBlurBlitter = null;
-  private static _blurBlitterV: BilateralBlurBlitter = null;
+  private static _combineProgram: Nullable<GPUProgram> = null;
+  private static _blurBlitterH: Nullable<BilateralBlurBlitter> = null;
+  private static _blurBlitterV: Nullable<BilateralBlurBlitter> = null;
   private _bindgroups: Record<string, BindGroup>;
   private _resolveBindGroup: Record<string, BindGroup>;
-  private _combineBindGroup: BindGroup;
+  private _combineBindGroup: Nullable<BindGroup>;
   /**
    * Creates an instance of SSR post effect
    */
@@ -60,7 +61,7 @@ export class SSR extends AbstractPostEffect {
     blitter.kernelRadius = kernelRadius;
     blitter.stdDev = stdDev;
     blitter.size = size;
-    blitter.depthTex = ctx.linearDepthTexture;
+    blitter.depthTex = ctx.linearDepthTexture ?? null;
     blitter.depthCutoff = depthCutoff;
     blitter.blurSizeTex = blurSizeTex;
     blitter.blurSizeIndex = blurSizeIndex;
@@ -79,7 +80,7 @@ export class SSR extends AbstractPostEffect {
       SSR._combineProgram = program;
     }
     if (!this._combineBindGroup) {
-      this._combineBindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+      this._combineBindGroup = device.createBindGroup(program!.bindGroupLayouts[0]);
     }
     const linearSampler = fetchSampler('clamp_linear');
     this._combineBindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
@@ -109,7 +110,7 @@ export class SSR extends AbstractPostEffect {
     intersectTexture: Texture2D
   ) {
     const device = ctx.device;
-    const hash = ctx.env.light.envLight ? ctx.env.light.getHash() : '';
+    const hash = ctx.env!.light.envLight ? ctx.env!.light.getHash() : '';
     let program = SSR._resolveProgram[hash];
     if (program === undefined) {
       program = this._createResolveProgram(ctx);
@@ -141,9 +142,9 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('invProjMatrix', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
-    if (ctx.env.light.envLight) {
-      bindGroup.setValue('envLightStrength', ctx.env.light.strength);
-      ctx.env.light.envLight.updateBindGroup(bindGroup);
+    if (ctx.env!.light.envLight) {
+      bindGroup.setValue('envLightStrength', ctx.env!.light.strength);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
@@ -160,7 +161,7 @@ export class SSR extends AbstractPostEffect {
   ) {
     const device = ctx.device;
     const hash = `${Number(blur)}:${
-      ctx.env.light.envLight ? ctx.env.light.getHash() : ''
+      ctx.env!.light.envLight ? ctx.env!.light.getHash() : ''
     }:${!!ctx.HiZTexture}:${!!ctx.camera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
     if (program === undefined) {
@@ -176,9 +177,9 @@ export class SSR extends AbstractPostEffect {
     const linearSampler = fetchSampler('clamp_linear');
     if (!blur) {
       bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
-      if (ctx.env.light.envLight) {
-        bindGroup.setValue('envLightStrength', ctx.env.light.strength);
-        ctx.env.light.envLight.updateBindGroup(bindGroup);
+      if (ctx.env!.light.envLight) {
+        bindGroup.setValue('envLightStrength', ctx.env!.light.strength);
+        ctx.env!.light.envLight.updateBindGroup(bindGroup);
       }
     }
     bindGroup.setTexture('roughnessTex', ctx.SSRRoughnessTexture, nearestSampler);
@@ -228,7 +229,7 @@ export class SSR extends AbstractPostEffect {
     device.pushDeviceStates();
     copyTexture(
       inputColorTexture,
-      device.getFramebuffer(),
+      device.getFramebuffer()!,
       fetchSampler('clamp_nearest_nomip'),
       AbstractPostEffect.getDefaultRenderState(ctx, 'eq')
     );
@@ -363,7 +364,7 @@ export class SSR extends AbstractPostEffect {
           });
         });
       }
-    });
+    })!;
     program.name = '@SSR_Combine';
     return program;
   }
@@ -374,8 +375,8 @@ export class SSR extends AbstractPostEffect {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
-        if (ctx.env.light.envLight) {
-          ctx.env.light.envLight.initShaderBindings(pb);
+        if (ctx.env!.light.envLight) {
+          ctx.env!.light.envLight.initShaderBindings(pb);
         }
         pb.main(function () {
           this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
@@ -397,9 +398,9 @@ export class SSR extends AbstractPostEffect {
         this.invViewMatrix = pb.mat4().uniform(0);
         this.invProjMatrix = pb.mat4().uniform(0);
         this.ssrMaxRoughness = pb.float().uniform(0);
-        if (ctx.env.light.envLight) {
+        if (ctx.env!.light.envLight) {
           this.envLightStrength = pb.float().uniform(0);
-          ctx.env.light.envLight.initShaderBindings(pb);
+          ctx.env!.light.envLight.initShaderBindings(pb);
         }
         this.$outputs.outColor = pb.vec4();
         pb.func('getPosition', [pb.vec2('uv'), pb.mat4('mat')], function () {
@@ -430,7 +431,7 @@ export class SSR extends AbstractPostEffect {
           }
         );
         pb.func('resolveEnvRadiance', [pb.vec2('uv'), pb.vec4('roughnessInfo')], function () {
-          if (!ctx.env.light.envLight) {
+          if (!ctx.env!.light.envLight) {
             this.$return(pb.vec3(0));
             return;
           }
@@ -453,7 +454,7 @@ export class SSR extends AbstractPostEffect {
           this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
           this.$l.roughness2 = pb.float(0);
           this.$l.env = pb.mul(
-            ctx.env.light.envLight.getRadiance(this, this.reflectVecW, this.roughness2),
+            ctx.env!.light.envLight.getRadiance(this, this.reflectVecW, this.roughness2)!,
             this.envLightStrength
           );
           this.$return(pb.min(this.env, pb.vec3(1)));
@@ -523,7 +524,7 @@ export class SSR extends AbstractPostEffect {
           this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
         });
       }
-    });
+    })!;
     program.name = '@SSR_Resolve';
     return program;
   }
@@ -534,8 +535,8 @@ export class SSR extends AbstractPostEffect {
         this.flip = pb.int().uniform(0);
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
-        if (!blur && ctx.env.light.envLight) {
-          ctx.env.light.envLight.initShaderBindings(pb);
+        if (!blur && ctx.env!.light.envLight) {
+          ctx.env!.light.envLight.initShaderBindings(pb);
         }
         pb.main(function () {
           this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
@@ -548,9 +549,9 @@ export class SSR extends AbstractPostEffect {
       fragment(pb) {
         if (!blur) {
           this.colorTex = pb.tex2D().uniform(0);
-          if (ctx.env.light.envLight) {
+          if (ctx.env!.light.envLight) {
             this.envLightStrength = pb.float().uniform(0);
-            ctx.env.light.envLight.initShaderBindings(pb);
+            ctx.env!.light.envLight.initShaderBindings(pb);
           }
         }
         this.roughnessTex = pb.tex2D().uniform(0);
@@ -671,10 +672,10 @@ export class SSR extends AbstractPostEffect {
               this.a = this.hitInfo.w;
               this.color = pb.vec3(this.hitInfo.xy, pb.clamp(pb.div(this.blurRadius, 255), 0, 1));
             } else {
-              if (ctx.env.light.envLight) {
+              if (ctx.env!.light.envLight) {
                 this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
                 this.$l.env = pb.mul(
-                  ctx.env.light.envLight.getRadiance(this, this.reflectVecW, this.roughness),
+                  ctx.env!.light.envLight.getRadiance(this, this.reflectVecW, this.roughness)!,
                   this.envLightStrength
                 );
               } else {
@@ -700,7 +701,7 @@ export class SSR extends AbstractPostEffect {
           });
         });
       }
-    });
+    })!;
     program.name = blur ? '@SSR_Intersect_Blur' : '@SSR_Intersect';
     return program;
   }

@@ -3,14 +3,15 @@ import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { fetchSampler } from '../utility/misc';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Grayscale post effect
  * @public
  */
 export class Grayscale extends AbstractPostEffect {
-  private static _program: GPUProgram = null;
-  private static _bindgroup: BindGroup = null;
+  private static _program: Nullable<GPUProgram> = null;
+  private static _bindgroup: Nullable<BindGroup> = null;
   /**
    * Creates an instance of grayscale post effect
    */
@@ -30,11 +31,11 @@ export class Grayscale extends AbstractPostEffect {
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
     this._prepare(device);
-    Grayscale._bindgroup.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
-    Grayscale._bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    Grayscale._bindgroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    Grayscale._bindgroup!.setTexture('srcTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
+    Grayscale._bindgroup!.setValue('flip', this.needFlip(device) ? 1 : 0);
+    Grayscale._bindgroup!.setValue('srgbOut', srgbOutput ? 1 : 0);
     device.setProgram(Grayscale._program);
-    device.setBindGroup(0, Grayscale._bindgroup);
+    device.setBindGroup(0, Grayscale._bindgroup!);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -67,7 +68,7 @@ export class Grayscale extends AbstractPostEffect {
             });
           });
         }
-      });
+      })!;
       Grayscale._program.name = '@Grayscale';
       Grayscale._bindgroup = device.createBindGroup(Grayscale._program.bindGroupLayouts[0]);
     }

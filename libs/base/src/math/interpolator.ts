@@ -50,7 +50,7 @@ export class Interpolator {
   /** @internal */
   private _mode: InterpolationMode;
   /** @internal */
-  private _target: InterpolationTarget;
+  private _target: Nullable<InterpolationTarget>;
   /** @internal */
   private _stride: number;
   /** @internal */
@@ -78,7 +78,7 @@ export class Interpolator {
    */
   constructor(
     mode: InterpolationMode,
-    target: InterpolationTarget,
+    target: Nullable<InterpolationTarget>,
     inputs: InterpolateData,
     outputs: InterpolateData
   ) {
@@ -88,7 +88,7 @@ export class Interpolator {
     this._outputs = outputs;
     this._mode = mode;
     this._target = target;
-    this._stride = strideMap[target] ?? Math.floor(outputs.length / inputs.length);
+    this._stride = target ? strideMap[target] : Math.floor(outputs.length / inputs.length);
     this._maxTime = inputs[inputs.length - 1];
     this._a = null;
     this._h = null;
@@ -100,17 +100,21 @@ export class Interpolator {
   set mode(val: InterpolationMode) {
     if (val !== this._mode) {
       this._mode = val;
-      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+      this._stride = this._target
+        ? strideMap[this._target]
+        : Math.floor(this._outputs.length / this._inputs.length);
     }
   }
   /** Gets the interpolation target */
-  get target(): InterpolationTarget {
+  get target() {
     return this._target;
   }
-  set target(val: InterpolationTarget) {
+  set target(val) {
     if (val !== this._target) {
       this._target = val;
-      this._stride = strideMap[this._target] ?? Math.floor(this._outputs.length / this._inputs.length);
+      this._stride = this._target
+        ? strideMap[this._target]
+        : Math.floor(this._outputs.length / this._inputs.length);
     }
   }
   /** stride */

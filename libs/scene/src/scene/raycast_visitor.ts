@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Ray, Vector3 } from '@zephyr3d/base';
 import { OctreeNode } from './octree';
 import type { Mesh } from './mesh';
@@ -15,7 +16,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private readonly _rayLocal: Ray;
   /** @internal */
-  private _intersected: PickTarget;
+  private _intersected: Nullable<PickTarget>;
   /** @internal */
   private _intersectedDist: number;
   /** @internal */
@@ -27,7 +28,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
     this._intersectedDist = length;
     this._intersectedPoint = new Vector3();
   }
-  get intersected(): PickTarget {
+  get intersected() {
     return this._intersected;
   }
   get intersectedDist(): number {
@@ -49,10 +50,10 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   visitWater(node: Water) {
     if (!node.hidden && node.pickable) {
-      const bv = node.getWorldBoundingVolume().toAABB();
+      const bv = node.getWorldBoundingVolume()!.toAABB();
       const d = this._ray.bboxIntersectionTestEx(bv);
       if (this.updateVisitResult(d, node)) {
-        this._intersectedDist = d;
+        this._intersectedDist = d!;
         this._intersected = node.getPickTarget();
         return true;
       }
@@ -62,7 +63,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   visitMesh(node: Mesh) {
     if (!node.hidden && node.pickable) {
       this._ray.transform(node.invWorldMatrix, this._rayLocal);
-      const d = node.primitive.raycast(this._rayLocal);
+      const d = node.primitive!.raycast(this._rayLocal);
       if (this.updateVisitResult(d, node)) {
         this._intersected = node.getPickTarget();
         return true;
@@ -80,7 +81,7 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
     }
     return false;
   }
-  private updateVisitResult(d: number, node: SceneNode) {
+  private updateVisitResult(d: Nullable<number>, node: SceneNode) {
     if (d !== null) {
       Vector3.combine(this._rayLocal.origin, this._rayLocal.direction, 1, d, tmpV3);
       node.worldMatrix.transformPointAffine(tmpV3, tmpV3);
